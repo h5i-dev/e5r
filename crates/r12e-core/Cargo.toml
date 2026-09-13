@@ -1,0 +1,12 @@
+[package]
+name = "r12e-core"
+description = "r12e — addresses, memory maps, provenance, and the hostile-input reader."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde = { workspace = true }

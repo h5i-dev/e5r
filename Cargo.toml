@@ -1,0 +1,45 @@
+# r12e — a CLI reverse engineering toolkit.
+#
+# The library owns every fact; the CLI and the MCP server are thin clients.
+# Crate boundaries and the dependency direction are documented in ROADMAP.md
+# under "Architecture": edges run downward only, and r12e-core depends on
+# nothing else in the workspace.
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+repository = "https://github.com/h5i-dev/r12e"
+authors = ["r12e contributors"]
+
+[workspace.dependencies]
+r12e-core = { path = "crates/r12e-core", version = "0.1.0" }
+r12e-format = { path = "crates/r12e-format", version = "0.1.0" }
+r12e-arch = { path = "crates/r12e-arch", version = "0.1.0" }
+r12e-analysis = { path = "crates/r12e-analysis", version = "0.1.0" }
+r12e-db = { path = "crates/r12e-db", version = "0.1.0" }
+r12e-api = { path = "crates/r12e-api", version = "0.1.0" }
+
+# Kept deliberately short. Loaders and decoders are written here rather than
+# pulled in, because provenance tagging and hostile-input behaviour are the
+# product, not an implementation detail we can delegate.
+memmap2 = "0.9"
+rayon = "1.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# A dev-profile build lands in target/debug, which this checkout forbids
+# (see CLAUDE.md). Release is the only profile used here.
+[profile.release]
+opt-level = 3
+# Off on purpose: this machine has 7.5 GB of RAM and debug info in a workspace
+# this size makes linking the peak-memory step. Profile with a temporary
+# override when a flamegraph is actually needed.
+debug = false
+lto = "thin"
+codegen-units = 16
+panic = "unwind"
