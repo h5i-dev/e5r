@@ -9,11 +9,12 @@
 
 pub mod cfg;
 pub mod jumptable;
+pub mod noreturn;
 pub mod program;
 pub mod strings;
 pub mod xref;
 
-pub use cfg::{Block, Cfg, Halt};
+pub use cfg::{Block, Cfg, Halt, Terminator};
 pub use jumptable::{JumpTable, TableKind};
 pub use program::{Function, Options, Program, Stats, analyze};
 pub use strings::Found;

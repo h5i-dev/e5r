@@ -13,6 +13,7 @@ use r12e_format::Object;
 use rayon::prelude::*;
 
 use crate::cfg::{self, Cfg, Halt};
+use crate::noreturn;
 use crate::strings::{self, Found};
 use crate::xref::{self, Xref, XrefIndex};
 
@@ -70,6 +71,9 @@ pub struct Options {
     pub string_opts: strings::Options,
     /// Build the cross reference index.
     pub xrefs: bool,
+    /// Work out which functions never return and re-walk the callers that
+    /// assumed they did.
+    pub noreturn: bool,
     /// Threads to use. `None` means rayon's default.
     pub threads: Option<usize>,
 }
@@ -83,6 +87,7 @@ impl Default for Options {
             strings: true,
             string_opts: strings::Options::default(),
             xrefs: true,
+            noreturn: true,
             threads: None,
         }
     }
@@ -100,6 +105,8 @@ pub struct Program {
     pub strings: Vec<Found>,
     /// Rounds of discovery it took, for reporting.
     pub rounds: usize,
+    /// Functions found never to return.
+    pub noreturn: BTreeSet<Addr>,
 }
 
 impl Program {
@@ -334,6 +341,44 @@ fn finish(
         }
     }
 
+    // Which functions never return, and a re-walk of the callers that assumed
+    // they did. One pass: the set is computed from complete functions, and a
+    // re-walk only ever shortens a function, so a second pass finds nothing
+    // the first did not.
+    let noreturn = if opts.noreturn {
+        let named: BTreeMap<Addr, Option<String>> =
+            known.iter().map(|(a, f)| (*a, f.name.clone())).collect();
+        let graph: BTreeMap<Addr, &Cfg> = known.iter().map(|(a, f)| (*a, &f.cfg)).collect();
+        let set = noreturn::compute(&named, &graph);
+        let affected: Vec<Addr> = known
+            .iter()
+            .filter(|(a, f)| !set.contains(a) && f.cfg.calls.iter().any(|c| set.contains(c)))
+            .map(|(a, _)| *a)
+            .collect();
+        let stop_at: BTreeSet<Addr> = known.keys().copied().collect();
+        let rebuilt: Vec<(Addr, Cfg)> = affected
+            .par_iter()
+            .map(|a| {
+                (
+                    *a,
+                    cfg::build_with(mem, &arch, *a, &stop_at, &set, &opts.caps),
+                )
+            })
+            .collect();
+        for (a, c) in rebuilt {
+            if c.blocks.is_empty() {
+                continue;
+            }
+            if let Some(f) = known.get_mut(&a) {
+                f.range = c.hull();
+                f.cfg = c;
+            }
+        }
+        set
+    } else {
+        BTreeSet::new()
+    };
+
     let xrefs = if opts.xrefs {
         let mut all: Vec<Vec<Xref>> = known
             .values()
@@ -366,6 +411,7 @@ fn finish(
         xrefs,
         strings,
         rounds,
+        noreturn,
     }
 }
 
@@ -535,6 +581,8 @@ pub struct Stats {
     pub strings: usize,
     /// Functions that hit a resource cap.
     pub capped: usize,
+    /// Functions found never to return.
+    pub noreturn: usize,
     /// Jump tables resolved.
     pub tables: usize,
     /// Targets those tables contributed.
@@ -558,6 +606,7 @@ impl Program {
                 .values()
                 .filter(|f| matches!(f.cfg.halt, Halt::InstructionCap | Halt::BlockCap))
                 .count(),
+            noreturn: self.noreturn.len(),
             tables: self.functions.values().map(|f| f.cfg.tables.len()).sum(),
             table_targets: self
                 .functions

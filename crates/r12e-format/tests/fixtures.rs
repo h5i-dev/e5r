@@ -280,3 +280,60 @@ fn single_byte_corruption_never_panics() {
         buf[i] = old;
     }
 }
+
+#[test]
+fn plt_thunks_are_named_where_objdump_names_them() {
+    // objdump prints `<name@plt>` at each PLT entry, which is the oracle for
+    // whether the layout arithmetic is right. An off-by-one here names every
+    // indirect call after the wrong import.
+    for path in ["/bin/bash", "/usr/lib/aarch64-linux-gnu/libc.so.6"] {
+        let p = Path::new(path);
+        if !p.is_file() {
+            continue;
+        }
+        let data = std::fs::read(p).unwrap();
+        let Ok(obj) = load(&data, &LoadOptions::default()) else {
+            continue;
+        };
+        let Ok(out) = Command::new("objdump")
+            .args(["-d", "--section=.plt"])
+            .arg(p)
+            .output()
+        else {
+            continue;
+        };
+        let text = String::from_utf8_lossy(&out.stdout);
+        let mut checked = 0;
+        for line in text.lines() {
+            // "0000000000032b80 <mbrtowc@plt>:"
+            let Some((addr, rest)) = line.split_once(" <") else {
+                continue;
+            };
+            let Some(name) = rest.strip_suffix(">:") else {
+                continue;
+            };
+            if !name.ends_with("@plt") {
+                continue;
+            }
+            // objdump synthesizes `*ABS*+0x...@plt` for an IFUNC entry whose
+            // relocation names no symbol. That is its own invention, not a
+            // name in the file, so there is nothing to match.
+            if name.starts_with('*') {
+                continue;
+            }
+            let Ok(addr) = u64::from_str_radix(addr.trim(), 16) else {
+                continue;
+            };
+            let ours = obj
+                .function_hints
+                .iter()
+                .find(|h| h.addr == Addr(addr) && h.name.as_deref() == Some(name));
+            assert!(
+                ours.is_some(),
+                "{path}: objdump names {name} at {addr:#x}, we do not"
+            );
+            checked += 1;
+        }
+        assert!(checked > 10, "{path}: only {checked} PLT entries compared");
+    }
+}

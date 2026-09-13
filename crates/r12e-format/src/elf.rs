@@ -38,7 +38,6 @@ const PT_GNU_STACK: u32 = 0x6474_e551;
 const PT_GNU_RELRO: u32 = 0x6474_e552;
 
 // sh_type
-const SHT_PROGBITS: u32 = 1;
 const SHT_SYMTAB: u32 = 2;
 const SHT_STRTAB: u32 = 3;
 const SHT_RELA: u32 = 4;
@@ -84,6 +83,10 @@ struct SecHdr {
     offset: u64,
     size: u64,
     link: u32,
+    /// The section these entries apply to. Read for the record rather than
+    /// used: identifying the PLT relocation table through it does not work,
+    /// because it names `.got.plt` rather than `.plt`.
+    #[allow(dead_code)]
     info: u32,
     addralign: u64,
     entsize: u64,
@@ -241,11 +244,11 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
         .insert("elf.machine".into(), format!("{e_machine}"));
     obj.metadata.insert("elf.class".into(), bits.to_string());
 
-    read_symbols(&r, &shdrs, &mut obj, caps)?;
+    let dynsym_names = read_symbols(&r, &shdrs, &mut obj, caps)?;
     read_dynamic(&r, &phdrs, &shdrs, &mut obj, caps);
     read_notes(&r, &phdrs, &shdrs, &mut obj);
     read_init_arrays(&r, &shdrs, wide, &mut obj, caps);
-    read_plt_relocations(&r, &shdrs, wide, &mut obj, caps);
+    read_plt_relocations(&r, &shdrs, wide, &dynsym_names, &mut obj, caps);
 
     if opts.eh_frame {
         read_eh_frame(&r, &phdrs, &mut obj);
@@ -588,7 +591,11 @@ fn read_symbols(
     shdrs: &[SecHdr],
     obj: &mut Object,
     caps: &r12e_core::Caps,
-) -> Result<()> {
+) -> Result<Vec<String>> {
+    // Dynamic symbol names by their index in the table, including the entries
+    // that are skipped as symbols. A relocation names a symbol by that index,
+    // so a vector that drops entries would name the wrong one.
+    let mut dynsym_names: Vec<String> = Vec::new();
     let wide = obj.bits == Bits::Bits64;
     let entsize = if wide { 24 } else { 16 };
 
@@ -619,6 +626,9 @@ fn read_symbols(
         let count = sh.size / step;
         caps.check("symbols", count, caps.symbols)?;
 
+        if dynamic {
+            dynsym_names.resize(count as usize, String::new());
+        }
         for i in 0..count {
             let Ok(mut s) = r.slice_at("symbol", sh.offset + i * step, entsize) else {
                 break;
@@ -645,6 +655,11 @@ fn read_symbols(
                 .cstr_at("symbol name", name_off as u64, caps.string_len)
                 .map(|b| String::from_utf8_lossy(b).into_owned())
                 .unwrap_or_default();
+            if dynamic {
+                if let Some(slot) = dynsym_names.get_mut(i as usize) {
+                    slot.clone_from(&name);
+                }
+            }
             if name.is_empty() && info >> 4 == 0 {
                 continue;
             }
@@ -721,7 +736,7 @@ fn read_symbols(
             });
         }
     }
-    Ok(())
+    Ok(dynsym_names)
 }
 
 /// Read `.dynamic` for needed libraries, soname, and init/fini.
@@ -871,81 +886,95 @@ fn read_plt_relocations(
     r: &Reader<'_>,
     shdrs: &[SecHdr],
     wide: bool,
+    dynsym_names: &[String],
     obj: &mut Object,
     caps: &r12e_core::Caps,
 ) {
     let Some(plt) = obj.section(".plt").cloned() else {
         return;
     };
-    let dynsym: Vec<&Symbol> = obj.symbols.iter().filter(|s| s.dynamic).collect();
-    if dynsym.is_empty() {
+    if dynsym_names.is_empty() || plt.range.is_empty() {
         return;
     }
 
-    for sh in shdrs
-        .iter()
-        .filter(|s| s.kind == SHT_RELA || s.kind == SHT_REL)
-    {
-        let is_rela = sh.kind == SHT_RELA;
-        let step = match (wide, is_rela) {
-            (true, true) => 24,
-            (true, false) => 16,
-            (false, true) => 12,
-            (false, false) => 8,
+    // The PLT relocation table is the one named `.rela.plt` or `.rel.plt`.
+    // Finding it through `sh_info` does not work: that field names the section
+    // the relocations apply to, which is `.got.plt`, not the PLT.
+    let Some((sh, _)) = shdrs.iter().zip(&obj.sections).find(|(sh, sec)| {
+        (sh.kind == SHT_RELA || sh.kind == SHT_REL)
+            && (sec.name == ".rela.plt" || sec.name == ".rel.plt")
+    }) else {
+        return;
+    };
+
+    let is_rela = sh.kind == SHT_RELA;
+    let step = match (wide, is_rela) {
+        (true, true) => 24,
+        (true, false) => 16,
+        (false, true) => 12,
+        (false, false) => 8,
+    };
+    let count = sh.size / step;
+    if count == 0 || caps.check("relocations", count, caps.relocations).is_err() {
+        return;
+    }
+    // The PLT's layout is fixed per architecture: a resolver stub of one size
+    // followed by entries of another. Dividing the section's length by the
+    // relocation count instead gives the wrong answer whenever the section
+    // also holds IFUNC entries, which it usually does.
+    let (header, entry_size) = plt_layout(&obj.arch);
+    if plt.range.len() < header + count * entry_size {
+        obj.warnings.push(format!(
+            ".plt is {:#x} bytes, too small for {count} entries of {entry_size:#x} \
+             after a {header:#x}-byte header; thunks not named",
+            plt.range.len()
+        ));
+        return;
+    }
+
+    for i in 0..count {
+        let Ok(mut e) = r.slice_at("relocation", sh.offset + i * step, step) else {
+            break;
         };
-        let count = sh.size / step;
-        if caps.check("relocations", count, caps.relocations).is_err() {
-            continue;
+        if e.uword("r_offset", wide).is_err() {
+            break;
         }
-        // Only the PLT relocation table is in slot order.
-        let names_plt = shdrs.get(sh.info as usize).is_some_and(|t| {
-            t.addr == plt.range.start().get()
-                || t.addr != 0 && t.kind == SHT_PROGBITS && t.flags & SHF_EXECINSTR != 0
-        });
-        if !names_plt {
-            continue;
-        }
-        let entry_size = if !plt.range.is_empty() && count > 0 {
-            (plt.range.len() / (count + 1)).max(1)
+        let sym_index = if wide {
+            let Ok(info) = e.u64("r_info") else { break };
+            (info >> 32) as usize
         } else {
-            16
+            let Ok(info) = e.u32("r_info") else { break };
+            (info >> 8) as usize
         };
-        for i in 0..count {
-            let Ok(mut e) = r.slice_at("relocation", sh.offset + i * step, step) else {
-                break;
-            };
-            let Ok(_offset) = e.uword("r_offset", wide) else {
-                break;
-            };
-            let sym_index = if wide {
-                let Ok(info) = e.u64("r_info") else { break };
-                (info >> 32) as usize
-            } else {
-                let Ok(info) = e.u32("r_info") else { break };
-                (info >> 8) as usize
-            };
-            // Dynamic symbols are indexed in table order, which is the order
-            // they were pushed.
-            let Some(sym) = dynsym.get(sym_index) else {
-                continue;
-            };
-            let thunk = plt
-                .range
-                .start()
-                .checked_add((i + 1) * entry_size)
-                .filter(|a| plt.range.contains(*a));
-            if let Some(imp) = obj.imports.iter_mut().find(|im| im.name == sym.name) {
-                imp.thunk = thunk;
-            }
-            if let Some(t) = thunk {
-                obj.function_hints.push(FunctionHint {
-                    addr: t,
-                    size: Some(entry_size),
-                    name: Some(format!("{}@plt", sym.name)),
-                    provenance: Provenance::new(Evidence::ImportThunk),
-                });
-            }
+        let Some(name) = dynsym_names.get(sym_index).filter(|n| !n.is_empty()) else {
+            continue;
+        };
+        let thunk = plt
+            .range
+            .start()
+            .checked_add(header + i * entry_size)
+            .filter(|a| plt.range.contains(*a));
+        if let Some(imp) = obj.imports.iter_mut().find(|im| im.name == *name) {
+            imp.thunk = thunk;
         }
+        if let Some(t) = thunk {
+            obj.function_hints.push(FunctionHint {
+                addr: t,
+                size: Some(entry_size),
+                name: Some(format!("{name}@plt")),
+                provenance: Provenance::new(Evidence::ImportThunk),
+            });
+        }
+    }
+}
+
+/// The size of a PLT's resolver stub and of each entry after it.
+fn plt_layout(arch: &Arch) -> (u64, u64) {
+    match arch {
+        Arch::AArch64 => (32, 16),
+        Arch::X86_64 | Arch::X86 => (16, 16),
+        Arch::Arm => (20, 12),
+        _ => (16, 16),
     }
 }
 

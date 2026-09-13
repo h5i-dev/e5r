@@ -12,6 +12,24 @@ use r12e_core::{Addr, AddrRange, Arch, Caps, MemoryMap};
 
 use crate::jumptable::{self, JumpTable};
 
+/// Why a block ended, which is what tells a returning function from one that
+/// never comes back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Terminator {
+    /// A branch, conditional or not, or a fall-through into another block.
+    Flow,
+    /// A return to the caller.
+    Return,
+    /// A tail call: the callee returns on this function's behalf.
+    TailCall,
+    /// A call to a function that never returns.
+    NoReturnCall,
+    /// A breakpoint or an undefined instruction.
+    Trap,
+    /// An indirect branch nothing resolved, or bytes that did not decode.
+    Unresolved,
+}
+
 /// One straight-line run of instructions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
@@ -23,6 +41,8 @@ pub struct Block {
     pub insns: u32,
     /// True when the block ends somewhere analysis could not follow.
     pub unresolved: bool,
+    /// Why it ended.
+    pub terminator: Terminator,
 }
 
 /// Why a walk stopped before it ran out of work.
@@ -100,6 +120,21 @@ pub fn build(
     stop_at: &BTreeSet<Addr>,
     caps: &Caps,
 ) -> Cfg {
+    build_with(mem, arch, entry, stop_at, &BTreeSet::new(), caps)
+}
+
+/// As [`build`], told which functions never return.
+///
+/// A call to one of those ends the block: continuing past it walks into
+/// whatever the compiler put next, which is usually a literal pool.
+pub fn build_with(
+    mem: &MemoryMap,
+    arch: &Arch,
+    entry: Addr,
+    stop_at: &BTreeSet<Addr>,
+    noreturn: &BTreeSet<Addr>,
+    caps: &Caps,
+) -> Cfg {
     // The executable range the entry sits in bounds every jump table target:
     // a switch does not branch into another section.
     let section = mem
@@ -110,7 +145,7 @@ pub fn build(
     let mut work: Vec<Addr> = vec![entry];
     let mut seen: BTreeSet<Addr> = BTreeSet::new();
     let mut calls: BTreeSet<Addr> = BTreeSet::new();
-    let mut ends: BTreeMap<Addr, (Addr, Vec<Addr>, u32, bool)> = BTreeMap::new();
+    let mut ends: BTreeMap<Addr, (Addr, Vec<Addr>, u32, bool, Terminator)> = BTreeMap::new();
     let mut has_indirect = false;
     let mut insn_budget = caps.function_insns;
     let mut halt = Halt::Complete;
@@ -136,9 +171,11 @@ pub fn build(
         let mut end = start;
         // Kept so an indirect branch can be resolved against what led to it.
         let mut body: Vec<Insn> = Vec::new();
+        let mut term = Terminator::Flow;
         let (succs, unresolved) = loop {
             if insn_budget == 0 {
                 halt = Halt::InstructionCap;
+                term = Terminator::Unresolved;
                 break (Vec::new(), true);
             }
             // A branch into the middle of this run means the run ends here and
@@ -148,10 +185,12 @@ pub fn build(
             }
             let Some(window) = mem.decode_window(at, arch.max_insn_len()) else {
                 halt = Halt::Undecodable;
+                term = Terminator::Unresolved;
                 break (Vec::new(), true);
             };
             let Some(insn) = r12e_arch::decode(arch, window, at) else {
                 halt = Halt::Undecodable;
+                term = Terminator::Unresolved;
                 break (Vec::new(), true);
             };
             insn_budget -= 1;
@@ -167,6 +206,10 @@ pub fn build(
                 }
                 Flow::Call(t) => {
                     calls.insert(t);
+                    if noreturn.contains(&t) {
+                        term = Terminator::NoReturnCall;
+                        break (Vec::new(), false);
+                    }
                     at = next;
                     continue;
                 }
@@ -174,7 +217,14 @@ pub fn build(
                     at = next;
                     continue;
                 }
-                Flow::Return | Flow::Trap => break (Vec::new(), false),
+                Flow::Return => {
+                    term = Terminator::Return;
+                    break (Vec::new(), false);
+                }
+                Flow::Trap => {
+                    term = Terminator::Trap;
+                    break (Vec::new(), false);
+                }
                 Flow::IndirectBranch => {
                     // A switch: read the table rather than giving up.
                     let context = with_predecessors(&bodies, &ends, start, &body);
@@ -186,6 +236,7 @@ pub fn build(
                         }
                         None => {
                             has_indirect = true;
+                            term = Terminator::Unresolved;
                             break (Vec::new(), true);
                         }
                     }
@@ -194,6 +245,11 @@ pub fn build(
                     // A branch to another function's entry is a tail call.
                     if stop_at.contains(&t) && t != entry {
                         calls.insert(t);
+                        term = if noreturn.contains(&t) {
+                            Terminator::NoReturnCall
+                        } else {
+                            Terminator::TailCall
+                        };
                         break (Vec::new(), false);
                     }
                     break (vec![t], false);
@@ -211,7 +267,7 @@ pub fn build(
         let mut s = succs.clone();
         s.sort_unstable();
         s.dedup();
-        ends.insert(start, (end, s.clone(), count, unresolved));
+        ends.insert(start, (end, s.clone(), count, unresolved, term));
         bodies.insert(start, body);
 
         for t in s {
@@ -224,7 +280,7 @@ pub fn build(
     // Split blocks whose range covers another block's start. A conditional
     // branch backwards into a run already walked is the usual cause.
     let mut blocks: BTreeMap<Addr, Block> = BTreeMap::new();
-    for (start, (end, succs, insns, unresolved)) in &ends {
+    for (start, (end, succs, insns, unresolved, term)) in &ends {
         // An empty block has nothing to cut, and an excluded range whose
         // bounds are equal is a panic rather than an empty iterator.
         let cut = if *end > *start {
@@ -238,9 +294,9 @@ pub fn build(
         } else {
             None
         };
-        let (real_end, real_succs, real_unresolved) = match cut {
-            Some(c) => (c, vec![c], false),
-            None => (*end, succs.clone(), *unresolved),
+        let (real_end, real_succs, real_unresolved, real_term) = match cut {
+            Some(c) => (c, vec![c], false, Terminator::Flow),
+            None => (*end, succs.clone(), *unresolved, *term),
         };
         let Some(range) = AddrRange::new(*start, real_end) else {
             continue;
@@ -255,6 +311,7 @@ pub fn build(
                 successors: real_succs,
                 insns: if cut.is_some() { 0 } else { *insns },
                 unresolved: real_unresolved,
+                terminator: real_term,
             },
         );
     }
@@ -283,7 +340,7 @@ pub fn build(
 /// comparisons that could size a table wrongly.
 fn with_predecessors(
     bodies: &BTreeMap<Addr, Vec<Insn>>,
-    ends: &BTreeMap<Addr, (Addr, Vec<Addr>, u32, bool)>,
+    ends: &BTreeMap<Addr, (Addr, Vec<Addr>, u32, bool, Terminator)>,
     block: Addr,
     body: &[Insn],
 ) -> Vec<Insn> {
@@ -292,7 +349,7 @@ fn with_predecessors(
     for _ in 0..3 {
         let mut next = Vec::new();
         for target in &frontier {
-            for (start, (_, succs, _, _)) in ends {
+            for (start, (_, succs, _, _, _)) in ends {
                 if succs.contains(target) && !chain.contains(start) && *start != block {
                     chain.push(*start);
                     next.push(*start);

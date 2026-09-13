@@ -21,9 +21,10 @@ rather than argued about again.
 | CLI with JSON on every command | built (M8) |
 | MCP server, diff, patch, signatures | not started (M9, M10) |
 
-Measured on a 10-core aarch64 machine: `libc.so.6` (1.7 MB) analyzes in 0.08s
-and 33 MB, finding 3,534 functions and 436,040 instructions; `objdump -d` on the
-same file takes 0.31s and only disassembles. 95 tests, clippy clean.
+Measured on a 10-core aarch64 machine: `libc.so.6` (1.7 MB) analyzes in around
+a tenth of a second, finding 3,524 functions, 80.3% of them complete;
+`objdump -d` on the same file takes 0.31s and only disassembles. 150 tests,
+clippy clean.
 
 r12e is a reverse engineering toolkit with a command line as its only front end.
 It loads a binary, recovers functions, disassembles, lifts to an IR, decompiles
@@ -192,9 +193,9 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       prologue scanning as the last resort. Each layer tags its provenance.
 - [x] Recursive descent with a linear sweep fallback over the gaps, with the two
       reconciled rather than concatenated.
-- [x] Basic blocks, CFG, tail-call detection. No-return propagation through the
-      call graph is still to do (a call to `abort` ends a block, and the
-      fixpoint matters).
+- [x] Basic blocks, CFG, tail-call detection, and no-return propagation
+      through the call graph. Each block records why it ended, which is what
+      distinguishes a function that returns from one that only ever traps.
 - [x] Jump table recovery for the absolute, base-relative and entry-relative
       forms, on both architectures. The bound comes from the compare that
       guards the switch, matched to the register the table is indexed by; a

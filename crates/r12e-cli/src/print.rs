@@ -230,6 +230,7 @@ pub fn stats(w: &mut Out, p: &Program, as_json: bool) -> R {
         pct(s.complete, s.functions)
     );
     outln!(w, "  capped    {}", s.capped);
+    outln!(w, "  noreturn  {}", s.noreturn);
     outln!(w, "blocks      {}", s.blocks);
     outln!(
         w,
