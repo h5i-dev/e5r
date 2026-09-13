@@ -238,3 +238,46 @@ threads, twice each. All 105 runs produce identical output. Green.
   the Mach-O tests use cross-compiled objects and a synthesized fat header.
 - Anything on a real PE image, because there is no Windows linker here; the PE
   tests use a synthesized image and real COFF objects.
+
+## DecBench
+
+The sections above are ours: we chose the fixtures and we grade our own work.
+[DecBench](https://decbench.com) is a third-party benchmark that does not.
+Full method, caveats and the defect analysis are in
+[`docs/decbench.md`](decbench.md); this is the headline.
+
+Measured 2026-09-13 against DecBench `5818d67`. zlib 1.2.13 from its
+`projects/sailr` corpus, built by its own pipeline at O0 with DWARF, stripped
+before the decompiler sees it: 779 functions across 7 binaries, aarch64.
+Percent of functions perfect on each metric, higher better.
+
+| | Union | Structure (GED) | Types | Recompile |
+| --- | --- | --- | --- | --- |
+| angr 9.3.4 | 37.0 | 34.6 | 10.2 | 0.66 |
+| r12e 0.1.0 | 23.4 | 22.9 | 5.6 | 0.64 |
+
+Behind on structure, behind on types, level on recompilation, which is the axis
+the roadmap bet was open. Not scored by DecBench but measured in the same run:
+r12e returned C for 780 of 780 requested functions in 21s against angr's 760
+and 278s, and 96.1% of its functions recompiled after DecBench's fixup pass
+against angr's 88.5%.
+
+The comparison stops at angr. Ghidra 12.1.3 is installed here but ships its
+decompiler as an x86-64 binary only, so it cannot decompile on this arm64
+machine at all; IDA and Binary Ninja are not installed. DecBench's published
+leaderboard is x86-64 and is not comparable to this run: angr scores 45.7 union
+there against 37.0 here, so the slice, not r12e, accounts for the difference.
+r12e reaches 63% of angr's union on the binaries where both ran, and that ratio
+is the only honest cross-reference until the corpus is built for x86-64 or the
+250-function sample set is submitted.
+
+What costs the score, in order: goto density (1.98 per function against angr's
+0.57; functions r12e structures without a goto score 36.2% GED-perfect, above
+angr's whole-set 34.6%, and functions with three or more score 0.0%); locals
+reaching the metric with no name, offset or type, because `decompile --json`
+emits only a count of them, which makes 58% of the type ground truth
+unmatchable by construction; and PLT call sites emitted with no arguments and
+their result read from `__clobbered()`, in 295 of the 780 functions.
+
+Reproduce with `scripts/decbench.sh`. Not measured: any optimization level
+above O0, any other project, and any architecture but aarch64.

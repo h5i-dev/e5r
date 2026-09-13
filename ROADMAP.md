@@ -541,9 +541,15 @@ designed before it gets coded, and the design lives in
       five-byte file beginning with the ELF magic, where the class byte was
       read by indexing the slice instead of through the reader. A `cargo-fuzz`
       setup for longer runs is still to do.
-- [ ] Resource caps on every attacker-controlled count, with a documented policy.
-- [ ] `#![forbid(unsafe_code)]` where possible, and a written justification for
-      every exception.
+- [x] Resource caps on every attacker-controlled count, with a documented
+      policy in [`docs/design/limits.md`](../docs/design/limits.md): bound by
+      the file first, then by the cap, check the cursor advanced, and read
+      through the reader. Checked by the mutation fuzzer in the ordinary test
+      suite rather than by review.
+- [x] `#![forbid(unsafe_code)]` on every crate except `r12e-cli`, which is
+      `#![deny(unsafe_code)]` so one audited call can opt in. There is exactly
+      one exception, the memory map, and its justification is in
+      [`docs/design/limits.md`](../docs/design/limits.md).
 - [ ] A no-panic gate on the loader and decoder paths, checked by fuzzing rather
       than asserted in a README.
 - [ ] Static musl builds for Linux, plus macOS and Windows binaries.

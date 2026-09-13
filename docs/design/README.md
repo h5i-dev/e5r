@@ -12,6 +12,7 @@ does not do. They are not API references; the code is the API reference.
 | [recovery.md](recovery.md) | `r12e-analysis` | finding functions, and the difference between evidence and a scan |
 | [decompiling.md](decompiling.md) | `r12e-decomp` | IR to C, and why running the C is the only real gate |
 | [db.md](db.md) | `r12e-db` | the annotation store, and why it merges |
+| [limits.md](limits.md) | `r12e-core` | what to do with a count read from a file, and the one unsafe block |
 
 ## The rule they all share
 
