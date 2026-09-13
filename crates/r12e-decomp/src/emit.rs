@@ -29,6 +29,8 @@ pub struct Output {
     pub signature: String,
     /// How many parameters it declares, so a call to it passes that many.
     pub arity: usize,
+    /// Which of them are pointers.
+    pub pointer_parameters: Vec<bool>,
 }
 
 /// What the debug information said about a function, when it said anything.
@@ -55,6 +57,8 @@ pub struct Callee {
     pub name: String,
     /// How many parameters it declares.
     pub arity: usize,
+    /// Which of them are pointers, so a call passes something C will take.
+    pub pointer_parameters: Vec<bool>,
     /// False when it was declared to return nothing, so its result is not
     /// assigned to anything.
     pub returns_value: bool,
@@ -74,6 +78,11 @@ pub struct Param {
     pub pointer: bool,
     /// Its declared width in bytes, zero when unknown.
     pub size: u8,
+    /// Fields seen through it, when it is a pointer whose shape was
+    /// recovered rather than declared.
+    pub fields: Vec<(i64, u8)>,
+    /// The element size, when it walks an array of them.
+    pub stride: Option<u64>,
 }
 
 /// Decompile an SSA function to pseudo-C.
@@ -153,6 +162,12 @@ pub fn decompile_full(
                 }
                 if param.size > 0 {
                     rebuilder.sizes.insert(o, param.size);
+                }
+                if !param.fields.is_empty() {
+                    rebuilder.fields.insert(o, param.fields.clone());
+                    if let Some(stride) = param.stride {
+                        rebuilder.strides.insert(o, stride);
+                    }
                 }
                 // A parameter declared floating is floating even when nothing
                 // in the body does arithmetic on it: at O0 it is stored to the
@@ -269,6 +284,10 @@ pub fn decompile_full(
         _ => parameter_list(f, &rebuilder),
     };
     let arity = declared.len();
+    let pointer_parameters: Vec<bool> = match prototype {
+        Some(p) => p.parameters.iter().map(|param| param.pointer).collect(),
+        None => vec![false; arity],
+    };
     let declared_parameters = if declared.is_empty() {
         "void".to_string()
     } else {
@@ -307,6 +326,7 @@ pub fn decompile_full(
         text,
         signature,
         arity,
+        pointer_parameters,
         declarations,
         gotos: s.gotos,
         locals: rebuilder.locals.len(),
@@ -807,6 +827,21 @@ impl Emitter<'_> {
             let SsaKind::Op(o) = op.kind else { continue };
             match o {
                 Op::Store => {
+                    // A store to a known field says so, the same as a load.
+                    if let Some(field) = self
+                        .r
+                        .field_access(op.inputs.first(), op.size)
+                        .filter(|_| op.size > 0)
+                    {
+                        if let Some(value) = op
+                            .inputs
+                            .get(1)
+                            .map(|i| self.r.integer(self.r.operand(i), i))
+                        {
+                            let _ = writeln!(out, "{pad}{field} = {value};");
+                            continue;
+                        }
+                    }
                     let addr = op
                         .inputs
                         .first()
@@ -842,7 +877,7 @@ impl Emitter<'_> {
                             let name = callee
                                 .map(|c| c.name.clone())
                                 .unwrap_or_else(|| crate::expr::default_call_name(target));
-                            Expr::Call(name, self.arguments(at, index, callee.map(|c| c.arity)))
+                            Expr::Call(name, self.arguments(at, index, callee))
                         }
                         _ => self.r.expr(op),
                     };
@@ -921,13 +956,23 @@ impl Emitter<'_> {
     /// The value each one holds is whatever last wrote it before the call. A
     /// register nothing wrote is passed as zero rather than left out, because
     /// the count has to match what the callee declares.
-    fn arguments(&self, at: Addr, index: usize, arity: Option<usize>) -> Vec<Expr> {
-        let Some(n) = arity else { return Vec::new() };
+    fn arguments(&self, at: Addr, index: usize, callee: Option<&Callee>) -> Vec<Expr> {
+        let Some(callee) = callee else {
+            return Vec::new();
+        };
+        let n = callee.arity;
+        let pointers = &callee.pointer_parameters;
         let mut out = Vec::new();
-        for offset in self.r.abi.integer_arguments.iter().take(n) {
-            match self.value_before(at, index, *offset) {
-                Some(v) => out.push(self.r.operand(&Operand::Value(v))),
-                None => out.push(Expr::Const(0, 8)),
+        for (slot, offset) in self.r.abi.integer_arguments.iter().enumerate().take(n) {
+            let value = match self.value_before(at, index, *offset) {
+                Some(v) => self.r.operand(&Operand::Value(v)),
+                None => Expr::Const(0, 8),
+            };
+            // A parameter declared as a pointer needs the argument cast to it:
+            // the machine passes bits and C wants to be told what they are.
+            match pointers.get(slot) {
+                Some(true) => out.push(Expr::Cast("void *", Box::new(value))),
+                _ => out.push(value),
             }
         }
         // A callee with more parameters than there are argument registers

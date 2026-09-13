@@ -37,6 +37,10 @@ pub enum Expr {
     Binary(&'static str, Box<Expr>, Box<Expr>),
     /// A memory read.
     Deref(Box<Expr>, u8),
+    /// A field of a structure reached through a pointer.
+    Field(Box<Expr>, String),
+    /// A field of one element of an array of structures.
+    Element(Box<Expr>, Box<Expr>, String),
     /// A named operation C has no operator for.
     Named(&'static str, Vec<Expr>),
     /// A call to a function, named.
@@ -151,6 +155,16 @@ impl Expr {
                     f.write_str(")")?;
                 }
                 Ok(())
+            }
+            Expr::Field(base, name) => {
+                base.render(f, 12)?;
+                write!(f, "->{name}")
+            }
+            Expr::Element(base, index, name) => {
+                base.render(f, 12)?;
+                f.write_str("[")?;
+                index.render(f, 0)?;
+                write!(f, "].{name}")
             }
             Expr::Deref(a, size) => {
                 write!(f, "*({} *)", c_type(*size))?;
@@ -273,6 +287,22 @@ pub fn use_counts(f: &SsaFunction) -> BTreeMap<Value, usize> {
         }
     }
     out
+}
+
+/// How an address was built from an incoming pointer.
+struct Walk {
+    register: u64,
+    offset: i64,
+    index: Option<(Expr, u64)>,
+}
+
+/// What to call a field at an offset, since nothing named it.
+pub fn field_name(offset: i64) -> String {
+    if offset < 0 {
+        format!("field_m{:x}", -offset)
+    } else {
+        format!("field_{offset:x}")
+    }
 }
 
 /// The name a promoted stack slot gets, from its offset.
@@ -409,6 +439,11 @@ pub struct Rebuilder<'a> {
     /// The declared width of an incoming register's value, which is not the
     /// width of the register: a `float` arrives in a sixteen-byte one.
     pub sizes: BTreeMap<u64, u8>,
+    /// Fields seen through each incoming pointer, so an access at a known
+    /// offset reads as the field it is rather than as arithmetic.
+    pub fields: BTreeMap<u64, Vec<(i64, u8)>>,
+    /// The element size of each of those, when the pointer walks an array.
+    pub strides: BTreeMap<u64, u64>,
 }
 
 impl<'a> Rebuilder<'a> {
@@ -440,6 +475,8 @@ impl<'a> Rebuilder<'a> {
             names: BTreeMap::new(),
             pointers: BTreeSet::new(),
             sizes: BTreeMap::new(),
+            fields: BTreeMap::new(),
+            strides: BTreeMap::new(),
             floats: float_locations(f),
             abi: r12e_ir::abi::of(&f.arch),
             defs,
@@ -481,6 +518,109 @@ impl<'a> Rebuilder<'a> {
             return Expr::Cast("uint64_t", Box::new(e));
         }
         e
+    }
+
+    /// The field an address names, when it is a known offset from a pointer
+    /// whose shape was recovered.
+    ///
+    /// Only a constant offset from the pointer itself: anything with an index
+    /// in it is walking an array, and calling that a field would be wrong.
+    pub fn field_access(&self, address: Option<&Operand>, size: u8) -> Option<Expr> {
+        let walk = self.pointer_offset(address?, 0)?;
+        let shape = self.fields.get(&walk.register)?;
+        let (at, width) = shape.iter().find(|(at, _)| *at == walk.offset)?;
+        if *width != size {
+            return None;
+        }
+        let name = self.names.get(&walk.register).cloned()?;
+        let base = Expr::Input(
+            Location {
+                space: r12e_ir::op::Space::Register,
+                offset: walk.register,
+                size: 8,
+            },
+            name,
+        );
+        match walk.index {
+            // An index scaled by the element size is an array subscript; one
+            // scaled by anything else is arithmetic this does not understand.
+            Some((index, scale)) if self.strides.get(&walk.register) == Some(&scale) => Some(
+                Expr::Element(Box::new(base), Box::new(index), field_name(*at)),
+            ),
+            Some(_) => None,
+            None => Some(Expr::Field(Box::new(base), field_name(*at))),
+        }
+    }
+
+    /// An address written as an incoming register, a constant, and at most one
+    /// scaled index.
+    fn pointer_offset(&self, o: &Operand, depth: u32) -> Option<Walk> {
+        if depth > 8 {
+            return None;
+        }
+        match o {
+            Operand::Undefined(l) if l.space == r12e_ir::op::Space::Register => Some(Walk {
+                register: l.offset,
+                offset: 0,
+                index: None,
+            }),
+            Operand::Value(v) => {
+                let op = self.definition(*v)?;
+                let SsaKind::Op(kind) = op.kind else {
+                    return None;
+                };
+                match kind {
+                    Op::Copy => self.pointer_offset(op.inputs.first()?, depth + 1),
+                    Op::IntAdd => {
+                        let (a, b) = (op.inputs.first()?, op.inputs.get(1)?);
+                        if let Some(k) = b.as_const() {
+                            let mut walk = self.pointer_offset(a, depth + 1)?;
+                            walk.offset += k as i64;
+                            return Some(walk);
+                        }
+                        // One side is the pointer and the other a scaled index.
+                        let (base, other) = match self.pointer_offset(a, depth + 1) {
+                            Some(w) => (w, b),
+                            None => (self.pointer_offset(b, depth + 1)?, a),
+                        };
+                        if base.index.is_some() {
+                            return None;
+                        }
+                        let (index, scale) = self.scaled(other)?;
+                        Some(Walk {
+                            index: Some((index, scale)),
+                            ..base
+                        })
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// An index multiplied by a constant, however it was written.
+    fn scaled(&self, o: &Operand) -> Option<(Expr, u64)> {
+        let Operand::Value(v) = o else { return None };
+        let op = self.definition(*v)?;
+        let SsaKind::Op(kind) = op.kind else {
+            return None;
+        };
+        match kind {
+            Op::IntLeft => {
+                let n = op.inputs.get(1)?.as_const()?;
+                if n >= 32 {
+                    return None;
+                }
+                Some((self.operand(op.inputs.first()?), 1u64 << n))
+            }
+            Op::IntMul => {
+                let n = op.inputs.get(1)?.as_const()?;
+                Some((self.operand(op.inputs.first()?), n))
+            }
+            Op::Copy | Op::IntSExt | Op::IntZExt => self.scaled(op.inputs.first()?),
+            _ => None,
+        }
     }
 
     /// True when an operand holds a value a floating point operation made.
@@ -611,7 +751,10 @@ impl<'a> Rebuilder<'a> {
             // A copy of a value whose declared type is not an integer still
             // lands in an integer local, so the conversion is written down.
             Op::Copy => ia(),
-            Op::Load => Expr::Deref(Box::new(ia()), op.size),
+            Op::Load => match self.field_access(op.inputs.first(), op.size) {
+                Some(field) => field,
+                None => Expr::Deref(Box::new(ia()), op.size),
+            },
             Op::IntAdd => ibin("+"),
             Op::IntSub => ibin("-"),
             Op::IntMul => ibin("*"),

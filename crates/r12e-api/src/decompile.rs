@@ -102,6 +102,7 @@ pub fn decompile_program(p: &Program, targets: &[&Function]) -> Unit {
                 Callee {
                     name: r12e_decomp::identifier(&name),
                     arity: out.arity,
+                    pointer_parameters: out.pointer_parameters.clone(),
                     returns_value: !out.signature.starts_with("void "),
                 },
             );
@@ -210,15 +211,44 @@ fn recovered(p: &Program, f: &Function) -> Option<Prototype> {
     let abi = r12e_ir::abi::of(&p.object.arch);
     let recovered = r12e_ir::proto::recover(&ssa, &abi);
 
+    // What each incoming pointer was used as, so an access at a known offset
+    // reads as a field rather than as arithmetic.
+    let shapes: BTreeMap<u64, Layout> = r12e_ir::shape::shapes(&ssa)
+        .into_iter()
+        .filter(|(l, _)| l.offset != abi.stack_pointer)
+        .map(|(l, shape)| (l.offset, (shape.fields(), shape.size())))
+        .collect();
+
     let mut parameters = Vec::new();
+    let mut definitions = Vec::new();
     for n in 0..recovered.integer_arguments {
         let name = format!("arg{n}");
+        let offset = abi.integer_arguments.get(n).copied().unwrap_or(u64::MAX);
+        // Two or more fields is a structure worth naming; one is a pointer to
+        // a value, which `*p` already says.
+        let (fields, stride) = shapes
+            .get(&offset)
+            .filter(|(f, _)| f.len() > 1)
+            .cloned()
+            .unwrap_or_default();
+        // The name carries the function, because two functions rarely hand
+        // the same structure to the same argument register and a shared name
+        // would claim they did.
+        let tag = format!("{}_{name}", r12e_decomp::identifier(&f.display_name()));
+        let (decl, pointer) = if fields.is_empty() {
+            (format!("uint64_t {name}"), false)
+        } else {
+            definitions.push(structure(&tag, &fields));
+            (format!("struct s_{tag} *{name}"), true)
+        };
         parameters.push(Param {
-            decl: format!("uint64_t {name}"),
+            decl,
             name,
             floating: false,
-            pointer: false,
+            pointer,
             size: 8,
+            fields,
+            stride,
         });
     }
     for n in 0..recovered.float_arguments {
@@ -229,6 +259,8 @@ fn recovered(p: &Program, f: &Function) -> Option<Prototype> {
             floating: true,
             pointer: false,
             size: 8,
+            fields: Vec::new(),
+            stride: None,
         });
     }
     Some(Prototype {
@@ -243,9 +275,39 @@ fn recovered(p: &Program, f: &Function) -> Option<Prototype> {
             }
             Some(_) => "uint64_t".to_string(),
         }),
-        definitions: Vec::new(),
+        definitions,
         locals: BTreeMap::new(),
     })
+}
+
+/// What was seen through one pointer: its fields, and the element size when
+/// it walks an array of them.
+type Layout = (Vec<(i64, u8)>, Option<u64>);
+
+/// The C definition of a structure the accesses imply.
+fn structure(name: &str, fields: &[(i64, u8)]) -> String {
+    let mut out = format!("struct s_{name} {{");
+    let mut at = 0i64;
+    for (offset, size) in fields {
+        // Padding, so every field lands where the code put it.
+        if *offset > at {
+            out.push_str(&format!(" uint8_t pad_{at:x}[{}];", offset - at));
+            at = *offset;
+        }
+        if *offset < at {
+            continue;
+        }
+        let ty = match size {
+            1 => "uint8_t",
+            2 => "uint16_t",
+            4 => "uint32_t",
+            _ => "uint64_t",
+        };
+        out.push_str(&format!(" {ty} {};", r12e_decomp::field_name(*offset)));
+        at = offset + *size as i64;
+    }
+    out.push_str(" };");
+    out
 }
 
 /// What the debug information said about a function.
@@ -268,6 +330,9 @@ fn declared(p: &Program, f: &Function) -> Option<Prototype> {
                 floating: matches!(resolved, Some(Type::Float { .. })),
                 pointer: matches!(resolved, Some(Type::Pointer(_))),
                 size: d.types.size_of(*ty).unwrap_or(0) as u8,
+                // The declared type already names the fields.
+                fields: Vec::new(),
+                stride: None,
             }
         })
         .collect();
