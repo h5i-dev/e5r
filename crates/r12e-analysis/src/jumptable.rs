@@ -12,7 +12,10 @@
 //! target, so scanning until an entry looks wrong never stops. The bound has to
 //! come from the compare that guards the switch, and the compare has to be
 //! matched to the register the table is indexed by. Without that match a stray
-//! comparison elsewhere in the function would size the table.
+//! comparison elsewhere in the function would size the table. x86 makes that
+//! matching harder than AArch64 does: it copies the switch value into the
+//! register the table is indexed by, so the compare and the branch name
+//! different registers and the moves between them have to be followed.
 
 use std::collections::BTreeMap;
 
@@ -70,6 +73,10 @@ fn key(r: Reg) -> Option<RegKey> {
 enum Val {
     /// Anything.
     Unknown,
+    /// Another register's unknown value, carried by a move. x86 copies the
+    /// switch value into the register the table is indexed by, so the compare
+    /// that bounds the switch names a register the branch never mentions.
+    Alias(RegKey),
     /// A known address the code formed.
     Const(u64),
     /// `base + index * scale`: a pointer to one element of a table.
@@ -124,6 +131,9 @@ impl Regs {
 
     fn set(&mut self, r: Reg, v: Val) {
         if let Some(k) = key(r) {
+            // An alias names this register, so writing it makes every alias to
+            // it stale.
+            self.registers.retain(|_, held| *held != Val::Alias(k));
             self.registers.insert(k, v);
             // Anything spilled from this register is now stale: the slot holds
             // what was written, not what the register holds next.
@@ -187,12 +197,16 @@ pub fn recover(
     let shape = match last.operands().first()? {
         Operand::Reg(r) => regs.get(*r),
         // `jmp qword ptr [rip + table + rax*8]`: the table is the operand.
-        Operand::Mem(m) => {
+        Operand::Mem(m) if m.seg.is_none() => {
             let table = if m.is_pc_relative() {
                 m.pc_target(last.end())?.get()
             } else {
                 match m.base.map(|b| regs.get(b)) {
                     Some(Val::Const(c)) => c.wrapping_add(m.disp as u64),
+                    // No base register at all: `jmp [0x2001b8 + rax*8]`, the
+                    // absolute form a non-PIE x86-64 build emits. The
+                    // displacement is the whole table address.
+                    None if m.disp > 0 => m.disp as u64,
                     _ => return None,
                 }
             };
@@ -255,8 +269,9 @@ pub fn recover(
         return None;
     }
 
-    // The compare that guards the switch, matched to the index register.
-    let bound = index.and_then(|ix| bound_for(ix, &insns[..insns.len() - 1]));
+    // The compare that guards the switch, matched to the index register or to
+    // whichever register the index was copied from.
+    let bound = index.and_then(|ix| bound_for(&aliases(ix, &regs), &insns[..insns.len() - 1]));
     // A compact table of byte or halfword offsets cannot be bounded by
     // scanning: every value in range yields a plausible target, so the scan
     // would stop wherever the following bytes happened to look wrong. Without
@@ -313,11 +328,32 @@ pub fn recover(
     })
 }
 
+/// Every register the index value has been held in, newest first.
+///
+/// Without this, `cmp edi, 10 ; mov eax, edi ; jmp [table + rax*8]` has no
+/// bound: the compare names `edi` and the branch names `rax`. An unbounded
+/// absolute table then scans into whatever follows it, which for a compiler
+/// that packs several tables together is the next switch's entries.
+fn aliases(index: RegKey, regs: &Regs) -> Vec<RegKey> {
+    let mut chain = vec![index];
+    let mut at = index;
+    while let Some(Val::Alias(next)) = regs.registers.get(&at) {
+        if chain.contains(next) {
+            break;
+        }
+        chain.push(*next);
+        at = *next;
+    }
+    chain
+}
+
 /// The switch bound from the compare that guards it.
 ///
-/// `cmp <index>, #n` means at most `n + 1` entries. The register has to match,
-/// or an unrelated comparison would size the table.
-fn bound_for(index: RegKey, body: &[Insn]) -> Option<u64> {
+/// `cmp <index>, #n` means at most `n + 1` entries. The register has to be one
+/// the index value lives in, or an unrelated comparison would size the table.
+/// The nearest such compare wins, since an outer range check on the same value
+/// is looser than the one right above the branch.
+fn bound_for(index: &[RegKey], body: &[Insn]) -> Option<u64> {
     (0..body.len()).rev().find_map(|n| {
         let i = &body[n];
         // A subtraction whose only purpose is the flags it sets: an
@@ -337,7 +373,7 @@ fn bound_for(index: RegKey, body: &[Insn]) -> Option<u64> {
         let Some(Operand::Reg(r)) = i.operands().first() else {
             return None;
         };
-        if key(*r) != Some(index) {
+        if !key(*r).is_some_and(|k| index.contains(&k)) {
             return None;
         }
         match i.operands().get(1) {
@@ -359,6 +395,12 @@ fn sign_extend(v: u64, bytes: u64) -> i64 {
 
 /// Advance the value model by one instruction.
 fn step(i: &Insn, regs: &mut Regs) {
+    // These name a register first but write only flags. Treating the first
+    // operand as a destination would discard the index value at the exact
+    // instruction that bounds it.
+    if matches!(i.mnemonic, "cmp" | "cmn" | "test" | "tst") {
+        return;
+    }
     let ops = i.operands();
     let dest = match ops.first() {
         Some(Operand::Reg(r)) => Some(*r),
@@ -537,21 +579,31 @@ fn shift_of(ops: &[Operand]) -> u8 {
 }
 
 fn operand_value(op: Option<&Operand>, regs: &Regs) -> Val {
-    match op {
+    let v = match op {
         Some(Operand::Reg(r)) => regs.get(*r),
         Some(Operand::Shifted(r, _, _)) | Some(Operand::Extended(r, _, _)) => regs.get(*r),
         Some(Operand::Imm(v)) => Val::Const(*v as u64),
         Some(Operand::UImm(v)) => Val::Const(*v),
         _ => Val::Unknown,
+    };
+    // An alias says which register a value came from, not what it is;
+    // arithmetic on it knows no more than it does about anything unknown.
+    match v {
+        Val::Alias(_) => Val::Unknown,
+        v => v,
     }
 }
 
 /// The value a load produces, when it reads something the model recognizes.
 fn load_value(i: &Insn, ops: &[Operand], regs: &Regs) -> Val {
     let Some(Operand::Mem(m)) = ops.get(1) else {
-        // A register move carries the value along.
+        // A register move carries the value along, and when there is no value
+        // it carries the source register's identity instead.
         return match ops.get(1) {
-            Some(Operand::Reg(src)) => regs.get(*src),
+            Some(Operand::Reg(src)) => match regs.get(*src) {
+                Val::Unknown => key(*src).map_or(Val::Unknown, Val::Alias),
+                v => v,
+            },
             _ => Val::Unknown,
         };
     };
@@ -789,6 +841,144 @@ mod tests {
             4,
         );
         assert!(t.is_none());
+    }
+
+    /// `jmp qword ptr [disp + rax*8]`, with no base register at all.
+    ///
+    /// A non-PIE x86-64 build addresses its table absolutely, and clang packs
+    /// the tables of adjacent switches together, so an unbounded scan runs
+    /// straight into the next switch's entries and every one of them looks
+    /// like a valid target. The bound is the only thing that stops it, and the
+    /// compare names the register the index was copied *from*.
+    fn x86_absolute_switch(copy: bool) -> Vec<Insn> {
+        // With `copy`, the guard names rdi and the branch indexes by rax;
+        // without it both name rax and no alias is involved.
+        let guarded = if copy { 7 } else { 0 };
+        let mut cmp = Insn::new(Addr(0x40_0000), 3, "cmp", Flow::Next);
+        cmp.push(Operand::Reg(Reg::gpr(guarded, Width::W32)));
+        cmp.push(Operand::Imm(3));
+
+        let mut mov = Insn::new(Addr(0x40_0003), 2, "mov", Flow::Next);
+        mov.push(Operand::Reg(Reg::gpr(0, Width::W32)));
+        mov.push(Operand::Reg(Reg::gpr(guarded, Width::W32)));
+
+        let mut jmp = Insn::new(Addr(0x40_0005), 7, "jmp", Flow::IndirectBranch);
+        jmp.push(Operand::Mem(Mem {
+            seg: None,
+            base: None,
+            index: Some((gpr(0), Extend::Lsl, 3)),
+            disp: table_addr().get() as i64,
+            mode: AddrMode::Offset,
+            size: 8,
+        }));
+        vec![cmp, mov, jmp]
+    }
+
+    #[test]
+    fn an_absolute_table_with_no_base_register_is_read() {
+        // Eight entries are present but the guard says four, and the four past
+        // the guard are the next switch's table. Believing them would invent
+        // successors.
+        let entries: Vec<i64> = (0..8).map(|n| CODE.get() as i64 + 4 * n).collect();
+        let mem = map_with(&entries, 8);
+        let t = recover(
+            &x86_absolute_switch(true),
+            &mem,
+            section(),
+            &Caps::default(),
+            1,
+        )
+        .expect("absolute table");
+        assert_eq!(t.kind, TableKind::Absolute);
+        assert_eq!(t.table, table_addr());
+        assert_eq!(t.entry_size, 8);
+        assert!(!t.bounded_by_scan);
+        assert_eq!(t.targets.len(), 4);
+        assert_eq!(t.targets[0], CODE);
+        assert_eq!(t.targets[3], Addr(CODE.get() + 12));
+    }
+
+    #[test]
+    fn a_move_carries_the_bound_to_the_register_the_branch_indexes_by() {
+        // The same code with the compare naming the index register directly
+        // must recover the same four cases: the move is the only difference,
+        // so anything else means the bound was found by accident.
+        let entries: Vec<i64> = (0..8).map(|n| CODE.get() as i64 + 4 * n).collect();
+        let mem = map_with(&entries, 8);
+        let direct = recover(
+            &x86_absolute_switch(false),
+            &mem,
+            section(),
+            &Caps::default(),
+            1,
+        );
+        let copied = recover(
+            &x86_absolute_switch(true),
+            &mem,
+            section(),
+            &Caps::default(),
+            1,
+        );
+        assert_eq!(direct, copied);
+
+        // A compare of a register the index never came from still must not
+        // size the table, and without a bound the scan runs to all eight.
+        let mut stray = x86_absolute_switch(true);
+        stray[0] = cmp_imm(0x40_0000, 9, 3);
+        let t = recover(&stray, &mem, section(), &Caps::default(), 1).expect("unbounded scan");
+        assert!(t.bounded_by_scan);
+        assert_eq!(t.targets.len(), 8);
+    }
+
+    #[test]
+    fn a_table_of_offsets_from_its_own_base_is_recognized() {
+        // lea rcx, [rip + table] ; movsxd rax, [rcx + rax*4] ; add rax, rcx
+        // The entries are signed 32-bit displacements from the table address,
+        // which is what a PIE x86-64 build emits.
+        let entries: Vec<i64> = (0..4).map(|n| -(TABLE_OFF as i64) + 4 * n).collect();
+        let mem = map_with(&entries, 4);
+
+        let mut lea = Insn::new(Addr(0x40_0000), 7, "lea", Flow::Next);
+        lea.push(Operand::Reg(gpr(1)));
+        lea.push(Operand::Mem(Mem {
+            seg: None,
+            base: Some(Reg {
+                class: RegClass::Pc,
+                num: 0,
+                width: Width::W64,
+            }),
+            index: None,
+            disp: table_addr().get() as i64 - 0x40_0007,
+            mode: AddrMode::Offset,
+            size: 0,
+        }));
+
+        let mut load = Insn::new(Addr(0x40_0007), 4, "movsxd", Flow::Next);
+        load.push(Operand::Reg(gpr(0)));
+        load.push(Operand::Mem(Mem {
+            seg: None,
+            base: Some(gpr(1)),
+            index: Some((gpr(0), Extend::Lsl, 2)),
+            disp: 0,
+            mode: AddrMode::Offset,
+            size: 4,
+        }));
+
+        let mut add = Insn::new(Addr(0x40_000b), 3, "add", Flow::Next);
+        add.push(Operand::Reg(gpr(0)));
+        add.push(Operand::Reg(gpr(1)));
+
+        let mut jmp = Insn::new(Addr(0x40_000e), 2, "jmp", Flow::IndirectBranch);
+        jmp.push(Operand::Reg(gpr(0)));
+
+        let insns = vec![cmp_imm(0x3f_fffc, 0, 3), lea, load, add, jmp];
+        let t = recover(&insns, &mem, section(), &Caps::default(), 1).expect("offset table");
+        assert_eq!(t.kind, TableKind::RelativeToBase);
+        assert_eq!(t.base, table_addr());
+        assert_eq!(t.entry_size, 4);
+        assert_eq!(t.targets.len(), 4);
+        assert_eq!(t.targets[0], CODE);
+        assert_eq!(t.targets[3], Addr(CODE.get() + 12));
     }
 
     #[test]
