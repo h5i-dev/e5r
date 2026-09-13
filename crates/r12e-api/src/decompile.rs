@@ -182,9 +182,74 @@ fn one(p: &Program, f: &Function, callees: &BTreeMap<u64, Callee>) -> Option<(Ou
     ))
 }
 
-/// What the debug information said about a function, in the shape the emitter
-/// wants it.
+/// What is known about a function's shape, in the form the emitter wants.
+///
+/// The debug information where there is any, and otherwise what the code
+/// itself says: how many argument registers arrive with values and whether
+/// anything is left for the caller. The second is weaker but it is what a
+/// stripped binary has.
 fn prototype(p: &Program, f: &Function) -> Option<Prototype> {
+    declared(p, f).or_else(|| recovered(p, f))
+}
+
+/// The shape the code implies, for a function nothing declared.
+fn recovered(p: &Program, f: &Function) -> Option<Prototype> {
+    let blocks: BTreeMap<Addr, (Addr, Vec<Addr>)> = f
+        .cfg
+        .blocks
+        .iter()
+        .map(|(a, b)| (*a, (b.range.end(), b.successors.clone())))
+        .collect();
+    if blocks.is_empty() {
+        return None;
+    }
+    let mut ir = r12e_ir::func::build(&p.object.memory, &p.object.arch, f.entry, &blocks);
+    r12e_ir::stack::promote(&mut ir);
+    let mut ssa = r12e_ir::ssa::build(&ir);
+    r12e_ir::opt::optimize(&mut ssa);
+    let abi = r12e_ir::abi::of(&p.object.arch);
+    let recovered = r12e_ir::proto::recover(&ssa, &abi);
+
+    let mut parameters = Vec::new();
+    for n in 0..recovered.integer_arguments {
+        let name = format!("arg{n}");
+        parameters.push(Param {
+            decl: format!("uint64_t {name}"),
+            name,
+            floating: false,
+            pointer: false,
+            size: 8,
+        });
+    }
+    for n in 0..recovered.float_arguments {
+        let name = format!("farg{n}");
+        parameters.push(Param {
+            decl: format!("double {name}"),
+            name,
+            floating: true,
+            pointer: false,
+            size: 8,
+        });
+    }
+    Some(Prototype {
+        parameters,
+        // A function that leaves nothing behind returns nothing, and saying
+        // `void` is what makes the output read like the source.
+        returns: Some(match recovered.returns {
+            None => "void".to_string(),
+            Some(offset) if recovered.returns_float => {
+                let _ = offset;
+                "double".to_string()
+            }
+            Some(_) => "uint64_t".to_string(),
+        }),
+        definitions: Vec::new(),
+        locals: BTreeMap::new(),
+    })
+}
+
+/// What the debug information said about a function.
+fn declared(p: &Program, f: &Function) -> Option<Prototype> {
     use r12e_types::ctype::Type;
 
     let d = p.object.debug.as_ref()?;

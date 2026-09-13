@@ -623,7 +623,7 @@ impl<'a> Rebuilder<'a> {
             Op::IntOr => ibin("|"),
             Op::IntXor => ibin("^"),
             Op::IntNot => Expr::Unary("~", Box::new(ia())),
-            Op::IntNegate => Expr::Unary("-", Box::new(a())),
+            Op::IntNegate => Expr::Unary("-", Box::new(ia())),
             Op::IntLeft => ibin("<<"),
             Op::IntRight => ibin(">>"),
             Op::IntSRight => signed_bin(">>"),
@@ -639,16 +639,16 @@ impl<'a> Rebuilder<'a> {
             // A negated comparison is the opposite comparison, which is what
             // the source said before the machine turned it into flags.
             Op::BoolNot => negate(a()),
-            Op::IntZExt => Expr::Cast(c_type(op.size), Box::new(a())),
-            Op::IntSExt => Expr::Cast(signed_type(op.size), Box::new(a())),
+            Op::IntZExt => Expr::Cast(c_type(op.size), Box::new(ia())),
+            Op::IntSExt => Expr::Cast(signed_type(op.size), Box::new(ia())),
             // A shift by a byte count, which is how a narrow read is expressed.
             Op::SubPiece => match op.inputs.get(1).and_then(|i| i.as_const()) {
-                Some(0) => Expr::Cast(c_type(op.size), Box::new(a())),
+                Some(0) => Expr::Cast(c_type(op.size), Box::new(ia())),
                 Some(n) => Expr::Cast(
                     c_type(op.size),
                     Box::new(Expr::Binary(
                         ">>",
-                        Box::new(a()),
+                        Box::new(ia()),
                         Box::new(Expr::Const(n * 8, 1)),
                     )),
                 ),

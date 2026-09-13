@@ -28,6 +28,10 @@ const MAX_OVERCOUNT: f64 = 0.14;
 /// never reads the result is the evidence this cannot see from inside.
 const MAX_FALSE_RETURN: f64 = 0.95;
 
+/// The same, once the callers have had their say. Lower, because a function
+/// every caller ignores did not return anything whatever it left behind.
+const MAX_FALSE_RETURN_WITH_CALLERS: f64 = 0.60;
+
 fn corpus() -> Option<PathBuf> {
     let d = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/build");
     d.is_dir().then(|| d.canonicalize().unwrap())
@@ -229,4 +233,77 @@ fn a_function_that_keeps_the_conventions_promises_says_so() {
         standard * 4 >= total * 3,
         "only {standard} of {total} functions keep the calling convention"
     );
+}
+
+/// The callers settle what a function alone could not.
+///
+/// A function that leaves a value in the result register which every caller
+/// ignores did not return anything, whatever the register held. This is the
+/// measurement the single-function ceiling above cannot make, so it is made
+/// here on binaries where the callers are present.
+#[test]
+fn callers_settle_whether_a_function_returns() {
+    let mut void_functions = 0;
+    let mut credited = 0;
+    let mut checked = 0;
+    for fixture in ["shapes.a64.O0.cpp", "shapes.a64.O2.cpp", "hello.a64.O0"] {
+        let Some(p) = open(fixture) else { continue };
+        let Some(d) = p.object.debug.as_ref() else {
+            continue;
+        };
+        let recovered = r12e_api::prototypes(&p);
+        for f in p.functions_by_address().filter(|f| f.is_complete()) {
+            let Some(df) = d.functions.get(&f.entry) else {
+                continue;
+            };
+            let Some(found) = recovered.get(&f.entry) else {
+                continue;
+            };
+            checked += 1;
+            // A real return must survive: losing one costs every caller.
+            if df.signature.returns.is_some() {
+                assert!(
+                    found.prototype.returns.is_some() || found.callers == 0,
+                    "{fixture}: {} returns a value and the recovery dropped it",
+                    f.display_name()
+                );
+                continue;
+            }
+            void_functions += 1;
+            if found.prototype.returns.is_some() {
+                credited += 1;
+            }
+        }
+    }
+    if checked == 0 {
+        return;
+    }
+    let share = credited as f64 / void_functions.max(1) as f64;
+    assert!(
+        share <= MAX_FALSE_RETURN_WITH_CALLERS,
+        "{credited} of {void_functions} void functions are still credited with \
+         a result once the callers have spoken ({share:.2}), ceiling is \
+         {MAX_FALSE_RETURN_WITH_CALLERS}"
+    );
+    println!(
+        "{checked} prototypes across whole programs, \
+         {credited} of {void_functions} void functions still credited ({share:.2})"
+    );
+}
+
+#[test]
+fn a_function_nothing_calls_keeps_its_own_answer() {
+    let Some(p) = open("wide.a64.O0.o") else { return };
+    let recovered = r12e_api::prototypes(&p);
+    // Nothing in an object file of library functions calls `arith64`, so the
+    // callers say nothing and its own answer stands.
+    let Some(f) = p
+        .functions_by_address()
+        .find(|f| f.name.as_deref() == Some("arith64"))
+    else {
+        return;
+    };
+    let found = recovered.get(&f.entry).expect("recovered");
+    assert_eq!(found.callers, 0);
+    assert!(found.prototype.returns.is_some());
 }
