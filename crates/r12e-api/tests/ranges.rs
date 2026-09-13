@@ -24,7 +24,7 @@ use r12e_ir::ssa::{SsaFunction, SsaKind};
 
 /// Floor on the share of returned values the analysis can say anything about.
 /// Only raised.
-const MIN_BOUNDED: f64 = 0.20;
+const MIN_BOUNDED: f64 = 0.50;
 
 fn build() -> Option<PathBuf> {
     let d = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/build");

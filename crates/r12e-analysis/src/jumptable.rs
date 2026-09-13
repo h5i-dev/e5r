@@ -318,8 +318,20 @@ pub fn recover(
 /// `cmp <index>, #n` means at most `n + 1` entries. The register has to match,
 /// or an unrelated comparison would size the table.
 fn bound_for(index: RegKey, body: &[Insn]) -> Option<u64> {
-    body.iter().rev().find_map(|i| {
-        if !matches!(i.mnemonic, "cmp" | "subs") {
+    (0..body.len()).rev().find_map(|n| {
+        let i = &body[n];
+        // A subtraction whose only purpose is the flags it sets: an
+        // unoptimized compiler writes `sub rax, 11` and branches on it rather
+        // than comparing, and the difference itself is thrown away. The
+        // branch immediately after is what says so.
+        let comparison = match i.mnemonic {
+            "cmp" | "subs" => true,
+            "sub" => body
+                .get(n + 1)
+                .is_some_and(|next| matches!(next.flow, Flow::CondBranch(_))),
+            _ => false,
+        };
+        if !comparison {
             return None;
         }
         let Some(Operand::Reg(r)) = i.operands().first() else {
@@ -392,8 +404,20 @@ fn step(i: &Insn, regs: &mut Regs) {
 
 /// The value of an `add` whose parts the model knows.
 fn add_value(ops: &[Operand], regs: &Regs) -> Val {
-    let a = operand_value(ops.get(1), regs);
-    let b = operand_value(ops.get(2), regs);
+    // Three operands on AArch64, two on x86 where the destination is also the
+    // first source. Reading the two-operand form as if it had three loses the
+    // value entirely, which is how a switch stays unresolved.
+    let (a, b) = if ops.len() >= 3 {
+        (
+            operand_value(ops.get(1), regs),
+            operand_value(ops.get(2), regs),
+        )
+    } else {
+        (
+            operand_value(ops.first(), regs),
+            operand_value(ops.get(1), regs),
+        )
+    };
     let shift = shift_of(ops);
 
     match (a, b) {
