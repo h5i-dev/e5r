@@ -148,7 +148,12 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 - [x] ELF32 and ELF64, both endians. Program headers, sections, `symtab`,
       `dynsym`, GNU hash, symbol versioning, `.dynamic`, `.init_array`,
       `.eh_frame` and `.eh_frame_hdr`, `.note.gnu.build-id`.
-- [ ] ELF relocations for x86-64, AArch64 and i386, enough to load `.o` files
+- [x] ELF relocations for x86-64 and AArch64, enough to load `.o` files
+      correctly: the absolute, relative and branch kinds a compiler emits,
+      including the split immediate an `adrp` carries and the scaled
+      twelve-bit offsets. Gated by running functions out of the objects and
+      comparing against what the processor produced. i386 is still to do.
+- [ ] ELF relocations for i386, enough to load `.o` files
       and to resolve PLT entries to names.
 - [x] PE and COFF. Both image and object layouts, import and delay-import
       descriptors with their IAT slots, exports, the COFF symbol table, the
@@ -281,9 +286,25 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 
 ### M5. Types
 
+- [x] A C type model with structures, unions, arrays, enums, function pointers
+      and typedefs, which prints a declaration the way C spells it: the
+      declarator wraps around the name, so a pointer to an array is not a
+      prefix and a suffix glued together.
+- [x] DWARF 4 and 5 consumption: the type graph, function signatures with
+      named parameters, local variables with frame offsets, and the line
+      table. Relocations are applied to the debug sections first, because a
+      relocatable object writes zero where an address goes. Measured against
+      readelf for names and against the object's own symbol table for
+      addresses.
+- [x] Structure recovery from access patterns: the offsets touched through a
+      pointer become fields, loop-carried pointers are followed through their
+      phi so a walk reports its element size, and the result is what was seen
+      rather than a conclusion. Gated against the debug information: the
+      recovery runs without looking at it and has to agree.
 - [ ] A C type model with structures, unions, arrays, enums, function pointers,
       bitfields and typedefs, sized per architecture.
-- [ ] DWARF 4 and 5 consumption: types, variables, line numbers, inlined frames.
+- [ ] DWARF inlined frames, call sites and location lists, which the current
+      reader skips.
 - [ ] PDB consumption for Windows binaries, from the public format documentation.
 - [x] Demanglers: Itanium C++ at 94% exact parity with `c++filt` over 5,953
       real libstdc++ symbols, Rust in both schemes, and MSVC qualified names.
@@ -292,8 +313,8 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 - [ ] Type archives. Parse C headers into the type model so an analyst can apply
       a known API signature. Importing Ghidra `.gdt` is worth doing if the format
       holds still.
-- [ ] Structure recovery from access patterns: offsets touched through a pointer
-      become fields, with the confidence recorded.
+- [ ] Structure recovery fed back into the decompiler, so an access becomes a
+      field reference rather than an offset.
 - [ ] C++ recovery: vtables, RTTI where present, constructor and destructor
       identification, `this` pointer typing.
 - [ ] Go: `pclntab` function names, `moduledata`, interface tables, the runtime
@@ -385,7 +406,10 @@ designed before it gets coded, and the design lives in `docs/design/db.md`.
 
 ### M9. Automation and agents
 
-- [ ] `r12e-api`: the stable library surface the CLI and the MCP server both use.
+- [x] `r12e-api`: the library surface the CLI and the tests share, so a
+      difference between what a test checks and what a user gets is a
+      difference a user will find. Decompilation, shapes, signatures,
+      emulation and queries go through it.
       Semver from 1.0, with a compatibility test suite.
 - [x] MCP server, as `r12e mcp`: open, stats, list_functions, disassemble,
       xrefs, strings, annotate and read_annotations. Written directly rather
@@ -408,13 +432,27 @@ designed before it gets coded, and the design lives in `docs/design/db.md`.
 - [ ] Patch sets. An auditable object describing byte edits, previewed before
       write, applied to a sibling file by default, assembled from public
       encodings. Never a silent overwrite of the input.
-- [ ] Signature matching. An open format for library function identification with
+- [x] Signature matching, in a sorted text format that reviews in a diff.
+      A library built from a binary with symbols recovers 10 of 11 names in
+      its stripped copy with none wrong. It refuses every coin flip: two
+      signatures that disagree about a hash name nothing, a function shorter
+      than twenty-four instructions is not identified by shape, and import
+      thunks are excluded because four instructions that differ only in an
+      offset match across binaries by coincidence.
+- [ ] Signature matching against published libraries: an importer for the
       a corpus built from real distribution packages, so a statically linked
       binary stops being 8,000 anonymous functions.
-- [ ] Emulation of selected paths, built on the M4 IR interpreter with a memory
+- [x] Emulation, built on the M4 IR interpreter: `r12e emulate` runs a
+      function with given arguments and reports what came back and what it
+      touched. Nothing escapes the process. Gated against the processor by
+      running the oracle's case table through it.
+- [ ] Emulation of selected paths with a memory
       model and syscall stubs added: string decryption, resolving an obfuscated
       control flow, confirming a jump table.
-- [ ] A query language over the program model. "Find every call to `memcpy` whose
+- [x] A query language over the program model, over seven entities with
+      boolean operators, brackets and JSON on the same command. A field that
+      does not exist is a typo and says so rather than matching nothing.
+- [ ] Query over dataflow facts: "find every call to `memcpy` whose
       third argument is not bounded by a constant" is a question the incumbents
       answer with a throwaway script. Making it a first-class query, over a model
       that already records provenance, is the most useful thing r12e can offer a
