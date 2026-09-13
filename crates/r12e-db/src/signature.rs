@@ -229,12 +229,12 @@ mod tests {
         let library = Library::build(vec![Signature {
             shape: 1,
             bytes: 2,
-            insns: 20,
+            insns: 40,
             name: "memcpy".into(),
             source: "libc".into(),
         }]);
         // Same shape, different bytes: the branch targets moved.
-        let found = library.identify(&anchor(1, 99, 20)).expect("a match");
+        let found = library.identify(&anchor(1, 99, 40)).expect("a match");
         assert_eq!(found.resolution, Resolution::Shape);
     }
 
@@ -265,19 +265,19 @@ mod tests {
             Signature {
                 shape: 1,
                 bytes: 2,
-                insns: 20,
+                insns: 40,
                 name: "memcpy".into(),
                 source: "libc".into(),
             },
             Signature {
                 shape: 1,
                 bytes: 3,
-                insns: 20,
+                insns: 40,
                 name: "memmove".into(),
                 source: "libc".into(),
             },
         ]);
-        assert!(library.identify(&anchor(1, 99, 20)).is_none());
+        assert!(library.identify(&anchor(1, 99, 40)).is_none());
     }
 
     #[test]
