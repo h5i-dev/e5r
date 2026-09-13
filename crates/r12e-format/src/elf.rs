@@ -1095,13 +1095,24 @@ fn read_debug_info(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object, hints: bo
     // index, so that table needs its relocations as much as the rest: without
     // them every function in the unit resolves to zero.
     let addr_bytes = relocated(r, shdrs, obj, ".debug_addr", section(".debug_addr"));
+    // The string offsets are relocated too: an index resolves through this
+    // table, and unrelocated it points every name at the first string in the
+    // section, which is the producer.
+    let str_offset_bytes = relocated(
+        r,
+        shdrs,
+        obj,
+        ".debug_str_offsets",
+        section(".debug_str_offsets"),
+    );
     let rnglist_bytes = relocated(r, shdrs, obj, ".debug_rnglists", section(".debug_rnglists"));
     let sections = crate::dwarf::Sections {
         info: &info_bytes,
         abbrev: section(".debug_abbrev"),
         str: section(".debug_str"),
         line_str: section(".debug_line_str"),
-        str_offsets: section(".debug_str_offsets"),
+        str_offsets: &str_offset_bytes,
+
         addr: &addr_bytes,
         rnglists: &rnglist_bytes,
         line: &line_bytes,

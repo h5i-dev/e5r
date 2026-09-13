@@ -459,6 +459,16 @@ impl<'a> Rebuilder<'a> {
             Operand::Const(..) => None,
         };
         let Some(l) = location else { return e };
+        // A value a floating point operation produced is a number whatever
+        // location it landed in: the conversion ops write one into a register
+        // this pass has no other reason to call floating.
+        if !self.floats.contains(&l) && self.produces_float(o) {
+            let size = match o {
+                Operand::Value(v) => v.location.size,
+                _ => l.size,
+            };
+            return Expr::Named(reinterpret_to_bits(size.min(8)), vec![e]);
+        }
         if self.floats.contains(&l) {
             let size = if l.space == r12e_ir::op::Space::Register {
                 self.sizes.get(&l.offset).copied().unwrap_or(l.size)
@@ -471,6 +481,18 @@ impl<'a> Rebuilder<'a> {
             return Expr::Cast("uint64_t", Box::new(e));
         }
         e
+    }
+
+    /// True when an operand holds a value a floating point operation made.
+    fn produces_float(&self, o: &Operand) -> bool {
+        let Operand::Value(v) = o else { return false };
+        let Some(op) = self.definition(*v) else {
+            return false;
+        };
+        let SsaKind::Op(kind) = op.kind else {
+            return false;
+        };
+        is_float_op(kind) && !produces_bool(kind)
     }
 
     /// What to call a value that arrived from outside.

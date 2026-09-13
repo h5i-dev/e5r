@@ -851,7 +851,7 @@ impl Emitter<'_> {
                         // declared to return a pointer, which C will not
                         // assign without being told.
                         Some(name) => {
-                            let _ = writeln!(out, "{pad}{name} = (uint64_t){e};");
+                            let _ = writeln!(out, "{pad}{name} = (uint64_t)({e});");
                         }
                         None => {
                             let _ = writeln!(out, "{pad}{e};");
@@ -906,7 +906,10 @@ impl Emitter<'_> {
         let value = self.result(at);
         match (&self.returns, value.is_empty()) {
             (Some(ty), _) if ty == "void" => "return;".to_string(),
-            (Some(ty), false) => format!("return ({ty}){value};"),
+            // The value is already rendered, so the cast needs its own
+            // parentheses: a cast binds tighter than anything in an
+            // expression and would otherwise apply to the first term.
+            (Some(ty), false) => format!("return ({ty})({value});"),
             (Some(ty), true) => format!("return ({ty})0;"),
             (None, false) => format!("return {value};"),
             (None, true) => "return;".to_string(),
