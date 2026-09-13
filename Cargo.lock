@@ -242,6 +242,7 @@ dependencies = [
  "r12e-analysis",
  "r12e-arch",
  "r12e-core",
+ "r12e-db",
  "r12e-format",
  "serde",
  "serde_json",
@@ -251,6 +252,15 @@ dependencies = [
 name = "r12e-core"
 version = "0.1.0"
 dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "r12e-db"
+version = "0.1.0"
+dependencies = [
+ "r12e-arch",
+ "r12e-core",
  "serde",
 ]
 

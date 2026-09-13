@@ -189,7 +189,7 @@ pub fn funcs(w: &mut Out, p: &Program, as_json: bool) -> R {
             f.cfg.covered_bytes(),
             f.cfg.blocks.len(),
             f.cfg.insns(),
-            f.provenance.strength(),
+            f.provenance.strength().to_string(),
             truncate(&ev, 27),
             f.display_name(),
             if f.is_complete() {

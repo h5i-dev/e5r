@@ -9,6 +9,7 @@
 #![deny(unsafe_code)]
 
 mod addr;
+mod annotate;
 mod json;
 mod out;
 mod print;
@@ -70,6 +71,9 @@ struct Common {
     /// Skip the heuristic prologue scan, leaving only evidence-led discovery.
     #[arg(long)]
     no_scan: bool,
+    /// Annotation log to use. Defaults to the binary's path plus `.r12e`.
+    #[arg(long, global = true)]
+    db: Option<PathBuf>,
 }
 
 #[derive(Subcommand)]
@@ -120,6 +124,49 @@ enum Command {
     },
     /// Counts: functions, blocks, instructions, references, strings.
     Stats(Common),
+    /// Read and write the annotation log.
+    ///
+    /// The log is a text file git can merge: every assertion is one line keyed
+    /// to a content anchor, so the work survives a rebuild and two analysts on
+    /// separate branches merge without conflict markers.
+    Annotate {
+        #[command(flatten)]
+        common: Common,
+        #[command(subcommand)]
+        what: Annotation,
+    },
+}
+
+/// What to do to the annotation log.
+#[derive(Subcommand)]
+enum Annotation {
+    /// Name a function or an address.
+    Name {
+        /// Address or symbol.
+        target: String,
+        /// The name. Omit to clear it.
+        value: Option<String>,
+    },
+    /// Attach a comment.
+    Comment {
+        /// Address or symbol.
+        target: String,
+        /// The text. Omit to clear it.
+        value: Option<String>,
+    },
+    /// Record a type or prototype.
+    Type {
+        /// Address or symbol.
+        target: String,
+        /// The type, as source text. Omit to clear it.
+        value: Option<String>,
+    },
+    /// Show everything the log says about this binary.
+    List,
+    /// Take back the most recent assertion.
+    Undo,
+    /// Put back the most recently undone assertion.
+    Redo,
 }
 
 impl Command {
@@ -132,6 +179,7 @@ impl Command {
             | Command::Exports(c)
             | Command::Funcs(c)
             | Command::Stats(c) => c,
+            Command::Annotate { common, .. } => common,
             Command::Disas { common, .. }
             | Command::Xrefs { common, .. }
             | Command::Strings { common, .. } => common,
@@ -210,8 +258,26 @@ fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
     if matches!(cli.command, Command::Funcs(_) | Command::Stats(_)) {
         opts.strings = matches!(cli.command, Command::Stats(_));
     }
+    if matches!(cli.command, Command::Annotate { .. }) {
+        opts.strings = false;
+        opts.xrefs = false;
+    }
 
-    let program = r12e_analysis::analyze(object, &opts);
+    let mut program = r12e_analysis::analyze(object, &opts);
+
+    // Names from the log override what the container said, because the point
+    // of writing one down was to overrule the engine.
+    let db = common
+        .db
+        .clone()
+        .unwrap_or_else(|| annotate::default_path(&common.file));
+    if !matches!(cli.command, Command::Annotate { .. }) {
+        for (at, name, _) in annotate::names(&program, &db) {
+            if let Some(f) = program.functions.get_mut(&at) {
+                f.name = Some(name);
+            }
+        }
+    }
 
     match &cli.command {
         Command::Funcs(c) => print::funcs(w, &program, c.json),
@@ -227,8 +293,55 @@ fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             target,
             from,
         } => print::xrefs(w, &program, target, *from, common.json),
+        Command::Annotate { what, common } => {
+            let who = whoami();
+            match what {
+                Annotation::Name { target, value } => annotate::set(
+                    w,
+                    &program,
+                    &db,
+                    r12e_db::Field::Name,
+                    target,
+                    value.clone(),
+                    &who,
+                ),
+                Annotation::Comment { target, value } => annotate::set(
+                    w,
+                    &program,
+                    &db,
+                    r12e_db::Field::Comment,
+                    target,
+                    value.clone(),
+                    &who,
+                ),
+                Annotation::Type { target, value } => annotate::set(
+                    w,
+                    &program,
+                    &db,
+                    r12e_db::Field::Type,
+                    target,
+                    value.clone(),
+                    &who,
+                ),
+                Annotation::List => annotate::list(w, &program, &db, common.json),
+                Annotation::Undo => annotate::step(w, &db, false),
+                Annotation::Redo => annotate::step(w, &db, true),
+            }
+        }
         _ => unreachable!("handled above"),
     }
+}
+
+/// Who to record as the author of an assertion.
+///
+/// The environment, then the OS user, then a placeholder. Never a hostname or
+/// anything else that would leak more than a name into a file meant for a pull
+/// request.
+fn whoami() -> String {
+    std::env::var("R12E_AUTHOR")
+        .or_else(|_| std::env::var("USER"))
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_else(|_| "unknown".to_string())
 }
 
 /// Map the file read-only, so opening a 500 MB binary does not copy it.
