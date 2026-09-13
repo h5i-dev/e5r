@@ -220,7 +220,9 @@ impl<'a> Reader<'a> {
             });
         }
         let start = offset as usize;
-        let limit = ((offset + max).min(available)) as usize;
+        // Saturating: a caller asking for an unbounded string passes a huge
+        // maximum, and wrapping would make the limit smaller than the start.
+        let limit = (offset.saturating_add(max).min(available)) as usize;
         match self.data[start..limit].iter().position(|&b| b == 0) {
             Some(n) => Ok(&self.data[start..start + n]),
             None => Err(Error::BadField {

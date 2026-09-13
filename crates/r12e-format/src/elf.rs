@@ -225,6 +225,7 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
         .unwrap_or(Addr::ZERO);
 
     let mut obj = Object {
+        debug: None,
         format: Format::Elf,
         arch,
         endian,
@@ -256,6 +257,13 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
 
     if opts.eh_frame {
         read_eh_frame(&r, &phdrs, &mut obj);
+    }
+
+    if opts.debug_info {
+        // A relocatable object's debug addresses are section-relative and need
+        // the relocations applied; its symbol table already names every
+        // function, so the types and lines are read and the hints are not.
+        read_debug_info(&r, &shdrs, &mut obj, !relocatable);
     }
 
     if let Some(entry) = obj.entry {
@@ -1057,6 +1065,159 @@ fn read_notes(r: &Reader<'_>, phdrs: &[ProgHdr], shdrs: &[SecHdr], obj: &mut Obj
 }
 
 /// Function starts from `.eh_frame`, the best boundary evidence an ELF carries.
+/// Read what the compiler recorded, when it recorded anything.
+///
+/// A function the debug information names is a fact, not an inference, so the
+/// hint it produces outranks everything the analysis would work out for
+/// itself.
+fn read_debug_info(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object, hints: bool) {
+    let section = |name: &str| -> &[u8] {
+        match obj.section(name) {
+            Some(s) if s.file_size > 0 => r
+                .bytes_at("debug section", s.file_offset, s.file_size)
+                .unwrap_or(&[]),
+            _ => &[],
+        }
+    };
+    // A relocatable object writes zero where an address goes and leaves a
+    // relocation to fill it in, so every function would appear to start at the
+    // same place until they are applied.
+    let info_bytes = relocated(r, shdrs, obj, ".debug_info", section(".debug_info"));
+    let line_bytes = relocated(r, shdrs, obj, ".debug_line", section(".debug_line"));
+    let sections = crate::dwarf::Sections {
+        info: &info_bytes,
+        abbrev: section(".debug_abbrev"),
+        str: section(".debug_str"),
+        line_str: section(".debug_line_str"),
+        str_offsets: section(".debug_str_offsets"),
+        addr: section(".debug_addr"),
+        rnglists: section(".debug_rnglists"),
+        line: &line_bytes,
+    };
+    if sections.is_empty() {
+        return;
+    }
+    let info = crate::dwarf::parse(&sections, obj.endian);
+    for (addr, f) in info.functions.iter().filter(|_| hints) {
+        if f.name.is_empty() {
+            continue;
+        }
+        obj.function_hints.push(FunctionHint {
+            addr: *addr,
+            size: f.size.filter(|s| *s > 0),
+            name: Some(f.name.clone()),
+            provenance: Provenance::new(Evidence::DebugInfo),
+        });
+    }
+    obj.debug = Some(info);
+}
+
+/// A copy of a section with its relocations applied.
+///
+/// Only the absolute kinds, which is all debug information uses: the value
+/// written is the symbol's address plus the addend. Anything else is left
+/// alone, because writing a guess into a debug section produces confident
+/// nonsense rather than a gap.
+fn relocated(
+    r: &Reader<'_>,
+    shdrs: &[SecHdr],
+    obj: &Object,
+    name: &str,
+    data: &[u8],
+) -> Vec<u8> {
+    let mut out = data.to_vec();
+    if data.is_empty() {
+        return out;
+    }
+    let Some(target) = obj.sections.iter().position(|s| s.name == name) else {
+        return out;
+    };
+    let wide = obj.bits == Bits::Bits64;
+    let step: u64 = if wide { 24 } else { 12 };
+
+    for (n, sh) in shdrs.iter().enumerate() {
+        if sh.kind != SHT_RELA || sh.info as usize != target {
+            continue;
+        }
+        let _ = n;
+        let count = sh.size / step.max(1);
+        for i in 0..count {
+            let at = sh.offset + i * step;
+            let Ok(mut e) = r.slice_at("relocation", at, step) else {
+                continue;
+            };
+            let (offset, info, addend) = if wide {
+                let Ok(o) = e.u64("r_offset") else { continue };
+                let Ok(i) = e.u64("r_info") else { continue };
+                let Ok(a) = e.i64("r_addend") else { continue };
+                (o, i, a)
+            } else {
+                let Ok(o) = e.u32("r_offset") else { continue };
+                let Ok(i) = e.u32("r_info") else { continue };
+                let Ok(a) = e.i32("r_addend") else { continue };
+                (o as u64, i as u64, a as i64)
+            };
+            let symbol = if wide { info >> 32 } else { info >> 8 };
+            let kind = if wide { info & 0xffff_ffff } else { info & 0xff };
+            // The absolute relocations, which are the only ones a debug
+            // section uses: 1 is 64-bit on both architectures this supports,
+            // and the 32-bit ones differ by number.
+            let size = match (&obj.arch, kind) {
+                (Arch::X86_64, 1) | (Arch::AArch64, 257) => 8,
+                (Arch::X86_64, 10) | (Arch::X86_64, 11) | (Arch::AArch64, 258) => 4,
+                _ => continue,
+            };
+            let Some(value) = symbol_value(r, shdrs, obj, symbol) else {
+                continue;
+            };
+            let result = value.wrapping_add(addend as u64);
+            // The offset comes from the file, so it can be anything.
+            let Ok(start) = usize::try_from(offset) else {
+                continue;
+            };
+            let Some(slot) = out.get_mut(start..start.saturating_add(size)) else {
+                continue;
+            };
+            for (k, byte) in slot.iter_mut().enumerate() {
+                *byte = (result >> (k * 8)) as u8;
+            }
+        }
+    }
+    out
+}
+
+/// The address a relocation's symbol resolves to, which for a section symbol
+/// is where the loader put that section.
+fn symbol_value(r: &Reader<'_>, shdrs: &[SecHdr], obj: &Object, index: u64) -> Option<u64> {
+    let wide = obj.bits == Bits::Bits64;
+    let entsize: u64 = if wide { 24 } else { 16 };
+    let sh = shdrs.iter().find(|s| s.kind == SHT_SYMTAB)?;
+    let at = sh.offset + index * entsize;
+    let mut e = r.slice_at("symbol", at, entsize).ok()?;
+    if wide {
+        let _name = e.u32("st_name").ok()?;
+        let _info = e.u8("st_info").ok()?;
+        let _other = e.u8("st_other").ok()?;
+        let shndx = e.u16("st_shndx").ok()?;
+        let value = e.u64("st_value").ok()?;
+        Some(section_base(obj, shndx)? + value)
+    } else {
+        let _name = e.u32("st_name").ok()?;
+        let value = e.u32("st_value").ok()? as u64;
+        let _size = e.u32("st_size").ok()?;
+        let _info = e.u8("st_info").ok()?;
+        let _other = e.u8("st_other").ok()?;
+        let shndx = e.u16("st_shndx").ok()?;
+        Some(section_base(obj, shndx)? + value)
+    }
+}
+
+fn section_base(obj: &Object, index: u16) -> Option<u64> {
+    obj.sections
+        .get(index as usize)
+        .map(|s| s.range.start().get())
+}
+
 fn read_eh_frame(r: &Reader<'_>, phdrs: &[ProgHdr], obj: &mut Object) {
     let Some(sec) = obj.section(".eh_frame").cloned() else {
         // A stripped binary can still have PT_GNU_EH_FRAME pointing at the

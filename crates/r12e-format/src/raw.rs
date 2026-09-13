@@ -27,6 +27,7 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
 
     let bits = arch.bits();
     Ok(Object {
+        debug: None,
         format: Format::Raw,
         endian: r12e_core::Endian::Little,
         bits,

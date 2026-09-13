@@ -264,6 +264,7 @@ fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
         base: common.base.map(Addr),
         arch,
         eh_frame: true,
+        debug_info: true,
     };
     let object = r12e_format::load(&data, &load_opts).map_err(|e| e.to_string())?;
 

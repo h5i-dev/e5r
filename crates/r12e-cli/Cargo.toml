@@ -22,6 +22,7 @@ r12e-diff = { workspace = true }
 r12e-types = { workspace = true }
 r12e-ir = { workspace = true }
 r12e-decomp = { workspace = true }
+r12e-api = { workspace = true }
 clap = { workspace = true }
 memmap2 = { workspace = true }
 serde = { workspace = true }

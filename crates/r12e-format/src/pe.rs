@@ -279,6 +279,7 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
     }
 
     let mut obj = Object {
+        debug: None,
         format: Format::Pe,
         arch,
         endian: Endian::Little,

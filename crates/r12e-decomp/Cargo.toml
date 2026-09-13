@@ -18,3 +18,4 @@ serde = { workspace = true }
 r12e-analysis = { workspace = true }
 r12e-format = { workspace = true }
 r12e-decomp = { workspace = true }
+r12e-api = { workspace = true }

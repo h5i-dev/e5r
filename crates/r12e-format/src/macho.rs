@@ -383,6 +383,7 @@ fn load_thin(data: &[u8], opts: &LoadOptions, base: u64) -> Result<Object> {
     }
 
     let mut obj = Object {
+        debug: None,
         format: Format::MachO,
         arch,
         endian,

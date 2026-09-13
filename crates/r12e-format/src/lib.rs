@@ -12,6 +12,7 @@
 #![warn(missing_docs)]
 
 pub mod ehframe;
+pub mod dwarf;
 pub mod elf;
 pub mod macho;
 pub mod pe;
@@ -200,6 +201,8 @@ pub struct Object {
     /// Things worth reporting that do not fit elsewhere: build id, interpreter,
     /// needed libraries, compiler notes.
     pub metadata: BTreeMap<String, String>,
+    /// What DWARF said, when the file carried it.
+    pub debug: Option<crate::dwarf::DebugInfo>,
     /// Problems found while loading that did not stop the load. A hostile file
     /// is still worth analyzing, and the complaints belong in the report.
     pub warnings: Vec<String>,
@@ -273,6 +276,10 @@ pub struct LoadOptions {
     /// Read `.eh_frame` for function starts. On by default; it is the best
     /// boundary evidence an ELF offers and costs one pass.
     pub eh_frame: bool,
+    /// Read DWARF debug information when it is present. On by default: what
+    /// the compiler knew about names and types cannot be recovered any other
+    /// way, so it is worth the pass over the sections.
+    pub debug_info: bool,
 }
 
 impl Default for LoadOptions {
@@ -282,6 +289,7 @@ impl Default for LoadOptions {
             base: None,
             arch: None,
             eh_frame: true,
+            debug_info: true,
         }
     }
 }

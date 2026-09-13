@@ -10,16 +10,19 @@
 //! labelled goto, which is honest but is also the thing to improve, so the
 //! density is held under a ceiling that only comes down.
 
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use r12e_analysis::{Options, Program, analyze};
-use r12e_core::Addr;
 use r12e_format::LoadOptions;
 
-/// Ceiling on gotos per function. Only lowered.
-const MAX_GOTO_DENSITY: f64 = 0.26;
+/// Ceiling on the share of functions the structuring could not express without
+/// a label. Only lowered.
+///
+/// The share rather than the count: one function of forty nested loops can
+/// need twenty labels, and averaging those over the corpus says more about
+/// that one function than about the structuring.
+const MAX_UNSTRUCTURED: f64 = 0.13;
 
 fn build_dir() -> Option<PathBuf> {
     let d = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/build");
@@ -32,61 +35,14 @@ fn open(name: &str) -> Option<Program> {
     Some(analyze(obj, &Options::default()))
 }
 
-struct Unit {
-    text: String,
-    functions: usize,
-    gotos: usize,
-}
-
-/// Decompile every recovered function into one translation unit.
-fn decompile_all(p: &Program) -> Unit {
-    let mut declarations: Vec<String> = Vec::new();
-    let mut bodies = String::new();
-    let mut functions = 0;
-    let mut gotos = 0;
-    let mut seen: Vec<String> = Vec::new();
-
-    for f in p.functions_by_address() {
-        if !f.is_complete() || f.cfg.blocks.len() > 300 {
-            continue;
-        }
-        let blocks: BTreeMap<Addr, (Addr, Vec<Addr>)> = f
-            .cfg
-            .blocks
-            .iter()
-            .map(|(a, b)| (*a, (b.range.end(), b.successors.clone())))
-            .collect();
-        let mut ir = r12e_ir::func::build(&p.object.memory, &p.object.arch, f.entry, &blocks);
-        r12e_ir::stack::promote(&mut ir);
-        let mut ssa = r12e_ir::ssa::build(&ir);
-        r12e_ir::opt::optimize(&mut ssa);
-        // A name C will take, and only once: two symbols can share a name.
-        let name = format!("f_{:x}", f.entry.get());
-        if seen.contains(&name) {
-            continue;
-        }
-        seen.push(name.clone());
-        let out = r12e_decomp::decompile(&name, &ssa);
-        declarations.extend(out.declarations);
-        bodies.push_str(&out.text);
-        bodies.push('\n');
-        functions += 1;
-        gotos += out.gotos;
-    }
-
-    declarations.sort();
-    declarations.dedup();
-    let mut text = String::from("#include <stdint.h>\n");
-    for d in &declarations {
-        text.push_str(d);
-        text.push('\n');
-    }
-    text.push_str(&bodies);
-    Unit {
-        text,
-        functions,
-        gotos,
-    }
+/// Decompile every recovered function into one translation unit, by exactly
+/// the path the command line takes.
+fn decompile_all(p: &Program) -> r12e_api::Unit {
+    let targets: Vec<&r12e_analysis::Function> = p
+        .functions_by_address()
+        .filter(|f| f.is_complete() && f.cfg.blocks.len() <= 300)
+        .collect();
+    r12e_api::decompile_program(p, &targets)
 }
 
 fn clang() -> Option<String> {
@@ -120,29 +76,30 @@ fn compile(text: &str, tag: &str) -> Option<(bool, String)> {
 fn check(binary: &str) {
     let Some(p) = open(binary) else { return };
     let unit = decompile_all(&p);
-    if unit.functions == 0 {
+    let count = unit.functions.len();
+    if count == 0 {
         return;
     }
-    let Some((ok, errors)) = compile(&unit.text, binary) else {
+    let Some((ok, errors)) = compile(&unit.text(), binary) else {
         return; // no compiler here
     };
     assert!(
         ok,
-        "{binary}: the decompiled output of {} functions does not compile:\n{}",
-        unit.functions,
+        "{binary}: the decompiled output of {count} functions does not compile:\n{}",
         errors.lines().take(20).collect::<Vec<_>>().join("\n")
     );
 
-    let density = unit.gotos as f64 / unit.functions as f64;
+    let gotos = unit.gotos();
+    let unstructured = unit.functions.iter().filter(|f| f.gotos > 0).count();
+    let share = unstructured as f64 / count as f64;
     assert!(
-        density <= MAX_GOTO_DENSITY,
-        "{binary}: {} gotos across {} functions ({density:.2} each), ceiling is {MAX_GOTO_DENSITY}",
-        unit.gotos,
-        unit.functions
+        share <= MAX_UNSTRUCTURED,
+        "{binary}: {unstructured} of {count} functions needed a label \
+         ({share:.2}), ceiling is {MAX_UNSTRUCTURED}; {gotos} gotos in total"
     );
     println!(
-        "{binary}: {} functions, {} gotos ({density:.2} each)",
-        unit.functions, unit.gotos
+        "{binary}: {count} functions, {unstructured} needed a label ({share:.2}), \
+         {gotos} gotos"
     );
 }
 
@@ -163,4 +120,23 @@ fn x86_output_compiles() {
 #[test]
 fn a_stripped_binary_decompiles_too() {
     check("hello.a64.O2.stripped");
+}
+
+/// The fixtures built with debug information, where the output is typed from
+/// what the compiler recorded rather than from the calling convention.
+#[test]
+fn output_typed_from_debug_information_compiles() {
+    for name in [
+        "wide.a64.O0.o",
+        "wide.a64.O1.o",
+        "wide.a64.O2.o",
+        "wide.x64.O0.o",
+        "wide.x64.O2.o",
+        "shapes.a64.O0.o",
+        "shapes.x64.O2.o",
+        "hello.a64.O0",
+        "hello.a64.O2",
+    ] {
+        check(name);
+    }
 }

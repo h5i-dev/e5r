@@ -55,8 +55,26 @@ pub enum Region {
     Break,
     /// Going back to the top of the loop this sits inside.
     Continue,
+    /// A multi-way branch through a jump table.
+    Switch {
+        /// The block holding the branch.
+        head: Addr,
+        /// The arms, in case-value order.
+        cases: Vec<Case>,
+        /// Where control goes for an index the table does not cover.
+        default: Option<Box<Region>>,
+    },
     /// Nothing.
     Empty,
+}
+
+/// One arm of a switch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Case {
+    /// The values that reach this arm; several indices can share a body.
+    pub values: Vec<u64>,
+    /// What it does.
+    pub body: Region,
 }
 
 /// A structured function, with the measure of how well it worked.
@@ -73,6 +91,11 @@ pub struct Structured {
 /// The graph structuring works over: successors per block.
 pub type Graph = BTreeMap<Addr, Vec<Addr>>;
 
+/// The cases of each multi-way branch: the value the index takes and where it
+/// goes. Without this a jump table is a block with many successors and no way
+/// to say which is which, and every arm but one becomes a goto.
+pub type Switches = BTreeMap<Addr, Vec<(u64, Addr)>>;
+
 /// Which successor a conditional branch jumps to when its condition holds.
 ///
 /// Guessing this from the order of the successors is how an `if` comes out
@@ -81,6 +104,16 @@ pub type Taken = BTreeMap<Addr, Addr>;
 
 /// Structure a control flow graph.
 pub fn structure(entry: Addr, graph: &Graph, taken: &Taken) -> Structured {
+    structure_with(entry, graph, taken, &Switches::new())
+}
+
+/// Structure a control flow graph, knowing what its jump tables mean.
+pub fn structure_with(
+    entry: Addr,
+    graph: &Graph,
+    taken: &Taken,
+    switches: &Switches,
+) -> Structured {
     let order = reverse_postorder(entry, graph);
     let index: BTreeMap<Addr, usize> = order.iter().enumerate().map(|(i, a)| (*a, i)).collect();
     let preds = predecessors(graph);
@@ -110,6 +143,7 @@ pub fn structure(entry: Addr, graph: &Graph, taken: &Taken) -> Structured {
     let mut ctx = Ctx {
         graph,
         taken,
+        switches,
         postdom: &postdom,
         loop_headers: &loop_headers,
         bodies: &bodies,
@@ -117,6 +151,7 @@ pub fn structure(entry: Addr, graph: &Graph, taken: &Taken) -> Structured {
         labels: BTreeSet::new(),
         gotos: 0,
         depth: 0,
+        duplication: 8,
         loops: Vec::new(),
     };
     let root = ctx.region(entry, None, None);
@@ -130,6 +165,7 @@ pub fn structure(entry: Addr, graph: &Graph, taken: &Taken) -> Structured {
 struct Ctx<'a> {
     graph: &'a Graph,
     taken: &'a Taken,
+    switches: &'a Switches,
     postdom: &'a BTreeMap<Addr, Addr>,
     loop_headers: &'a BTreeSet<Addr>,
     bodies: &'a BTreeMap<Addr, BTreeSet<Addr>>,
@@ -137,6 +173,11 @@ struct Ctx<'a> {
     labels: BTreeSet<Addr>,
     gotos: usize,
     depth: u32,
+    /// How much duplication is left. A tail that several arms share can be
+    /// written out in each of them instead of jumped to, which reads far
+    /// better, but only while it stays small: unbounded duplication turns a
+    /// chain of comparisons into an exponential one.
+    duplication: u32,
     /// The loops currently being structured, innermost last. An edge to the
     /// innermost loop's exit is a `break` and an edge to its header is a
     /// `continue`; without this both come out as gotos.
@@ -191,6 +232,12 @@ impl Ctx<'_> {
                 }
             }
             if self.emitted.contains(&cursor) {
+                // A small tail is written out again rather than jumped to.
+                if self.duplication > 0 && self.small_tail(cursor, stop) {
+                    self.duplication -= 1;
+                    parts.push(self.duplicate(cursor, stop, enclosing));
+                    break;
+                }
                 self.gotos += 1;
                 self.labels.insert(cursor);
                 parts.push(Region::Goto(cursor));
@@ -235,6 +282,17 @@ impl Ctx<'_> {
                     }
                     cursor = next;
                 }
+                _ if self.switches.contains_key(&cursor) => {
+                    let (region, after) = self.build_switch(cursor, stop, enclosing);
+                    parts.push(Region::Block(cursor));
+                    parts.push(region);
+                    match after {
+                        Some(next) if Some(next) != stop && !self.emitted.contains(&next) => {
+                            cursor = next;
+                        }
+                        _ => break,
+                    }
+                }
                 _ => {
                     let (region, after) = self.build_if(cursor, &succs, stop, enclosing);
                     parts.push(Region::Block(cursor));
@@ -260,6 +318,59 @@ impl Ctx<'_> {
             1 => parts.pop().unwrap(),
             _ => Region::Seq(parts),
         }
+    }
+
+    /// True when a block starts a tail small enough to write out again.
+    fn small_tail(&self, at: Addr, stop: Option<Addr>) -> bool {
+        let mut seen: BTreeSet<Addr> = BTreeSet::new();
+        let mut work = vec![at];
+        while let Some(block) = work.pop() {
+            if Some(block) == stop || !self.graph.contains_key(&block) {
+                continue;
+            }
+            if self.loop_headers.contains(&block) {
+                return false;
+            }
+            if !seen.insert(block) {
+                continue;
+            }
+            if seen.len() > 2 {
+                return false;
+            }
+            for s in self.graph.get(&block).into_iter().flatten() {
+                if !seen.contains(s) {
+                    work.push(*s);
+                }
+            }
+        }
+        !seen.is_empty()
+    }
+
+    /// Structure a tail again, as a copy.
+    fn duplicate(&mut self, at: Addr, stop: Option<Addr>, enclosing: Option<Addr>) -> Region {
+        // The blocks are already marked as emitted, so they are unmarked for
+        // the duration of the copy and put back afterwards.
+        let mut restored: Vec<Addr> = Vec::new();
+        let mut work = vec![at];
+        let mut seen: BTreeSet<Addr> = BTreeSet::new();
+        while let Some(block) = work.pop() {
+            if Some(block) == stop || !seen.insert(block) {
+                continue;
+            }
+            if self.emitted.remove(&block) {
+                restored.push(block);
+            }
+            for s in self.graph.get(&block).into_iter().flatten() {
+                if !seen.contains(s) {
+                    work.push(*s);
+                }
+            }
+        }
+        let region = self.region(at, stop, enclosing);
+        for block in restored {
+            self.emitted.insert(block);
+        }
+        region
     }
 
     /// Build a loop from its header.
@@ -396,6 +507,69 @@ impl Ctx<'_> {
                 invert,
                 then: Box::new(then),
                 otherwise,
+            },
+            join,
+        )
+    }
+
+    /// Build a switch from a block whose jump table is known.
+    fn build_switch(
+        &mut self,
+        head: Addr,
+        stop: Option<Addr>,
+        enclosing: Option<Addr>,
+    ) -> (Region, Option<Addr>) {
+        let entries = self.switches.get(&head).cloned().unwrap_or_default();
+        let join = self.postdom.get(&head).copied().filter(|j| *j != head);
+
+        // Several indices often share a body, which C says with several
+        // labels on one arm rather than with a copy of the body each.
+        let mut grouped: BTreeMap<Addr, Vec<u64>> = BTreeMap::new();
+        for (value, target) in &entries {
+            grouped.entry(*target).or_default().push(*value);
+        }
+        // In the order the values first appear, so the output reads in the
+        // order the source was written.
+        let mut order: Vec<Addr> = Vec::new();
+        for (_, target) in &entries {
+            if !order.contains(target) {
+                order.push(*target);
+            }
+        }
+
+        let mut cases = Vec::new();
+        for target in order {
+            let values = grouped.remove(&target).unwrap_or_default();
+            if Some(target) == join {
+                // An arm that goes straight to the join does nothing but
+                // leave; it still needs its labels.
+                cases.push(Case {
+                    values,
+                    body: Region::Break,
+                });
+                continue;
+            }
+            let body = self.region(target, join.or(stop), enclosing);
+            cases.push(Case { values, body });
+        }
+
+        // A successor the table does not name is where an out-of-range index
+        // goes, which C calls the default.
+        let named: BTreeSet<Addr> = entries.iter().map(|(_, t)| *t).collect();
+        let default = self
+            .graph
+            .get(&head)
+            .into_iter()
+            .flatten()
+            .find(|s| !named.contains(s) && Some(**s) != join)
+            .copied()
+            .map(|s| Box::new(self.region(s, join.or(stop), enclosing)));
+
+        (
+            Region::Switch {
+                head,
+                cases,
+                default,
             },
             join,
         )
@@ -790,20 +964,23 @@ mod tests {
             (5, &[]),
         ]);
         let s = structure(Addr(0), &graph);
-        // Whatever it produces, every block appears at most once and the gotos
-        // are counted.
+        // A block can appear more than once: a small tail shared by several
+        // arms is written out in each of them rather than jumped to. What must
+        // not happen is unbounded duplication.
         let regions = collect(&s.root);
-        let mut blocks: Vec<Addr> = regions
+        let blocks: Vec<Addr> = regions
             .iter()
             .filter_map(|r| match r {
                 Region::Block(a) => Some(*a),
                 _ => None,
             })
             .collect();
-        let before = blocks.len();
-        blocks.sort();
-        blocks.dedup();
-        assert_eq!(before, blocks.len(), "a block was emitted twice");
+        assert!(
+            blocks.len() <= graph.len() * 4,
+            "{} blocks emitted for a graph of {}",
+            blocks.len(),
+            graph.len()
+        );
     }
 
     #[test]
@@ -838,6 +1015,14 @@ mod tests {
             }
             Region::While { body, .. } | Region::Infinite { body, .. } => {
                 out.extend(collect(body));
+            }
+            Region::Switch { cases, default, .. } => {
+                for c in cases {
+                    out.extend(collect(&c.body));
+                }
+                if let Some(d) = default {
+                    out.extend(collect(d));
+                }
             }
             _ => {}
         }

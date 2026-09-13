@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod ctype;
 pub mod itanium;
 pub mod msvc;
 pub mod rust;

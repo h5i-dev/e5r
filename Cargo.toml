@@ -26,6 +26,7 @@ r12e-types = { path = "crates/r12e-types", version = "0.1.0" }
 r12e-diff = { path = "crates/r12e-diff", version = "0.1.0" }
 r12e-ir = { path = "crates/r12e-ir", version = "0.1.0" }
 r12e-decomp = { path = "crates/r12e-decomp", version = "0.1.0" }
+r12e-api = { path = "crates/r12e-api", version = "0.1.0" }
 
 # Kept deliberately short. Loaders and decoders are written here rather than
 # pulled in, because provenance tagging and hostile-input behaviour are the

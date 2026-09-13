@@ -13,6 +13,9 @@ pub mod emit;
 pub mod expr;
 pub mod structure;
 
-pub use emit::{Output, decompile};
+pub use emit::{
+    Callee, Output, Param, Prototype, decompile, decompile_full, decompile_in, decompile_with,
+    identifier,
+};
 pub use expr::Expr;
-pub use structure::{Region, Structured};
+pub use structure::{Case, Region, Structured, Switches};

@@ -470,8 +470,6 @@ pub fn diff(w: &mut Out, old: &Program, new: &Program, all: bool, as_json: bool)
 
 /// Decompile one function, or every recovered function, to pseudo-C.
 pub fn decompile(w: &mut Out, p: &Program, target: &str, as_json: bool) -> R {
-    use std::collections::BTreeMap;
-
     let chosen: Vec<&r12e_analysis::Function> = if target == "all" {
         p.functions_by_address().collect()
     } else {
@@ -491,71 +489,42 @@ pub fn decompile(w: &mut Out, p: &Program, target: &str, as_json: bool) -> R {
         return Ok(exit::NOT_FOUND);
     }
 
-    let mut outputs = Vec::new();
-    for f in &chosen {
-        let blocks: BTreeMap<Addr, (Addr, Vec<Addr>)> = f
-            .cfg
-            .blocks
-            .iter()
-            .map(|(a, b)| (*a, (b.range.end(), b.successors.clone())))
-            .collect();
-        let mut ir = r12e_ir::func::build(&p.object.memory, &p.object.arch, f.entry, &blocks);
-        r12e_ir::stack::promote(&mut ir);
-        let mut ssa = r12e_ir::ssa::build(&ir);
-        r12e_ir::opt::optimize(&mut ssa);
-        let name = f.display_name();
-        let out = r12e_decomp::decompile(&name, &ssa);
-        outputs.push((*f, out, ir.unlifted.len()));
-    }
-
+    let unit = r12e_api::decompile_program(p, &chosen);
     if as_json {
-        let items = outputs
+        let items = unit
+            .functions
             .iter()
-            .map(|(f, o, unlifted)| {
-                (
-                    *f,
-                    o.text.clone(),
-                    o.gotos,
-                    o.locals,
-                    o.unmodelled + unlifted,
-                )
+            .map(|d| {
+                let f = p.function(d.addr).unwrap_or(chosen[0]);
+                (f, d.text.clone(), d.gotos, d.locals, d.unmodelled)
             })
             .collect();
         return json::emit(w, &json::decompiled(items));
     }
 
-    // The declarations first, deduplicated, so the whole output is one
-    // translation unit a compiler will accept.
-    let mut declarations: Vec<String> = outputs
-        .iter()
-        .flat_map(|(_, o, _)| o.declarations.iter().cloned())
-        .collect();
-    declarations.sort();
-    declarations.dedup();
-    if !declarations.is_empty() {
+    if !unit.declarations.is_empty() {
         outln!(w, "#include <stdint.h>");
-        for d in &declarations {
+        for d in &unit.declarations {
             outln!(w, "{d}");
         }
         outln!(w);
     }
-
-    for (n, (f, o, unlifted)) in outputs.iter().enumerate() {
+    for (n, d) in unit.functions.iter().enumerate() {
         if n > 0 {
             outln!(w);
         }
         // What a reader needs to judge the output: where it came from, and how
         // much of it the structuring and the lifter could not express.
-        outln!(w, "// {}", f.entry);
-        if o.gotos > 0 || o.unmodelled + unlifted > 0 {
+        outln!(w, "// {}", d.addr);
+        if d.gotos > 0 || d.unmodelled > 0 {
             outln!(
                 w,
                 "// {} goto(s), {} unmodelled instruction(s)",
-                o.gotos,
-                o.unmodelled + unlifted
+                d.gotos,
+                d.unmodelled
             );
         }
-        for line in o.text.lines() {
+        for line in d.text.lines() {
             outln!(w, "{line}");
         }
     }

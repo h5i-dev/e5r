@@ -39,8 +39,8 @@ pub enum Expr {
     Deref(Box<Expr>, u8),
     /// A named operation C has no operator for.
     Named(&'static str, Vec<Expr>),
-    /// A call to a known address.
-    Call(u64, Vec<Expr>),
+    /// A call to a function, named.
+    Call(String, Vec<Expr>),
     /// A call through an expression.
     CallInd(Box<Expr>),
     /// A cast, which the machine performs and C has to be told about.
@@ -167,8 +167,8 @@ impl Expr {
                 }
                 f.write_str(")")
             }
-            Expr::Call(target, args) => {
-                write!(f, "sub_{target:x}(")?;
+            Expr::Call(name, args) => {
+                write!(f, "{name}(")?;
                 for (n, a) in args.iter().enumerate() {
                     if n > 0 {
                         f.write_str(", ")?;
@@ -192,6 +192,21 @@ impl Expr {
 }
 
 /// The C type for a size in bytes.
+/// What to call a function whose name is not known.
+pub fn default_call_name(target: u64) -> String {
+    format!("sub_{target:x}")
+}
+
+/// The helper that reads a bit pattern as a number of this width.
+pub fn reinterpret_to_float(size: u8) -> &'static str {
+    if size == 4 { "__flt" } else { "__dbl" }
+}
+
+/// The helper that reads a number of this width as its bits.
+pub fn reinterpret_to_bits(size: u8) -> &'static str {
+    if size == 4 { "__bits32" } else { "__bits" }
+}
+
 /// The floating point type of a width.
 pub fn float_type(size: u8) -> &'static str {
     if size == 4 { "float" } else { "double" }
@@ -275,6 +290,20 @@ pub fn slot_name(l: Location) -> String {
 /// True when a location is an argument the caller passed on the stack.
 pub fn is_stack_argument(l: Location) -> bool {
     l.space == r12e_ir::op::Space::Stack && (l.offset as i64) > 0
+}
+
+/// Negate a condition without stacking `!` on something already negated.
+pub fn negate(e: Expr) -> Expr {
+    match e {
+        Expr::Unary("!", inner) => *inner,
+        Expr::Binary("==", a, b) => Expr::Binary("!=", a, b),
+        Expr::Binary("!=", a, b) => Expr::Binary("==", a, b),
+        Expr::Binary("<", a, b) => Expr::Binary(">=", a, b),
+        Expr::Binary("<=", a, b) => Expr::Binary(">", a, b),
+        Expr::Binary(">", a, b) => Expr::Binary("<=", a, b),
+        Expr::Binary(">=", a, b) => Expr::Binary("<", a, b),
+        other => Expr::Unary("!", Box::new(other)),
+    }
 }
 
 /// Which locations hold floating point values.
@@ -369,6 +398,17 @@ pub struct Rebuilder<'a> {
     /// Locations that hold floating point values, which is what decides how a
     /// literal is printed and how a parameter is declared.
     pub floats: BTreeSet<Location>,
+    /// Names for incoming registers, from whatever knew better than the
+    /// convention did.
+    pub names: BTreeMap<u64, String>,
+    /// Incoming registers whose declared type is a pointer. C scales
+    /// arithmetic on those by the size of what they point at, and the machine
+    /// has already done the scaling, so they are cast back to integers
+    /// wherever they are used as addresses.
+    pub pointers: BTreeSet<u64>,
+    /// The declared width of an incoming register's value, which is not the
+    /// width of the register: a `float` arrives in a sixteen-byte one.
+    pub sizes: BTreeMap<u64, u8>,
 }
 
 impl<'a> Rebuilder<'a> {
@@ -393,6 +433,9 @@ impl<'a> Rebuilder<'a> {
         }
         Rebuilder {
             f,
+            names: BTreeMap::new(),
+            pointers: BTreeSet::new(),
+            sizes: BTreeMap::new(),
             floats: float_locations(f),
             abi: r12e_ir::abi::of(&f.arch),
             defs,
@@ -401,21 +444,61 @@ impl<'a> Rebuilder<'a> {
         }
     }
 
+    /// An expression read as an integer, whatever it was declared as.
+    ///
+    /// A floating value has to be reinterpreted, and a pointer has to be cast,
+    /// because C scales arithmetic on a pointer and the machine already did.
+    pub fn integer(&self, e: Expr, o: &Operand) -> Expr {
+        let location = match o {
+            Operand::Value(v) => Some(v.location),
+            Operand::Undefined(l) => Some(*l),
+            Operand::Const(..) => None,
+        };
+        let Some(l) = location else { return e };
+        if self.floats.contains(&l) {
+            let size = if l.space == r12e_ir::op::Space::Register {
+                self.sizes.get(&l.offset).copied().unwrap_or(l.size)
+            } else {
+                l.size
+            };
+            return Expr::Named(reinterpret_to_bits(size), vec![e]);
+        }
+        if l.space == r12e_ir::op::Space::Register && self.pointers.contains(&l.offset) {
+            return Expr::Cast("uint64_t", Box::new(e));
+        }
+        e
+    }
+
+    /// What to call a value that arrived from outside.
+    pub fn name_of(&self, l: Location) -> String {
+        if l.space == r12e_ir::op::Space::Register {
+            if let Some(name) = self.names.get(&l.offset) {
+                return name.clone();
+            }
+        }
+        input_name(l, &self.abi)
+    }
+
     /// The expression for one operand.
     pub fn operand(&self, o: &Operand) -> Expr {
         match o {
             Operand::Const(v, s) => Expr::Const(*v, *s),
-            Operand::Undefined(l) => Expr::Input(*l, input_name(*l, &self.abi)),
+            Operand::Undefined(l) => Expr::Input(*l, self.name_of(*l)),
             Operand::Value(v) => {
                 if let Some(name) = self.locals.get(v) {
                     return Expr::Local(name.clone());
                 }
                 match self.definition(*v) {
                     Some(op) => self.expr(op),
-                    None => Expr::Input(v.location, input_name(v.location, &self.abi)),
+                    None => Expr::Input(v.location, self.name_of(v.location)),
                 }
             }
         }
+    }
+
+    /// Where a value is defined: which block, and which operation in it.
+    pub fn definition_site(&self, v: Value) -> Option<(r12e_core::Addr, usize)> {
+        self.defs.get(&v).copied()
     }
 
     fn definition(&self, v: Value) -> Option<&'a SsaOp> {
@@ -454,29 +537,27 @@ impl<'a> Rebuilder<'a> {
         // A value the machine holds in a register has no type of its own, so
         // where the two disagree the reinterpretation is written down rather
         // than left for the C compiler to do something else with.
+        // The width the operation works at, which is what a literal operand
+        // means whatever width it was stored as.
+        let width = op
+            .inputs
+            .first()
+            .map(|i| i.size())
+            .filter(|s| *s == 4 || *s == 8)
+            .unwrap_or(op.size);
         let float_in = |e: Expr, o: &Operand| -> Expr {
             match o {
-                Operand::Const(v, size) => Expr::FConst(*v, *size),
+                Operand::Const(v, _) => Expr::FConst(*v, width),
                 Operand::Value(v) if !self.floats.contains(&v.location) => {
-                    Expr::Named("__dbl", vec![e])
+                    Expr::Named(reinterpret_to_float(width), vec![e])
                 }
                 Operand::Undefined(l) if !self.floats.contains(l) => {
-                    Expr::Named("__dbl", vec![e])
+                    Expr::Named(reinterpret_to_float(width), vec![e])
                 }
                 _ => e,
             }
         };
-        let int_in = |e: Expr, o: &Operand| -> Expr {
-            match o {
-                Operand::Value(v) if self.floats.contains(&v.location) => {
-                    Expr::Named("__bits", vec![e])
-                }
-                Operand::Undefined(l) if self.floats.contains(l) => {
-                    Expr::Named("__bits", vec![e])
-                }
-                _ => e,
-            }
-        };
+        let int_in = |e: Expr, o: &Operand| -> Expr { self.integer(e, o) };
 
         // A literal consumed by a floating point operation is a number, not a
         // bit pattern, and printing it as one is the difference between `1.0`
@@ -501,13 +582,15 @@ impl<'a> Rebuilder<'a> {
         let fbin = |sym: &'static str| Expr::Binary(sym, Box::new(fa()), Box::new(fb()));
 
         match o {
-            Op::Copy => a(),
-            Op::Load => Expr::Deref(Box::new(a()), op.size),
-            Op::IntAdd => bin("+"),
-            Op::IntSub => bin("-"),
-            Op::IntMul => bin("*"),
-            Op::IntDiv => bin("/"),
-            Op::IntRem => bin("%"),
+            // A copy of a value whose declared type is not an integer still
+            // lands in an integer local, so the conversion is written down.
+            Op::Copy => ia(),
+            Op::Load => Expr::Deref(Box::new(ia()), op.size),
+            Op::IntAdd => ibin("+"),
+            Op::IntSub => ibin("-"),
+            Op::IntMul => ibin("*"),
+            Op::IntDiv => ibin("/"),
+            Op::IntRem => ibin("%"),
             Op::IntSDiv => signed_bin("/"),
             Op::IntSRem => signed_bin("%"),
             Op::IntAnd => ibin("&"),
@@ -518,16 +601,18 @@ impl<'a> Rebuilder<'a> {
             Op::IntLeft => ibin("<<"),
             Op::IntRight => ibin(">>"),
             Op::IntSRight => signed_bin(">>"),
-            Op::IntEqual => bin("=="),
-            Op::IntNotEqual => bin("!="),
-            Op::IntLess => bin("<"),
-            Op::IntLessEqual => bin("<="),
+            Op::IntEqual => ibin("=="),
+            Op::IntNotEqual => ibin("!="),
+            Op::IntLess => ibin("<"),
+            Op::IntLessEqual => ibin("<="),
             Op::IntSLess => signed_bin("<"),
             Op::IntSLessEqual => signed_bin("<="),
             Op::BoolAnd => bin("&&"),
             Op::BoolOr => bin("||"),
             Op::BoolXor => bin("^"),
-            Op::BoolNot => Expr::Unary("!", Box::new(a())),
+            // A negated comparison is the opposite comparison, which is what
+            // the source said before the machine turned it into flags.
+            Op::BoolNot => negate(a()),
             Op::IntZExt => Expr::Cast(c_type(op.size), Box::new(a())),
             Op::IntSExt => Expr::Cast(signed_type(op.size), Box::new(a())),
             // A shift by a byte count, which is how a narrow read is expressed.
@@ -543,9 +628,9 @@ impl<'a> Rebuilder<'a> {
                 ),
                 None => Expr::Unknown("subpiece"),
             },
-            Op::CallInd => Expr::Named("__callind", vec![a()]),
+            Op::CallInd => Expr::Named("__callind", vec![ia()]),
             Op::Call => match op.inputs.first().and_then(|i| i.as_const()) {
-                Some(target) => Expr::Call(target, Vec::new()),
+                Some(target) => Expr::Call(default_call_name(target), Vec::new()),
                 None => Expr::Unknown("call"),
             },
             Op::PopCount => Expr::Named("__popcount", vec![a()]),

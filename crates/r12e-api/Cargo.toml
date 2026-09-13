@@ -1,6 +1,6 @@
 [package]
-name = "r12e-format"
-description = "r12e — container loaders: ELF, PE, Mach-O, raw."
+name = "r12e-api"
+description = "r12e — the library surface the CLI and the servers share."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,5 +10,8 @@ authors.workspace = true
 
 [dependencies]
 r12e-core = { workspace = true }
+r12e-format = { workspace = true }
+r12e-analysis = { workspace = true }
+r12e-ir = { workspace = true }
+r12e-decomp = { workspace = true }
 r12e-types = { workspace = true }
-serde = { workspace = true }

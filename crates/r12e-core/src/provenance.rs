@@ -54,6 +54,8 @@ impl fmt::Display for Strength {
 pub enum Evidence {
     /// An entry in a symbol table.
     SymbolTable,
+    /// Debug information: what the compiler recorded about its own output.
+    DebugInfo,
     /// A symbol with no declared type, sitting in executable memory.
     CodeSymbol,
     /// An entry in a dynamic symbol table.
@@ -96,6 +98,7 @@ impl Evidence {
     pub fn strength(self) -> Strength {
         match self {
             Evidence::SymbolTable
+            | Evidence::DebugInfo
             | Evidence::DynamicSymbol
             | Evidence::EntryPoint
             | Evidence::InitArray
@@ -123,6 +126,7 @@ impl Evidence {
     pub fn as_str(self) -> &'static str {
         match self {
             Evidence::SymbolTable => "symbol table",
+            Evidence::DebugInfo => "debug info",
             Evidence::CodeSymbol => "code symbol",
             Evidence::DynamicSymbol => "dynamic symbol",
             Evidence::EntryPoint => "entry point",

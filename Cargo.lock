@@ -228,6 +228,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "r12e-api"
+version = "0.1.0"
+dependencies = [
+ "r12e-analysis",
+ "r12e-core",
+ "r12e-decomp",
+ "r12e-format",
+ "r12e-ir",
+ "r12e-types",
+]
+
+[[package]]
 name = "r12e-arch"
 version = "0.1.0"
 dependencies = [
@@ -241,6 +253,7 @@ dependencies = [
  "clap",
  "memmap2",
  "r12e-analysis",
+ "r12e-api",
  "r12e-arch",
  "r12e-core",
  "r12e-db",
@@ -274,6 +287,7 @@ name = "r12e-decomp"
 version = "0.1.0"
 dependencies = [
  "r12e-analysis",
+ "r12e-api",
  "r12e-arch",
  "r12e-core",
  "r12e-decomp",
@@ -299,6 +313,7 @@ name = "r12e-format"
 version = "0.1.0"
 dependencies = [
  "r12e-core",
+ "r12e-types",
  "serde",
 ]
 
