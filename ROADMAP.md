@@ -10,7 +10,7 @@ rather than argued about again.
 | --- | --- |
 | workspace, guards, fixtures, CI | built (M0) |
 | ELF loader with provenance-tagged hints | built (M1) |
-| PE and COFF | built (M1); Mach-O not started; raw built |
+| ELF, PE and COFF, Mach-O, raw | built (M1) |
 | AArch64 decoder | built, objdump parity over 1.43M instructions, 99.87% decoded |
 | x86-64 decoder | built, llvm-objdump parity over 4,760 instructions, 100% decoded |
 | SLEIGH runtime and compiler | not started |
@@ -151,8 +151,9 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       (`RUNTIME_FUNCTION` unwind data, the best function-boundary oracle
       Windows offers). Base relocations, resources and load config are still
       to do.
-- [ ] Mach-O, including fat binaries, chained fixups, the exports trie, and
-      `LC_FUNCTION_STARTS`, which is another boundary oracle.
+- [x] Mach-O, thin and fat, with `LC_FUNCTION_STARTS` for boundaries, the
+      symbol table, dylib dependencies and the UUID. Chained fixups and the
+      exports trie are still to do, as is the dyld shared cache.
 - [x] Raw blob loading with an explicit base, architecture and entry point, plus
       Intel HEX and S-record, for firmware work.
 - [ ] `ar` archives and loose object files.

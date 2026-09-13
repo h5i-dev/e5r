@@ -49,6 +49,12 @@ for src in fixtures/portable/*.c; do
     "$xcc" --target=x86_64-linux-gnu -g -"$opt" -ffreestanding -c \
       -o "$out/${base}.x64.${opt}.o" "$src"
   done
+  # Mach-O objects for both architectures. clang cross-compiles these without
+  # a sysroot, which is the only Mach-O this machine can produce.
+  "$xcc" --target=arm64-apple-macos11 -O2 -ffreestanding -c \
+    -o "$out/${base}.macho.a64.o" "$src" 2>/dev/null || true
+  "$xcc" --target=x86_64-apple-macos11 -O2 -ffreestanding -c \
+    -o "$out/${base}.macho.x64.o" "$src" 2>/dev/null || true
   # A COFF object, so the PE loader has real input on a machine with no
   # Windows linker.
   "$xcc" --target=x86_64-pc-windows-msvc -O2 -ffreestanding -c \

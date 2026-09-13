@@ -105,6 +105,7 @@ threads, twice each. All 105 runs produce identical output. Green.
 - rizin and Ghidra, because neither is installed here.
 - DecBench, because there is no decompiler yet.
 - Coverage and mutation scores, because the tooling is not wired up.
-- Anything on Mach-O, because there is no Mach-O loader.
+- Anything on a real Mach-O image, because there is no macOS linker here;
+  the Mach-O tests use cross-compiled objects and a synthesized fat header.
 - Anything on a real PE image, because there is no Windows linker here; the PE
   tests use a synthesized image and real COFF objects.

@@ -13,6 +13,7 @@
 
 pub mod ehframe;
 pub mod elf;
+pub mod macho;
 pub mod pe;
 pub mod raw;
 
@@ -295,6 +296,10 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
         Err(e) if e.is_not_recognized() => {}
         other => return other,
     }
+    match macho::load(data, opts) {
+        Err(e) if e.is_not_recognized() => {}
+        other => return other,
+    }
     match pe::load(data, opts) {
         Err(e) if e.is_not_recognized() => {}
         other => return other,
@@ -303,6 +308,6 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
         return raw::load(data, opts);
     }
     Err(Error::NotRecognized {
-        expected: "recognized container (ELF or PE); pass an architecture to load it raw",
+        expected: "recognized container (ELF, Mach-O or PE); pass an architecture to load it raw",
     })
 }
