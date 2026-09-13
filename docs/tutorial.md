@@ -31,15 +31,20 @@ after this point rests on it.
 ```
 $ r12e funcs prog
 address                 size  blocks   insns  strength  evidence                    name
-0x400144                  24       1       9  proven    .eh_frame                   -
-0x400168                  14       1       5  proven    .eh_frame                   -
+0x400144                  24       1       9  inferred  direct call target          sub_400144
+0x400168                  14       1       5  inferred  direct call target          sub_400168
+0x40017c                  18       1       6  inferred  direct call target          sub_40017c
 ...
 ```
 
-`strength` and `evidence` are the point. `proven` from `.eh_frame` means the
-compiler emitted an unwind entry for exactly this range, which survives
-stripping. `heuristic` from a prologue scan means something looked like a
-function. The two fail differently, so they are never mixed into one number.
+`strength` and `evidence` are the point, and this binary is a good example of
+why. It is freestanding, so there is no `.eh_frame` and the symbol table is
+gone: every one of these is `inferred`, found because something calls it.
+On an ordinary dynamically linked binary you will see `proven` from
+`.eh_frame`, which the compiler emits for unwinding and which survives
+stripping, and `heuristic` where a prologue scan found something that merely
+looked like a function. Those three fail differently, so they are never mixed
+into one number.
 
 To see what is fact and what is a scanner's opinion, run it both ways:
 
@@ -57,12 +62,32 @@ Build a signature library from a binary that has symbols:
 
 ```
 $ r12e sig fixtures/build/driver.a64.O2 create -o driver.r12e-sig
+38 signature(s) written
 $ r12e sig prog apply driver.r12e-sig
+address              match      name                         was
+0x400144             exact      arith8                       sub_400144
+0x400168             exact      arith16                      sub_400168
+0x40017c             exact      arith32                      sub_40017c
+...
 ```
 
-A signature identifies a function by what it is rather than where it is. The
-number that matters is recall **with zero wrong names**: a wrong name is worse
-than no name, because you will believe it.
+A signature identifies a function by what it is rather than where it is, and
+`match` says how strongly. Apply the same library to builds at other
+optimization levels and the column earns its place:
+
+| build the signatures came from | applied to | exact | shape | none |
+| --- | --- | --- | --- | --- |
+| `driver.a64.O2` | `O3` | 35 | 0 | |
+| `driver.a64.O2` | `Os` | 28 | 0 | |
+| `driver.a64.O2` | `O1` | 27 | 1 | |
+| `driver.a64.O2` | `O0` | 0 | 0 | all |
+
+The one `shape` match at `-O1` is `_start`, whose bytes differ and whose
+instruction shapes do not. `-O0` recovers nothing, correctly: the code really
+is different, and a tool that claimed a match there would be lying to you.
+
+The number that matters is recall **with zero wrong names**. A wrong name is
+worse than no name, because you will believe it.
 
 ## 4. Read the code
 
@@ -93,14 +118,30 @@ $ r12e annotate prog comment 0x400144 "length is little endian, unlike the rest"
 $ r12e annotate prog type 0x400144 "int parse_header(const uint8_t *p, size_t n)"
 ```
 
-This writes `prog.r12e`, one assertion per line:
+Each one prints what it recorded:
+
+```
+0x400144 name = "parse_header"
+0x400144 comment = "length is little endian, unlike the rest"
+```
+
+and writes `prog.r12e`, one assertion per line:
 
 ```
 $ cat prog.r12e
-r12e-log 1
-name 3f0a1c2b8e7d4a19 d41d8cd98f00b204 12 0 seq=1 who=you value=parse_header
-...
+r12e-annotations 1
+# One assertion per line, sorted by content id. Order does not affect the
+# result, so the union of two branches is the correct merge. Put this in
+# .gitattributes so git does that for you:
+#     *.r12e merge=union
+# Do not sort or reflow by hand.
+name shape=6a0730fc0e7aa36f bytes=893ddaba11934499 insns=9 abs=400144 off=0 \
+  seq=0 id=0a30883f9c5dc4a3 by="you" value="parse_header"
+comment shape=6a0730fc0e7aa36f bytes=893ddaba11934499 insns=9 abs=400144 off=0 \
+  seq=1 id=c009f5fec3f16326 by="you" value="length is little endian, unlike the rest"
 ```
+
+(Two lines here, one line in the file.)
 
 Each line is keyed by a **content anchor**: a fingerprint of the function's
 instruction shapes with branch targets excluded, an exact hash of its bytes,
@@ -144,19 +185,20 @@ This is the step the incumbents cannot do.
 ```
 $ make -B                      # rebuild the program from changed source
 $ r12e annotate ./prog list
+0x400144            name     "parse_header"
+0x400144            comment  "length is little endian, unlike the rest"
 ```
 
-The names come back, and each one says how it was found:
+The names come back because the log is keyed by content, not by address. The
+three fields at the front of each line are what did it: `shape=` is the
+fingerprint that survives a rebase and a relink, `bytes=` is the exact hash for
+the same-binary fast path, and `abs=` is the address, used only as a tiebreak.
 
-```
-0x400180  parse_header   shape     # the bytes changed, the shape did not
-0x4001c4  read_length    exact     # this function was not touched
-0x400220  emit_record    address   # only the address matched: check this one
-```
-
-`address` is the resolution that means "the code this was written against is
-not there any more". It is not hidden, and nothing that writes to a binary
-accepts it without being told to.
+Where it matters most is the case where an anchor resolves on the address
+alone, because that means the code the annotation was written against is not
+there any more. Nothing hides that. `r12e sig ... apply` prints the resolution
+per function in its `match` column, and `r12e patch ... apply` refuses outright
+unless you pass `--allow-address-only`.
 
 ## 8. Save the session
 
