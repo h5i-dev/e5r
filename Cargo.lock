@@ -288,6 +288,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "r12e-ir"
+version = "0.1.0"
+dependencies = [
+ "r12e-analysis",
+ "r12e-arch",
+ "r12e-core",
+ "r12e-format",
+ "serde",
+]
+
+[[package]]
 name = "r12e-types"
 version = "0.1.0"
 

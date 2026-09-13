@@ -24,6 +24,7 @@ r12e-analysis = { path = "crates/r12e-analysis", version = "0.1.0" }
 r12e-db = { path = "crates/r12e-db", version = "0.1.0" }
 r12e-types = { path = "crates/r12e-types", version = "0.1.0" }
 r12e-diff = { path = "crates/r12e-diff", version = "0.1.0" }
+r12e-ir = { path = "crates/r12e-ir", version = "0.1.0" }
 
 # Kept deliberately short. Loaders and decoders are written here rather than
 # pulled in, because provenance tagging and hostile-input behaviour are the

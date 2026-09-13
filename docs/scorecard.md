@@ -56,6 +56,32 @@ x86-64 material is cross-compiled. 4,760 instructions is enough to find
 systematic errors and not enough to claim the breadth the AArch64 number does.
 That is the honest reading of it.
 
+## Lifting
+
+The IR is measured two ways. Coverage is the share of instructions inside
+recovered functions that the lifter models completely; anything it does not
+model emits an explicit `Unimplemented` rather than an approximation.
+
+| architecture | instructions | lifted |
+| --- | --- | --- |
+| AArch64 | 603,588 | 98.75% |
+
+What remains is `mrs` (reading system registers, which needs a system model),
+the 16-byte SIMD loads and stores (the interpreter holds a value in 64 bits),
+`svc` and `brk` (which leave the program), and the byte reversals and
+high-half multiplies, which have no single IR operation and are not
+approximated.
+
+Correctness is measured by running lifted code and comparing against the same
+computation written in Rust: ten functions covering arithmetic at every width,
+both division kinds including division by zero, widening and sign extension,
+all seven comparisons, conditional selection, shifts and rotates, nested loops
+and a memory-summing loop. All pass. Two bugs were found this way that reading
+the lifter could not have: signed overflow was always false at 64-bit width,
+and the two-operand conditional-select aliases had their condition inverted.
+
+x86-64 is not lifted at all yet.
+
 ## Function recovery
 
 Measured against the symbol table, which names every function the compiler
