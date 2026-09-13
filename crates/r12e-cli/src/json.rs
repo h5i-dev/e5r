@@ -393,6 +393,46 @@ pub fn identified(found: &[r12e_api::Identified]) -> Listing<IdentifiedOut> {
     )
 }
 
+/// The answer to a query, as objects keyed by column name.
+#[derive(Serialize)]
+pub struct QueryOut {
+    schema: &'static str,
+    entity: String,
+    matched: usize,
+    count: usize,
+    items: Vec<std::collections::BTreeMap<String, serde_json::Value>>,
+}
+
+pub fn query(answer: &r12e_api::Answer) -> QueryOut {
+    let items = answer
+        .rows
+        .iter()
+        .map(|row| {
+            row.values
+                .iter()
+                .map(|(name, value)| {
+                    use r12e_api::query::Field;
+                    let v = match value {
+                        Field::Number(n) => serde_json::Value::from(*n),
+                        Field::Address(a) => serde_json::Value::from(hex(*a)),
+                        Field::Text(t) => serde_json::Value::from(t.clone()),
+                        Field::Bool(b) => serde_json::Value::from(*b),
+                        Field::Missing => serde_json::Value::Null,
+                    };
+                    (name.to_string(), v)
+                })
+                .collect()
+        })
+        .collect::<Vec<_>>();
+    QueryOut {
+        schema: SCHEMA,
+        entity: answer.entity.as_str().to_string(),
+        matched: answer.matched,
+        count: items.len(),
+        items,
+    }
+}
+
 pub fn disas(p: &Program, fns: &[&Function]) -> Listing<DisasOut> {
     listing(
         fns.iter()

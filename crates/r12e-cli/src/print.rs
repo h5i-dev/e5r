@@ -613,3 +613,77 @@ pub fn identified(
     }
     Ok(exit::OK)
 }
+
+/// Answer a query.
+pub fn query(w: &mut Out, p: &Program, text: &str, as_json: bool) -> R {
+    if text.trim().is_empty() {
+        return Err("a query is needed: try `functions where insns > 100`".into());
+    }
+    let answer = r12e_api::query::run(p, text)?;
+    if as_json {
+        return json::emit(w, &json::query(&answer));
+    }
+    if answer.rows.is_empty() {
+        eprintln!("nothing matched");
+        return Ok(exit::NOT_FOUND);
+    }
+
+    // Column widths from the data, so a table of addresses does not reserve
+    // room for the longest name a symbol could have.
+    let widths: Vec<usize> = answer
+        .columns
+        .iter()
+        .enumerate()
+        .map(|(n, c)| {
+            answer
+                .rows
+                .iter()
+                .map(|r| {
+                    r.values
+                        .get(n)
+                        .map(|(_, v)| escape(&v.to_string()).len())
+                        .unwrap_or(0)
+                })
+                .chain(std::iter::once(c.len()))
+                .max()
+                .unwrap_or(c.len())
+                .min(60)
+        })
+        .collect();
+
+    let mut header = String::new();
+    for (c, width) in answer.columns.iter().zip(&widths) {
+        let _ = std::fmt::Write::write_fmt(&mut header, format_args!("{c:<width$}  "));
+    }
+    outln!(w, "{}", header.trim_end());
+    for row in &answer.rows {
+        let mut line = String::new();
+        for ((_, value), width) in row.values.iter().zip(&widths) {
+            // A string from a binary can contain anything, including the
+            // newline that would break the table it is printed in.
+            let text = escape(&value.to_string());
+            let text = if text.len() > 60 { &text[..60] } else { &text };
+            let _ = std::fmt::Write::write_fmt(&mut line, format_args!("{text:<width$}  "));
+        }
+        outln!(w, "{}", line.trim_end());
+    }
+    if answer.rows.len() < answer.matched {
+        eprintln!("{} of {} shown", answer.rows.len(), answer.matched);
+    }
+    Ok(exit::OK)
+}
+
+/// A string that will not break the table it is printed in.
+fn escape(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push('.'),
+            c => out.push(c),
+        }
+    }
+    out
+}

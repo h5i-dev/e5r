@@ -163,6 +163,16 @@ enum Command {
         /// Address, symbol, or `all`.
         target: String,
     },
+    /// Ask a question about the program.
+    ///
+    /// `functions where insns > 100 and name ~ "crypt"`, and the same shape
+    /// for strings, symbols, imports, exports, sections and xrefs.
+    Query {
+        #[command(flatten)]
+        common: Common,
+        /// The query.
+        query: Vec<String>,
+    },
     /// Build and apply function signatures.
     ///
     /// A signature identifies a function by what it is rather than where it
@@ -251,7 +261,8 @@ impl Command {
             Command::Annotate { common, .. } | Command::Diff { common, .. } => common,
             // The server takes its paths per call rather than up front.
             Command::Mcp => unreachable!("handled before a file is opened"),
-            Command::Sig { common, .. }
+            Command::Query { common, .. }
+            | Command::Sig { common, .. }
             | Command::Disas { common, .. }
             | Command::Decompile { common, .. }
             | Command::Shapes { common, .. }
@@ -371,6 +382,9 @@ fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             print::decompile(w, &program, target, common.json)
         }
         Command::Shapes { common, target } => print::shapes(w, &program, target, common.json),
+        Command::Query { common, query } => {
+            print::query(w, &program, &query.join(" "), common.json)
+        }
         Command::Sig { what, common } => match what {
             SigCommand::Create { out } => {
                 let library = r12e_api::collect_signatures(
