@@ -213,6 +213,11 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       AArch64 is at zero disagreements over 1,426,341 instructions, 99.377%
       decoded. Random-byte fuzzing against the oracle is still to do.
 - [ ] SLEIGH runtime: load a compiled `.sla`, decode, and produce p-code.
+      Loading is done: the format is worked out in
+      [`docs/sla-format.md`](../docs/sla-format.md) and the reader consumes all
+      137 files Ghidra ships, 95 MB of payload, interpreting 99.90% of it and
+      keeping the rest as raw nodes with their offsets rather than guessing.
+      Decoding from that model is not started.
 - [ ] SLEIGH compiler: `.slaspec` to `.sla`, so Ghidra's processor tree builds
       from source instead of shipping as binary blobs. This is the single largest
       task in M2 and it unlocks RISC-V, MIPS, PowerPC, SPARC, SuperH, 6502, Z80,
@@ -252,14 +257,17 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 - [x] PLT thunk resolution from the relocation table, so a call through one
       prints the imported name. GOT and IAT still to do for the indirect
       forms.
-- [ ] Windows-specific entry points, which are how a PE runs code the entry
-      point never reaches: TLS callbacks from the directory the loader already
-      notices, static and dynamic initializer tables, and the exception
-      handlers. On x86-64 those live in `.pdata` and `.xdata`, which also give
-      function boundaries and frame layouts; on 32-bit they are a linked list
-      through `fs:[0]` that has to be recognized in the code. A binary whose
-      real work happens in a TLS callback is a common enough shape that missing
-      it is missing the program.
+- [x] Windows-specific entry points, which are how a PE runs code the entry
+      point never reaches. TLS callbacks, the `.pdata` exception directory with
+      the `.xdata` unwind info behind it (frame layout, handler, chained
+      parent, and the ARM64 packed form), SEH scope tables, base relocations,
+      and the load config's Control Flow Guard and SafeSEH tables, which are
+      linker-built lists of real entry points the loader enforces and so carry
+      their own evidence kind. Measured against `llvm-readobj` entry for entry
+      over four real linked PE images, x64 and arm64 at O0 and O2, with zero
+      disagreements. Still to do: the resource directory, the 32-bit `fs:[0]`
+      handler chain, which is code recognition rather than a directory, and the
+      `.CRT$XC*` initializer tables, which are a section-name convention.
 - [x] Parallel analysis with deterministic output. Functions are independent
       units; the work queue order must not reach the result.
 
