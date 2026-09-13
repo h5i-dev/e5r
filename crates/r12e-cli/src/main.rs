@@ -11,6 +11,7 @@
 mod addr;
 mod annotate;
 mod json;
+mod mcp;
 mod out;
 mod print;
 
@@ -124,6 +125,9 @@ enum Command {
     },
     /// Counts: functions, blocks, instructions, references, strings.
     Stats(Common),
+    /// Speak the Model Context Protocol on stdin and stdout, so an agent can
+    /// drive the analysis.
+    Mcp,
     /// Read and write the annotation log.
     ///
     /// The log is a text file git can merge: every assertion is one line keyed
@@ -180,6 +184,8 @@ impl Command {
             | Command::Funcs(c)
             | Command::Stats(c) => c,
             Command::Annotate { common, .. } => common,
+            // The server takes its paths per call rather than up front.
+            Command::Mcp => unreachable!("handled before a file is opened"),
             Command::Disas { common, .. }
             | Command::Xrefs { common, .. }
             | Command::Strings { common, .. } => common,
@@ -207,6 +213,10 @@ fn main() -> ExitCode {
 }
 
 fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
+    // The server opens files itself, one per tool call.
+    if matches!(cli.command, Command::Mcp) {
+        return mcp::serve();
+    }
     let common = cli.command.common();
 
     let file =

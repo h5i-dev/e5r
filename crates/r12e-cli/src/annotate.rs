@@ -89,7 +89,7 @@ pub fn anchor_of(p: &Program, f: &r12e_analysis::Function) -> Anchor {
 }
 
 /// The anchor covering an address, with the offset into it.
-fn anchor_for_addr(p: &Program, at: Addr) -> Option<Anchor> {
+pub fn anchor_for(p: &Program, at: Addr) -> Option<Anchor> {
     let f = p.function(at).or_else(|| p.function_at(at))?;
     let offset = at.get().saturating_sub(f.entry.get()) as u32;
     Some(anchor_of(p, f).at_offset(offset))
@@ -108,7 +108,7 @@ pub fn set(
     let Some(at) = addr::resolve(p, target) else {
         return Err(format!("{target:?} is not an address or a symbol"));
     };
-    let Some(anchor) = anchor_for_addr(p, at) else {
+    let Some(anchor) = anchor_for(p, at) else {
         return Err(format!("no function covers {at}"));
     };
     let mut log = load(db)?;

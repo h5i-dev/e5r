@@ -21,6 +21,7 @@ $ r12e disas ./a.out main
 $ r12e annotate ./a.out name 0x4006e8 parse_header
 $ r12e xrefs ./a.out 0x4006e8
 $ r12e stats --json ./a.out
+$ r12e mcp                    # JSON-RPC on stdin and stdout, for an agent
 ```
 
 Analysis of `libc.so.6` (1.7 MB, 3,534 functions, 436,040 instructions, 57,646

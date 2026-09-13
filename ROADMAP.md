@@ -19,7 +19,8 @@ rather than argued about again.
 | IR, SSA, types, decompiler | not started (M4 to M6) |
 | annotation log, content anchors, git merge | built (M7) |
 | CLI with JSON on every command | built (M8) |
-| MCP server, diff, patch, signatures | not started (M9, M10) |
+| MCP server | built (M9) |
+| diff, patch, signatures | not started (M10) |
 
 Measured on a 10-core aarch64 machine: `libc.so.6` (1.7 MB) analyzes in around
 a tenth of a second, finding 3,524 functions, 80.3% of them complete;
@@ -339,8 +340,11 @@ designed before it gets coded, and the design lives in `docs/design/db.md`.
 
 - [ ] `r12e-api`: the stable library surface the CLI and the MCP server both use.
       Semver from 1.0, with a compatibility test suite.
-- [ ] MCP server exposing open, list functions, disassemble, decompile, xrefs,
-      rename, retype, comment, diff and patch preview.
+- [x] MCP server, as `r12e mcp`: open, stats, list_functions, disassemble,
+      xrefs, strings, annotate and read_annotations. Written directly rather
+      than through an SDK; the protocol is newline-delimited JSON-RPC and a
+      dependency would be larger than the code. decompile, diff and patch
+      preview follow their features.
 - [ ] Cancellable jobs with a budget, so an agent that asks for the decompilation
       of a 40,000-function binary gets partial results and a reason.
 - [ ] A batch mode that runs a script of commands and emits one JSON document.
