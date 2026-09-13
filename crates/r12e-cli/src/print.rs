@@ -10,7 +10,7 @@ use r12e_format::Object;
 use crate::addr;
 use crate::exit;
 use crate::json;
-use crate::out::{Out, outln};
+use crate::out::{Out, Role, outln};
 
 type R = Result<u8, String>;
 
@@ -72,11 +72,14 @@ pub fn sections(w: &mut Out, o: &Object, as_json: bool) -> R {
     }
     outln!(
         w,
-        "{:<24}{:<20}{:>10}  {:>10}  perm",
-        "name",
-        "address",
-        "size",
-        "file off"
+        "{}",
+        head(
+            w,
+            &format!(
+                "{:<24}{:<20}{:>10}  {:>10}  perm",
+                "name", "address", "size", "file off"
+            )
+        )
     );
     for s in &o.sections {
         let addr = if s.range.is_empty() {
@@ -86,9 +89,9 @@ pub fn sections(w: &mut Out, o: &Object, as_json: bool) -> R {
         };
         outln!(
             w,
-            "{:<24}{:<20}{:>10x}  {:>10x}  {}{}{}",
+            "{:<24}{}{:>10x}  {:>10x}  {}{}{}",
             s.name,
-            addr,
+            cell(w, Role::Addr, &addr, 20),
             s.range.len(),
             s.file_offset,
             'r',
@@ -111,12 +114,12 @@ pub fn symbols(w: &mut Out, o: &Object, as_json: bool) -> R {
     for s in &o.symbols {
         outln!(
             w,
-            "{:<20}{:>8x}  {:<10}{:<8}{}",
-            s.addr.to_string(),
+            "{}{:>8x}  {:<10}{:<8}{}",
+            cell(w, Role::Addr, &s.addr.to_string(), 20),
             s.size,
             format!("{:?}", s.kind).to_lowercase(),
             if s.dynamic { "dynamic" } else { "static" },
-            r12e_types::pretty(&s.name)
+            w.paint(Role::Name, &last(w, 48, &r12e_types::pretty(&s.name)))
         );
     }
     Ok(exit::OK)
@@ -172,14 +175,14 @@ pub fn funcs(w: &mut Out, p: &Program, as_json: bool) -> R {
     }
     outln!(
         w,
-        "{:<20}{:>8}  {:>6}  {:>6}  {:<10}{:<28}{}",
-        "address",
-        "size",
-        "blocks",
-        "insns",
-        "strength",
-        "evidence",
-        "name"
+        "{}",
+        head(
+            w,
+            &format!(
+                "{:<20}{:>8}  {:>6}  {:>6}  {:<10}{:<28}{}",
+                "address", "size", "blocks", "insns", "strength", "evidence", "name"
+            )
+        )
     );
     for f in p.functions_by_address() {
         let ev = {
@@ -190,21 +193,23 @@ pub fn funcs(w: &mut Out, p: &Program, as_json: bool) -> R {
             }
             s
         };
+        let strength = f.provenance.strength().to_string();
+        let tail = if f.is_complete() {
+            ""
+        } else {
+            "  [incomplete]"
+        };
         outln!(
             w,
-            "{:<20}{:>8x}  {:>6}  {:>6}  {:<10}{:<28}{}{}",
-            f.entry.to_string(),
+            "{}{:>8x}  {:>6}  {:>6}  {}{:<28}{}{}",
+            cell(w, Role::Addr, &f.entry.to_string(), 20),
             f.cfg.covered_bytes(),
             f.cfg.blocks.len(),
             f.cfg.insns(),
-            f.provenance.strength().to_string(),
+            cell(w, strength_role(&strength), &strength, 10),
             truncate(&ev, 27),
-            f.display_name(),
-            if f.is_complete() {
-                ""
-            } else {
-                "  [incomplete]"
-            },
+            w.paint(Role::Name, &last(w, 84 + tail.len(), &f.display_name())),
+            tail,
         );
     }
     Ok(exit::OK)
@@ -214,7 +219,45 @@ fn truncate(s: &str, n: usize) -> String {
     if s.len() <= n {
         s.to_string()
     } else {
-        format!("{}…", &s[..n - 1])
+        // On a character boundary, because a name can be UTF-8 and cutting a
+        // multi-byte sequence in half would panic.
+        let mut cut = n - 1;
+        while cut > 0 && !s.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        format!("{}…", &s[..cut])
+    }
+}
+
+/// A fixed-width cell, padded before it is coloured so the escape sequences do
+/// not count toward the width.
+fn cell(w: &Out, role: Role, text: &str, width: usize) -> String {
+    w.paint(role, &format!("{text:<width$}"))
+}
+
+/// A header row, which is one colour across.
+fn head(w: &Out, text: &str) -> String {
+    w.paint(Role::Head, text)
+}
+
+/// Fit the last column of a listing to the terminal, and never when the output
+/// is going somewhere else: a piped listing must diff against the same listing
+/// taken a week ago.
+fn last(w: &Out, used: usize, text: &str) -> String {
+    match w.width() {
+        Some(total) if total > used + 8 => truncate(text, total - used),
+        Some(_) => truncate(text, 8),
+        None => text.to_string(),
+    }
+}
+
+/// The colour a strength is printed in. The ladder is the point: a reader
+/// scanning a listing should see at a glance which rows are facts.
+fn strength_role(s: &str) -> Role {
+    match s {
+        "proven" | "asserted" => Role::Strong,
+        "inferred" => Role::Weak,
+        _ => Role::Unknown,
     }
 }
 
@@ -270,7 +313,12 @@ pub fn strings(w: &mut Out, p: &Program, as_json: bool) -> R {
         return Ok(exit::NOT_FOUND);
     }
     for s in &p.strings {
-        outln!(w, "{}  {:?}", s.addr, s.text);
+        outln!(
+            w,
+            "{}  {}",
+            w.paint(Role::Addr, &s.addr.to_string()),
+            last(w, 22, &format!("{:?}", s.text))
+        );
     }
     Ok(exit::OK)
 }
@@ -307,8 +355,8 @@ pub fn disas(w: &mut Out, p: &Program, target: &str, show_bytes: bool, as_json: 
         outln!(
             w,
             "{} <{}>:  {} block(s), {}",
-            f.entry,
-            f.display_name(),
+            w.paint(Role::Addr, &f.entry.to_string()),
+            w.paint(Role::Name, &f.display_name()),
             f.cfg.blocks.len(),
             f.provenance
         );
@@ -334,11 +382,11 @@ pub fn disas(w: &mut Out, p: &Program, target: &str, show_bytes: bool, as_json: 
             let annot = annotate(p, i);
             outln!(
                 w,
-                "  {:>12x}: {:<10}{}{}",
-                i.addr.get(),
+                "  {}: {:<10}{}{}",
+                w.paint(Role::Addr, &format!("{:>12x}", i.addr.get())),
                 raw,
                 text.replace('\t', " "),
-                annot
+                w.paint(Role::Name, &annot)
             );
         }
     }
@@ -608,19 +656,26 @@ pub fn identified(
     }
     outln!(
         w,
-        "{:<20} {:<10} {:<28} {}",
-        "address",
-        "match",
-        "name",
-        "was"
+        "{}",
+        head(
+            w,
+            &format!("{:<20} {:<10} {:<28} {}", "address", "match", "name", "was")
+        )
     );
     for i in &found {
+        // The resolution is the point of this listing: `exact` and `shape` are
+        // evidence, `address` is a coincidence until someone checks it.
+        let role = match i.resolution.as_str() {
+            "exact" | "shape" => Role::Strong,
+            "address" => Role::Unknown,
+            _ => Role::Weak,
+        };
         outln!(
             w,
-            "{:<20} {:<10} {:<28} {}",
-            i.addr.to_string(),
-            i.resolution.as_str(),
-            i.name,
+            "{} {} {} {}",
+            cell(w, Role::Addr, &i.addr.to_string(), 20),
+            cell(w, role, i.resolution.as_str(), 10),
+            cell(w, Role::Name, &i.name, 28),
             i.was
         );
     }

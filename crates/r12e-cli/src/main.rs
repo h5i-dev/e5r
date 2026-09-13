@@ -78,6 +78,12 @@ pub struct Common {
     /// Annotation log to use. Defaults to the binary's path plus `.r12e`.
     #[arg(long, global = true)]
     db: Option<PathBuf>,
+    /// When to colour the output. Piped output is never coloured under `auto`.
+    #[arg(long, global = true, value_name = "WHEN", default_value = "auto")]
+    color: out::When,
+    /// Do not page, even when a terminal is reading.
+    #[arg(long, global = true)]
+    no_pager: bool,
 }
 
 #[derive(Subcommand)]
@@ -469,6 +475,24 @@ pub enum Annotation {
 }
 
 impl Command {
+    /// Colour and paging for this command, or `None` when its output is meant
+    /// for a program rather than for a person.
+    fn terminal_options(&self) -> Option<(out::When, bool)> {
+        match self {
+            // The server speaks a protocol, and the two writers below are
+            // redirected into a file the first time and never read on screen.
+            Command::Mcp | Command::Completions { .. } | Command::Manpage => None,
+            Command::Project { .. } => Some((out::When::Auto, false)),
+            _ => {
+                let c = self.common();
+                if c.json {
+                    return None;
+                }
+                Some((c.color, !c.no_pager))
+            }
+        }
+    }
+
     fn common(&self) -> &Common {
         match self {
             Command::Info(c)
@@ -511,6 +535,11 @@ fn parse_u64(s: &str) -> Result<u64, String> {
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let mut w = out::Out::new();
+    // JSON is for a program, so it is never coloured and never paged whatever
+    // the terminal is.
+    if let Some(c) = cli.command.terminal_options() {
+        w.attach_terminal(c.0, c.1);
+    }
     let result = run(&cli, &mut w);
     // A reader that went away is the normal end of `... | head`, not a failure.
     let piped_out = !w.finish();
