@@ -14,8 +14,10 @@ rather than argued about again.
 | x86-64 decoder | built, llvm-objdump parity over 4,760 instructions, 100% decoded |
 | SLEIGH runtime and compiler | not started (M2) |
 | functions, CFG, xrefs, strings, jump tables, no-return | built and parallel (M3) |
-| IR, lifters, interpreter, SSA, dataflow | built for AArch64 (M4) |
-| types, decompiler | not started (M5, M6) |
+| IR, lifters, interpreter, SSA, dataflow | built for AArch64 and x86-64, gated against real execution (M4) |
+| stack promotion, ABI model, algebraic rules | built (M4) |
+| decompiler to pseudo-C | built, output gated on compiling (M6) |
+| type model, DWARF, PDB | not started (M5) |
 | demanglers | Itanium, Rust both schemes, MSVC names (M5) |
 | annotation log, content anchors, git merge | built (M7) |
 | CLI with JSON on every command | built (M8) |
@@ -229,19 +231,37 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 - [x] A p-code-style IR with explicit varnodes and address spaces. Operations
       have no implicit effects, so an instruction that sets four flags becomes
       four operations; the register file is byte-addressed, so `w0` overlapping
-      `x0` is a property of the addresses rather than a rule. AArch64 lifts at
-      98.75% of the instructions inside recovered functions.
+      `x0` is a property of the addresses rather than a rule. AArch64 lifts
+      99.52% of the instructions inside recovered functions and x86-64 99.83%,
+      including the integer SIMD of both and floating point.
+- [x] x86-64 lifting with every flag each instruction writes, the wide multiply
+      and divide its one-operand forms need, and SSE. Gated by running the same
+      program on both architectures — natively here, under qemu for the other —
+      and comparing the recorded answers against the interpreted lifting: 59
+      calls across five optimization levels on each architecture, floating
+      point compared as the bits the machine produced.
 - [x] SSA construction over the IR, with partial register writes made explicit
       rather than papered over: locations are canonical whole registers, a
       narrow read becomes a `SubPiece` and a narrow write a masked merge, so
       `w0` sitting inside `x0` is a dependency dataflow can see.
-- [ ] Stack frame recovery: frame pointer or not, prologue and epilogue matching,
-      stack depth tracking through calls, `alloca` and dynamic frames.
-- [ ] Memory promotion, turning stack slots into variables where aliasing allows.
+- [x] Stack depth tracked through a function, so an access at a known offset
+      from the entry stack pointer is recognized whichever block it is in.
+      `alloca` and dynamic frames make the depth unknown, which the analysis
+      reports rather than guesses.
+- [x] Memory promotion, turning stack slots into variables where aliasing
+      allows. It refuses when any stack address is used as a value or when two
+      slots overlap without being identical.
 - [x] Constant folding, copy propagation and dead code elimination, each run to
       a fixed point. On the fixture corpus they take 7,726 lifted operations to
-      915, which is what turns IR into something a person can read. A rule pool
-      for the algebraic identities is still to do.
+      915, which is what turns IR into something a person can read.
+- [x] An algebraic rule pool: known-bits simplification, which collapses the
+      sub-register merges partial writes produce; local common-subexpression
+      elimination; and pattern rules that turn flag algebra back into the
+      comparison it stands for.
+- [x] The default calling convention per architecture, which dead code
+      elimination needs to know what the caller reads after a return and the
+      decompiler needs to name arguments. Per-function detection of the ones a
+      compiler invents is still to do.
 - [ ] Value-set or range analysis, enough to bound a jump table index and to
       prove a comparison constant.
 - [ ] Calling convention detection per function, including non-standard ones that
@@ -285,22 +305,32 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 
 ### M6. Decompiler
 
-- [ ] Region identification over the CFG, producing a region tree distinct from
-      the block graph.
-- [ ] Structuring into if, while, for, switch and the rest, with the goto set as
-      the measured quality signal. Follow the SAILR approach: make an edit,
-      restructure, count gotos, keep the change or roll it back.
-- [ ] Expression rebuilding from SSA, with operator precedence and cast insertion
-      that is correct rather than pretty.
-- [ ] Variable naming and merging, so the output reads as code and not as a
-      register dump.
+- [x] Region identification over the CFG, producing a region tree distinct from
+      the block graph: sequences, two-way branches joined at their immediate
+      post-dominator, natural loops from back edges, and a labelled goto where
+      the graph has no such shape.
+- [x] Structuring into if, while and the loop forms, with break and continue
+      taken from the loop nesting and the goto count reported as the quality
+      signal. Switch recovery and the SAILR edit-and-measure loop are still to
+      do.
+- [x] Expression rebuilding from SSA, with operator precedence and cast
+      insertion that is correct rather than pretty, and the reinterpretations
+      between a value's bits and the number they stand for written down
+      wherever the two disagree.
+- [x] Variable naming: a value read more than once or produced by a phi becomes
+      a named local, a promoted stack slot becomes a named variable, and
+      arguments are named from the calling convention. Merging variables that
+      share storage across their live ranges is still to do.
 - [ ] C emission with a position map, so every token maps back to an address and
       the CLI can highlight, slice and cross-reference the output.
 - [ ] Port Ghidra's 89 decompiler datatests to our format before the M6 gate
       opens. They encode two decades of decompiler bugs and they are the cheapest
       correctness signal available. Every bug fixed after that adds one case.
-- [ ] Quality gates: goto density per function against a baseline, and a
-      recompilability check on a corpus where the output is expected to build.
+- [x] Quality gates: goto density per function against a ceiling that only
+      comes down, and a recompilability check — every function recovered from
+      the fixture corpus is decompiled into one translation unit that `clang`
+      has to accept. Density is zero at O0, O1 and Os on both architectures and
+      0.24 per function at O2 and O3.
 - [ ] M6 does not close until DecBench scores r12e above Ghidra on the
       unoptimized set: 32.2 union, 29.3 structure. See the DecBench section.
 - [ ] Options are toggles, not rewrites. A user who wants low-level output and a

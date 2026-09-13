@@ -64,21 +64,30 @@ model emits an explicit `Unimplemented` rather than an approximation.
 
 | architecture | instructions | lifted |
 | --- | --- | --- |
-| AArch64 | 603,588 | 98.75% |
+| AArch64 | 607,913 | 99.52% |
+| x86-64 | 9,242 | 99.83% |
 
-What remains is `mrs` (reading system registers, which needs a system model),
-the 16-byte SIMD loads and stores (the interpreter holds a value in 64 bits),
-`svc` and `brk` (which leave the program), and the byte reversals and
-high-half multiplies, which have no single IR operation and are not
-approximated.
+The AArch64 corpus includes libc, bash and ls; the x86-64 one is the fixtures
+only, because this host runs no x86 system binaries, so the two numbers are
+not comparable.
 
-Correctness is measured by running lifted code and comparing against the same
-computation written in Rust: ten functions covering arithmetic at every width,
-both division kinds including division by zero, widening and sign extension,
-all seven comparisons, conditional selection, shifts and rotates, nested loops
-and a memory-summing loop. All pass. Two bugs were found this way that reading
-the lifter could not have: signed overflow was always false at 64-bit width,
-and the two-operand conditional-select aliases had their condition inverted.
+What remains on AArch64 is `mrs` (reading system registers, which needs a
+system model), `svc` and `brk` (which leave the program), the load-acquire and
+store-release forms, the SVE instructions in libc's string routines, and the
+byte and bit reversals.
+
+Correctness is measured against a processor. One program is compiled for both
+architectures and executed — natively here, under qemu for the other — and the
+recorded answers are what the interpreted lifting is compared against: 59
+calls across five optimization levels on each architecture, 590 executions,
+with floating point compared as the exact bits the machine produced. No
+expected value in that suite was written by hand.
+
+It found bugs that reading could not: `ldpsw` and `ldnp` lifted as stores, the
+signed double-width divide composing its halves without sign, signed overflow
+always false at 64-bit width, the two-operand conditional-select aliases with
+their condition inverted, and an eight-byte clear at offset four that straddles
+two SSA locations and silently discarded the value it was meant to preserve.
 
 SSA construction and the dataflow passes run over the same corpus: 7,726
 lifted operations reduce to 915, a little over a tenth, which is the
@@ -87,7 +96,24 @@ every complete function in the corpus: one definition per value, one phi input
 per predecessor, phis first in their block, every use reaching a definition,
 and a second optimization pass finding nothing.
 
-x86-64 is not lifted at all yet.
+## Decompiler
+
+Every function recovered from the fixture corpus is decompiled into one
+translation unit and handed to `clang -c`, which has to accept it. That is the
+gate; reading the output cannot tell you whether it is well formed.
+
+Goto density, the share of functions the structuring could not express without
+a label, is the quality signal:
+
+| corpus | functions | gotos | per function |
+| --- | --- | --- | --- |
+| driver.a64.O0 / O1 / Os | 37-38 | 0 | 0.00 |
+| driver.x64.O0 / O1 / Os | 36-37 | 0 | 0.00 |
+| driver.a64.O2 / O3 | 37 | 9 | 0.24 |
+| driver.x64.O2 / O3 | 37 | 9 | 0.24 |
+
+The O2 and O3 figures are one vectorized function each, whose loop has several
+exits.
 
 ## Function recovery
 
@@ -104,6 +130,24 @@ binaries: libc 95.3%, libcrypto 95.6%, bash 90.3%, libstdc++ 52.1%. The
 libstdc++ figure is the one to look at: it is full of C++ exception paths and
 virtual dispatch, and the remainder is mostly genuine indirect calls that no
 static analysis resolves.
+
+Against Ghidra 12.1.3 headless, on the same binaries, counting only functions
+inside the file (Ghidra puts imports in a synthetic block past the end):
+
+| binary | Ghidra | r12e | agreed | Ghidra only | r12e only | r12e time |
+| --- | --- | --- | --- | --- | --- | --- |
+| driver.a64.O2 | 38 | 38 | 38 | 0 | 0 | 0.020s |
+| driver.x64.O2 | 38 | 38 | 38 | 0 | 0 | 0.019s |
+| hello.a64.O2 | 17 | 16 | 15 | 2 | 1 | 0.019s |
+
+Ghidra's two extras on `hello` are the PLT resolver stub and a padding `nop`;
+r12e's one extra is `__wrap_main`, a real function whose symbol has no type.
+Ghidra's analysis of the same binary takes about ten seconds. Reproduce with
+`scripts/compare-ghidra.sh`.
+
+Ghidra's own decompiler could not be compared on this machine: the public
+distribution ships the decompiler as a native x86-64 binary, and this host is
+aarch64.
 
 ## Demangling
 
