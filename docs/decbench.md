@@ -14,7 +14,10 @@ same binaries**: behind on structure, behind on types, level on
 recompilation. It decompiles more of the corpus than angr does and thirteen
 times faster, and neither of those is a DecBench metric.
 
-Measured on 2026-09-13 against DecBench at commit `5818d67`.
+Measured on 2026-09-13 against DecBench at commit `5818d67`. Every number
+below was re-derived on the same day from the cached decompilations by a
+second run of the driver; the scoreboard it produced is identical to the
+first.
 
 ## The plugin interface
 
@@ -61,7 +64,7 @@ registry.
 
 | Requirement | State here |
 | --- | --- |
-| Python >= 3.10 with the `decbench` package | 3.12, installed in a venv from the checkout |
+| Python >= 3.10 with the `decbench` package | 3.12, installed in a venv from a copy of the checkout |
 | angr, pyjoern, cfgutils, pyelftools, lief, scipy | pip, all resolved |
 | Joern (the source and decompiled CFG parser) | 1.8 GB, downloaded by pyjoern on first use |
 | A JDK for Joern | OpenJDK 21 |
@@ -103,14 +106,19 @@ makes it the only honest like-for-like comparison in the table below.
   keeps them apart.
 - **What the decompiler saw:** a `strip --strip-all` copy. No symbols, no DWARF.
 - **Versions:** r12e 0.1.0 at `523515a`, angr 9.3.4, DecBench `5818d67`,
-  metrics as that commit defines them (GED `cache_version` per its
-  `metrics/ged.py`, byte_match 7, type_match 6).
+  metrics as that commit defines them (`cache_version` ged 4, byte_match 7,
+  type_match 6).
 
 ## Results
 
 Percent of functions scored perfect on each metric, which is what DecBench
-ranks on. Higher is better. Both columns are the same 779 functions of the same
-seven binaries on the same machine, so this is like for like.
+ranks on. Higher is better. Both columns are the same seven binaries and the
+same 780 function slots on the same machine, 779 of them after the duplicate
+DWARF name merges. The denominators differ, because
+DecBench scores each decompiler over the functions it returned: 779 for r12e,
+759 for angr, which returned nothing for twenty of them. Crediting angr with a
+zero on those twenty instead of dropping them gives it 36.1 union rather than
+37.0, so the choice does not change the ordering.
 
 | | Union | Structure (GED) | Types | Recompile |
 | --- | --- | --- | --- | --- |
@@ -132,12 +140,39 @@ recompile column is the one the roadmap bet on being open, and it is: r12e's
 mean assembly similarity is marginally the higher of the two and it compiles
 after fixup more often, while both land five perfect functions out of ~780.
 
+**Do not read the recompile column as correctness.** byte_match recompiles the
+function and compares the two assemblies by Jaccard similarity with
+linker-dependent operands normalized away, which measures shape. A function
+that drops every argument at every call, as defect 3 below says ours do,
+still produces call instructions in roughly the right places and still scores.
+This repository's own `cargo test --release -p r12e-decomp --test roundtrip`
+gate compiles each pure decompiled function and runs it against the
+interpreter, and at the time of this run it reported over a thousand calls
+disagreeing with the machine across dozens of functions. Those two statements
+are consistent: 0.181 mean byte_match and semantically wrong output are the
+same output. The field-wide recompile floor, nobody above 3.0, is a statement
+about the metric's strictness on perfect matches and not a licence to read the
+mean as a correctness score.
+
 Two things that DecBench does not score, and which are ours:
 
 | | Functions returned | Wall time for all seven binaries |
 | --- | --- | --- |
 | r12e | 780 / 780 | 21s |
-| angr | 760 / 780 (16 failures) | 278s |
+| angr | 760 / 780 | 278s |
+
+### Against what the roadmap asked for
+
+`ROADMAP.md` sets M6's exit criterion as beating Ghidra's published unoptimized
+score, 32.2 union and 29.3 structure, and G12 as holding union and recompile at
+or above the last release per dataset. **M6's bar is not met.** 23.4 union and
+22.9 structure are short of it even before allowing that Ghidra's 32.2 was
+measured on a corpus this slice is harder than: angr drops from 45.7 published
+to 37.0 here, and applying that same 0.81 ratio to Ghidra would put it near 26
+on this slice, still ahead of us. That scaling is an inference, not a
+measurement, and the only way to settle it is to run Ghidra, which this machine
+cannot. This run is the first G12 baseline; there is no previous release to
+compare against.
 
 ### Against the published leaderboard
 
@@ -167,10 +202,14 @@ nobody should read one into it: the only way to get a comparable number is to
 run the published corpus on x86-64, which needs a cross toolchain this machine
 does not have, or to submit to the 250-function sample set.
 
-The LLM rows are left out of the table on purpose. Codex and Claude Code lead
-the 250-function sample set (57.2 and 56.4 union) and score 0.2 on the full
-set, because they only ever attempted 250 functions. Quoting either number
-without the other misleads.
+Six of the thirteen published entrants are left out of the table: DecBench
+marks Codex, Claude Code, Fission, Glaurung, Manifold and Ventris
+`sample_set_only`, meaning they attempted only the sample set. Their full-set
+rows are a scale artifact, not a score. Codex and Claude Code lead the sample
+set and score 0.2 on the full one; recomputing from the checkout's
+`site/data/samples.json` over the 243 functions each attempted gives 56.8 and
+56.2 union, against 38.6 for Hex-Rays over the 500 it attempted. Quoting either
+number without the other misleads.
 
 ### The three defects that cost the most
 
@@ -232,14 +271,29 @@ Reproduce it in three lines:
 printf '#include <string.h>\nint f(const char*s){return strlen(s)>3;}\n%s\n' \
   'int main(int c,char**v){return f(v[0]);}' > /tmp/p.c
 gcc -g -O0 -fno-builtin /tmp/p.c -o /tmp/p
-./target/release/r12e decompile /tmp/p f   # the strlen call takes no arguments
+./target/release/r12e decompile /tmp/p f     # v0 = (uint64_t)(sub_5f0());
+./target/release/r12e decompile /tmp/p all   # strlen_plt();  and v0 never assigned
 ```
+
+The argument is gone in both. The assignment is gone only in `all`, which is
+the mode the benchmark runs.
 
 This one does not show up as a GED loss, because a call is a call whatever its
 arguments, but it is the reason a recompiled r12e function computes the wrong
 thing, and it is a `docs/design/decompiling.md` violation: the design says the
 decompiler does not silently drop anything, and this drops every argument at
 the call.
+
+### The working tree has already moved
+
+Checked the same day, after the run: the binary at `0edd06e` decompiles the
+same 158 functions of `example` into 133 identical bodies and 25 changed ones,
+and the goto count over that fixed set rises from 289 to 407. Structuring is
+the metric this document says costs us the most, and it has got worse by 41%
+on this corpus since the measured commit. That tree has several agents mid-edit
+in it and is not a release, so this is a warning rather than a number: whoever
+re-runs this benchmark should expect the GED column to move, and should check
+which direction before quoting it.
 
 ### What this run does not say
 
@@ -257,25 +311,33 @@ the call.
 ## How to reproduce from a clean checkout
 
 ```bash
-# 1. A virtualenv with DecBench in it. The checkout is read-only for us, so
-#    install from a copy if you want to keep it pristine.
-python3 -m venv ~/.venvs/decbench
-~/.venvs/decbench/bin/pip install -e ~/Ref/decbench
+# 1. A copy of the checkout to install from. `pip install -e` writes an
+#    egg-info into the source tree, so installing from ~/Ref/decbench directly
+#    would modify it. This is what the measured run did.
+cp -a ~/Ref/decbench /tmp/decbench-work
 
-# 2. Build r12e.
+# 2. A virtualenv with DecBench in it.
+python3 -m venv /tmp/decbench-venv
+/tmp/decbench-venv/bin/pip install -e /tmp/decbench-work
+
+# 3. Build r12e.
 cargo build --release
 
-# 3. One command. It compiles the corpus project on the first run (network:
+# 4. One command. It compiles the corpus project on the first run (network:
 #    the project TOMLs name upstream tarballs and git remotes), then
 #    decompiles and evaluates.
-DECBENCH_REPO=~/Ref/decbench DECBENCH_VENV=~/.venvs/decbench \
+DECBENCH_REPO=/tmp/decbench-work DECBENCH_VENV=/tmp/decbench-venv \
   scripts/decbench.sh /tmp/decbench-r12e zlib O0 r12e,angr
 ```
 
 The first run also downloads Joern (1.8 GB) the first time a metric needs a
 CFG. Budget an hour for a single project at one optimization level on this
 machine: the decompiling is minutes, the Joern parsing and the graph edit
-distances are the rest.
+distances are the rest. Results are cached in the tree, so re-running only
+redoes the evaluation; `DECBENCH_REDO=r12e` forces the decompiling again after
+a rebuild. Joern plants a `workspace/` directory of CPG stores next to
+wherever it runs, so the driver chdirs into the results tree first, to keep it
+out of this repository.
 
 `scripts/decbench_run.py` is the driver. DecBench's own
 `scripts/run_benchmark.py` was not used, because it decompiles through its own

@@ -230,8 +230,10 @@ threads, twice each. All 105 runs produce identical output. Green.
 
 ## What is not measured
 
-- rizin and Ghidra, because neither is installed here.
-- DecBench, because there is no decompiler yet.
+- rizin, because it is not installed here, and Ghidra's decompiler, because
+  the 12.1.3 install here ships it as an x86-64 binary and this host is arm64.
+- DecBench beyond one project, one optimization level and one architecture:
+  see the DecBench section below for what was and was not run.
 - Coverage and mutation scores as numbers: the CI jobs report them, but no
   floor is enforced yet.
 - Anything on a real Mach-O image, because there is no macOS linker here;
@@ -257,10 +259,23 @@ Percent of functions perfect on each metric, higher better.
 | r12e 0.1.0 | 23.4 | 22.9 | 5.6 | 0.64 |
 
 Behind on structure, behind on types, level on recompilation, which is the axis
-the roadmap bet was open. Not scored by DecBench but measured in the same run:
-r12e returned C for 780 of 780 requested functions in 21s against angr's 760
-and 278s, and 96.1% of its functions recompiled after DecBench's fixup pass
-against angr's 88.5%.
+the roadmap bet was open. **M6's exit criterion is not met:** it asks for
+Ghidra's published 32.2 union and 29.3 structure, and this is 23.4 and 22.9.
+G12 has no previous release to compare against, so this run is its baseline.
+
+The recompile column is not a correctness score. byte_match compares
+recompiled assembly by Jaccard similarity, so output that drops every call
+argument still scores; the `roundtrip` gate, which actually runs the
+decompiled function against the interpreter, disagrees with the machine on
+over a thousand calls at this commit. Both are true of the same output.
+
+Not scored by DecBench but measured in the same run: r12e returned C for 780
+of 780 requested functions in 21s against angr's 760 and 278s, and 96.1% of
+its functions recompiled after DecBench's fixup pass against angr's 88.5%.
+DecBench scores each decompiler over the functions it returned, so angr's
+denominator is 759 against our 779; crediting it a zero on the twenty it
+missed gives it 36.1 union rather than 37.0, which does not change the
+ordering.
 
 The comparison stops at angr. Ghidra 12.1.3 is installed here but ships its
 decompiler as an x86-64 binary only, so it cannot decompile on this arm64

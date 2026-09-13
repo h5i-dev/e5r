@@ -403,7 +403,10 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       has to accept. Density is zero at O0, O1 and Os on both architectures and
       0.24 per function at O2 and O3.
 - [ ] M6 does not close until DecBench scores r12e above Ghidra on the
-      unoptimized set: 32.2 union, 29.3 structure. See the DecBench section.
+      unoptimized set: 32.2 union, 29.3 structure. **Measured 2026-09-13: 23.4
+      union, 22.9 structure.** Not met. The gap is structuring: 1.98 gotos per
+      function against angr's 0.57, and the 124 functions with three or more
+      score zero on structure, every one of them.
 - [ ] Options are toggles, not rewrites. A user who wants low-level output and a
       user who wants idiomatic C get the same engine with different switches.
 
@@ -771,14 +774,16 @@ Tasks:
       built at several optimization levels with DWARF retained is ground truth
       that already exists, and it feeds the G4 function-boundary gate as much as
       it feeds the decompiler work.
-- [ ] Write a `r12e_raw.py` harness for `decbench/decompilers/raw/` so r12e is
-      scored on every run rather than by us. The existing harnesses for Ghidra,
-      angr and kuna are the template.
+- [x] A DecBench backend for r12e, as `scripts/decbench_r12e.py`. Out of tree,
+      which DecBench's own documentation permits, so the benchmark checkout
+      stays untouched. Driven by `scripts/decbench.sh`.
 - [ ] Submit to the 250-function sample set as soon as M6 produces output at all.
       It needs no harness and no open-sourcing: decompile the kit, mail back the
       zip. An early bad score is a baseline, not an embarrassment.
-- [ ] Record the DecBench numbers in `docs/scorecard.md` per release, including
-      the runs where we lose.
+- [x] Record the DecBench numbers in `docs/scorecard.md` per release, including
+      the runs where we lose. The first run is one we lose: 23.4 union against
+      angr's 37.0 on the same slice, with the method and the defect analysis in
+      [`docs/decbench.md`](../docs/decbench.md).
 
 ## Not building
 
