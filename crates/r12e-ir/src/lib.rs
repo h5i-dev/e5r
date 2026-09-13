@@ -19,6 +19,7 @@ pub mod lift;
 pub mod op;
 pub mod opt;
 pub mod ssa;
+pub mod stack;
 
 pub use exec::{Outcome, run, run_with};
 pub use interp::{Machine, Step, Stop, step};

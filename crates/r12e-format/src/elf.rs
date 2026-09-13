@@ -724,6 +724,22 @@ fn read_symbols(
                         Evidence::SymbolTable
                     }),
                 });
+            } else if kind == SymbolKind::Other
+                && !undefined
+                && addr != Addr::ZERO
+                && is_code_name(&name)
+                && in_executable_section(obj, addr)
+            {
+                // A symbol with no declared type sitting in an executable
+                // section names code: assemblers write them for hand-written
+                // entry points and linkers for wrappers. Claiming a function
+                // here is an inference, not a fact, and says so.
+                obj.function_hints.push(FunctionHint {
+                    addr,
+                    size: (size != 0).then_some(size),
+                    name: Some(name.clone()),
+                    provenance: Provenance::new(Evidence::CodeSymbol),
+                });
             }
 
             obj.symbols.push(Symbol {
@@ -1067,4 +1083,21 @@ fn read_eh_frame(r: &Reader<'_>, phdrs: &[ProgHdr], obj: &mut Object) {
         }
         Err(e) => obj.warnings.push(format!(".eh_frame: {e}")),
     }
+}
+
+
+/// True when a name is one a function could have.
+///
+/// ARM and AArch64 write mapping symbols — `$x` for code, `$d` for data — at
+/// every transition, and they are not functions. Nor are the assembler's local
+/// labels.
+fn is_code_name(name: &str) -> bool {
+    !name.is_empty() && !name.starts_with('$') && !name.starts_with(".L")
+}
+
+/// True when an address falls inside a section the loader marked executable.
+fn in_executable_section(obj: &Object, addr: Addr) -> bool {
+    obj.sections
+        .iter()
+        .any(|s| s.exec && s.range.contains(addr))
 }

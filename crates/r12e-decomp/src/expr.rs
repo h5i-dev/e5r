@@ -224,6 +224,9 @@ fn signed_type(size: u8) -> &'static str {
 /// such; anything else keeps its machine name, which is honest about not
 /// knowing where the value came from.
 pub fn input_name(l: Location, abi: &Abi) -> String {
+    if l.space == r12e_ir::op::Space::Stack {
+        return slot_name(l);
+    }
     if l.space != r12e_ir::op::Space::Register {
         return format!("mem{:x}", l.offset);
     }
@@ -255,6 +258,23 @@ pub fn use_counts(f: &SsaFunction) -> BTreeMap<Value, usize> {
         }
     }
     out
+}
+
+/// The name a promoted stack slot gets, from its offset.
+pub fn slot_name(l: Location) -> String {
+    let offset = l.offset as i64;
+    if offset < 0 {
+        format!("local_{:x}", -offset)
+    } else {
+        // Above the stack pointer on entry is the caller's frame, which is
+        // where arguments past the registers arrive.
+        format!("arg_s{offset:x}")
+    }
+}
+
+/// True when a location is an argument the caller passed on the stack.
+pub fn is_stack_argument(l: Location) -> bool {
+    l.space == r12e_ir::op::Space::Stack && (l.offset as i64) > 0
 }
 
 /// Which locations hold floating point values.

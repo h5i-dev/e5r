@@ -54,6 +54,8 @@ impl fmt::Display for Strength {
 pub enum Evidence {
     /// An entry in a symbol table.
     SymbolTable,
+    /// A symbol with no declared type, sitting in executable memory.
+    CodeSymbol,
     /// An entry in a dynamic symbol table.
     DynamicSymbol,
     /// The container's declared entry point.
@@ -103,7 +105,8 @@ impl Evidence {
             | Evidence::GoPclntab
             | Evidence::Export => Strength::Proven,
 
-            Evidence::ImportThunk
+            Evidence::CodeSymbol
+            | Evidence::ImportThunk
             | Evidence::CallTarget
             | Evidence::BranchTarget
             | Evidence::JumpTable => Strength::Inferred,
@@ -120,6 +123,7 @@ impl Evidence {
     pub fn as_str(self) -> &'static str {
         match self {
             Evidence::SymbolTable => "symbol table",
+            Evidence::CodeSymbol => "code symbol",
             Evidence::DynamicSymbol => "dynamic symbol",
             Evidence::EntryPoint => "entry point",
             Evidence::InitArray => "init array",

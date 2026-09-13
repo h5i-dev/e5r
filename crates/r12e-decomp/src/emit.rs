@@ -69,7 +69,9 @@ pub fn decompile(name: &str, f: &SsaFunction) -> Output {
     // Values that arrive from outside and are not arguments: registers the
     // function inherited. Declaring them says where they came from without
     // pretending they are parameters.
-    let mut inherited: BTreeSet<String> = BTreeSet::new();
+    // Keyed by name: the same location read at two widths must be declared
+    // once, not twice with different types.
+    let mut inherited: BTreeMap<String, String> = BTreeMap::new();
     let mut called: BTreeSet<u64> = BTreeSet::new();
     let mut helpers: BTreeSet<&'static str> = BTreeSet::new();
     for b in f.blocks.values() {
@@ -83,7 +85,7 @@ pub fn decompile(name: &str, f: &SsaFunction) -> Output {
                         } else {
                             c_type(l.size)
                         };
-                        inherited.insert(format!("{ty} {name}"));
+                        inherited.entry(name).or_insert_with(|| ty.to_string());
                     }
                 }
             }
@@ -120,16 +122,12 @@ pub fn decompile(name: &str, f: &SsaFunction) -> Output {
     text.push_str("{\n");
     // Only the ones the body actually mentions: an inherited flag that every
     // pass removed should not be declared.
-    let inherited: Vec<&String> = inherited
+    let inherited: Vec<(&String, &String)> = inherited
         .iter()
-        .filter(|d| {
-            d.rsplit(' ')
-                .next()
-                .is_some_and(|name| mentions(&body, name))
-        })
+        .filter(|(name, _)| mentions(&body, name))
         .collect();
-    for d in &inherited {
-        let _ = writeln!(text, "    {d};  // inherited");
+    for (name, ty) in &inherited {
+        let _ = writeln!(text, "    {ty} {name};  // inherited");
     }
     for (value, local) in &rebuilder.locals {
         let ty = if rebuilder.floats.contains(&value.location) {
@@ -286,16 +284,22 @@ fn parameters(f: &SsaFunction, r: &Rebuilder) -> String {
     for b in f.blocks.values() {
         for op in &b.ops {
             for i in &op.inputs {
-                if let Operand::Undefined(l) = i {
-                    let name = input_name(*l, &r.abi);
+                let Operand::Undefined(l) = i else { continue };
+                let name = input_name(*l, &r.abi);
+                let ty = if r.floats.contains(l) {
+                    crate::expr::float_type(l.size)
+                } else {
+                    c_type(l.size)
+                };
+                // Register arguments come first, in the order the convention
+                // uses them; then the ones the caller left on the stack, in
+                // address order.
+                if l.space == Space::Register {
                     if let Some(n) = order.iter().position(|o| *o == l.offset) {
-                        let ty = if r.floats.contains(l) {
-                            crate::expr::float_type(l.size)
-                        } else {
-                            c_type(l.size)
-                        };
                         seen.insert(n, format!("{ty} {name}"));
                     }
+                } else if crate::expr::is_stack_argument(*l) {
+                    seen.insert(order.len() + l.offset as usize, format!("{ty} {name}"));
                 }
             }
         }

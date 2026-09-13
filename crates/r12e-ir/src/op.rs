@@ -28,6 +28,9 @@ pub enum Space {
     Ram,
     /// A temporary introduced by lifting, invisible to the machine.
     Unique,
+    /// A stack slot that has been proven to be accessed only directly. The
+    /// offset is from the stack pointer on entry, so it is usually negative.
+    Stack,
 }
 
 /// A storage location: a space, an offset in it, and a size in bytes.
@@ -110,6 +113,7 @@ impl fmt::Display for Varnode {
             Space::Register => write!(f, "r[{:#x}]:{}", self.offset, self.size),
             Space::Ram => write!(f, "ram[{:#x}]:{}", self.offset, self.size),
             Space::Unique => write!(f, "u{}:{}", self.offset, self.size),
+            Space::Stack => write!(f, "stack[{}]:{}", self.offset as i64, self.size),
         }
     }
 }

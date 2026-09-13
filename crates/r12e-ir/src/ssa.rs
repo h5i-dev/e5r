@@ -38,8 +38,8 @@ pub struct Location {
 pub fn location(v: Varnode) -> Option<Location> {
     match v.space {
         Space::Const | Space::Ram => None,
-        Space::Unique => Some(Location {
-            space: Space::Unique,
+        Space::Unique | Space::Stack => Some(Location {
+            space: v.space,
             offset: v.offset,
             size: v.size,
         }),
@@ -96,6 +96,7 @@ impl std::fmt::Display for Value {
             Space::Unique => "u",
             Space::Ram => "m",
             Space::Const => "c",
+            Space::Stack => "s",
         };
         write!(f, "{space}{:x}_{}", self.location.offset, self.version)
     }
@@ -358,6 +359,11 @@ pub fn build(f: &Function) -> SsaFunction {
     let mut out: BTreeMap<Addr, SsaBlock> = BTreeMap::new();
     let mut incoming: BTreeMap<Addr, BTreeMap<Location, Operand>> = BTreeMap::new();
     incoming.insert(f.entry, BTreeMap::new());
+    // What reaches the end of each block, for filling the phis. Not the same
+    // as what the block defines: a location a block never touches still has a
+    // value there, inherited from the block that dominates it, and a phi
+    // reading only the predecessor's own definitions loses it.
+    let mut exit_state: BTreeMap<Addr, BTreeMap<Location, Operand>> = BTreeMap::new();
 
     // Explicit stack rather than recursion.
     let mut stack = vec![f.entry];
@@ -406,6 +412,7 @@ pub fn build(f: &Function) -> SsaFunction {
                 predecessors: block.predecessors.clone(),
             },
         );
+        exit_state.insert(at, current.clone());
 
         // Every successor inherits this block's final versions for its phis,
         // and every dominator child inherits them wholesale.
@@ -429,10 +436,7 @@ pub fn build(f: &Function) -> SsaFunction {
     }
 
     // Fill the phi inputs, one per predecessor in order.
-    let final_versions: BTreeMap<Addr, BTreeMap<Location, Operand>> = out
-        .iter()
-        .map(|(a, b)| (*a, block_exit_versions(b)))
-        .collect();
+    let final_versions = exit_state;
     for (at, b) in out.iter_mut() {
         let preds = b.predecessors.clone();
         for op in b.ops.iter_mut() {
@@ -461,16 +465,6 @@ pub fn build(f: &Function) -> SsaFunction {
     }
 }
 
-/// The version of each location at a block's exit.
-fn block_exit_versions(b: &SsaBlock) -> BTreeMap<Location, Operand> {
-    let mut out = BTreeMap::new();
-    for op in &b.ops {
-        if let Some(v) = op.out {
-            out.insert(v.location, Operand::Value(v));
-        }
-    }
-    out
-}
 
 fn bump(counters: &mut BTreeMap<Location, u32>, loc: Location) -> u32 {
     let c = counters.entry(loc).or_insert(0);

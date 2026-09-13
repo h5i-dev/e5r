@@ -120,7 +120,9 @@ impl<'a> Machine<'a> {
         let raw = match v.space {
             Space::Const => v.offset,
             Space::Register => self.reg(v.offset, v.size),
-            Space::Unique => self.temps.get(&v.offset).copied().unwrap_or(0),
+            // A promoted slot is storage of its own; the interpreter runs
+            // unpromoted code, so this exists for completeness.
+            Space::Unique | Space::Stack => self.temps.get(&v.offset).copied().unwrap_or(0),
             Space::Ram => self.read_mem(v.offset, v.size),
         };
         raw & v.mask()
@@ -131,7 +133,7 @@ impl<'a> Machine<'a> {
         match v.space {
             Space::Const => {}
             Space::Register => self.set_reg(v.offset, v.size, value),
-            Space::Unique => {
+            Space::Unique | Space::Stack => {
                 self.temps.insert(v.offset, value);
             }
             Space::Ram => {

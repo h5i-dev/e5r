@@ -56,7 +56,8 @@ fn decompile_all(p: &Program) -> Unit {
             .iter()
             .map(|(a, b)| (*a, (b.range.end(), b.successors.clone())))
             .collect();
-        let ir = r12e_ir::func::build(&p.object.memory, &p.object.arch, f.entry, &blocks);
+        let mut ir = r12e_ir::func::build(&p.object.memory, &p.object.arch, f.entry, &blocks);
+        r12e_ir::stack::promote(&mut ir);
         let mut ssa = r12e_ir::ssa::build(&ir);
         r12e_ir::opt::optimize(&mut ssa);
         // A name C will take, and only once: two symbols can share a name.
