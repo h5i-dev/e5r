@@ -31,11 +31,24 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Build the fixture corpus
+      # Every gate that has no tool skips silently, which is the worst
+      # possible outcome: a green run that measured nothing. These are what
+      # the oracle-backed gates need, named so a missing one is visible.
+      #   clang, llvm, binutils  the fixture corpus and objdump parity
+      #   llvm-objdump           the ARM32 and x86-64 parity oracles
+      #   qemu-user-static       the x86-64 half of the lifter's hardware oracle
+      #   golang-go              the Go fixture, which found five decoder bugs
+      - name: Install the oracles
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang llvm binutils
-          ./scripts/build-fixtures.sh
+          sudo apt-get install -y clang llvm binutils qemu-user-static golang-go
+      - name: Build the fixture corpus
+        run: ./scripts/build-fixtures.sh
+      - name: Say which oracles are present
+        run: |
+          for t in clang llvm-objdump objdump readelf c++filt qemu-x86_64 go rustc; do
+            printf '%-16s %s\n' "$t" "$(command -v $t || echo MISSING)"
+          done
       - run: cargo test --workspace -- --nocapture
 
   # G5: the same bytes must produce the same output at any thread count.
