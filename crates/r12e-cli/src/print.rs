@@ -51,7 +51,9 @@ pub fn info(w: &mut Out, o: &Object, as_json: bool) -> R {
     outln!(w, "exports   {}", o.exports.len());
     outln!(w, "hints     {} function entries", o.function_hints.len());
     for (k, v) in &o.metadata {
-        outln!(w, "{k:<10}{v}");
+        // A key longer than the column still needs a space after it, or the
+        // value runs into the name.
+        outln!(w, "{k:<9} {}", v.replace('\n', " "));
     }
     for warning in &o.warnings {
         outln!(w, "warning   {warning}");

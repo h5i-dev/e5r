@@ -282,6 +282,11 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
         });
     }
 
+    // What a language's own runtime needs to find at run time: Go's function
+    // table names every function in a stripped binary, which no other evidence
+    // in the file does.
+    crate::metadata::apply(&mut obj);
+
     obj.normalize_symbols();
     obj.normalize_hints();
     Ok(obj)

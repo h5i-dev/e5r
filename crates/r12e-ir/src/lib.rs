@@ -19,6 +19,7 @@ pub mod lift;
 pub mod op;
 pub mod opt;
 pub mod proto;
+pub mod range;
 pub mod shape;
 pub mod ssa;
 pub mod stack;

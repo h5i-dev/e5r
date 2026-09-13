@@ -16,7 +16,7 @@
 
 use std::collections::BTreeMap;
 
-use r12e_arch::{Flow, Insn, Operand, Reg, RegClass};
+use r12e_arch::{Flow, Insn, Operand, Reg, RegClass, Mem};
 use r12e_core::{Addr, AddrRange, Caps, MemoryMap};
 use serde::Serialize;
 
@@ -106,18 +106,47 @@ enum Val {
 }
 
 #[derive(Default)]
-struct Regs(BTreeMap<RegKey, Val>);
+struct Regs {
+    registers: BTreeMap<RegKey, Val>,
+    /// Stack slots, keyed by the register the address was formed from and the
+    /// displacement. An unoptimized compiler spills the switch index and
+    /// reloads it, so without this the index is unknown by the time the branch
+    /// reads it and the table cannot be bounded.
+    slots: BTreeMap<(RegKey, i64), Val>,
+}
 
 impl Regs {
     fn get(&self, r: Reg) -> Val {
         key(r)
-            .and_then(|k| self.0.get(&k).copied())
+            .and_then(|k| self.registers.get(&k).copied())
             .unwrap_or(Val::Unknown)
     }
 
     fn set(&mut self, r: Reg, v: Val) {
         if let Some(k) = key(r) {
-            self.0.insert(k, v);
+            self.registers.insert(k, v);
+            // Anything spilled from this register is now stale: the slot holds
+            // what was written, not what the register holds next.
+            self.slots.retain(|(base, _), _| *base != k);
+        }
+    }
+
+    /// The slot a memory operand names, when it is a simple base and
+    /// displacement.
+    fn slot(&self, m: &Mem) -> Option<(RegKey, i64)> {
+        if m.index.is_some() || m.mode != r12e_arch::AddrMode::Offset {
+            return None;
+        }
+        Some((key(m.base?)?, m.disp))
+    }
+
+    fn load_slot(&self, m: &Mem) -> Option<Val> {
+        self.slots.get(&self.slot(m)?).copied()
+    }
+
+    fn store_slot(&mut self, m: &Mem, v: Val) {
+        if let Some(k) = self.slot(m) {
+            self.slots.insert(k, v);
         }
     }
 }
@@ -349,6 +378,15 @@ fn step(i: &Insn, regs: &mut Regs) {
 
     if let Some(d) = dest {
         regs.set(d, value.unwrap_or(Val::Unknown));
+        return;
+    }
+    // A spill: the destination is memory and the source a register whose value
+    // the model knows.
+    if let (Some(Operand::Mem(m)), Some(Operand::Reg(source))) = (ops.first(), ops.get(1)) {
+        if matches!(i.mnemonic, "mov" | "str" | "stur") {
+            let v = regs.get(*source);
+            regs.store_slot(m, v);
+        }
     }
 }
 
@@ -493,6 +531,11 @@ fn load_value(i: &Insn, ops: &[Operand], regs: &Regs) -> Val {
             _ => Val::Unknown,
         };
     };
+
+    // A reload of something this function spilled: the value is what went in.
+    if let Some(v) = regs.load_slot(m) {
+        return v;
+    }
 
     let signed = matches!(i.mnemonic, "ldrsw" | "ldrsb" | "ldrsh" | "movsxd" | "movsx");
     let size = if m.size == 0 { 8 } else { m.size };

@@ -132,4 +132,91 @@ for src in fixtures/asm/*.s; do
     || echo "skip $src (does not assemble)" >&2
 done
 
+# Runtime metadata fixtures: a language's own runtime tables, which is the only
+# thing a stripped binary of that language still says about itself.
+#
+# The Go pair is a real oracle: the stripped copy has no symbols at all, so
+# every name the pclntab reader recovers is checked against the unstripped
+# copy's symbol table.
+if command -v go > /dev/null; then
+  mkdir -p "$out/gosrc"
+  cat > "$out/gosrc/go.mod" <<'EOF'
+module r12efixture
+
+go 1.16
+EOF
+  cat > "$out/gosrc/main.go" <<'EOF'
+package main
+
+import "os"
+
+func alpha(x int) int { return x*3 + 1 }
+
+func beta(x int) int { return alpha(x) - 7 }
+
+func main() {
+	if beta(len(os.Args)) == 0 {
+		os.Exit(1)
+	}
+}
+EOF
+  (cd "$out/gosrc" && GOFLAGS=-trimpath go build -o ../hello.go . 2>/dev/null) || true
+  if [ -x "$out/hello.go" ]; then
+    cp "$out/hello.go" "$out/hello.go.stripped"
+    strip "$out/hello.go.stripped"
+  fi
+  rm -rf "$out/gosrc"
+fi
+
+# Rust panic locations. Compiled from inside the output directory so the file
+# name recorded in the Location records is exactly "panicky.rs", which is what
+# the test compares against.
+if command -v rustc > /dev/null; then
+  cat > "$out/panicky.rs" <<'EOF'
+fn pick(v: &[u32], i: usize) -> u32 {
+    v[i]
+}
+
+fn main() {
+    let n = std::env::args().count();
+    println!("{}", pick(&[1, 2, 3], n * 7));
+    assert!(n < 100, "too many arguments");
+}
+EOF
+  (cd "$out" && rustc -O -C panic=abort -o panicky panicky.rs 2>/dev/null) || true
+fi
+
+# An Objective-C object, for the class and method lists. It is relocatable, so
+# every pointer in it is still zero: it proves the reader survives a file whose
+# metadata sections are present and unresolved, not that it reads a class. A
+# linked Mach-O would prove that, and there is no macOS linker here.
+cat > "$out/greeter.m" <<'EOF'
+@interface Greeter { Class isa; }
+- (int)count;
++ (int)make;
+@end
+
+@implementation Greeter
+- (int)count { return 7; }
++ (int)make { return 1; }
+@end
+EOF
+"$xcc" --target=arm64-apple-macos11 -O1 -Wno-objc-root-class -c \
+  -o "$out/greeter.macho.a64.o" "$out/greeter.m" 2>/dev/null || true
+
+
+# ARM fixtures, A32 and T32 from the same sources: the two instruction sets
+# compile the same C into different encodings, which is what the ARM decoder
+# gate is measured on. Freestanding again, so no ARM sysroot is needed.
+for src in fixtures/portable/*.c; do
+  [ -e "$src" ] || continue
+  base=$(basename "$src" .c)
+  for opt in O0 O1 O2; do
+    "$xcc" --target=arm-linux-gnueabihf -"$opt" -ffreestanding -c \
+      -o "$out/${base}.arm.${opt}.o" "$src" 2>/dev/null || true
+    "$xcc" --target=thumbv7-linux-gnueabihf -mthumb -"$opt" -ffreestanding -c \
+      -o "$out/${base}.thumb.${opt}.o" "$src" 2>/dev/null || true
+  done
+done
+
 ls "$out"
