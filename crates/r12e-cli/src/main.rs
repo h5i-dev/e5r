@@ -14,11 +14,12 @@ mod json;
 mod mcp;
 mod out;
 mod print;
+mod shell;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, CommandFactory, Parser, Subcommand};
 use r12e_analysis::Options;
 use r12e_core::{Addr, Arch, Caps};
 use r12e_format::LoadOptions;
@@ -209,6 +210,16 @@ enum Command {
         #[command(flatten)]
         common: Common,
     },
+    /// Write a completion script for a shell.
+    ///
+    /// Generated from the command tree, so it cannot describe a command that
+    /// does not exist.
+    Completions {
+        /// Which shell.
+        shell: shell::Shell,
+    },
+    /// Write the manual page, in roff.
+    Manpage,
     /// Speak the Model Context Protocol on stdin and stdout, so an agent can
     /// drive the analysis.
     Mcp,
@@ -285,7 +296,9 @@ impl Command {
             | Command::Stats(c) => c,
             Command::Annotate { common, .. } | Command::Diff { common, .. } => common,
             // The server takes its paths per call rather than up front.
-            Command::Mcp => unreachable!("handled before a file is opened"),
+            Command::Mcp | Command::Completions { .. } | Command::Manpage => {
+                unreachable!("handled before a file is opened")
+            }
             Command::Vtables { common, .. }
             | Command::Emulate { common, .. }
             | Command::Query { common, .. }
@@ -319,9 +332,25 @@ fn main() -> ExitCode {
 }
 
 fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
-    // The server opens files itself, one per tool call.
-    if matches!(cli.command, Command::Mcp) {
-        return mcp::serve();
+    // The server opens files itself, one per tool call, and the two writers
+    // below have no input at all.
+    match &cli.command {
+        Command::Mcp => return mcp::serve(),
+        Command::Completions { shell } => {
+            let script = shell::completions(&Cli::command(), *shell);
+            for line in script.lines() {
+                out::outln!(w, "{line}");
+            }
+            return Ok(exit::OK);
+        }
+        Command::Manpage => {
+            let page = shell::manpage(&Cli::command());
+            for line in page.lines() {
+                out::outln!(w, "{line}");
+            }
+            return Ok(exit::OK);
+        }
+        _ => {}
     }
     let common = cli.command.common();
 
