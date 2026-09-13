@@ -12,7 +12,7 @@ rather than argued about again.
 | ELF loader with provenance-tagged hints | built (M1) |
 | PE, Mach-O, raw | raw only; PE and Mach-O not started |
 | AArch64 decoder | built, objdump parity over 1.43M instructions, 99.38% decoded |
-| x86-64 decoder | not started; x86-64 containers load, nothing decodes |
+| x86-64 decoder | built, llvm-objdump parity over 4,760 instructions, 100% decoded |
 | SLEIGH runtime and compiler | not started |
 | functions, CFG, xrefs, strings | built and parallel (M3); jump tables not started |
 | IR, SSA, types, decompiler | not started (M4 to M6) |
@@ -156,9 +156,12 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 
 ### M2. Instruction decoding
 
-- [ ] x86 and x86-64 decoder, table-driven from a specification file that is
-      checked into the repo and compiled at build time. Legacy prefixes, REX,
-      VEX, EVEX, AVX-512, and the encodings that matter for obfuscated code.
+- [x] x86-64 decoder, table-driven in the Intel manual's own operand notation
+      so an entry can be diffed against appendix A. Legacy prefixes, REX, the
+      one-byte, two-byte and three-byte maps, mandatory prefixes, groups, and
+      SSE through SSE4.2. VEX, EVEX and AVX are not written; 32-bit mode is
+      not supported, because the opcodes it spends on inc/dec and the BCD
+      instructions are REX prefixes in long mode.
 - [x] AArch64 A64 decoder. SVE and SME can wait; NEON cannot.
 - [ ] ARM32 and Thumb-2, including interworking and the IT block.
 - [x] Differential comparison of each decoder against `objdump` over the fixture

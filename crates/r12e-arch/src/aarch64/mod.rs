@@ -1001,7 +1001,8 @@ fn load_store_pair(w: u32, addr: Addr) -> Option<Insn> {
     i.push(Operand::Reg(rt));
     i.push(Operand::Reg(rt2));
     i.push(Operand::Mem(Mem {
-        base: rsp(bits(w, 9, 5), true),
+        seg: None,
+        base: Some(rsp(bits(w, 9, 5), true)),
         index: None,
         disp: imm7,
         mode,
@@ -1070,7 +1071,8 @@ fn load_store_reg(w: u32, addr: Addr) -> Option<Insn> {
             i.push(Operand::Reg(reg));
         }
         i.push(Operand::Mem(Mem {
-            base: rsp(rn, true),
+            seg: None,
+            base: Some(rsp(rn, true)),
             index: None,
             disp: imm,
             mode: AddrMode::Offset,
@@ -1095,7 +1097,8 @@ fn load_store_reg(w: u32, addr: Addr) -> Option<Insn> {
         );
         i.push(Operand::Reg(r(rt, true)));
         i.push(Operand::Mem(Mem {
-            base: rsp(rn, true),
+            seg: None,
+            base: Some(rsp(rn, true)),
             index: None,
             disp: offset,
             mode: if writeback {
@@ -1132,7 +1135,8 @@ fn load_store_reg(w: u32, addr: Addr) -> Option<Insn> {
                 i.push(Operand::Reg(reg));
             }
             i.push(Operand::Mem(Mem {
-                base: rsp(rn, true),
+                seg: None,
+                base: Some(rsp(rn, true)),
                 index: None,
                 disp: imm9,
                 mode: AddrMode::Offset,
@@ -1149,7 +1153,8 @@ fn load_store_reg(w: u32, addr: Addr) -> Option<Insn> {
             let mut i = ins(addr, mnem, Flow::Next);
             i.push(Operand::Reg(reg));
             i.push(Operand::Mem(Mem {
-                base: rsp(rn, true),
+                seg: None,
+                base: Some(rsp(rn, true)),
                 index: None,
                 disp: imm9,
                 mode,
@@ -1174,7 +1179,8 @@ fn load_store_reg(w: u32, addr: Addr) -> Option<Insn> {
             let mut i = ins(addr, unpriv, Flow::Next);
             i.push(Operand::Reg(reg));
             i.push(Operand::Mem(Mem {
-                base: rsp(rn, true),
+                seg: None,
+                base: Some(rsp(rn, true)),
                 index: None,
                 disp: imm9,
                 mode: AddrMode::Offset,
@@ -1210,7 +1216,8 @@ fn load_store_reg(w: u32, addr: Addr) -> Option<Insn> {
                 i.push(Operand::Reg(reg));
             }
             i.push(Operand::Mem(Mem {
-                base: rsp(rn, true),
+                seg: None,
+                base: Some(rsp(rn, true)),
                 index: Some((
                     r(rm, index_wide),
                     if explicit_zero_shift {
@@ -1259,7 +1266,8 @@ fn compare_and_swap(w: u32, addr: Addr) -> Option<Insn> {
     i.push(Operand::Reg(r(bits(w, 20, 16), width)));
     i.push(Operand::Reg(r(bits(w, 4, 0), width)));
     i.push(Operand::Mem(Mem {
-        base: rsp(bits(w, 9, 5), true),
+        seg: None,
+        base: Some(rsp(bits(w, 9, 5), true)),
         index: None,
         disp: 0,
         mode: AddrMode::Offset,
@@ -1298,7 +1306,8 @@ fn atomic_memory(w: u32, addr: Addr) -> Option<Insn> {
         let mut i = ins(addr, mnem, Flow::Next);
         i.push(Operand::Reg(r(rt, sf)));
         i.push(Operand::Mem(Mem {
-            base: rsp(rn, true),
+            seg: None,
+            base: Some(rsp(rn, true)),
             index: None,
             disp: 0,
             mode: AddrMode::Offset,
@@ -1335,7 +1344,8 @@ fn atomic_memory(w: u32, addr: Addr) -> Option<Insn> {
         i.push(Operand::Reg(r(rt, sf)));
     }
     i.push(Operand::Mem(Mem {
-        base: rsp(rn, true),
+        seg: None,
+        base: Some(rsp(rn, true)),
         index: None,
         disp: 0,
         mode: AddrMode::Offset,
@@ -1447,7 +1457,8 @@ fn load_store_exclusive(w: u32, addr: Addr) -> Option<Insn> {
         let mut i = ins(addr, mnem, Flow::Next);
         i.push(Operand::Reg(r(rt, sf)));
         i.push(Operand::Mem(Mem {
-            base: rsp(rn, true),
+            seg: None,
+            base: Some(rsp(rn, true)),
             index: None,
             disp: 0,
             mode: AddrMode::Offset,
@@ -1484,7 +1495,8 @@ fn load_store_exclusive(w: u32, addr: Addr) -> Option<Insn> {
         i.push(Operand::Reg(r(rt2, sf)));
     }
     i.push(Operand::Mem(Mem {
-        base: rsp(rn, true),
+        seg: None,
+        base: Some(rsp(rn, true)),
         index: None,
         disp: 0,
         mode: AddrMode::Offset,

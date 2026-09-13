@@ -28,11 +28,16 @@ done
 for src in fixtures/portable/*.c; do
   [ -e "$src" ] || continue
   base=$(basename "$src" .c)
-  for opt in O0 O2; do
+  # Several optimization levels, because each one emits a different corner of
+  # the instruction set, and that is what the decoder gates are measured on.
+  for opt in O0 O1 O2 O3 Os; do
     "$cc" -g -"$opt" -ffreestanding -c -o "$out/${base}.a64.${opt}.o" "$src"
     "$xcc" --target=x86_64-linux-gnu -g -"$opt" -ffreestanding -c \
       -o "$out/${base}.x64.${opt}.o" "$src"
   done
+  # One SSE4.2 build, to reach past the x86-64 baseline.
+  "$xcc" --target=x86_64-linux-gnu -g -O2 -msse4.2 -ffreestanding -c \
+    -o "$out/${base}.x64.sse42.o" "$src" 2>/dev/null || true
 done
 
 # x86-64 assembly fixtures, kept from the C++ project: they pin encodings.

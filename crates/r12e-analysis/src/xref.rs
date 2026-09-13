@@ -156,6 +156,36 @@ pub fn collect(insns: &[Insn], mem: &MemoryMap, out: &mut Vec<Xref>) {
 /// it completes.
 fn track(i: &Insn, regs: &mut Regs, mem: &MemoryMap, out: &mut Vec<Xref>) {
     let ops = i.operands();
+
+    // x86 forms addresses with the program counter directly, so a pc-relative
+    // operand names its target outright, whatever the instruction is. This is
+    // the x86 equivalent of the adrp/add pair below.
+    for (n, op) in ops.iter().enumerate() {
+        let Operand::Mem(m) = op else { continue };
+        if !m.is_pc_relative() {
+            continue;
+        }
+        let Some(t) = m.pc_target(i.end()) else {
+            continue;
+        };
+        if !mem.is_mapped(t) {
+            continue;
+        }
+        // The first operand is the destination in Intel order, so a memory
+        // operand there is a write.
+        out.push(Xref {
+            from: i.addr,
+            to: t,
+            kind: if m.size == 0 {
+                XrefKind::Data
+            } else if n == 0 {
+                XrefKind::Write
+            } else {
+                XrefKind::Read
+            },
+        });
+    }
+
     match i.mnemonic {
         // adrp and adr put a resolved address straight into a register.
         "adrp" | "adr" => {
@@ -210,7 +240,7 @@ fn track(i: &Insn, regs: &mut Regs, mem: &MemoryMap, out: &mut Vec<Xref>) {
                     // A literal load names its target outright.
                     Operand::Addr(a) => referenced = Some(*a),
                     Operand::Mem(m) if m.index.is_none() => {
-                        if let Some(base) = regs.get(m.base) {
+                        if let Some(base) = m.base.and_then(|b| regs.get(b)) {
                             let at = base.wrapping_add(m.disp as u64);
                             if mem.is_mapped(Addr(at)) {
                                 referenced = Some(Addr(at));

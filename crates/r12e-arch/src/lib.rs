@@ -10,6 +10,7 @@
 
 pub mod aarch64;
 pub mod insn;
+pub mod x86;
 
 pub use insn::{
     AddrMode, Cond, Extend, Flow, Insn, MAX_OPERANDS, Mem, Operand, Reg, RegClass, Shift, Width,
@@ -22,6 +23,7 @@ use r12e_core::{Addr, Arch};
 pub fn decode(arch: &Arch, bytes: &[u8], addr: Addr) -> Option<Insn> {
     match arch {
         Arch::AArch64 => aarch64::decode(bytes, addr),
+        Arch::X86_64 => x86::decode(bytes, addr),
         _ => None,
     }
 }
@@ -30,6 +32,7 @@ pub fn decode(arch: &Arch, bytes: &[u8], addr: Addr) -> Option<Insn> {
 pub fn format(arch: &Arch, i: &Insn, objdump: bool) -> String {
     match arch {
         Arch::AArch64 => aarch64::format(i, aarch64::text::Style { objdump }),
+        Arch::X86_64 => x86::format(i, x86::Style::default()),
         _ => i.mnemonic.to_string(),
     }
 }

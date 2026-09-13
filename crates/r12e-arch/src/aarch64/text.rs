@@ -44,6 +44,8 @@ fn reg(out: &mut String, r: Reg) {
             let _ = write!(out, "s{}", r.num);
         }
         RegClass::Pc => out.push_str("pc"),
+        // x86 banks, which AArch64 never produces.
+        RegClass::GprHigh | RegClass::Seg => out.push('?'),
         RegClass::Flags => out.push_str("nzcv"),
     }
 }
@@ -64,7 +66,9 @@ fn count(out: &mut String, v: i64) {
 
 fn mem(out: &mut String, m: Mem, _style: Style) {
     out.push('[');
-    reg(out, m.base);
+    if let Some(b) = m.base {
+        reg(out, b);
+    }
     match m.mode {
         AddrMode::PostIndex => {
             out.push_str("], ");
@@ -191,11 +195,12 @@ mod tests {
         mem(
             &mut s,
             Mem {
-                base: Reg {
+                seg: None,
+                base: Some(Reg {
                     class: RegClass::Sp,
                     num: 31,
                     width: Width::W64,
-                },
+                }),
                 index: None,
                 disp: 16,
                 mode: AddrMode::PostIndex,

@@ -41,6 +41,12 @@ impl Width {
 pub enum RegClass {
     /// General purpose.
     Gpr,
+    /// The high byte of one of the first four x86 registers: `ah`, `ch`, `dh`,
+    /// `bh`. A separate bank because `ah` is not the low byte of `rax`, and
+    /// code that treats it as one is wrong in a way that is hard to see.
+    GprHigh,
+    /// An x86 segment register.
+    Seg,
     /// The stack pointer, which AArch64 encodes as register 31 in some forms.
     Sp,
     /// The zero register, which is register 31 in the other forms.
@@ -171,11 +177,18 @@ pub enum AddrMode {
 }
 
 /// A memory reference.
+///
+/// General enough for both architectures: AArch64 always has a base and never
+/// a segment, x86 can have neither base nor index (`[0x1234]`) and can scale
+/// its index by 1, 2, 4 or 8.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Mem {
-    /// Base register.
-    pub base: Reg,
-    /// Optional index register with its extension and shift amount.
+    /// Segment override, on the architectures that have one.
+    pub seg: Option<Reg>,
+    /// Base register, absent for an absolute or index-only address.
+    pub base: Option<Reg>,
+    /// Index register with its extension and shift amount. The shift is the
+    /// log2 of x86's scale.
     pub index: Option<(Reg, Extend, u8)>,
     /// Constant displacement.
     pub disp: i64,
@@ -183,6 +196,33 @@ pub struct Mem {
     pub mode: AddrMode,
     /// Bytes transferred, for reporting and for data typing.
     pub size: u64,
+}
+
+impl Mem {
+    /// True when the base is the program counter, so the displacement is
+    /// relative to the end of the instruction.
+    pub fn is_pc_relative(&self) -> bool {
+        self.base.map(|b| b.class) == Some(RegClass::Pc)
+    }
+
+    /// The absolute address a pc-relative operand names, given where the
+    /// instruction ends.
+    pub fn pc_target(&self, insn_end: Addr) -> Option<Addr> {
+        self.is_pc_relative()
+            .then(|| insn_end.wrapping_offset(self.disp))
+    }
+
+    /// A plain `[base + disp]`.
+    pub const fn base_disp(base: Reg, disp: i64, size: u64) -> Mem {
+        Mem {
+            seg: None,
+            base: Some(base),
+            index: None,
+            disp,
+            mode: AddrMode::Offset,
+            size,
+        }
+    }
 }
 
 /// A condition code, in the architecture's own numbering.
@@ -292,6 +332,9 @@ pub struct Insn {
     pub mnemonic: &'static str,
     /// What the flow analysis needs to know.
     pub flow: Flow,
+    /// A prefix that modifies the whole instruction rather than an operand:
+    /// x86's `lock`, `rep` and `repne`. Printed ahead of the mnemonic.
+    pub prefix: Option<&'static str>,
     ops: [Operand; MAX_OPERANDS],
     n_ops: u8,
 }
@@ -304,6 +347,7 @@ impl Insn {
             len,
             mnemonic,
             flow,
+            prefix: None,
             ops: [Operand::Imm(0); MAX_OPERANDS],
             n_ops: 0,
         }
