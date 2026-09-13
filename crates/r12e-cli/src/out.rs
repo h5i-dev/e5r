@@ -7,9 +7,18 @@
 
 use std::io::{BufWriter, Stdout, Write};
 
+/// Where the output goes.
+enum Sink {
+    /// Standard output, which is the usual case.
+    Stdout(BufWriter<Stdout>),
+    /// A string, for a command that runs another command and keeps what it
+    /// printed rather than letting it out.
+    Buffer(String),
+}
+
 /// The output stream.
 pub struct Out {
-    w: BufWriter<Stdout>,
+    w: Sink,
     /// Set once the reader has gone away; every later write is skipped.
     closed: bool,
 }
@@ -18,7 +27,15 @@ impl Out {
     /// A 64 KiB buffered writer over stdout.
     pub fn new() -> Out {
         Out {
-            w: BufWriter::with_capacity(64 * 1024, std::io::stdout()),
+            w: Sink::Stdout(BufWriter::with_capacity(64 * 1024, std::io::stdout())),
+            closed: false,
+        }
+    }
+
+    /// A stream that collects what is written instead of printing it.
+    pub fn buffer() -> Out {
+        Out {
+            w: Sink::Buffer(String::new()),
             closed: false,
         }
     }
@@ -28,14 +45,33 @@ impl Out {
         if self.closed {
             return;
         }
-        if self.w.write_fmt(args).is_err() || self.w.write_all(b"\n").is_err() {
-            self.closed = true;
+        match &mut self.w {
+            Sink::Stdout(w) => {
+                if w.write_fmt(args).is_err() || w.write_all(b"\n").is_err() {
+                    self.closed = true;
+                }
+            }
+            Sink::Buffer(s) => {
+                let _ = std::fmt::Write::write_fmt(s, args);
+                s.push('\n');
+            }
+        }
+    }
+
+    /// What was collected, for a buffered stream.
+    pub fn take(self) -> String {
+        match self.w {
+            Sink::Buffer(s) => s,
+            Sink::Stdout(_) => String::new(),
         }
     }
 
     /// Flush, reporting whether the reader was still there.
     pub fn finish(mut self) -> bool {
-        !self.closed && self.w.flush().is_ok()
+        match &mut self.w {
+            Sink::Stdout(w) => !self.closed && w.flush().is_ok(),
+            Sink::Buffer(_) => !self.closed,
+        }
     }
 }
 

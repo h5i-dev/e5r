@@ -10,6 +10,7 @@
 
 mod addr;
 mod annotate;
+mod batch;
 mod json;
 mod mcp;
 mod out;
@@ -48,14 +49,14 @@ mod exit {
                   Every command takes --json. Exit codes: 0 ok, 1 nothing found, \
                   2 bad usage, 3 bad input."
 )]
-struct Cli {
+pub struct Cli {
     #[command(subcommand)]
     command: Command,
 }
 
 /// Arguments shared by every command that opens a file.
 #[derive(Args, Clone)]
-struct Common {
+pub struct Common {
     /// The binary to analyze.
     file: PathBuf,
     /// Emit JSON instead of text.
@@ -79,7 +80,7 @@ struct Common {
 }
 
 #[derive(Subcommand)]
-enum Command {
+pub enum Command {
     /// Container, architecture, entry point, and what the loader noticed.
     Info(Common),
     /// Sections and their mapping.
@@ -210,6 +211,21 @@ enum Command {
         #[command(flatten)]
         common: Common,
     },
+    /// Run several commands over one file and print one document.
+    ///
+    /// For a caller that wants every answer at once: each line of the script
+    /// is a command, and the results come back together with the command that
+    /// produced each one, so nothing has to be matched up afterwards.
+    Batch {
+        #[command(flatten)]
+        common: Common,
+        /// A file of commands, one per line; `-` reads standard input.
+        #[arg(short, long)]
+        script: Option<PathBuf>,
+        /// A command to run, repeatable.
+        #[arg(short, long)]
+        command: Vec<String>,
+    },
     /// Write a completion script for a shell.
     ///
     /// Generated from the command tree, so it cannot describe a command that
@@ -238,7 +254,7 @@ enum Command {
 
 /// What to do with signatures.
 #[derive(Subcommand)]
-enum SigCommand {
+pub enum SigCommand {
     /// Write a signature for every named function.
     Create {
         /// Where to write them; standard output when absent.
@@ -254,7 +270,7 @@ enum SigCommand {
 
 /// What to do to the annotation log.
 #[derive(Subcommand)]
-enum Annotation {
+pub enum Annotation {
     /// Name a function or an address.
     Name {
         /// Address or symbol.
@@ -294,7 +310,9 @@ impl Command {
             | Command::Exports(c)
             | Command::Funcs(c)
             | Command::Stats(c) => c,
-            Command::Annotate { common, .. } | Command::Diff { common, .. } => common,
+            Command::Annotate { common, .. }
+            | Command::Batch { common, .. }
+            | Command::Diff { common, .. } => common,
             // The server takes its paths per call rather than up front.
             Command::Mcp | Command::Completions { .. } | Command::Manpage => {
                 unreachable!("handled before a file is opened")
@@ -331,7 +349,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
+pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
     // The server opens files itself, one per tool call, and the two writers
     // below have no input at all.
     match &cli.command {
@@ -446,6 +464,11 @@ fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             budget,
         } => print::emulate(w, &program, target, args, *depth, *budget, common.json),
         Command::Vtables { common } => print::vtables(w, &program, common.json),
+        Command::Batch {
+            common,
+            script,
+            command,
+        } => batch::run(w, cli, common, script.as_deref(), command),
         Command::Query { common, query } => {
             print::query(w, &program, &query.join(" "), common.json)
         }
