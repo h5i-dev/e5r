@@ -426,7 +426,11 @@ impl<'a> Rebuilder<'a> {
                 continue;
             };
             let multiple = uses.get(value).copied().unwrap_or(0) > 1;
-            if multiple || op.kind == SsaKind::Phi {
+            // A call's result gets a name whether or not it is read twice: the
+            // call is a statement, and inlining its result would write the
+            // call out again and make it happen twice.
+            let call = matches!(op.kind, SsaKind::Op(Op::Call) | SsaKind::Op(Op::CallInd));
+            if multiple || call || op.kind == SsaKind::Phi {
                 locals.insert(*value, format!("v{n}"));
                 n += 1;
             }
@@ -687,6 +691,7 @@ impl<'a> Rebuilder<'a> {
             Op::IntSCarry => Expr::Named("__overflow", vec![a(), b()]),
             Op::IntSBorrow => Expr::Named("__borrow", vec![a(), b()]),
             Op::Piece => Expr::Unknown("piece"),
+            Op::Undefine => Expr::Unknown("clobbered"),
             Op::Unimplemented => Expr::Unknown("unmodelled"),
             _ => Expr::Unknown("op"),
         }

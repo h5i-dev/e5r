@@ -294,6 +294,25 @@ fn writeback(b: &mut Builder, m: &Mem) {
     b.emit(Op::Copy, Some(v), &[updated]);
 }
 
+/// Say that a call left the caller-saved registers holding anything.
+///
+/// Without this the dataflow believes whatever they held before the call, and
+/// the decompiler prints it: a value the callee overwrote, read as if it had
+/// survived.
+fn clobber(b: &mut Builder) {
+    let abi = crate::abi::of(&r12e_core::Arch::AArch64);
+    for offset in &abi.caller_saved {
+        // Not the result register: the call itself defines that.
+        if *offset == gpr_offset(0) {
+            continue;
+        }
+        b.emit(Op::Undefine, Some(Varnode::register(*offset, 8)), &[]);
+    }
+    for flag in [flag_n(), flag_z(), flag_c(), flag_v()] {
+        b.emit(Op::Undefine, Some(flag), &[]);
+    }
+}
+
 /// The four-bit encoding of a condition name.
 fn cond_number(name: &str) -> Option<u8> {
     const NAMES: [&str; 16] = [
@@ -319,7 +338,12 @@ pub fn lift(i: &Insn) -> Lifted {
         Flow::CondBranch(t) => return cond_branch(b, i, ops, t),
         Flow::Call(t) => {
             b.emit(Op::Copy, Some(Varnode::register(LR, 8)), &[next]);
-            b.emit(Op::Call, None, &[Varnode::constant(t.get(), 8)]);
+            b.emit(
+                Op::Call,
+                Some(Varnode::register(gpr_offset(0), 8)),
+                &[Varnode::constant(t.get(), 8)],
+            );
+            clobber(&mut b);
             return b.finish(true);
         }
         Flow::IndirectCall => {
@@ -328,7 +352,12 @@ pub fn lift(i: &Insn) -> Lifted {
             };
             let target = reg(*r);
             b.emit(Op::Copy, Some(Varnode::register(LR, 8)), &[next]);
-            b.emit(Op::CallInd, None, &[target]);
+            b.emit(
+                Op::CallInd,
+                Some(Varnode::register(gpr_offset(0), 8)),
+                &[target],
+            );
+            clobber(&mut b);
             return b.finish(true);
         }
         Flow::Return => {

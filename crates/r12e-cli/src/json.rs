@@ -457,6 +457,51 @@ pub fn run(f: &Function, r: &r12e_api::Run) -> RunOut {
     }
 }
 
+/// One virtual table.
+#[derive(Serialize)]
+pub struct VTableOut {
+    addr: String,
+    entry: String,
+    class: Option<String>,
+    offset_to_top: i64,
+    typeinfo: Option<String>,
+    evidence: String,
+    methods: Vec<MethodOut>,
+}
+
+#[derive(Serialize)]
+pub struct MethodOut {
+    slot: usize,
+    addr: String,
+    name: Option<String>,
+}
+
+pub fn vtables(p: &Program, tables: &[r12e_api::VTable]) -> Listing<VTableOut> {
+    listing(
+        tables
+            .iter()
+            .map(|t| VTableOut {
+                addr: hex(t.addr),
+                entry: hex(t.entry),
+                class: t.class.clone(),
+                offset_to_top: t.offset_to_top,
+                typeinfo: t.typeinfo.map(hex),
+                evidence: t.evidence.as_str().to_string(),
+                methods: t
+                    .methods
+                    .iter()
+                    .enumerate()
+                    .map(|(slot, addr)| MethodOut {
+                        slot,
+                        addr: hex(*addr),
+                        name: p.function(*addr).map(|f| f.display_name()),
+                    })
+                    .collect(),
+            })
+            .collect(),
+    )
+}
+
 pub fn disas(p: &Program, fns: &[&Function]) -> Listing<DisasOut> {
     listing(
         fns.iter()

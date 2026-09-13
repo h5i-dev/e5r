@@ -1119,6 +1119,17 @@ fn read_debug_info(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object, hints: bo
     obj.debug = Some(info);
 }
 
+/// How many relocations a section really holds.
+///
+/// The declared size is a number from the file and can say anything; what
+/// bounds the work is how many entries actually fit in the file.
+fn relocation_count(r: &Reader<'_>, sh: &SecHdr, step: u64) -> u64 {
+    let step = step.max(1);
+    let declared = sh.size / step;
+    let available = (r.len() as u64).saturating_sub(sh.offset) / step;
+    declared.min(available)
+}
+
 /// Apply the relocations that name code and data addresses.
 ///
 /// Only the kinds a compiler emits inside an object file, and only where the
@@ -1140,9 +1151,9 @@ fn apply_code_relocations(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object) {
         if target.range.is_empty() || target.name.starts_with(".debug") {
             continue;
         }
-        for i in 0..sh.size / step.max(1) {
+        for i in 0..relocation_count(r, sh, step) {
             let Ok(mut e) = r.slice_at("relocation", sh.offset + i * step, step) else {
-                continue;
+                break;
             };
             let (offset, info, addend) = if wide {
                 let (Ok(o), Ok(n), Ok(a)) = (
@@ -1289,8 +1300,7 @@ fn relocated(
             continue;
         }
         let _ = n;
-        let count = sh.size / step.max(1);
-        for i in 0..count {
+        for i in 0..relocation_count(r, sh, step) {
             let at = sh.offset + i * step;
             let Ok(mut e) = r.slice_at("relocation", at, step) else {
                 continue;

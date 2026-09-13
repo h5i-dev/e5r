@@ -419,7 +419,12 @@ pub fn lift(i: &Insn) -> Lifted {
         }
         Flow::Call(t) => {
             push(&mut b, next);
-            b.emit(Op::Call, None, &[Varnode::constant(t.get(), 8)]);
+            b.emit(
+                Op::Call,
+                Some(Varnode::register(gpr_offset(0), 8)),
+                &[Varnode::constant(t.get(), 8)],
+            );
+            clobber(&mut b);
             return b.finish(true);
         }
         Flow::IndirectCall => {
@@ -427,7 +432,12 @@ pub fn lift(i: &Insn) -> Lifted {
                 return b.unimplemented();
             };
             push(&mut b, next);
-            b.emit(Op::CallInd, None, &[target]);
+            b.emit(
+                Op::CallInd,
+                Some(Varnode::register(gpr_offset(0), 8)),
+                &[target],
+            );
+            clobber(&mut b);
             return b.finish(true);
         }
         Flow::IndirectBranch => {
@@ -820,6 +830,27 @@ pub fn lift(i: &Insn) -> Lifted {
             }
         }
         _ => b.unimplemented(),
+    }
+}
+
+/// Say that a call left the caller-saved registers holding anything.
+fn clobber(b: &mut Builder) {
+    let abi = crate::abi::of(&r12e_core::Arch::X86_64);
+    for offset in &abi.caller_saved {
+        if *offset == gpr_offset(0) {
+            continue;
+        }
+        b.emit(Op::Undefine, Some(Varnode::register(*offset, 8)), &[]);
+    }
+    for flag in [
+        flag_cf(),
+        flag_pf(),
+        flag_af(),
+        flag_zf(),
+        flag_sf(),
+        flag_of(),
+    ] {
+        b.emit(Op::Undefine, Some(flag), &[]);
     }
 }
 

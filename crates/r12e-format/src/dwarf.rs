@@ -30,8 +30,14 @@ impl<'a> Cur<'a> {
     fn position(&self) -> usize {
         self.0.pos() as usize
     }
-    fn seek(&mut self, at: usize) {
-        let _ = self.0.seek("dwarf", at as u64);
+    /// Move to an offset, clamped to the end of the data. Returns false when
+    /// the cursor did not actually move forward, which is how a length field
+    /// that points backwards or past the end is caught.
+    fn seek(&mut self, at: usize) -> bool {
+        let before = self.position();
+        let target = at.min(self.0.len());
+        let _ = self.0.seek("dwarf", target as u64);
+        self.position() > before
     }
     fn is_empty(&self) -> bool {
         self.0.remaining() == 0
@@ -195,11 +201,17 @@ pub fn parse(sections: &Sections<'_>, endian: Endian) -> DebugInfo {
     }
     let mut reader = Cur::new(sections.info, endian);
     // A malformed unit header stops the walk rather than resynchronizing on a
-    // guess, because a wrong guess produces confident nonsense.
+    // guess, because a wrong guess produces confident nonsense. A unit that
+    // does not advance the cursor stops it too: a length field is a number
+    // from the file and can say anything, including nothing.
     while !reader.is_empty() {
+        let before = reader.position();
         match unit(&mut reader, sections, endian, &mut out) {
             Some(()) => out.units += 1,
             None => break,
+        }
+        if reader.position() <= before {
+            break;
         }
     }
     if !sections.line.is_empty() {
@@ -222,10 +234,12 @@ fn unit(
     if sixty_four {
         length = reader.u64()?;
     }
-    if length == 0 {
-        return None;
-    }
-    let end = reader.position() + length as usize;
+    // The length is from the file: a unit that claims to run past the end of
+    // the section is malformed, and believing it would walk off the data.
+    let end = reader
+        .position()
+        .checked_add(length as usize)
+        .filter(|e| *e <= sections.info.len() && *e > reader.position())?;
     let version = reader.u16()?;
     if !(2..=5).contains(&version) {
         return None;
@@ -259,6 +273,11 @@ fn unit(
     let mut entries: BTreeMap<usize, Entry> = BTreeMap::new();
     let mut stack: Vec<usize> = Vec::new();
     while reader.position() < end {
+        // One entry is at least one byte, so a unit cannot hold more entries
+        // than it has bytes; anything beyond that is a cursor going nowhere.
+        if entries.len() > length as usize {
+            return None;
+        }
         let at = reader.position();
         let code = reader.uleb128()?;
         if code == 0 {
@@ -704,9 +723,15 @@ struct Abbreviation {
 }
 
 fn abbreviations(data: &[u8], at: usize) -> Option<BTreeMap<u64, Abbreviation>> {
-    let mut reader = Cur::new(data.get(at..)?, Endian::Little);
+    let rest = data.get(at..)?;
+    let mut reader = Cur::new(rest, Endian::Little);
     let mut out = BTreeMap::new();
     loop {
+        // Every declaration costs bytes, so there cannot be more of them than
+        // the table has.
+        if out.len() > rest.len() {
+            return None;
+        }
         let code = reader.uleb128()?;
         if code == 0 {
             break;
@@ -715,6 +740,9 @@ fn abbreviations(data: &[u8], at: usize) -> Option<BTreeMap<u64, Abbreviation>> 
         let children = reader.u8()? != 0;
         let mut attributes = Vec::new();
         loop {
+            if attributes.len() > rest.len() {
+                return None;
+            }
             let attribute = reader.uleb128()?;
             let form = reader.uleb128()?;
             // `implicit_const` carries its value in the abbreviation itself.
@@ -870,7 +898,11 @@ fn lines(sections: &Sections<'_>, endian: Endian) -> Vec<LineRow> {
     let mut out = Vec::new();
     let mut reader = Cur::new(sections.line, endian);
     while !reader.is_empty() {
+        let before = reader.position();
         if line_program(&mut reader, sections, endian, &mut out).is_none() {
+            break;
+        }
+        if reader.position() <= before {
             break;
         }
     }
@@ -888,10 +920,10 @@ fn line_program(
     if sixty_four {
         length = reader.u64()?;
     }
-    if length == 0 {
-        return None;
-    }
-    let end = reader.position() + length as usize;
+    let end = reader
+        .position()
+        .checked_add(length as usize)
+        .filter(|e| *e <= sections.line.len() && *e > reader.position())?;
     let version = reader.u16()?;
     if !(2..=5).contains(&version) {
         reader.seek(end);
@@ -924,7 +956,13 @@ fn line_program(
 
     reader.seek(program_start);
     let mut state = LineState::new(default_is_stmt);
+    let rows_before = out.len();
     while reader.position() < end {
+        // Every opcode costs a byte and at most one row, so a program cannot
+        // emit more rows than it has bytes.
+        if out.len() - rows_before > length as usize {
+            return None;
+        }
         let opcode = reader.u8()?;
         if opcode == 0 {
             // Extended.
@@ -996,7 +1034,13 @@ fn line_program(
 
 fn file_names_v4(reader: &mut Cur<'_>) -> Option<Vec<String>> {
     // Include directories, which this does not need but has to step over.
+    let limit = reader.0.len();
+    let mut seen = 0;
     loop {
+        seen += 1;
+        if seen > limit {
+            return None;
+        }
         let s = reader.cstr()?;
         if s.is_empty() {
             break;

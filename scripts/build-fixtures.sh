@@ -100,6 +100,30 @@ if [ -n "$lld" ]; then
   done
 fi
 
+# C++ fixtures: virtual dispatch, inheritance and RTTI, which is what vtable
+# recovery has to find. Freestanding, so no C++ runtime is needed to build them.
+cxx=${CXX:-g++}
+for src in fixtures/cpp/*.cpp; do
+  [ -e "$src" ] || continue
+  base=$(basename "$src" .cpp)
+  case "$base" in start) continue ;; esac
+  for opt in O0 O2; do
+    "$cxx" -g -"$opt" -fno-exceptions -c -o "$out/${base}.a64.${opt}.cpp.o" "$src" \
+      2>/dev/null || true
+    # And linked, so the vtable scan has a binary where every slot resolves.
+    # Without RTTI: the type information refers to the ABI runtime's own
+    # tables, which a freestanding link has nothing to resolve against.
+    # `-ffreestanding` as well: without it the optimizer rewrites a counting
+    # loop into a call to `strlen`, which there is nothing here to link.
+    "$cxx" -g -"$opt" -fno-exceptions -fno-rtti -ffreestanding -fno-pie -no-pie \
+      -nostdlib -static \
+      -o "$out/${base}.a64.${opt}.cpp" "$src" fixtures/cpp/start.cpp 2>/dev/null || true
+    if [ -x "$out/${base}.a64.${opt}.cpp" ]; then
+      "$out/${base}.a64.${opt}.cpp" > "$out/${base}.a64.${opt}.cpp.out" || true
+    fi
+  done
+done
+
 # x86-64 assembly fixtures, kept from the C++ project: they pin encodings.
 for src in fixtures/asm/*.s; do
   [ -e "$src" ] || continue

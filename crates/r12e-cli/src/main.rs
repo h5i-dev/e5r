@@ -163,6 +163,11 @@ enum Command {
         /// Address, symbol, or `all`.
         target: String,
     },
+    /// List virtual tables and the classes they belong to.
+    Vtables {
+        #[command(flatten)]
+        common: Common,
+    },
     /// Run a function in the interpreter.
     ///
     /// The same machine the lifter's semantics gate uses, which is measured
@@ -281,7 +286,8 @@ impl Command {
             Command::Annotate { common, .. } | Command::Diff { common, .. } => common,
             // The server takes its paths per call rather than up front.
             Command::Mcp => unreachable!("handled before a file is opened"),
-            Command::Emulate { common, .. }
+            Command::Vtables { common, .. }
+            | Command::Emulate { common, .. }
             | Command::Query { common, .. }
             | Command::Sig { common, .. }
             | Command::Disas { common, .. }
@@ -410,6 +416,7 @@ fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             depth,
             budget,
         } => print::emulate(w, &program, target, args, *depth, *budget, common.json),
+        Command::Vtables { common } => print::vtables(w, &program, common.json),
         Command::Query { common, query } => {
             print::query(w, &program, &query.join(" "), common.json)
         }

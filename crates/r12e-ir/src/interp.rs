@@ -261,6 +261,9 @@ pub fn step(m: &mut Machine<'_>, ir: &IrOp) -> Step {
     let ys = ir.input(1).map(|v| sext(m.read(v), v.size)).unwrap_or(0);
 
     let value = match ir.op {
+        // The callee wrote whatever is there; the machine is not told to
+        // forget it, only the analysis is.
+        Op::Undefine => return Step::Next,
         Op::Copy => x,
         Op::Load => {
             let size = out.size;

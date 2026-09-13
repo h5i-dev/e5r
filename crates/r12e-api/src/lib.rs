@@ -13,10 +13,12 @@ pub mod decompile;
 pub mod emulate;
 pub mod query;
 pub mod shapes;
+pub mod vtables;
 pub mod signatures;
 
 pub use decompile::{Decompiled, Unit, decompile_function, decompile_program};
 pub use emulate::{Run, Setup};
 pub use query::{Answer, Entity, Query, Row};
 pub use shapes::{Pointer, shapes_of};
+pub use vtables::{VTable, vtables};
 pub use signatures::{Identified, anchor_of, collect_signatures, identify};

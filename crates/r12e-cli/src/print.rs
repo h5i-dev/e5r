@@ -748,3 +748,39 @@ fn describe(stop: &r12e_ir::Stop) -> String {
         Stop::DivideByZero(a) => format!("divided by zero at {a}"),
     }
 }
+
+/// List the virtual tables.
+pub fn vtables(w: &mut Out, p: &Program, as_json: bool) -> R {
+    let tables = r12e_api::vtables(p);
+    if as_json {
+        return json::emit(w, &json::vtables(p, &tables));
+    }
+    if tables.is_empty() {
+        eprintln!("no virtual tables found");
+        return Ok(exit::NOT_FOUND);
+    }
+    for (n, t) in tables.iter().enumerate() {
+        if n > 0 {
+            outln!(w);
+        }
+        outln!(
+            w,
+            "{} <{}>  {} method(s), {}",
+            t.entry,
+            t.class.as_deref().unwrap_or("unnamed"),
+            t.methods.len(),
+            t.evidence.as_str()
+        );
+        if t.offset_to_top != 0 {
+            outln!(w, "  offset to top {}", t.offset_to_top);
+        }
+        for (slot, method) in t.methods.iter().enumerate() {
+            let name = p
+                .function(*method)
+                .map(|f| f.display_name())
+                .unwrap_or_else(|| format!("{method}"));
+            outln!(w, "  [{slot}] {method}  {name}");
+        }
+    }
+    Ok(exit::OK)
+}

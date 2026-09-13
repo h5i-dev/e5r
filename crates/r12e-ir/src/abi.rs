@@ -25,6 +25,8 @@ pub struct Abi {
     pub results: Vec<u64>,
     /// Registers the callee must restore, so the caller may read them after.
     pub callee_saved: Vec<u64>,
+    /// Registers a call may leave holding anything.
+    pub caller_saved: Vec<u64>,
     /// The stack pointer.
     pub stack_pointer: u64,
     /// Where the vector registers start, for naming.
@@ -82,6 +84,11 @@ pub fn of(arch: &Arch) -> Abi {
                 .iter()
                 .map(|n| x86::gpr_offset(*n))
                 .collect(),
+            // rax, rcx, rdx, rsi, rdi and r8 through r11.
+            caller_saved: [0u8, 1, 2, 6, 7, 8, 9, 10, 11]
+                .iter()
+                .map(|n| x86::gpr_offset(*n))
+                .collect(),
             stack_pointer: x86::sp_offset(),
             vector_base: x86::vec_offset(0),
         },
@@ -95,6 +102,8 @@ pub fn of(arch: &Arch) -> Abi {
             ],
             // x19 through x28, and the frame pointer.
             callee_saved: (19..=29).map(aarch64::gpr_offset).collect(),
+            // x0 through x18, which a callee may use for anything.
+            caller_saved: (0..=18).map(aarch64::gpr_offset).collect(),
             stack_pointer: aarch64::sp_offset(),
             vector_base: aarch64::vec_offset(0),
         },

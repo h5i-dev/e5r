@@ -55,6 +55,9 @@ pub struct Callee {
     pub name: String,
     /// How many parameters it declares.
     pub arity: usize,
+    /// False when it was declared to return nothing, so its result is not
+    /// assigned to anything.
+    pub returns_value: bool,
 }
 
 /// One declared parameter.
@@ -400,6 +403,7 @@ fn helper_for(o: Op) -> Option<&'static str> {
         Op::IntSCarry => "uint64_t __overflow(uint64_t, uint64_t);",
         Op::IntSBorrow => "uint64_t __borrow(uint64_t, uint64_t);",
         Op::Unimplemented => "void __unmodelled(uint64_t);",
+        Op::Undefine => "uint64_t __clobbered(void);",
         Op::CBranch => "int __condition(void);",
         _ => return None,
     })
@@ -825,6 +829,13 @@ impl Emitter<'_> {
                     let _ = writeln!(out, "{pad}{}", self.return_statement(at));
                 }
                 Op::Call | Op::CallInd => {
+                    let void = match op.inputs.first().and_then(|i| i.as_const()) {
+                        Some(target) => self
+                            .callees
+                            .get(&target)
+                            .is_some_and(|c| !c.returns_value),
+                        None => false,
+                    };
                     let e = match (o, op.inputs.first().and_then(|i| i.as_const())) {
                         (Op::Call, Some(target)) => {
                             let callee = self.callees.get(&target);
@@ -835,9 +846,12 @@ impl Emitter<'_> {
                         }
                         _ => self.r.expr(op),
                     };
-                    match op.out.and_then(|v| self.r.locals.get(&v)) {
+                    match op.out.and_then(|v| self.r.locals.get(&v)).filter(|_| !void) {
+                        // The local is an integer and the callee may be
+                        // declared to return a pointer, which C will not
+                        // assign without being told.
                         Some(name) => {
-                            let _ = writeln!(out, "{pad}{name} = {e};");
+                            let _ = writeln!(out, "{pad}{name} = (uint64_t){e};");
                         }
                         None => {
                             let _ = writeln!(out, "{pad}{e};");

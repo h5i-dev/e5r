@@ -273,6 +273,12 @@ pub enum Op {
     /// Change of floating point width.
     FloatConvert,
 
+    /// `out` now holds something this function did not compute: what a call
+    /// leaves in the registers the convention lets it clobber. It is not a
+    /// value, it is the absence of one, and dataflow needs to see the
+    /// difference.
+    Undefine,
+
     /// Concatenate: `out = (in0 << (in1.size * 8)) | in1`.
     Piece,
     /// Extract: `out = in0 >> (in1 * 8)`, truncated to `out.size`.
@@ -322,7 +328,7 @@ impl Op {
             | Op::Call
             | Op::CallInd
             | Op::Return => 1,
-            Op::Unimplemented => 0,
+            Op::Unimplemented | Op::Undefine => 0,
             Op::IntDiv128 | Op::IntSDiv128 | Op::IntRem128 | Op::IntSRem128 => 3,
             Op::FloatMulAdd => 3,
             _ => 2,
@@ -405,6 +411,7 @@ impl Op {
             Op::BoolNot => "!",
             Op::Piece => "piece",
             Op::SubPiece => "subpiece",
+            Op::Undefine => "undefine",
             Op::Unimplemented => "unimplemented",
         }
     }

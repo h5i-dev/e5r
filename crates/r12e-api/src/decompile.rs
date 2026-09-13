@@ -102,6 +102,7 @@ pub fn decompile_program(p: &Program, targets: &[&Function]) -> Unit {
                 Callee {
                     name: r12e_decomp::identifier(&name),
                     arity: out.arity,
+                    returns_value: !out.signature.starts_with("void "),
                 },
             );
             outputs.push((f.entry, name, out, unlifted));
