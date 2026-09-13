@@ -237,6 +237,18 @@ that does not exist.
 | `--threads N` | How much of the analysis to run in parallel. The output does not depend on this. |
 | `--color WHEN` | `auto` (a terminal only), `always`, or `never`. `NO_COLOR` is honoured. |
 | `--no-pager` | Do not page, even when a terminal is reading. `PAGER` and `R12E_PAGER` choose the pager. |
+| `--budget SECONDS` | Stop after this long and report what was finished. |
+| `--limit N` | Stop after this many items and report what was finished. |
+| `--progress` | Show a counter on stderr. Silent when stderr is not a terminal. |
+
+A job that runs out of budget prints why on stderr and how much is left, and
+the output it already produced is still a valid document:
+
+```
+$ r12e decompile libstdc++.so.6 all --budget 3 > partial.c
+r12e: out of time after 3.5s and 1024 of 5609 function(s); 4585 not done.
+Raise --budget or --limit, or narrow the target.
+```
 
 Colour, paging and width-fitting happen only when a person is reading. Piped
 output carries no escape sequences and is never truncated, so a listing taken

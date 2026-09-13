@@ -11,11 +11,13 @@
 mod addr;
 mod annotate;
 mod batch;
+mod budget;
 mod json;
 mod mcp;
 mod out;
 mod patch;
 mod print;
+mod progress;
 mod shell;
 
 use std::path::PathBuf;
@@ -84,6 +86,15 @@ pub struct Common {
     /// Do not page, even when a terminal is reading.
     #[arg(long, global = true)]
     no_pager: bool,
+    /// Stop after this many seconds and report what was finished.
+    #[arg(long, global = true, value_name = "SECONDS")]
+    budget: Option<f64>,
+    /// Stop after this many items and report what was finished.
+    #[arg(long, global = true, value_name = "N")]
+    limit: Option<usize>,
+    /// Show progress on stderr. Off when stderr is not a terminal.
+    #[arg(long, global = true)]
+    progress: bool,
 }
 
 #[derive(Subcommand)]
@@ -662,8 +673,23 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             common,
             target,
             bytes,
-        } => print::disas(w, &program, target, *bytes, common.json),
-        Command::Decompile { common, target } => print::decompile(w, &program, target, common.json),
+        } => print::disas(
+            w,
+            &program,
+            target,
+            *bytes,
+            common.json,
+            budget::Budget::new(common.budget, common.limit),
+            common.progress,
+        ),
+        Command::Decompile { common, target } => print::decompile(
+            w,
+            &program,
+            target,
+            common.json,
+            budget::Budget::new(common.budget, common.limit),
+            common.progress,
+        ),
         Command::Shapes { common, target } => print::shapes(w, &program, target, common.json),
         Command::Emulate {
             common,

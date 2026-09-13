@@ -459,8 +459,10 @@ designed before it gets coded, and the design lives in
 - [x] Shell completion for bash, zsh and fish, and a generated man page, both
       generated from the command tree so neither can describe a command that
       does not exist.
-- [ ] Progress reporting on stderr with an estimate, because analysis of a 500 MB
-      binary is not instant even when it is fast.
+- [ ] Progress reporting on stderr with an estimate. `--progress` covers the
+      loops the CLI drives, with a rate-based estimate, silent unless stderr is
+      a terminal. What it does not yet cover is the inside of `analyze()`,
+      which needs a stage callback in `r12e-analysis`.
 
 ### M9. Automation and agents
 
@@ -474,8 +476,12 @@ designed before it gets coded, and the design lives in
       than through an SDK; the protocol is newline-delimited JSON-RPC and a
       dependency would be larger than the code. decompile, diff and patch
       preview follow their features.
-- [ ] Cancellable jobs with a budget, so an agent that asks for the decompilation
-      of a 40,000-function binary gets partial results and a reason.
+- [x] Cancellable jobs with a budget, so an agent that asks for the decompilation
+      of a 40,000-function binary gets partial results and a reason. `--budget`
+      in seconds and `--limit` in items, on `decompile` and `disas`. The clock
+      starts when the command does, so loading and analysis count against it,
+      and the reason goes to stderr so a partial document is still a valid
+      document.
 - [x] A batch mode that runs a script of commands and emits one JSON document,
       each result carried with the command that produced it.
 - [ ] Scripting. Start with the batch language above; add an embedded interpreter

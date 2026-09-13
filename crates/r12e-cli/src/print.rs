@@ -8,9 +8,11 @@ use r12e_core::{Addr, Strength};
 use r12e_format::Object;
 
 use crate::addr;
+use crate::budget::{Budget, Stopped};
 use crate::exit;
 use crate::json;
 use crate::out::{Out, Role, outln};
+use crate::progress::Progress;
 
 type R = Result<u8, String>;
 
@@ -324,8 +326,16 @@ pub fn strings(w: &mut Out, p: &Program, as_json: bool) -> R {
 }
 
 /// Disassembly.
-pub fn disas(w: &mut Out, p: &Program, target: &str, show_bytes: bool, as_json: bool) -> R {
-    let chosen: Vec<&r12e_analysis::Function> = if target == "all" {
+pub fn disas(
+    w: &mut Out,
+    p: &Program,
+    target: &str,
+    show_bytes: bool,
+    as_json: bool,
+    mut budget: Budget,
+    progress: bool,
+) -> R {
+    let mut chosen: Vec<&r12e_analysis::Function> = if target == "all" {
         p.functions_by_address().collect()
     } else {
         let Some(a) = addr::resolve(p, target) else {
@@ -344,11 +354,28 @@ pub fn disas(w: &mut Out, p: &Program, target: &str, show_bytes: bool, as_json: 
         return Ok(exit::NOT_FOUND);
     }
 
+    let wanted = chosen.len();
+    if !budget.unlimited() {
+        let mut allowed = Vec::with_capacity(chosen.len());
+        let mut why = Stopped::Finished;
+        for f in chosen {
+            why = budget.take();
+            if !why.complete() {
+                break;
+            }
+            allowed.push(f);
+        }
+        crate::budget::report(&budget, why, allowed.len(), wanted, "function(s)");
+        chosen = allowed;
+    }
+
     if as_json {
         return json::emit(w, &json::disas(p, &chosen));
     }
 
+    let mut bar = Progress::new("disassembled", chosen.len(), progress && !as_json);
     for (n, f) in chosen.iter().enumerate() {
+        bar.step();
         if n > 0 {
             outln!(w);
         }
@@ -519,7 +546,14 @@ pub fn diff(w: &mut Out, old: &Program, new: &Program, all: bool, as_json: bool)
 }
 
 /// Decompile one function, or every recovered function, to pseudo-C.
-pub fn decompile(w: &mut Out, p: &Program, target: &str, as_json: bool) -> R {
+pub fn decompile(
+    w: &mut Out,
+    p: &Program,
+    target: &str,
+    as_json: bool,
+    mut budget: Budget,
+    progress: bool,
+) -> R {
     let chosen: Vec<&r12e_analysis::Function> = if target == "all" {
         p.functions_by_address().collect()
     } else {
@@ -539,7 +573,46 @@ pub fn decompile(w: &mut Out, p: &Program, target: &str, as_json: bool) -> R {
         return Ok(exit::NOT_FOUND);
     }
 
-    let unit = r12e_api::decompile_program(p, &chosen);
+    // Decompiled in chunks so a budget can stop between them. One function at
+    // a time would lose the cross-function pass that settles call arity, and
+    // the whole list at once cannot be interrupted; a chunk is the compromise,
+    // and it is small enough that the budget overshoots by at most one chunk.
+    const CHUNK: usize = 64;
+    let wanted = chosen.len();
+    let mut bar = Progress::new("decompiled", wanted, progress && !as_json);
+    let mut unit = r12e_api::Unit::default();
+    let mut why = Stopped::Finished;
+    if budget.unlimited() {
+        unit = r12e_api::decompile_program(p, &chosen);
+        bar.step();
+    } else {
+        for group in chosen.chunks(CHUNK) {
+            let mut taking: Vec<&r12e_analysis::Function> = Vec::with_capacity(group.len());
+            for f in group {
+                why = budget.take();
+                if !why.complete() {
+                    break;
+                }
+                taking.push(f);
+            }
+            if !taking.is_empty() {
+                let part = r12e_api::decompile_program(p, &taking);
+                unit.declarations.extend(part.declarations);
+                unit.functions.extend(part.functions);
+                for _ in 0..taking.len() {
+                    bar.step();
+                }
+            }
+            if !why.complete() {
+                break;
+            }
+        }
+        // Declarations come from every chunk and repeat across them.
+        unit.declarations.sort();
+        unit.declarations.dedup();
+    }
+    bar.finish();
+    let produced = unit.functions.len();
     if as_json {
         let items = unit
             .functions
@@ -559,6 +632,7 @@ pub fn decompile(w: &mut Out, p: &Program, target: &str, as_json: bool) -> R {
         }
         outln!(w);
     }
+    crate::budget::report(&budget, why, produced, wanted, "function(s)");
     for (n, d) in unit.functions.iter().enumerate() {
         if n > 0 {
             outln!(w);
