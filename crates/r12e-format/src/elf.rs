@@ -259,6 +259,13 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
         read_eh_frame(&r, &phdrs, &mut obj);
     }
 
+    if relocatable {
+        // A relocatable object writes zero where an address goes: without the
+        // relocations, every call inside it points at itself and the call
+        // graph is fiction.
+        apply_code_relocations(&r, &shdrs, &mut obj);
+    }
+
     if opts.debug_info {
         // A relocatable object's debug addresses are section-relative and need
         // the relocations applied; its symbol table already names every
@@ -1110,6 +1117,148 @@ fn read_debug_info(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object, hints: bo
         });
     }
     obj.debug = Some(info);
+}
+
+/// Apply the relocations that name code and data addresses.
+///
+/// Only the kinds a compiler emits inside an object file, and only where the
+/// symbol resolves to something this file defines: an external symbol has no
+/// address here, and writing a guess would produce a call graph that points
+/// somewhere wrong rather than nowhere.
+fn apply_code_relocations(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object) {
+    let wide = obj.bits == Bits::Bits64;
+    let step: u64 = if wide { 24 } else { 12 };
+    let arch = obj.arch.clone();
+
+    let mut patches: Vec<(Addr, Vec<u8>)> = Vec::new();
+    for sh in shdrs.iter().filter(|s| s.kind == SHT_RELA) {
+        let Some(target) = obj.sections.get(sh.info as usize).cloned() else {
+            continue;
+        };
+        // Any section that is mapped: a jump table lives in `.rodata` and is
+        // as much in need of its relocations as the code that reads it.
+        if target.range.is_empty() || target.name.starts_with(".debug") {
+            continue;
+        }
+        for i in 0..sh.size / step.max(1) {
+            let Ok(mut e) = r.slice_at("relocation", sh.offset + i * step, step) else {
+                continue;
+            };
+            let (offset, info, addend) = if wide {
+                let (Ok(o), Ok(n), Ok(a)) = (
+                    e.u64("r_offset"),
+                    e.u64("r_info"),
+                    e.i64("r_addend"),
+                ) else {
+                    continue;
+                };
+                (o, n, a)
+            } else {
+                let (Ok(o), Ok(n), Ok(a)) = (
+                    e.u32("r_offset"),
+                    e.u32("r_info"),
+                    e.i32("r_addend"),
+                ) else {
+                    continue;
+                };
+                (o as u64, n as u64, a as i64)
+            };
+            let symbol = if wide { info >> 32 } else { info >> 8 };
+            let kind = if wide { info & 0xffff_ffff } else { info & 0xff };
+            let Some(value) = symbol_value(r, shdrs, obj, symbol) else {
+                continue;
+            };
+            // Where the fixup goes, which is an offset into the section the
+            // relocation names.
+            let place = target.range.start().get().wrapping_add(offset);
+            // However much is there: the last entry of a table sits at the
+            // end of its section, and asking for eight bytes there fails.
+            let mut word = [0u8; 8];
+            let available = (1..=8)
+                .rev()
+                .find_map(|n| obj.memory.slice(Addr(place), n));
+            let Some(existing) = available else { continue };
+            word[..existing.len()].copy_from_slice(existing);
+            if let Some(bytes) = fixup(&arch, kind, value, addend, place, &word) {
+                patches.push((Addr(place), bytes));
+            }
+        }
+    }
+    for (at, bytes) in patches {
+        obj.memory.patch(at, &bytes);
+    }
+}
+
+/// The bytes one relocation writes, or nothing when its kind is not handled.
+fn fixup(
+    arch: &Arch,
+    kind: u64,
+    symbol: u64,
+    addend: i64,
+    place: u64,
+    existing: &[u8; 8],
+) -> Option<Vec<u8>> {
+    let value = symbol.wrapping_add(addend as u64);
+    let relative = value.wrapping_sub(place);
+    let word = u32::from_le_bytes([existing[0], existing[1], existing[2], existing[3]]);
+
+    match arch {
+        Arch::X86_64 => Some(match kind {
+            // R_X86_64_64.
+            1 => value.to_le_bytes().to_vec(),
+            // PC32 and PLT32, which differ only in whether a stub may be used.
+            2 | 4 => (relative as u32).to_le_bytes().to_vec(),
+            // The 32-bit absolute forms.
+            10 | 11 => (value as u32).to_le_bytes().to_vec(),
+            _ => return None,
+        }),
+        Arch::AArch64 => Some(match kind {
+            // ABS64.
+            257 => value.to_le_bytes().to_vec(),
+            // ABS32.
+            258 => (value as u32).to_le_bytes().to_vec(),
+            // PREL64 and PREL32.
+            260 => relative.to_le_bytes().to_vec(),
+            261 => (relative as u32).to_le_bytes().to_vec(),
+            // ADR_PREL_PG_HI21: the page difference, in the split immediate an
+            // `adrp` carries.
+            275 | 276 => {
+                let pages = (value & !0xfff).wrapping_sub(place & !0xfff) as i64 >> 12;
+                let immlo = (pages as u32 & 3) << 29;
+                let immhi = ((pages as u32 >> 2) & 0x7ffff) << 5;
+                ((word & !0x60ff_ffe0) | immlo | immhi).to_le_bytes().to_vec()
+            }
+            // The twelve-bit offsets: an add, or a load or store scaled by its
+            // access size.
+            277 => {
+                let imm = (value & 0xfff) as u32;
+                ((word & !0x003f_fc00) | (imm << 10)).to_le_bytes().to_vec()
+            }
+            278 | 284 | 285 | 286 | 299 => {
+                let scale = match kind {
+                    278 => 0,
+                    284 => 1,
+                    285 => 2,
+                    286 => 3,
+                    _ => 4,
+                };
+                let imm = ((value & 0xfff) >> scale) as u32;
+                ((word & !0x003f_fc00) | (imm << 10)).to_le_bytes().to_vec()
+            }
+            // JUMP26 and CALL26: the branch displacement in instructions.
+            282 | 283 => {
+                let imm = ((relative as i64 >> 2) as u32) & 0x03ff_ffff;
+                ((word & !0x03ff_ffff) | imm).to_le_bytes().to_vec()
+            }
+            // CONDBR19 and the test-and-branch form.
+            280 => {
+                let imm = ((relative as i64 >> 2) as u32 & 0x7ffff) << 5;
+                ((word & !0x00ff_ffe0) | imm).to_le_bytes().to_vec()
+            }
+            _ => return None,
+        }),
+        _ => None,
+    }
 }
 
 /// A copy of a section with its relocations applied.

@@ -90,6 +90,13 @@ impl<'a> Machine<'a> {
     }
 
     /// Put bytes in memory.
+    /// The memory the machine has written, which is everything not in the
+    /// image it started from.
+    pub fn written(&self) -> &BTreeMap<u64, u8> {
+        &self.memory
+    }
+
+    /// Write bytes into the machine's memory.
     pub fn write_mem(&mut self, at: u64, bytes: &[u8]) {
         for (i, b) in bytes.iter().enumerate() {
             self.memory.insert(at + i as u64, *b);

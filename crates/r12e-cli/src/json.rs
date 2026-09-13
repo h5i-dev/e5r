@@ -433,6 +433,30 @@ pub fn query(answer: &r12e_api::Answer) -> QueryOut {
     }
 }
 
+/// What one emulated run did.
+#[derive(Serialize)]
+pub struct RunOut {
+    function: FunctionOut,
+    stopped: String,
+    result: String,
+    insns: u64,
+    ops: u64,
+    unmodelled: Vec<String>,
+    bytes_written: usize,
+}
+
+pub fn run(f: &Function, r: &r12e_api::Run) -> RunOut {
+    RunOut {
+        function: function_out(f),
+        stopped: format!("{:?}", r.stop).to_lowercase(),
+        result: format!("{:#x}", r.result),
+        insns: r.insns,
+        ops: r.ops,
+        unmodelled: r.unlifted.iter().map(|a| hex(*a)).collect(),
+        bytes_written: r.written.len(),
+    }
+}
+
 pub fn disas(p: &Program, fns: &[&Function]) -> Listing<DisasOut> {
     listing(
         fns.iter()

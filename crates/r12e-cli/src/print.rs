@@ -687,3 +687,64 @@ fn escape(text: &str) -> String {
     }
     out
 }
+
+/// Run a function and report what it did.
+#[allow(clippy::too_many_arguments)]
+pub fn emulate(
+    w: &mut Out,
+    p: &Program,
+    target: &str,
+    args: &[u64],
+    depth: u32,
+    budget: u64,
+    as_json: bool,
+) -> R {
+    let Some(a) = addr::resolve(p, target) else {
+        return Err(format!("{target:?} is not an address or a symbol"));
+    };
+    let Some(f) = p.function(a).or_else(|| p.function_at(a)) else {
+        eprintln!("no function covers {a}");
+        return Ok(exit::NOT_FOUND);
+    };
+    let setup = r12e_api::Setup {
+        arguments: args.to_vec(),
+        depth,
+        budget,
+        ..Default::default()
+    };
+    let run = r12e_api::emulate::run(p, f, &setup);
+
+    if as_json {
+        return json::emit(w, &json::run(f, &run));
+    }
+    outln!(w, "{} <{}>", f.entry, f.display_name());
+    outln!(w, "  stopped   {}", describe(&run.stop));
+    outln!(w, "  result    {:#x} ({})", run.result, run.result as i64);
+    outln!(w, "  executed  {} instruction(s), {} operation(s)", run.insns, run.ops);
+    if !run.unlifted.is_empty() {
+        let shown: Vec<String> = run.unlifted.iter().take(5).map(|a| a.to_string()).collect();
+        outln!(
+            w,
+            "  unmodelled {} instruction(s): {}",
+            run.unlifted.len(),
+            shown.join(", ")
+        );
+    }
+    if !run.written.is_empty() {
+        outln!(w, "  wrote     {} byte(s) of memory", run.written.len());
+    }
+    Ok(exit::OK)
+}
+
+/// Why a run stopped, in words.
+fn describe(stop: &r12e_ir::Stop) -> String {
+    use r12e_ir::Stop;
+    match stop {
+        Stop::Returned => "returned".into(),
+        Stop::Budget => "ran out of budget".into(),
+        Stop::Unimplemented(a) => format!("reached an instruction the lifter does not model at {a}"),
+        Stop::NoCode(a) => format!("branched to {a}, where there is no code"),
+        Stop::Call(a) => format!("called {a}, and calls were not being followed"),
+        Stop::DivideByZero(a) => format!("divided by zero at {a}"),
+    }
+}

@@ -163,6 +163,26 @@ enum Command {
         /// Address, symbol, or `all`.
         target: String,
     },
+    /// Run a function in the interpreter.
+    ///
+    /// The same machine the lifter's semantics gate uses, which is measured
+    /// against what real hardware does. Nothing escapes the process: memory is
+    /// a copy, a system call stops the run, and a budget bounds it.
+    Emulate {
+        #[command(flatten)]
+        common: Common,
+        /// Address or symbol of the function to run.
+        target: String,
+        /// Integer arguments, in the calling convention's order.
+        #[arg(value_parser = parse_u64)]
+        args: Vec<u64>,
+        /// How deep to follow calls.
+        #[arg(long, default_value_t = 64)]
+        depth: u32,
+        /// How many IR operations to allow.
+        #[arg(long, default_value_t = 1 << 22)]
+        budget: u64,
+    },
     /// Ask a question about the program.
     ///
     /// `functions where insns > 100 and name ~ "crypt"`, and the same shape
@@ -261,7 +281,8 @@ impl Command {
             Command::Annotate { common, .. } | Command::Diff { common, .. } => common,
             // The server takes its paths per call rather than up front.
             Command::Mcp => unreachable!("handled before a file is opened"),
-            Command::Query { common, .. }
+            Command::Emulate { common, .. }
+            | Command::Query { common, .. }
             | Command::Sig { common, .. }
             | Command::Disas { common, .. }
             | Command::Decompile { common, .. }
@@ -382,6 +403,13 @@ fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             print::decompile(w, &program, target, common.json)
         }
         Command::Shapes { common, target } => print::shapes(w, &program, target, common.json),
+        Command::Emulate {
+            common,
+            target,
+            args,
+            depth,
+            budget,
+        } => print::emulate(w, &program, target, args, *depth, *budget, common.json),
         Command::Query { common, query } => {
             print::query(w, &program, &query.join(" "), common.json)
         }

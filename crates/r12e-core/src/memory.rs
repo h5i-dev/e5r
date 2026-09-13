@@ -89,6 +89,22 @@ pub struct Segment {
 }
 
 impl Segment {
+    /// Overwrite bytes in the segment. Returns false when the write would
+    /// leave the part that is backed by the file.
+    pub fn patch(&mut self, at: Addr, bytes: &[u8]) -> bool {
+        let Some(offset) = at.get().checked_sub(self.range.start().get()) else {
+            return false;
+        };
+        let Ok(offset) = usize::try_from(offset) else {
+            return false;
+        };
+        let Some(slot) = self.data.get_mut(offset..offset + bytes.len()) else {
+            return false;
+        };
+        slot.copy_from_slice(bytes);
+        true
+    }
+
     /// A segment backed by file bytes.
     pub fn new(
         range: AddrRange,
@@ -195,6 +211,16 @@ impl MemoryMap {
     }
 
     /// Every segment, sorted by start address.
+    /// Overwrite bytes wherever they are mapped, for a relocation the loader
+    /// has to apply itself.
+    pub fn patch(&mut self, at: Addr, bytes: &[u8]) -> bool {
+        self.segments
+            .iter_mut()
+            .find(|s| s.range.contains(at))
+            .is_some_and(|s| s.patch(at, bytes))
+    }
+
+    /// The segments, in address order.
     pub fn segments(&self) -> &[Segment] {
         &self.segments
     }
