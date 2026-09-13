@@ -13,6 +13,7 @@
 
 pub mod ehframe;
 pub mod elf;
+pub mod pe;
 pub mod raw;
 
 use std::collections::BTreeMap;
@@ -294,10 +295,14 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
         Err(e) if e.is_not_recognized() => {}
         other => return other,
     }
+    match pe::load(data, opts) {
+        Err(e) if e.is_not_recognized() => {}
+        other => return other,
+    }
     if opts.arch.is_some() {
         return raw::load(data, opts);
     }
     Err(Error::NotRecognized {
-        expected: "recognized container (ELF); pass an architecture to load it raw",
+        expected: "recognized container (ELF or PE); pass an architecture to load it raw",
     })
 }

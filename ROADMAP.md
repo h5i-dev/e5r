@@ -10,7 +10,7 @@ rather than argued about again.
 | --- | --- |
 | workspace, guards, fixtures, CI | built (M0) |
 | ELF loader with provenance-tagged hints | built (M1) |
-| PE, Mach-O, raw | raw only; PE and Mach-O not started |
+| PE and COFF | built (M1); Mach-O not started; raw built |
 | AArch64 decoder | built, objdump parity over 1.43M instructions, 99.38% decoded |
 | x86-64 decoder | built, llvm-objdump parity over 4,760 instructions, 100% decoded |
 | SLEIGH runtime and compiler | not started |
@@ -139,10 +139,12 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       `.eh_frame` and `.eh_frame_hdr`, `.note.gnu.build-id`.
 - [ ] ELF relocations for x86-64, AArch64 and i386, enough to load `.o` files
       and to resolve PLT entries to names.
-- [ ] PE and COFF. Import and delay-import descriptors, exports, TLS callbacks,
-      base relocations, resources, debug directory with the PDB path, load config,
-      and the exception directory (`RUNTIME_FUNCTION` unwind data, which is the
-      best function-boundary oracle Windows offers).
+- [x] PE and COFF. Both image and object layouts, import and delay-import
+      descriptors with their IAT slots, exports, the COFF symbol table, the
+      debug directory's PDB path, and the exception directory
+      (`RUNTIME_FUNCTION` unwind data, the best function-boundary oracle
+      Windows offers). Base relocations, resources and load config are still
+      to do.
 - [ ] Mach-O, including fat binaries, chained fixups, the exports trie, and
       `LC_FUNCTION_STARTS`, which is another boundary oracle.
 - [x] Raw blob loading with an explicit base, architecture and entry point, plus

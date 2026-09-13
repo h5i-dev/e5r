@@ -35,6 +35,10 @@ for src in fixtures/portable/*.c; do
     "$xcc" --target=x86_64-linux-gnu -g -"$opt" -ffreestanding -c \
       -o "$out/${base}.x64.${opt}.o" "$src"
   done
+  # A COFF object, so the PE loader has real input on a machine with no
+  # Windows linker.
+  "$xcc" --target=x86_64-pc-windows-msvc -O2 -ffreestanding -c \
+    -o "$out/${base}.coff.o" "$src" 2>/dev/null || true
   # One SSE4.2 build, to reach past the x86-64 baseline.
   "$xcc" --target=x86_64-linux-gnu -g -O2 -msse4.2 -ffreestanding -c \
     -o "$out/${base}.x64.sse42.o" "$src" 2>/dev/null || true
