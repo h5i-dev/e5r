@@ -230,6 +230,14 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 - [x] PLT thunk resolution from the relocation table, so a call through one
       prints the imported name. GOT and IAT still to do for the indirect
       forms.
+- [ ] Windows-specific entry points, which are how a PE runs code the entry
+      point never reaches: TLS callbacks from the directory the loader already
+      notices, static and dynamic initializer tables, and the exception
+      handlers. On x86-64 those live in `.pdata` and `.xdata`, which also give
+      function boundaries and frame layouts; on 32-bit they are a linked list
+      through `fs:[0]` that has to be recognized in the code. A binary whose
+      real work happens in a TLS callback is a common enough shape that missing
+      it is missing the program.
 - [x] Parallel analysis with deterministic output. Functions are independent
       units; the work queue order must not reach the result.
 
