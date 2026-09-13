@@ -628,9 +628,13 @@ pub fn simplify(f: &mut SsaFunction) -> Changes {
                 Op::IntLeft | Op::IntRight | Op::IntSRight if c.as_const() == Some(0) => Some(a),
                 // Widening something already that wide.
                 Op::IntZExt if ma & width == ma && a.size() == op.size => Some(a),
-                // Taking the low bytes of a value that has no others.
+                // Taking the low bytes of a value that has no others. The
+                // replacement has to be the same width: a narrow read is the
+                // only record of how many bits an operation works at, and a
+                // signed comparison rebuilt from operands that grew reads the
+                // sign bit in the wrong place.
                 Op::SubPiece if c.as_const() == Some(0) && ma & !width_mask(op.size) == 0 => {
-                    Some(a)
+                    narrowed_to(&source, &a, op.size)
                 }
                 _ => None,
             };
@@ -672,6 +676,42 @@ pub fn simplify(f: &mut SsaFunction) -> Changes {
     changes
 }
 
+/// An operand of exactly `size` bytes holding what the low `size` bytes of `o`
+/// hold, when a widening put them there.
+///
+/// Zero-extending a value and then reading its low bytes back is what lifting a
+/// narrow register write followed by a narrow read produces, and the value
+/// before the extension is already the right width. Without this the only way
+/// to keep the width is to keep the extract.
+fn narrowed_to(
+    source: &BTreeMap<Value, (Op, Vec<Operand>)>,
+    o: &Operand,
+    size: u8,
+) -> Option<Operand> {
+    let mut current = *o;
+    // A bound rather than a visited set: the chains are a handful of links and
+    // a cycle would otherwise spin here.
+    for _ in 0..16 {
+        if current.size() == size {
+            return Some(current);
+        }
+        let Operand::Value(v) = current else {
+            return None;
+        };
+        let (Op::IntZExt, inputs) = source.get(&v)? else {
+            return None;
+        };
+        let next = *inputs.first()?;
+        // Extending something narrower than the read puts zeroes in the bytes
+        // being read, so the value before it is not what is wanted.
+        if next.size() < size {
+            return None;
+        }
+        current = next;
+    }
+    None
+}
+
 /// Rewrite flag algebra back into the comparison it stands for.
 ///
 /// A machine has no `<`; it has a subtraction and four flags, and a condition
@@ -680,11 +720,13 @@ pub fn simplify(f: &mut SsaFunction) -> Changes {
 /// These rules recognize the formulas the architectures actually emit and put
 /// the comparison back.
 pub fn patterns(f: &mut SsaFunction) -> Changes {
-    let mut source: BTreeMap<Value, (Op, Vec<Operand>)> = BTreeMap::new();
+    // The width each operation works at travels with it: a comparison rebuilt
+    // from a subtraction has to compare the bits the subtraction subtracted.
+    let mut source: BTreeMap<Value, (Op, Vec<Operand>, u8)> = BTreeMap::new();
     for b in f.blocks.values() {
         for op in &b.ops {
             if let (Some(out), SsaKind::Op(o)) = (op.out, op.kind.clone()) {
-                source.insert(out, (o, op.inputs.clone()));
+                source.insert(out, (o, op.inputs.clone(), op.size));
             }
         }
     }
@@ -700,20 +742,29 @@ pub fn patterns(f: &mut SsaFunction) -> Changes {
             // A comparison against a subtraction is a comparison of its
             // operands, which is what the subtraction was for.
             if matches!(o, Op::IntEqual | Op::IntNotEqual) && c.as_const() == Some(0) {
-                if let Some((x, y)) = as_subtraction(&source, &a) {
-                    op.inputs = vec![x, y];
-                    changes.folded += 1;
-                    continue;
+                if let Some((x, y, width)) = as_subtraction(&source, &a) {
+                    if let (Some(x), Some(y)) = (at_width(x, width), at_width(y, width)) {
+                        op.inputs = vec![x, y];
+                        changes.folded += 1;
+                        continue;
+                    }
                 }
             }
 
             // The signed comparisons: the sign of the difference against the
             // overflow flag.
             if matches!(o, Op::IntEqual | Op::IntNotEqual) {
-                if let (Some((x, y)), Some((px, py))) =
+                if let (Some((x, y, width)), Some((px, py))) =
                     (sign_of_difference(&source, &a), as_borrow(&source, &c))
                 {
-                    if x == px && y == py {
+                    // Both operands have to be the width the machine compared
+                    // at, or the sign bit the comparison reads is not the one
+                    // the flags were computed from.
+                    let narrowed = match (x == px && y == py, at_width(x, width)) {
+                        (true, Some(x)) => at_width(y, width).map(|y| (x, y)),
+                        _ => None,
+                    };
+                    if let Some((x, y)) = narrowed {
                         op.kind = SsaKind::Op(if o == Op::IntEqual {
                             // Sign agrees with overflow: not less than.
                             Op::IntSLessEqual
@@ -751,25 +802,40 @@ pub fn patterns(f: &mut SsaFunction) -> Changes {
     changes
 }
 
-/// The operands of a subtraction, if that is what an operand is.
+/// The operands of a subtraction and the width it works at, if that is what an
+/// operand is.
 fn as_subtraction(
-    source: &BTreeMap<Value, (Op, Vec<Operand>)>,
+    source: &BTreeMap<Value, (Op, Vec<Operand>, u8)>,
     o: &Operand,
-) -> Option<(Operand, Operand)> {
+) -> Option<(Operand, Operand, u8)> {
     let Operand::Value(v) = o else { return None };
-    let (Op::IntSub, inputs) = source.get(v)? else {
+    let (Op::IntSub, inputs, size) = source.get(v)? else {
         return None;
     };
-    Some((inputs.first().cloned()?, inputs.get(1).cloned()?))
+    Some((inputs.first().cloned()?, inputs.get(1).cloned()?, *size))
+}
+
+/// An operand read at `width` bytes, or `None` when it cannot be.
+///
+/// A constant is whatever width it is needed at, since its value says
+/// everything about it. Anything else already carries a width, and a
+/// comparison rebuilt at a width the operand does not have would read a
+/// different sign bit than the machine did.
+fn at_width(o: Operand, width: u8) -> Option<Operand> {
+    match o {
+        _ if o.size() == width => Some(o),
+        Operand::Const(v, _) => Some(Operand::Const(v & width_mask(width), width)),
+        _ => None,
+    }
 }
 
 /// `(x - y) >> (bits - 1) != 0`, which is the negative flag.
 fn sign_of_difference(
-    source: &BTreeMap<Value, (Op, Vec<Operand>)>,
+    source: &BTreeMap<Value, (Op, Vec<Operand>, u8)>,
     o: &Operand,
-) -> Option<(Operand, Operand)> {
+) -> Option<(Operand, Operand, u8)> {
     let Operand::Value(v) = o else { return None };
-    let (Op::IntNotEqual, inputs) = source.get(v)? else {
+    let (Op::IntNotEqual, inputs, _) = source.get(v)? else {
         return None;
     };
     if inputs.get(1)?.as_const() != Some(0) {
@@ -778,7 +844,7 @@ fn sign_of_difference(
     let Operand::Value(shifted) = inputs.first()? else {
         return None;
     };
-    let (Op::IntRight, shift_inputs) = source.get(shifted)? else {
+    let (Op::IntRight, shift_inputs, _) = source.get(shifted)? else {
         return None;
     };
     let bits = shift_inputs.first()?.size() as u64 * 8;
@@ -790,22 +856,22 @@ fn sign_of_difference(
 
 /// The operands of a signed borrow, if that is what an operand is.
 fn as_borrow(
-    source: &BTreeMap<Value, (Op, Vec<Operand>)>,
+    source: &BTreeMap<Value, (Op, Vec<Operand>, u8)>,
     o: &Operand,
 ) -> Option<(Operand, Operand)> {
     let Operand::Value(v) = o else { return None };
-    let (Op::IntSBorrow, inputs) = source.get(v)? else {
+    let (Op::IntSBorrow, inputs, _) = source.get(v)? else {
         return None;
     };
     Some((inputs.first().cloned()?, inputs.get(1).cloned()?))
 }
 
 fn as_inequality(
-    source: &BTreeMap<Value, (Op, Vec<Operand>)>,
+    source: &BTreeMap<Value, (Op, Vec<Operand>, u8)>,
     o: &Operand,
 ) -> Option<(Operand, Operand)> {
     let Operand::Value(v) = o else { return None };
-    let (op, inputs) = source.get(v)?;
+    let (op, inputs, _) = source.get(v)?;
     match op {
         Op::IntNotEqual => Some((inputs.first().cloned()?, inputs.get(1).cloned()?)),
         // The same thing said the other way round, which is how a machine that
@@ -816,22 +882,22 @@ fn as_inequality(
 }
 
 fn as_equality(
-    source: &BTreeMap<Value, (Op, Vec<Operand>)>,
+    source: &BTreeMap<Value, (Op, Vec<Operand>, u8)>,
     o: &Operand,
 ) -> Option<(Operand, Operand)> {
     let Operand::Value(v) = o else { return None };
-    let (Op::IntEqual, inputs) = source.get(v)? else {
+    let (Op::IntEqual, inputs, _) = source.get(v)? else {
         return None;
     };
     Some((inputs.first().cloned()?, inputs.get(1).cloned()?))
 }
 
 fn as_signed_le(
-    source: &BTreeMap<Value, (Op, Vec<Operand>)>,
+    source: &BTreeMap<Value, (Op, Vec<Operand>, u8)>,
     o: &Operand,
 ) -> Option<(Operand, Operand)> {
     let Operand::Value(v) = o else { return None };
-    let (Op::IntSLessEqual, inputs) = source.get(v)? else {
+    let (Op::IntSLessEqual, inputs, _) = source.get(v)? else {
         return None;
     };
     Some((inputs.first().cloned()?, inputs.get(1).cloned()?))
