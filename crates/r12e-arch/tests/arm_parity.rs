@@ -13,9 +13,12 @@ use std::process::Command;
 use r12e_arch::arm::{self, ItState, Mode, Thumb};
 use r12e_core::Addr;
 
-/// Coverage floor over the corpus. Raise it as the tables fill in; what is
-/// missing is listed by `arm_parity_report`.
-const MIN_COVERAGE: f64 = 0.995;
+/// Coverage floor over the corpus, which is at 100% today. What the decoders
+/// decline outside it is the Advanced SIMD register file, the parallel
+/// arithmetic and saturating packing instructions, and the encodings the
+/// architecture calls unpredictable; `arm_parity_report` lists whatever the
+/// corpus is currently missing. Raise this as it grows; never lower it.
+const MIN_COVERAGE: f64 = 0.999;
 
 fn corpus() -> Option<PathBuf> {
     let d = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/build");
@@ -146,10 +149,8 @@ fn check(tool: &str, path: &Path, mode: Mode) -> Tally {
         match decoded {
             None => {
                 t.undecoded += 1;
-                t.missing.push(format!(
-                    "{} | {addr:x} {bytes:02x?} {want}",
-                    want.split('\t').next().unwrap_or("?")
-                ));
+                t.missing
+                    .push(want.split('\t').next().unwrap_or("?").to_string());
             }
             Some(i) if i.len as usize != bytes.len() => t.wrong.push(format!(
                 "{addr:x}: {bytes:02x?} length {} != llvm's {}",
@@ -161,8 +162,9 @@ fn check(tool: &str, path: &Path, mode: Mode) -> Tally {
                 if got == want {
                     t.matched += 1;
                 } else {
-                    t.wrong
-                        .push(format!("{addr:x}: {bytes:02x?} llvm {want:?} != ours {got:?}"));
+                    t.wrong.push(format!(
+                        "{addr:x}: {bytes:02x?} llvm {want:?} != ours {got:?}"
+                    ));
                 }
             }
         }
@@ -181,7 +183,11 @@ fn fixtures() -> Vec<(PathBuf, Mode)> {
     };
     for e in rd.flatten() {
         let p = e.path();
-        let name = p.file_name().unwrap_or_default().to_string_lossy().into_owned();
+        let name = p
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
         if name.contains(".arm.") {
             out.push((p, Mode::A32));
         } else if name.contains(".thumb.") {
@@ -219,7 +225,8 @@ fn arm_matches_llvm_objdump() {
             let kind = f
                 .split("llvm \"")
                 .nth(1)
-                .and_then(|s| s.split(['\t', '"']).next())
+                .and_then(|s| s.split("\\t").next())
+                .and_then(|s| s.split('"').next())
                 .unwrap_or("length")
                 .to_string();
             *by_kind.entry(kind).or_default() += 1;
@@ -230,7 +237,12 @@ fn arm_matches_llvm_objdump() {
             named.len(),
             all.total(),
             summary.join(", "),
-            named.iter().take(20).cloned().collect::<Vec<_>>().join("\n")
+            named
+                .iter()
+                .take(20)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join("\n")
         );
     }
 
@@ -293,7 +305,12 @@ fn it_blocks_predicate_the_instructions_after_them() {
     }
     assert_eq!(
         out,
-        ["itt\tmi", "movmi\tr0, #0x0", "movmi\tr0, #0x0", "movs\tr0, #0x0"]
+        [
+            "itt\tmi",
+            "movmi\tr0, #0x0",
+            "movmi\tr0, #0x0",
+            "movs\tr0, #0x0"
+        ]
     );
 }
 
@@ -315,7 +332,8 @@ fn arm_parity_report() {
             let key = b
                 .split("llvm \"")
                 .nth(1)
-                .and_then(|s| s.split(['\t', '"']).next())
+                .and_then(|s| s.split("\\t").next())
+                .and_then(|s| s.split('"').next())
                 .unwrap_or("length")
                 .to_string();
             *wrong.entry(key.clone()).or_default() += 1;

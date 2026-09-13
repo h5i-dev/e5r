@@ -10,7 +10,7 @@ use r12e_core::Addr;
 
 use crate::insn::{AddrMode, Cond, Flow, Insn, Mem, Operand};
 
-use super::text::{always, decimal, index};
+use super::text::{always, decimal, index, minus_zero};
 use super::{AL, bit, bits, cm, core_list, reg, sext, shifted, t2_imm, vfp, wb_reg};
 
 /// The eight ITSTATE bits: the block's condition in 7:4, what remains of its
@@ -26,7 +26,7 @@ impl ItState {
 
     /// The condition the next instruction runs under, if any.
     pub fn cond(self) -> Option<Cond> {
-        self.in_block().then(|| Cond(self.0 >> 4))
+        self.in_block().then_some(Cond(self.0 >> 4))
     }
 
     /// The state one instruction later.
@@ -80,7 +80,12 @@ fn branch_flow(cond: u32, target: Addr) -> Flow {
 /// A sixteen-bit encoding that sets the flags outside an IT block and does not
 /// set them inside one, which is the whole difference between `adds` and
 /// `addlo` in a listing.
-fn flagged(in_it: bool, cond: u32, plain: &'static [&str; 16], setting: &'static str) -> &'static str {
+fn flagged(
+    in_it: bool,
+    cond: u32,
+    plain: &'static [&str; 16],
+    setting: &'static str,
+) -> &'static str {
     if in_it { cm(plain, cond) } else { setting }
 }
 
@@ -179,7 +184,7 @@ fn narrow(hw: u32, cond: u32, in_it: bool, addr: Addr) -> Option<Insn> {
             Some(i)
         }
         0b101100..=0b101111 => misc(hw, cond, addr),
-        0b110000 | 0b110001 | 0b110010 | 0b110011 => {
+        0b110000..=0b110011 => {
             let rn = bits(hw, 10, 8);
             let list = bits(hw, 7, 0);
             if list == 0 {
@@ -261,16 +266,13 @@ fn shift_add_sub(hw: u32, cond: u32, in_it: bool, addr: Addr) -> Option<Insn> {
             }
             Some(i)
         }
-        op @ (0b000 | 0b001 | 0b010) => {
+        op @ 0b000..=0b010 => {
             let imm5 = bits(hw, 10, 6);
-            // `lsl` by nothing is how a register move is encoded.
+            // `lsl` by nothing is how a register move is encoded, and it is
+            // the one sixteen-bit form that keeps setting the flags inside an
+            // IT block rather than taking the block's condition.
             if op == 0 && imm5 == 0 {
-                let mut i = at(
-                    addr,
-                    2,
-                    flagged(in_it, cond, conds!("mov"), "movs"),
-                    Flow::Next,
-                );
+                let mut i = at(addr, 2, "movs", Flow::Next);
                 i.push(Operand::Reg(reg(rd))).push(Operand::Reg(reg(rn)));
                 return Some(i);
             }
@@ -554,10 +556,10 @@ const WIDE_DP: [&[&str; 16]; 16] = [
     conds!("and", ".w"),
     conds!("bic", ".w"),
     conds!("orr", ".w"),
-    conds!("orn", ".w"),
+    conds!("orn"),
     conds!("eor", ".w"),
     conds!("and", ".w"),
-    conds!("pkh"),
+    conds!("and", ".w"),
     conds!("and", ".w"),
     conds!("add", ".w"),
     conds!("and", ".w"),
@@ -587,7 +589,14 @@ fn dp_shifted(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
         let mut i = at(
             addr,
             4,
-            cm(if s { conds!("mvns", ".w") } else { conds!("mvn", ".w") }, cond),
+            cm(
+                if s {
+                    conds!("mvns", ".w")
+                } else {
+                    conds!("mvn", ".w")
+                },
+                cond,
+            ),
             Flow::Next,
         );
         i.push(Operand::Reg(reg(rd))).push(shifted(rm, ty, imm5));
@@ -620,10 +629,10 @@ fn wide_dp_name(op: usize, s: bool, cond: u32) -> Option<&'static str> {
         conds!("ands", ".w"),
         conds!("bics", ".w"),
         conds!("orrs", ".w"),
-        conds!("orns", ".w"),
+        conds!("orns"),
         conds!("eors", ".w"),
         conds!("ands", ".w"),
-        conds!("pkh"),
+        conds!("ands", ".w"),
         conds!("ands", ".w"),
         conds!("adds", ".w"),
         conds!("ands", ".w"),
@@ -634,7 +643,8 @@ fn wide_dp_name(op: usize, s: bool, cond: u32) -> Option<&'static str> {
         conds!("rsbs"),
         conds!("ands", ".w"),
     ];
-    if matches!(op, 0b0101 | 0b0111 | 0b1001 | 0b1100 | 0b1111) {
+    // `pkh` shares the opcode field but not the operand shape.
+    if matches!(op, 0b0101 | 0b0110 | 0b0111 | 0b1001 | 0b1100 | 0b1111) {
         return None;
     }
     Some(cm(if s { S_FORMS[op] } else { WIDE_DP[op] }, cond))
@@ -667,7 +677,14 @@ fn move_shifted(
         at(
             addr,
             4,
-            cm(if s { conds!("movs", ".w") } else { conds!("mov", ".w") }, cond),
+            cm(
+                if s {
+                    conds!("movs", ".w")
+                } else {
+                    conds!("mov", ".w")
+                },
+                cond,
+            ),
             Flow::Next,
         )
     } else if ty == 3 && imm5 == 0 {
@@ -681,7 +698,14 @@ fn move_shifted(
         at(
             addr,
             4,
-            cm(if s { setting[ty as usize] } else { plain[ty as usize] }, cond),
+            cm(
+                if s {
+                    setting[ty as usize]
+                } else {
+                    plain[ty as usize]
+                },
+                cond,
+            ),
             Flow::Next,
         )
     };
@@ -756,7 +780,14 @@ fn dp_imm(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
         let mut i = at(
             addr,
             4,
-            cm(if s { conds!("movs", ".w") } else { conds!("mov", ".w") }, cond),
+            cm(
+                if s {
+                    conds!("movs", ".w")
+                } else {
+                    conds!("mov", ".w")
+                },
+                cond,
+            ),
             Flow::Next,
         );
         i.push(Operand::Reg(reg(rd)));
@@ -765,13 +796,18 @@ fn dp_imm(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
         let mut i = at(
             addr,
             4,
-            cm(if s { conds!("mvns", ".w") } else { conds!("mvn", ".w") }, cond),
+            cm(if s { conds!("mvns") } else { conds!("mvn") }, cond),
             Flow::Next,
         );
         i.push(Operand::Reg(reg(rd)));
         i
     } else {
-        let mut i = at(addr, 4, cm(if s { S_FORMS[op] } else { PLAIN[op] }, cond), Flow::Next);
+        let mut i = at(
+            addr,
+            4,
+            cm(if s { S_FORMS[op] } else { PLAIN[op] }, cond),
+            Flow::Next,
+        );
         i.push(Operand::Reg(reg(rd))).push(Operand::Reg(reg(rn)));
         i
     };
@@ -797,7 +833,14 @@ fn dp_plain_imm(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
             let mut i = at(
                 addr,
                 4,
-                cm(if op == 0 { conds!("addw") } else { conds!("subw") }, cond),
+                cm(
+                    if op == 0 {
+                        conds!("addw")
+                    } else {
+                        conds!("subw")
+                    },
+                    cond,
+                ),
                 Flow::Next,
             );
             i.push(Operand::Reg(reg(rd)))
@@ -810,10 +853,18 @@ fn dp_plain_imm(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
             let mut i = at(
                 addr,
                 4,
-                cm(if bit(w, 23) == 1 { conds!("movt") } else { conds!("movw") }, cond),
+                cm(
+                    if bit(w, 23) == 1 {
+                        conds!("movt")
+                    } else {
+                        conds!("movw")
+                    },
+                    cond,
+                ),
                 Flow::Next,
             );
-            i.push(Operand::Reg(reg(rd))).push(Operand::UImm(imm16 as u64));
+            i.push(Operand::Reg(reg(rd)))
+                .push(Operand::UImm(imm16 as u64));
             Some(i)
         }
         0b10100 | 0b11100 => {
@@ -821,7 +872,14 @@ fn dp_plain_imm(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
             let mut i = at(
                 addr,
                 4,
-                cm(if signed { conds!("sbfx") } else { conds!("ubfx") }, cond),
+                cm(
+                    if signed {
+                        conds!("sbfx")
+                    } else {
+                        conds!("ubfx")
+                    },
+                    cond,
+                ),
                 Flow::Next,
             );
             i.push(Operand::Reg(reg(rd)))
@@ -838,7 +896,14 @@ fn dp_plain_imm(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
             let mut i = at(
                 addr,
                 4,
-                cm(if rn == 15 { conds!("bfc") } else { conds!("bfi") }, cond),
+                cm(
+                    if rn == 15 {
+                        conds!("bfc")
+                    } else {
+                        conds!("bfi")
+                    },
+                    cond,
+                ),
                 Flow::Next,
             );
             i.push(Operand::Reg(reg(rd)));
@@ -963,9 +1028,9 @@ fn block(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
         (true, false, true) => (cm(conds!("pop", ".w"), cond), true),
         (false, true, true) => (cm(conds!("push", ".w"), cond), true),
         (true, false, _) => (cm(conds!("ldm", ".w"), cond), false),
-        (true, true, _) => (cm(conds!("ldmdb", ".w"), cond), false),
+        (true, true, _) => (cm(conds!("ldmdb"), cond), false),
         (false, false, _) => (cm(conds!("stm", ".w"), cond), false),
-        (false, true, _) => (cm(conds!("stmdb", ".w"), cond), false),
+        (false, true, _) => (cm(conds!("stmdb"), cond), false),
     };
     let mut i = at(addr, 4, mn, flow);
     if !implicit {
@@ -988,13 +1053,13 @@ fn dual(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
             let mut i = at(addr, 4, cm(conds!("strex"), cond), Flow::Next);
             i.push(Operand::Reg(reg(rt2)))
                 .push(Operand::Reg(reg(rt)))
-                .push(Operand::Mem(decimal(m)));
+                .push(Operand::Mem(m));
             Some(i)
         }
         (0b00, 0b01) => {
             let m = Mem::base_disp(reg(rn), bits(w, 7, 0) as i64 * 4, 4);
             let mut i = at(addr, 4, cm(conds!("ldrex"), cond), Flow::Next);
-            i.push(Operand::Reg(reg(rt))).push(Operand::Mem(decimal(m)));
+            i.push(Operand::Reg(reg(rt))).push(Operand::Mem(m));
             Some(i)
         }
         (0b01, 0b01) if bits(w, 7, 4) <= 1 => {
@@ -1026,14 +1091,17 @@ fn dual(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
                 (true, false) => AddrMode::Offset,
             };
             let off = bits(w, 7, 0) as i64 * 4;
-            let m = Mem {
+            let mut m = decimal(Mem {
                 seg: None,
                 base: Some(reg(rn)),
                 index: None,
                 disp: if u { off } else { -off },
                 mode,
                 size: 8,
-            };
+            });
+            if !u && off == 0 {
+                m = minus_zero(m);
+            }
             let mut i = at(
                 addr,
                 4,
@@ -1042,7 +1110,7 @@ fn dual(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
             );
             i.push(Operand::Reg(reg(rt)))
                 .push(Operand::Reg(reg(rt2)))
-                .push(Operand::Mem(decimal(m)));
+                .push(Operand::Mem(m));
             Some(i)
         }
     }
@@ -1116,10 +1184,14 @@ fn ldst(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
             return None;
         }
         let off = bits(w, 11, 0) as i64;
-        if off == 0 && !wide_imm {
-            return None; // a subtracted zero, which prints as `#-0x0`
+        let mut m = always(Mem::base_disp(
+            reg(15),
+            if wide_imm { off } else { -off },
+            bytes,
+        ));
+        if !wide_imm && off == 0 {
+            m = minus_zero(m);
         }
-        let m = always(Mem::base_disp(reg(15), if wide_imm { off } else { -off }, bytes));
         let mut i = at(addr, 4, cm(pick(true), cond), Flow::Next);
         i.push(Operand::Reg(reg(rt))).push(Operand::Mem(m));
         return Some(i);
@@ -1141,8 +1213,28 @@ fn ldst(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
         return None;
     }
     let (p, u, wb) = (bit(w, 10) == 1, bit(w, 9) == 1, bit(w, 8) == 1);
+    if p && u && !wb {
+        const T_FORMS: [&[&str; 16]; 6] = [
+            conds!("strbt"),
+            conds!("ldrbt"),
+            conds!("strht"),
+            conds!("ldrht"),
+            conds!("strt"),
+            conds!("ldrt"),
+        ];
+        const T_SIGNED: [&[&str; 16]; 2] = [conds!("ldrsbt"), conds!("ldrsht")];
+        let mn = if signed {
+            T_SIGNED[size as usize]
+        } else {
+            T_FORMS[(size * 2 + load as u32) as usize]
+        };
+        let m = Mem::base_disp(reg(rn), bits(w, 7, 0) as i64, bytes);
+        let mut i = at(addr, 4, cm(mn, cond), Flow::Next);
+        i.push(Operand::Reg(reg(rt))).push(Operand::Mem(decimal(m)));
+        return Some(i);
+    }
     if !p && !wb {
-        return None; // the unprivileged forms
+        return None;
     }
     let mode = match (p, wb) {
         (false, _) => AddrMode::PostIndex,
@@ -1150,16 +1242,19 @@ fn ldst(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
         (true, false) => AddrMode::Offset,
     };
     let off = bits(w, 7, 0) as i64;
-    let m = Mem {
+    let mut m = decimal(Mem {
         seg: None,
         base: Some(reg(rn)),
         index: None,
         disp: if u { off } else { -off },
         mode,
         size: bytes,
-    };
+    });
+    if !u && off == 0 {
+        m = minus_zero(m);
+    }
     let mut i = at(addr, 4, cm(pick(false), cond), Flow::Next);
-    i.push(Operand::Reg(reg(rt))).push(Operand::Mem(decimal(m)));
+    i.push(Operand::Reg(reg(rt))).push(Operand::Mem(m));
     Some(i)
 }
 
@@ -1184,20 +1279,27 @@ fn dp_reg(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
         ];
         let op = bits(w, 22, 21) as usize;
         let s = bit(w, 20) == 1;
-        let mut i = at(addr, 4, cm(if s { SETS[op] } else { PLAIN[op] }, cond), Flow::Next);
+        let mut i = at(
+            addr,
+            4,
+            cm(if s { SETS[op] } else { PLAIN[op] }, cond),
+            Flow::Next,
+        );
         i.push(Operand::Reg(reg(rd)))
             .push(Operand::Reg(reg(rn)))
             .push(Operand::Reg(reg(rm)));
         return Some(i);
     }
     if bit(w, 23) == 0 && bits(w, 7, 6) == 0b10 {
+        // The four with a sixteen-bit counterpart take `.w`; the two that
+        // pack halfwords do not, and neither do the accumulating forms.
         const PLAIN: [&[&str; 16]; 6] = [
-            conds!("sxth"),
-            conds!("uxth"),
+            conds!("sxth", ".w"),
+            conds!("uxth", ".w"),
             conds!("sxtb16"),
             conds!("uxtb16"),
-            conds!("sxtb"),
-            conds!("uxtb"),
+            conds!("sxtb", ".w"),
+            conds!("uxtb", ".w"),
         ];
         const WITH: [&[&str; 16]; 6] = [
             conds!("sxtah"),
@@ -1231,6 +1333,9 @@ fn dp_reg(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
         return Some(i);
     }
     if bits(w, 23, 22) == 0b10 && bits(w, 7, 6) == 0b10 {
+        if rn != rm {
+            return None; // the source is encoded twice and must agree
+        }
         let mn = match (bits(w, 21, 20), bits(w, 5, 4)) {
             (0b01, 0b00) => conds!("rev", ".w"),
             (0b01, 0b01) => conds!("rev16", ".w"),

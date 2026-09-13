@@ -9,10 +9,10 @@ use r12e_core::Addr;
 
 use crate::insn::{AddrMode, Flow, Insn, Mem, Operand};
 
-use super::text::{decimal, index};
+use super::text::{decimal, index, minus_zero};
 use super::{
-    AL, BARRIERS, MSR_MASKS, bit, bits, cm, core_list, reg, sext, shift_by_reg, shifted, so_imm_ops,
-    vfp, wb_reg,
+    AL, BARRIERS, MSR_MASKS, bit, bits, cm, core_list, reg, sext, shift_by_reg, shifted,
+    so_imm_ops, vfp, wb_reg,
 };
 
 const DP: [&[&str; 16]; 16] = [
@@ -126,7 +126,11 @@ fn dp_reg(w: u32, cond: u32, addr: Addr, by: Option<u32>) -> Option<Insn> {
     if op == 0b1101 {
         let flow = pc_write(rd, rm, by.is_none() && ty == 0 && imm5 == 0);
         let shift_mn = cm(
-            if s { SHIFTS_S[ty as usize] } else { SHIFTS[ty as usize] },
+            if s {
+                SHIFTS_S[ty as usize]
+            } else {
+                SHIFTS[ty as usize]
+            },
             cond,
         );
         let mut i = match by {
@@ -272,14 +276,22 @@ fn multiply(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
     };
     Some(match bits(w, 23, 21) {
         0b000 => {
-            let mut i = at(addr, cm(if s { conds!("muls") } else { conds!("mul") }, cond), Flow::Next);
+            let mut i = at(
+                addr,
+                cm(if s { conds!("muls") } else { conds!("mul") }, cond),
+                Flow::Next,
+            );
             i.push(Operand::Reg(reg(rd)))
                 .push(Operand::Reg(reg(rn)))
                 .push(Operand::Reg(reg(rm)));
             i
         }
         0b001 => {
-            let mut i = at(addr, cm(if s { conds!("mlas") } else { conds!("mla") }, cond), Flow::Next);
+            let mut i = at(
+                addr,
+                cm(if s { conds!("mlas") } else { conds!("mla") }, cond),
+                Flow::Next,
+            );
             i.push(Operand::Reg(reg(rd)))
                 .push(Operand::Reg(reg(rn)))
                 .push(Operand::Reg(reg(rm)))
@@ -368,6 +380,9 @@ fn extra_ldst(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
     if imm {
         let off = (bits(w, 11, 8) << 4 | bits(w, 3, 0)) as i64;
         m.disp = if u { off } else { -off };
+        if !u && off == 0 {
+            m = minus_zero(m);
+        }
     } else {
         if !u {
             return None; // a subtracted index has nowhere to live in `Mem`
@@ -395,7 +410,8 @@ fn dp_imm(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
                 cm(if wide { conds!("movt") } else { conds!("movw") }, cond),
                 Flow::Next,
             );
-            i.push(Operand::Reg(reg(rd))).push(Operand::UImm(imm as u64));
+            i.push(Operand::Reg(reg(rd)))
+                .push(Operand::UImm(imm as u64));
             Some(i)
         }
         0b10010 if rn == 0 && rd == 0b1111 => {
@@ -486,6 +502,9 @@ fn ldst(w: u32, cond: u32, addr: Addr, reg_form: bool) -> Option<Insn> {
     } else {
         let off = bits(w, 11, 0) as i64;
         m.disp = if u { off } else { -off };
+        if !u && off == 0 && mode != AddrMode::Offset {
+            m = minus_zero(m);
+        }
     }
     if mode == AddrMode::PostIndex {
         m = decimal(m);
@@ -521,7 +540,14 @@ fn media(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
             let signed = op1 < 0b11110;
             let mut i = at(
                 addr,
-                cm(if signed { conds!("sbfx") } else { conds!("ubfx") }, cond),
+                cm(
+                    if signed {
+                        conds!("sbfx")
+                    } else {
+                        conds!("ubfx")
+                    },
+                    cond,
+                ),
                 Flow::Next,
             );
             i.push(Operand::Reg(reg(rd)))
@@ -538,20 +564,35 @@ fn media(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
             }
             let mut i = at(
                 addr,
-                cm(if rm == 15 { conds!("bfc") } else { conds!("bfi") }, cond),
+                cm(
+                    if rm == 15 {
+                        conds!("bfc")
+                    } else {
+                        conds!("bfi")
+                    },
+                    cond,
+                ),
                 Flow::Next,
             );
             i.push(Operand::Reg(reg(rd)));
             if rm != 15 {
                 i.push(Operand::Reg(reg(rm)));
             }
-            i.push(Operand::Count(lsb as i64)).push(Operand::Count(width));
+            i.push(Operand::Count(lsb as i64))
+                .push(Operand::Count(width));
             Some(i)
         }
         (0b10001 | 0b10011, 0b000) => {
             let mut i = at(
                 addr,
-                cm(if op1 == 0b10001 { conds!("sdiv") } else { conds!("udiv") }, cond),
+                cm(
+                    if op1 == 0b10001 {
+                        conds!("sdiv")
+                    } else {
+                        conds!("udiv")
+                    },
+                    cond,
+                ),
                 Flow::Next,
             );
             i.push(Operand::Reg(reg(rn)))
@@ -559,7 +600,9 @@ fn media(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
                 .push(Operand::Reg(reg(bits(w, 11, 8))));
             Some(i)
         }
-        (0b01011, 0b001) | (0b01011, 0b101) | (0b01111, 0b001) | (0b01111, 0b101) => {
+        (0b01011, 0b001) | (0b01011, 0b101) | (0b01111, 0b001) | (0b01111, 0b101)
+            if rn == 15 && bits(w, 11, 8) == 15 =>
+        {
             let mn = match (op1, op2) {
                 (0b01011, 0b001) => conds!("rev"),
                 (0b01011, 0b101) => conds!("rev16"),
@@ -570,7 +613,9 @@ fn media(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
             i.push(Operand::Reg(reg(rd))).push(Operand::Reg(reg(rm)));
             Some(i)
         }
-        (0b01000 | 0b01010 | 0b01011 | 0b01100 | 0b01110 | 0b01111, 0b011) => {
+        (0b01000 | 0b01010 | 0b01011 | 0b01100 | 0b01110 | 0b01111, 0b011)
+            if bits(w, 9, 8) == 0 =>
+        {
             let plain = rn == 15;
             let mn = match (op1, plain) {
                 (0b01000, true) => conds!("sxtb16"),
@@ -619,7 +664,11 @@ fn block(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
     }
     let stack = rn == 13 && wb && list.count_ones() >= 2;
     let flow = if l && list >> 15 == 1 {
-        if rn == 13 { Flow::Return } else { Flow::IndirectBranch }
+        if rn == 13 {
+            Flow::Return
+        } else {
+            Flow::IndirectBranch
+        }
     } else {
         Flow::Next
     };

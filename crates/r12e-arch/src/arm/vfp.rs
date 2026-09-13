@@ -8,7 +8,7 @@ use r12e_core::Addr;
 
 use crate::insn::{AddrMode, Flow, Insn, Mem, Operand};
 
-use super::text::decimal;
+use super::text::{decimal, minus_zero};
 use super::{bit, bits, cm, reg, vfp_list, vreg, wb_reg};
 
 /// One mnemonic in both precisions, single first.
@@ -43,14 +43,17 @@ pub fn ldst(w: u32, cond: u32, addr: Addr, len: u8) -> Option<Insn> {
 
     if p == 1 && !wb {
         let off = bits(w, 7, 0) as i64 * 4;
-        let m = Mem {
+        let mut m = decimal(Mem {
             seg: None,
             base: Some(reg(rn)),
             index: None,
             disp: if u == 1 { off } else { -off },
             mode: AddrMode::Offset,
             size: if double { 8 } else { 4 },
-        };
+        });
+        if u == 0 && off == 0 {
+            m = minus_zero(m);
+        }
         let mut i = Insn::new(
             addr,
             len,
@@ -58,28 +61,40 @@ pub fn ldst(w: u32, cond: u32, addr: Addr, len: u8) -> Option<Insn> {
             Flow::Next,
         );
         i.push(Operand::Reg(vreg(first, double)))
-            .push(Operand::Mem(decimal(m)));
+            .push(Operand::Mem(m));
         return Some(i);
     }
     if p == u {
         return None;
     }
     let imm8 = bits(w, 7, 0);
-    let count = if double { imm8 / 2 } else { imm8 };
-    if count == 0 || first + count > 32 {
+    if double && imm8 & 1 == 1 {
+        return None; // the deprecated `fldmx` and `fstmx` forms
+    }
+    // A run that would leave the register file is truncated rather than
+    // rejected, which is what LLVM's decoder does with it.
+    let mut count = if double { imm8 / 2 } else { imm8 };
+    if count == 0 {
         return None;
     }
+    if double && (count > 16 || first + count > 32) {
+        count = 16.min(32 - first);
+    } else if !double && first + count > 32 {
+        count = 32 - first;
+    }
     let stack = rn == 13 && wb;
-    let mn = match (l, p == 1, stack) {
-        (true, true, true) => cm(conds!("vpop"), cond),
-        (false, false, true) => cm(conds!("vpush"), cond),
-        (true, false, _) => cm(conds!("vldmia"), cond),
-        (true, true, _) => cm(conds!("vldmdb"), cond),
-        (false, false, _) => cm(conds!("vstmia"), cond),
-        (false, true, _) => cm(conds!("vstmdb"), cond),
+    // `vpush` is the decrement-before store and `vpop` the increment-after
+    // load, the two directions a stack needs.
+    let (mn, implicit) = match (l, p == 1, stack) {
+        (true, false, true) => (cm(conds!("vpop"), cond), true),
+        (false, true, true) => (cm(conds!("vpush"), cond), true),
+        (true, false, _) => (cm(conds!("vldmia"), cond), false),
+        (true, true, _) => (cm(conds!("vldmdb"), cond), false),
+        (false, false, _) => (cm(conds!("vstmia"), cond), false),
+        (false, true, _) => (cm(conds!("vstmdb"), cond), false),
     };
     let mut i = Insn::new(addr, len, mn, Flow::Next);
-    if !stack {
+    if !implicit {
         if wb {
             i.push(Operand::Name(wb_reg(rn)));
         } else {
@@ -145,7 +160,10 @@ fn transfer(w: u32, cond: u32, addr: Addr, len: u8, double: bool) -> Option<Insn
     match bits(w, 23, 21) {
         0b000 => {
             let mut i = Insn::new(addr, len, cm(conds!("vmov"), cond), Flow::Next);
-            let (core, vec) = (Operand::Reg(reg(rt)), Operand::Reg(vreg(vn << 1 | n, false)));
+            let (core, vec) = (
+                Operand::Reg(reg(rt)),
+                Operand::Reg(vreg(vn << 1 | n, false)),
+            );
             if load {
                 i.push(core).push(vec);
             } else {
@@ -155,6 +173,8 @@ fn transfer(w: u32, cond: u32, addr: Addr, len: u8, double: bool) -> Option<Insn
         }
         0b111 => {
             let sys = Operand::Name(VFP_SYSREGS[vn as usize]);
+            // Only the status register has the flags spelling.
+            let flags = vn == 1;
             let mut i = Insn::new(
                 addr,
                 len,
@@ -162,7 +182,7 @@ fn transfer(w: u32, cond: u32, addr: Addr, len: u8, double: bool) -> Option<Insn
                 Flow::Next,
             );
             if load {
-                let dst = if rt == 15 {
+                let dst = if rt == 15 && flags {
                     Operand::Name("APSR_nzcv")
                 } else {
                     Operand::Reg(reg(rt))
@@ -244,7 +264,8 @@ fn other(w: u32, cond: u32, addr: Addr, len: u8, double: bool) -> Option<Insn> {
                 fp!("vcmpe")[sz]
             };
             let mut i = Insn::new(addr, len, cm(mn, cond), Flow::Next);
-            i.push(Operand::Reg(vreg(d, double))).push(Operand::Count(0));
+            i.push(Operand::Reg(vreg(d, double)))
+                .push(Operand::Count(0));
             Some(i)
         }
         (0b0111, 0b11) => {
@@ -262,7 +283,12 @@ fn other(w: u32, cond: u32, addr: Addr, len: u8, double: bool) -> Option<Insn> {
                 [conds!("vcvt", ".f32.s32"), conds!("vcvt", ".f64.s32")],
             ];
             let src = num(bits(w, 3, 0), bit(w, 5), false);
-            let mut i = Insn::new(addr, len, cm(CVT[(opc3 >> 1) as usize][sz], cond), Flow::Next);
+            let mut i = Insn::new(
+                addr,
+                len,
+                cm(CVT[(opc3 >> 1) as usize][sz], cond),
+                Flow::Next,
+            );
             i.push(Operand::Reg(vreg(d, double)))
                 .push(Operand::Reg(vreg(src, false)));
             Some(i)

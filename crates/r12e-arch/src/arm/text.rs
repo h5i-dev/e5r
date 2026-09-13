@@ -76,8 +76,11 @@ fn mem(out: &mut String, m: Mem) {
     let flags = m.seg.map_or(0, |r| r.num);
     let decimal = flags & DEC != 0;
     let force = flags & ALW != 0;
+    let neg_zero = flags & NEG != 0;
     let disp = |out: &mut String, v: i64| {
-        if decimal {
+        if neg_zero {
+            out.push_str(if decimal { "#-0" } else { "#-0x0" });
+        } else if decimal {
             let _ = write!(out, "#{v}");
         } else if v < 0 {
             let _ = write!(out, "#-{:#x}", v.unsigned_abs());
@@ -110,7 +113,7 @@ fn mem(out: &mut String, m: Mem) {
             }
         }
         AddrMode::Offset => {
-            if !index(out) && (m.disp != 0 || force) {
+            if !index(out) && (m.disp != 0 || force || neg_zero) {
                 out.push_str(", ");
                 disp(out, m.disp);
             }
@@ -199,6 +202,7 @@ pub fn format(i: &Insn) -> String {
 /// mistaken for a real ARM operand.
 const DEC: u8 = 1;
 const ALW: u8 = 2;
+const NEG: u8 = 4;
 
 fn mark(mut m: Mem, flags: u8) -> Mem {
     m.seg = Some(Reg {
@@ -217,6 +221,12 @@ pub(crate) fn decimal(m: Mem) -> Mem {
 /// The literal loads, which print `[pc, #0x0]` rather than `[pc]`.
 pub(crate) fn always(m: Mem) -> Mem {
     mark(m, ALW)
+}
+
+/// A subtracting offset of zero, which a listing spells `#-0`: the sign is in
+/// the encoding and survives the arithmetic that loses it.
+pub(crate) fn minus_zero(m: Mem) -> Mem {
+    mark(m, NEG)
 }
 
 /// An index register with no scale and no sign, the only indexed form the
@@ -253,7 +263,7 @@ mod tests {
     #[test]
     fn register_lists_expand() {
         let mut s = String::new();
-        list(&mut s, 0x4030);
+        list(&mut s, 0x5030);
         assert_eq!(s, "{r4, r5, r12, lr}");
         let mut v = String::new();
         list(&mut v, 2 << 28 | 8 << 8 | 3);

@@ -219,4 +219,61 @@ for src in fixtures/portable/*.c; do
   done
 done
 
+# Ghidra's decompiler datatests, ported. Each source is one theme and links to
+# its own static freestanding executable, because the shapes these pin need a
+# linked image: a jump table's entries and a reference to a global are both
+# relocations until the linker resolves them, and a relocatable object shows the
+# decompiler neither. `-fno-pie` for the same reason, so a global is a plain
+# address rather than a load from the GOT.
+#
+# Two optimization levels: a datatest is written against one compiler's output,
+# and the only honest substitute for that is checking the property at more than
+# one, since which of the two shows a given shape differs case by case.
+if [ -d fixtures/datatests ]; then
+  for src in fixtures/datatests/*.c; do
+    [ -e "$src" ] || continue
+    base=$(basename "$src" .c)
+    case "$base" in support) continue ;; esac
+    for opt in O1 O2; do
+      "$xcc" -"$opt" -ffreestanding -fno-stack-protector -fno-builtin -fno-pie \
+        -nostdlib -static -Ifixtures/datatests \
+        -o "$out/dt-${base}.a64.${opt}" "$src" fixtures/datatests/support.c \
+        2>/dev/null || true
+      if [ -n "${lld:-}" ]; then
+        "$xcc" --target=x86_64-unknown-linux-gnu -B"$out/ld" -fuse-ld=lld -"$opt" \
+          -ffreestanding -fno-stack-protector -fno-builtin -fno-pie -nostdlib \
+          -static -Ifixtures/datatests \
+          -o "$out/dt-${base}.x64.${opt}" "$src" fixtures/datatests/support.c \
+          2>/dev/null || true
+      fi
+    done
+  done
+fi
+
+# An `ar` archive, for the archive reader. Built from objects that are already
+# here, with one deliberately long member name so the GNU `//` long-name table
+# is exercised rather than only the sixteen-byte name field. `ar t` and `nm -s`
+# are the oracle the tests compare against, so the archive has to be a real one.
+if command -v ar >/dev/null 2>&1; then
+  members=""
+  for o in shapes.a64.O0.o shapes.a64.O1.o shapes.a64.O2.o; do
+    if [ -e "$out/$o" ]; then
+      members="$members $o"
+    fi
+  done
+  if [ -n "$members" ]; then
+    first=${members# }
+    first=${first%% *}
+    long=a-member-name-far-longer-than-sixteen-bytes.o
+    cp "$out/$first" "$out/$long"
+    rm -f "$out/libshapes.a" "$out/libshapes-thin.a"
+    # shellcheck disable=SC2086
+    (cd "$out" && ar rcs libshapes.a $members "$long") || true
+    # A thin archive: the members stay on disk and only their names are stored,
+    # which is a different name encoding and a different member walk.
+    # shellcheck disable=SC2086
+    (cd "$out" && ar rcsT libshapes-thin.a $members) || true
+  fi
+fi
+
 ls "$out"

@@ -7,7 +7,7 @@
 //! which instruction set an address holds, because the bytes never say.
 //!
 //! The condition is part of the mnemonic in every ARM listing, so mnemonics
-//! come from per-opcode tables of fifteen spellings rather than from a suffix
+//! come from per-opcode tables of sixteen spellings rather than from a suffix
 //! glued on at print time: [`Insn::mnemonic`] is a `&'static str`.
 
 // Encoding literals are grouped the way the architecture reference manual draws
@@ -146,10 +146,7 @@ pub(crate) fn reg(n: u32) -> Reg {
 /// A single or double precision VFP register.
 #[inline]
 pub(crate) fn vreg(n: u32, double: bool) -> Reg {
-    Reg::vec(
-        n as u8,
-        if double { Width::W64 } else { Width::W32 },
-    )
+    Reg::vec(n as u8, if double { Width::W64 } else { Width::W32 })
 }
 
 /// A core register list rides in [`Operand::Sys`], the one operand whose
@@ -290,10 +287,37 @@ pub(crate) const BARRIERS: [&str; 16] = [
 
 /// The status register field spellings of a `msr` mask, `SPSR` above `CPSR`.
 pub(crate) const MSR_MASKS: [&str; 32] = [
-    "CPSR", "CPSR_c", "CPSR_x", "CPSR_xc", "apsr_g", "CPSR_sc", "CPSR_sx", "CPSR_sxc",
-    "apsr_nzcvq", "CPSR_fc", "CPSR_fx", "CPSR_fxc", "apsr_nzcvqg", "CPSR_fsc", "CPSR_fsx",
-    "CPSR_fsxc", "SPSR", "SPSR_c", "SPSR_x", "SPSR_xc", "SPSR_s", "SPSR_sc", "SPSR_sx",
-    "SPSR_sxc", "SPSR_f", "SPSR_fc", "SPSR_fx", "SPSR_fxc", "SPSR_fs", "SPSR_fsc", "SPSR_fsx",
+    "CPSR",
+    "CPSR_c",
+    "CPSR_x",
+    "CPSR_xc",
+    "APSR_g",
+    "CPSR_sc",
+    "CPSR_sx",
+    "CPSR_sxc",
+    "APSR_nzcvq",
+    "CPSR_fc",
+    "CPSR_fx",
+    "CPSR_fxc",
+    "APSR_nzcvqg",
+    "CPSR_fsc",
+    "CPSR_fsx",
+    "CPSR_fsxc",
+    "SPSR",
+    "SPSR_c",
+    "SPSR_x",
+    "SPSR_xc",
+    "SPSR_s",
+    "SPSR_sc",
+    "SPSR_sx",
+    "SPSR_sxc",
+    "SPSR_f",
+    "SPSR_fc",
+    "SPSR_fx",
+    "SPSR_fxc",
+    "SPSR_fs",
+    "SPSR_fsc",
+    "SPSR_fsx",
     "SPSR_fsxc",
 ];
 
