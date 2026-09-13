@@ -243,6 +243,8 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       correctness signal available. Every bug fixed after that adds one case.
 - [ ] Quality gates: goto density per function against a baseline, and a
       recompilability check on a corpus where the output is expected to build.
+- [ ] M6 does not close until DecBench scores r12e above Ghidra on the
+      unoptimized set: 32.2 union, 29.3 structure. See the DecBench section.
 - [ ] Options are toggles, not rewrites. A user who wants low-level output and a
       user who wants idiomatic C get the same engine with different switches.
 
@@ -372,6 +374,7 @@ Green before every merge to main. Each one is a command, not a judgment call.
 | G9 | Annotation log merge scenarios fold to the expected state |
 | G10 | Line and branch coverage at or above the floor for the crate |
 | G11 | Mutation score at or above the floor for the crate |
+| G12 | DecBench union and recompile rates at or above the last release, per dataset |
 
 ## Test coverage targets
 
@@ -488,6 +491,86 @@ release and rerun every release.
 
 Where a number is worse than the incumbent, it stays in the table. A scorecard
 that only reports wins is marketing.
+
+### DecBench
+
+The scorecard above is ours, which means we choose the fixtures and we grade our
+own work. [DecBench](https://decbench.com) is the external check: a public
+benchmark that compiles 39 projects at several optimization levels, decompiles
+every function with every entrant, and scores the output against the original
+source on three axes. 94,575 functions across 803 binaries, with a published
+dataset and a leaderboard.
+
+Its three metrics, none of which we chose:
+
+| Metric | What it compares |
+| --- | --- |
+| Structure (GED) | graph edit distance between the source CFG and the decompiled CFG, 0 being isomorphic |
+| Types | recovered variable types against DWARF |
+| Recompile | recompile the decompiled function with the original toolchain, then compare assembly by Jaccard similarity with linker-dependent operands normalized away |
+
+Union is the fraction of functions where the entrant is perfect on at least one
+of the three.
+
+Where the field stands, from the 2026-08-29 snapshot. Numbers are percent of
+functions, higher is better, on the unoptimized (O0, stripped) set of 34,406
+functions:
+
+| | Union | Structure | Types | Recompile |
+| --- | --- | --- | --- | --- |
+| Hex-Rays | 47.9 | 45.7 | 8.7 | 0.8 |
+| kuna | 46.8 | 44.8 | 8.1 | 3.0 |
+| angr | 45.7 | 41.2 | 12.1 | 0.6 |
+| Ghidra | 32.2 | 29.3 | 7.7 | 0.2 |
+| Binary Ninja | 28.9 | 24.0 | 10.4 | 0.2 |
+| r2dec | 22.1 | 21.5 | 2.3 | 0.1 |
+
+On plain `-O2` with inlining, everything drops: kuna 31.4, Hex-Rays 30.7, angr
+30.3, Ghidra 21.7. On the large-function tail the whole field collapses: kuna
+1.6, Binary Ninja 0.8, angr 0.7, Hex-Rays 0.6, Ghidra 0.4.
+
+Four things follow for this roadmap.
+
+1. **Ghidra is not the bar,** and beating it is not the achievement it sounds
+   like. It sits fourth on the default set, 15 points behind Hex-Rays. "Better
+   than Ghidra" as a decompiler claim means passing 32.2 union and 29.3 structure
+   on the unoptimized set, and that is the M6 exit criterion. The bar that
+   matters is Hex-Rays at 47.9.
+
+2. **Recompilation is wide open.** The best score in the field is kuna at 3.0 and
+   Ghidra manages 0.2, so fewer than one function in thirty rebuilds to
+   equivalent assembly anywhere. Output that actually recompiles is worth more to
+   a patch-diff or a vulnerability workflow than output that reads nicely, and it
+   is the one axis where a new entrant can lead instead of catching up. M6
+   optimizes for it on purpose, which is why the recompilability gate is in G7
+   from the start.
+
+3. **Large functions are the other open axis.** Under 2% for everyone, on a set
+   of 1,987 functions. A large optimized function is what a researcher actually
+   hits in real work, and it is what a structuring pass with no budget discipline
+   gives up on. Scale is already an M11 commitment.
+
+4. **The LLM results are a scale artifact.** Codex scores 57.2 union and Claude
+   Code 56.4 on the 250-function sample set, ahead of every traditional
+   decompiler there. Both score 0.2 on the full 34,406-function set. Per-function
+   attention from a frontier model wins when someone pays for 250 functions, and
+   nobody is paying for 94,575. That argues for a fast deterministic engine an
+   agent drives, which is bet 5. It does not argue that the engine is obsolete.
+
+Tasks:
+
+- [ ] Use the DecBench dataset as part of the M0 fixture corpus. 39 projects
+      built at several optimization levels with DWARF retained is ground truth
+      that already exists, and it feeds the G4 function-boundary gate as much as
+      it feeds the decompiler work.
+- [ ] Write a `r12e_raw.py` harness for `decbench/decompilers/raw/` so r12e is
+      scored on every run rather than by us. The existing harnesses for Ghidra,
+      angr and kuna are the template.
+- [ ] Submit to the 250-function sample set as soon as M6 produces output at all.
+      It needs no harness and no open-sourcing: decompile the kit, mail back the
+      zip. An early bad score is a baseline, not an embarrassment.
+- [ ] Record the DecBench numbers in `docs/scorecard.md` per release, including
+      the runs where we lose.
 
 ## Not building
 
