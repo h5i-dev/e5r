@@ -129,7 +129,7 @@ Dependency edges run downward only. `r12e-cli` may depend on everything;
       disassembler that no longer exists.
 - [x] CI on GitHub Actions: fmt, clippy with `-D warnings`, `cargo deny`, tests.
       CI runners are disposable, so CI builds dev profile on purpose.
-- [ ] `CONTRIBUTING.md` with the clean-room rule: public specifications and
+- [x] `CONTRIBUTING.md` with the clean-room rule: public specifications and
       published papers only, no decompiled IDA or disassembled Hex-Rays.
 - [x] Test corpus. A `fixtures/` tree of small committed binaries plus a script
       that fetches larger ones (coreutils, `libcrypto`, a Go binary, a stripped
