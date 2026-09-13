@@ -172,3 +172,6 @@ cython_debug/
 *.exe
 *.out
 *.app
+
+# Machine-local Claude Code settings (wires up scripts/deny-debug-build.py)
+.claude/settings.local.json
