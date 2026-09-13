@@ -1111,6 +1111,11 @@ fn read_debug_info(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object, hints: bo
         section(".debug_str_offsets"),
     );
     let rnglist_bytes = relocated(r, shdrs, obj, ".debug_rnglists", section(".debug_rnglists"));
+    // The range and location lists carry addresses too, so a relocatable
+    // object needs them applied here for the same reason `.debug_addr` does.
+    let range_bytes = relocated(r, shdrs, obj, ".debug_ranges", section(".debug_ranges"));
+    let loclist_bytes = relocated(r, shdrs, obj, ".debug_loclists", section(".debug_loclists"));
+    let loc_bytes = relocated(r, shdrs, obj, ".debug_loc", section(".debug_loc"));
     let sections = crate::dwarf::Sections {
         info: &info_bytes,
         abbrev: section(".debug_abbrev"),
@@ -1120,6 +1125,9 @@ fn read_debug_info(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object, hints: bo
 
         addr: &addr_bytes,
         rnglists: &rnglist_bytes,
+        ranges: &range_bytes,
+        loclists: &loclist_bytes,
+        loc: &loc_bytes,
         line: &line_bytes,
     };
     if sections.is_empty() {

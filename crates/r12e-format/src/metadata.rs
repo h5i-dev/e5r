@@ -23,7 +23,7 @@ use crate::{FunctionHint, Object};
 
 /// Longest name any of these tables may spell. A table whose string has no
 /// terminator would otherwise walk the rest of the image.
-const MAX_NAME: u64 = 1 << 12;
+pub(crate) const MAX_NAME: u64 = 1 << 12;
 
 /// Tables to attempt before giving up. A file can be full of bytes that look
 /// like a `pclntab` magic, and each one costs a header validation.
@@ -41,6 +41,8 @@ pub struct Metadata {
     pub panics: Vec<PanicSite>,
     /// Objective-C classes, in class-list order.
     pub classes: Vec<ObjcClass>,
+    /// Swift reflection metadata, when the image carried any.
+    pub swift: Option<crate::swift::SwiftMetadata>,
     /// Facts for the object's metadata map.
     pub notes: BTreeMap<String, String>,
     /// What could not be read. Reported rather than guessed at.
@@ -76,6 +78,23 @@ pub fn read(obj: &Object) -> Metadata {
         files.dedup();
         out.notes
             .insert("rust.source_files".into(), files.len().to_string());
+    }
+
+    let swift = crate::swift::read(obj);
+    if !swift.is_empty() {
+        out.notes
+            .insert("swift.types".into(), swift.types.len().to_string());
+        let fields: usize = swift.field_descriptors.iter().map(|d| d.fields.len()).sum();
+        out.notes.insert("swift.fields".into(), fields.to_string());
+        out.notes.insert(
+            "swift.conformances".into(),
+            swift.conformances.len().to_string(),
+        );
+        out.hints.extend(swift.hints());
+        out.warnings.extend(swift.warnings.iter().cloned());
+        out.swift = Some(swift);
+    } else {
+        out.warnings.extend(swift.warnings);
     }
 
     out.classes = objc_classes(obj);
@@ -848,20 +867,25 @@ fn data_sections(obj: &Object) -> impl Iterator<Item = &crate::Section> {
 ///
 /// All three readers chase pointers, and all three must treat an unmapped one
 /// as absence rather than an error, so the whole helper returns `Option`.
-struct Image<'a> {
+pub(crate) struct Image<'a> {
     obj: &'a Object,
     wide: bool,
 }
 
 impl<'a> Image<'a> {
-    fn new(obj: &'a Object) -> Image<'a> {
+    pub(crate) fn new(obj: &'a Object) -> Image<'a> {
         Image {
             obj,
             wide: obj.bits == Bits::Bits64,
         }
     }
 
-    fn ptr_size(&self) -> u64 {
+    /// The image these reads are against.
+    pub(crate) fn obj(&self) -> &'a Object {
+        self.obj
+    }
+
+    pub(crate) fn ptr_size(&self) -> u64 {
         if self.wide { 8 } else { 4 }
     }
 
@@ -872,11 +896,21 @@ impl<'a> Image<'a> {
         ))
     }
 
-    fn u32(&self, addr: Addr) -> Option<u32> {
+    pub(crate) fn u16(&self, addr: Addr) -> Option<u16> {
+        self.at(addr, 2)?.u16("field").ok()
+    }
+
+    pub(crate) fn u32(&self, addr: Addr) -> Option<u32> {
         self.at(addr, 4)?.u32("field").ok()
     }
 
-    fn ptr(&self, addr: Addr) -> Option<Addr> {
+    /// Bytes from `addr` to the end of its segment, for a record whose length
+    /// is only known once it has been walked.
+    pub(crate) fn to_end(&self, addr: Addr) -> Option<&'a [u8]> {
+        self.obj.memory.segment_at(addr)?.slice_to_end(addr)
+    }
+
+    pub(crate) fn ptr(&self, addr: Addr) -> Option<Addr> {
         let v = self.at(addr, self.ptr_size())?;
         let mut c = v;
         Some(Addr(c.uword("pointer", self.wide).ok()?))
@@ -902,7 +936,7 @@ impl<'a> Image<'a> {
 
     /// A NUL-terminated string, bounded so an unterminated run cannot walk the
     /// image.
-    fn cstr(&self, addr: Addr, max: u64) -> Option<&'a str> {
+    pub(crate) fn cstr(&self, addr: Addr, max: u64) -> Option<&'a str> {
         let seg = self.obj.memory.segment_at(addr)?;
         let bytes = seg.slice_to_end(addr)?;
         let n = bytes

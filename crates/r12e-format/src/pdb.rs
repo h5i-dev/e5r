@@ -1077,6 +1077,7 @@ impl Symbols<'_> {
             name,
             ty,
             frame_offset: Some(offset as i64),
+            ..Default::default()
         })
     }
 }

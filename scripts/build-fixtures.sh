@@ -485,3 +485,39 @@ for src in fixtures/asm/*.s; do
   base=$(basename "$src" .s)
   "$xcc" --target=i386-linux-gnu -c -o "$out/asm-${base}.x32.o" "$src" 2>/dev/null || true
 done
+
+# Calls whose argument bounds are known by construction, for the dataflow query
+# gate. Linked and static for both architectures at two optimization levels:
+# the question is about a call site, and a relocatable object has none of the
+# call targets resolved. `-fno-builtin` so the file's own `memcpy` is what the
+# calls reach, and `-fno-pie` so the address of a global is an address.
+for src in fixtures/dataflow/*.c; do
+  [ -e "$src" ] || continue
+  base=$(basename "$src" .c)
+  for opt in O0 O2; do
+    "$xcc" -"$opt" -ffreestanding -fno-stack-protector -fno-builtin -fno-pie \
+      -nostdlib -static -o "$out/df-${base}.a64.${opt}" "$src" 2>/dev/null || true
+    if [ -n "${lld:-}" ]; then
+      "$xcc" --target=x86_64-unknown-linux-gnu -B"$out/ld" -fuse-ld=lld -"$opt" \
+        -ffreestanding -fno-stack-protector -fno-builtin -fno-pie -nostdlib \
+        -static -o "$out/df-${base}.x64.${opt}" "$src" 2>/dev/null || true
+    fi
+  done
+done
+
+# DWARF 4, which is the reader's other half. GCC 13 defaults to DWARF 5, and
+# the two versions keep ranges and location lists in different sections with
+# different encodings: `.debug_ranges` and `.debug_loc` rather than
+# `.debug_rnglists` and `.debug_loclists`, addresses in pairs rather than
+# behind entry kinds, and `DW_TAG_GNU_call_site` rather than `DW_TAG_call_site`.
+# Without a fixture at -gdwarf-4 none of that path is measured against readelf.
+for src in fixtures/portable/*.c; do
+  [ -e "$src" ] || continue
+  base=$(basename "$src" .c)
+  "$cc" -gdwarf-4 -O2 -ffreestanding -c -o "$out/${base}.a64.dwarf4.o" "$src" \
+    2>/dev/null || true
+done
+if [ -e fixtures/src/hello.c ]; then
+  "$cc" -gdwarf-4 -O2 -fno-pie -no-pie -o "$out/hello.a64.dwarf4" fixtures/src/hello.c \
+    2>/dev/null || true
+fi

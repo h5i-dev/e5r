@@ -22,6 +22,7 @@ pub mod pdata;
 pub mod pdb;
 pub mod pe;
 pub mod raw;
+pub mod swift;
 pub mod windirs;
 
 use std::collections::BTreeMap;

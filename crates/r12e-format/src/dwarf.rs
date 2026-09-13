@@ -11,7 +11,7 @@
 
 use std::collections::BTreeMap;
 
-use r12e_core::{Addr, Endian, Reader};
+use r12e_core::{Addr, AddrRange, Endian, Evidence, Provenance, Reader};
 use r12e_types::ctype::{Composite, Enumeration, Field, Signature, Type, TypeId, Types};
 
 /// A cursor over a debug section.
@@ -100,6 +100,66 @@ impl DebugInfo {
         let n = self.lines.partition_point(|r| r.addr <= addr);
         self.lines.get(n.checked_sub(1)?).filter(|r| !r.end)
     }
+
+    /// The function whose body covers `addr`.
+    pub fn function_at(&self, addr: Addr) -> Option<&DebugFunction> {
+        let n = self.functions.range(..=addr).next_back().map(|(_, f)| f);
+        n.filter(|f| f.covers(addr))
+    }
+
+    /// The inlined frames covering `addr`, outermost first.
+    ///
+    /// The last one is the function whose source the instruction was written
+    /// in; the others are the calls that brought it here.
+    pub fn inlined_at(&self, addr: Addr) -> Vec<&InlinedFrame> {
+        let Some(f) = self.function_at(addr) else {
+            return Vec::new();
+        };
+        let mut found: Vec<&InlinedFrame> = f.inlines.iter().filter(|i| i.covers(addr)).collect();
+        found.sort_by_key(|i| i.depth);
+        found
+    }
+
+    /// The call the compiler recorded as returning to `addr`.
+    pub fn call_site_returning_to(&self, addr: Addr) -> Option<&CallSite> {
+        self.function_at(addr)?
+            .call_sites
+            .iter()
+            .find(|c| c.return_pc == Some(addr))
+    }
+
+    /// Function entries the debug information proves, including the callees
+    /// call sites name at an address.
+    ///
+    /// Not wired into the loaders: `elf.rs` emits its own hints from
+    /// [`DebugInfo::functions`]. This is the same list plus the call targets,
+    /// for a caller that wants both.
+    pub fn hints(&self) -> Vec<crate::FunctionHint> {
+        let mut out = Vec::new();
+        for (addr, f) in &self.functions {
+            if f.name.is_empty() {
+                continue;
+            }
+            out.push(crate::FunctionHint {
+                addr: *addr,
+                size: f.size.filter(|s| *s > 0),
+                name: Some(f.name.clone()),
+                provenance: Provenance::new(Evidence::DebugInfo),
+            });
+        }
+        for f in self.functions.values() {
+            for c in &f.call_sites {
+                let Some(target) = c.target else { continue };
+                out.push(crate::FunctionHint {
+                    addr: target,
+                    size: None,
+                    name: c.target_name.clone(),
+                    provenance: Provenance::new(Evidence::DebugInfo),
+                });
+            }
+        }
+        out
+    }
 }
 
 /// A function the compiler described.
@@ -123,6 +183,137 @@ pub struct DebugFunction {
     pub decl_line: Option<u64>,
     /// True when the compiler inlined it somewhere.
     pub inlined: bool,
+    /// The ranges the body occupies when it is not one contiguous piece, which
+    /// is what `DW_AT_ranges` says. Empty when `low_pc` and `size` describe it.
+    pub ranges: Vec<AddrRange>,
+    /// Functions inlined into this one, innermost frames carrying the larger
+    /// `depth`. Sorted by start address then depth.
+    pub inlines: Vec<InlinedFrame>,
+    /// Calls the compiler described, sorted by the address each returns to.
+    pub call_sites: Vec<CallSite>,
+}
+
+impl DebugFunction {
+    /// True when `addr` is inside the body.
+    pub fn covers(&self, addr: Addr) -> bool {
+        if !self.ranges.is_empty() {
+            return self.ranges.iter().any(|r| r.contains(addr));
+        }
+        match self.size {
+            Some(n) => AddrRange::sized(self.low_pc, n).is_some_and(|r| r.contains(addr)),
+            // Without a size the entry address is all that is known, and
+            // claiming the rest of the image would be an invention.
+            None => addr == self.low_pc,
+        }
+    }
+}
+
+/// A call the compiler inlined, and the source it came from.
+///
+/// An inlined call has no function of its own: the instructions belong to the
+/// caller, and only this says a different function's source is sitting inside
+/// it.
+#[derive(Debug, Clone, Default)]
+pub struct InlinedFrame {
+    /// The inlined function's name, from the entry its abstract origin names.
+    pub name: String,
+    /// Its linkage name, when the abstract origin carried one.
+    pub linkage_name: Option<String>,
+    /// Offset in `.debug_info` of the abstract origin, so a caller can join
+    /// this to the out-of-line copy when there is one.
+    pub abstract_origin: Option<u64>,
+    /// The file the call was written in, resolved through the unit's line
+    /// program file table.
+    pub call_file: Option<String>,
+    /// The line the call was written on.
+    pub call_line: Option<u32>,
+    /// The column the call was written at.
+    pub call_column: Option<u32>,
+    /// Where the inlined body starts, when the entry said so separately from
+    /// its ranges.
+    pub entry_pc: Option<Addr>,
+    /// Every range of addresses the inlined body occupies.
+    pub ranges: Vec<AddrRange>,
+    /// How deep inside other inlined frames this one sits; zero for a call
+    /// inlined directly into the function itself.
+    pub depth: u32,
+    /// Its parameters and locals, in the caller's frame.
+    pub locals: Vec<DebugLocal>,
+}
+
+impl InlinedFrame {
+    /// True when `addr` is inside the inlined body.
+    pub fn covers(&self, addr: Addr) -> bool {
+        self.ranges.iter().any(|r| r.contains(addr))
+    }
+
+    /// The lowest address the frame covers.
+    pub fn low_pc(&self) -> Option<Addr> {
+        self.ranges.iter().map(|r| r.start()).min()
+    }
+}
+
+/// One call, as the compiler described it.
+///
+/// This is the prototype information our own analysis tries to derive: which
+/// registers and stack slots hold the arguments at the call, and what the
+/// caller put in them.
+#[derive(Debug, Clone, Default)]
+pub struct CallSite {
+    /// The address the call returns to, which is what DWARF keys a call site
+    /// by. Absent only for a tail call that never returns here.
+    pub return_pc: Option<Addr>,
+    /// The address of the call instruction, when the producer recorded one.
+    pub call_pc: Option<Addr>,
+    /// The callee's entry address, when the entry it names has one.
+    pub target: Option<Addr>,
+    /// The callee's name, when the entry names a callee at all.
+    pub target_name: Option<String>,
+    /// Where the callee is found at run time, for an indirect call.
+    pub target_location: Option<Location>,
+    /// True when the call is a tail call, so control does not come back.
+    pub tail_call: bool,
+    /// What the caller puts where, one per argument the producer described.
+    pub parameters: Vec<CallSiteParameter>,
+}
+
+/// One argument of a call, as the compiler described it.
+#[derive(Debug, Clone, Default)]
+pub struct CallSiteParameter {
+    /// Where the callee reads the argument from: a register, or a slot.
+    pub location: Option<Location>,
+    /// The value the caller passes, as far as the expression says.
+    pub value: Option<Location>,
+    /// The same value expressed so the callee can still recover it after the
+    /// call has clobbered the register: `DW_AT_call_data_value`.
+    pub data_value: Option<Location>,
+}
+
+/// Where a value lives, as far as a location expression says.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Location {
+    /// In a DWARF register number, which is architecture specific.
+    Register(u16),
+    /// At an offset from the frame base.
+    FrameOffset(i64),
+    /// At an offset from a register's value.
+    RegisterOffset(u16, i64),
+    /// At a fixed address.
+    Address(Addr),
+    /// A constant: the value itself, not storage holding it.
+    Constant(i64),
+    /// An expression this does not model, kept as the file spells it so a
+    /// caller with a full evaluator can still use it.
+    Expression(Vec<u8>),
+}
+
+/// Where a value lives over one range of the program counter.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocationRange {
+    /// The addresses this entry applies to.
+    pub range: AddrRange,
+    /// Where the value is while the program counter is in that range.
+    pub location: Location,
 }
 
 /// A local variable with a known frame offset.
@@ -134,6 +325,42 @@ pub struct DebugLocal {
     pub ty: TypeId,
     /// Offset from the frame base, when the location was a simple one.
     pub frame_offset: Option<i64>,
+    /// Where it lives, when one expression covers the whole function.
+    pub location: Option<Location>,
+    /// Where it lives per range of the program counter, from a location list.
+    /// At -O2 a variable that is in a register for part of a function and on
+    /// the stack for the rest is the normal case, and this is the only honest
+    /// answer for it; `location` is then `None`.
+    pub locations: Vec<LocationRange>,
+}
+
+impl Default for DebugLocal {
+    fn default() -> DebugLocal {
+        DebugLocal {
+            name: String::new(),
+            ty: Types::VOID,
+            frame_offset: None,
+            location: None,
+            locations: Vec::new(),
+        }
+    }
+}
+
+impl DebugLocal {
+    /// Where the variable is while the program counter is at `pc`.
+    ///
+    /// A location list wins over a single location when there is one, because
+    /// a single location on a variable that also has a list would be a
+    /// contradiction rather than a default.
+    pub fn location_at(&self, pc: Addr) -> Option<&Location> {
+        if let Some(e) = self.locations.iter().find(|e| e.range.contains(pc)) {
+            return Some(&e.location);
+        }
+        if self.locations.is_empty() {
+            return self.location.as_ref();
+        }
+        None
+    }
 }
 
 /// A variable at a fixed address.
@@ -181,6 +408,12 @@ pub struct Sections<'a> {
     pub addr: &'a [u8],
     /// `.debug_rnglists`, DWARF 5.
     pub rnglists: &'a [u8],
+    /// `.debug_ranges`, DWARF 4.
+    pub ranges: &'a [u8],
+    /// `.debug_loclists`, DWARF 5.
+    pub loclists: &'a [u8],
+    /// `.debug_loc`, DWARF 4.
+    pub loc: &'a [u8],
     /// `.debug_line`.
     pub line: &'a [u8],
 }
@@ -263,9 +496,15 @@ fn unit(
     let mut unit = Unit {
         address_size,
         sixty_four,
+        version,
         base: start,
         str_offsets_base: 8,
         addr_base: 8,
+        // The default is the size of the list section's own header, which is
+        // what an index is measured from when the unit declares no base.
+        rnglists_base: if sixty_four { 20 } else { 12 },
+        loclists_base: if sixty_four { 20 } else { 12 },
+        low_pc: Addr::ZERO,
         endian,
         sections: *sections,
     };
@@ -304,7 +543,9 @@ fn unit(
         entries.insert(at, entry);
     }
 
-    // The bases DWARF 5 indirects through live on the unit's own entry.
+    // The bases DWARF 5 indirects through live on the unit's own entry, and so
+    // does the base address that a range or location pair is measured from.
+    let mut stmt_list = None;
     if let Some((_, root)) = entries.iter().next() {
         if let Some(Value::Unsigned(v)) = root.get(DW_AT_STR_OFFSETS_BASE) {
             unit.str_offsets_base = *v as usize;
@@ -312,10 +553,37 @@ fn unit(
         if let Some(Value::Unsigned(v)) = root.get(DW_AT_ADDR_BASE) {
             unit.addr_base = *v as usize;
         }
+        if let Some(Value::Unsigned(v)) = root.get(DW_AT_RNGLISTS_BASE) {
+            unit.rnglists_base = *v as usize;
+        }
+        if let Some(Value::Unsigned(v)) = root.get(DW_AT_LOCLISTS_BASE) {
+            unit.loclists_base = *v as usize;
+        }
+        if let Some(a) = root.addr_of(DW_AT_LOW_PC) {
+            unit.low_pc = a;
+        }
+        stmt_list = root.unsigned(DW_AT_STMT_LIST);
     }
+
+    // Children by parent, built once. Every walk below wants them, and a scan
+    // of the whole unit per entry is what makes a large unit quadratic.
+    let mut children: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for (at, entry) in &entries {
+        if let Some(parent) = entry.parent {
+            children.entry(parent).or_default().push(*at);
+        }
+    }
+
+    // `DW_AT_decl_file` and `DW_AT_call_file` index the file table of this
+    // unit's own line program, so it has to be read before either can be a name.
+    let files = stmt_list
+        .and_then(|at| file_table(sections, endian, at as usize))
+        .unwrap_or_default();
 
     let mut resolver = Resolver {
         entries: &entries,
+        children: &children,
+        files: &files,
         types: &mut out.types,
         made: BTreeMap::new(),
         unit: &unit,
@@ -386,6 +654,16 @@ impl Entry {
         }
     }
 
+    /// An attribute that names an address, in either of the two forms a
+    /// producer writes one.
+    fn addr_of(&self, attribute: u64) -> Option<Addr> {
+        match self.get(attribute)? {
+            Value::Address(a) => Some(*a),
+            Value::Unsigned(v) => Some(Addr(*v)),
+            _ => None,
+        }
+    }
+
     fn reference(&self, attribute: u64) -> Option<usize> {
         match self.get(attribute)? {
             Value::Reference(r) => Some(*r),
@@ -404,14 +682,23 @@ enum Value {
     Reference(usize),
     Block(Vec<u8>),
     Flag(#[allow(dead_code)] bool),
+    /// An index into a unit's range or location list offset table, which is a
+    /// different thing from a section offset and cannot be told apart later.
+    ListIndex(u64),
 }
 
 struct Unit<'a> {
     address_size: u8,
     sixty_four: bool,
+    version: u16,
     base: usize,
     str_offsets_base: usize,
     addr_base: usize,
+    rnglists_base: usize,
+    loclists_base: usize,
+    /// The unit's own `DW_AT_low_pc`, which is what an offset pair in a range
+    /// or location list is measured from until an entry says otherwise.
+    low_pc: Addr,
     endian: Endian,
     sections: Sections<'a>,
 }
@@ -419,6 +706,8 @@ struct Unit<'a> {
 /// Build C types from the entries that describe them.
 struct Resolver<'a> {
     entries: &'a BTreeMap<usize, Entry>,
+    children: &'a BTreeMap<usize, Vec<usize>>,
+    files: &'a [String],
     types: &'a mut Types,
     made: BTreeMap<usize, TypeId>,
     unit: &'a Unit<'a>,
@@ -426,13 +715,21 @@ struct Resolver<'a> {
 
 impl Resolver<'_> {
     fn function(&mut self, at: usize, entry: &Entry) -> Option<DebugFunction> {
-        let low = match entry.get(DW_AT_LOW_PC) {
-            Some(Value::Address(a)) => *a,
-            Some(Value::Unsigned(v)) => Addr(*v),
-            _ => return None,
+        // A function need not be contiguous: `DW_AT_ranges` describes one that
+        // the compiler split, and its lowest range is then where it starts.
+        let ranges = self.ranges_of(entry);
+        let low = match entry.addr_of(DW_AT_LOW_PC) {
+            // A relocatable object legitimately puts a function at offset
+            // zero, so zero is an address here and not a missing one.
+            Some(a) => a,
+            // A function split into a hot and a cold piece has ranges and an
+            // entry point, and the lowest range is the cold piece as often as
+            // not, so the declared entry wins over it.
+            None => match entry.addr_of(DW_AT_ENTRY_PC) {
+                Some(a) => a,
+                None => ranges.iter().map(|r| r.start()).min()?,
+            },
         };
-        // A relocatable object legitimately puts a function at offset zero,
-        // so zero is an address here and not a missing one.
         // `high_pc` is an address in DWARF 2 and 3 and a length in 4 and 5,
         // told apart by the form class rather than by the version.
         let size = match entry.get(DW_AT_HIGH_PC) {
@@ -446,11 +743,10 @@ impl Resolver<'_> {
             ..Default::default()
         };
         let mut locals = Vec::new();
-        for (child_at, child) in self.entries.iter() {
-            if child.parent != Some(at) {
+        for child_at in self.kids(at) {
+            let Some(child) = self.entries.get(&child_at).cloned() else {
                 continue;
-            }
-            let _ = child_at;
+            };
             match child.tag {
                 DW_TAG_FORMAL_PARAMETER => {
                     let ty = child
@@ -460,24 +756,20 @@ impl Resolver<'_> {
                     signature
                         .parameters
                         .push((child.string().map(str::to_string), ty));
+                    if let Some(local) = self.local(&child) {
+                        locals.push(local);
+                    }
                 }
                 DW_TAG_UNSPECIFIED_PARAMETERS => signature.varargs = true,
                 DW_TAG_VARIABLE => {
-                    let ty = child
-                        .reference(DW_AT_TYPE)
-                        .and_then(|r| self.type_at(r, 0))
-                        .unwrap_or(Types::VOID);
-                    if let Some(name) = child.string() {
-                        locals.push(DebugLocal {
-                            name: name.to_string(),
-                            ty,
-                            frame_offset: frame_offset(child.get(DW_AT_LOCATION)),
-                        });
+                    if let Some(local) = self.local(&child) {
+                        locals.push(local);
                     }
                 }
                 _ => {}
             }
         }
+        let (inlines, call_sites) = self.subtree(at);
         Some(DebugFunction {
             name: entry.string().unwrap_or_default().to_string(),
             linkage_name: match entry.get(DW_AT_LINKAGE_NAME) {
@@ -488,10 +780,276 @@ impl Resolver<'_> {
             size,
             signature,
             locals,
-            decl_file: None,
+            decl_file: self.file(entry.unsigned(DW_AT_DECL_FILE)),
             decl_line: entry.unsigned(DW_AT_DECL_LINE),
             inlined: entry.get(DW_AT_INLINE).is_some(),
+            ranges,
+            inlines,
+            call_sites,
         })
+    }
+
+    /// One named variable or parameter, with whatever its location says.
+    fn local(&mut self, entry: &Entry) -> Option<DebugLocal> {
+        // A parameter of an inlined call carries nothing of its own but a
+        // reference to the abstract copy, which is where its name and its
+        // type live. Without following that, an inlined frame has anonymous
+        // arguments, which is most of what makes the frame worth having.
+        let origin = entry.reference(DW_AT_ABSTRACT_ORIGIN);
+        let name = match entry.string() {
+            Some(n) => n.to_string(),
+            None => match self.origin_names(origin) {
+                (n, _) if !n.is_empty() => n,
+                _ => return None,
+            },
+        };
+        let ty = entry
+            .reference(DW_AT_TYPE)
+            .or_else(|| self.entries.get(&origin?)?.reference(DW_AT_TYPE))
+            .and_then(|r| self.type_at(r, 0))
+            .unwrap_or(Types::VOID);
+        let value = entry.get(DW_AT_LOCATION);
+        let (location, locations) = self.locations_of(value);
+        Some(DebugLocal {
+            name,
+            ty,
+            frame_offset: frame_offset(value),
+            location,
+            locations,
+        })
+    }
+
+    /// The children of an entry, in the order the file wrote them.
+    fn kids(&self, at: usize) -> Vec<usize> {
+        self.children.get(&at).cloned().unwrap_or_default()
+    }
+
+    /// Every inlined frame and call site under a subprogram.
+    ///
+    /// Both nest: a call site sits inside the inlined body it was made from,
+    /// and an inlined body inside another. The walk is iterative because the
+    /// nesting depth is a number from the file.
+    fn subtree(&mut self, root: usize) -> (Vec<InlinedFrame>, Vec<CallSite>) {
+        // (entry, inline depth). Reversed on push so siblings come out in
+        // document order, which is what makes the result deterministic.
+        let mut stack: Vec<(usize, u32)> = vec![(root, 0)];
+        let mut found: Vec<(usize, u64, u32)> = Vec::new();
+        let mut visited = 0usize;
+        while let Some((at, depth)) = stack.pop() {
+            // The tree cannot have more nodes than the unit has entries, so a
+            // parent chain that somehow loops still terminates here.
+            visited += 1;
+            if visited > self.entries.len() {
+                break;
+            }
+            for child_at in self.kids(at).into_iter().rev() {
+                let Some(tag) = self.entries.get(&child_at).map(|e| e.tag) else {
+                    continue;
+                };
+                match tag {
+                    // A nested function is a function of its own, and its call
+                    // sites belong to it rather than to this one.
+                    DW_TAG_SUBPROGRAM => continue,
+                    DW_TAG_INLINED_SUBROUTINE => {
+                        found.push((child_at, tag, depth));
+                        stack.push((child_at, depth + 1));
+                    }
+                    DW_TAG_CALL_SITE | DW_TAG_GNU_CALL_SITE => {
+                        found.push((child_at, tag, depth));
+                    }
+                    _ => stack.push((child_at, depth)),
+                }
+            }
+        }
+
+        let mut inlines = Vec::new();
+        let mut call_sites = Vec::new();
+        for (at, tag, depth) in found {
+            let Some(entry) = self.entries.get(&at).cloned() else {
+                continue;
+            };
+            if tag == DW_TAG_INLINED_SUBROUTINE {
+                if let Some(f) = self.inlined(at, &entry, depth) {
+                    inlines.push(f);
+                }
+            } else if let Some(c) = self.call_site(at, &entry) {
+                call_sites.push(c);
+            }
+        }
+        inlines.sort_by_key(|i| (i.low_pc().unwrap_or(Addr::MAX), i.depth));
+        call_sites.sort_by_key(|c| (c.return_pc.unwrap_or(Addr::MAX), c.call_pc));
+        (inlines, call_sites)
+    }
+
+    /// One `DW_TAG_inlined_subroutine`.
+    fn inlined(&mut self, at: usize, entry: &Entry, depth: u32) -> Option<InlinedFrame> {
+        let mut ranges = self.ranges_of(entry);
+        if ranges.is_empty() {
+            // The contiguous form, which is what a producer writes when the
+            // inlined body was not split.
+            let low = entry.addr_of(DW_AT_LOW_PC)?;
+            let end = match entry.get(DW_AT_HIGH_PC) {
+                Some(Value::Address(a)) => *a,
+                Some(Value::Unsigned(v)) => low.checked_add(*v)?,
+                _ => return None,
+            };
+            ranges.push(AddrRange::new(low, end)?);
+        }
+        let origin = entry.reference(DW_AT_ABSTRACT_ORIGIN);
+        let (name, linkage_name) = self.origin_names(origin);
+        let mut locals = Vec::new();
+        for child_at in self.kids(at) {
+            let Some(child) = self.entries.get(&child_at).cloned() else {
+                continue;
+            };
+            if matches!(child.tag, DW_TAG_FORMAL_PARAMETER | DW_TAG_VARIABLE) {
+                if let Some(local) = self.local(&child) {
+                    locals.push(local);
+                }
+            }
+        }
+        Some(InlinedFrame {
+            name,
+            linkage_name,
+            abstract_origin: origin.map(|r| r as u64),
+            call_file: self.file(entry.unsigned(DW_AT_CALL_FILE)),
+            call_line: entry.unsigned(DW_AT_CALL_LINE).map(|v| v as u32),
+            call_column: entry.unsigned(DW_AT_CALL_COLUMN).map(|v| v as u32),
+            entry_pc: entry.addr_of(DW_AT_ENTRY_PC),
+            ranges,
+            depth,
+            locals,
+        })
+    }
+
+    /// One `DW_TAG_call_site`, or the GNU spelling of the same thing.
+    fn call_site(&mut self, at: usize, entry: &Entry) -> Option<CallSite> {
+        // The GNU form predates the standard one and puts the return address
+        // in `DW_AT_low_pc` rather than in an attribute of its own.
+        let gnu = entry.tag == DW_TAG_GNU_CALL_SITE;
+        let return_pc = entry
+            .addr_of(DW_AT_CALL_RETURN_PC)
+            .or_else(|| gnu.then(|| entry.addr_of(DW_AT_LOW_PC)).flatten());
+        let call_pc = entry.addr_of(DW_AT_CALL_PC);
+        if return_pc.is_none() && call_pc.is_none() {
+            // Without an address the entry says nothing an analysis can use.
+            return None;
+        }
+        let origin = entry
+            .reference(DW_AT_CALL_ORIGIN)
+            .or_else(|| entry.reference(DW_AT_ABSTRACT_ORIGIN));
+        let (name, _) = self.origin_names(origin);
+        let target = origin.and_then(|r| self.entries.get(&r)?.addr_of(DW_AT_LOW_PC));
+        let target_location = self
+            .single_location(entry.get(DW_AT_CALL_TARGET))
+            .or_else(|| self.single_location(entry.get(DW_AT_GNU_CALL_SITE_TARGET)));
+        let tail_call =
+            entry.get(DW_AT_CALL_TAIL_CALL).is_some() || entry.get(DW_AT_GNU_TAIL_CALL).is_some();
+
+        let mut parameters = Vec::new();
+        for child_at in self.kids(at) {
+            let Some(child) = self.entries.get(&child_at) else {
+                continue;
+            };
+            if !matches!(
+                child.tag,
+                DW_TAG_CALL_SITE_PARAMETER | DW_TAG_GNU_CALL_SITE_PARAMETER
+            ) {
+                continue;
+            }
+            parameters.push(CallSiteParameter {
+                location: self.single_location(child.get(DW_AT_LOCATION)),
+                value: self
+                    .single_location(child.get(DW_AT_CALL_VALUE))
+                    .or_else(|| self.single_location(child.get(DW_AT_GNU_CALL_SITE_VALUE))),
+                data_value: self
+                    .single_location(child.get(DW_AT_CALL_DATA_VALUE))
+                    .or_else(|| self.single_location(child.get(DW_AT_GNU_CALL_SITE_DATA_VALUE))),
+            });
+        }
+        Some(CallSite {
+            return_pc,
+            call_pc,
+            target,
+            target_name: (!name.is_empty()).then_some(name),
+            target_location,
+            tail_call,
+            parameters,
+        })
+    }
+
+    /// The name and linkage name of the entry a reference points at, following
+    /// the chain an abstract instance or a declaration adds.
+    fn origin_names(&self, origin: Option<usize>) -> (String, Option<String>) {
+        let mut at = origin;
+        let mut name = String::new();
+        let mut linkage = None;
+        // Eight hops: a chain longer than that is a file playing games.
+        for _ in 0..8 {
+            let Some(entry) = at.and_then(|r| self.entries.get(&r)) else {
+                break;
+            };
+            if name.is_empty() {
+                if let Some(n) = entry.string() {
+                    name = n.to_string();
+                }
+            }
+            if linkage.is_none() {
+                if let Some(Value::String(s)) = entry.get(DW_AT_LINKAGE_NAME) {
+                    linkage = Some(s.clone());
+                }
+            }
+            if !name.is_empty() && linkage.is_some() {
+                break;
+            }
+            at = entry
+                .reference(DW_AT_ABSTRACT_ORIGIN)
+                .or_else(|| entry.reference(DW_AT_SPECIFICATION));
+        }
+        (name, linkage)
+    }
+
+    /// A file index as the unit's line program spells it.
+    fn file(&self, index: Option<u64>) -> Option<String> {
+        let name = self.files.get(usize::try_from(index?).ok()?)?;
+        (!name.is_empty()).then(|| name.clone())
+    }
+
+    /// A location attribute that is one expression rather than a list.
+    fn single_location(&self, value: Option<&Value>) -> Option<Location> {
+        match value? {
+            Value::Block(bytes) => decode_location(bytes, self.unit),
+            _ => None,
+        }
+    }
+
+    /// A location attribute in either shape: one expression, or a list keyed
+    /// by program counter.
+    fn locations_of(&self, value: Option<&Value>) -> (Option<Location>, Vec<LocationRange>) {
+        match value {
+            Some(Value::Block(bytes)) => (decode_location(bytes, self.unit), Vec::new()),
+            Some(Value::Unsigned(at)) => (None, location_list(self.unit, *at as usize)),
+            Some(Value::ListIndex(i)) => (
+                None,
+                match list_offset(self.unit, *i, true) {
+                    Some(at) => location_list(self.unit, at),
+                    None => Vec::new(),
+                },
+            ),
+            _ => (None, Vec::new()),
+        }
+    }
+
+    /// The address ranges an entry's `DW_AT_ranges` names.
+    fn ranges_of(&self, entry: &Entry) -> Vec<AddrRange> {
+        match entry.get(DW_AT_RANGES) {
+            Some(Value::Unsigned(at)) => range_list(self.unit, *at as usize),
+            Some(Value::ListIndex(i)) => match list_offset(self.unit, *i, false) {
+                Some(at) => range_list(self.unit, at),
+                None => Vec::new(),
+            },
+            _ => Vec::new(),
+        }
     }
 
     fn variable(&mut self, entry: &Entry) -> Option<DebugVariable> {
@@ -561,10 +1119,11 @@ impl Resolver<'_> {
                 // The count lives on a subrange child, as either a count or an
                 // upper bound.
                 let count = self
-                    .entries
-                    .iter()
-                    .find(|(_, c)| c.parent == Some(at) && c.tag == DW_TAG_SUBRANGE_TYPE)
-                    .and_then(|(_, c)| {
+                    .kids(at)
+                    .into_iter()
+                    .filter_map(|k| self.entries.get(&k))
+                    .find(|c| c.tag == DW_TAG_SUBRANGE_TYPE)
+                    .and_then(|c| {
                         c.unsigned(DW_AT_COUNT)
                             .or_else(|| c.unsigned(DW_AT_UPPER_BOUND).map(|n| n + 1))
                     });
@@ -576,13 +1135,14 @@ impl Resolver<'_> {
                 let placeholder = self.types.reserve(name.as_deref().unwrap_or("anonymous"));
                 self.made.insert(at, placeholder);
                 let mut fields = Vec::new();
-                let children: Vec<(usize, Entry)> = self
-                    .entries
-                    .iter()
-                    .filter(|(_, c)| c.parent == Some(at) && c.tag == DW_TAG_MEMBER)
-                    .map(|(a, c)| (*a, c.clone()))
+                let children: Vec<Entry> = self
+                    .kids(at)
+                    .into_iter()
+                    .filter_map(|k| self.entries.get(&k))
+                    .filter(|c| c.tag == DW_TAG_MEMBER)
+                    .cloned()
                     .collect();
-                for (_, child) in children {
+                for child in children {
                     let ty = child
                         .reference(DW_AT_TYPE)
                         .and_then(|r| self.type_at(r, depth + 1))
@@ -606,10 +1166,11 @@ impl Resolver<'_> {
             }
             DW_TAG_ENUMERATION_TYPE => {
                 let values: Vec<(String, i64)> = self
-                    .entries
-                    .iter()
-                    .filter(|(_, c)| c.parent == Some(at) && c.tag == DW_TAG_ENUMERATOR)
-                    .filter_map(|(_, c)| {
+                    .kids(at)
+                    .into_iter()
+                    .filter_map(|k| self.entries.get(&k))
+                    .filter(|c| c.tag == DW_TAG_ENUMERATOR)
+                    .filter_map(|c| {
                         Some((
                             c.string()?.to_string(),
                             match c.get(DW_AT_CONST_VALUE)? {
@@ -635,10 +1196,10 @@ impl Resolver<'_> {
                     ..Default::default()
                 };
                 let children: Vec<Entry> = self
-                    .entries
-                    .iter()
-                    .filter(|(_, c)| c.parent == Some(at))
-                    .map(|(_, c)| c.clone())
+                    .kids(at)
+                    .into_iter()
+                    .filter_map(|k| self.entries.get(&k))
+                    .cloned()
                     .collect();
                 for child in children {
                     match child.tag {
@@ -853,7 +1414,7 @@ fn read_form(reader: &mut Cur<'_>, form: u64, implicit: i64, unit: &mut Unit<'_>
             let actual = reader.uleb128()?;
             return read_form(reader, actual, 0, unit);
         }
-        DW_FORM_LOCLISTX | DW_FORM_RNGLISTX => Value::Unsigned(reader.uleb128()?),
+        DW_FORM_LOCLISTX | DW_FORM_RNGLISTX => Value::ListIndex(reader.uleb128()?),
         DW_FORM_REF_SUP4 | DW_FORM_STRP_SUP => Value::Unsigned(offset(reader, unit.sixty_four)?),
         // A form this does not know cannot be skipped by length, so the unit
         // stops here rather than reading garbage as attributes.
@@ -1094,9 +1655,13 @@ fn entry_table(
             let mut unit = Unit {
                 address_size: 8,
                 sixty_four,
+                version: 5,
                 base: 0,
                 str_offsets_base: 8,
                 addr_base: 8,
+                rnglists_base: 12,
+                loclists_base: 12,
+                low_pc: Addr::ZERO,
                 endian,
                 sections: *sections,
             };
@@ -1145,6 +1710,417 @@ fn emit(state: &mut LineState, files: &[String], out: &mut Vec<LineRow>) {
     });
 }
 
+/// An address in the unit's address size.
+fn read_address(reader: &mut Cur<'_>, unit: &Unit<'_>) -> Option<Addr> {
+    Some(Addr(if unit.address_size == 4 {
+        reader.u32()? as u64
+    } else {
+        reader.u64()?
+    }))
+}
+
+/// The section offset an index into a unit's range or location offset table
+/// resolves to.
+///
+/// DWARF 5 lets a unit reach its lists by index so the attribute stays small;
+/// the table sits at the unit's base and its entries are measured from that
+/// same base.
+fn list_offset(unit: &Unit<'_>, index: u64, locations: bool) -> Option<usize> {
+    let (section, base) = if locations {
+        (unit.sections.loclists, unit.loclists_base)
+    } else {
+        (unit.sections.rnglists, unit.rnglists_base)
+    };
+    let size = if unit.sixty_four { 8 } else { 4 };
+    let at = base.checked_add(usize::try_from(index).ok()?.checked_mul(size)?)?;
+    let bytes = section.get(at..at.checked_add(size)?)?;
+    let mut reader = Cur::new(bytes, unit.endian);
+    let value = if unit.sixty_four {
+        reader.u64()?
+    } else {
+        reader.u32()? as u64
+    };
+    base.checked_add(usize::try_from(value).ok()?)
+}
+
+/// The ranges a `DW_AT_ranges` offset names, in whichever section this DWARF
+/// version keeps them in.
+fn range_list(unit: &Unit<'_>, at: usize) -> Vec<AddrRange> {
+    if unit.version >= 5 {
+        rnglists(unit, at)
+    } else {
+        debug_ranges(unit, at)
+    }
+}
+
+/// A DWARF 5 `.debug_rnglists` list.
+fn rnglists(unit: &Unit<'_>, at: usize) -> Vec<AddrRange> {
+    let Some(rest) = unit.sections.rnglists.get(at..) else {
+        return Vec::new();
+    };
+    let mut reader = Cur::new(rest, unit.endian);
+    let mut base = unit.low_pc;
+    let mut out = Vec::new();
+    // Every entry costs at least its one-byte kind, so a list cannot hold more
+    // entries than the bytes behind it.
+    for _ in 0..rest.len() {
+        let Some(kind) = reader.u8() else { break };
+        let pair = match kind {
+            DW_RLE_END_OF_LIST => break,
+            DW_RLE_BASE_ADDRESSX => {
+                match reader.uleb128().and_then(|i| address_from_table(unit, i)) {
+                    Some(a) => base = a,
+                    None => break,
+                }
+                continue;
+            }
+            DW_RLE_BASE_ADDRESS => {
+                match read_address(&mut reader, unit) {
+                    Some(a) => base = a,
+                    None => break,
+                }
+                continue;
+            }
+            DW_RLE_STARTX_ENDX => {
+                let (Some(s), Some(e)) = (reader.uleb128(), reader.uleb128()) else {
+                    break;
+                };
+                match (address_from_table(unit, s), address_from_table(unit, e)) {
+                    (Some(s), Some(e)) => (s, e),
+                    _ => break,
+                }
+            }
+            DW_RLE_STARTX_LENGTH => {
+                let (Some(s), Some(n)) = (reader.uleb128(), reader.uleb128()) else {
+                    break;
+                };
+                match address_from_table(unit, s).and_then(|s| Some((s, s.checked_add(n)?))) {
+                    Some(p) => p,
+                    None => break,
+                }
+            }
+            DW_RLE_OFFSET_PAIR => {
+                let (Some(s), Some(e)) = (reader.uleb128(), reader.uleb128()) else {
+                    break;
+                };
+                match (base.checked_add(s), base.checked_add(e)) {
+                    (Some(s), Some(e)) => (s, e),
+                    _ => break,
+                }
+            }
+            DW_RLE_START_END => {
+                let (Some(s), Some(e)) = (
+                    read_address(&mut reader, unit),
+                    read_address(&mut reader, unit),
+                ) else {
+                    break;
+                };
+                (s, e)
+            }
+            DW_RLE_START_LENGTH => {
+                let Some(s) = read_address(&mut reader, unit) else {
+                    break;
+                };
+                match reader.uleb128().and_then(|n| s.checked_add(n)) {
+                    Some(e) => (s, e),
+                    None => break,
+                }
+            }
+            // A kind this does not know carries an operand of a length only
+            // the kind says, so the list stops rather than resynchronizing.
+            _ => break,
+        };
+        if let Some(r) = AddrRange::new(pair.0, pair.1).filter(|r| !r.is_empty()) {
+            out.push(r);
+        }
+    }
+    out
+}
+
+/// A DWARF 4 `.debug_ranges` list: bare address pairs.
+fn debug_ranges(unit: &Unit<'_>, at: usize) -> Vec<AddrRange> {
+    let Some(rest) = unit.sections.ranges.get(at..) else {
+        return Vec::new();
+    };
+    let mut reader = Cur::new(rest, unit.endian);
+    let mut base = unit.low_pc;
+    let mut out = Vec::new();
+    let all_ones = if unit.address_size == 4 {
+        u32::MAX as u64
+    } else {
+        u64::MAX
+    };
+    // Each entry is two addresses, so the bytes bound the count.
+    for _ in 0..rest.len() / 2 {
+        let (Some(start), Some(end)) = (
+            read_address(&mut reader, unit),
+            read_address(&mut reader, unit),
+        ) else {
+            break;
+        };
+        if start == Addr::ZERO && end == Addr::ZERO {
+            break;
+        }
+        // The all-ones first word is how the format announces a new base
+        // rather than a range.
+        if start.get() == all_ones {
+            base = end;
+            continue;
+        }
+        match (base.checked_add(start.get()), base.checked_add(end.get())) {
+            (Some(s), Some(e)) => {
+                if let Some(r) = AddrRange::new(s, e).filter(|r| !r.is_empty()) {
+                    out.push(r);
+                }
+            }
+            _ => break,
+        }
+    }
+    out
+}
+
+/// The entries a location list offset names, in whichever section this DWARF
+/// version keeps them in.
+fn location_list(unit: &Unit<'_>, at: usize) -> Vec<LocationRange> {
+    if unit.version >= 5 {
+        loclists(unit, at)
+    } else {
+        debug_loc(unit, at)
+    }
+}
+
+/// A DWARF 5 `.debug_loclists` list.
+fn loclists(unit: &Unit<'_>, at: usize) -> Vec<LocationRange> {
+    let Some(rest) = unit.sections.loclists.get(at..) else {
+        return Vec::new();
+    };
+    let mut reader = Cur::new(rest, unit.endian);
+    let mut base = unit.low_pc;
+    let mut out = Vec::new();
+    for _ in 0..rest.len() {
+        let Some(kind) = reader.u8() else { break };
+        let pair = match kind {
+            DW_LLE_END_OF_LIST => break,
+            DW_LLE_BASE_ADDRESSX => {
+                match reader.uleb128().and_then(|i| address_from_table(unit, i)) {
+                    Some(a) => base = a,
+                    None => break,
+                }
+                continue;
+            }
+            DW_LLE_BASE_ADDRESS => {
+                match read_address(&mut reader, unit) {
+                    Some(a) => base = a,
+                    None => break,
+                }
+                continue;
+            }
+            DW_LLE_STARTX_ENDX => {
+                let (Some(s), Some(e)) = (reader.uleb128(), reader.uleb128()) else {
+                    break;
+                };
+                match (address_from_table(unit, s), address_from_table(unit, e)) {
+                    (Some(s), Some(e)) => (s, e),
+                    _ => break,
+                }
+            }
+            DW_LLE_STARTX_LENGTH => {
+                let (Some(s), Some(n)) = (reader.uleb128(), reader.uleb128()) else {
+                    break;
+                };
+                match address_from_table(unit, s).and_then(|s| Some((s, s.checked_add(n)?))) {
+                    Some(p) => p,
+                    None => break,
+                }
+            }
+            DW_LLE_OFFSET_PAIR => {
+                let (Some(s), Some(e)) = (reader.uleb128(), reader.uleb128()) else {
+                    break;
+                };
+                match (base.checked_add(s), base.checked_add(e)) {
+                    (Some(s), Some(e)) => (s, e),
+                    _ => break,
+                }
+            }
+            DW_LLE_START_END => {
+                let (Some(s), Some(e)) = (
+                    read_address(&mut reader, unit),
+                    read_address(&mut reader, unit),
+                ) else {
+                    break;
+                };
+                (s, e)
+            }
+            DW_LLE_START_LENGTH => {
+                let Some(s) = read_address(&mut reader, unit) else {
+                    break;
+                };
+                match reader.uleb128().and_then(|n| s.checked_add(n)) {
+                    Some(e) => (s, e),
+                    None => break,
+                }
+            }
+            // A default location applies wherever no other entry does, which
+            // is not a range and has nowhere to go in the result.
+            DW_LLE_DEFAULT_LOCATION => {
+                let Some(n) = reader.uleb128() else { break };
+                if reader.bytes(n as usize).is_none() {
+                    break;
+                }
+                continue;
+            }
+            _ => break,
+        };
+        let Some(n) = reader.uleb128() else { break };
+        let Some(expression) = reader.bytes(n as usize) else {
+            break;
+        };
+        let Some(range) = AddrRange::new(pair.0, pair.1).filter(|r| !r.is_empty()) else {
+            continue;
+        };
+        if let Some(location) = decode_location(expression, unit) {
+            out.push(LocationRange { range, location });
+        }
+    }
+    out
+}
+
+/// A DWARF 4 `.debug_loc` list: address pairs, each with a counted expression.
+fn debug_loc(unit: &Unit<'_>, at: usize) -> Vec<LocationRange> {
+    let Some(rest) = unit.sections.loc.get(at..) else {
+        return Vec::new();
+    };
+    let mut reader = Cur::new(rest, unit.endian);
+    let mut base = unit.low_pc;
+    let mut out = Vec::new();
+    let all_ones = if unit.address_size == 4 {
+        u32::MAX as u64
+    } else {
+        u64::MAX
+    };
+    for _ in 0..rest.len() / 2 {
+        let (Some(start), Some(end)) = (
+            read_address(&mut reader, unit),
+            read_address(&mut reader, unit),
+        ) else {
+            break;
+        };
+        if start == Addr::ZERO && end == Addr::ZERO {
+            break;
+        }
+        if start.get() == all_ones {
+            base = end;
+            continue;
+        }
+        let Some(n) = reader.u16() else { break };
+        let Some(expression) = reader.bytes(n as usize) else {
+            break;
+        };
+        let (Some(s), Some(e)) = (base.checked_add(start.get()), base.checked_add(end.get()))
+        else {
+            break;
+        };
+        let Some(range) = AddrRange::new(s, e).filter(|r| !r.is_empty()) else {
+            continue;
+        };
+        if let Some(location) = decode_location(expression, unit) {
+            out.push(LocationRange { range, location });
+        }
+    }
+    out
+}
+
+/// What a location expression says about where a value is.
+///
+/// The shapes a compiler actually emits for storage are a register, a frame
+/// offset, a register offset and a fixed address. Anything else is kept as its
+/// bytes rather than half-evaluated, because a half-evaluated expression is a
+/// wrong answer that looks like a right one.
+fn decode_location(bytes: &[u8], unit: &Unit<'_>) -> Option<Location> {
+    if bytes.is_empty() {
+        return None;
+    }
+    // Anything the decoder cannot finish becomes the bytes themselves rather
+    // than nothing: dropping the entry would lose the range it covers, which
+    // is information even when the expression is not understood.
+    Some(decode_known(bytes, unit).unwrap_or_else(|| Location::Expression(bytes.to_vec())))
+}
+
+fn decode_known(bytes: &[u8], unit: &Unit<'_>) -> Option<Location> {
+    let mut reader = Cur::new(bytes, unit.endian);
+    let op = reader.u8()?;
+    let decoded = match op {
+        DW_OP_ADDR => Location::Address(read_address(&mut reader, unit)?),
+        DW_OP_ADDRX => Location::Address(address_from_table(unit, reader.uleb128()?)?),
+        DW_OP_FBREG => Location::FrameOffset(reader.sleb128()?),
+        DW_OP_REGX => Location::Register(u16::try_from(reader.uleb128()?).ok()?),
+        DW_OP_BREGX => {
+            let register = u16::try_from(reader.uleb128()?).ok()?;
+            Location::RegisterOffset(register, reader.sleb128()?)
+        }
+        DW_OP_LIT0..=DW_OP_LIT31 => Location::Constant((op - DW_OP_LIT0) as i64),
+        DW_OP_REG0..=DW_OP_REG31 => Location::Register((op - DW_OP_REG0) as u16),
+        DW_OP_BREG0..=DW_OP_BREG31 => {
+            Location::RegisterOffset((op - DW_OP_BREG0) as u16, reader.sleb128()?)
+        }
+        _ => return Some(Location::Expression(bytes.to_vec())),
+    };
+    // What is left has to be nothing, or a marker that changes what the value
+    // means rather than where it is.
+    loop {
+        match reader.u8() {
+            None => return Some(decoded),
+            Some(DW_OP_STACK_VALUE) => {}
+            Some(_) => return Some(Location::Expression(bytes.to_vec())),
+        }
+    }
+}
+
+/// The file table of the line program at `at`.
+///
+/// `DW_AT_decl_file` and `DW_AT_call_file` are indices into this, and without
+/// it neither can become a name. Only the header is read: the program itself
+/// is walked separately, for the rows.
+fn file_table(sections: &Sections<'_>, endian: Endian, at: usize) -> Option<Vec<String>> {
+    if at >= sections.line.len() {
+        return None;
+    }
+    let mut reader = Cur::new(sections.line, endian);
+    if at != 0 && !reader.seek(at) {
+        return None;
+    }
+    let length = reader.u32()?;
+    let sixty_four = length == 0xffff_ffff;
+    if sixty_four {
+        reader.u64()?;
+    }
+    let version = reader.u16()?;
+    if !(2..=5).contains(&version) {
+        return None;
+    }
+    if version >= 5 {
+        reader.u8()?; // address size
+        reader.u8()?; // segment selector size
+    }
+    offset(&mut reader, sixty_four)?; // header length
+    reader.u8()?; // minimum instruction length
+    if version >= 4 {
+        reader.u8()?; // maximum operations per instruction
+    }
+    reader.u8()?; // default is_stmt
+    reader.u8()?; // line base
+    reader.u8()?; // line range
+    let opcode_base = reader.u8()?.max(1);
+    for _ in 1..opcode_base {
+        reader.u8()?;
+    }
+    if version >= 5 {
+        file_names_v5(&mut reader, sections, endian, sixty_four)
+    } else {
+        file_names_v4(&mut reader)
+    }
+}
+
 // Tags.
 const DW_TAG_ARRAY_TYPE: u64 = 0x01;
 const DW_TAG_CLASS_TYPE: u64 = 0x02;
@@ -1159,6 +2135,12 @@ const DW_TAG_TYPEDEF: u64 = 0x16;
 const DW_TAG_UNION_TYPE: u64 = 0x17;
 const DW_TAG_UNSPECIFIED_PARAMETERS: u64 = 0x18;
 const DW_TAG_SUBRANGE_TYPE: u64 = 0x21;
+const DW_TAG_INLINED_SUBROUTINE: u64 = 0x1d;
+const DW_TAG_CALL_SITE: u64 = 0x48;
+const DW_TAG_CALL_SITE_PARAMETER: u64 = 0x49;
+/// The GNU spelling, which is what a producer writing DWARF 4 emits.
+const DW_TAG_GNU_CALL_SITE: u64 = 0x4109;
+const DW_TAG_GNU_CALL_SITE_PARAMETER: u64 = 0x410a;
 const DW_TAG_BASE_TYPE: u64 = 0x24;
 const DW_TAG_CONST_TYPE: u64 = 0x26;
 const DW_TAG_ENUMERATOR: u64 = 0x28;
@@ -1185,6 +2167,29 @@ const DW_AT_TYPE: u64 = 0x49;
 const DW_AT_LINKAGE_NAME: u64 = 0x6e;
 const DW_AT_STR_OFFSETS_BASE: u64 = 0x72;
 const DW_AT_ADDR_BASE: u64 = 0x73;
+const DW_AT_STMT_LIST: u64 = 0x10;
+const DW_AT_DECL_FILE: u64 = 0x3a;
+const DW_AT_ABSTRACT_ORIGIN: u64 = 0x31;
+const DW_AT_SPECIFICATION: u64 = 0x47;
+const DW_AT_ENTRY_PC: u64 = 0x52;
+const DW_AT_RANGES: u64 = 0x55;
+const DW_AT_CALL_COLUMN: u64 = 0x57;
+const DW_AT_CALL_FILE: u64 = 0x58;
+const DW_AT_CALL_LINE: u64 = 0x59;
+const DW_AT_RNGLISTS_BASE: u64 = 0x74;
+const DW_AT_LOCLISTS_BASE: u64 = 0x8c;
+const DW_AT_CALL_RETURN_PC: u64 = 0x7d;
+const DW_AT_CALL_VALUE: u64 = 0x7e;
+const DW_AT_CALL_ORIGIN: u64 = 0x7f;
+const DW_AT_CALL_PC: u64 = 0x81;
+const DW_AT_CALL_TAIL_CALL: u64 = 0x82;
+const DW_AT_CALL_TARGET: u64 = 0x83;
+const DW_AT_CALL_DATA_VALUE: u64 = 0x86;
+// The GNU call site attributes, which a DWARF 4 producer uses instead.
+const DW_AT_GNU_CALL_SITE_VALUE: u64 = 0x2111;
+const DW_AT_GNU_CALL_SITE_DATA_VALUE: u64 = 0x2112;
+const DW_AT_GNU_CALL_SITE_TARGET: u64 = 0x2113;
+const DW_AT_GNU_TAIL_CALL: u64 = 0x2115;
 
 // Base type encodings.
 const DW_ATE_BOOLEAN: u64 = 0x02;
@@ -1237,8 +2242,38 @@ const DW_FORM_ADDRX4: u64 = 0x2c;
 
 // Location expression opcodes.
 const DW_OP_ADDR: u8 = 0x03;
+const DW_OP_LIT0: u8 = 0x30;
+const DW_OP_LIT31: u8 = 0x4f;
+const DW_OP_REG0: u8 = 0x50;
+const DW_OP_REG31: u8 = 0x6f;
+const DW_OP_BREG0: u8 = 0x70;
+const DW_OP_BREG31: u8 = 0x8f;
+const DW_OP_REGX: u8 = 0x90;
 const DW_OP_FBREG: u8 = 0x91;
+const DW_OP_BREGX: u8 = 0x92;
+const DW_OP_STACK_VALUE: u8 = 0x9f;
 const DW_OP_ADDRX: u8 = 0xa1;
+
+// Range list entry kinds, DWARF 5.
+const DW_RLE_END_OF_LIST: u8 = 0x00;
+const DW_RLE_BASE_ADDRESSX: u8 = 0x01;
+const DW_RLE_STARTX_ENDX: u8 = 0x02;
+const DW_RLE_STARTX_LENGTH: u8 = 0x03;
+const DW_RLE_OFFSET_PAIR: u8 = 0x04;
+const DW_RLE_BASE_ADDRESS: u8 = 0x05;
+const DW_RLE_START_END: u8 = 0x06;
+const DW_RLE_START_LENGTH: u8 = 0x07;
+
+// Location list entry kinds, DWARF 5.
+const DW_LLE_END_OF_LIST: u8 = 0x00;
+const DW_LLE_BASE_ADDRESSX: u8 = 0x01;
+const DW_LLE_STARTX_ENDX: u8 = 0x02;
+const DW_LLE_STARTX_LENGTH: u8 = 0x03;
+const DW_LLE_OFFSET_PAIR: u8 = 0x04;
+const DW_LLE_DEFAULT_LOCATION: u8 = 0x05;
+const DW_LLE_BASE_ADDRESS: u8 = 0x06;
+const DW_LLE_START_END: u8 = 0x07;
+const DW_LLE_START_LENGTH: u8 = 0x08;
 
 // Line number program opcodes.
 const DW_LNS_COPY: u8 = 0x01;
