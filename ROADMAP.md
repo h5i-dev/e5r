@@ -23,10 +23,12 @@ rather than argued about again.
 | binary diff | built (M10) |
 | patch, signatures, emulation, queries | not started (M10) |
 
-Measured on a 10-core aarch64 machine: `libc.so.6` (1.7 MB) analyzes in around
-a tenth of a second, finding 3,524 functions, 80.3% of them complete;
-`objdump -d` on the same file takes 0.31s and only disassembles. 150 tests,
-clippy clean.
+The measured numbers live in [`docs/scorecard.md`](docs/scorecard.md),
+including the ones that go against us. In short: `libc.so.6` analyzes in 0.10s
+and 58 MB, finding 3,517 functions with 95.3% analyzed completely, where
+`objdump -d` takes 0.26s and only disassembles; both decoders are at zero
+disagreements with their oracle; memory use is about ten times objdump's, which
+is the axis r12e is worse on. 164 tests, clippy clean.
 
 r12e is a reverse engineering toolkit with a command line as its only front end.
 It loads a binary, recovers functions, disassembles, lifts to an IR, decompiles
