@@ -22,7 +22,6 @@ r12e-format = { path = "crates/r12e-format", version = "0.1.0" }
 r12e-arch = { path = "crates/r12e-arch", version = "0.1.0" }
 r12e-analysis = { path = "crates/r12e-analysis", version = "0.1.0" }
 r12e-db = { path = "crates/r12e-db", version = "0.1.0" }
-r12e-api = { path = "crates/r12e-api", version = "0.1.0" }
 
 # Kept deliberately short. Loaders and decoders are written here rather than
 # pulled in, because provenance tagging and hostile-input behaviour are the
@@ -31,6 +30,7 @@ memmap2 = "0.9"
 rayon = "1.10"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+clap = { version = "4.5", features = ["derive", "wrap_help"] }
 
 # A dev-profile build lands in target/debug, which this checkout forbids
 # (see CLAUDE.md). Release is the only profile used here.

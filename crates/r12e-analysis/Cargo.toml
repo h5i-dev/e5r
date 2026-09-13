@@ -1,0 +1,16 @@
+[package]
+name = "r12e-analysis"
+description = "r12e — function discovery, control flow, cross references, strings."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+r12e-core = { workspace = true }
+r12e-format = { workspace = true }
+r12e-arch = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
