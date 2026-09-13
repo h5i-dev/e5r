@@ -28,6 +28,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "r12e-format"
+version = "0.1.0"
+dependencies = [
+ "r12e-core",
+ "serde",
+]
+
+[[package]]
 name = "serde"
 version = "1.0.229"
 source = "registry+https://github.com/rust-lang/crates.io-index"
