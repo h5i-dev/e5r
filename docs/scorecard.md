@@ -95,6 +95,18 @@ positives. Adding two functions reports exactly those two.
 There is no CVE build-pair corpus here yet, which is the measurement that would
 actually settle whether the patch-diff use case works at scale.
 
+## Fuzzing
+
+Mutation fuzzing runs in the ordinary test suite, seeded from the corpus, with
+a time budget per target. A recent run: 341,075 mutated loader inputs and
+1,521,697 random ones, 2,338,351 AArch64 words and 2,185,050 x86 byte
+sequences, no panics.
+
+It found one on its first run, which is the point: a five-byte file beginning
+with the ELF magic, where the class byte was read by indexing the slice rather
+than through the bounds-checked reader. That was the one place in the loaders
+that bypassed it.
+
 ## Determinism
 
 `scripts/check-determinism.sh`: 35 fixtures, each analyzed at 1, 4 and 10
@@ -104,7 +116,8 @@ threads, twice each. All 105 runs produce identical output. Green.
 
 - rizin and Ghidra, because neither is installed here.
 - DecBench, because there is no decompiler yet.
-- Coverage and mutation scores, because the tooling is not wired up.
+- Coverage and mutation scores as numbers: the CI jobs report them, but no
+  floor is enforced yet.
 - Anything on a real Mach-O image, because there is no macOS linker here;
   the Mach-O tests use cross-compiled objects and a synthesized fat header.
 - Anything on a real PE image, because there is no Windows linker here; the PE

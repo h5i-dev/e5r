@@ -132,9 +132,10 @@ Dependency edges run downward only. `r12e-cli` may depend on everything;
       Ground truth comes from DWARF where the fixture has it.
 - [x] Bench harness that records wall time, peak RSS and output hash per fixture,
       so a regression shows up as a number and not a feeling.
-- [ ] Coverage and mutation tooling: `cargo llvm-cov` and `cargo mutants` in CI,
-      with the per-crate floors from "Test coverage targets" in a checked-in
-      config so raising or lowering one is a reviewed diff.
+- [x] Coverage and mutation tooling in CI: `cargo llvm-cov` reports per-crate
+      line coverage, and `cargo mutants` runs on the diff of a pull request
+      with `mutants.toml` saying what not to mutate. Both report rather than
+      gate for now; a floor nobody can pass is a floor everyone learns to skip.
 
 ### M1. Containers
 
@@ -391,8 +392,12 @@ designed before it gets coded, and the design lives in `docs/design/db.md`.
 
 ### M12. Hardening and release
 
-- [ ] Fuzz targets for every parser and decoder, run in CI with a persistent
-      corpus.
+- [x] Mutation fuzzing of every loader and decoder, running in the ordinary
+      test suite rather than behind a nightly toolchain, seeded from the real
+      corpus and bounded by time. It found a panic on its first run: a
+      five-byte file beginning with the ELF magic, where the class byte was
+      read by indexing the slice instead of through the reader. A `cargo-fuzz`
+      setup for longer runs is still to do.
 - [ ] Resource caps on every attacker-controlled count, with a documented policy.
 - [ ] `#![forbid(unsafe_code)]` where possible, and a written justification for
       every exception.

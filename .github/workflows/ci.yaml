@@ -23,13 +23,20 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
+  # G2, G3, G4, G6, G7, G9: the whole suite, with the corpus built so the
+  # oracle-backed gates actually run. Without fixtures they skip silently.
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace
+      - name: Build the fixture corpus
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm binutils
+          ./scripts/build-fixtures.sh
+      - run: cargo test --workspace -- --nocapture
 
   # G5: the same bytes must produce the same output at any thread count.
   determinism:
@@ -38,5 +45,40 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update && sudo apt-get install -y clang
+      - run: ./scripts/build-fixtures.sh
       - run: cargo build --release
       - run: ./scripts/check-determinism.sh
+
+  # G10: line coverage per crate. Reported rather than enforced until the
+  # floors in ROADMAP.md are met, because a gate nobody can pass is a gate
+  # everyone learns to skip.
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update && sudo apt-get install -y clang
+      - run: ./scripts/build-fixtures.sh
+      - run: cargo llvm-cov --workspace --summary-only
+
+  # G11: mutation score on the diff only, because a whole-workspace run takes
+  # hours. The nightly job is where the full sweep belongs.
+  mutants:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+      - run: sudo apt-get update && sudo apt-get install -y clang
+      - run: ./scripts/build-fixtures.sh
+      - run: cargo mutants --no-shuffle --in-diff <(git diff origin/${{ github.base_ref }}) || true

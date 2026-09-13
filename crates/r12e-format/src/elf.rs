@@ -115,7 +115,11 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
     let caps = &opts.caps;
     let mut warnings = Vec::new();
 
-    let class = data[4];
+    // Read through the reader rather than indexing: a five-byte file that
+    // starts with the magic is a real fuzz case, and indexing panicked on it.
+    let ident = Reader::le(data);
+    let class = ident.bytes_at("e_ident[EI_CLASS]", 4, 1)?[0];
+    let data_encoding = ident.bytes_at("e_ident[EI_DATA]", 5, 1)?[0];
     let wide = match class {
         1 => false,
         2 => true,
@@ -127,7 +131,7 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
             });
         }
     };
-    let endian = match data[5] {
+    let endian = match data_encoding {
         1 => Endian::Little,
         2 => Endian::Big,
         other => {
