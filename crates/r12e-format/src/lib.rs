@@ -15,6 +15,8 @@ pub mod ehframe;
 pub mod dwarf;
 pub mod elf;
 pub mod macho;
+pub mod metadata;
+pub mod pdb;
 pub mod pe;
 pub mod raw;
 
