@@ -277,3 +277,211 @@ if command -v ar >/dev/null 2>&1; then
 fi
 
 ls "$out"
+
+# Windows images, for the PE loader's Windows-specific directories: the TLS
+# callback array, .pdata/.xdata unwind data, the SEH scope table, base
+# relocations and the load config's control-flow-guard function table.
+#
+# There is no Windows toolchain on this machine, but there does not need to be:
+# clang cross-compiles COFF objects without a sysroot and rust-lld, which is
+# already unpacked next to the Rust toolchain, is lld-link under another name.
+# The image links against no CRT at all, so the two pieces the CRT would
+# normally supply are written out here: `_tls_used`, the IMAGE_TLS_DIRECTORY the
+# linker points the TLS directory at, and `__C_specific_handler`, the SEH
+# dispatcher whose address UNWIND_INFO records.
+#
+# `-fasynchronous-unwind-tables` is what makes clang emit .pdata for every
+# function rather than only for the one with a handler; without it a C image
+# has a single runtime function and proves nothing.
+if command -v "$xcc" >/dev/null 2>&1 && [ -n "${lld:-}" ]; then
+  cat > "$out/win.c" <<'WINC'
+typedef unsigned long long u64;
+typedef unsigned long u32;
+
+int g_counter;
+int g_tls_index;
+char tls_block[64];
+
+int callee(int x);
+
+__attribute__((noinline)) int worker(int x) {
+    int a[8];
+    for (int i = 0; i < 8; i++) a[i] = x + i;
+    g_counter += a[x & 7];
+    return callee(a[0]) + a[7];
+}
+
+__attribute__((noinline)) int callee(int x) { return x * 3 + g_counter; }
+
+/* __try/__except is what puts a scope table in the language-specific handler
+   data that follows UNWIND_INFO. */
+__attribute__((noinline)) int guarded(int x) {
+    int r = 0;
+    __try {
+        r = worker(x);
+        if (r == 0) r = *(volatile int *)0;
+    } __except (1) {
+        r = -1;
+    }
+    return r;
+}
+
+static void __stdcall tls_callback_one(void *h, u32 reason, void *res) {
+    (void)h; (void)res;
+    g_counter += (int)reason + 1;
+}
+
+static void __stdcall tls_callback_two(void *h, u32 reason, void *res) {
+    (void)h; (void)res;
+    g_counter += (int)reason + 2;
+}
+
+typedef void (__stdcall *tls_cb_t)(void *, u32, void *);
+
+/* The null-terminated array the loader walks before the entry point runs. */
+const tls_cb_t tls_callbacks[] = { tls_callback_one, tls_callback_two, 0 };
+
+struct tls_directory64 {
+    u64 StartAddressOfRawData;
+    u64 EndAddressOfRawData;
+    u64 AddressOfIndex;
+    u64 AddressOfCallBacks;
+    u32 SizeOfZeroFill;
+    u32 Characteristics;
+};
+
+/* The linker finds this symbol by name and points the TLS directory at it. */
+const struct tls_directory64 _tls_used = {
+    (u64)(void *)&tls_block[0],
+    (u64)(void *)&tls_block[64],
+    (u64)(void *)&g_tls_index,
+    (u64)(void *)&tls_callbacks[0],
+    0,
+    0,
+};
+
+/* A stand-in for the CRT's SEH dispatcher. */
+long __C_specific_handler(void *rec, void *frame, void *ctx, void *disp) {
+    (void)rec; (void)frame; (void)ctx; (void)disp;
+    return 1;
+}
+
+/* A frame too large for the four-bit UWOP_ALLOC_SMALL form. */
+__attribute__((noinline)) int big_frame(int x) {
+    volatile int a[600];
+    for (int i = 0; i < 600; i++) a[i] = x + i;
+    return a[x % 600] + callee(a[0]);
+}
+
+/* Enough live values across calls to force callee-saved pushes. */
+__attribute__((noinline)) int many_saves(int a, int b, int c, int d, int e, int f) {
+    int r = callee(a) + callee(b);
+    r += callee(c) + callee(d);
+    r += callee(e) + callee(f);
+    return r + a + b + c + d + e + f;
+}
+
+/* Floating point, which on win64 means UWOP_SAVE_XMM128. */
+__attribute__((noinline)) double fp_saves(double a, double b, double c) {
+    double r = a * b;
+    g_counter += (int)(r + c);
+    r += (double)callee(g_counter);
+    return r * c + a - b;
+}
+
+__attribute__((noinline)) int tail(int x) { return x ^ 0x5a5a; }
+
+int _fltused = 0x9875;
+
+int mainCRTStartup(void) {
+    int r = guarded(g_counter);
+    r += big_frame(r) + many_saves(r, 1, 2, 3, 4, 5);
+    r += (int)fp_saves((double)r, 2.0, 3.0);
+    return r + tail(r);
+}
+WINC
+  cat > "$out/win-loadcfg.c" <<'LCC'
+typedef unsigned long long u64;
+typedef unsigned long u32;
+typedef unsigned short u16;
+
+/* IMAGE_LOAD_CONFIG_DIRECTORY64 through the long-jump table. The linker
+   recognizes it by name and fills the guard tables in when /guard:cf is on. */
+struct load_config64 {
+    u32 Size; u32 TimeDateStamp; u16 MajorVersion; u16 MinorVersion;
+    u32 GlobalFlagsClear; u32 GlobalFlagsSet; u32 CriticalSectionDefaultTimeout;
+    u64 DeCommitFreeBlockThreshold; u64 DeCommitTotalFreeThreshold;
+    u64 LockPrefixTable; u64 MaximumAllocationSize; u64 VirtualMemoryThreshold;
+    u64 ProcessAffinityMask; u32 ProcessHeapFlags; u16 CSDVersion; u16 DependentLoadFlags;
+    u64 EditList; u64 SecurityCookie; u64 SEHandlerTable; u64 SEHandlerCount;
+    u64 GuardCFCheckFunctionPointer; u64 GuardCFDispatchFunctionPointer;
+    u64 GuardCFFunctionTable; u64 GuardCFFunctionCount; u32 GuardFlags;
+    u32 CodeIntegrity0; u64 CodeIntegrity1; u32 CodeIntegrity2; u32 pad;
+    u64 GuardAddressTakenIatEntryTable; u64 GuardAddressTakenIatEntryCount;
+    u64 GuardLongJumpTargetTable; u64 GuardLongJumpTargetCount;
+};
+
+u64 __security_cookie = 0x2b992ddfa232ULL;
+
+/* Synthesized by the linker under /guard:cf. */
+extern u64 __guard_fids_table[];
+extern u64 __guard_fids_count;
+extern u64 __guard_iat_table[];
+extern u64 __guard_iat_count;
+extern u64 __guard_longjmp_table[];
+extern u64 __guard_longjmp_count;
+/* Normally the CRT's; defined here because there is no CRT. */
+void (*__guard_check_icall_fptr)(void);
+void (*__guard_dispatch_icall_fptr)(void);
+
+const struct load_config64 _load_config_used = {
+  sizeof(struct load_config64), 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  (u64)(void*)&__security_cookie, 0, 0,
+  (u64)(void*)&__guard_check_icall_fptr, (u64)(void*)&__guard_dispatch_icall_fptr,
+  (u64)(void*)&__guard_fids_table[0], (u64)(void*)&__guard_fids_count,
+  0, 0,0,0,0,
+  (u64)(void*)&__guard_iat_table[0], (u64)(void*)&__guard_iat_count,
+  (u64)(void*)&__guard_longjmp_table[0], (u64)(void*)&__guard_longjmp_count };
+LCC
+  for opt in O0 O2; do
+    for t in "x64:x86_64-pc-windows-msvc:x64" "a64:aarch64-pc-windows-msvc:arm64"; do
+      tag=${t%%:*}; rest=${t#*:}; triple=${rest%%:*}; machine=${rest##*:}
+      "$xcc" --target="$triple" -"$opt" -fasynchronous-unwind-tables \
+        -ffreestanding -c -o "$out/win.$tag.$opt.obj" "$out/win.c" 2>/dev/null || continue
+      "$xcc" --target="$triple" -"$opt" -ffreestanding -c \
+        -o "$out/win-loadcfg.$tag.$opt.obj" "$out/win-loadcfg.c" 2>/dev/null || continue
+      # /guard:cf makes the linker build the CFG function table, which is
+      # another list of real entry points. The GuardFlags warning is expected:
+      # setting that field needs an absolute symbol a C initializer cannot name.
+      "$lld" -flavor link /machine:"$machine" /nodefaultlib /entry:mainCRTStartup \
+        /subsystem:console /guard:cf /out:"$out/win.$tag.$opt.exe" \
+        "$out/win.$tag.$opt.obj" "$out/win-loadcfg.$tag.$opt.obj" 2>/dev/null || true
+    done
+  done
+  rm -f "$out"/win.*.obj "$out"/win-loadcfg.*.obj
+fi
+
+# i386 objects, for the 32-bit x86 decoder gate. clang cross-compiles these
+# without a sysroot the same way it does x86-64, and the interesting part is
+# that a 32-bit compiler reaches for encodings long mode never emits: the
+# one-byte inc and dec, the stack-relative addressing without a REX prefix, and
+# x87 wherever the ABI returns a floating point value on the stack.
+for src in fixtures/portable/*.c; do
+  [ -e "$src" ] || continue
+  base=$(basename "$src" .c)
+  for opt in O0 O1 O2 O3 Os; do
+    "$xcc" --target=i386-linux-gnu -g -"$opt" -ffreestanding -c \
+      -o "$out/${base}.x32.${opt}.o" "$src" 2>/dev/null || true
+  done
+  # One build without SSE, so the floating point goes through the x87 stack
+  # rather than through xmm registers.
+  "$xcc" --target=i386-linux-gnu -g -O2 -mno-sse -mfpmath=387 -ffreestanding -c \
+    -o "$out/${base}.x32.x87.o" "$src" 2>/dev/null || true
+done
+
+# The x86 assembly fixtures assembled for 32-bit as well, where they assemble.
+for src in fixtures/asm/*.s; do
+  [ -e "$src" ] || continue
+  base=$(basename "$src" .s)
+  "$xcc" --target=i386-linux-gnu -c -o "$out/asm-${base}.x32.o" "$src" 2>/dev/null || true
+done

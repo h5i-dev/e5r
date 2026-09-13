@@ -9,7 +9,17 @@
 //! ARM64 every non-leaf function has a `RUNTIME_FUNCTION` entry giving its
 //! exact start and end. It is the best function-boundary evidence any format
 //! offers and it survives stripping, which is the same reason `.eh_frame`
-//! matters on ELF.
+//! matters on ELF. That directory, the unwind data behind it and the SEH scope
+//! tables live in [`crate::pdata`]; the TLS callback array, the base relocation
+//! table and the load config live in [`crate::windirs`].
+//!
+//! One gap is deliberate and visible in the output. The control-flow-guard
+//! function table and the SafeSEH handler table are both linker-built lists of
+//! real function entries, but `Evidence` has no variant that describes them,
+//! and every other variant would either overstate or understate the claim. They
+//! are returned in [`WindowsInfo::load_config`] and counted in the metadata
+//! rather than emitted as hints. Adding `Evidence::GuardTable` with
+//! `Strength::Proven` to `r12e-core` is what would close it.
 
 use std::collections::BTreeMap;
 
@@ -19,7 +29,8 @@ use r12e_core::{
 };
 
 use crate::{
-    Binding, Export, Format, FunctionHint, Import, LoadOptions, Object, Section, Symbol, SymbolKind,
+    Binding, Export, Format, FunctionHint, Import, LoadOptions, Object, Section, Symbol,
+    SymbolKind, pdata, windirs,
 };
 
 const DOS_MAGIC: [u8; 2] = *b"MZ";
@@ -43,8 +54,10 @@ const SCN_MEM_WRITE: u32 = 0x8000_0000;
 const DIR_EXPORT: usize = 0;
 const DIR_IMPORT: usize = 1;
 const DIR_EXCEPTION: usize = 3;
+const DIR_BASERELOC: usize = 5;
 const DIR_DEBUG: usize = 6;
 const DIR_TLS: usize = 9;
+const DIR_LOAD_CONFIG: usize = 10;
 const DIR_DELAY_IMPORT: usize = 13;
 
 /// One section header, before names are resolved.
@@ -63,6 +76,179 @@ struct SecHdr {
 struct Dir {
     rva: u32,
     size: u32,
+}
+
+/// The part of a loaded image a directory walk needs.
+///
+/// Copied out of the section table rather than borrowed from the [`Object`],
+/// because every walk both reads the sections and appends warnings to the
+/// object they came from.
+#[derive(Debug, Clone, Copy)]
+struct Span {
+    range: AddrRange,
+    file_offset: u64,
+    file_size: u64,
+    exec: bool,
+}
+
+/// A mapped PE image, and the three translations every data directory needs:
+/// RVA to file offset, RVA to address, and the file's own absolute addresses to
+/// addresses under whatever base the image was actually loaded at.
+#[derive(Clone)]
+pub struct Image<'a> {
+    data: Reader<'a>,
+    spans: Vec<Span>,
+    base: u64,
+    image_base: u64,
+    wide: bool,
+    arch: Arch,
+}
+
+impl<'a> Image<'a> {
+    /// A view over an already-loaded object.
+    ///
+    /// `data` is the file the object came from. Exact for an image loaded where
+    /// it asked to be, which is every case the loader does not rebase; a
+    /// rebased image needs [`load_windows`], which keeps both bases.
+    pub fn of(data: &'a [u8], obj: &Object) -> Image<'a> {
+        let base = obj.image_base.get();
+        Image::new(
+            Reader::new(data, Endian::Little),
+            &obj.sections,
+            base,
+            base,
+            obj.bits == Bits::Bits64,
+            obj.arch.clone(),
+        )
+    }
+
+    fn new(
+        data: Reader<'a>,
+        sections: &[Section],
+        base: u64,
+        image_base: u64,
+        wide: bool,
+        arch: Arch,
+    ) -> Image<'a> {
+        Image {
+            data,
+            spans: sections
+                .iter()
+                .filter(|s| !s.range.is_empty())
+                .map(|s| Span {
+                    range: s.range,
+                    file_offset: s.file_offset,
+                    file_size: s.file_size,
+                    exec: s.exec,
+                })
+                .collect(),
+            base,
+            image_base,
+            wide,
+            arch,
+        }
+    }
+
+    /// The file, as a bounds-checked cursor.
+    pub fn reader(&self) -> Reader<'a> {
+        self.data
+    }
+
+    /// Bytes in the file.
+    pub fn len(&self) -> u64 {
+        self.data.len() as u64
+    }
+
+    /// True when the file is empty.
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    /// True for PE32+, which is what decides every pointer width below.
+    pub fn wide(&self) -> bool {
+        self.wide
+    }
+
+    /// The machine the image targets.
+    pub fn arch(&self) -> &Arch {
+        &self.arch
+    }
+
+    /// Where an RVA lands once the image is loaded.
+    pub fn addr_of(&self, rva: u32) -> Addr {
+        Addr(self.base.wrapping_add(rva as u64))
+    }
+
+    /// An absolute address the file stores, moved to wherever the image was
+    /// actually loaded. PE writes these relative to the base it declares, so an
+    /// image loaded somewhere else needs the difference applied. `None` for
+    /// zero, which every one of these fields uses to mean absent, and for a
+    /// value below the declared base, which cannot be inside the image.
+    pub fn addr_of_va(&self, va: u64) -> Option<Addr> {
+        if va == 0 || va < self.image_base {
+            return None;
+        }
+        Some(Addr(self.base.wrapping_add(va - self.image_base)))
+    }
+
+    /// File offset holding the bytes an RVA names, when a section maps it and
+    /// those bytes are actually in the file.
+    pub fn offset_of(&self, rva: u32) -> Option<u64> {
+        self.offset_of_addr(self.addr_of(rva))
+    }
+
+    /// The same translation from an address rather than an RVA.
+    pub fn offset_of_addr(&self, addr: Addr) -> Option<u64> {
+        let s = self.span_at(addr)?;
+        let delta = addr.get() - s.range.start().get();
+        // A `.bss`-like section is mapped but has no bytes behind it.
+        if delta >= s.file_size {
+            return None;
+        }
+        let off = s.file_offset.checked_add(delta)?;
+        (off < self.len()).then_some(off)
+    }
+
+    /// Bytes between a file offset and the end of the section's raw data, which
+    /// is the bound a table with no count has to stop at.
+    pub fn section_bytes_after(&self, offset: u64) -> Option<u64> {
+        let s = self.spans.iter().find(|s| {
+            offset >= s.file_offset && offset < s.file_offset.saturating_add(s.file_size)
+        })?;
+        Some((s.file_offset + s.file_size).saturating_sub(offset))
+    }
+
+    /// True when the address is inside a section the file marks executable.
+    pub fn is_code(&self, addr: Addr) -> bool {
+        self.span_at(addr).is_some_and(|s| s.exec)
+    }
+
+    /// True when any section maps the address at all.
+    pub fn is_mapped(&self, addr: Addr) -> bool {
+        self.span_at(addr).is_some()
+    }
+
+    fn span_at(&self, addr: Addr) -> Option<&Span> {
+        self.spans.iter().find(|s| s.range.contains(addr))
+    }
+}
+
+/// What the Windows-specific data directories said.
+///
+/// Everything here is also reflected in the [`Object`]: starts became function
+/// hints, problems became warnings, counts became metadata. This is the full
+/// structure, for a caller that wants the frame layout or the relocation map
+/// rather than the summary.
+#[derive(Debug, Clone, Default)]
+pub struct WindowsInfo {
+    /// The TLS directory and its callback array.
+    pub tls: Option<windirs::TlsDirectory>,
+    /// The exception directory, the unwind records and the scope tables.
+    pub exceptions: pdata::Exceptions,
+    /// Every base relocation, which is every absolute address in the image.
+    pub relocations: Vec<windirs::BaseReloc>,
+    /// The load config, including the guard tables.
+    pub load_config: Option<windirs::LoadConfig>,
 }
 
 /// True when the buffer looks like a PE image or a COFF object.
@@ -90,6 +276,15 @@ pub fn is_pe(data: &[u8]) -> bool {
 
 /// Parse a PE image or a COFF object.
 pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
+    load_windows(data, opts).map(|(obj, _)| obj)
+}
+
+/// Parse a PE image and keep the Windows-specific directories in full.
+///
+/// [`load`] is this with the second half dropped. A caller that wants the frame
+/// layout of a function, the address of every relocation, or the guard tables
+/// calls this instead; nothing else differs, and neither does the [`Object`].
+pub fn load_windows(data: &[u8], opts: &LoadOptions) -> Result<(Object, WindowsInfo)> {
     if !is_pe(data) {
         return Err(Error::NotRecognized {
             expected: "PE or COFF",
@@ -327,6 +522,7 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
     }
 
     read_symbols(&r, sym_table, n_symbols, is_image, base, &mut obj, caps);
+    let mut win = WindowsInfo::default();
     if is_image {
         read_imports(&r, &dirs[DIR_IMPORT], base, wide, &mut obj, caps, false);
         read_imports(
@@ -339,11 +535,32 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
             true,
         );
         read_exports(&r, &dirs[DIR_EXPORT], base, &mut obj, caps);
-        read_exceptions(&r, &dirs[DIR_EXCEPTION], base, &mut obj, caps);
         read_debug(&r, &dirs[DIR_DEBUG], base, &mut obj, caps);
-        if dirs[DIR_TLS].rva != 0 {
-            obj.metadata.insert("pe.tls".into(), "present".into());
-        }
+
+        let img = Image::new(r, &obj.sections, base, image_base, wide, obj.arch.clone());
+        win.exceptions = pdata::read(
+            &img,
+            dirs[DIR_EXCEPTION].rva,
+            dirs[DIR_EXCEPTION].size,
+            caps,
+            &mut obj,
+        );
+        win.tls = windirs::read_tls(&img, dirs[DIR_TLS].rva, dirs[DIR_TLS].size, caps, &mut obj);
+        win.relocations = windirs::read_relocations(
+            &img,
+            dirs[DIR_BASERELOC].rva,
+            dirs[DIR_BASERELOC].size,
+            caps,
+            &mut obj,
+        );
+        win.load_config = windirs::read_load_config(
+            &img,
+            dirs[DIR_LOAD_CONFIG].rva,
+            dirs[DIR_LOAD_CONFIG].size,
+            caps,
+            &mut obj,
+        );
+        record_windows_metadata(&win, &mut obj);
     }
 
     if let Some(entry) = obj.entry {
@@ -357,7 +574,48 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
 
     obj.normalize_symbols();
     obj.normalize_hints();
-    Ok(obj)
+    Ok((obj, win))
+}
+
+/// Summarize the Windows directories into the metadata map, so a report that
+/// never looks at [`WindowsInfo`] still says what was there.
+fn record_windows_metadata(win: &WindowsInfo, obj: &mut Object) {
+    if !win.exceptions.functions.is_empty() {
+        obj.metadata.insert(
+            "pe.runtime_functions".into(),
+            win.exceptions.functions.len().to_string(),
+        );
+        let scopes: usize = win.exceptions.unwind.iter().map(|u| u.scopes.len()).sum();
+        if scopes != 0 {
+            obj.metadata
+                .insert("pe.seh_scopes".into(), scopes.to_string());
+        }
+    }
+    if let Some(tls) = &win.tls {
+        obj.metadata.insert("pe.tls".into(), "present".into());
+        obj.metadata
+            .insert("pe.tls_callbacks".into(), tls.callbacks.len().to_string());
+    }
+    if !win.relocations.is_empty() {
+        obj.metadata
+            .insert("pe.relocations".into(), win.relocations.len().to_string());
+    }
+    if let Some(cfg) = &win.load_config {
+        obj.metadata
+            .insert("pe.load_config".into(), cfg.size.to_string());
+        if !cfg.guard_functions.is_empty() {
+            obj.metadata.insert(
+                "pe.guard_functions".into(),
+                cfg.guard_functions.len().to_string(),
+            );
+        }
+        if !cfg.se_handlers.is_empty() {
+            obj.metadata.insert(
+                "pe.safeseh_handlers".into(),
+                cfg.se_handlers.len().to_string(),
+            );
+        }
+    }
 }
 
 fn machine_to_arch(m: u16) -> Arch {
@@ -707,40 +965,6 @@ fn read_exports(r: &Reader<'_>, dir: &Dir, base: u64, obj: &mut Object, caps: &C
                 provenance: Provenance::new(Evidence::Export),
             });
         }
-    }
-}
-
-/// The exception directory: one `RUNTIME_FUNCTION` per non-leaf function,
-/// giving its exact start and end. The best boundary evidence PE offers.
-fn read_exceptions(r: &Reader<'_>, dir: &Dir, base: u64, obj: &mut Object, caps: &Caps) {
-    if dir.rva == 0 || dir.size == 0 {
-        return;
-    }
-    let Some(at) = at_rva(r, obj, base, dir.rva) else {
-        return;
-    };
-    // x86-64 and ARM64 both use 12-byte entries: start, end, unwind info.
-    let count = (dir.size as u64 / 12).min(caps.symbols);
-    for i in 0..count {
-        let Ok(mut e) = r.slice_at("runtime function", at + i * 12, 12) else {
-            break;
-        };
-        let (Ok(start), Ok(end)) = (e.u32("BeginAddress"), e.u32("EndAddress")) else {
-            break;
-        };
-        if start == 0 || end <= start {
-            continue;
-        }
-        let addr = Addr(base.wrapping_add(start as u64));
-        if !obj.memory.is_executable(addr) {
-            continue;
-        }
-        obj.function_hints.push(FunctionHint {
-            addr,
-            size: Some((end - start) as u64),
-            name: None,
-            provenance: Provenance::new(Evidence::PeUnwind),
-        });
     }
 }
 

@@ -68,6 +68,11 @@ pub enum Evidence {
     EhFrame,
     /// A PE `RUNTIME_FUNCTION` unwind record.
     PeUnwind,
+    /// A table the loader validates indirect calls against: Control Flow
+    /// Guard's function table, or SafeSEH's handler table. The linker built it
+    /// from real function entries, and the loader enforces it at run time, so
+    /// an address in it is a function whatever else the image says.
+    GuardTable,
     /// A Mach-O `LC_FUNCTION_STARTS` entry.
     MachFunctionStarts,
     /// Go's `pclntab`.
@@ -113,6 +118,7 @@ impl Evidence {
             | Evidence::InitArray
             | Evidence::EhFrame
             | Evidence::PeUnwind
+            | Evidence::GuardTable
             | Evidence::MachFunctionStarts
             | Evidence::GoPclntab
             | Evidence::Pdb
@@ -149,6 +155,7 @@ impl Evidence {
             Evidence::InitArray => "init array",
             Evidence::EhFrame => ".eh_frame FDE",
             Evidence::PeUnwind => "PE unwind record",
+            Evidence::GuardTable => "PE guard table",
             Evidence::MachFunctionStarts => "LC_FUNCTION_STARTS",
             Evidence::GoPclntab => "Go pclntab",
             Evidence::ObjcMetadata => "ObjC metadata",

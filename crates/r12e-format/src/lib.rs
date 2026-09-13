@@ -18,9 +18,11 @@ pub mod elf;
 pub mod macho;
 pub mod metadata;
 pub mod overlay;
+pub mod pdata;
 pub mod pdb;
 pub mod pe;
 pub mod raw;
+pub mod windirs;
 
 use std::collections::BTreeMap;
 
