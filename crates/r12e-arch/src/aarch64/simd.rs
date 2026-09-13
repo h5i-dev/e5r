@@ -584,11 +584,14 @@ fn across_lanes(w: u32, addr: Addr) -> Option<Insn> {
         (0b11011, 0) => "addv",
         _ => return None,
     };
-    // The destination is a scalar of the lane width.
-    let width = match size {
-        0b00 => Width::W8,
-        0b01 => Width::W16,
-        _ => Width::W32,
+    // The destination is a scalar of the lane width, except for the long adds,
+    // which accumulate into twice it.
+    let long = opcode == 0b00011;
+    let width = match (size, long) {
+        (0b00, false) => Width::W8,
+        (0b01, false) | (0b00, true) => Width::W16,
+        (_, false) | (0b01, true) => Width::W32,
+        _ => Width::W64,
     };
     let mut i = ins(addr, mnem);
     i.push(Operand::Reg(Reg::vec(rd as u8, width)));

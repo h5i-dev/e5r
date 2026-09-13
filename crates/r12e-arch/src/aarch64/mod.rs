@@ -13,6 +13,7 @@
 #![allow(clippy::unusual_byte_groupings)]
 
 pub mod simd;
+pub mod sysreg;
 pub mod text;
 
 pub use text::{Style, format};
@@ -94,39 +95,6 @@ const COND_NAMES: [&str; 16] = [
 const B_COND: [&str; 16] = [
     "b.eq", "b.ne", "b.cs", "b.cc", "b.mi", "b.pl", "b.vs", "b.vc", "b.hi", "b.ls", "b.ge", "b.lt",
     "b.gt", "b.le", "b.al", "b.nv",
-];
-
-/// Common system registers by their 15-bit `op0:op1:CRn:CRm:op2` encoding.
-///
-/// Unknown registers fall back to the generic `s<op0>_<op1>_c<n>_c<m>_<op2>`
-/// spelling, which is what every assembler accepts and objdump prints.
-const SYSREGS: &[(u32, &str)] = &[
-    (0xde82, "tpidr_el0"),
-    (0xde83, "tpidrro_el0"),
-    (0xde85, "tpidr2_el0"),
-    (0xde00, "cntfrq_el0"),
-    (0xde01, "cntpct_el0"),
-    (0xde02, "cntvct_el0"),
-    (0xda10, "nzcv"),
-    (0xda11, "daif"),
-    (0xda20, "fpcr"),
-    (0xda21, "fpsr"),
-    (0xd801, "ctr_el0"),
-    (0xd807, "dczid_el0"),
-    (0xc800, "midr_el1"),
-    (0xc805, "mpidr_el1"),
-    (0xd001, "clidr_el1"),
-    (0xd000, "ccsidr_el1"),
-    (0xd002, "csselr_el1"),
-    (0xc880, "sctlr_el1"),
-    (0xc882, "cpacr_el1"),
-    (0xce82, "tpidr_el1"),
-    (0xee82, "tpidr_el2"),
-    (0xdf00, "pmcr_el0"),
-    (0xdf01, "pmcntenset_el0"),
-    (0xc900, "id_aa64pfr0_el1"),
-    (0xc906, "id_aa64isar0_el1"),
-    (0xc907, "id_aa64isar1_el1"),
 ];
 
 /// Barrier option names, indexed by `CRm`. The unnamed slots print as numbers.
@@ -230,8 +198,10 @@ pub fn sysreg_name(enc: u32) -> String {
     if enc & 0xffff_0000 != 0 {
         return format!("C{}", enc & 0xffff);
     }
-    if let Some((_, n)) = SYSREGS.iter().find(|(e, _)| *e == enc) {
-        return (*n).to_string();
+    if let Ok(e) = u16::try_from(enc)
+        && let Some(n) = sysreg::lookup(e)
+    {
+        return n.to_string();
     }
     // binutils prints op0 straight from bits 20:19, which is 2 or 3 for a
     // normal MRS and 0 or 1 for the encodings it does not consider one.
@@ -443,6 +413,32 @@ fn decode_bit_masks(n: u32, imms: u32, immr: u32, sf: bool) -> Option<u64> {
     Some(if sf { out } else { out & 0xffff_ffff })
 }
 
+/// Whether a `MOVZ` or `MOVN` would spell this bitmask immediate, in which
+/// case `ORR Rd, ZR, #imm` keeps its own name rather than taking the MOV alias.
+///
+/// The ARM ARM defines the test as written here; it is the reason `orr x1,
+/// xzr, #0x10` disassembles as itself while a value no move-wide can reach
+/// disassembles as `mov`.
+fn move_wide_preferred(sf: bool, n: u32, imms: u32, immr: u32) -> bool {
+    let width = if sf { 64 } else { 32 };
+    // The immediate's element size has to be the whole register.
+    if sf && n != 1 {
+        return false;
+    }
+    if !sf && (n != 0 || imms & 0x20 != 0) {
+        return false;
+    }
+    if imms < 16 {
+        // A MOVZ needs the ones to stay inside one halfword once rotated.
+        return (16 - immr % 16) % 16 <= 15 - imms;
+    }
+    if imms >= width - 15 {
+        // A MOVN needs the same of the zeros.
+        return immr % 16 <= imms - width + 15;
+    }
+    false
+}
+
 fn logical_imm(w: u32, addr: Addr) -> Option<Insn> {
     let sf = bit(w, 31) == 1;
     let opc = bits(w, 30, 29);
@@ -461,7 +457,7 @@ fn logical_imm(w: u32, addr: Addr) -> Option<Insn> {
         i.push(Operand::UImm(imm));
         return Some(i);
     }
-    if opc == 0b01 && rn == 31 {
+    if opc == 0b01 && rn == 31 && !move_wide_preferred(sf, n, bits(w, 15, 10), bits(w, 21, 16)) {
         let mut i = ins(addr, "mov", Flow::Next);
         i.push(Operand::Reg(rsp(rd, sf)));
         i.push(Operand::UImm(imm));
@@ -557,15 +553,13 @@ fn bitfield(w: u32, addr: Addr) -> Option<Insn> {
     let unsigned = opc == 0b10;
 
     // The alias set the manual defines, in the order objdump prefers them.
-    if (signed || unsigned) && imms + 1 == immr {
-        let mnem = if signed { "asr" } else { "lsl" };
-        // LSL is UBFM with imms = immr - 1; ASR shares the shape with a
-        // different opc, so only the unsigned case is a left shift.
-        let amount = if unsigned { width - immr } else { immr };
-        let mut i = ins(addr, if signed { "asr" } else { mnem }, Flow::Next);
+    // LSL is UBFM with imms = immr - 1. The signed encoding of that shape is
+    // SBFIZ, not a shift, and falls through to the insert forms below.
+    if unsigned && imms + 1 == immr {
+        let mut i = ins(addr, "lsl", Flow::Next);
         i.push(Operand::Reg(r(rd, sf)));
         i.push(Operand::Reg(r(rn, sf)));
-        i.push(Operand::Count(amount as i64));
+        i.push(Operand::Count((width - immr) as i64));
         return Some(i);
     }
     if imms == width - 1 && (signed || unsigned) {
@@ -580,8 +574,10 @@ fn bitfield(w: u32, addr: Addr) -> Option<Insn> {
             (true, 7) => Some("sxtb"),
             (true, 15) => Some("sxth"),
             (true, 31) if sf => Some("sxtw"),
-            (false, 7) => Some("uxtb"),
-            (false, 15) => Some("uxth"),
+            // There is no 64-bit UXTB or UXTH: zero extending into an X
+            // register is already what writing a W register does.
+            (false, 7) if !sf => Some("uxtb"),
+            (false, 15) if !sf => Some("uxth"),
             _ => None,
         };
         if let Some(m) = ext {

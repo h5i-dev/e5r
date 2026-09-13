@@ -82,10 +82,27 @@ fn objdump(path: &Path) -> Vec<Line> {
         lines.push(Line {
             addr,
             word,
-            text: body.trim_end().to_string(),
+            text: unprefixed(body.trim_end()),
         });
     }
     lines
+}
+
+/// Strip the `0x` objdump puts on a branch target it has no symbol for.
+///
+/// With a symbol it prints `b.lt 4002a4 <use_struct+0x20>`, and without one
+/// `b.lt 0x11080`, so the same instruction is spelled two ways depending on
+/// whether the binary was stripped. Only the last operand, and only when the
+/// whole of it is an address.
+fn unprefixed(text: &str) -> String {
+    let cut = text.rfind(['\t', ' ']).map(|i| i + 1).unwrap_or(0);
+    let last = &text[cut..];
+    match last.strip_prefix("0x") {
+        Some(hex) if !hex.is_empty() && hex.bytes().all(|b| b.is_ascii_hexdigit()) => {
+            format!("{}{hex}", &text[..cut])
+        }
+        _ => text.to_string(),
+    }
 }
 
 /// Coverage floor: the fraction of objdump-decodable instructions we also
@@ -335,4 +352,67 @@ fn parity_report() {
     for (k, n) in mv.iter().take(40) {
         println!("{n:>7}  {k}");
     }
+}
+
+/// The system register table says the same thing the assembler and the
+/// disassembler do, over every encoding an `MRS` can name.
+///
+/// The table is data, and data written by hand goes wrong quietly: the
+/// encodings for `midr_el1`, `cntfrq_el0` and six others were wrong for as
+/// long as no fixture happened to read them. This checks all 32768 of them.
+#[test]
+fn sysreg_names_match_binutils() {
+    let dir = std::env::temp_dir().join(format!("r12e-sysreg-{}", std::process::id()));
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let mut asm = String::new();
+    let mut encodings = Vec::new();
+    for op0 in 2..4u32 {
+        for op1 in 0..8u32 {
+            for crn in 0..16u32 {
+                for crm in 0..16u32 {
+                    for op2 in 0..8u32 {
+                        asm.push_str(&format!("mrs x0, s{op0}_{op1}_c{crn}_c{crm}_{op2}\n"));
+                        encodings.push(op0 << 14 | op1 << 11 | crn << 7 | crm << 3 | op2);
+                    }
+                }
+            }
+        }
+    }
+    let src = dir.join("sys.s");
+    let obj = dir.join("sys.o");
+    if std::fs::write(&src, &asm).is_err() {
+        return;
+    }
+    let assembled = Command::new("as").arg("-o").arg(&obj).arg(&src).status();
+    if !matches!(assembled, Ok(s) if s.success()) {
+        return; // no aarch64 assembler here
+    }
+    let lines = objdump(&obj);
+    assert_eq!(lines.len(), encodings.len(), "objdump lost instructions");
+
+    let mut wrong = Vec::new();
+    for (line, enc) in lines.iter().zip(&encodings) {
+        let theirs = line.text.rsplit("x0, ").next().unwrap_or("").trim();
+        let ours = aarch64::sysreg_name(*enc);
+        // A name binutils does not have prints as the generic spelling, which
+        // is what it prints too.
+        if ours != theirs {
+            wrong.push(format!("{enc:#06x}: objdump {theirs:?} != ours {ours:?}"));
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(
+        wrong.is_empty(),
+        "{} of {} system register names disagree\nfirst 20:\n{}",
+        wrong.len(),
+        encodings.len(),
+        wrong
+            .iter()
+            .take(20)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
 }
