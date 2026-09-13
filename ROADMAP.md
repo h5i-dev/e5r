@@ -227,7 +227,9 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       than by segment. Go string headers and Rust slices are still to do.
 - [ ] Data flow into the data sections: pointers, vtables, jump tables and
       literal pools marked as data so the code partition stops at them.
-- [ ] PLT, GOT and IAT thunk resolution, so an indirect call prints a name.
+- [x] PLT thunk resolution from the relocation table, so a call through one
+      prints the imported name. GOT and IAT still to do for the indirect
+      forms.
 - [x] Parallel analysis with deterministic output. Functions are independent
       units; the work queue order must not reach the result.
 
@@ -315,8 +317,11 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       holds still.
 - [ ] Structure recovery fed back into the decompiler, so an access becomes a
       field reference rather than an offset.
-- [ ] C++ recovery: vtables, RTTI where present, constructor and destructor
-      identification, `this` pointer typing.
+- [x] C++ vtable recovery, by symbol and by scanning, reported with what each
+      rests on, and gated against a fixture whose virtual dispatch is run in
+      the interpreter and compared against hardware.
+- [ ] C++ recovery beyond the tables: RTTI where present, constructor and
+      destructor identification, `this` pointer typing.
 - [ ] Go: `pclntab` function names, `moduledata`, interface tables, the runtime
       type descriptors.
 - [ ] Rust: the metadata that exists, which is less than people expect. Panic
@@ -425,10 +430,12 @@ designed before it gets coded, and the design lives in `docs/design/db.md`.
 
 ### M10. The differentiators
 
-- [ ] Binary diff. Function matching across two builds by anchor, by call graph
-      neighborhood, and by structural hash, reporting matched, changed, added and
-      removed with a similarity score. Patch diffing is the use case that has to
-      work: given a vulnerable and a patched build, point at the change.
+- [x] Binary diff. Function matching across two builds by anchor, by name and
+      by call graph neighborhood, reporting matched, changed, added and removed
+      with a similarity score, gated on a patched build where the change is
+      known.
+- [ ] Diff at instruction granularity inside a changed function, so the answer
+      is the line that changed rather than the function that contains it.
 - [ ] Patch sets. An auditable object describing byte edits, previewed before
       write, applied to a sibling file by default, assembled from public
       encodings. Never a silent overwrite of the input.
