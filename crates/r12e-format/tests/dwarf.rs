@@ -68,7 +68,9 @@ fn readelf_functions(path: &Path) -> Option<BTreeMap<u64, String>> {
 fn check(name: &str) {
     let Some(dir) = corpus() else { return };
     let path = dir.join(name);
-    let Ok(data) = std::fs::read(&path) else { return };
+    let Ok(data) = std::fs::read(&path) else {
+        return;
+    };
     let Ok(obj) = r12e_format::load(&data, &LoadOptions::default()) else {
         return;
     };

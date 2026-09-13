@@ -11,11 +11,13 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-pub mod ehframe;
+pub mod archive;
 pub mod dwarf;
+pub mod ehframe;
 pub mod elf;
 pub mod macho;
 pub mod metadata;
+pub mod overlay;
 pub mod pdb;
 pub mod pe;
 pub mod raw;
@@ -302,6 +304,7 @@ impl Default for LoadOptions {
 /// format" lets the next one try; any other error stops, because a file that
 /// announces itself as ELF and then fails is a broken ELF, not a PE.
 pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
+    archive::refuse_in_load(data)?;
     match elf::load(data, opts) {
         Err(e) if e.is_not_recognized() => {}
         other => return other,

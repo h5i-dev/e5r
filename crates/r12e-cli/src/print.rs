@@ -577,7 +577,11 @@ pub fn shapes(w: &mut Out, p: &Program, target: &str, as_json: bool) -> R {
                 Some(s) => format!("{s} bytes"),
                 None => "size unknown".to_string(),
             };
-            let access = if pointer.written { "read and written" } else { "read only" };
+            let access = if pointer.written {
+                "read and written"
+            } else {
+                "read only"
+            };
             outln!(w, "  {name}: {size}, {access}");
             for (offset, width) in &pointer.fields {
                 outln!(w, "    +{offset:<4} {width} byte(s)");
@@ -602,7 +606,14 @@ pub fn identified(
         eprintln!("nothing in {} signature(s) matched", library.len());
         return Ok(exit::NOT_FOUND);
     }
-    outln!(w, "{:<20} {:<10} {:<28} {}", "address", "match", "name", "was");
+    outln!(
+        w,
+        "{:<20} {:<10} {:<28} {}",
+        "address",
+        "match",
+        "name",
+        "was"
+    );
     for i in &found {
         outln!(
             w,
@@ -722,7 +733,12 @@ pub fn emulate(
     outln!(w, "{} <{}>", f.entry, f.display_name());
     outln!(w, "  stopped   {}", describe(&run.stop));
     outln!(w, "  result    {:#x} ({})", run.result, run.result as i64);
-    outln!(w, "  executed  {} instruction(s), {} operation(s)", run.insns, run.ops);
+    outln!(
+        w,
+        "  executed  {} instruction(s), {} operation(s)",
+        run.insns,
+        run.ops
+    );
     if !run.unlifted.is_empty() {
         let shown: Vec<String> = run.unlifted.iter().take(5).map(|a| a.to_string()).collect();
         outln!(
@@ -744,7 +760,9 @@ fn describe(stop: &r12e_ir::Stop) -> String {
     match stop {
         Stop::Returned => "returned".into(),
         Stop::Budget => "ran out of budget".into(),
-        Stop::Unimplemented(a) => format!("reached an instruction the lifter does not model at {a}"),
+        Stop::Unimplemented(a) => {
+            format!("reached an instruction the lifter does not model at {a}")
+        }
         Stop::NoCode(a) => format!("branched to {a}, where there is no code"),
         Stop::Call(a) => format!("called {a}, and calls were not being followed"),
         Stop::DivideByZero(a) => format!("divided by zero at {a}"),
@@ -783,6 +801,93 @@ pub fn vtables(w: &mut Out, p: &Program, as_json: bool) -> R {
                 .unwrap_or_else(|| format!("{method}"));
             outln!(w, "  [{slot}] {method}  {name}");
         }
+    }
+    Ok(exit::OK)
+}
+
+/// Overlay, entropy and what they suggest.
+pub fn overlay(w: &mut Out, o: &Object, data: &[u8], as_json: bool) -> R {
+    let report = r12e_format::overlay::analyze(o, data);
+    if as_json {
+        return json::emit(w, &json::overlay(&report));
+    }
+    outln!(w, "described end  {:#x}", report.described_end);
+    match &report.overlay {
+        Some(ov) => outln!(
+            w,
+            "overlay        {:#x}, {} bytes, entropy {:.2}, looks like {}",
+            ov.offset,
+            ov.size,
+            ov.entropy,
+            ov.content.as_str()
+        ),
+        None => outln!(w, "overlay        none"),
+    }
+    if !report.sections.is_empty() {
+        outln!(w, "");
+        outln!(
+            w,
+            "{:<24}{:>10}  {:>8}  {:>8}",
+            "section",
+            "size",
+            "entropy",
+            "peak"
+        );
+        for s in &report.sections {
+            let peak = s.peak().map(|p| p.entropy).unwrap_or(s.entropy);
+            outln!(
+                w,
+                "{:<24}{:>10x}  {:>8.2}  {:>8.2}",
+                s.name,
+                s.size,
+                s.entropy,
+                peak
+            );
+        }
+    }
+    if !report.findings.is_empty() {
+        outln!(w, "");
+        for f in &report.findings {
+            let where_ = f.section.as_deref().unwrap_or("image");
+            outln!(w, "{:<10} {:<24} {}", f.strength.as_str(), where_, f.detail);
+        }
+    }
+    for warn in &report.warnings {
+        eprintln!("note: {warn}");
+    }
+    // Nothing found is a real answer about a file, not a failed lookup.
+    Ok(exit::OK)
+}
+
+/// Members of an `ar` archive, and the symbols each one defines.
+pub fn archive(w: &mut Out, data: &[u8], symbols: bool, as_json: bool) -> R {
+    let ar = r12e_format::archive::open(data).map_err(|e| e.to_string())?;
+    if as_json {
+        return json::emit(w, &json::archive(&ar));
+    }
+    outln!(
+        w,
+        "{} archive, {} member(s), {} indexed symbol(s){}",
+        ar.flavor.as_str(),
+        ar.members.len(),
+        ar.index.len(),
+        if ar.thin { ", thin" } else { "" }
+    );
+    outln!(w, "");
+    outln!(w, "{:<44}{:>10}  {:>10}", "member", "offset", "size");
+    for (n, m) in ar.members.iter().enumerate() {
+        outln!(w, "{:<44}{:>10x}  {:>10x}", m.name, m.offset, m.size);
+        if symbols {
+            for s in ar.symbols_of(n) {
+                outln!(w, "    {s}");
+            }
+        }
+    }
+    for warn in &ar.warnings {
+        eprintln!("note: {warn}");
+    }
+    if ar.members.is_empty() {
+        return Ok(exit::NOT_FOUND);
     }
     Ok(exit::OK)
 }

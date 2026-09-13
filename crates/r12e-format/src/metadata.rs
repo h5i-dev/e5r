@@ -302,7 +302,11 @@ pub fn parse_pclntab(body: &[u8], text_start: Option<Addr>) -> Result<GoPclntab>
     // 1.18 added `textStart` ahead of them.
     let (name_at, functab_at, text) = match version {
         GoVersion::V12 => (0u64, 8 + ptr_size, text_start.unwrap_or(Addr::ZERO)),
-        GoVersion::V116 => (header_field(2)?, header_field(6)?, text_start.unwrap_or(Addr::ZERO)),
+        GoVersion::V116 => (
+            header_field(2)?,
+            header_field(6)?,
+            text_start.unwrap_or(Addr::ZERO),
+        ),
         GoVersion::V118 | GoVersion::V120 => {
             let declared_text = header_field(2)?;
             let text = match (declared_text, text_start) {
@@ -316,7 +320,11 @@ pub fn parse_pclntab(body: &[u8], text_start: Option<Addr>) -> Result<GoPclntab>
     // A table cannot declare more entries than it has bytes: the function
     // table is `nfunc` pairs plus one sentinel giving the end of the last
     // function, so the room left after its offset decides the count.
-    let field = if version.offset_entries() { 4 } else { ptr_size };
+    let field = if version.offset_entries() {
+        4
+    } else {
+        ptr_size
+    };
     let slots = (body.len() as u64).saturating_sub(functab_at) / field;
     let room = slots.saturating_sub(1) / 2;
     if declared > room {
@@ -339,7 +347,11 @@ pub fn parse_pclntab(body: &[u8], text_start: Option<Addr>) -> Result<GoPclntab>
 
     // The `_func` record opens with the entry PC, pointer-sized until 1.18 and
     // a 32-bit offset after, and the name offset follows it.
-    let name_field = if version.offset_entries() { 4 } else { ptr_size };
+    let name_field = if version.offset_entries() {
+        4
+    } else {
+        ptr_size
+    };
     let mut functions = Vec::new();
     let mut skipped = 0u64;
     for i in 0..nfunc {
@@ -349,7 +361,11 @@ pub fn parse_pclntab(body: &[u8], text_start: Option<Addr>) -> Result<GoPclntab>
         c.seek("functab offset", functab_at + (2 * i + 1) * field)?;
         // The `_func` offset is measured from the whole table before 1.16 and
         // from the function table itself after it.
-        let func_base = if version == GoVersion::V12 { 0 } else { functab_at };
+        let func_base = if version == GoVersion::V12 {
+            0
+        } else {
+            functab_at
+        };
         let func_at = func_base.wrapping_add(c.uword("functab offset", field == 8)?);
         let mut f = r;
         if f.seek("_func", func_at.wrapping_add(name_field)).is_err() {
@@ -447,7 +463,10 @@ fn parse_build_info(img: &Image<'_>, at: Addr, head: &[u8]) -> Option<(String, O
         let body = seg.slice_to_end(at.checked_add(32)?)?;
         let (version, rest) = varint_bytes(body)?;
         let module = varint_bytes(rest).map(|(m, _)| m).unwrap_or_default();
-        return Some((std::str::from_utf8(version).ok()?.to_string(), trim_module(module)));
+        return Some((
+            std::str::from_utf8(version).ok()?.to_string(),
+            trim_module(module),
+        ));
     }
     // Big-endian is flagged in the same byte the inline format reuses.
     let endian = if flags & 0x1 != 0 {
@@ -687,7 +706,11 @@ fn objc_class_at(img: &Image<'_>, at: Addr) -> Option<ObjcClass> {
 }
 
 /// The name and method list of one class object, class or metaclass.
-fn objc_class_half(img: &Image<'_>, at: Addr, class_method: bool) -> Option<(String, Vec<ObjcMethod>)> {
+fn objc_class_half(
+    img: &Image<'_>,
+    at: Addr,
+    class_method: bool,
+) -> Option<(String, Vec<ObjcMethod>)> {
     // objc_class: isa, superclass, cache, vtable, data.
     let data = Addr(img.ptr(at.checked_add(32)?)?.get() & CLASS_DATA_MASK);
     if data == Addr::ZERO {
@@ -699,7 +722,9 @@ fn objc_class_half(img: &Image<'_>, at: Addr, class_method: bool) -> Option<(Str
     if (flags & RO_META != 0) != class_method {
         return None;
     }
-    let name = img.cstr(img.ptr(data.checked_add(24)?)?, MAX_NAME)?.to_string();
+    let name = img
+        .cstr(img.ptr(data.checked_add(24)?)?, MAX_NAME)?
+        .to_string();
     let methods = match img.ptr(data.checked_add(32)?) {
         Some(list) if list != Addr::ZERO => objc_methods(img, list, class_method),
         _ => Vec::new(),
@@ -709,7 +734,8 @@ fn objc_class_half(img: &Image<'_>, at: Addr, class_method: bool) -> Option<(Str
 
 /// Read one `method_list_t`.
 fn objc_methods(img: &Image<'_>, at: Addr, class_method: bool) -> Vec<ObjcMethod> {
-    let Some((entsize, declared)) = img.u32(at).zip(img.u32(at.checked_add(4).unwrap_or(at))) else {
+    let Some((entsize, declared)) = img.u32(at).zip(img.u32(at.checked_add(4).unwrap_or(at)))
+    else {
         return Vec::new();
     };
     let small = entsize & METHOD_LIST_SMALL != 0;
@@ -932,6 +958,9 @@ mod tests {
     #[test]
     fn a_module_line_without_its_sentinels_is_dropped() {
         assert_eq!(trim_module(&[0xffu8; 32]), None);
-        assert_eq!(trim_module(b"0123456789abcdefpath0123456789abcdef"), Some("path".to_string()));
+        assert_eq!(
+            trim_module(b"0123456789abcdefpath0123456789abcdef"),
+            Some("path".to_string())
+        );
     }
 }

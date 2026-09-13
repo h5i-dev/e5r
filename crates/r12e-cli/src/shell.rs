@@ -103,7 +103,10 @@ fn zsh(root: &Command, name: &str) -> String {
     out.push_str("    )\n");
     out.push_str("    _arguments -C '1: :->command' '*:: :->argument'\n");
     out.push_str("    case $state in\n");
-    let _ = writeln!(out, "        command) _describe '{name} command' commands ;;");
+    let _ = writeln!(
+        out,
+        "        command) _describe '{name} command' commands ;;"
+    );
     out.push_str("        argument)\n            case $words[1] in\n");
     for sub in subcommands(root) {
         let _ = writeln!(

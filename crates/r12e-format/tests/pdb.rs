@@ -182,12 +182,7 @@ fn tpi() -> Vec<u8> {
         .bytes(&member(T_REAL32, 0, "f"));
     records.bytes(&type_record(0x1203, &both.0));
     let mut union = Buf::default();
-    union
-        .u16(2)
-        .u16(0)
-        .u32(VALUE_FIELDS)
-        .u16(4)
-        .cstr("Value");
+    union.u16(2).u16(0).u32(VALUE_FIELDS).u16(4).cstr("Value");
     records.bytes(&type_record(0x1506, &union.0));
 
     // An array, which declares a size in bytes where C declares a count.
@@ -300,7 +295,9 @@ fn module_lines() -> Vec<u8> {
     let mut out = Buf::default();
     let mut checksum = Buf::default();
     checksum.u32(1).u8(0).u8(0).pad_zero();
-    out.u32(0xf4).u32(checksum.0.len() as u32).bytes(&checksum.0);
+    out.u32(0xf4)
+        .u32(checksum.0.len() as u32)
+        .bytes(&checksum.0);
 
     let mut block = Buf::default();
     block
@@ -600,7 +597,10 @@ fn the_type_graph_is_the_one_the_records_described() {
         "union Value { int32_t i; float f; };"
     );
     // The array record gave forty bytes of four byte elements.
-    assert_eq!(info.types.declare(variable("table").ty, "table"), "int32_t table[10]");
+    assert_eq!(
+        info.types.declare(variable("table").ty, "table"),
+        "int32_t table[10]"
+    );
     // A qualifier does not change the layout, so it is not carried.
     assert_eq!(info.types.name_of(variable("konst").ty), "int32_t");
 }
@@ -617,10 +617,7 @@ fn public_symbols_name_addresses_no_procedure_record_claimed() {
     assert_eq!(public.size, None);
     // The procedure record says more about its address than the public does,
     // so it is the one that survives.
-    assert_eq!(
-        info.functions[&Addr(IMAGE_BASE + TEXT_RVA)].name,
-        "add"
-    );
+    assert_eq!(info.functions[&Addr(IMAGE_BASE + TEXT_RVA)].name, "add");
     let counter = info
         .variables
         .get(&Addr(IMAGE_BASE + DATA_RVA + 0x200))
@@ -718,12 +715,7 @@ fn a_lying_count_does_not_exhaust_memory() {
     assert!(directory > 0, "the directory has bytes");
     // The first word of the directory is the stream count.
     let at = map * BLOCK;
-    let block = u32::from_le_bytes([
-        case[at],
-        case[at + 1],
-        case[at + 2],
-        case[at + 3],
-    ]) as usize;
+    let block = u32::from_le_bytes([case[at], case[at + 1], case[at + 2], case[at + 3]]) as usize;
     case[block * BLOCK..block * BLOCK + 4].copy_from_slice(&u32::MAX.to_le_bytes());
     assert!(pdb::Msf::open(&case).is_none());
     assert!(

@@ -1177,26 +1177,24 @@ fn apply_code_relocations(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object) {
                 break;
             };
             let (offset, info, addend) = if wide {
-                let (Ok(o), Ok(n), Ok(a)) = (
-                    e.u64("r_offset"),
-                    e.u64("r_info"),
-                    e.i64("r_addend"),
-                ) else {
+                let (Ok(o), Ok(n), Ok(a)) = (e.u64("r_offset"), e.u64("r_info"), e.i64("r_addend"))
+                else {
                     continue;
                 };
                 (o, n, a)
             } else {
-                let (Ok(o), Ok(n), Ok(a)) = (
-                    e.u32("r_offset"),
-                    e.u32("r_info"),
-                    e.i32("r_addend"),
-                ) else {
+                let (Ok(o), Ok(n), Ok(a)) = (e.u32("r_offset"), e.u32("r_info"), e.i32("r_addend"))
+                else {
                     continue;
                 };
                 (o as u64, n as u64, a as i64)
             };
             let symbol = if wide { info >> 32 } else { info >> 8 };
-            let kind = if wide { info & 0xffff_ffff } else { info & 0xff };
+            let kind = if wide {
+                info & 0xffff_ffff
+            } else {
+                info & 0xff
+            };
             let Some(value) = symbol_value(r, shdrs, obj, symbol) else {
                 continue;
             };
@@ -1206,9 +1204,7 @@ fn apply_code_relocations(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object) {
             // However much is there: the last entry of a table sits at the
             // end of its section, and asking for eight bytes there fails.
             let mut word = [0u8; 8];
-            let available = (1..=8)
-                .rev()
-                .find_map(|n| obj.memory.slice(Addr(place), n));
+            let available = (1..=8).rev().find_map(|n| obj.memory.slice(Addr(place), n));
             let Some(existing) = available else { continue };
             word[..existing.len()].copy_from_slice(existing);
             if let Some(bytes) = fixup(&arch, kind, value, addend, place, &word) {
@@ -1258,7 +1254,9 @@ fn fixup(
                 let pages = (value & !0xfff).wrapping_sub(place & !0xfff) as i64 >> 12;
                 let immlo = (pages as u32 & 3) << 29;
                 let immhi = ((pages as u32 >> 2) & 0x7ffff) << 5;
-                ((word & !0x60ff_ffe0) | immlo | immhi).to_le_bytes().to_vec()
+                ((word & !0x60ff_ffe0) | immlo | immhi)
+                    .to_le_bytes()
+                    .to_vec()
             }
             // The twelve-bit offsets: an add, or a load or store scaled by its
             // access size.
@@ -1299,13 +1297,7 @@ fn fixup(
 /// written is the symbol's address plus the addend. Anything else is left
 /// alone, because writing a guess into a debug section produces confident
 /// nonsense rather than a gap.
-fn relocated(
-    r: &Reader<'_>,
-    shdrs: &[SecHdr],
-    obj: &Object,
-    name: &str,
-    data: &[u8],
-) -> Vec<u8> {
+fn relocated(r: &Reader<'_>, shdrs: &[SecHdr], obj: &Object, name: &str, data: &[u8]) -> Vec<u8> {
     let mut out = data.to_vec();
     if data.is_empty() {
         return out;
@@ -1338,7 +1330,11 @@ fn relocated(
                 (o as u64, i as u64, a as i64)
             };
             let symbol = if wide { info >> 32 } else { info >> 8 };
-            let kind = if wide { info & 0xffff_ffff } else { info & 0xff };
+            let kind = if wide {
+                info & 0xffff_ffff
+            } else {
+                info & 0xff
+            };
             // The absolute relocations, which are the only ones a debug
             // section uses: 1 is 64-bit on both architectures this supports,
             // and the 32-bit ones differ by number.
@@ -1425,7 +1421,6 @@ fn read_eh_frame(r: &Reader<'_>, phdrs: &[ProgHdr], obj: &mut Object) {
         Err(e) => obj.warnings.push(format!(".eh_frame: {e}")),
     }
 }
-
 
 /// True when a name is one a function could have.
 ///

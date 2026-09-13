@@ -41,7 +41,10 @@ fn the_pclntab_names_what_stripping_removed() {
         // puts at the ends of the text section, not functions.
         .filter(|s| s.size != 0)
         .map(|s| {
-            let n = s.name.trim_end_matches(".abi0").trim_end_matches(".abiinternal");
+            let n = s
+                .name
+                .trim_end_matches(".abi0")
+                .trim_end_matches(".abiinternal");
             (s.addr.get(), n.to_string())
         })
         .collect();
@@ -125,7 +128,10 @@ fn panic_locations_name_the_file_and_line_they_are_in() {
     let ours: Vec<_> = sites.iter().filter(|s| s.file == "panicky.rs").collect();
     assert!(!ours.is_empty(), "found {} sites, none ours", sites.len());
     let lines: Vec<u32> = ours.iter().map(|s| s.line).collect();
-    assert!(lines.contains(&2), "the indexing panic is on line 2: {lines:?}");
+    assert!(
+        lines.contains(&2),
+        "the indexing panic is on line 2: {lines:?}"
+    );
     // And the standard library's own panics come with it.
     assert!(
         sites.iter().any(|s| s.file.contains("core/src")),
@@ -373,12 +379,12 @@ fn synth_objc() -> Vec<u8> {
     u32at(&mut f, 20, 2 * (72 + 4 * 80));
 
     let seg = |f: &mut Vec<u8>,
-                   at: u64,
-                   name: &str,
-                   vmaddr: u64,
-                   fileoff: u64,
-                   prot: u32,
-                   sects: &[(&str, u64, u64, u32)]| {
+               at: u64,
+               name: &str,
+               vmaddr: u64,
+               fileoff: u64,
+               prot: u32,
+               sects: &[(&str, u64, u64, u32)]| {
         u32at(f, at, 0x19);
         u32at(f, at + 4, 72 + 80 * sects.len() as u32);
         put(f, at + 8, &name16(name));
@@ -477,7 +483,11 @@ fn synth_objc() -> Vec<u8> {
     let entry = DATA + 0x508;
     u32at(&mut f, 0x1508, (DATA + 0x600).wrapping_sub(entry) as u32);
     u32at(&mut f, 0x150c, types.wrapping_sub(entry + 4) as u32);
-    u32at(&mut f, 0x1510, (TEXT + 0x460).wrapping_sub(entry + 8) as u32);
+    u32at(
+        &mut f,
+        0x1510,
+        (TEXT + 0x460).wrapping_sub(entry + 8) as u32,
+    );
     f
 }
 
@@ -510,7 +520,10 @@ fn objc_class_lists_name_every_implementation() {
         "the type encodings did not come through"
     );
     assert!(
-        metadata::read(&obj).notes.get("objc.methods").is_some_and(|n| n == "4"),
+        metadata::read(&obj)
+            .notes
+            .get("objc.methods")
+            .is_some_and(|n| n == "4"),
         "the summary disagrees with the class list"
     );
 }
@@ -584,7 +597,10 @@ fn mutated_real_files_are_read_or_refused_but_never_hang() {
                     assert!(p.file.ends_with(".rs"));
                 }
             }
-            assert!(start.elapsed() < Duration::from_secs(60), "{name} is too slow");
+            assert!(
+                start.elapsed() < Duration::from_secs(60),
+                "{name} is too slow"
+            );
         }
     }
 }
@@ -603,7 +619,10 @@ fn a_binary_with_no_section_headers_still_gives_up_its_table() {
     data[0x3c..0x3e].copy_from_slice(&0u16.to_le_bytes());
     data[0x3e..0x40].copy_from_slice(&0u16.to_le_bytes());
     let obj = load(&data, &LoadOptions::default()).expect("headerless ELF does not load");
-    assert!(obj.sections.is_empty(), "the section headers are still there");
+    assert!(
+        obj.sections.is_empty(),
+        "the section headers are still there"
+    );
 
     let t = metadata::go_pclntab(&obj).expect("the scan missed the table");
     assert!(t.functions.len() > 500);

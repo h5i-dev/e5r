@@ -572,3 +572,114 @@ pub fn diff(d: &r12e_diff::Diff) -> DiffOut {
         changes: d.changed().map(pair).collect(),
     }
 }
+
+#[derive(Serialize)]
+pub struct OverlayOut {
+    offset: String,
+    size: u64,
+    entropy: f64,
+    content: &'static str,
+}
+
+#[derive(Serialize)]
+pub struct SectionEntropyOut {
+    name: String,
+    file_offset: String,
+    size: u64,
+    entropy: f64,
+    peak_entropy: f64,
+    peak_offset: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct FindingOut {
+    kind: &'static str,
+    section: Option<String>,
+    detail: String,
+    strength: &'static str,
+}
+
+#[derive(Serialize)]
+pub struct OverlayReport {
+    schema: &'static str,
+    described_end: String,
+    overlay: Option<OverlayOut>,
+    sections: Vec<SectionEntropyOut>,
+    findings: Vec<FindingOut>,
+    warnings: Vec<String>,
+}
+
+pub fn overlay(r: &r12e_format::overlay::Report) -> OverlayReport {
+    OverlayReport {
+        schema: SCHEMA,
+        described_end: format!("{:#x}", r.described_end),
+        overlay: r.overlay.as_ref().map(|o| OverlayOut {
+            offset: format!("{:#x}", o.offset),
+            size: o.size,
+            entropy: o.entropy,
+            content: o.content.as_str(),
+        }),
+        sections: r
+            .sections
+            .iter()
+            .map(|s| SectionEntropyOut {
+                name: s.name.clone(),
+                file_offset: format!("{:#x}", s.file_offset),
+                size: s.size,
+                entropy: s.entropy,
+                peak_entropy: s.peak().map(|p| p.entropy).unwrap_or(s.entropy),
+                peak_offset: s.peak().map(|p| format!("{:#x}", p.offset)),
+            })
+            .collect(),
+        findings: r
+            .findings
+            .iter()
+            .map(|f| FindingOut {
+                kind: f.kind.as_str(),
+                section: f.section.clone(),
+                detail: f.detail.clone(),
+                strength: f.strength.as_str(),
+            })
+            .collect(),
+        warnings: r.warnings.clone(),
+    }
+}
+
+#[derive(Serialize)]
+pub struct MemberOut {
+    name: String,
+    offset: u64,
+    size: u64,
+    mtime: u64,
+    symbols: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct ArchiveOut {
+    schema: &'static str,
+    flavor: &'static str,
+    thin: bool,
+    members: Vec<MemberOut>,
+    warnings: Vec<String>,
+}
+
+pub fn archive(a: &r12e_format::archive::Archive) -> ArchiveOut {
+    ArchiveOut {
+        schema: SCHEMA,
+        flavor: a.flavor.as_str(),
+        thin: a.thin,
+        members: a
+            .members
+            .iter()
+            .enumerate()
+            .map(|(n, m)| MemberOut {
+                name: m.name.clone(),
+                offset: m.offset,
+                size: m.size,
+                mtime: m.mtime,
+                symbols: a.symbols_of(n).into_iter().map(str::to_string).collect(),
+            })
+            .collect(),
+        warnings: a.warnings.clone(),
+    }
+}

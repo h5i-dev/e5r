@@ -715,7 +715,9 @@ impl<'a> TypeTable<'a> {
                     let (Some(_attributes), Some(ty)) = (r.u16(), r.u32()) else {
                         return;
                     };
-                    let Some(offset) = numeric(&mut r) else { return };
+                    let Some(offset) = numeric(&mut r) else {
+                        return;
+                    };
                     if let Some(id) = self.build(ty, types, made, depth + 1) {
                         out.members.push(Field {
                             name: types.name_of(id).replace(' ', "_"),

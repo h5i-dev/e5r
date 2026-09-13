@@ -226,6 +226,28 @@ pub enum Command {
         #[arg(short, long)]
         command: Vec<String>,
     },
+    /// Report an overlay, section entropy, and what they suggest.
+    ///
+    /// Findings are observations with a strength, never a verdict: a section
+    /// that is writable and executable is a fact, and what put it there is
+    /// not. A packer is named only when a section carries that packer's own
+    /// signature.
+    Overlay {
+        #[command(flatten)]
+        common: Common,
+    },
+    /// List the members of an `ar` archive.
+    ///
+    /// An archive holds objects rather than being one, so it is not loaded:
+    /// picking a member silently would make every later answer about bytes
+    /// the caller did not choose.
+    Archive {
+        #[command(flatten)]
+        common: Common,
+        /// Also list the symbols each member defines.
+        #[arg(long)]
+        symbols: bool,
+    },
     /// Write a completion script for a shell.
     ///
     /// Generated from the command tree, so it cannot describe a command that
@@ -318,6 +340,8 @@ impl Command {
                 unreachable!("handled before a file is opened")
             }
             Command::Vtables { common, .. }
+            | Command::Overlay { common, .. }
+            | Command::Archive { common, .. }
             | Command::Emulate { common, .. }
             | Command::Query { common, .. }
             | Command::Sig { common, .. }
@@ -377,6 +401,10 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
     // Memory-mapped: opening a 500 MB binary should not copy it.
     let data = map_file(&file).map_err(|e| format!("{}: {e}", common.file.display()))?;
 
+    if let Command::Archive { common, symbols } = &cli.command {
+        return print::archive(w, &data, *symbols, common.json);
+    }
+
     let arch = match &common.arch {
         Some(a) => Some(
             a.parse::<Arch>()
@@ -401,6 +429,7 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
         Command::Symbols(c) => return print::symbols(w, &object, c.json),
         Command::Imports(c) => return print::imports(w, &object, c.json),
         Command::Exports(c) => return print::exports(w, &object, c.json),
+        Command::Overlay { common } => return print::overlay(w, &object, &data, common.json),
         _ => {}
     }
 
@@ -452,9 +481,7 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             target,
             bytes,
         } => print::disas(w, &program, target, *bytes, common.json),
-        Command::Decompile { common, target } => {
-            print::decompile(w, &program, target, common.json)
-        }
+        Command::Decompile { common, target } => print::decompile(w, &program, target, common.json),
         Command::Shapes { common, target } => print::shapes(w, &program, target, common.json),
         Command::Emulate {
             common,
@@ -476,7 +503,11 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             SigCommand::Create { out } => {
                 let library = r12e_api::collect_signatures(
                     &program,
-                    &common.file.file_name().unwrap_or_default().to_string_lossy(),
+                    &common
+                        .file
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy(),
                 );
                 match out {
                     Some(path) => {

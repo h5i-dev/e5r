@@ -14,7 +14,6 @@ use std::collections::BTreeMap;
 use r12e_core::{Addr, Endian, Reader};
 use r12e_types::ctype::{Composite, Enumeration, Field, Signature, Type, TypeId, Types};
 
-
 /// A cursor over a debug section.
 ///
 /// The core reader labels every read for its error messages; DWARF reads
@@ -65,7 +64,10 @@ impl<'a> Cur<'a> {
     }
     fn cstr(&mut self) -> Option<String> {
         let at = self.0.pos();
-        let bytes = self.0.cstr_at("dwarf", at, self.0.remaining() as u64).ok()?;
+        let bytes = self
+            .0
+            .cstr_at("dwarf", at, self.0.remaining() as u64)
+            .ok()?;
         let out = String::from_utf8_lossy(bytes).into_owned();
         let _ = self.0.seek("dwarf", at + bytes.len() as u64 + 1);
         Some(out)
@@ -438,9 +440,7 @@ impl Resolver<'_> {
             Some(Value::Unsigned(v)) => Some(*v),
             _ => None,
         };
-        let returns = entry
-            .reference(DW_AT_TYPE)
-            .and_then(|r| self.type_at(r, 0));
+        let returns = entry.reference(DW_AT_TYPE).and_then(|r| self.type_at(r, 0));
         let mut signature = Signature {
             returns,
             ..Default::default()
@@ -573,9 +573,7 @@ impl Resolver<'_> {
             DW_TAG_STRUCTURE_TYPE | DW_TAG_UNION_TYPE | DW_TAG_CLASS_TYPE => {
                 // Reserved first, so a field pointing back at this structure
                 // finds it instead of recursing forever.
-                let placeholder = self
-                    .types
-                    .reserve(name.as_deref().unwrap_or("anonymous"));
+                let placeholder = self.types.reserve(name.as_deref().unwrap_or("anonymous"));
                 self.made.insert(at, placeholder);
                 let mut fields = Vec::new();
                 let children: Vec<(usize, Entry)> = self
@@ -777,12 +775,7 @@ fn offset(reader: &mut Cur<'_>, sixty_four: bool) -> Option<u64> {
 }
 
 /// Read one attribute value in its form.
-fn read_form(
-    reader: &mut Cur<'_>,
-    form: u64,
-    implicit: i64,
-    unit: &mut Unit<'_>,
-) -> Option<Value> {
+fn read_form(reader: &mut Cur<'_>, form: u64, implicit: i64, unit: &mut Unit<'_>) -> Option<Value> {
     Some(match form {
         DW_FORM_ADDR => Value::Address(Addr(match unit.address_size {
             4 => reader.u32()? as u64,
@@ -861,9 +854,7 @@ fn read_form(
             return read_form(reader, actual, 0, unit);
         }
         DW_FORM_LOCLISTX | DW_FORM_RNGLISTX => Value::Unsigned(reader.uleb128()?),
-        DW_FORM_REF_SUP4 | DW_FORM_STRP_SUP => {
-            Value::Unsigned(offset(reader, unit.sixty_four)?)
-        }
+        DW_FORM_REF_SUP4 | DW_FORM_STRP_SUP => Value::Unsigned(offset(reader, unit.sixty_four)?),
         // A form this does not know cannot be skipped by length, so the unit
         // stops here rather than reading garbage as attributes.
         _ => return None,
@@ -1002,8 +993,8 @@ fn line_program(
                 DW_LNS_NEGATE_STMT => state.statement = !state.statement,
                 DW_LNS_CONST_ADD_PC => {
                     let adjusted = (255 - opcode_base) as i64;
-                    state.address += (adjusted / line_range) as u64
-                        * minimum_instruction_length.max(1) as u64;
+                    state.address +=
+                        (adjusted / line_range) as u64 * minimum_instruction_length.max(1) as u64;
                 }
                 DW_LNS_FIXED_ADVANCE_PC => state.address += reader.u16()? as u64,
                 _ => {
@@ -1146,10 +1137,7 @@ impl LineState {
 fn emit(state: &mut LineState, files: &[String], out: &mut Vec<LineRow>) {
     out.push(LineRow {
         addr: Addr(state.address),
-        file: files
-            .get(state.file as usize)
-            .cloned()
-            .unwrap_or_default(),
+        file: files.get(state.file as usize).cloned().unwrap_or_default(),
         line: state.line,
         column: state.column,
         end: state.end,
