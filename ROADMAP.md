@@ -9,19 +9,20 @@ rather than argued about again.
 | Part | State |
 | --- | --- |
 | workspace, guards, fixtures, CI | built (M0) |
-| ELF loader with provenance-tagged hints | built (M1) |
 | ELF, PE and COFF, Mach-O, raw | built (M1) |
 | AArch64 decoder | built, objdump parity over 1.43M instructions, 99.87% decoded |
 | x86-64 decoder | built, llvm-objdump parity over 4,760 instructions, 100% decoded |
-| SLEIGH runtime and compiler | not started |
-| functions, CFG, xrefs, strings, jump tables | built and parallel (M3) |
-| demanglers | Itanium, Rust (both schemes), MSVC names (M5) |
+| SLEIGH runtime and compiler | not started (M2) |
+| functions, CFG, xrefs, strings, jump tables, no-return | built and parallel (M3) |
 | IR, SSA, types, decompiler | not started (M4 to M6) |
+| demanglers | Itanium, Rust both schemes, MSVC names (M5) |
 | annotation log, content anchors, git merge | built (M7) |
 | CLI with JSON on every command | built (M8) |
 | MCP server | built (M9) |
 | binary diff | built (M10) |
 | patch, signatures, emulation, queries | not started (M10) |
+| benchmarks and scorecard | built (M11) |
+| fuzzing, coverage and mutation tooling | built (M12); packaging not started |
 
 The measured numbers live in [`docs/scorecard.md`](docs/scorecard.md),
 including the ones that go against us. In short: `libc.so.6` analyzes in 0.10s
