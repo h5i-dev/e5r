@@ -13,6 +13,7 @@ rather than argued about again.
 | AArch64 decoder | built, objdump parity over 1.43M instructions, 99.87% decoded |
 | x86-64 decoder | built, llvm-objdump parity over 4,760 instructions, 100% decoded |
 | SLEIGH runtime and compiler | not started (M2) |
+| i386, ARM32 and Thumb-2 decoders | not started (M2) |
 | functions, CFG, xrefs, strings, jump tables, no-return | built and parallel (M3) |
 | IR, lifters, interpreter, SSA, dataflow | built for AArch64 and x86-64, gated against real execution (M4) |
 | stack promotion, ABI model, algebraic rules | built (M4) |
@@ -185,6 +186,14 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       decoded: it is a separate architecture's worth of encodings and the
       coverage number records its absence.
 - [ ] ARM32 and Thumb-2, including interworking and the IT block.
+- [ ] i386, the 32-bit mode of the x86 decoder. The loader already recognizes
+      the architecture and the decoder then declines every instruction, which
+      is the worst of both: a file that opens and says nothing. The work is the
+      mode rather than the opcodes, since the table is shared: no REX, a
+      different default operand and address size, `0x66` and `0x67` meaning the
+      opposite of what they mean in long mode, and the 16-bit addressing forms
+      long mode dropped. The gate is the existing x86 parity test with a
+      32-bit corpus added.
 - [x] Differential comparison of each decoder against `objdump` over the fixture
       corpus and the system binaries. Parity is a gate with no allowance;
       undecoded encodings are a separate number with a floor that only moves up.
