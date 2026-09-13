@@ -220,6 +220,55 @@ pub enum Op {
     /// Logical not.
     BoolNot,
 
+    /// Floating point addition, at the width of its operands.
+    FloatAdd,
+    /// Floating point subtraction.
+    FloatSub,
+    /// Floating point multiplication.
+    FloatMul,
+    /// Floating point division.
+    FloatDiv,
+    /// Fused multiply-add: `in0 * in1 + in2`, rounded once.
+    FloatMulAdd,
+    /// Sign flip.
+    FloatNeg,
+    /// Magnitude.
+    FloatAbs,
+    /// Square root.
+    FloatSqrt,
+    /// Larger of two, the IEEE rule rather than a comparison.
+    FloatMax,
+    /// Smaller of two.
+    FloatMin,
+    /// Equality, false when either side is not a number.
+    FloatEqual,
+    /// Inequality, true when either side is not a number.
+    FloatNotEqual,
+    /// Ordered less than.
+    FloatLess,
+    /// Ordered less than or equal.
+    FloatLessEqual,
+    /// True when the value is not a number.
+    FloatNan,
+    /// Round toward zero, still floating point.
+    FloatTrunc,
+    /// Round to nearest, ties to even.
+    FloatRound,
+    /// Round up.
+    FloatCeil,
+    /// Round down.
+    FloatFloor,
+    /// Signed integer to floating point.
+    IntToFloat,
+    /// Unsigned integer to floating point.
+    UIntToFloat,
+    /// Floating point to signed integer, truncating toward zero.
+    FloatToInt,
+    /// Floating point to unsigned integer.
+    FloatToUInt,
+    /// Change of floating point width.
+    FloatConvert,
+
     /// Concatenate: `out = (in0 << (in1.size * 8)) | in1`.
     Piece,
     /// Extract: `out = in0 >> (in1 * 8)`, truncated to `out.size`.
@@ -248,6 +297,19 @@ impl Op {
             | Op::IntNegate
             | Op::IntZExt
             | Op::IntSExt
+            | Op::FloatNeg
+            | Op::FloatAbs
+            | Op::FloatSqrt
+            | Op::FloatNan
+            | Op::FloatTrunc
+            | Op::FloatRound
+            | Op::FloatCeil
+            | Op::FloatFloor
+            | Op::IntToFloat
+            | Op::UIntToFloat
+            | Op::FloatToInt
+            | Op::FloatToUInt
+            | Op::FloatConvert
             | Op::BoolNot
             | Op::PopCount
             | Op::LzCount
@@ -258,6 +320,7 @@ impl Op {
             | Op::Return => 1,
             Op::Unimplemented => 0,
             Op::IntDiv128 | Op::IntSDiv128 | Op::IntRem128 | Op::IntSRem128 => 3,
+            Op::FloatMulAdd => 3,
             _ => 2,
         }
     }
@@ -281,6 +344,30 @@ impl Op {
             Op::IntSDiv => "/s",
             Op::IntRem => "%u",
             Op::IntSRem => "%s",
+            Op::FloatAdd => "f+",
+            Op::FloatSub => "f-",
+            Op::FloatMul => "f*",
+            Op::FloatDiv => "f/",
+            Op::FloatMulAdd => "fmuladd",
+            Op::FloatNeg => "fneg",
+            Op::FloatAbs => "fabs",
+            Op::FloatSqrt => "fsqrt",
+            Op::FloatMax => "fmax",
+            Op::FloatMin => "fmin",
+            Op::FloatEqual => "f==",
+            Op::FloatNotEqual => "f!=",
+            Op::FloatLess => "f<",
+            Op::FloatLessEqual => "f<=",
+            Op::FloatNan => "fnan",
+            Op::FloatTrunc => "ftrunc",
+            Op::FloatRound => "fround",
+            Op::FloatCeil => "fceil",
+            Op::FloatFloor => "ffloor",
+            Op::IntToFloat => "s2f",
+            Op::UIntToFloat => "u2f",
+            Op::FloatToInt => "f2s",
+            Op::FloatToUInt => "f2u",
+            Op::FloatConvert => "f2f",
             Op::IntMulHigh => "*hu",
             Op::IntSMulHigh => "*hs",
             Op::IntDiv128 => "/u128",

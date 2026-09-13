@@ -39,6 +39,8 @@ struct Case {
 
 enum Arg {
     Number(u64),
+    /// A floating argument, as its bit pattern and its width.
+    Float(u64, u8),
     Symbol(String),
 }
 
@@ -57,7 +59,7 @@ fn cases() -> Vec<Case> {
         let args = parts
             .map(|t| match t.strip_prefix('&') {
                 Some(s) => Arg::Symbol(s.to_string()),
-                None => Arg::Number(parse_number(t)),
+                None => parse_argument(t),
             })
             .collect();
         out.push(Case {
@@ -67,6 +69,25 @@ fn cases() -> Vec<Case> {
         });
     }
     out
+}
+
+/// A floating literal is one with a point or an exponent; a trailing `f` makes
+/// it single precision, exactly as the C the driver was built from reads it.
+fn parse_argument(t: &str) -> Arg {
+    let single = t.ends_with('f') && !t.starts_with("0x");
+    let body = if single { &t[..t.len() - 1] } else { t };
+    let floating = !body.starts_with("0x")
+        && (body.contains('.') || body.contains('e') || body.contains('E'));
+    if floating {
+        if let Ok(v) = body.parse::<f64>() {
+            return if single {
+                Arg::Float((v as f32).to_bits() as u64, 4)
+            } else {
+                Arg::Float(v.to_bits(), 8)
+            };
+        }
+    }
+    Arg::Number(parse_number(t))
 }
 
 fn parse_number(t: &str) -> u64 {
@@ -83,6 +104,10 @@ fn parse_number(t: &str) -> u64 {
 /// holds: the C cast to `u64` widens by the function's own return type.
 fn widen(raw: u64, kind: &str) -> u64 {
     let (bits, signed) = match kind {
+        // A floating result is compared as the bits the register holds, which
+        // the driver recorded the same way.
+        "f32" => (32, false),
+        "f64" => return raw,
         "u8" => (8, false),
         "i8" => (8, true),
         "u16" => (16, false),
@@ -104,42 +129,85 @@ fn widen(raw: u64, kind: &str) -> u64 {
 }
 
 /// Set up the machine for a call and run it, returning the result register.
-fn call(p: &Program, entry: Addr, args: &[u64]) -> (u64, r12e_ir::Outcome) {
+///
+/// Integer and floating arguments have separate sequences of registers, which
+/// is how both calling conventions work.
+fn call(p: &Program, entry: Addr, args: &[Value], float_result: bool) -> (u64, r12e_ir::Outcome) {
     let mut m = Machine::over(&p.object.memory);
     m.budget = 1 << 24;
     // Real storage under the stack pointer, so a spill and its reload agree.
     m.write_mem(STACK - 0x8000, &[0u8; 0x10000]);
     match p.object.arch {
         Arch::AArch64 => {
-            use r12e_ir::lift::aarch64::{gpr_offset, sp_offset};
-            for (i, a) in args.iter().enumerate().take(8) {
-                m.set_reg(gpr_offset(i as u8), 8, *a);
+            use r12e_ir::lift::aarch64::{gpr_offset, sp_offset, vec_offset};
+            let (mut n, mut f) = (0u8, 0u8);
+            for a in args {
+                match a {
+                    Value::Int(v) if n < 8 => {
+                        m.set_reg(gpr_offset(n), 8, *v);
+                        n += 1;
+                    }
+                    Value::Int(_) => {}
+                    Value::Float(v, size) if f < 8 => {
+                        m.set_reg(vec_offset(f), *size, *v);
+                        f += 1;
+                    }
+                    Value::Float(..) => {}
+                }
             }
             m.set_reg(sp_offset(), 8, STACK);
             // The link register holds an address that is not code, so the
             // outermost return stops rather than running on.
             m.set_reg(gpr_offset(30), 8, SENTINEL);
             let outcome = run_with(&mut m, &p.object.memory, &p.object.arch, entry, DEPTH);
-            (m.reg(gpr_offset(0), 8), outcome)
+            let result = if float_result {
+                m.reg(vec_offset(0), 8)
+            } else {
+                m.reg(gpr_offset(0), 8)
+            };
+            (result, outcome)
         }
         _ => {
-            use r12e_ir::lift::x86::{gpr_offset, sp_offset};
-            // rdi, rsi, rdx, rcx, r8, r9, then the stack.
+            use r12e_ir::lift::x86::{gpr_offset, sp_offset, vec_offset};
+            // rdi, rsi, rdx, rcx, r8, r9 for integers, xmm0 onward for floats.
             const ORDER: [u8; 6] = [7, 6, 2, 1, 8, 9];
-            for (i, a) in args.iter().enumerate().take(6) {
-                m.set_reg(gpr_offset(ORDER[i]), 8, *a);
-            }
             let sp = STACK;
             m.set_reg(sp_offset(), 8, sp);
-            // The return address the callee pops, then arguments seven onward.
             m.write_mem(sp, &SENTINEL.to_le_bytes());
-            for (i, a) in args.iter().enumerate().skip(6) {
-                m.write_mem(sp + 8 + (i as u64 - 6) * 8, &a.to_le_bytes());
+            let (mut n, mut f, mut stacked) = (0usize, 0u8, 0u64);
+            for a in args {
+                match a {
+                    Value::Int(v) if n < 6 => {
+                        m.set_reg(gpr_offset(ORDER[n]), 8, *v);
+                        n += 1;
+                    }
+                    Value::Int(v) => {
+                        m.write_mem(sp + 8 + stacked * 8, &v.to_le_bytes());
+                        stacked += 1;
+                    }
+                    Value::Float(v, size) if f < 8 => {
+                        m.set_reg(vec_offset(f), *size, *v);
+                        f += 1;
+                    }
+                    Value::Float(..) => {}
+                }
             }
             let outcome = run_with(&mut m, &p.object.memory, &p.object.arch, entry, DEPTH);
-            (m.reg(gpr_offset(0), 8), outcome)
+            let result = if float_result {
+                m.reg(vec_offset(0), 8)
+            } else {
+                m.reg(gpr_offset(0), 8)
+            };
+            (result, outcome)
         }
     }
+}
+
+/// An argument as the machine takes it.
+#[derive(Debug, Clone, Copy)]
+enum Value {
+    Int(u64),
+    Float(u64, u8),
 }
 
 fn load(name: &str) -> Option<Program> {
@@ -179,16 +247,18 @@ fn check(binary: &str) {
             incomplete.push(format!("{}: no symbol", case.name));
             continue;
         };
-        let args: Vec<u64> = case
+        let args: Vec<Value> = case
             .args
             .iter()
             .map(|a| match a {
-                Arg::Number(v) => *v,
-                Arg::Symbol(s) => table.get(s).map(|a| a.get()).unwrap_or(0),
+                Arg::Number(v) => Value::Int(*v),
+                Arg::Float(v, size) => Value::Float(*v, *size),
+                Arg::Symbol(s) => Value::Int(table.get(s).map(|a| a.get()).unwrap_or(0)),
             })
             .collect();
         let expected = u64::from_le_bytes(recorded[n * 8..n * 8 + 8].try_into().unwrap());
-        let (raw, outcome) = call(&p, *entry, &args);
+        let floating = case.kind.starts_with('f') && case.kind != "flag";
+        let (raw, outcome) = call(&p, *entry, &args, floating);
         if outcome.stop != Stop::Returned {
             incomplete.push(format!(
                 "{}({:?}) stopped with {:?}, unlifted {:?}",

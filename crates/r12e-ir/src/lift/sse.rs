@@ -30,10 +30,15 @@ fn vector(op: &Operand) -> Option<u8> {
 }
 
 /// True when the SIMD lifter handles this instruction.
+///
+/// A conversion can name no vector register at all — `cvttsd2si rax, [rbp-8]`
+/// reads memory and writes a general register — so the mnemonic decides for
+/// those.
 pub fn handles(i: &Insn) -> bool {
     i.operands()
         .iter()
         .any(|o| matches!(o, Operand::Reg(r) if r.class == RegClass::Vec))
+        || i.mnemonic.starts_with("cvt")
 }
 
 /// Read sixteen bytes of a source operand into two temporaries, whichever
@@ -71,6 +76,10 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
     let ops = i.operands();
     let at = i.next();
     let m = i.mnemonic;
+
+    if let Some(l) = scalar_float(&mut b, i) {
+        return l;
+    }
 
     match m {
         // Whole-register moves, aligned or not: the IR does not model the
@@ -325,6 +334,133 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
             }
             b.finish(true)
         }
+        // Packing with saturation: two registers of wide lanes become one of
+        // narrow ones, each clamped to what the narrow lane can hold.
+        "packssdw" | "packsswb" | "packusdw" | "packuswb" => {
+            let (Some(d), Some(src)) = (ops.first().and_then(vector), ops.get(1)) else {
+                return b.unimplemented();
+            };
+            let wide: u8 = if m.ends_with("dw") { 4 } else { 2 };
+            let narrow = wide / 2;
+            let signed = m.starts_with("packs");
+            let Some(y) = read_wide(&mut b, src, at) else {
+                return b.unimplemented();
+            };
+            let source = [b.eval(Op::Copy, 8, &[y[0]]), b.eval(Op::Copy, 8, &[y[1]])];
+            let per = 16 / wide as u64;
+            let mut packed = Vec::new();
+            for n in 0..per {
+                let v = lane(d, n, wide);
+                packed.push(saturate(&mut b, v, wide, narrow, signed));
+            }
+            for n in 0..per {
+                let v = piece(&mut b, source, n, wide);
+                packed.push(saturate(&mut b, v, wide, narrow, signed));
+            }
+            for (n, v) in packed.into_iter().enumerate() {
+                b.emit(Op::Copy, Some(lane(d, n as u64, narrow)), &[v]);
+            }
+            b.finish(true)
+        }
+        // Shuffling one half's words, leaving the other half alone.
+        "pshuflw" | "pshufhw" => {
+            let (Some(d), Some(src), Some(order)) =
+                (ops.first().and_then(vector), ops.get(1), ops.get(2))
+            else {
+                return b.unimplemented();
+            };
+            let control = match order {
+                Operand::Imm(v) => *v as u64,
+                Operand::UImm(v) => *v,
+                Operand::Count(v) => *v as u64,
+                _ => return b.unimplemented(),
+            };
+            let Some(y) = read_wide(&mut b, src, at) else {
+                return b.unimplemented();
+            };
+            let source = [b.eval(Op::Copy, 8, &[y[0]]), b.eval(Op::Copy, 8, &[y[1]])];
+            let base = if m == "pshufhw" { 4u64 } else { 0 };
+            let mut picked = Vec::new();
+            for n in 0..4u64 {
+                let from = base + ((control >> (n * 2)) & 3);
+                picked.push(piece(&mut b, source, from, 2));
+            }
+            // The untouched half is copied across, because the source may be
+            // memory or another register.
+            let other = if m == "pshufhw" { 0u64 } else { 4 };
+            let mut kept = Vec::new();
+            for n in 0..4u64 {
+                kept.push(piece(&mut b, source, other + n, 2));
+            }
+            for (n, v) in picked.into_iter().enumerate() {
+                let named = b.eval(Op::Copy, 2, &[v]);
+                b.emit(Op::Copy, Some(lane(d, base + n as u64, 2)), &[named]);
+            }
+            for (n, v) in kept.into_iter().enumerate() {
+                let named = b.eval(Op::Copy, 2, &[v]);
+                b.emit(Op::Copy, Some(lane(d, other + n as u64, 2)), &[named]);
+            }
+            b.finish(true)
+        }
+        // One lane out to a general register.
+        "pextrw" | "pextrb" | "pextrd" | "pextrq" => {
+            let size: u8 = match m {
+                "pextrb" => 1,
+                "pextrw" => 2,
+                "pextrd" => 4,
+                _ => 8,
+            };
+            let (Some(dst), Some(s), Some(index)) = (ops.first(), ops.get(1).and_then(vector), ops.get(2))
+            else {
+                return b.unimplemented();
+            };
+            let n = match index {
+                Operand::Imm(v) => *v as u64,
+                Operand::UImm(v) => *v,
+                Operand::Count(v) => *v as u64,
+                _ => return b.unimplemented(),
+            } % (16 / size as u64);
+            let value = lane(s, n, size);
+            match dst {
+                Operand::Reg(r) if r.class != RegClass::Vec => {
+                    // The destination is a full register and the lane is
+                    // zero-extended into it.
+                    let dest_size = if size == 8 { 8 } else { 4 };
+                    let widened = if size == dest_size {
+                        value
+                    } else {
+                        b.eval(Op::IntZExt, dest_size, &[value])
+                    };
+                    b.emit(
+                        Op::Copy,
+                        Some(Varnode::register(
+                            crate::lift::x86::gpr_offset(r.num),
+                            dest_size,
+                        )),
+                        &[widened],
+                    );
+                    if dest_size == 4 {
+                        b.emit(
+                            Op::Copy,
+                            Some(Varnode::register(
+                                crate::lift::x86::gpr_offset(r.num) + 4,
+                                4,
+                            )),
+                            &[Varnode::constant(0, 4)],
+                        );
+                    }
+                    b.finish(true)
+                }
+                Operand::Mem(mem) => {
+                    let Some(addr) = address(&mut b, mem, at) else {
+                        return b.unimplemented();
+                    };
+                    b.emit(Op::Store, None, &[addr, value]);
+                    b.finish(true)
+                }
+                _ => b.unimplemented(),
+            }
+        }
         // Shifts of whole lanes by an immediate.
         "psllq" | "psrlq" | "pslld" | "psrld" | "psllw" | "psrlw" | "psrad" | "psraw" => {
             let (Some(d), Some(amount)) = (ops.first().and_then(vector), ops.get(1)) else {
@@ -384,6 +520,267 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
     }
 }
 
+/// The scalar floating point instructions, which operate on the low lane and
+/// leave the rest of the register alone.
+fn scalar_float(b: &mut Builder, i: &Insn) -> Option<Lifted> {
+    let m = i.mnemonic;
+    let ops = i.operands();
+    let at = i.next();
+    // The trailing `ss` or `sd` says single or double, scalar either way.
+    let size: u8 = if m.ends_with("ss") {
+        4
+    } else if m.ends_with("sd") {
+        8
+    } else if m.ends_with("ps") {
+        4
+    } else if m.ends_with("pd") {
+        8
+    } else {
+        0
+    };
+
+    // The scalar moves, which behave differently from register and from
+    // memory: from memory the rest of the register is cleared.
+    if matches!(m, "movss" | "movsd") {
+        let (dst, src) = (ops.first()?, ops.get(1)?);
+        let value = match src {
+            Operand::Reg(r) if r.class == RegClass::Vec => lane(r.num, 0, size),
+            Operand::Mem(mem) => {
+                let addr = address(b, mem, at)?;
+                b.eval(Op::Load, size, &[addr])
+            }
+            _ => return None,
+        };
+        match dst {
+            Operand::Reg(d) if d.class == RegClass::Vec => {
+                b.emit(Op::Copy, Some(lane(d.num, 0, size)), &[value]);
+                if matches!(src, Operand::Mem(_)) {
+                    let mut off = size as u64;
+                    while off < 16 {
+                        let chunk = if 16 - off >= 8 { 8 } else { (16 - off) as u8 };
+                        b.emit(
+                            Op::Copy,
+                            Some(Varnode::register(vec_offset(d.num) + off, chunk)),
+                            &[Varnode::constant(0, chunk)],
+                        );
+                        off += chunk as u64;
+                    }
+                }
+            }
+            Operand::Mem(mem) => {
+                let addr = address(b, mem, at)?;
+                b.emit(Op::Store, None, &[addr, value]);
+            }
+            _ => return None,
+        }
+        return Some(b.clone_finish());
+    }
+
+    let arithmetic = matches!(
+        &m[..m.len().saturating_sub(2)],
+        "add" | "sub" | "mul" | "div" | "min" | "max" | "sqrt"
+    );
+    if arithmetic && size != 0 {
+        let d = match ops.first()? {
+            Operand::Reg(r) if r.class == RegClass::Vec => r.num,
+            _ => return None,
+        };
+        let packed = m.ends_with("ps") || m.ends_with("pd");
+        let count = if packed { 16 / size as u64 } else { 1 };
+        let y = read_wide(b, ops.get(1)?, at)?;
+        let source = [b.eval(Op::Copy, 8, &[y[0]]), b.eval(Op::Copy, 8, &[y[1]])];
+        for n in 0..count {
+            let x = lane(d, n, size);
+            let c = piece(b, source, n, size);
+            let op = match &m[..m.len() - 2] {
+                "add" => Op::FloatAdd,
+                "sub" => Op::FloatSub,
+                "mul" => Op::FloatMul,
+                "div" => Op::FloatDiv,
+                "min" => Op::FloatMin,
+                "max" => Op::FloatMax,
+                _ => Op::FloatSqrt,
+            };
+            let r = if op == Op::FloatSqrt {
+                b.eval(op, size, &[c])
+            } else {
+                b.eval(op, size, &[x, c])
+            };
+            b.emit(Op::Copy, Some(lane(d, n, size)), &[r]);
+        }
+        return Some(b.clone_finish());
+    }
+
+    // The ordered and unordered compares, which write the integer flags.
+    if matches!(m, "ucomiss" | "ucomisd" | "comiss" | "comisd") {
+        let width: u8 = if m.ends_with("ss") { 4 } else { 8 };
+        let d = match ops.first()? {
+            Operand::Reg(r) if r.class == RegClass::Vec => r.num,
+            _ => return None,
+        };
+        let x = lane(d, 0, width);
+        let c = match ops.get(1)? {
+            Operand::Reg(r) if r.class == RegClass::Vec => lane(r.num, 0, width),
+            Operand::Mem(mem) => {
+                let addr = address(b, mem, at)?;
+                b.eval(Op::Load, width, &[addr])
+            }
+            _ => return None,
+        };
+        use crate::lift::x86::{flag_af, flag_cf, flag_of, flag_pf, flag_sf, flag_zf};
+        // Unordered sets all three of zero, parity and carry; otherwise they
+        // carry the comparison and the other three are cleared.
+        let nan_x = b.eval(Op::FloatNan, 1, &[x]);
+        let nan_y = b.eval(Op::FloatNan, 1, &[c]);
+        let unordered = b.eval(Op::BoolOr, 1, &[nan_x, nan_y]);
+        let less = b.eval(Op::FloatLess, 1, &[x, c]);
+        let equal = b.eval(Op::FloatEqual, 1, &[x, c]);
+        let zf = b.eval(Op::BoolOr, 1, &[unordered, equal]);
+        let cf = b.eval(Op::BoolOr, 1, &[unordered, less]);
+        b.emit(Op::Copy, Some(flag_zf()), &[zf]);
+        b.emit(Op::Copy, Some(flag_cf()), &[cf]);
+        b.emit(Op::Copy, Some(flag_pf()), &[unordered]);
+        for f in [flag_of(), flag_sf(), flag_af()] {
+            b.emit(Op::Copy, Some(f), &[Varnode::constant(0, 1)]);
+        }
+        return Some(b.clone_finish());
+    }
+
+    // The compares that write a mask rather than flags: the mnemonic carries
+    // the predicate.
+    if m.starts_with("cmp") && size != 0 && m.len() > 5 {
+        let predicate = &m[3..m.len() - 2];
+        let packed = m.ends_with("ps") || m.ends_with("pd");
+        let d = match ops.first()? {
+            Operand::Reg(r) if r.class == RegClass::Vec => r.num,
+            _ => return None,
+        };
+        let y = read_wide(b, ops.get(1)?, at)?;
+        let source = [b.eval(Op::Copy, 8, &[y[0]]), b.eval(Op::Copy, 8, &[y[1]])];
+        let count = if packed { 16 / size as u64 } else { 1 };
+        for n in 0..count {
+            let x = lane(d, n, size);
+            let c = piece(b, source, n, size);
+            let truth = match predicate {
+                "eq" => b.eval(Op::FloatEqual, 1, &[x, c]),
+                "lt" => b.eval(Op::FloatLess, 1, &[x, c]),
+                "le" => b.eval(Op::FloatLessEqual, 1, &[x, c]),
+                "neq" => b.eval(Op::FloatNotEqual, 1, &[x, c]),
+                "nlt" => {
+                    let less = b.eval(Op::FloatLess, 1, &[x, c]);
+                    b.eval(Op::BoolNot, 1, &[less])
+                }
+                "nle" => {
+                    let le = b.eval(Op::FloatLessEqual, 1, &[x, c]);
+                    b.eval(Op::BoolNot, 1, &[le])
+                }
+                "unord" => {
+                    let a = b.eval(Op::FloatNan, 1, &[x]);
+                    let e = b.eval(Op::FloatNan, 1, &[c]);
+                    b.eval(Op::BoolOr, 1, &[a, e])
+                }
+                "ord" => {
+                    let a = b.eval(Op::FloatNan, 1, &[x]);
+                    let e = b.eval(Op::FloatNan, 1, &[c]);
+                    let either = b.eval(Op::BoolOr, 1, &[a, e]);
+                    b.eval(Op::BoolNot, 1, &[either])
+                }
+                _ => return None,
+            };
+            let mask = all_bits(b, truth, size);
+            b.emit(Op::Copy, Some(lane(d, n, size)), &[mask]);
+        }
+        return Some(b.clone_finish());
+    }
+
+    // The conversions.
+    let converted = match m {
+        "cvtsi2ss" | "cvtsi2sd" => {
+            let to: u8 = if m.ends_with("ss") { 4 } else { 8 };
+            let d = match ops.first()? {
+                Operand::Reg(r) if r.class == RegClass::Vec => r.num,
+                _ => return None,
+            };
+            let src = match ops.get(1)? {
+                Operand::Reg(r) => Varnode::register(
+                    crate::lift::x86::gpr_offset(r.num),
+                    if r.width == r12e_arch::Width::W64 { 8 } else { 4 },
+                ),
+                Operand::Mem(mem) => {
+                    let addr = address(b, mem, at)?;
+                    let bytes = if mem.size == 0 { 4 } else { mem.size as u8 };
+                    b.eval(Op::Load, bytes, &[addr])
+                }
+                _ => return None,
+            };
+            let v = b.eval(Op::IntToFloat, to, &[src]);
+            b.emit(Op::Copy, Some(lane(d, 0, to)), &[v]);
+            true
+        }
+        "cvttss2si" | "cvttsd2si" | "cvtss2si" | "cvtsd2si" => {
+            let from: u8 = if m.contains("ss") { 4 } else { 8 };
+            let (dest, dest_size) = match ops.first()? {
+                Operand::Reg(r) => (
+                    r.num,
+                    if r.width == r12e_arch::Width::W64 { 8u8 } else { 4 },
+                ),
+                _ => return None,
+            };
+            let src = match ops.get(1)? {
+                Operand::Reg(r) if r.class == RegClass::Vec => lane(r.num, 0, from),
+                Operand::Mem(mem) => {
+                    let addr = address(b, mem, at)?;
+                    b.eval(Op::Load, from, &[addr])
+                }
+                _ => return None,
+            };
+            let v = b.eval(Op::FloatToInt, dest_size, &[src]);
+            b.emit(
+                Op::Copy,
+                Some(Varnode::register(
+                    crate::lift::x86::gpr_offset(dest),
+                    dest_size,
+                )),
+                &[v],
+            );
+            if dest_size == 4 {
+                b.emit(
+                    Op::Copy,
+                    Some(Varnode::register(
+                        crate::lift::x86::gpr_offset(dest) + 4,
+                        4,
+                    )),
+                    &[Varnode::constant(0, 4)],
+                );
+            }
+            true
+        }
+        "cvtss2sd" | "cvtsd2ss" => {
+            let (from, to): (u8, u8) = if m == "cvtss2sd" { (4, 8) } else { (8, 4) };
+            let d = match ops.first()? {
+                Operand::Reg(r) if r.class == RegClass::Vec => r.num,
+                _ => return None,
+            };
+            let src = match ops.get(1)? {
+                Operand::Reg(r) if r.class == RegClass::Vec => lane(r.num, 0, from),
+                Operand::Mem(mem) => {
+                    let addr = address(b, mem, at)?;
+                    b.eval(Op::Load, from, &[addr])
+                }
+                _ => return None,
+            };
+            let v = b.eval(Op::FloatConvert, to, &[src]);
+            b.emit(Op::Copy, Some(lane(d, 0, to)), &[v]);
+            true
+        }
+        _ => false,
+    };
+    if converted {
+        return Some(b.clone_finish());
+    }
+    None
+}
+
 /// One lane cut out of a pair of eight-byte temporaries.
 fn piece(b: &mut Builder, source: [Varnode; 2], index: u64, size: u8) -> Varnode {
     let per_half = 8 / size as u64;
@@ -402,6 +799,43 @@ fn piece(b: &mut Builder, source: [Varnode; 2], index: u64, size: u8) -> Varnode
         )
     };
     b.eval(Op::SubPiece, size, &[shifted, Varnode::constant(0, 1)])
+}
+
+/// Clamp a wide lane into a narrow one, which is what packing does.
+fn saturate(b: &mut Builder, v: Varnode, wide: u8, narrow: u8, signed: bool) -> Varnode {
+    let bits = narrow as u64 * 8;
+    let (low, high) = if signed {
+        (
+            (!0u64 << (bits - 1)) & mask(wide),
+            (1u64 << (bits - 1)) - 1,
+        )
+    } else {
+        (0, (1u64 << bits) - 1)
+    };
+    let hi = Varnode::constant(high, wide);
+    let lo = Varnode::constant(low, wide);
+    let above = if signed {
+        b.eval(Op::IntSLess, 1, &[hi, v])
+    } else {
+        b.eval(Op::IntLess, 1, &[hi, v])
+    };
+    let clamped_high = select(b, above, hi, v, wide);
+    let below = if signed {
+        b.eval(Op::IntSLess, 1, &[clamped_high, lo])
+    } else {
+        b.eval(Op::IntLess, 1, &[clamped_high, lo])
+    };
+    let clamped = select(b, below, lo, clamped_high, wide);
+    b.eval(Op::SubPiece, narrow, &[clamped, Varnode::constant(0, 1)])
+}
+
+/// The mask of a value of this many bytes.
+fn mask(size: u8) -> u64 {
+    if size >= 8 {
+        u64::MAX
+    } else {
+        (1u64 << (size as u64 * 8)) - 1
+    }
 }
 
 /// Spread a zero-or-one across a whole lane, which is what a packed compare

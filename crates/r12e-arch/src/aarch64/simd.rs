@@ -96,6 +96,32 @@ pub fn decode(w: u32, addr: Addr) -> Option<Insn> {
     if w & 0x9F3E_0C00 == 0x0E20_0800 {
         return two_reg_misc(w, addr);
     }
+    // Scalar two-register miscellaneous: the conversions that read and write
+    // a vector register rather than a general one.
+    if w & 0xDF3E_0C00 == 0x5E20_0800 {
+        let u = bit(w, 29);
+        let opcode = bits(w, 16, 12);
+        let mnem = match (opcode, u) {
+            (0b11101, 0) => "scvtf",
+            (0b11101, 1) => "ucvtf",
+            (0b11011, 0) => "fcvtzs",
+            (0b11011, 1) => "fcvtzu",
+            (0b11010, 0) => "fcvtns",
+            (0b11010, 1) => "fcvtnu",
+            (0b11100, 0) => "fcvtas",
+            (0b11100, 1) => "fcvtau",
+            _ => return None,
+        };
+        let width = if bit(w, 22) == 1 {
+            Width::W64
+        } else {
+            Width::W32
+        };
+        let mut i = ins(addr, mnem);
+        i.push(Operand::Reg(Reg::vec(bits(w, 4, 0) as u8, width)));
+        i.push(Operand::Reg(Reg::vec(bits(w, 9, 5) as u8, width)));
+        return Some(i);
+    }
     // Scalar pairwise: one register folded to a scalar.
     if w & 0xDF3E_0C00 == 0x5E30_0800 {
         return scalar_pairwise(w, addr);

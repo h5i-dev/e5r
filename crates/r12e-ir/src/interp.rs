@@ -363,6 +363,134 @@ pub fn step(m: &mut Machine<'_>, ir: &IrOp) -> Step {
                 }
             }
         }
+        // Floating point, at the width of the operands. The bits are the
+        // value; nothing here reinterprets a pattern it was not given.
+        Op::FloatAdd
+        | Op::FloatSub
+        | Op::FloatMul
+        | Op::FloatDiv
+        | Op::FloatMax
+        | Op::FloatMin
+        | Op::FloatNeg
+        | Op::FloatAbs
+        | Op::FloatSqrt
+        | Op::FloatTrunc
+        | Op::FloatRound
+        | Op::FloatCeil
+        | Op::FloatFloor => {
+            // A single precision result is computed in single precision, so
+            // the rounding happens where the machine does it.
+            if out.size == 4 {
+                let a = as_f32(x);
+                let c = as_f32(y);
+                let r = match ir.op {
+                    Op::FloatAdd => a + c,
+                    Op::FloatSub => a - c,
+                    Op::FloatMul => a * c,
+                    Op::FloatDiv => a / c,
+                    Op::FloatMax => a.max(c),
+                    Op::FloatMin => a.min(c),
+                    Op::FloatNeg => -a,
+                    Op::FloatAbs => a.abs(),
+                    Op::FloatSqrt => a.sqrt(),
+                    Op::FloatTrunc => a.trunc(),
+                    Op::FloatRound => round_ties_even(a as f64) as f32,
+                    Op::FloatCeil => a.ceil(),
+                    _ => a.floor(),
+                };
+                r.to_bits() as u64
+            } else {
+                let size = ir.input(0).map(|v| v.size).unwrap_or(8);
+                let a = as_f64(x, size);
+                let c = as_f64(y, ir.input(1).map(|v| v.size).unwrap_or(size));
+                let r = match ir.op {
+                    Op::FloatAdd => a + c,
+                    Op::FloatSub => a - c,
+                    Op::FloatMul => a * c,
+                    Op::FloatDiv => a / c,
+                    Op::FloatMax => a.max(c),
+                    Op::FloatMin => a.min(c),
+                    Op::FloatNeg => -a,
+                    Op::FloatAbs => a.abs(),
+                    Op::FloatSqrt => a.sqrt(),
+                    Op::FloatTrunc => a.trunc(),
+                    Op::FloatRound => round_ties_even(a),
+                    Op::FloatCeil => a.ceil(),
+                    _ => a.floor(),
+                };
+                r.to_bits()
+            }
+        }
+        // Fused: one rounding, which is why it is an operation rather than a
+        // multiply followed by an add.
+        Op::FloatMulAdd => {
+            let z = ir.input(2).map(|v| m.read(v)).unwrap_or(0);
+            if out.size == 4 {
+                as_f32(x).mul_add(as_f32(y), as_f32(z)).to_bits() as u64
+            } else {
+                f64::from_bits(x).mul_add(f64::from_bits(y), f64::from_bits(z)).to_bits()
+            }
+        }
+        Op::FloatEqual | Op::FloatNotEqual | Op::FloatLess | Op::FloatLessEqual | Op::FloatNan => {
+            let size = ir.input(0).map(|v| v.size).unwrap_or(8);
+            let a = as_f64(x, size);
+            let c = as_f64(y, ir.input(1).map(|v| v.size).unwrap_or(size));
+            match ir.op {
+                Op::FloatEqual => (a == c) as u64,
+                Op::FloatNotEqual => (a != c) as u64,
+                Op::FloatLess => (a < c) as u64,
+                Op::FloatLessEqual => (a <= c) as u64,
+                _ => a.is_nan() as u64,
+            }
+        }
+        Op::IntToFloat | Op::UIntToFloat => {
+            let size = ir.input(0).map(|v| v.size).unwrap_or(8);
+            if out.size == 4 {
+                let v = if ir.op == Op::IntToFloat {
+                    sext(x, size) as f32
+                } else {
+                    (x & mask_of(ir, 0)) as f32
+                };
+                v.to_bits() as u64
+            } else {
+                let v = if ir.op == Op::IntToFloat {
+                    sext(x, size) as f64
+                } else {
+                    (x & mask_of(ir, 0)) as f64
+                };
+                v.to_bits()
+            }
+        }
+        // Saturating, which is what both architectures do with a value the
+        // integer cannot hold.
+        Op::FloatToInt | Op::FloatToUInt => {
+            let size = ir.input(0).map(|v| v.size).unwrap_or(8);
+            let v = as_f64(x, size).trunc();
+            if ir.op == Op::FloatToInt {
+                match out.size {
+                    1 => v as i8 as u64,
+                    2 => v as i16 as u64,
+                    4 => v as i32 as u64,
+                    _ => v as i64 as u64,
+                }
+            } else {
+                match out.size {
+                    1 => v as u8 as u64,
+                    2 => v as u16 as u64,
+                    4 => v as u32 as u64,
+                    _ => v as u64,
+                }
+            }
+        }
+        Op::FloatConvert => {
+            let size = ir.input(0).map(|v| v.size).unwrap_or(8);
+            let v = as_f64(x, size);
+            if out.size == 4 {
+                (v as f32).to_bits() as u64
+            } else {
+                v.to_bits()
+            }
+        }
         Op::IntZExt => x,
         Op::IntSExt => xs as u64,
         Op::PopCount => x.count_ones() as u64,
@@ -393,6 +521,30 @@ fn sext128(v: u128, bits: u32) -> i128 {
         return v as i128;
     }
     ((v << (128 - bits)) as i128) >> (128 - bits)
+}
+
+/// Read a bit pattern as a floating point number of the given width.
+fn as_f64(bits: u64, size: u8) -> f64 {
+    if size == 4 {
+        f32::from_bits(bits as u32) as f64
+    } else {
+        f64::from_bits(bits)
+    }
+}
+
+/// Read a bit pattern as single precision.
+fn as_f32(bits: u64) -> f32 {
+    f32::from_bits(bits as u32)
+}
+
+/// Round to nearest with ties to even, the mode both architectures start in.
+fn round_ties_even(v: f64) -> f64 {
+    let r = v.round();
+    if (v - v.trunc()).abs() == 0.5 && r % 2.0 != 0.0 {
+        r - v.signum()
+    } else {
+        r
+    }
 }
 
 /// The divisor of a divide, which the double-width forms take third.

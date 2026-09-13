@@ -13,28 +13,35 @@ use r12e_format::LoadOptions;
 use r12e_ir::lift;
 
 /// Floor on the share of decoded instructions the lifter models. Only raised.
-const MIN_COVERAGE: f64 = 0.98;
+const MIN_COVERAGE: f64 = 0.995;
+/// The x86-64 floor, which has only the fixtures behind it: this host runs no
+/// x86 system binaries, so the corpus is smaller and the number is not
+/// comparable to the AArch64 one.
+const MIN_X86_COVERAGE: f64 = 0.998;
 
-fn targets() -> Vec<PathBuf> {
+fn targets(arch: &Arch) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/build");
+    let tag = if *arch == Arch::AArch64 { "a64" } else { "x64" };
     if let Ok(entries) = std::fs::read_dir(&dir) {
         for e in entries.flatten() {
             let p = e.path();
             let n = p.file_name().unwrap().to_string_lossy().into_owned();
-            if n.contains("a64") && !n.contains("macho") {
+            if n.contains(tag) && !n.contains("macho") && !n.ends_with(".out") {
                 out.push(p);
             }
         }
     }
-    for p in [
-        "/usr/lib/aarch64-linux-gnu/libc.so.6",
-        "/bin/bash",
-        "/bin/ls",
-    ] {
-        let p = PathBuf::from(p);
-        if p.is_file() {
-            out.push(p);
+    if *arch == Arch::AArch64 {
+        for p in [
+            "/usr/lib/aarch64-linux-gnu/libc.so.6",
+            "/bin/bash",
+            "/bin/ls",
+        ] {
+            let p = PathBuf::from(p);
+            if p.is_file() {
+                out.push(p);
+            }
         }
     }
     out
@@ -45,26 +52,26 @@ fn targets() -> Vec<PathBuf> {
 /// Walking every executable byte instead would count section padding, which
 /// decodes as `udf` and made up a seventh of the denominator. Measuring against
 /// what analysis believes is code is the honest denominator.
-fn measure() -> (u64, u64, BTreeMap<String, u64>) {
+fn measure(arch: &Arch) -> (u64, u64, BTreeMap<String, u64>) {
     let mut decoded = 0u64;
     let mut lifted = 0u64;
     let mut missing: BTreeMap<String, u64> = BTreeMap::new();
 
-    for path in targets() {
+    for path in targets(arch) {
         let Ok(data) = std::fs::read(&path) else {
             continue;
         };
         let Ok(obj) = r12e_format::load(&data, &LoadOptions::default()) else {
             continue;
         };
-        if obj.arch != Arch::AArch64 {
+        if obj.arch != *arch {
             continue;
         }
         let program = analyze(obj, &Options::default());
         for f in program.functions_by_address() {
             for insn in program.instructions(f) {
                 decoded += 1;
-                if lift::aarch64::lift(&insn).complete {
+                if lift::lift(arch, &insn).complete {
                     lifted += 1;
                 } else {
                     *missing.entry(insn.mnemonic.to_string()).or_default() += 1;
@@ -77,8 +84,17 @@ fn measure() -> (u64, u64, BTreeMap<String, u64>) {
 
 #[test]
 fn the_lifter_models_most_of_what_the_decoder_decodes() {
-    let (decoded, lifted, missing) = measure();
-    if decoded < 10_000 {
+    check(&Arch::AArch64, MIN_COVERAGE, 10_000);
+}
+
+#[test]
+fn the_x86_lifter_models_most_of_what_the_decoder_decodes() {
+    check(&Arch::X86_64, MIN_X86_COVERAGE, 2_000);
+}
+
+fn check(arch: &Arch, floor: f64, minimum: u64) {
+    let (decoded, lifted, missing) = measure(arch);
+    if decoded < minimum {
         return; // no corpus
     }
     let coverage = lifted as f64 / decoded as f64;
@@ -90,15 +106,15 @@ fn the_lifter_models_most_of_what_the_decoder_decodes() {
         .map(|(m, n)| format!("{m} x{n}"))
         .collect();
     assert!(
-        coverage >= MIN_COVERAGE,
-        "lifted {:.2}% of {decoded} decoded instructions, floor is {:.0}%\n\
+        coverage >= floor,
+        "{arch:?}: lifted {:.2}% of {decoded} decoded instructions, floor is {:.0}%\n\
          biggest gaps: {}",
         coverage * 100.0,
-        MIN_COVERAGE * 100.0,
+        floor * 100.0,
         summary.join(", ")
     );
     println!(
-        "lift coverage: {lifted} of {decoded} decoded instructions, {:.2}%",
+        "{arch:?} lift coverage: {lifted} of {decoded} decoded instructions, {:.2}%",
         coverage * 100.0
     );
 }
@@ -107,7 +123,14 @@ fn the_lifter_models_most_of_what_the_decoder_decodes() {
 #[test]
 #[ignore]
 fn lift_coverage_report() {
-    let (decoded, lifted, missing) = measure();
+    for arch in [Arch::AArch64, Arch::X86_64] {
+        report(&arch);
+    }
+}
+
+fn report(arch: &Arch) {
+    let (decoded, lifted, missing) = measure(arch);
+    println!("--- {arch:?} ---");
     println!(
         "{lifted} of {decoded} lifted ({:.2}%)",
         lifted as f64 / decoded.max(1) as f64 * 100.0

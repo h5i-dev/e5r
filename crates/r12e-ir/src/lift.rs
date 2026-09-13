@@ -91,6 +91,15 @@ impl Builder {
         }
     }
 
+    /// Finish a complete instruction without consuming the builder, for a
+    /// lifter that decides as it goes whether it handled the instruction.
+    pub fn clone_finish(&self) -> Lifted {
+        Lifted {
+            ops: self.ops.clone(),
+            complete: true,
+        }
+    }
+
     /// Give up on this instruction, honestly.
     pub fn unimplemented(mut self) -> Lifted {
         self.emit(Op::Unimplemented, None, &[]);

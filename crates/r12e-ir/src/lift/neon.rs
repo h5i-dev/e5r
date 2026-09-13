@@ -10,7 +10,7 @@
 
 use r12e_arch::{Insn, Lanes, Operand, RegClass, Width};
 
-use crate::lift::aarch64::{gpr_offset, sp_offset, vec_offset};
+use crate::lift::aarch64::{flag_c, flag_n, flag_v, flag_z, gpr_offset, sp_offset, vec_offset};
 use crate::lift::{Builder, Lifted};
 use crate::op::{Op, Varnode};
 
@@ -452,6 +452,25 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
                     clear_above(&mut b, d.num, size as u64);
                     b.finish(true)
                 }
+                // A literal, which the encoding spells as a small set of
+                // representable values.
+                (Some(Operand::Reg(d)), Some(Operand::FpImm(bits)))
+                    if d.class == RegClass::Vec =>
+                {
+                    let size = if d.width == Width::W64 { 8 } else { 4 };
+                    let value = if size == 4 {
+                        (f64::from_bits(*bits) as f32).to_bits() as u64
+                    } else {
+                        *bits
+                    };
+                    b.emit(
+                        Op::Copy,
+                        Some(lane(d.num, 0, size)),
+                        &[Varnode::constant(value, size)],
+                    );
+                    clear_above(&mut b, d.num, size as u64);
+                    b.finish(true)
+                }
                 (Some(Operand::Reg(d)), Some(Operand::Reg(s)))
                     if d.class == RegClass::Vec && s.class == RegClass::Vec =>
                 {
@@ -610,7 +629,227 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
             }
             b.finish(true)
         }
+        _ => float(b, i),
+    }
+}
+
+/// The floating point instructions, scalar and packed.
+///
+/// The lane size comes from the register width for a scalar and from the
+/// arrangement for a vector, and the operations are the IR's own: nothing here
+/// approximates a rounding rule with integer arithmetic.
+fn float(mut b: Builder, i: &Insn) -> Lifted {
+    let ops = i.operands();
+    let m = i.mnemonic;
+    // The conversions from integers do not start with `f`, and everything
+    // else here does.
+    if !m.starts_with('f') && !matches!(m, "scvtf" | "ucvtf") {
+        return b.unimplemented();
+    }
+
+    // The forms whose destination is a general register, or none at all.
+    match m {
+        "fcmp" | "fcmpe" => {
+            let Some((x, _, size)) = ops.first().and_then(vector) else {
+                return b.unimplemented();
+            };
+            let a = lane(x, 0, size);
+            // The second operand is either a register or the literal zero.
+            let c = match ops.get(1) {
+                Some(o) if vector(o).is_some() => {
+                    let (y, ..) = vector(o).unwrap();
+                    lane(y, 0, size)
+                }
+                // The compare-with-zero form, which the decoder spells out.
+                Some(Operand::FpImm(0)) | Some(Operand::Imm(0)) | Some(Operand::Name(_))
+                | None => Varnode::constant(0, size),
+                _ => return b.unimplemented(),
+            };
+            let less = b.eval(Op::FloatLess, 1, &[a, c]);
+            let equal = b.eval(Op::FloatEqual, 1, &[a, c]);
+            let nan_a = b.eval(Op::FloatNan, 1, &[a]);
+            let nan_c = b.eval(Op::FloatNan, 1, &[c]);
+            let unordered = b.eval(Op::BoolOr, 1, &[nan_a, nan_c]);
+            let carry = b.eval(Op::BoolNot, 1, &[less]);
+            b.emit(Op::Copy, Some(flag_n()), &[less]);
+            b.emit(Op::Copy, Some(flag_z()), &[equal]);
+            b.emit(Op::Copy, Some(flag_c()), &[carry]);
+            b.emit(Op::Copy, Some(flag_v()), &[unordered]);
+            return b.finish(true);
+        }
+        "fcvtzs" | "fcvtzu" => {
+            let (Some(Operand::Reg(dest)), Some(src)) = (ops.first(), ops.get(1)) else {
+                return b.unimplemented();
+            };
+            let Some((x, _, from)) = vector(src) else {
+                return b.unimplemented();
+            };
+            let to = if dest.width == Width::W64 { 8u8 } else { 4 };
+            let op = if m == "fcvtzs" {
+                Op::FloatToInt
+            } else {
+                Op::FloatToUInt
+            };
+            let v = b.eval(op, to, &[lane(x, 0, from)]);
+            b.emit(
+                Op::Copy,
+                Some(Varnode::register(gpr_offset(dest.num), to)),
+                &[v],
+            );
+            if to == 4 {
+                b.emit(
+                    Op::Copy,
+                    Some(Varnode::register(gpr_offset(dest.num) + 4, 4)),
+                    &[Varnode::constant(0, 4)],
+                );
+            }
+            return b.finish(true);
+        }
+        "scvtf" | "ucvtf" => {
+            let (Some(dst), Some(Operand::Reg(src))) = (ops.first(), ops.get(1)) else {
+                return b.unimplemented();
+            };
+            let Some((d, _, to)) = vector(dst) else {
+                return b.unimplemented();
+            };
+            let from = if src.width == Width::W64 { 8u8 } else { 4 };
+            let value = if src.class == RegClass::Zr {
+                Varnode::constant(0, from)
+            } else if src.class == RegClass::Vec {
+                lane(src.num, 0, from)
+            } else {
+                Varnode::register(gpr_offset(src.num), from)
+            };
+            let op = if m == "scvtf" {
+                Op::IntToFloat
+            } else {
+                Op::UIntToFloat
+            };
+            let v = b.eval(op, to, &[value]);
+            b.emit(Op::Copy, Some(lane(d, 0, to)), &[v]);
+            clear_above(&mut b, d, to as u64);
+            return b.finish(true);
+        }
+        "fcvt" => {
+            let (Some(dst), Some(src)) = (ops.first(), ops.get(1)) else {
+                return b.unimplemented();
+            };
+            let (Some((d, _, to)), Some((x, _, from))) = (vector(dst), vector(src)) else {
+                return b.unimplemented();
+            };
+            if !matches!(to, 4 | 8) || !matches!(from, 4 | 8) {
+                return b.unimplemented();
+            }
+            let v = b.eval(Op::FloatConvert, to, &[lane(x, 0, from)]);
+            b.emit(Op::Copy, Some(lane(d, 0, to)), &[v]);
+            clear_above(&mut b, d, to as u64);
+            return b.finish(true);
+        }
+        "fcsel" => {
+            let (Some(dst), Some(a), Some(c), Some(Operand::Cond(cond))) =
+                (ops.first(), ops.get(1), ops.get(2), ops.get(3))
+            else {
+                return b.unimplemented();
+            };
+            let (Some((d, _, size)), Some((x, ..)), Some((y, ..))) = (vector(dst), vector(a), vector(c))
+            else {
+                return b.unimplemented();
+            };
+            let taken = crate::lift::aarch64::condition_value(&mut b, cond.0);
+            let r = select(&mut b, taken, lane(x, 0, size), lane(y, 0, size), size);
+            b.emit(Op::Copy, Some(lane(d, 0, size)), &[r]);
+            clear_above(&mut b, d, size as u64);
+            return b.finish(true);
+        }
+        _ => {}
+    }
+
+    // The shape of the destination decides scalar or packed.
+    let (d, count, size) = match ops.first().and_then(vector) {
+        Some(v) => v,
+        None => return b.unimplemented(),
+    };
+    if size != 4 && size != 8 {
+        return b.unimplemented();
+    }
+
+    let binary = |m: &str| -> Option<Op> {
+        Some(match m {
+            "fadd" => Op::FloatAdd,
+            "fsub" => Op::FloatSub,
+            "fmul" => Op::FloatMul,
+            "fdiv" => Op::FloatDiv,
+            "fmax" | "fmaxnm" => Op::FloatMax,
+            "fmin" | "fminnm" => Op::FloatMin,
+            _ => return None,
+        })
+    };
+
+    if let Some(op) = binary(m) {
+        let (Some((x, ..)), Some((y, ..))) = (ops.get(1).and_then(vector), ops.get(2).and_then(vector))
+        else {
+            return b.unimplemented();
+        };
+        for n in 0..count {
+            let r = b.eval(op, size, &[lane(x, n, size), lane(y, n, size)]);
+            b.emit(Op::Copy, Some(lane(d, n, size)), &[r]);
+        }
+        clear_tail(&mut b, d, count * size as u64);
+        return b.finish(true);
+    }
+
+    match m {
+        "fneg" | "fabs" | "fsqrt" | "frintz" | "frintn" | "frintp" | "frintm" | "frinta" => {
+            let Some((x, ..)) = ops.get(1).and_then(vector) else {
+                return b.unimplemented();
+            };
+            let op = match m {
+                "fneg" => Op::FloatNeg,
+                "fabs" => Op::FloatAbs,
+                "fsqrt" => Op::FloatSqrt,
+                "frintz" => Op::FloatTrunc,
+                "frintp" => Op::FloatCeil,
+                "frintm" => Op::FloatFloor,
+                _ => Op::FloatRound,
+            };
+            for n in 0..count {
+                let r = b.eval(op, size, &[lane(x, n, size)]);
+                b.emit(Op::Copy, Some(lane(d, n, size)), &[r]);
+            }
+            clear_tail(&mut b, d, count * size as u64);
+            b.finish(true)
+        }
+        // The fused multiply-adds, which round once: `fmadd` is `a + n * m`,
+        // and the other three negate one side or the other.
+        "fmadd" | "fmsub" | "fnmadd" | "fnmsub" => {
+            let (Some((x, ..)), Some((y, ..)), Some((a, ..))) = (
+                ops.get(1).and_then(vector),
+                ops.get(2).and_then(vector),
+                ops.get(3).and_then(vector),
+            ) else {
+                return b.unimplemented();
+            };
+            let mut multiplicand = lane(x, 0, size);
+            if matches!(m, "fmsub" | "fnmadd") {
+                multiplicand = b.eval(Op::FloatNeg, size, &[multiplicand]);
+            }
+            let mut addend = lane(a, 0, size);
+            if matches!(m, "fnmadd" | "fnmsub") {
+                addend = b.eval(Op::FloatNeg, size, &[addend]);
+            }
+            let r = b.eval(Op::FloatMulAdd, size, &[multiplicand, lane(y, 0, size), addend]);
+            b.emit(Op::Copy, Some(lane(d, 0, size)), &[r]);
+            clear_tail(&mut b, d, size as u64);
+            b.finish(true)
+        }
         _ => b.unimplemented(),
+    }
+}
+
+/// Clear whatever sits above a write of this many bytes.
+fn clear_tail(b: &mut Builder, num: u8, bytes: u64) {
+    if bytes < 16 {
+        clear_above(b, num, bytes);
     }
 }
 

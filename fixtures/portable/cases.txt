@@ -47,3 +47,19 @@ strcmp_like:i32 &text &text
 sum_array:u64 &nums 8
 dot:i32 &ints &other 8
 use_struct:i64 &points 3
+# Floating point. A token with a dot is a floating argument, and a trailing `f`
+# makes it single precision; the return kind says how the driver records it.
+fmath:f64 1.5 2.5
+fmath:f64 -0.25 3.75
+fmath:f64 1e10 0.5
+fmath32:f32 1.5f 2.5f
+fmath32:f32 -7.5f 0.25f
+f2i:i64 3.9
+f2i:i64 -3.9
+f2i:i64 1e18
+i2f:f64 42
+i2f:f64 -7
+i2f:f64 1234567890123456789
+d2f:f32 1.0e10
+d2f:f32 0.1
+f2d:f64 0.1f

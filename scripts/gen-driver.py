@@ -21,6 +21,24 @@ const i32 ints[8] = {1, -2, 3, -4, 5, -6, 70000, -80000};
 const i32 other[8] = {-9, 8, -7, 6, -5, 4, 30000, -20000};
 const struct Point points[3] = {{1, 2, 3}, {-4, 5, -6}, {7, -8, 9}};
 
+static u64 bits_f64(double v) {
+    union {
+        double d;
+        u64 u;
+    } x;
+    x.d = v;
+    return x.u;
+}
+
+static u64 bits_f32(float v) {
+    union {
+        float f;
+        u32 u;
+    } x;
+    x.f = v;
+    return x.u;
+}
+
 static void emit(u64 v) {
     unsigned char buf[8];
     for (int i = 0; i < 8; i++) buf[i] = (unsigned char)(v >> (i * 8));
@@ -71,9 +89,19 @@ def main() -> int:
             continue
         parts = line.split()
         # The name carries the return kind, which the test needs and C does not.
-        name = parts[0].split(":", 1)[0]
+        head = parts[0].split(":", 1)
+        name = head[0]
+        kind = head[1] if len(head) > 1 else "u64"
         args = ", ".join(argument(t) for t in parts[1:])
-        lines.append(f"    emit((u64)({name}({args})));\n")
+        call = f"{name}({args})"
+        # A floating result is recorded as its bit pattern, because that is
+        # what the register holds and what the interpreter can be compared to.
+        if kind == "f64":
+            lines.append(f"    emit(bits_f64({call}));\n")
+        elif kind == "f32":
+            lines.append(f"    emit(bits_f32({call}));\n")
+        else:
+            lines.append(f"    emit((u64)({call}));\n")
     lines.append("    finish();\n}\n")
     out.write_text("".join(lines))
     return 0

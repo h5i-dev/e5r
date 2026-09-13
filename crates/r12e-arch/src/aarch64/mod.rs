@@ -1980,6 +1980,27 @@ pub(crate) fn vfp_expand_imm(imm8: u8) -> u64 {
 /// moves, the FP arithmetic a compiler emits for `double`, and the compares.
 /// Anything else returns `None` and prints as an unknown word, which is honest.
 fn dp_simd(w: u32, addr: Addr) -> Option<Insn> {
+    // Floating point data processing, three source: the fused multiply-adds.
+    if bits(w, 31, 24) == 0b0001_1111 {
+        let width = match bits(w, 23, 22) {
+            0b00 => Width::W32,
+            0b01 => Width::W64,
+            0b11 => Width::W16,
+            _ => return None,
+        };
+        let mnem = match (bit(w, 21), bit(w, 15)) {
+            (0, 0) => "fmadd",
+            (0, 1) => "fmsub",
+            (1, 0) => "fnmadd",
+            _ => "fnmsub",
+        };
+        let mut i = ins(addr, mnem, Flow::Next);
+        i.push(Operand::Reg(v(bits(w, 4, 0), width)));
+        i.push(Operand::Reg(v(bits(w, 9, 5), width)));
+        i.push(Operand::Reg(v(bits(w, 20, 16), width)));
+        i.push(Operand::Reg(v(bits(w, 14, 10), width)));
+        return Some(i);
+    }
     // Floating point data processing, one and two source.
     if bits(w, 31, 24) == 0b0001_1110 && bit(w, 21) == 1 {
         let ftype = bits(w, 23, 22);
@@ -2019,6 +2040,23 @@ fn dp_simd(w: u32, addr: Addr) -> Option<Insn> {
             let mut i = ins(addr, "fmov", Flow::Next);
             i.push(Operand::Reg(v(rd, width)));
             i.push(Operand::FpImm(vfp_expand_imm(bits(w, 20, 13) as u8)));
+            return Some(i);
+        }
+        // Precision conversion, whose destination width differs from its
+        // source width and so cannot share the one-source path.
+        if bits(w, 14, 10) == 0b10000 && bits(w, 20, 17) == 0b0001 {
+            let to = match bits(w, 16, 15) {
+                0b00 => Width::W32,
+                0b01 => Width::W64,
+                0b11 => Width::W16,
+                _ => return None,
+            };
+            if to == width {
+                return None;
+            }
+            let mut i = ins(addr, "fcvt", Flow::Next);
+            i.push(Operand::Reg(v(rd, to)));
+            i.push(Operand::Reg(v(rn, width)));
             return Some(i);
         }
         // One source.

@@ -207,6 +207,11 @@ fn set_logical_flags(b: &mut Builder, size: u8, result: Varnode) {
     b.emit(Op::Copy, Some(flag_v()), &[Varnode::constant(0, 1)]);
 }
 
+/// The condition a test selects on, for a lifter in another module.
+pub fn condition_value(b: &mut Builder, cond: u8) -> Varnode {
+    condition(b, cond)
+}
+
 /// The condition a `b.<cond>` or a conditional select tests, as one byte.
 fn condition(b: &mut Builder, cond: u8) -> Varnode {
     let (n, z, c, v) = (flag_n(), flag_z(), flag_c(), flag_v());
