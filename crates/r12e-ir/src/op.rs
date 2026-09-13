@@ -352,6 +352,22 @@ impl IrOp {
     pub fn input(&self, n: usize) -> Option<Varnode> {
         self.inputs().get(n).copied()
     }
+
+    /// Rewrite every input in place.
+    pub fn map_inputs(&mut self, mut f: impl FnMut(Varnode) -> Varnode) {
+        for i in 0..self.n as usize {
+            self.inputs[i] = f(self.inputs[i]);
+        }
+    }
+
+    /// Replace the inputs wholesale.
+    pub fn set_inputs(&mut self, vs: &[Varnode]) {
+        self.n = 0;
+        for v in vs.iter().take(MAX_INPUTS) {
+            self.inputs[self.n as usize] = *v;
+            self.n += 1;
+        }
+    }
 }
 
 impl fmt::Display for IrOp {

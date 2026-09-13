@@ -80,6 +80,13 @@ and a memory-summing loop. All pass. Two bugs were found this way that reading
 the lifter could not have: signed overflow was always false at 64-bit width,
 and the two-operand conditional-select aliases had their condition inverted.
 
+SSA construction and the dataflow passes run over the same corpus: 7,726
+lifted operations reduce to 915, a little over a tenth, which is the
+bookkeeping lifting necessarily produces. Every SSA property is checked on
+every complete function in the corpus: one definition per value, one phi input
+per predecessor, phis first in their block, every use reaching a definition,
+and a second optimization pass finding nothing.
+
 x86-64 is not lifted at all yet.
 
 ## Function recovery

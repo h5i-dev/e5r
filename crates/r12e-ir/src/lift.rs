@@ -17,6 +17,10 @@ use r12e_core::Arch;
 
 use crate::op::{IrOp, Op, Varnode};
 
+/// The most temporaries one instruction's lifting may use. Block building
+/// shifts each instruction's temporaries by this much so they stay distinct.
+pub const MAX_TEMPS: u64 = 64;
+
 /// The IR for one machine instruction.
 #[derive(Debug, Clone, Default)]
 pub struct Lifted {
@@ -52,7 +56,10 @@ impl Builder {
 
     /// A fresh temporary of `size` bytes.
     pub fn temp(&mut self, size: u8) -> Varnode {
-        let v = Varnode::temp(self.next_temp, size);
+        // Wrapping rather than growing without bound: no instruction needs
+        // this many, and a runaway lifter should not silently corrupt another
+        // instruction's temporaries.
+        let v = Varnode::temp(self.next_temp % MAX_TEMPS, size);
         self.next_temp += 1;
         v
     }

@@ -217,6 +217,37 @@ fn comparisons_set_every_flag_correctly() {
 }
 
 #[test]
+fn a_switch_the_compiler_turned_into_arithmetic() {
+    // Asked for a dense switch returning 0x1111, 0x2222 and so on, GCC emitted
+    // `(n + 1) * 0x1111` as two shift-and-adds followed by a csinv for the
+    // default arm. Nothing about that resembles a switch, which makes it a good
+    // test of whether the lifter models what the compiler actually did.
+    let Some(p) = open("wide.a64.O2.o") else {
+        return;
+    };
+    check(
+        &p,
+        "dense",
+        &[
+            vec![0],
+            vec![1],
+            vec![5],
+            vec![11],
+            vec![12],
+            vec![(-1i64) as u64],
+        ],
+        |a| {
+            let n = a[0] as i32;
+            let r: i64 = match n {
+                0..=11 => 0x1111 * (n as i64 + 1),
+                _ => -1,
+            };
+            r as u64
+        },
+    );
+}
+
+#[test]
 fn conditional_selection() {
     let Some(p) = open("wide.a64.O2.o") else {
         return;

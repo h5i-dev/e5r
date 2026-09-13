@@ -14,7 +14,7 @@ rather than argued about again.
 | x86-64 decoder | built, llvm-objdump parity over 4,760 instructions, 100% decoded |
 | SLEIGH runtime and compiler | not started (M2) |
 | functions, CFG, xrefs, strings, jump tables, no-return | built and parallel (M3) |
-| IR, lifters, interpreter | built for AArch64 (M4); SSA and dataflow not started |
+| IR, lifters, interpreter, SSA, dataflow | built for AArch64 (M4) |
 | types, decompiler | not started (M5, M6) |
 | demanglers | Itanium, Rust both schemes, MSVC names (M5) |
 | annotation log, content anchors, git merge | built (M7) |
@@ -231,13 +231,17 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       four operations; the register file is byte-addressed, so `w0` overlapping
       `x0` is a property of the addresses rather than a rule. AArch64 lifts at
       98.75% of the instructions inside recovered functions.
-- [ ] SSA construction over the IR, with a heritage pass that handles partial
-      register writes (`al` inside `rax`) without lying about them.
+- [x] SSA construction over the IR, with partial register writes made explicit
+      rather than papered over: locations are canonical whole registers, a
+      narrow read becomes a `SubPiece` and a narrow write a masked merge, so
+      `w0` sitting inside `x0` is a dependency dataflow can see.
 - [ ] Stack frame recovery: frame pointer or not, prologue and epilogue matching,
       stack depth tracking through calls, `alloca` and dynamic frames.
 - [ ] Memory promotion, turning stack slots into variables where aliasing allows.
-- [ ] Constant propagation, copy propagation, dead code elimination, and a rule
-      pool driven to a local fixpoint.
+- [x] Constant folding, copy propagation and dead code elimination, each run to
+      a fixed point. On the fixture corpus they take 7,726 lifted operations to
+      915, which is what turns IR into something a person can read. A rule pool
+      for the algebraic identities is still to do.
 - [ ] Value-set or range analysis, enough to bound a jump table index and to
       prove a comparison constant.
 - [ ] Calling convention detection per function, including non-standard ones that

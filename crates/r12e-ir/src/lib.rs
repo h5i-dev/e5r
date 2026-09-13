@@ -12,9 +12,12 @@
 #![warn(missing_docs)]
 
 pub mod exec;
+pub mod func;
 pub mod interp;
 pub mod lift;
 pub mod op;
+pub mod opt;
+pub mod ssa;
 
 pub use exec::{Outcome, run};
 pub use interp::{Machine, Step, Stop, step};
