@@ -551,6 +551,13 @@ fn build(
 
     i.flow = flow_of(mnemonic, two_byte, opcode, &i);
     i.mnemonic = rename(mnemonic, p, &i);
+    // A 64-bit immediate move reads as a signed number, which is how a
+    // negative constant written in source appears again in the listing.
+    if i.mnemonic == "movabs" {
+        if let Some(Operand::UImm(v)) = i.operands().get(1).copied() {
+            i.set_operand(1, Operand::Imm(v as i64));
+        }
+    }
     if let Some(with_ops) = string_operands(&i, p) {
         i = with_ops;
     }

@@ -413,6 +413,13 @@ impl Insn {
         self
     }
 
+    /// Replace one operand, for a spelling that changes how it reads.
+    pub fn set_operand(&mut self, n: usize, op: Operand) {
+        if n < self.n_ops as usize {
+            self.ops[n] = op;
+        }
+    }
+
     /// The operands.
     pub fn operands(&self) -> &[Operand] {
         &self.ops[..self.n_ops as usize]

@@ -183,6 +183,10 @@ pub enum Step {
     Next,
     /// Continue at this machine address.
     Jump(Addr),
+    /// Enter a call at this address.
+    Call(Addr),
+    /// Return to this address.
+    Leave(Addr),
     /// Stop.
     Halt(Stop),
 }
@@ -212,14 +216,14 @@ pub fn step(m: &mut Machine<'_>, ir: &IrOp) -> Step {
         Op::BranchInd | Op::Return => {
             let t = a(m);
             return if ir.op == Op::Return {
-                Step::Halt(Stop::Returned)
+                Step::Leave(Addr(t))
             } else {
                 Step::Jump(Addr(t))
             };
         }
         Op::Call | Op::CallInd => {
             let t = a(m);
-            return Step::Halt(Stop::Call(Addr(t)));
+            return Step::Call(Addr(t));
         }
         _ => {}
     }
@@ -256,7 +260,16 @@ pub fn step(m: &mut Machine<'_>, ir: &IrOp) -> Step {
         Op::IntAdd => x.wrapping_add(y),
         Op::IntSub => x.wrapping_sub(y),
         Op::IntMul => x.wrapping_mul(y),
-        Op::IntDiv | Op::IntRem | Op::IntSDiv | Op::IntSRem if y == 0 => {
+        Op::IntDiv
+        | Op::IntRem
+        | Op::IntSDiv
+        | Op::IntSRem
+        | Op::IntDiv128
+        | Op::IntRem128
+        | Op::IntSDiv128
+        | Op::IntSRem128
+            if divisor(ir, m) == 0 =>
+        {
             return Step::Halt(Stop::DivideByZero(ir.addr));
         }
         Op::IntDiv => x / y,
@@ -314,6 +327,42 @@ pub fn step(m: &mut Machine<'_>, ir: &IrOp) -> Step {
             (sign_bit(x, size) != sign_bit(y, size) && sign_bit(d, size) != sign_bit(x, size))
                 as u64
         }
+        // The half of a product that does not fit. x86's `mul` writes it and
+        // AArch64's `umulh` reads it, so it is an operation rather than
+        // something a lifter can approximate.
+        Op::IntMulHigh => {
+            let bits = ir.input(0).map(|v| v.size as u32 * 8).unwrap_or(64);
+            ((x as u128 * y as u128) >> bits) as u64
+        }
+        Op::IntSMulHigh => {
+            let bits = ir.input(0).map(|v| v.size as u32 * 8).unwrap_or(64);
+            ((xs as i128 * ys as i128) >> bits) as u64
+        }
+        // A double-width dividend, which x86's one-operand divide needs. The
+        // third input is the divisor; the first two are the halves.
+        Op::IntDiv128 | Op::IntRem128 | Op::IntSDiv128 | Op::IntSRem128 => {
+            let bits = ir.input(1).map(|v| v.size as u32 * 8).unwrap_or(64);
+            let d = ir.input(2).map(|v| m.read(v)).unwrap_or(0);
+            let size = ir.input(1).map(|v| v.size).unwrap_or(8);
+            match ir.op {
+                Op::IntDiv128 => {
+                    let n = ((x as u128) << bits) | y as u128;
+                    (n / d as u128) as u64
+                }
+                Op::IntRem128 => {
+                    let n = ((x as u128) << bits) | y as u128;
+                    (n % d as u128) as u64
+                }
+                Op::IntSDiv128 => {
+                    let n = sext128((x as u128) << bits | y as u128, bits * 2);
+                    (n.wrapping_div(sext(d, size) as i128)) as u64
+                }
+                _ => {
+                    let n = sext128((x as u128) << bits | y as u128, bits * 2);
+                    (n.wrapping_rem(sext(d, size) as i128)) as u64
+                }
+            }
+        }
         Op::IntZExt => x,
         Op::IntSExt => xs as u64,
         Op::PopCount => x.count_ones() as u64,
@@ -335,6 +384,24 @@ pub fn step(m: &mut Machine<'_>, ir: &IrOp) -> Step {
 
     m.write(out, value);
     Step::Next
+}
+
+/// Read a double-width value as signed. The halves compose into 128 bits but
+/// the value occupies only twice the operand width, so the sign lives there.
+fn sext128(v: u128, bits: u32) -> i128 {
+    if bits >= 128 {
+        return v as i128;
+    }
+    ((v << (128 - bits)) as i128) >> (128 - bits)
+}
+
+/// The divisor of a divide, which the double-width forms take third.
+fn divisor(ir: &IrOp, m: &mut Machine) -> u64 {
+    let n = match ir.op {
+        Op::IntDiv128 | Op::IntRem128 | Op::IntSDiv128 | Op::IntSRem128 => 2,
+        _ => 1,
+    };
+    ir.input(n).map(|v| m.read(v)).unwrap_or(0)
 }
 
 /// The mask of the operation's first input, for the carry computation.

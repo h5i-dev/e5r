@@ -19,7 +19,7 @@ pub mod op;
 pub mod opt;
 pub mod ssa;
 
-pub use exec::{Outcome, run};
+pub use exec::{Outcome, run, run_with};
 pub use interp::{Machine, Step, Stop, step};
 pub use lift::{Lifted, lift};
 pub use op::{IrOp, Op, Space, Varnode};

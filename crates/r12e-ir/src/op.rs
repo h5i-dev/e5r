@@ -156,6 +156,18 @@ pub enum Op {
     IntRem,
     /// Signed remainder.
     IntSRem,
+    /// High half of an unsigned product, which no narrower operation can give.
+    IntMulHigh,
+    /// High half of a signed product.
+    IntSMulHigh,
+    /// Unsigned divide of a double-width dividend: `(hi:lo) / y`.
+    IntDiv128,
+    /// Signed divide of a double-width dividend.
+    IntSDiv128,
+    /// Unsigned remainder of a double-width dividend.
+    IntRem128,
+    /// Signed remainder of a double-width dividend.
+    IntSRem128,
     /// Bitwise and.
     IntAnd,
     /// Bitwise or.
@@ -245,6 +257,7 @@ impl Op {
             | Op::CallInd
             | Op::Return => 1,
             Op::Unimplemented => 0,
+            Op::IntDiv128 | Op::IntSDiv128 | Op::IntRem128 | Op::IntSRem128 => 3,
             _ => 2,
         }
     }
@@ -268,6 +281,12 @@ impl Op {
             Op::IntSDiv => "/s",
             Op::IntRem => "%u",
             Op::IntSRem => "%s",
+            Op::IntMulHigh => "*hu",
+            Op::IntSMulHigh => "*hs",
+            Op::IntDiv128 => "/u128",
+            Op::IntSDiv128 => "/s128",
+            Op::IntRem128 => "%u128",
+            Op::IntSRem128 => "%s128",
             Op::IntAnd => "&",
             Op::IntOr => "|",
             Op::IntXor => "^",

@@ -58,6 +58,11 @@ pub fn sp_offset() -> u64 {
     SP
 }
 
+/// The byte offset of a vector register; they are sixteen bytes each.
+pub fn vec_offset(n: u8) -> u64 {
+    V_BASE + n as u64 * 16
+}
+
 fn width_bytes(w: Width) -> u8 {
     match w {
         Width::W8 => 1,
@@ -338,6 +343,12 @@ pub fn lift(i: &Insn) -> Lifted {
         }
         Flow::Trap | Flow::Syscall => return b.unimplemented(),
         Flow::Next => {}
+    }
+
+    // Anything naming a vector register goes to the SIMD lifter, where a lane
+    // is just a varnode inside the register.
+    if crate::lift::neon::handles(i) {
+        return crate::lift::neon::lift(b, i);
     }
 
     let dest = match ops.first() {
@@ -721,9 +732,55 @@ pub fn lift(i: &Insn) -> Lifted {
         }
 
         "smulh" | "umulh" => {
-            // The high half of a 64x64 product, which the IR has no single
-            // operation for. Not modelled rather than approximated.
-            b.unimplemented()
+            let (Some(d), Some(x), Some(y)) = (dest, ops.get(1), ops.get(2)) else {
+                return b.unimplemented();
+            };
+            let (Some(a), Some(c)) = (source(&mut b, x, 8), source(&mut b, y, 8)) else {
+                return b.unimplemented();
+            };
+            let op = if i.mnemonic == "smulh" {
+                Op::IntSMulHigh
+            } else {
+                Op::IntMulHigh
+            };
+            let r = b.eval(op, 8, &[a, c]);
+            write_reg(&mut b, d, r);
+            b.finish(true)
+        }
+
+        // The widening multiply-accumulates: two 32-bit sources, a 64-bit
+        // accumulator, and a product that needs the full width.
+        "umaddl" | "smaddl" | "umsubl" | "smsubl" | "umnegl" | "smnegl" => {
+            let (Some(d), Some(Operand::Reg(x)), Some(Operand::Reg(y))) =
+                (dest, ops.get(1), ops.get(2))
+            else {
+                return b.unimplemented();
+            };
+            let signed = i.mnemonic.starts_with('s');
+            let ext = if signed { Op::IntSExt } else { Op::IntZExt };
+            let a = b.eval(ext, 8, &[Varnode { size: 4, ..reg(*x) }]);
+            let c = b.eval(ext, 8, &[Varnode { size: 4, ..reg(*y) }]);
+            let product = b.eval(Op::IntMul, 8, &[a, c]);
+            let r = match ops.get(3) {
+                Some(acc) => {
+                    let Some(base) = source(&mut b, acc, 8) else {
+                        return b.unimplemented();
+                    };
+                    let op = if i.mnemonic.ends_with("subl") {
+                        Op::IntSub
+                    } else {
+                        Op::IntAdd
+                    };
+                    b.eval(op, 8, &[base, product])
+                }
+                // The negating forms have no accumulator.
+                None if i.mnemonic.ends_with("negl") => {
+                    b.eval(Op::IntNegate, 8, &[product])
+                }
+                None => product,
+            };
+            write_reg(&mut b, d, r);
+            b.finish(true)
         }
 
         "clz" | "rbit" | "rev" | "rev16" | "rev32" | "cls" => {
@@ -979,10 +1036,19 @@ fn load(mut b: Builder, i: &Insn, ops: &[Operand]) -> Lifted {
     let (Some(Operand::Reg(d)), Some(second)) = (ops.first(), ops.get(1)) else {
         return b.unimplemented();
     };
-    // The interpreter holds a value in 64 bits, so a wider register is left
-    // unmodelled rather than silently truncated.
+    // A value wider than the IR carries is moved in eight-byte pieces rather
+    // than truncated.
     if d.class == RegClass::Vec && width_bytes(d.width) > 8 {
-        return b.unimplemented();
+        let addr = match second {
+            Operand::Addr(a) => Varnode::constant(a.get(), 8),
+            Operand::Mem(m) => address(&mut b, m, i.addr).0,
+            _ => return b.unimplemented(),
+        };
+        crate::lift::neon::wide_transfer(&mut b, addr, d.num, 16, false);
+        if let Operand::Mem(m) = second {
+            writeback(&mut b, m);
+        }
+        return b.finish(true);
     }
     let out_size = reg(*d).size;
     let (addr, access) = match second {
@@ -1017,7 +1083,10 @@ fn store(mut b: Builder, i: &Insn, ops: &[Operand]) -> Lifted {
         return b.unimplemented();
     };
     if s.class == RegClass::Vec && width_bytes(s.width) > 8 {
-        return b.unimplemented();
+        let (addr, _) = address(&mut b, m, i.addr);
+        crate::lift::neon::wide_transfer(&mut b, addr, s.num, 16, true);
+        writeback(&mut b, m);
+        return b.finish(true);
     }
     let (addr, access) = address(&mut b, m, i.addr);
     let src = reg(*s);
@@ -1038,18 +1107,36 @@ fn pair(mut b: Builder, i: &Insn, ops: &[Operand]) -> Lifted {
         return b.unimplemented();
     };
     if width_bytes(a.width) > 8 || width_bytes(c.width) > 8 {
-        return b.unimplemented();
+        // A pair of vector registers, moved in eight-byte pieces.
+        if a.class != RegClass::Vec || c.class != RegClass::Vec {
+            return b.unimplemented();
+        }
+        let (addr, _) = address(&mut b, m, i.addr);
+        let storing = i.mnemonic.starts_with('s');
+        crate::lift::neon::wide_transfer(&mut b, addr, a.num, 16, storing);
+        let second = b.eval(Op::IntAdd, 8, &[addr, Varnode::constant(16, 8)]);
+        crate::lift::neon::wide_transfer(&mut b, second, c.num, 16, storing);
+        writeback(&mut b, m);
+        return b.finish(true);
     }
     let (addr, total) = address(&mut b, m, i.addr);
     let each = (total / 2).max(1);
     let second = b.eval(Op::IntAdd, 8, &[addr, Varnode::constant(each as u64, 8)]);
-    if i.mnemonic == "ldp" {
-        let first_v = b.temp(each);
-        b.emit(Op::Load, Some(first_v), &[addr]);
-        write_reg(&mut b, *a, first_v);
-        let second_v = b.temp(each);
-        b.emit(Op::Load, Some(second_v), &[second]);
-        write_reg(&mut b, *c, second_v);
+    // Every loading form starts with `ld`: `ldpsw` and `ldnp` are loads too,
+    // and treating them as stores would write memory the program only reads.
+    if i.mnemonic.starts_with("ld") {
+        // `ldpsw` loads two words and sign-extends each to a doubleword.
+        let widen = i.mnemonic == "ldpsw";
+        for (slot, at) in [(*a, addr), (*c, second)] {
+            let loaded = b.temp(each);
+            b.emit(Op::Load, Some(loaded), &[at]);
+            let value = if widen {
+                b.eval(Op::IntSExt, 8, &[loaded])
+            } else {
+                loaded
+            };
+            write_reg(&mut b, slot, value);
+        }
     } else {
         b.emit(Op::Store, None, &[addr, reg(*a)]);
         b.emit(Op::Store, None, &[second, reg(*c)]);

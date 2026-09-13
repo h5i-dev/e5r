@@ -64,6 +64,42 @@ for src in fixtures/portable/*.c; do
     -o "$out/${base}.x64.sse42.o" "$src" 2>/dev/null || true
 done
 
+# The lifter oracle: one program, two architectures, executed for real.
+#
+# The driver is generated from the case table so the test and the machine run
+# the same calls. Each build is executed and its output recorded, which is what
+# the lifter is then measured against. Recording at build time rather than test
+# time means a machine without qemu can still run the gate.
+lld=$(ls -d "$HOME"/.rustup/toolchains/*/lib/rustlib/*/bin/rust-lld 2>/dev/null | head -1)
+if [ -n "$lld" ]; then
+  mkdir -p "$out/ld"
+  ln -sf "$lld" "$out/ld/ld.lld"
+  python3 scripts/gen-driver.py fixtures/portable/cases.txt "$out/driver.c"
+  cp fixtures/portable/wide.c "$out/wide.c"
+  for opt in O0 O1 O2 O3 Os; do
+    "$xcc" --target=x86_64-unknown-linux-gnu -B"$out/ld" -fuse-ld=lld -"$opt" \
+      -fno-inline -ffreestanding -fno-stack-protector -fno-builtin -nostdlib \
+      -static -o "$out/driver.x64.$opt" "$out/driver.c" 2>/dev/null || true
+    # clang for both: gcc's freestanding entry needs a runtime this has not.
+    "$xcc" -"$opt" -fno-inline -ffreestanding -fno-stack-protector -fno-builtin \
+      -nostdlib -static -o "$out/driver.a64.$opt" "$out/driver.c" 2>/dev/null || true
+    if [ -x "$out/driver.a64.$opt" ]; then
+      "$out/driver.a64.$opt" > "$out/driver.a64.$opt.out" || true
+    fi
+    if [ -x "$out/driver.x64.$opt" ] && command -v qemu-x86_64 > /dev/null; then
+      qemu-x86_64 "$out/driver.x64.$opt" > "$out/driver.x64.$opt.out" || true
+    fi
+  done
+  # The two architectures computing the same answers is the harness checking
+  # itself before anything is measured against it.
+  for opt in O0 O1 O2 O3 Os; do
+    if [ -s "$out/driver.a64.$opt.out" ] && [ -s "$out/driver.x64.$opt.out" ]; then
+      cmp -s "$out/driver.a64.$opt.out" "$out/driver.x64.$opt.out" \
+        || echo "warning: driver.$opt disagrees across architectures" >&2
+    fi
+  done
+fi
+
 # x86-64 assembly fixtures, kept from the C++ project: they pin encodings.
 for src in fixtures/asm/*.s; do
   [ -e "$src" ] || continue

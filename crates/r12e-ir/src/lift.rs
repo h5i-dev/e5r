@@ -11,6 +11,9 @@
 //! would make a wrong answer look like a right one.
 
 pub mod aarch64;
+pub mod neon;
+pub mod sse;
+pub mod x86;
 
 use r12e_arch::Insn;
 use r12e_core::Arch;
@@ -102,6 +105,7 @@ impl Builder {
 pub fn lift(arch: &Arch, insn: &Insn) -> Lifted {
     match arch {
         Arch::AArch64 => aarch64::lift(insn),
+        Arch::X86_64 => x86::lift(insn),
         _ => Builder::new(insn.addr).unimplemented(),
     }
 }

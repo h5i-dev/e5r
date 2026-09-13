@@ -96,6 +96,10 @@ pub fn decode(w: u32, addr: Addr) -> Option<Insn> {
     if w & 0x9F3E_0C00 == 0x0E20_0800 {
         return two_reg_misc(w, addr);
     }
+    // Scalar pairwise: one register folded to a scalar.
+    if w & 0xDF3E_0C00 == 0x5E30_0800 {
+        return scalar_pairwise(w, addr);
+    }
     // Across lanes.
     if w & 0x9F3E_0C00 == 0x0E30_0800 {
         return across_lanes(w, addr);
@@ -471,10 +475,23 @@ fn two_reg_misc(w: u32, addr: Addr) -> Option<Insn> {
         _ => return None,
     };
 
+    // A narrowing move writing the upper half of its destination is spelled
+    // with a trailing `2`.
+    let narrowing = matches!(mnem, "xtn" | "sqxtn" | "uqxtn" | "sqxtun");
+    let mnem = if narrowing && q == 1 {
+        match mnem {
+            "xtn" => "xtn2",
+            "sqxtn" => "sqxtn2",
+            "uqxtn" => "uqxtn2",
+            _ => "sqxtun2",
+        }
+    } else {
+        mnem
+    };
     let mut i = ins(addr, mnem);
     i.push(v(rd, l));
     // The narrowing moves read the next arrangement up.
-    if matches!(mnem, "xtn" | "sqxtn" | "uqxtn" | "sqxtun") {
+    if narrowing {
         i.push(v(rn, wide_lanes(size)?));
     } else {
         i.push(v(rn, l));
@@ -482,6 +499,45 @@ fn two_reg_misc(w: u32, addr: Addr) -> Option<Insn> {
     if zero {
         i.push(Operand::Count(0));
     }
+    Some(i)
+}
+
+/// The scalar pairwise forms: two lanes of one register folded into a scalar.
+fn scalar_pairwise(w: u32, addr: Addr) -> Option<Insn> {
+    let u = bit(w, 29);
+    let size = bits(w, 23, 22);
+    let opcode = bits(w, 16, 12);
+    let (mnem, width, lanes) = match (opcode, u) {
+        (0b11011, 0) if size == 0b11 => ("addp", Width::W64, Lanes::D2),
+        (0b01101, 1) => {
+            let half = size & 1 == 0;
+            (
+                "faddp",
+                if half { Width::W32 } else { Width::W64 },
+                if half { Lanes::S2 } else { Lanes::D2 },
+            )
+        }
+        (0b01100, 1) => {
+            let half = size & 1 == 0;
+            (
+                "fmaxnmp",
+                if half { Width::W32 } else { Width::W64 },
+                if half { Lanes::S2 } else { Lanes::D2 },
+            )
+        }
+        (0b01111, 1) => {
+            let half = size & 1 == 0;
+            (
+                "fmaxp",
+                if half { Width::W32 } else { Width::W64 },
+                if half { Lanes::S2 } else { Lanes::D2 },
+            )
+        }
+        _ => return None,
+    };
+    let mut i = ins(addr, mnem);
+    i.push(Operand::Reg(Reg::vec(bits(w, 4, 0) as u8, width)));
+    i.push(v(bits(w, 9, 5), lanes));
     Some(i)
 }
 

@@ -13,7 +13,8 @@ pub mod insn;
 pub mod x86;
 
 pub use insn::{
-    AddrMode, Cond, Extend, Flow, Insn, MAX_OPERANDS, Mem, Operand, Reg, RegClass, Shift, Width,
+    AddrMode, Cond, Extend, Flow, Insn, Lanes, MAX_OPERANDS, Mem, Operand, Reg, RegClass, Shift,
+    Width,
 };
 
 use r12e_core::{Addr, Arch};

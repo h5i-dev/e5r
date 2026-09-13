@@ -30,17 +30,30 @@ impl Outcome {
     }
 }
 
-/// Run from `entry` until the code returns or the budget runs out.
-///
-/// Calls are not followed: a call stops the run and reports its target, which
-/// is what a test of one function wants and what an analysis that wants more
-/// can drive itself.
+/// Run from `entry` until the code returns or the budget runs out, without
+/// following calls: a call stops the run and reports its target.
 pub fn run(m: &mut Machine<'_>, image: &MemoryMap, arch: &Arch, entry: Addr) -> Outcome {
+    run_with(m, image, arch, entry, 0)
+}
+
+/// Run, following calls up to `depth` frames deep.
+///
+/// Following calls is what makes a function that uses a helper, or recurses,
+/// testable at all; the depth limit is what keeps a runaway from being
+/// indistinguishable from a hang.
+pub fn run_with(
+    m: &mut Machine<'_>,
+    image: &MemoryMap,
+    arch: &Arch,
+    entry: Addr,
+    depth: u32,
+) -> Outcome {
     let mut pc = entry;
     let mut insns = 0u64;
     let mut ops = 0u64;
     let mut unlifted = Vec::new();
     let mut budget = m.budget;
+    let mut frames = 0u32;
 
     loop {
         if budget == 0 {
@@ -82,6 +95,34 @@ pub fn run(m: &mut Machine<'_>, image: &MemoryMap, arch: &Arch, entry: Addr) -> 
                 Step::Next => {}
                 Step::Jump(t) => {
                     next = t;
+                    jumped = true;
+                    break;
+                }
+                Step::Call(target) => {
+                    if frames >= depth {
+                        return Outcome {
+                            stop: Stop::Call(target),
+                            insns: insns + 1,
+                            ops,
+                            unlifted,
+                        };
+                    }
+                    frames += 1;
+                    next = target;
+                    jumped = true;
+                    break;
+                }
+                Step::Leave(target) => {
+                    if frames == 0 {
+                        return Outcome {
+                            stop: Stop::Returned,
+                            insns: insns + 1,
+                            ops,
+                            unlifted,
+                        };
+                    }
+                    frames -= 1;
+                    next = target;
                     jumped = true;
                     break;
                 }
