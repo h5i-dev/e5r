@@ -52,7 +52,8 @@ pub fn decode(bytes: &[u8], addr: Addr, it: ItState) -> Option<(Insn, ItState)> 
     let cond = it.value();
     if hw1 >> 11 >= 0b11101 {
         let hw2 = u16::from_le_bytes(bytes.get(2..4)?.try_into().ok()?) as u32;
-        return Some((wide(hw1 << 16 | hw2, cond, addr)?, it.advance()));
+        let i = wide(hw1 << 16 | hw2, cond, it.in_block(), addr)?;
+        return Some((i, it.advance()));
     }
     let i = narrow(hw1, cond, it.in_block(), addr)?;
     // An `it` replaces the state rather than advancing it.
@@ -221,6 +222,7 @@ fn narrow(hw: u32, cond: u32, in_it: bool, addr: Addr) -> Option<Insn> {
                 }
                 _ => {
                     let target = super::target(addr, 4 + sext(imm, 8) * 2);
+                    let c = if in_it { cond } else { c };
                     let mut i = at(addr, 2, cm(conds!("b"), c), Flow::CondBranch(target));
                     i.push(Operand::Addr(target));
                     Some(i)
@@ -529,7 +531,7 @@ fn it_name(first: u32, mask: u32) -> &'static str {
 }
 
 /// The thirty-two-bit encodings, table A6-9.
-fn wide(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
+fn wide(w: u32, cond: u32, in_it: bool, addr: Addr) -> Option<Insn> {
     let op2 = bits(w, 26, 20);
     match bits(w, 28, 27) {
         // The coprocessor space, which for VFP is the A32 word unchanged.
@@ -541,7 +543,7 @@ fn wide(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
         0b01 if op2 & 0b1100100 == 0b0000000 => block(w, cond, addr),
         0b01 if op2 & 0b1100100 == 0b0000100 => dual(w, cond, addr),
         0b01 => dp_shifted(w, cond, addr),
-        0b10 if bit(w, 15) == 1 => control(w, cond, addr),
+        0b10 if bit(w, 15) == 1 => control(w, cond, in_it, addr),
         0b10 if op2 & 0b0100000 == 0 => dp_imm(w, cond, addr),
         0b10 => dp_plain_imm(w, cond, addr),
         _ => group11(w, cond, addr),
@@ -852,7 +854,7 @@ fn dp_plain_imm(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
 }
 
 /// Branches, and the control instructions that share their slot.
-fn control(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
+fn control(w: u32, cond: u32, in_it: bool, addr: Addr) -> Option<Insn> {
     let s = bit(w, 26);
     let (j1, j2) = (bit(w, 13), bit(w, 11));
     match (bit(w, 14), bit(w, 12)) {
@@ -867,6 +869,9 @@ fn control(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
                 21,
             );
             let target = super::target(addr, 4 + off);
+            // Inside an IT block a conditional branch is unpredictable, and
+            // the block's condition is the one that prints.
+            let c = if in_it { cond } else { c };
             let mut i = at(addr, 4, cm(conds!("b", ".w"), c), Flow::CondBranch(target));
             i.push(Operand::Addr(target));
             Some(i)
@@ -878,7 +883,18 @@ fn control(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
                 s << 24 | i1 << 23 | i2 << 22 | bits(w, 25, 16) << 12 | bits(w, 10, 0) << 1,
                 25,
             );
-            let target = super::target(addr, 4 + off);
+            // `blx` changes instruction set, so its target is A32-aligned and
+            // measured from a pc rounded down to a word.
+            let exchange = hi == 1 && lo == 0;
+            if exchange && bit(w, 0) == 1 {
+                return None;
+            }
+            let base = if exchange {
+                Addr(addr.get() & !3)
+            } else {
+                addr
+            };
+            let target = super::target(base, 4 + off);
             let (mn, flow) = match (hi, lo) {
                 (0, _) => (cm(conds!("b", ".w"), cond), branch_flow(cond, target)),
                 (_, 1) => (cm(conds!("bl"), cond), Flow::Call(target)),
