@@ -15,6 +15,7 @@ rather than argued about again.
 | x86-64 decoder | built, llvm-objdump parity over 4,760 instructions, 100% decoded |
 | SLEIGH runtime and compiler | not started |
 | functions, CFG, xrefs, strings, jump tables | built and parallel (M3) |
+| demanglers | Itanium, Rust (both schemes), MSVC names (M5) |
 | IR, SSA, types, decompiler | not started (M4 to M6) |
 | annotation log, content anchors, git merge | built (M7) |
 | CLI with JSON on every command | built (M8) |
@@ -243,7 +244,10 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       bitfields and typedefs, sized per architecture.
 - [ ] DWARF 4 and 5 consumption: types, variables, line numbers, inlined frames.
 - [ ] PDB consumption for Windows binaries, from the public format documentation.
-- [ ] Demanglers: Itanium C++, MSVC, Rust legacy and v0, Swift, ObjC selectors.
+- [x] Demanglers: Itanium C++ at 94% exact parity with `c++filt` over 5,953
+      real libstdc++ symbols, Rust in both schemes, and MSVC qualified names.
+      Swift and ObjC selectors are still to do, and MSVC's type grammar is a
+      separate job from its names.
 - [ ] Type archives. Parse C headers into the type model so an analyst can apply
       a known API signature. Importing Ghidra `.gdt` is worth doing if the format
       holds still.

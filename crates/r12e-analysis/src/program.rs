@@ -33,10 +33,19 @@ pub struct Function {
 
 impl Function {
     /// The name to show, falling back to the conventional address form.
+    ///
+    /// Demangled where possible: `std::vector<int>::push_back(int&&)` is what
+    /// an analyst needs to see, and the mangled form is one command away.
     pub fn display_name(&self) -> String {
-        self.name
-            .clone()
-            .unwrap_or_else(|| format!("sub_{:x}", self.entry.get()))
+        match &self.name {
+            Some(n) => r12e_types::pretty(n),
+            None => format!("sub_{:x}", self.entry.get()),
+        }
+    }
+
+    /// The name exactly as the file spells it, still mangled.
+    pub fn raw_name(&self) -> Option<&str> {
+        self.name.as_deref()
     }
 
     /// True when the walk finished with nothing unresolved.
@@ -130,10 +139,11 @@ impl Program {
             // names; showing one as a label is worse than showing nothing.
             .filter(|s| !s.name.is_empty() && !s.name.starts_with('$'))
             .map(|s| {
+                let name = r12e_types::pretty(&s.name);
                 if s.addr == addr {
-                    s.name.clone()
+                    name
                 } else {
-                    format!("{}+{:#x}", s.name, addr.get() - s.addr.get())
+                    format!("{name}+{:#x}", addr.get() - s.addr.get())
                 }
             })
     }

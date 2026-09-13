@@ -222,6 +222,7 @@ dependencies = [
  "r12e-arch",
  "r12e-core",
  "r12e-format",
+ "r12e-types",
  "rayon",
  "serde",
 ]
@@ -244,6 +245,7 @@ dependencies = [
  "r12e-core",
  "r12e-db",
  "r12e-format",
+ "r12e-types",
  "serde",
  "serde_json",
 ]
@@ -271,6 +273,10 @@ dependencies = [
  "r12e-core",
  "serde",
 ]
+
+[[package]]
+name = "r12e-types"
+version = "0.1.0"
 
 [[package]]
 name = "rayon"

@@ -114,7 +114,7 @@ pub fn symbols(w: &mut Out, o: &Object, as_json: bool) -> R {
             s.size,
             format!("{:?}", s.kind).to_lowercase(),
             if s.dynamic { "dynamic" } else { "static" },
-            s.name
+            r12e_types::pretty(&s.name)
         );
     }
     Ok(exit::OK)
@@ -130,9 +130,15 @@ pub fn imports(w: &mut Out, o: &Object, as_json: bool) -> R {
         return Ok(exit::NOT_FOUND);
     }
     for i in &o.imports {
+        let name = r12e_types::pretty(&i.name);
+        let lib = i
+            .library
+            .as_deref()
+            .map(|l| format!("{l}  "))
+            .unwrap_or_default();
         match i.thunk {
-            Some(t) => outln!(w, "{t}  {}", i.name),
-            None => outln!(w, "{:<20}{}", "", i.name),
+            Some(t) => outln!(w, "{t}  {lib}{name}"),
+            None => outln!(w, "{:<20}{lib}{name}", ""),
         }
     }
     Ok(exit::OK)
@@ -148,7 +154,7 @@ pub fn exports(w: &mut Out, o: &Object, as_json: bool) -> R {
         return Ok(exit::NOT_FOUND);
     }
     for e in &o.exports {
-        outln!(w, "{}  {}", e.addr, e.name);
+        outln!(w, "{}  {}", e.addr, r12e_types::pretty(&e.name));
     }
     Ok(exit::OK)
 }
