@@ -45,7 +45,9 @@ struct Case {
 /// The cases whose arguments are plain numbers, with the answer the processor
 /// gave.
 fn cases() -> Vec<Case> {
-    let Some(dir) = build() else { return Vec::new() };
+    let Some(dir) = build() else {
+        return Vec::new();
+    };
     let table = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/portable/cases.txt");
     let _ = dir;
     let Ok(text) = std::fs::read_to_string(table) else {
@@ -129,15 +131,10 @@ fn returned(
             continue;
         }
         // The last write to a result register in this block is what it leaves.
-        let last = b
-            .ops
-            .iter()
-            .rev()
-            .filter_map(|op| op.out)
-            .find(|v| {
-                v.location.space == r12e_ir::op::Space::Register
-                    && abi.results.contains(&v.location.offset)
-            });
+        let last = b.ops.iter().rev().filter_map(|op| op.out).find(|v| {
+            v.location.space == r12e_ir::op::Space::Register
+                && abi.results.contains(&v.location.offset)
+        });
         let Some(range) = last.and_then(|v| ranges.get(&v)) else {
             // A path whose value is unknown makes the whole answer unknown.
             return Some(Range::ANY);
@@ -220,7 +217,9 @@ fn every_range_contains_what_the_processor_produced() {
 
 #[test]
 fn a_masked_value_is_bounded_by_its_mask() {
-    let Some(p) = open("wide.a64.O2.o") else { return };
+    let Some(p) = open("wide.a64.O2.o") else {
+        return;
+    };
     // `indexed` reads `table[i & 63] + table[(i >> 6) & 63]`, so the masks
     // bound the indices whatever the argument is.
     let Some(f) = p

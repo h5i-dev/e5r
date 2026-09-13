@@ -13,8 +13,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use r12e_ir::op::Op;
 use r12e_ir::abi::Abi;
+use r12e_ir::op::Op;
 use r12e_ir::ssa::{Location, Operand, SsaFunction, SsaKind, SsaOp, Value};
 
 /// A rebuilt expression.
@@ -679,8 +679,18 @@ impl<'a> Rebuilder<'a> {
             // missed it; say so rather than inventing a value.
             return Expr::Unknown("phi");
         };
-        let a = || op.inputs.first().map(|i| self.operand(i)).unwrap_or(Expr::Unknown("missing"));
-        let b = || op.inputs.get(1).map(|i| self.operand(i)).unwrap_or(Expr::Unknown("missing"));
+        let a = || {
+            op.inputs
+                .first()
+                .map(|i| self.operand(i))
+                .unwrap_or(Expr::Unknown("missing"))
+        };
+        let b = || {
+            op.inputs
+                .get(1)
+                .map(|i| self.operand(i))
+                .unwrap_or(Expr::Unknown("missing"))
+        };
         let bin = |sym: &'static str| Expr::Binary(sym, Box::new(a()), Box::new(b()));
         let signed_bin = |sym: &'static str| {
             // The width of what is being compared, which is not the width of
@@ -814,10 +824,7 @@ impl<'a> Rebuilder<'a> {
                     Op::IntRem128 => "__urem128",
                     _ => "__srem128",
                 };
-                Expr::Named(
-                    name,
-                    op.inputs.iter().map(|i| self.operand(i)).collect(),
-                )
+                Expr::Named(name, op.inputs.iter().map(|i| self.operand(i)).collect())
             }
             Op::FloatAdd => fbin("+"),
             Op::FloatSub => fbin("-"),

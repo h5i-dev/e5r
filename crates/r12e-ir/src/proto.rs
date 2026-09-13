@@ -209,11 +209,7 @@ fn restored(f: &SsaFunction, offset: u64) -> bool {
     };
     let definitions = f.definitions();
     for b in f.blocks.values() {
-        if !b
-            .ops
-            .iter()
-            .any(|op| op.kind == SsaKind::Op(Op::Return))
-        {
+        if !b.ops.iter().any(|op| op.kind == SsaKind::Op(Op::Return)) {
             continue;
         }
         // What the register holds at the return: the last definition in this

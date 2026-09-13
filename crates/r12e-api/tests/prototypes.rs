@@ -185,7 +185,12 @@ fn recovered_prototypes_agree_with_the_debug_information() {
 fn a_result_is_claimed_only_when_something_was_left_behind() {
     let mut void_functions = 0;
     let mut credited = 0;
-    for fixture in ["wide.a64.O0.o", "wide.a64.O2.o", "wide.x64.O0.o", "wide.x64.O2.o"] {
+    for fixture in [
+        "wide.a64.O0.o",
+        "wide.a64.O2.o",
+        "wide.x64.O0.o",
+        "wide.x64.O2.o",
+    ] {
         let Some(p) = open(fixture) else { continue };
         let Some(d) = p.object.debug.as_ref() else {
             continue;
@@ -217,7 +222,9 @@ fn a_result_is_claimed_only_when_something_was_left_behind() {
 
 #[test]
 fn a_function_that_keeps_the_conventions_promises_says_so() {
-    let Some(p) = open("wide.a64.O2.o") else { return };
+    let Some(p) = open("wide.a64.O2.o") else {
+        return;
+    };
     let mut standard = 0;
     let mut total = 0;
     for f in p.functions_by_address().filter(|f| f.is_complete()) {
@@ -293,7 +300,9 @@ fn callers_settle_whether_a_function_returns() {
 
 #[test]
 fn a_function_nothing_calls_keeps_its_own_answer() {
-    let Some(p) = open("wide.a64.O0.o") else { return };
+    let Some(p) = open("wide.a64.O0.o") else {
+        return;
+    };
     let recovered = r12e_api::prototypes(&p);
     // Nothing in an object file of library functions calls `arith64`, so the
     // callers say nothing and its own answer stands.

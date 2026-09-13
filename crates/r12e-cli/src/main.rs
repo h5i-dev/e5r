@@ -14,6 +14,7 @@ mod batch;
 mod json;
 mod mcp;
 mod out;
+mod patch;
 mod print;
 mod shell;
 
@@ -226,6 +227,27 @@ pub enum Command {
         #[arg(short, long)]
         command: Vec<String>,
     },
+    /// Record, preview and apply byte patches.
+    ///
+    /// An edit is anchored to the code around it, so a patch written against
+    /// one build still lands on the right instruction in the next one. It
+    /// carries the bytes it expects to find, and applies as a whole set or not
+    /// at all.
+    Patch {
+        #[command(flatten)]
+        common: Common,
+        #[command(subcommand)]
+        what: PatchCommand,
+    },
+    /// Save and reopen an analysis session.
+    ///
+    /// A project file names the binary by content as well as by path, so
+    /// opening one against the wrong build says so rather than producing
+    /// answers about bytes that are not there.
+    Project {
+        #[command(subcommand)]
+        what: ProjectCommand,
+    },
     /// Report an overlay, section entropy, and what they suggest.
     ///
     /// Findings are observations with a strength, never a verdict: a section
@@ -271,6 +293,130 @@ pub enum Command {
         common: Common,
         #[command(subcommand)]
         what: Annotation,
+    },
+}
+
+/// What to do with a patch set.
+#[derive(Subcommand)]
+pub enum PatchCommand {
+    /// Capture an edit from the binary as it is now.
+    Record {
+        /// Address or symbol to write at.
+        target: String,
+        /// The bytes to write, in hex.
+        #[arg(long)]
+        bytes: String,
+        /// Why.
+        #[arg(long, default_value = "")]
+        note: String,
+        /// The patch set to add to, created when it does not exist.
+        #[arg(short, long)]
+        out: PathBuf,
+    },
+    /// List what a patch set says, without opening the binary.
+    Show {
+        /// The patch set.
+        set: PathBuf,
+    },
+    /// Say where it would land and what it would overwrite.
+    Preview {
+        /// The patch set.
+        set: PathBuf,
+    },
+    /// Write the patched binary.
+    Apply {
+        /// The patch set.
+        set: PathBuf,
+        /// Where to write. Defaults to refusing unless `--in-place`.
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+        /// Overwrite the binary itself.
+        #[arg(long)]
+        in_place: bool,
+        /// Write even where an edit matched on its address alone.
+        #[arg(long)]
+        allow_address_only: bool,
+    },
+    /// Write the binary with the patch set taken back out.
+    Revert {
+        /// The patch set that was applied.
+        set: PathBuf,
+        /// Where to write.
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+        /// Overwrite the binary itself.
+        #[arg(long)]
+        in_place: bool,
+        /// Refuse where an edit matched on its address alone.
+        ///
+        /// Off by default, because a patched binary no longer holds the bytes
+        /// the anchor fingerprinted: that is what applying the patch did. The
+        /// expected bytes still have to match, and they are the exact bytes
+        /// the apply wrote.
+        #[arg(long)]
+        anchored_only: bool,
+    },
+    /// Write the set that undoes this one, without applying anything.
+    Invert {
+        /// The patch set.
+        set: PathBuf,
+        /// Where to write it.
+        #[arg(short, long)]
+        out: PathBuf,
+    },
+    /// Combine several sets into one.
+    Merge {
+        /// The sets, in the order they apply.
+        sets: Vec<PathBuf>,
+        /// Where to write the result.
+        #[arg(short, long)]
+        out: PathBuf,
+    },
+}
+
+/// What to do with a project file.
+#[derive(Subcommand)]
+pub enum ProjectCommand {
+    /// Record what it takes to reopen this session.
+    New {
+        /// The binary.
+        binary: PathBuf,
+        /// Where to write the project.
+        #[arg(short, long)]
+        out: PathBuf,
+        /// An analysis option, as `key=value`. Repeatable.
+        #[arg(long = "set")]
+        settings: Vec<String>,
+        /// The annotation log. Defaults to the binary's path plus `.r12e`.
+        #[arg(long)]
+        log: Option<PathBuf>,
+    },
+    /// Print a project file.
+    Show {
+        /// The project.
+        project: PathBuf,
+    },
+    /// Say whether a binary is the one the project was made for.
+    Verify {
+        /// The project.
+        project: PathBuf,
+        /// The binary. Defaults to the path the project records.
+        #[arg(long)]
+        binary: Option<PathBuf>,
+    },
+    /// Attach a signature library, a patch set, or a log.
+    Add {
+        /// The project.
+        project: PathBuf,
+        /// A signature library. Repeatable.
+        #[arg(long)]
+        signatures: Vec<PathBuf>,
+        /// A patch set. Repeatable.
+        #[arg(long = "patch")]
+        patches: Vec<PathBuf>,
+        /// The annotation log.
+        #[arg(long)]
+        log: Option<PathBuf>,
     },
 }
 
@@ -336,12 +482,16 @@ impl Command {
             | Command::Batch { common, .. }
             | Command::Diff { common, .. } => common,
             // The server takes its paths per call rather than up front.
-            Command::Mcp | Command::Completions { .. } | Command::Manpage => {
+            Command::Mcp
+            | Command::Project { .. }
+            | Command::Completions { .. }
+            | Command::Manpage => {
                 unreachable!("handled before a file is opened")
             }
             Command::Vtables { common, .. }
             | Command::Overlay { common, .. }
             | Command::Archive { common, .. }
+            | Command::Patch { common, .. }
             | Command::Emulate { common, .. }
             | Command::Query { common, .. }
             | Command::Sig { common, .. }
@@ -378,6 +528,9 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
     // below have no input at all.
     match &cli.command {
         Command::Mcp => return mcp::serve(),
+        // A project names its own files; none of them is the binary the other
+        // commands open up front.
+        Command::Project { what } => return project(w, what),
         Command::Completions { shell } => {
             let script = shell::completions(&Cli::command(), *shell);
             for line in script.lines() {
@@ -499,6 +652,59 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
         Command::Query { common, query } => {
             print::query(w, &program, &query.join(" "), common.json)
         }
+        Command::Patch { what, common } => {
+            let subject = patch::Subject {
+                program: &program,
+                file: &data,
+                binary: &common.file,
+            };
+            match what {
+                PatchCommand::Record {
+                    target,
+                    bytes,
+                    note,
+                    out,
+                } => patch::record(
+                    w,
+                    &subject,
+                    target,
+                    &patch::hex(bytes)?,
+                    &whoami(),
+                    note,
+                    out,
+                ),
+                PatchCommand::Show { set } => patch::show(w, &patch::read(set)?),
+                PatchCommand::Preview { set } => patch::preview(w, &subject, &patch::read(set)?),
+                PatchCommand::Apply {
+                    set,
+                    out,
+                    in_place,
+                    allow_address_only,
+                } => patch::apply(
+                    w,
+                    &subject,
+                    &patch::read(set)?,
+                    out.as_deref(),
+                    *in_place,
+                    *allow_address_only,
+                ),
+                PatchCommand::Revert {
+                    set,
+                    out,
+                    in_place,
+                    anchored_only,
+                } => patch::apply(
+                    w,
+                    &subject,
+                    &patch::read(set)?.revert(),
+                    out.as_deref(),
+                    *in_place,
+                    !*anchored_only,
+                ),
+                PatchCommand::Invert { set, out } => patch::invert(w, &patch::read(set)?, out),
+                PatchCommand::Merge { sets, out } => patch::merge(w, sets, out),
+            }
+        }
         Command::Sig { what, common } => match what {
             SigCommand::Create { out } => {
                 let library = r12e_api::collect_signatures(
@@ -581,6 +787,42 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             }
         }
         _ => unreachable!("handled above"),
+    }
+}
+
+/// The project commands, which open the files they name and nothing else.
+fn project(w: &mut out::Out, what: &ProjectCommand) -> Result<u8, String> {
+    match what {
+        ProjectCommand::New {
+            binary,
+            out,
+            settings,
+            log,
+        } => {
+            let file =
+                std::fs::File::open(binary).map_err(|e| format!("{}: {e}", binary.display()))?;
+            let data = map_file(&file).map_err(|e| format!("{}: {e}", binary.display()))?;
+            let object = r12e_format::load(&data, &LoadOptions::default())
+                .map_err(|e| format!("{}: {e}", binary.display()))?;
+            patch::project_new(w, binary, &object, &data, settings, log.as_deref(), out)
+        }
+        ProjectCommand::Show { project } => patch::project_show(w, &patch::project_read(project)?),
+        ProjectCommand::Verify { project, binary } => {
+            let proj = patch::project_read(project)?;
+            let path = binary
+                .clone()
+                .unwrap_or_else(|| PathBuf::from(&proj.binary.path));
+            let file =
+                std::fs::File::open(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            let data = map_file(&file).map_err(|e| format!("{}: {e}", path.display()))?;
+            patch::project_verify(w, &proj, &path, &data)
+        }
+        ProjectCommand::Add {
+            project,
+            signatures,
+            patches,
+            log,
+        } => patch::project_add(w, project, signatures, patches, log.as_deref()),
     }
 }
 

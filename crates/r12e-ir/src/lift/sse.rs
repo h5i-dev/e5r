@@ -149,10 +149,7 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
                         Operand::Reg(d) => {
                             b.emit(
                                 Op::Copy,
-                                Some(Varnode::register(
-                                    crate::lift::x86::gpr_offset(d.num),
-                                    size,
-                                )),
+                                Some(Varnode::register(crate::lift::x86::gpr_offset(d.num), size)),
                                 &[value],
                             );
                             if size == 4 {
@@ -235,12 +232,20 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
                         all_bits(&mut b, greater, size)
                     }
                     "pminub" | "pminsd" => {
-                        let op = if m == "pminub" { Op::IntLess } else { Op::IntSLess };
+                        let op = if m == "pminub" {
+                            Op::IntLess
+                        } else {
+                            Op::IntSLess
+                        };
                         let less = b.eval(op, 1, &[x, c]);
                         select(&mut b, less, x, c, size)
                     }
                     _ => {
-                        let op = if m == "pmaxub" { Op::IntLess } else { Op::IntSLess };
+                        let op = if m == "pmaxub" {
+                            Op::IntLess
+                        } else {
+                            Op::IntSLess
+                        };
                         let less = b.eval(op, 1, &[x, c]);
                         select(&mut b, less, c, x, size)
                     }
@@ -316,7 +321,11 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
             };
             let source = [b.eval(Op::Copy, 8, &[y[0]]), b.eval(Op::Copy, 8, &[y[1]])];
             let count = 16 / size as u64;
-            let base = if m.starts_with("punpckh") { count / 2 } else { 0 };
+            let base = if m.starts_with("punpckh") {
+                count / 2
+            } else {
+                0
+            };
             let mut picked = Vec::new();
             for n in 0..count {
                 let index = base + n / 2;
@@ -410,7 +419,8 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
                 "pextrd" => 4,
                 _ => 8,
             };
-            let (Some(dst), Some(s), Some(index)) = (ops.first(), ops.get(1).and_then(vector), ops.get(2))
+            let (Some(dst), Some(s), Some(index)) =
+                (ops.first(), ops.get(1).and_then(vector), ops.get(2))
             else {
                 return b.unimplemented();
             };
@@ -704,7 +714,11 @@ fn scalar_float(b: &mut Builder, i: &Insn) -> Option<Lifted> {
             let src = match ops.get(1)? {
                 Operand::Reg(r) => Varnode::register(
                     crate::lift::x86::gpr_offset(r.num),
-                    if r.width == r12e_arch::Width::W64 { 8 } else { 4 },
+                    if r.width == r12e_arch::Width::W64 {
+                        8
+                    } else {
+                        4
+                    },
                 ),
                 Operand::Mem(mem) => {
                     let addr = address(b, mem, at)?;
@@ -722,7 +736,11 @@ fn scalar_float(b: &mut Builder, i: &Insn) -> Option<Lifted> {
             let (dest, dest_size) = match ops.first()? {
                 Operand::Reg(r) => (
                     r.num,
-                    if r.width == r12e_arch::Width::W64 { 8u8 } else { 4 },
+                    if r.width == r12e_arch::Width::W64 {
+                        8u8
+                    } else {
+                        4
+                    },
                 ),
                 _ => return None,
             };
@@ -746,10 +764,7 @@ fn scalar_float(b: &mut Builder, i: &Insn) -> Option<Lifted> {
             if dest_size == 4 {
                 b.emit(
                     Op::Copy,
-                    Some(Varnode::register(
-                        crate::lift::x86::gpr_offset(dest) + 4,
-                        4,
-                    )),
+                    Some(Varnode::register(crate::lift::x86::gpr_offset(dest) + 4, 4)),
                     &[Varnode::constant(0, 4)],
                 );
             }
@@ -805,10 +820,7 @@ fn piece(b: &mut Builder, source: [Varnode; 2], index: u64, size: u8) -> Varnode
 fn saturate(b: &mut Builder, v: Varnode, wide: u8, narrow: u8, signed: bool) -> Varnode {
     let bits = narrow as u64 * 8;
     let (low, high) = if signed {
-        (
-            (!0u64 << (bits - 1)) & mask(wide),
-            (1u64 << (bits - 1)) - 1,
-        )
+        ((!0u64 << (bits - 1)) & mask(wide), (1u64 << (bits - 1)) - 1)
     } else {
         (0, (1u64 << bits) - 1)
     };

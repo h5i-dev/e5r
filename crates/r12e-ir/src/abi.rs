@@ -11,8 +11,8 @@
 use r12e_core::Arch;
 
 use crate::lift::{aarch64, x86};
-use crate::ssa::Location;
 use crate::op::Space;
+use crate::ssa::Location;
 
 /// The registers a convention uses, as byte offsets into the register file.
 #[derive(Debug, Clone)]

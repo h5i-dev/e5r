@@ -96,9 +96,9 @@ fn the_scan_finds_the_same_tables_without_the_symbols() {
             .collect();
 
         for (addr, methods) in &named {
-            let found = scanned.get(addr).unwrap_or_else(|| {
-                panic!("{fixture}: the scan missed the table at {addr:#x}")
-            });
+            let found = scanned
+                .get(addr)
+                .unwrap_or_else(|| panic!("{fixture}: the scan missed the table at {addr:#x}"));
             assert_eq!(
                 found, methods,
                 "{fixture}: the table at {addr:#x} came out with {found} methods, not {methods}"
@@ -141,7 +141,9 @@ fn every_slot_points_at_something_executable() {
 
 #[test]
 fn a_binary_with_no_classes_has_no_tables() {
-    let Some(p) = open("wide.a64.O2.o") else { return };
+    let Some(p) = open("wide.a64.O2.o") else {
+        return;
+    };
     let found = r12e_api::vtables(&p);
     assert!(
         found.is_empty(),

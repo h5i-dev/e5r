@@ -646,7 +646,9 @@ impl Parser {
         };
         let op = match self.next() {
             Some(Token::Op(op)) => op,
-            Some(other) => return Err(format!("expected an operator after {field}, found {other}")),
+            Some(other) => {
+                return Err(format!("expected an operator after {field}, found {other}"));
+            }
             None => return Err(format!("{field} needs something to compare against")),
         };
         let value = match self.next() {

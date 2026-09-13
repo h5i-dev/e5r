@@ -124,7 +124,9 @@ fn an_array_walk_reports_its_element_size() {
 
 #[test]
 fn nothing_is_reported_for_a_function_that_takes_no_pointers() {
-    let Some(p) = open("wide.a64.O0.o") else { return };
+    let Some(p) = open("wide.a64.O0.o") else {
+        return;
+    };
     let Some(shapes) = shapes_of(&p, "arith64") else {
         return;
     };

@@ -192,7 +192,11 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
             else {
                 return b.unimplemented();
             };
-            let (count, size) = if count == 1 && xc > 1 { (xc, xs) } else { (count, size) };
+            let (count, size) = if count == 1 && xc > 1 {
+                (xc, xs)
+            } else {
+                (count, size)
+            };
             for n in 0..count {
                 let a = lane(x, n, size);
                 let r = match i.mnemonic {
@@ -223,7 +227,11 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
             };
             let bytes = count * size as u64;
             for at in (0..bytes).step_by(8) {
-                let chunk = if bytes - at >= 8 { 8u8 } else { (bytes - at) as u8 };
+                let chunk = if bytes - at >= 8 {
+                    8u8
+                } else {
+                    (bytes - at) as u8
+                };
                 let dst = Varnode::register(vec_offset(d) + at, chunk);
                 let a = Varnode::register(vec_offset(x) + at, chunk);
                 let c = Varnode::register(vec_offset(y) + at, chunk);
@@ -456,9 +464,7 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
                 }
                 // A literal, which the encoding spells as a small set of
                 // representable values.
-                (Some(Operand::Reg(d)), Some(Operand::FpImm(bits)))
-                    if d.class == RegClass::Vec =>
-                {
+                (Some(Operand::Reg(d)), Some(Operand::FpImm(bits))) if d.class == RegClass::Vec => {
                     let size = if d.width == Width::W64 { 8 } else { 4 };
                     let value = if size == 4 {
                         (f64::from_bits(*bits) as f32).to_bits() as u64
@@ -513,7 +519,11 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
                     let bytes = count * size as u64;
                     let mut at = 0;
                     while at < bytes {
-                        let chunk = if bytes - at >= 8 { 8 } else { (bytes - at) as u8 };
+                        let chunk = if bytes - at >= 8 {
+                            8
+                        } else {
+                            (bytes - at) as u8
+                        };
                         b.emit(
                             Op::Copy,
                             Some(Varnode::register(vec_offset(d) + at, chunk)),
@@ -663,8 +673,9 @@ fn float(mut b: Builder, i: &Insn) -> Lifted {
                     lane(y, 0, size)
                 }
                 // The compare-with-zero form, which the decoder spells out.
-                Some(Operand::FpImm(0)) | Some(Operand::Imm(0)) | Some(Operand::Name(_))
-                | None => Varnode::constant(0, size),
+                Some(Operand::FpImm(0)) | Some(Operand::Imm(0)) | Some(Operand::Name(_)) | None => {
+                    Varnode::constant(0, size)
+                }
                 _ => return b.unimplemented(),
             };
             let less = b.eval(Op::FloatLess, 1, &[a, c]);
@@ -753,7 +764,8 @@ fn float(mut b: Builder, i: &Insn) -> Lifted {
             else {
                 return b.unimplemented();
             };
-            let (Some((d, _, size)), Some((x, ..)), Some((y, ..))) = (vector(dst), vector(a), vector(c))
+            let (Some((d, _, size)), Some((x, ..)), Some((y, ..))) =
+                (vector(dst), vector(a), vector(c))
             else {
                 return b.unimplemented();
             };
@@ -788,7 +800,8 @@ fn float(mut b: Builder, i: &Insn) -> Lifted {
     };
 
     if let Some(op) = binary(m) {
-        let (Some((x, ..)), Some((y, ..))) = (ops.get(1).and_then(vector), ops.get(2).and_then(vector))
+        let (Some((x, ..)), Some((y, ..))) =
+            (ops.get(1).and_then(vector), ops.get(2).and_then(vector))
         else {
             return b.unimplemented();
         };
@@ -839,7 +852,11 @@ fn float(mut b: Builder, i: &Insn) -> Lifted {
             if matches!(m, "fnmadd" | "fnmsub") {
                 addend = b.eval(Op::FloatNeg, size, &[addend]);
             }
-            let r = b.eval(Op::FloatMulAdd, size, &[multiplicand, lane(y, 0, size), addend]);
+            let r = b.eval(
+                Op::FloatMulAdd,
+                size,
+                &[multiplicand, lane(y, 0, size), addend],
+            );
             b.emit(Op::Copy, Some(lane(d, 0, size)), &[r]);
             clear_tail(&mut b, d, size as u64);
             b.finish(true)
@@ -902,7 +919,11 @@ pub fn aligned_chunk(at: u64, limit: u64) -> u8 {
 pub fn wide_transfer(b: &mut Builder, addr: Varnode, num: u8, bytes: u64, store: bool) {
     let mut at = 0;
     while at < bytes {
-        let chunk = if bytes - at >= 8 { 8 } else { (bytes - at) as u8 };
+        let chunk = if bytes - at >= 8 {
+            8
+        } else {
+            (bytes - at) as u8
+        };
         let here = if at == 0 {
             addr
         } else {

@@ -80,7 +80,10 @@ pub fn vtables(p: &Program) -> Vec<VTable> {
         }
         let mut at = section.range.start();
         while at.get() + 24 <= section.range.end().get() {
-            if claimed.iter().any(|(lo, hi)| at.get() >= *lo && at.get() < *hi) {
+            if claimed
+                .iter()
+                .any(|(lo, hi)| at.get() >= *lo && at.get() < *hi)
+            {
                 at = at.wrapping_offset(8);
                 continue;
             }

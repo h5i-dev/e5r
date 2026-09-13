@@ -135,10 +135,7 @@ pub(crate) fn address(b: &mut Builder, m: &Mem, at: Addr) -> Option<Varnode> {
     }
     let mut addr = match m.base {
         Some(r) if r.class == RegClass::Pc => Varnode::constant(at.get(), 8),
-        Some(r) => Varnode {
-            size: 8,
-            ..reg(r)?
-        },
+        Some(r) => Varnode { size: 8, ..reg(r)? },
         None => Varnode::constant(0, 8),
     };
     if let Some((ix, ext, scale)) = m.index {
@@ -258,7 +255,11 @@ fn set_result_flags(b: &mut Builder, result: Varnode) {
     );
     b.emit(Op::Copy, Some(flag_zf()), &[zf]);
     // Parity is over the low byte only, on every width.
-    let low = b.eval(Op::IntAnd, result.size, &[result, Varnode::constant(0xff, result.size)]);
+    let low = b.eval(
+        Op::IntAnd,
+        result.size,
+        &[result, Varnode::constant(0xff, result.size)],
+    );
     let ones = b.eval(Op::PopCount, 1, &[low]);
     let odd = b.eval(Op::IntAnd, 1, &[ones, Varnode::constant(1, 1)]);
     let pf = b.eval(Op::IntEqual, 1, &[odd, Varnode::constant(0, 1)]);
@@ -410,11 +411,7 @@ pub fn lift(i: &Insn) -> Lifted {
             let Some(cond) = condition(&mut b, s) else {
                 return b.unimplemented();
             };
-            b.emit(
-                Op::CBranch,
-                None,
-                &[Varnode::constant(t.get(), 8), cond],
-            );
+            b.emit(Op::CBranch, None, &[Varnode::constant(t.get(), 8), cond]);
             return b.finish(true);
         }
         Flow::Call(t) => {
@@ -529,7 +526,11 @@ pub fn lift(i: &Insn) -> Lifted {
                     ..src
                 }
             } else {
-                let op = if m == "movzx" { Op::IntZExt } else { Op::IntSExt };
+                let op = if m == "movzx" {
+                    Op::IntZExt
+                } else {
+                    Op::IntSExt
+                };
                 b.eval(op, dest_size, &[src])
             };
             match store(&mut b, dest, widened, at) {
@@ -698,8 +699,7 @@ pub fn lift(i: &Insn) -> Lifted {
                 let from = Varnode::constant(byte as u64 * 8, 1);
                 let to = (size - 1 - byte) as u64 * 8;
                 let shifted = b.eval(Op::IntRight, size, &[x, from]);
-                let isolated =
-                    b.eval(Op::IntAnd, size, &[shifted, Varnode::constant(0xff, size)]);
+                let isolated = b.eval(Op::IntAnd, size, &[shifted, Varnode::constant(0xff, size)]);
                 let placed = b.eval(Op::IntLeft, size, &[isolated, Varnode::constant(to, 1)]);
                 result = Some(match result {
                     None => placed,
@@ -1004,7 +1004,11 @@ fn imul(mut b: Builder, _i: &Insn, ops: &[Operand], size: u8, at: Addr) -> Lifte
         let acc = Varnode::register(gpr_offset(0), size);
         let low = b.eval(Op::IntMul, size, &[acc, y]);
         let high = b.eval(Op::IntSMulHigh, size, &[acc, y]);
-        let expected = b.eval(Op::IntSRight, size, &[low, Varnode::constant(size as u64 * 8 - 1, 1)]);
+        let expected = b.eval(
+            Op::IntSRight,
+            size,
+            &[low, Varnode::constant(size as u64 * 8 - 1, 1)],
+        );
         let fits = b.eval(Op::IntEqual, 1, &[high, expected]);
         let overflow = b.eval(Op::BoolNot, 1, &[fits]);
         b.emit(Op::Copy, Some(flag_cf()), &[overflow]);
@@ -1022,11 +1026,7 @@ fn imul(mut b: Builder, _i: &Insn, ops: &[Operand], size: u8, at: Addr) -> Lifte
     }
 
     // Two and three operand forms write only the low half.
-    let (x_op, y_op) = if ops.len() == 3 {
-        (1, 2)
-    } else {
-        (0, 1)
-    };
+    let (x_op, y_op) = if ops.len() == 3 { (1, 2) } else { (0, 1) };
     let Some(x) = ops.get(x_op).and_then(|o| source(&mut b, o, size, at)) else {
         return b.unimplemented();
     };
@@ -1087,10 +1087,22 @@ fn divide(mut b: Builder, ops: &[Operand], size: u8, at: Addr, signed: bool) -> 
         } else {
             b.eval(Op::IntZExt, 2, &[d])
         };
-        let q = b.eval(if signed { Op::IntSDiv } else { Op::IntDiv }, 2, &[ax, wide]);
-        let r = b.eval(if signed { Op::IntSRem } else { Op::IntRem }, 2, &[ax, wide]);
+        let q = b.eval(
+            if signed { Op::IntSDiv } else { Op::IntDiv },
+            2,
+            &[ax, wide],
+        );
+        let r = b.eval(
+            if signed { Op::IntSRem } else { Op::IntRem },
+            2,
+            &[ax, wide],
+        );
         b.emit(Op::Copy, Some(Varnode::register(gpr_offset(0), 1)), &[q]);
-        b.emit(Op::Copy, Some(Varnode::register(gpr_offset(0) + 1, 1)), &[r]);
+        b.emit(
+            Op::Copy,
+            Some(Varnode::register(gpr_offset(0) + 1, 1)),
+            &[r],
+        );
         return b.finish(true);
     }
     let low = Varnode::register(gpr_offset(0), size);

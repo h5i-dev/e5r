@@ -440,7 +440,9 @@ pub fn step(m: &mut Machine<'_>, ir: &IrOp) -> Step {
             if out.size == 4 {
                 as_f32(x).mul_add(as_f32(y), as_f32(z)).to_bits() as u64
             } else {
-                f64::from_bits(x).mul_add(f64::from_bits(y), f64::from_bits(z)).to_bits()
+                f64::from_bits(x)
+                    .mul_add(f64::from_bits(y), f64::from_bits(z))
+                    .to_bits()
             }
         }
         Op::FloatEqual | Op::FloatNotEqual | Op::FloatLess | Op::FloatLessEqual | Op::FloatNan => {

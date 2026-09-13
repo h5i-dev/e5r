@@ -30,7 +30,9 @@ struct Case {
 }
 
 fn cases() -> Vec<Case> {
-    let Some(dir) = build() else { return Vec::new() };
+    let Some(dir) = build() else {
+        return Vec::new();
+    };
     let table = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/portable/cases.txt");
     let Ok(text) = std::fs::read_to_string(table) else {
         return Vec::new();

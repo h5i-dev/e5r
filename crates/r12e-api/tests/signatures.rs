@@ -77,7 +77,10 @@ fn a_stripped_binary_gets_its_names_back() {
         "recovered {recovered} of {} names ({recall:.2}), floor is {MIN_RECALL}",
         truth.len()
     );
-    println!("recovered {recovered} of {} names ({recall:.2})", truth.len());
+    println!(
+        "recovered {recovered} of {} names ({recall:.2})",
+        truth.len()
+    );
 }
 
 #[test]
@@ -105,7 +108,9 @@ fn a_library_built_from_one_build_recognizes_another() {
 
 #[test]
 fn the_library_file_survives_a_round_trip() {
-    let Some(p) = open("hello.a64.O2") else { return };
+    let Some(p) = open("hello.a64.O2") else {
+        return;
+    };
     let library = r12e_api::collect_signatures(&p, "hello");
     let text = library.to_text();
     let back = r12e_db::signature::Library::from_text(&text);

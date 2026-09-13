@@ -76,8 +76,8 @@ fn cases() -> Vec<Case> {
 fn parse_argument(t: &str) -> Arg {
     let single = t.ends_with('f') && !t.starts_with("0x");
     let body = if single { &t[..t.len() - 1] } else { t };
-    let floating = !body.starts_with("0x")
-        && (body.contains('.') || body.contains('e') || body.contains('E'));
+    let floating =
+        !body.starts_with("0x") && (body.contains('.') || body.contains('e') || body.contains('E'));
     if floating {
         if let Ok(v) = body.parse::<f64>() {
             return if single {

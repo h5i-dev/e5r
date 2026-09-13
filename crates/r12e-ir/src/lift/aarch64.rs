@@ -808,9 +808,7 @@ pub fn lift(i: &Insn) -> Lifted {
                     b.eval(op, 8, &[base, product])
                 }
                 // The negating forms have no accumulator.
-                None if i.mnemonic.ends_with("negl") => {
-                    b.eval(Op::IntNegate, 8, &[product])
-                }
+                None if i.mnemonic.ends_with("negl") => b.eval(Op::IntNegate, 8, &[product]),
                 None => product,
             };
             write_reg(&mut b, d, r);

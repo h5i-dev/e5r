@@ -230,9 +230,7 @@ impl Types {
     /// and anything anonymous.
     pub fn definition(&self, id: TypeId) -> Option<String> {
         match self.get(id)? {
-            Type::Typedef(name, inner) => {
-                Some(format!("typedef {};", self.declare(*inner, name)))
-            }
+            Type::Typedef(name, inner) => Some(format!("typedef {};", self.declare(*inner, name))),
             Type::Composite(c) => {
                 let name = c.name.as_ref()?;
                 let keyword = if c.union { "union" } else { "struct" };
@@ -396,7 +394,10 @@ impl Types {
     }
 
     fn needs_parentheses(&self, id: TypeId) -> bool {
-        matches!(self.get(id), Some(Type::Array(..)) | Some(Type::Function(_)))
+        matches!(
+            self.get(id),
+            Some(Type::Array(..)) | Some(Type::Function(_))
+        )
     }
 }
 
@@ -485,9 +486,24 @@ mod tests {
             union: false,
             size: Some(16),
             fields: vec![
-                Field { name: "x".into(), ty: int, offset: 0, bits: None },
-                Field { name: "y".into(), ty: int, offset: 4, bits: None },
-                Field { name: "tag".into(), ty: long, offset: 8, bits: None },
+                Field {
+                    name: "x".into(),
+                    ty: int,
+                    offset: 0,
+                    bits: None,
+                },
+                Field {
+                    name: "y".into(),
+                    ty: int,
+                    offset: 4,
+                    bits: None,
+                },
+                Field {
+                    name: "tag".into(),
+                    ty: long,
+                    offset: 8,
+                    bits: None,
+                },
             ],
         }));
         assert_eq!(t.field_at(point, 0).unwrap().0.name, "x");

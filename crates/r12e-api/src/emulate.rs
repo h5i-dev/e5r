@@ -85,10 +85,7 @@ pub fn run(p: &Program, f: &Function, setup: &Setup) -> Run {
         _ => 0,
     };
     for (n, a) in setup.arguments.iter().skip(registers).enumerate() {
-        m.write_mem(
-            setup.stack + reserved + n as u64 * 8,
-            &a.to_le_bytes(),
-        );
+        m.write_mem(setup.stack + reserved + n as u64 * 8, &a.to_le_bytes());
     }
     // Somewhere that is not code, so the outermost return stops the run.
     const SENTINEL: u64 = 0xdead_0000;
@@ -98,7 +95,13 @@ pub fn run(p: &Program, f: &Function, setup: &Setup) -> Run {
     }
 
     let before = m.written().clone();
-    let outcome = r12e_ir::run_with(&mut m, &p.object.memory, &p.object.arch, f.entry, setup.depth);
+    let outcome = r12e_ir::run_with(
+        &mut m,
+        &p.object.memory,
+        &p.object.arch,
+        f.entry,
+        setup.depth,
+    );
     let result = m.reg(abi.results.first().copied().unwrap_or(0), 8);
     let written = m
         .written()

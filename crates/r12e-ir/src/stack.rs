@@ -93,9 +93,8 @@ pub fn promote(f: &mut Function) -> Promoted {
     let overlapping: BTreeSet<(i64, u8)> = keys
         .iter()
         .filter(|a| {
-            keys.iter().any(|b| {
-                *b != **a && a.0 < b.0 + b.1 as i64 && b.0 < a.0 + a.1 as i64
-            })
+            keys.iter()
+                .any(|b| *b != **a && a.0 < b.0 + b.1 as i64 && b.0 < a.0 + a.1 as i64)
         })
         .copied()
         .collect();

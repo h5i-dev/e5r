@@ -1,0 +1,2 @@
+*.r12e-patch merge=union
+*.r12e-proj  merge=union

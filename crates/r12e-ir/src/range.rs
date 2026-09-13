@@ -178,7 +178,12 @@ pub fn of(operand: &Operand, known: &BTreeMap<Value, Range>) -> Range {
 }
 
 fn evaluate(op: &crate::ssa::SsaOp, known: &BTreeMap<Value, Range>) -> Range {
-    let a = || op.inputs.first().map(|i| of(i, known)).unwrap_or(Range::ANY);
+    let a = || {
+        op.inputs
+            .first()
+            .map(|i| of(i, known))
+            .unwrap_or(Range::ANY)
+    };
     let b = || op.inputs.get(1).map(|i| of(i, known)).unwrap_or(Range::ANY);
 
     match op.kind {
@@ -218,9 +223,7 @@ fn evaluate(op: &crate::ssa::SsaOp, known: &BTreeMap<Value, Range>) -> Range {
             Op::IntRight => {
                 let source = a();
                 match (op.inputs.get(1).and_then(|i| i.as_const()), source.low >= 0) {
-                    (Some(n), true) if n < 64 => {
-                        Range::new(source.low >> n, source.high >> n)
-                    }
+                    (Some(n), true) if n < 64 => Range::new(source.low >> n, source.high >> n),
                     _ => Range::unsigned(op.size),
                 }
             }
@@ -234,11 +237,7 @@ fn evaluate(op: &crate::ssa::SsaOp, known: &BTreeMap<Value, Range>) -> Range {
             // Widening says exactly how wide the result is.
             Op::IntZExt => {
                 let source = a();
-                let from = op
-                    .inputs
-                    .first()
-                    .map(|i| i.size())
-                    .unwrap_or(op.size);
+                let from = op.inputs.first().map(|i| i.size()).unwrap_or(op.size);
                 if source.low >= 0 {
                     Range::new(0, source.high.max(0))
                 } else {

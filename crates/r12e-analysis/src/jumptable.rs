@@ -16,7 +16,7 @@
 
 use std::collections::BTreeMap;
 
-use r12e_arch::{Flow, Insn, Operand, Reg, RegClass, Mem};
+use r12e_arch::{Flow, Insn, Mem, Operand, Reg, RegClass};
 use r12e_core::{Addr, AddrRange, Caps, MemoryMap};
 use serde::Serialize;
 

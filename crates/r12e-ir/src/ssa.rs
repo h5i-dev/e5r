@@ -465,7 +465,6 @@ pub fn build(f: &Function) -> SsaFunction {
     }
 }
 
-
 fn bump(counters: &mut BTreeMap<Location, u32>, loc: Location) -> u32 {
     let c = counters.entry(loc).or_insert(0);
     let v = *c;

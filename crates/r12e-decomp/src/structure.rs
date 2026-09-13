@@ -467,7 +467,11 @@ impl Ctx<'_> {
         // The branch says which way it goes when the condition holds; the
         // other successor is what falls through.
         let taken = self.taken.get(&head).copied().unwrap_or(succs[1]);
-        let fallthrough = succs.iter().copied().find(|s| *s != taken).unwrap_or(succs[0]);
+        let fallthrough = succs
+            .iter()
+            .copied()
+            .find(|s| *s != taken)
+            .unwrap_or(succs[0]);
         let join = self.join_of(head);
 
         // One arm empty: a plain `if` with no else.
@@ -934,9 +938,15 @@ mod tests {
         let graph = g(&[(0, &[1, 2]), (1, &[2]), (2, &[])]);
         let s = structure(Addr(0), &graph);
         assert_eq!(s.gotos, 0);
-        let found = collect(&s.root)
-            .into_iter()
-            .any(|r| matches!(r, Region::If { otherwise: None, .. }));
+        let found = collect(&s.root).into_iter().any(|r| {
+            matches!(
+                r,
+                Region::If {
+                    otherwise: None,
+                    ..
+                }
+            )
+        });
         assert!(found, "no plain if in {:?}", s.root);
     }
 
@@ -1007,7 +1017,9 @@ mod tests {
                     out.extend(collect(p));
                 }
             }
-            Region::If { then, otherwise, .. } => {
+            Region::If {
+                then, otherwise, ..
+            } => {
                 out.extend(collect(then));
                 if let Some(o) = otherwise {
                     out.extend(collect(o));

@@ -211,7 +211,11 @@ pub fn decompile_full(
     // Which names are parameters: the declared ones when there is a prototype,
     // and otherwise the convention's argument registers.
     let declared: BTreeSet<String> = match prototype {
-        Some(p) => p.parameters.iter().map(|param| param.name.clone()).collect(),
+        Some(p) => p
+            .parameters
+            .iter()
+            .map(|param| param.name.clone())
+            .collect(),
         None => BTreeSet::new(),
     };
     let mut called: BTreeSet<u64> = BTreeSet::new();
@@ -249,9 +253,8 @@ pub fn decompile_full(
         }
     }
 
-    let mut declarations: Vec<String> = prototype
-        .map(|p| p.definitions.clone())
-        .unwrap_or_default();
+    let mut declarations: Vec<String> =
+        prototype.map(|p| p.definitions.clone()).unwrap_or_default();
     declarations.extend(helpers.iter().map(|h| h.to_string()));
     declarations.extend(
         called
@@ -356,7 +359,13 @@ fn ends_control(r: &Region) -> bool {
 pub fn identifier(name: &str) -> String {
     let mut out: String = name
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     if out.chars().next().is_some_and(|c| c.is_ascii_digit()) {
         out.insert(0, '_');
@@ -439,17 +448,13 @@ fn result_register(f: &SsaFunction, r: &Rebuilder) -> Option<u64> {
     // only the order says which the caller reads.
     let mut best: Option<(usize, u64)> = None;
     for b in f.blocks.values() {
-        let returns = b
-            .ops
-            .iter()
-            .any(|op| op.kind == SsaKind::Op(Op::Return));
+        let returns = b.ops.iter().any(|op| op.kind == SsaKind::Op(Op::Return));
         if !returns {
             continue;
         }
         for (n, op) in b.ops.iter().enumerate() {
             let Some(v) = op.out else { continue };
-            if v.location.space != Space::Register || !r.abi.results.contains(&v.location.offset)
-            {
+            if v.location.space != Space::Register || !r.abi.results.contains(&v.location.offset) {
                 continue;
             }
             if best.map(|(at, _)| n > at).unwrap_or(true) {
@@ -545,7 +550,12 @@ impl Emitter<'_> {
             }
             Region::Block(at) => {
                 if self.labels.contains(at) {
-                    let _ = writeln!(out, "{}L{:x}:", "    ".repeat(depth.saturating_sub(1)), at.0);
+                    let _ = writeln!(
+                        out,
+                        "{}L{:x}:",
+                        "    ".repeat(depth.saturating_sub(1)),
+                        at.0
+                    );
                 }
                 self.statements(out, *at, depth);
             }
@@ -578,13 +588,14 @@ impl Emitter<'_> {
                     }
                 }
             }
-            Region::While {
-                head,
-                invert,
-                body,
-            } => {
+            Region::While { head, invert, body } => {
                 if self.labels.contains(head) {
-                    let _ = writeln!(out, "{}L{:x}:", "    ".repeat(depth.saturating_sub(1)), head.0);
+                    let _ = writeln!(
+                        out,
+                        "{}L{:x}:",
+                        "    ".repeat(depth.saturating_sub(1)),
+                        head.0
+                    );
                 }
                 // The head's own statements compute the condition, so they run
                 // on every iteration: a `for (; cond; )` with them hoisted
@@ -630,7 +641,12 @@ impl Emitter<'_> {
             }
             Region::Infinite { head, body } => {
                 if self.labels.contains(head) {
-                    let _ = writeln!(out, "{}L{:x}:", "    ".repeat(depth.saturating_sub(1)), head.0);
+                    let _ = writeln!(
+                        out,
+                        "{}L{:x}:",
+                        "    ".repeat(depth.saturating_sub(1)),
+                        head.0
+                    );
                 }
                 let _ = writeln!(out, "{pad}while (1) {{");
                 self.statements(out, *head, depth + 1);
@@ -865,10 +881,7 @@ impl Emitter<'_> {
                 }
                 Op::Call | Op::CallInd => {
                     let void = match op.inputs.first().and_then(|i| i.as_const()) {
-                        Some(target) => self
-                            .callees
-                            .get(&target)
-                            .is_some_and(|c| !c.returns_value),
+                        Some(target) => self.callees.get(&target).is_some_and(|c| !c.returns_value),
                         None => false,
                     };
                     let e = match (o, op.inputs.first().and_then(|i| i.as_const())) {
@@ -1012,17 +1025,13 @@ impl Emitter<'_> {
         let Some(offset) = self.result else {
             return String::new();
         };
-        let in_block = self
-            .f
-            .blocks
-            .get(&at)
-            .and_then(|b| {
-                b.ops
-                    .iter()
-                    .rev()
-                    .filter_map(|op| op.out)
-                    .find(|v| v.location.space == Space::Register && v.location.offset == offset)
-            });
+        let in_block = self.f.blocks.get(&at).and_then(|b| {
+            b.ops
+                .iter()
+                .rev()
+                .filter_map(|op| op.out)
+                .find(|v| v.location.space == Space::Register && v.location.offset == offset)
+        });
         // Nothing in this block wrote it, so the value came from wherever it
         // was last written: the newest version is the one that reaches here.
         let value = in_block.or_else(|| {
@@ -1073,7 +1082,10 @@ mod tests {
             "a >= b"
         );
         assert_eq!(
-            format!("{}", negate(Expr::Unary("!", Box::new(Expr::Local("c".into()))))),
+            format!(
+                "{}",
+                negate(Expr::Unary("!", Box::new(Expr::Local("c".into()))))
+            ),
             "c"
         );
     }
