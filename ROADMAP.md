@@ -382,7 +382,8 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 ### M7. The annotation store
 
 This is the feature that distinguishes r12e from every incumbent, so it gets
-designed before it gets coded, and the design lives in `docs/design/db.md`.
+designed before it gets coded, and the design lives in
+[`docs/design/db.md`](../docs/design/db.md).
 
 - [x] Content anchors. A function is identified by a fingerprint of its
       instruction-shape stream with branch targets excluded, so the identity
@@ -510,9 +511,9 @@ designed before it gets coded, and the design lives in `docs/design/db.md`.
 - [ ] Static musl builds for Linux, plus macOS and Windows binaries.
 - [ ] Packaging: `cargo install`, a Homebrew formula, and a release workflow that
       signs and attaches checksums.
-- [ ] `MANUAL.md`, a design document per subsystem under `docs/design/`, and a
-      tutorial that takes a reader from a stripped binary to a named, typed,
-      committed annotation log.
+- [ ] `MANUAL.md` is written and a design document per subsystem lives under
+      `docs/design/`. Still missing: the tutorial that takes a reader from a
+      stripped binary to a named, typed, committed annotation log.
 
 ## Quality gates
 
