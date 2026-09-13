@@ -1,0 +1,15 @@
+[package]
+name = "r12e-decomp"
+description = "r12e — expression rebuilding, structuring and C emission."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+r12e-core = { workspace = true }
+r12e-arch = { workspace = true }
+r12e-ir = { workspace = true }
+serde = { workspace = true }
