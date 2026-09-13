@@ -1091,14 +1091,19 @@ fn read_debug_info(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object, hints: bo
     // same place until they are applied.
     let info_bytes = relocated(r, shdrs, obj, ".debug_info", section(".debug_info"));
     let line_bytes = relocated(r, shdrs, obj, ".debug_line", section(".debug_line"));
+    // DWARF 5 puts the addresses in a table of their own and refers to them by
+    // index, so that table needs its relocations as much as the rest: without
+    // them every function in the unit resolves to zero.
+    let addr_bytes = relocated(r, shdrs, obj, ".debug_addr", section(".debug_addr"));
+    let rnglist_bytes = relocated(r, shdrs, obj, ".debug_rnglists", section(".debug_rnglists"));
     let sections = crate::dwarf::Sections {
         info: &info_bytes,
         abbrev: section(".debug_abbrev"),
         str: section(".debug_str"),
         line_str: section(".debug_line_str"),
         str_offsets: section(".debug_str_offsets"),
-        addr: section(".debug_addr"),
-        rnglists: section(".debug_rnglists"),
+        addr: &addr_bytes,
+        rnglists: &rnglist_bytes,
         line: &line_bytes,
     };
     if sections.is_empty() {

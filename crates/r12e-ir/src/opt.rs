@@ -12,7 +12,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::op::Op;
+use crate::op::{Op, Space};
 use crate::ssa::{Location, Operand, SsaFunction, SsaKind, Value};
 
 /// What a pass changed.
@@ -245,9 +245,13 @@ fn evaluate(op: Op, a: &[u64], size: u8, inputs: &[Operand]) -> Option<u64> {
 /// output: their effect is not the value they produce.
 /// The value a location holds at the end of a block, whether it was written
 /// there or arrived from a predecessor.
-fn last_definition(f: &SsaFunction, b: &crate::ssa::SsaBlock, location: Location) -> Option<Value> {
-    if let Some(v) = b
-        .ops
+fn last_definition(
+    f: &SsaFunction,
+    b: &crate::ssa::SsaBlock,
+    location: Location,
+    before: usize,
+) -> Option<Value> {
+    if let Some(v) = b.ops[..before.min(b.ops.len())]
         .iter()
         .rev()
         .filter_map(|op| op.out)
@@ -286,9 +290,40 @@ pub fn remove_dead(f: &mut SsaFunction) -> Changes {
             continue;
         }
         for location in &live_out {
-            if let Some(v) = last_definition(f, b, *location) {
+            if let Some(v) = last_definition(f, b, *location, b.ops.len()) {
                 if live.insert(v) {
                     work.push(v);
+                }
+            }
+        }
+    }
+
+    // A call reads its arguments out of registers the IR does not name as its
+    // inputs, so without this every instruction that sets one up looks dead.
+    // Deleting them does not just lose readability: it loses the argument.
+    let argument_locations: Vec<Location> = abi
+        .integer_arguments
+        .iter()
+        .chain(abi.float_arguments.iter())
+        .map(|offset| Location {
+            space: Space::Register,
+            offset: *offset,
+            size: 8,
+        })
+        .collect();
+    for b in f.blocks.values() {
+        for (n, op) in b.ops.iter().enumerate() {
+            if !matches!(
+                op.kind,
+                SsaKind::Op(crate::op::Op::Call) | SsaKind::Op(crate::op::Op::CallInd)
+            ) {
+                continue;
+            }
+            for location in &argument_locations {
+                if let Some(v) = last_definition(f, b, *location, n) {
+                    if live.insert(v) {
+                        work.push(v);
+                    }
                 }
             }
         }

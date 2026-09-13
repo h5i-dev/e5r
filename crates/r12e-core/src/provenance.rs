@@ -72,6 +72,15 @@ pub enum Evidence {
     MachFunctionStarts,
     /// Go's `pclntab`.
     GoPclntab,
+    /// Objective-C runtime metadata: the class and method lists a binary
+    /// carries so the runtime can dispatch.
+    ObjcMetadata,
+    /// Swift's own metadata: type and protocol descriptors.
+    SwiftMetadata,
+    /// A Rust panic site, whose string carries the file and line it is in.
+    RustPanic,
+    /// A Windows program database, the compiler's own record of its output.
+    Pdb,
     /// An export table entry.
     Export,
     /// An import thunk, PLT or IAT.
@@ -106,9 +115,16 @@ impl Evidence {
             | Evidence::PeUnwind
             | Evidence::MachFunctionStarts
             | Evidence::GoPclntab
+            | Evidence::Pdb
             | Evidence::Export => Strength::Proven,
 
-            Evidence::CodeSymbol
+            // Metadata a runtime reads while the program runs: present because
+            // something uses it, so what it names is real, but the format is a
+            // convention rather than a declaration.
+            Evidence::ObjcMetadata
+            | Evidence::SwiftMetadata
+            | Evidence::RustPanic
+            | Evidence::CodeSymbol
             | Evidence::ImportThunk
             | Evidence::CallTarget
             | Evidence::BranchTarget
@@ -135,6 +151,10 @@ impl Evidence {
             Evidence::PeUnwind => "PE unwind record",
             Evidence::MachFunctionStarts => "LC_FUNCTION_STARTS",
             Evidence::GoPclntab => "Go pclntab",
+            Evidence::ObjcMetadata => "ObjC metadata",
+            Evidence::SwiftMetadata => "Swift metadata",
+            Evidence::RustPanic => "Rust panic site",
+            Evidence::Pdb => "program database",
             Evidence::Export => "export table",
             Evidence::ImportThunk => "import thunk",
             Evidence::CallTarget => "direct call target",
