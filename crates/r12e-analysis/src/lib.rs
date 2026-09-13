@@ -8,11 +8,13 @@
 #![warn(missing_docs)]
 
 pub mod cfg;
+pub mod jumptable;
 pub mod program;
 pub mod strings;
 pub mod xref;
 
 pub use cfg::{Block, Cfg, Halt};
+pub use jumptable::{JumpTable, TableKind};
 pub use program::{Function, Options, Program, Stats, analyze};
 pub use strings::Found;
 pub use xref::{Xref, XrefIndex, XrefKind};

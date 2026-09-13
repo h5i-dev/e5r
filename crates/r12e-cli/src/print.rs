@@ -225,6 +225,13 @@ pub fn stats(w: &mut Out, p: &Program, as_json: bool) -> R {
     );
     outln!(w, "  capped    {}", s.capped);
     outln!(w, "blocks      {}", s.blocks);
+    outln!(
+        w,
+        "jump tables {} resolved, {} targets; {} functions still indirect",
+        s.tables,
+        s.table_targets,
+        s.indirect
+    );
     outln!(w, "insns       {}", s.insns);
     outln!(w, "xrefs       {}", s.xrefs);
     outln!(w, "strings     {}", s.strings);

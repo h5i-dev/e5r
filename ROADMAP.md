@@ -14,7 +14,7 @@ rather than argued about again.
 | AArch64 decoder | built, objdump parity over 1.43M instructions, 99.38% decoded |
 | x86-64 decoder | built, llvm-objdump parity over 4,760 instructions, 100% decoded |
 | SLEIGH runtime and compiler | not started |
-| functions, CFG, xrefs, strings | built and parallel (M3); jump tables not started |
+| functions, CFG, xrefs, strings, jump tables | built and parallel (M3) |
 | IR, SSA, types, decompiler | not started (M4 to M6) |
 | annotation log, content anchors, git merge | built (M7) |
 | CLI with JSON on every command | built (M8) |
@@ -192,9 +192,13 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 - [x] Basic blocks, CFG, tail-call detection. No-return propagation through the
       call graph is still to do (a call to `abort` ends a block, and the
       fixpoint matters).
-- [ ] Jump table recovery. Bounded index plus base is the easy case; the ones
-      that matter are the PIC pattern, the negative-offset pattern, and MSVC's
-      two-level tables.
+- [x] Jump table recovery for the absolute, base-relative and entry-relative
+      forms, on both architectures. The bound comes from the compare that
+      guards the switch, matched to the register the table is indexed by; a
+      compact table of byte or halfword offsets is refused outright when that
+      compare cannot be found, because every value in such a table yields a
+      plausible target and scanning cannot honestly bound it. MSVC's two-level
+      tables are still to do.
 - [x] Cross references: code to code, code to data, with the reference type
       recorded, including the AArch64 `adrp`/`add` pair. Data to data is still
       to do.

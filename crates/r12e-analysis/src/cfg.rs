@@ -10,6 +10,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use r12e_arch::{Flow, Insn};
 use r12e_core::{Addr, AddrRange, Arch, Caps, MemoryMap};
 
+use crate::jumptable::{self, JumpTable};
+
 /// One straight-line run of instructions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
@@ -47,6 +49,8 @@ pub struct Cfg {
     pub calls: Vec<Addr>,
     /// Addresses reached by an indirect branch we could not resolve.
     pub has_indirect: bool,
+    /// Jump tables resolved inside this function.
+    pub tables: Vec<JumpTable>,
     /// Why the walk ended.
     pub halt: Halt,
 }
@@ -96,6 +100,12 @@ pub fn build(
     stop_at: &BTreeSet<Addr>,
     caps: &Caps,
 ) -> Cfg {
+    // The executable range the entry sits in bounds every jump table target:
+    // a switch does not branch into another section.
+    let section = mem
+        .segment_at(entry)
+        .map(|s| s.range)
+        .unwrap_or(AddrRange::empty_at(entry));
     let mut starts: BTreeSet<Addr> = BTreeSet::new();
     let mut work: Vec<Addr> = vec![entry];
     let mut seen: BTreeSet<Addr> = BTreeSet::new();
@@ -104,6 +114,11 @@ pub fn build(
     let mut has_indirect = false;
     let mut insn_budget = caps.function_insns;
     let mut halt = Halt::Complete;
+    let mut tables: Vec<JumpTable> = Vec::new();
+    // Kept per block so an indirect branch can be resolved against the blocks
+    // that lead to it: the compare that bounds a switch is almost always in a
+    // predecessor, not in the block that ends with the branch.
+    let mut bodies: BTreeMap<Addr, Vec<Insn>> = BTreeMap::new();
 
     while let Some(start) = work.pop() {
         if !seen.insert(start) {
@@ -119,6 +134,8 @@ pub fn build(
         let mut count = 0u32;
         // One past the last instruction decoded, which is where the block ends.
         let mut end = start;
+        // Kept so an indirect branch can be resolved against what led to it.
+        let mut body: Vec<Insn> = Vec::new();
         let (succs, unresolved) = loop {
             if insn_budget == 0 {
                 halt = Halt::InstructionCap;
@@ -139,6 +156,7 @@ pub fn build(
             };
             insn_budget -= 1;
             count += 1;
+            body.push(insn);
             let next = insn.next();
             end = next;
 
@@ -158,8 +176,19 @@ pub fn build(
                 }
                 Flow::Return | Flow::Trap => break (Vec::new(), false),
                 Flow::IndirectBranch => {
-                    has_indirect = true;
-                    break (Vec::new(), true);
+                    // A switch: read the table rather than giving up.
+                    let context = with_predecessors(&bodies, &ends, start, &body);
+                    match jumptable::recover(&context, mem, section, caps, arch.insn_alignment()) {
+                        Some(t) => {
+                            let targets = t.targets.clone();
+                            tables.push(t);
+                            break (targets, false);
+                        }
+                        None => {
+                            has_indirect = true;
+                            break (Vec::new(), true);
+                        }
+                    }
                 }
                 Flow::Branch(t) => {
                     // A branch to another function's entry is a tail call.
@@ -183,6 +212,7 @@ pub fn build(
         s.sort_unstable();
         s.dedup();
         ends.insert(start, (end, s.clone(), count, unresolved));
+        bodies.insert(start, body);
 
         for t in s {
             if !seen.contains(&t) && mem.is_executable(t) {
@@ -235,15 +265,58 @@ pub fn build(
         }
     }
 
+    tables.sort_by_key(|t| t.at);
     Cfg {
         entry,
         blocks,
         calls: calls.into_iter().collect(),
         has_indirect,
+        tables,
         halt,
     }
 }
 
+/// The instructions of `block` preceded by those of the blocks that reach it.
+///
+/// Three levels is enough in practice: a compiler puts the bound check
+/// immediately before the table setup, and going deeper mostly adds unrelated
+/// comparisons that could size a table wrongly.
+fn with_predecessors(
+    bodies: &BTreeMap<Addr, Vec<Insn>>,
+    ends: &BTreeMap<Addr, (Addr, Vec<Addr>, u32, bool)>,
+    block: Addr,
+    body: &[Insn],
+) -> Vec<Insn> {
+    let mut chain: Vec<Addr> = Vec::new();
+    let mut frontier = vec![block];
+    for _ in 0..3 {
+        let mut next = Vec::new();
+        for target in &frontier {
+            for (start, (_, succs, _, _)) in ends {
+                if succs.contains(target) && !chain.contains(start) && *start != block {
+                    chain.push(*start);
+                    next.push(*start);
+                }
+            }
+        }
+        if next.is_empty() {
+            break;
+        }
+        frontier = next;
+    }
+
+    let mut out: Vec<Insn> = chain
+        .iter()
+        .filter_map(|a| bodies.get(a))
+        .flatten()
+        .copied()
+        .collect();
+    out.sort_by_key(|i| i.addr);
+    out.extend_from_slice(body);
+    out
+}
+
+/// How many instructions fit between two addresses.
 fn count_insns(mem: &MemoryMap, arch: &Arch, start: Addr, end: Addr) -> u32 {
     let mut at = start;
     let mut n = 0;

@@ -245,3 +245,86 @@ fn large_binaries_analyze_without_panicking() {
         );
     }
 }
+
+#[test]
+fn a_dense_switch_resolves_to_every_arm() {
+    // shapes.c and wide.c both hold a dense switch, which a compiler turns
+    // into a jump table. Every arm has to become a successor, or the function
+    // is not fully analyzed.
+    for (fixture, func, arms) in [
+        ("shapes.a64.O2.o", "dense_switch", 8usize),
+        ("wide.a64.O2.o", "dense", 12),
+        ("wide.x64.O2.o", "dense", 12),
+    ] {
+        let Some(p) = open(fixture) else { continue };
+        let Some(f) = p
+            .functions_by_address()
+            .find(|f| f.name.as_deref() == Some(func))
+        else {
+            continue;
+        };
+        // Either the compiler used a table, in which case it must resolve, or
+        // it used a comparison chain, in which case there is nothing indirect.
+        if f.cfg.tables.is_empty() {
+            assert!(
+                !f.cfg.has_indirect,
+                "{fixture}/{func}: an indirect branch nothing resolved"
+            );
+            continue;
+        }
+        let t = &f.cfg.tables[0];
+        assert!(
+            t.targets.len() >= arms,
+            "{fixture}/{func}: {} targets for {arms} arms",
+            t.targets.len()
+        );
+        for target in &t.targets {
+            assert!(
+                p.object.memory.is_executable(*target),
+                "{fixture}/{func}: target {target} is not executable"
+            );
+            assert!(
+                f.range.contains(*target),
+                "{fixture}/{func}: target {target} is outside the function"
+            );
+        }
+        assert!(f.is_complete(), "{fixture}/{func}: still incomplete");
+    }
+}
+
+/// A work list, not a gate: what jump table recovery found on a real binary.
+#[test]
+#[ignore]
+fn jump_table_report() {
+    for path in [
+        "/usr/lib/aarch64-linux-gnu/libc.so.6",
+        "/lib/aarch64-linux-gnu/libc.so.6",
+    ] {
+        let p = Path::new(path);
+        if !p.is_file() {
+            continue;
+        }
+        let data = std::fs::read(p).unwrap();
+        let obj = r12e_format::load(&data, &LoadOptions::default()).unwrap();
+        let prog = analyze(obj, &Options::default());
+        let mut all: Vec<_> = prog
+            .functions_by_address()
+            .flat_map(|f| f.cfg.tables.iter().map(move |t| (f.entry, t)))
+            .collect();
+        all.sort_by_key(|(_, t)| std::cmp::Reverse(t.targets.len()));
+        println!("{} tables", all.len());
+        for (f, t) in all.iter().take(20) {
+            println!(
+                "fn {f} branch {} table {} size {} kind {:?} base {} -> {} targets (scan={})",
+                t.at,
+                t.table,
+                t.entry_size,
+                t.kind,
+                t.base,
+                t.targets.len(),
+                t.bounded_by_scan
+            );
+        }
+        break;
+    }
+}

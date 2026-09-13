@@ -525,6 +525,12 @@ pub struct Stats {
     pub strings: usize,
     /// Functions that hit a resource cap.
     pub capped: usize,
+    /// Jump tables resolved.
+    pub tables: usize,
+    /// Targets those tables contributed.
+    pub table_targets: usize,
+    /// Functions still holding an unresolved indirect branch.
+    pub indirect: usize,
 }
 
 impl Program {
@@ -541,6 +547,18 @@ impl Program {
                 .functions
                 .values()
                 .filter(|f| matches!(f.cfg.halt, Halt::InstructionCap | Halt::BlockCap))
+                .count(),
+            tables: self.functions.values().map(|f| f.cfg.tables.len()).sum(),
+            table_targets: self
+                .functions
+                .values()
+                .flat_map(|f| f.cfg.tables.iter())
+                .map(|t| t.targets.len())
+                .sum(),
+            indirect: self
+                .functions
+                .values()
+                .filter(|f| f.cfg.has_indirect)
                 .count(),
         }
     }
