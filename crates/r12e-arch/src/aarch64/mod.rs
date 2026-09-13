@@ -12,6 +12,7 @@
 // them, which is what makes them checkable against the manual.
 #![allow(clippy::unusual_byte_groupings)]
 
+pub mod simd;
 pub mod text;
 
 pub use text::{Style, format};
@@ -22,13 +23,13 @@ use crate::insn::{AddrMode, Cond, Extend, Flow, Insn, Mem, Operand, Reg, RegClas
 
 /// Bits `hi..=lo` of `w`.
 #[inline]
-const fn bits(w: u32, hi: u32, lo: u32) -> u32 {
+pub(crate) const fn bits(w: u32, hi: u32, lo: u32) -> u32 {
     (w >> lo) & ((1u32 << (hi - lo + 1)) - 1)
 }
 
 /// Bit `n` of `w`.
 #[inline]
-const fn bit(w: u32, n: u32) -> u32 {
+pub(crate) const fn bit(w: u32, n: u32) -> u32 {
     (w >> n) & 1
 }
 
@@ -73,6 +74,16 @@ fn rsp(num: u32, sf: bool) -> Reg {
 #[inline]
 fn v(num: u32, width: Width) -> Reg {
     Reg::vec(num as u8, width)
+}
+
+/// A general purpose register, for the SIMD module.
+pub(crate) fn gpr_for(num: u32, wide: bool) -> Reg {
+    r(num, wide)
+}
+
+/// A stack-pointer-capable register, for the SIMD module.
+pub(crate) fn rsp_for(num: u32) -> Reg {
+    rsp(num, true)
 }
 
 const COND_NAMES: [&str; 16] = [
@@ -636,7 +647,6 @@ fn extract(w: u32, addr: Addr) -> Option<Insn> {
 
 fn branches(w: u32, addr: Addr) -> Option<Insn> {
     let op0 = bits(w, 31, 29);
-    let op1 = bits(w, 25, 22);
 
     // Conditional branch immediate.
     if op0 == 0b010 && bit(w, 25) == 0 {
@@ -650,8 +660,9 @@ fn branches(w: u32, addr: Addr) -> Option<Insn> {
         return Some(i);
     }
 
-    // Exception generation.
-    if op0 == 0b110 && op1 >= 0b1000 && bits(w, 31, 24) == 0b1101_0100 {
+    // Exception generation. The whole 0xd4 page is this group; an extra
+    // condition on op1 here silently dropped every svc and brk.
+    if bits(w, 31, 24) == 0b1101_0100 {
         return exception(w, addr);
     }
     // System.
@@ -1953,7 +1964,7 @@ fn dp_3source(w: u32, addr: Addr) -> Option<Insn> {
 /// The encoding is `sign : NOT(b6) : Replicate(b6, 8) : b5 b4 : frac`, which
 /// covers the small set of constants a compiler materializes inline. Every
 /// width expands to the same real value, so one double is enough.
-fn vfp_expand_imm(imm8: u8) -> u64 {
+pub(crate) fn vfp_expand_imm(imm8: u8) -> u64 {
     let sign = (imm8 >> 7) as u64 & 1;
     let b6 = (imm8 >> 6) as u64 & 1;
     let b54 = (imm8 >> 4) as u64 & 3;
@@ -2053,6 +2064,11 @@ fn dp_simd(w: u32, addr: Addr) -> Option<Insn> {
             i.push(Operand::Cond(Cond(bits(w, 15, 12) as u8)));
             return Some(i);
         }
+    }
+
+    // Advanced SIMD, which is most of this space.
+    if let Some(i) = simd::decode(w, addr) {
+        return Some(i);
     }
 
     // Conversion between floating point and integer.

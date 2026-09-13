@@ -11,7 +11,7 @@ rather than argued about again.
 | workspace, guards, fixtures, CI | built (M0) |
 | ELF loader with provenance-tagged hints | built (M1) |
 | PE and COFF | built (M1); Mach-O not started; raw built |
-| AArch64 decoder | built, objdump parity over 1.43M instructions, 99.38% decoded |
+| AArch64 decoder | built, objdump parity over 1.43M instructions, 99.87% decoded |
 | x86-64 decoder | built, llvm-objdump parity over 4,760 instructions, 100% decoded |
 | SLEIGH runtime and compiler | not started |
 | functions, CFG, xrefs, strings, jump tables | built and parallel (M3) |
@@ -166,7 +166,9 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       SSE through SSE4.2. VEX, EVEX and AVX are not written; 32-bit mode is
       not supported, because the opcodes it spends on inc/dec and the BCD
       instructions are REX prefixes in long mode.
-- [x] AArch64 A64 decoder. SVE and SME can wait; NEON cannot.
+- [x] AArch64 A64 decoder including Advanced SIMD. SVE is deliberately not
+      decoded: it is a separate architecture's worth of encodings and the
+      coverage number records its absence.
 - [ ] ARM32 and Thumb-2, including interworking and the IT block.
 - [x] Differential comparison of each decoder against `objdump` over the fixture
       corpus and the system binaries. Parity is a gate with no allowance;

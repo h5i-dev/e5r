@@ -89,9 +89,11 @@ fn objdump(path: &Path) -> Vec<Line> {
 }
 
 /// Coverage floor: the fraction of objdump-decodable instructions we also
-/// decode. The gap is Advanced SIMD, which is not implemented yet. Raise this
-/// as the gap closes; never lower it.
-const MIN_COVERAGE: f64 = 0.99;
+/// decode. What remains is the single-structure SIMD loads and stores, the
+/// by-element multiplies, the memory-tagging instructions, and the Scalable
+/// Vector Extension, which is a separate architecture's worth of encodings.
+/// Raise this as the gap closes; never lower it.
+const MIN_COVERAGE: f64 = 0.998;
 
 /// What comparing one file found.
 #[derive(Default)]
@@ -102,6 +104,8 @@ struct Tally {
     undecoded: usize,
     /// Decoded differently from objdump. These are bugs.
     wrong: Vec<String>,
+    /// Mnemonics objdump decoded and we did not.
+    missing: Vec<String>,
 }
 
 impl Tally {
@@ -109,6 +113,7 @@ impl Tally {
         self.matched += other.matched;
         self.undecoded += other.undecoded;
         self.wrong.extend(other.wrong);
+        self.missing.extend(other.missing);
     }
 
     fn total(&self) -> usize {
@@ -134,6 +139,8 @@ fn check(path: &Path) -> Tally {
         let want = l.text.as_str();
         let Some(insn) = aarch64::decode_word(l.word, Addr(l.addr)) else {
             t.undecoded += 1;
+            t.missing
+                .push(l.text.split('\t').next().unwrap_or("?").to_string());
             continue;
         };
         let got = aarch64::format(&insn, aarch64::Style { objdump: true });
@@ -307,5 +314,25 @@ fn parity_report() {
     v.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
     for (k, n) in v.iter().take(40) {
         println!("{n:>7}  {k:<12} {}", examples[k]);
+    }
+    let mut missing: BTreeMap<String, usize> = BTreeMap::new();
+    for p in std::fs::read_dir(&dir)
+        .unwrap()
+        .filter_map(|e| {
+            let p = e.ok()?.path();
+            let n = p.file_name()?.to_string_lossy().into_owned();
+            (n.contains("a64") || n.contains("hello")).then_some(p)
+        })
+        .chain(system_binaries())
+    {
+        for m in check(&p).missing {
+            *missing.entry(m).or_default() += 1;
+        }
+    }
+    let mut mv: Vec<_> = missing.into_iter().collect();
+    mv.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
+    println!("--- undecoded ---");
+    for (k, n) in mv.iter().take(40) {
+        println!("{n:>7}  {k}");
     }
 }

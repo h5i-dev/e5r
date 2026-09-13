@@ -108,6 +108,8 @@ pub enum Shift {
     Asr,
     /// Rotate right.
     Ror,
+    /// Shift left filling with ones, which only the SIMD immediate forms use.
+    Msl,
 }
 
 impl Shift {
@@ -118,6 +120,7 @@ impl Shift {
             Shift::Lsr => "lsr",
             Shift::Asr => "asr",
             Shift::Ror => "ror",
+            Shift::Msl => "msl",
         }
     }
 }
@@ -225,6 +228,46 @@ impl Mem {
     }
 }
 
+/// How a SIMD register's bits are divided into lanes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Lanes {
+    /// Eight bytes.
+    B8,
+    /// Sixteen bytes.
+    B16,
+    /// Four halfwords.
+    H4,
+    /// Eight halfwords.
+    H8,
+    /// Two words.
+    S2,
+    /// Four words.
+    S4,
+    /// One doubleword.
+    D1,
+    /// Two doublewords.
+    D2,
+    /// One quadword.
+    Q1,
+}
+
+impl Lanes {
+    /// The suffix a listing prints, as in `v0.16b`.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Lanes::B8 => "8b",
+            Lanes::B16 => "16b",
+            Lanes::H4 => "4h",
+            Lanes::H8 => "8h",
+            Lanes::S2 => "2s",
+            Lanes::S4 => "4s",
+            Lanes::D1 => "1d",
+            Lanes::D2 => "2d",
+            Lanes::Q1 => "1q",
+        }
+    }
+}
+
 /// A condition code, in the architecture's own numbering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Cond(pub u8);
@@ -254,6 +297,13 @@ pub enum Operand {
     /// A floating point literal, held as its IEEE-754 double bit pattern so the
     /// operand stays `Eq` and the instruction stays comparable.
     FpImm(u64),
+    /// A SIMD register viewed as lanes, as in `v0.16b`.
+    Vector(u8, Lanes),
+    /// One lane of a SIMD register, as in `v0.s[2]`.
+    VectorLane(u8, Width, u8),
+    /// A list of consecutive SIMD registers, as in `{v0.16b, v1.16b}`. The
+    /// fields are the first register, how many there are, and the lanes.
+    VectorList(u8, u8, Lanes),
     /// An absolute address, the resolved target of a branch or a pc-relative
     /// computation. Kept distinct from `Imm` so analysis can find targets
     /// without re-deriving them.

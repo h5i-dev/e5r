@@ -139,6 +139,8 @@ fn operand(out: &mut String, op: &Operand, needs_size: bool) {
         Operand::FpImm(b) => {
             let _ = write!(out, "{}", f64::from_bits(*b));
         }
+        // AArch64 lane operands, which x86 never produces.
+        Operand::Vector(..) | Operand::VectorLane(..) | Operand::VectorList(..) => {}
     }
 }
 

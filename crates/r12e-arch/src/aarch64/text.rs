@@ -126,6 +126,28 @@ fn operand(out: &mut String, op: &Operand, style: Style) {
         Operand::FpImm(b) => {
             let _ = write!(out, "#{}", fp_text(*b));
         }
+        Operand::Vector(n, lanes) => {
+            let _ = write!(out, "v{n}.{}", lanes.as_str());
+        }
+        Operand::VectorLane(n, width, index) => {
+            let letter = match width {
+                Width::W8 => 'b',
+                Width::W16 => 'h',
+                Width::W32 => 's',
+                _ => 'd',
+            };
+            let _ = write!(out, "v{n}.{letter}[{index}]");
+        }
+        Operand::VectorList(first, count, lanes) => {
+            out.push('{');
+            for i in 0..*count {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                let _ = write!(out, "v{}.{}", (first + i) % 32, lanes.as_str());
+            }
+            out.push('}');
+        }
         Operand::Addr(a) => {
             if style.objdump {
                 let _ = write!(out, "{:x}", a.get());
