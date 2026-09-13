@@ -23,6 +23,20 @@ for src in fixtures/src/*.c; do
   done
 done
 
+# A patched pair: the same program with one string changed, and a second with
+# two functions added. This is what the diff gate measures against.
+if [ -e fixtures/src/hello.c ]; then
+  # The patch changes code, not a string: a changed literal moves no
+  # instruction, so a string edit would test nothing about the matcher.
+  sed 's|acc += i;|acc += i * 2;|' fixtures/src/hello.c > "$out/hello-patched.c"
+  sed -e 's|acc += i;|acc += i * 2;|' \
+      -e 's|^int main(|int extra_helper(int a, int b) { return a * b + (a ^ b); }\nint another_one(int a) { return a << 3; }\n\nint main(|' \
+    fixtures/src/hello.c > "$out/hello-grown.c"
+  "$cc" -g -O2 -fno-pie -no-pie -o "$out/hello-patched.a64.O2" "$out/hello-patched.c"
+  "$cc" -g -O2 -fno-pie -no-pie -o "$out/hello-grown.a64.O2" "$out/hello-grown.c"
+  rm -f "$out/hello-patched.c" "$out/hello-grown.c"
+fi
+
 # Freestanding sources build for every target without a sysroot, so the same
 # source yields comparable AArch64 and x86-64 objects.
 for src in fixtures/portable/*.c; do

@@ -125,6 +125,21 @@ enum Command {
     },
     /// Counts: functions, blocks, instructions, references, strings.
     Stats(Common),
+    /// Compare two builds and say which functions changed.
+    ///
+    /// Matching runs strongest evidence first: identical bytes, then the
+    /// instruction shape, then names, then position in the call graph.
+    /// Changed functions are reported most changed first, which is the order a
+    /// patch diff is read in.
+    Diff {
+        #[command(flatten)]
+        common: Common,
+        /// The other build to compare against.
+        other: PathBuf,
+        /// Also list the pairs that did not change.
+        #[arg(long)]
+        all: bool,
+    },
     /// Speak the Model Context Protocol on stdin and stdout, so an agent can
     /// drive the analysis.
     Mcp,
@@ -183,7 +198,7 @@ impl Command {
             | Command::Exports(c)
             | Command::Funcs(c)
             | Command::Stats(c) => c,
-            Command::Annotate { common, .. } => common,
+            Command::Annotate { common, .. } | Command::Diff { common, .. } => common,
             // The server takes its paths per call rather than up front.
             Command::Mcp => unreachable!("handled before a file is opened"),
             Command::Disas { common, .. }
@@ -268,7 +283,7 @@ fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
     if matches!(cli.command, Command::Funcs(_) | Command::Stats(_)) {
         opts.strings = matches!(cli.command, Command::Stats(_));
     }
-    if matches!(cli.command, Command::Annotate { .. }) {
+    if matches!(cli.command, Command::Annotate { .. } | Command::Diff { .. }) {
         opts.strings = false;
         opts.xrefs = false;
     }
@@ -303,6 +318,15 @@ fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             target,
             from,
         } => print::xrefs(w, &program, target, *from, common.json),
+        Command::Diff { common, other, all } => {
+            let other_data = std::fs::File::open(other)
+                .and_then(|f| map_file(&f))
+                .map_err(|e| format!("{}: {e}", other.display()))?;
+            let other_obj =
+                r12e_format::load(&other_data, &load_opts).map_err(|e| e.to_string())?;
+            let other_prog = r12e_analysis::analyze(other_obj, &opts);
+            print::diff(w, &program, &other_prog, *all, common.json)
+        }
         Command::Annotate { what, common } => {
             let who = whoami();
             match what {

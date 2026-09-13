@@ -244,6 +244,7 @@ dependencies = [
  "r12e-arch",
  "r12e-core",
  "r12e-db",
+ "r12e-diff",
  "r12e-format",
  "r12e-types",
  "serde",
@@ -263,6 +264,18 @@ version = "0.1.0"
 dependencies = [
  "r12e-arch",
  "r12e-core",
+ "serde",
+]
+
+[[package]]
+name = "r12e-diff"
+version = "0.1.0"
+dependencies = [
+ "r12e-analysis",
+ "r12e-arch",
+ "r12e-core",
+ "r12e-db",
+ "r12e-format",
  "serde",
 ]
 

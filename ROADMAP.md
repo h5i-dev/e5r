@@ -20,7 +20,8 @@ rather than argued about again.
 | annotation log, content anchors, git merge | built (M7) |
 | CLI with JSON on every command | built (M8) |
 | MCP server | built (M9) |
-| diff, patch, signatures | not started (M10) |
+| binary diff | built (M10) |
+| patch, signatures, emulation, queries | not started (M10) |
 
 Measured on a 10-core aarch64 machine: `libc.so.6` (1.7 MB) analyzes in around
 a tenth of a second, finding 3,524 functions, 80.3% of them complete;

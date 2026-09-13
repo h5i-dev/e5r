@@ -399,3 +399,71 @@ pub fn xrefs(w: &mut Out, p: &Program, target: &str, from: bool, as_json: bool) 
 pub fn strength_name(s: Strength) -> &'static str {
     s.as_str()
 }
+
+/// A comparison of two builds.
+pub fn diff(w: &mut Out, old: &Program, new: &Program, all: bool, as_json: bool) -> R {
+    let d = r12e_diff::compare(old, new);
+    if as_json {
+        return json::emit(w, &json::diff(&d));
+    }
+    outln!(
+        w,
+        "{} matched ({} changed, {} identical), {} removed, {} added",
+        d.matched.len(),
+        d.changed_count(),
+        d.identical_count(),
+        d.removed.len(),
+        d.added.len()
+    );
+    if d.matched.is_empty() && d.added.is_empty() && d.removed.is_empty() {
+        eprintln!("nothing to compare");
+        return Ok(exit::NOT_FOUND);
+    }
+    outln!(w);
+    outln!(
+        w,
+        "{:<12}{:<20}{:<20}{:>7}  {:>7}  {}",
+        "similarity",
+        "old",
+        "new",
+        "old n",
+        "new n",
+        "name"
+    );
+    for m in d.matched.iter().filter(|m| all || m.changed()) {
+        outln!(
+            w,
+            "{:<12.3}{:<20}{:<20}{:>7}  {:>7}  {}  [{}]",
+            m.similarity,
+            m.old.to_string(),
+            m.new.to_string(),
+            m.old_insns,
+            m.new_insns,
+            m.name,
+            m.kind.as_str()
+        );
+    }
+    for (a, n) in &d.removed {
+        outln!(
+            w,
+            "{:<12}{:<20}{:<20}{:>7}  {:>7}  {n}",
+            "removed",
+            a.to_string(),
+            "",
+            "",
+            ""
+        );
+    }
+    for (a, n) in &d.added {
+        outln!(
+            w,
+            "{:<12}{:<20}{:<20}{:>7}  {:>7}  {n}",
+            "added",
+            "",
+            a.to_string(),
+            "",
+            ""
+        );
+    }
+    Ok(exit::OK)
+}

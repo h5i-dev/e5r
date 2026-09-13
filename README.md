@@ -20,6 +20,7 @@ $ r12e funcs ./a.out
 $ r12e disas ./a.out main
 $ r12e annotate ./a.out name 0x4006e8 parse_header
 $ r12e xrefs ./a.out 0x4006e8
+$ r12e diff ./old ./new         # what did the patch touch
 $ r12e stats --json ./a.out
 $ r12e mcp                    # JSON-RPC on stdin and stdout, for an agent
 ```

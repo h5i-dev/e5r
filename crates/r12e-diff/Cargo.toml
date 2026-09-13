@@ -1,6 +1,6 @@
 [package]
-name = "r12e-cli"
-description = "r12e — the command line."
+name = "r12e-diff"
+description = "r12e — matching functions across two builds."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,22 +8,12 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
-[[bin]]
-name = "r12e"
-path = "src/main.rs"
-
 [dependencies]
 r12e-core = { workspace = true }
-r12e-format = { workspace = true }
 r12e-arch = { workspace = true }
 r12e-analysis = { workspace = true }
 r12e-db = { workspace = true }
-r12e-diff = { workspace = true }
-r12e-types = { workspace = true }
-clap = { workspace = true }
-memmap2 = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
 
 [dev-dependencies]
-serde_json = { workspace = true }
+r12e-format = { workspace = true }

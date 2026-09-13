@@ -323,3 +323,42 @@ pub fn xrefs(p: &Program, refs: &[Xref]) -> Listing<XrefOut> {
             .collect(),
     )
 }
+
+/// A comparison of two builds.
+#[derive(Serialize)]
+pub struct DiffOut {
+    schema: &'static str,
+    matched: usize,
+    changed: usize,
+    identical: usize,
+    removed: Vec<Value>,
+    added: Vec<Value>,
+    /// Changed pairs, most changed first.
+    changes: Vec<Value>,
+}
+
+use serde_json::{Value, json};
+
+pub fn diff(d: &r12e_diff::Diff) -> DiffOut {
+    let pair = |m: &r12e_diff::Match| {
+        json!({
+            "old": format!("{:#x}", m.old.get()),
+            "new": format!("{:#x}", m.new.get()),
+            "name": m.name,
+            "kind": m.kind.as_str(),
+            "similarity": m.similarity,
+            "old_insns": m.old_insns,
+            "new_insns": m.new_insns,
+        })
+    };
+    let side = |(a, n): &(r12e_core::Addr, String)| json!({ "addr": format!("{:#x}", a.get()), "name": n });
+    DiffOut {
+        schema: SCHEMA,
+        matched: d.matched.len(),
+        changed: d.changed_count(),
+        identical: d.identical_count(),
+        removed: d.removed.iter().map(side).collect(),
+        added: d.added.iter().map(side).collect(),
+        changes: d.changed().map(pair).collect(),
+    }
+}
