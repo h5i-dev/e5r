@@ -235,6 +235,12 @@ that does not exist.
 | `--base ADDR` | Load a raw image, or rebase a relocatable one, at an address. |
 | `--arch NAME` | The architecture of a raw image, which has no header to say. |
 | `--threads N` | How much of the analysis to run in parallel. The output does not depend on this. |
+| `--color WHEN` | `auto` (a terminal only), `always`, or `never`. `NO_COLOR` is honoured. |
+| `--no-pager` | Do not page, even when a terminal is reading. `PAGER` and `R12E_PAGER` choose the pager. |
+
+Colour, paging and width-fitting happen only when a person is reading. Piped
+output carries no escape sequences and is never truncated, so a listing taken
+today diffs against the same listing taken a week ago.
 
 ## What is not built yet
 

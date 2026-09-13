@@ -443,8 +443,11 @@ designed before it gets coded, and the design lives in
       people type a hundred times an hour.
 - [x] Address expressions: symbol names, `main+0x20`, `[rip+0x10]`, section
       relative, file offset.
-- [ ] Paging, color, and a terminal-width-aware listing that stays diffable when
-      piped.
+- [x] Paging, color, and a terminal-width-aware listing that stays diffable when
+      piped. All three are decided once from whether standard output is a
+      terminal, so piped output is byte-identical to what it was before they
+      existed. `NO_COLOR`, `PAGER` and `R12E_PAGER` are honoured; `--color` and
+      `--no-pager` override. JSON is never coloured or paged.
 - [x] Shell completion for bash, zsh and fish, and a generated man page, both
       generated from the command tree so neither can describe a command that
       does not exist.
