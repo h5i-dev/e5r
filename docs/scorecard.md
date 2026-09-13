@@ -43,8 +43,24 @@ encoding not decoded at all is a separate number with a floor that only rises.
 
 | architecture | oracle | instructions | wrong | decoded |
 | --- | --- | --- | --- | --- |
-| AArch64 | `objdump -d` | 1,429,650 | 0 | 99.87% |
+| AArch64 | `objdump -d` | 1,640,904 | 0 | 99.85% |
 | x86-64 | `llvm-objdump --x86-asm-syntax=intel` | 4,760 | 0 | 100% |
+| ARM32 and Thumb-2 | `llvm-objdump-18 -d` | 3,568 | 0 | 100% |
+
+Adding a static Go binary to the AArch64 corpus raised it from 1.43M to 1.64M
+instructions and found five decoding bugs that the C corpus never reached: a
+system register table with eight wrong entries written by hand, a 64-bit
+`uxtb` and `uxth` that do not exist, the `MoveWidePreferred` test that decides
+whether `orr Rd, ZR, #imm` keeps its own name or takes the `mov` alias, `sbfm`
+with `imms + 1 == immr` spelled as a shift instead of `sbfiz`, and `uaddlv`
+and `saddlv` accumulating into the lane width rather than twice it. The system
+register table is now generated from what the assembler accepts over all
+32,768 encodings an `MRS` can name, and checked against it.
+
+The ARM32 figure is small and it is the number after a development sweep of
+roughly 260,000 random and strided encodings through `llvm-objdump`, which
+found and fixed about 15,000 disagreements before the fixture corpus was
+measured. The sweep is the real evidence; the fixture figure is the gate.
 
 The AArch64 corpus is the fixture set plus libc, libstdc++, libcrypto, bash,
 ls and objdump. What it does not decode is the single-structure SIMD loads and
@@ -98,9 +114,32 @@ and a second optimization pass finding nothing.
 
 ## Decompiler
 
+Two gates, and the second one is the one that matters.
+
 Every function recovered from the fixture corpus is decompiled into one
-translation unit and handed to `clang -c`, which has to accept it. That is the
-gate; reading the output cannot tell you whether it is well formed.
+translation unit and handed to `clang -c`, which has to accept it. That proves
+the output is well formed and nothing more.
+
+The second gate compiles the output and runs it. Every pure function in the
+corpus, meaning one whose whole behaviour is its return value, is decompiled,
+compiled, and called on 36 argument vectors, and the answers are compared
+against the interpreter, which is itself measured against what real hardware
+did with the same instructions. Nothing here is the decompiler checking itself.
+
+It found that most of the corpus was wrong:
+
+| after | functions measured | functions whose C disagrees with the machine |
+| --- | --- | --- |
+| the gate was first written | 225 | 130 |
+| extension widths fixed | 225 | 69 |
+| signed arithmetic widths fixed | 225 | 66 |
+
+An inverted signed comparison, found separately by the ported Ghidra
+datatests, had made every `<` and `<=` in a source program reach the output
+meaning its complement, on both architectures at every optimization level. It
+compiled cleanly, which is why the first gate never saw it.
+
+The remaining 66 are being worked through and each is named by the gate.
 
 Goto density, the share of functions the structuring could not express without
 a label, is the quality signal:

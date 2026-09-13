@@ -140,6 +140,68 @@ markers. Add this to `.gitattributes`:
 *.r12e merge=union
 ```
 
+## Containers that are not one program
+
+An `ar` archive holds objects rather than being one, so it is listed rather
+than loaded: picking a member silently would make every later answer about
+bytes you did not choose.
+
+```
+r12e archive libfoo.a              # members, sizes and offsets
+r12e archive libfoo.a --symbols    # and what each one defines
+```
+
+GNU and BSD archives, long names, both symbol index forms, and thin archives.
+
+```
+r12e overlay firmware.exe
+```
+
+reports where the headers stop describing the file, what is appended past that
+point, and the entropy of every section with a peak per 4 KB window, which is
+how a packed region inside an ordinary-looking section shows up.
+
+Findings carry a strength and never a verdict. A section that is writable and
+executable is a fact; what put it there is not. A packer is named only where a
+section carries that packer's own signature.
+
+## Patching
+
+An edit is anchored to the code around it and carries the bytes it expects to
+find, so a patch written against one build still lands on the right
+instruction in the next one, and says how it found it.
+
+```
+r12e patch prog record 0x401234 --bytes 90909090 --note "skip the check" -o fix.r12e-patch
+r12e patch prog preview fix.r12e-patch     # where it lands, what it overwrites
+r12e patch prog apply   fix.r12e-patch -o prog.patched
+r12e patch prog.patched revert fix.r12e-patch -o prog
+r12e patch prog merge a.r12e-patch b.r12e-patch -o both.r12e-patch
+```
+
+A set applies as a whole or not at all. Overlapping edits are a conflict
+rather than an order-dependent result, and an edit is always the same length
+as what it replaces, because a different length would move every byte after it
+and invalidate the rest of the set.
+
+`apply` refuses by default when an edit resolved on its address alone, since
+that means the code it was written against is no longer there; `--allow-address-only`
+overrides. `revert` does not refuse, because a patched binary no longer holds
+the bytes the anchor fingerprinted, which is exactly what applying it did.
+
+## Saving a session
+
+```
+r12e project new prog -o prog.r12e-proj --set scan_gaps=true
+r12e project add prog.r12e-proj --signatures libc.r12e-sig --patch fix.r12e-patch
+r12e project verify prog.r12e-proj
+r12e project show prog.r12e-proj
+```
+
+A project names its binary by content as well as by path. Opening it against a
+rebuilt binary says so rather than answering about bytes that are not there,
+and a binary that only moved is still the right one.
+
 ## Driving it from a program
 
 Every command takes `--json`. The schema is named in every document
@@ -176,6 +238,6 @@ that does not exist.
 
 ## What is not built yet
 
-ARM32 and SLEIGH languages, PDB for Windows binaries, Go and Objective-C
-metadata, patch sets, and an interactive session. `ROADMAP.md` is the list, and
-it says what each milestone is and what it is measured by.
+SLEIGH languages, i386, Windows-specific entry points, an assembler, and an
+interactive session. `ROADMAP.md` is the list, and it says what each milestone
+is and what it is measured by.
