@@ -167,9 +167,17 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       exports trie are still to do, as is the dyld shared cache.
 - [x] Raw blob loading with an explicit base, architecture and entry point, plus
       Intel HEX and S-record, for firmware work.
-- [ ] `ar` archives and loose object files.
-- [ ] Overlay detection, section entropy map, and a packer heuristic that reports
-      a suspicion with its evidence rather than a verdict.
+- [x] `ar` archives and loose object files. GNU and BSD flavours, long names,
+      both symbol index forms and thin archives, measured against `ar t` and
+      `nm -s`. An archive is opened rather than loaded: it has no architecture,
+      entry point or memory map, so making one an `Object` would mean picking a
+      member and making every later answer about bytes the caller never chose.
+- [x] Overlay detection, section entropy map, and a packer heuristic that reports
+      a suspicion with its evidence rather than a verdict. Nine finding kinds,
+      each with a strength; a packer is named only where a section carries that
+      packer's own signature. The false-positive gate matters as much as the
+      true positives: fourteen ordinary binaries, seven linked and seven
+      relocatable, produce no overlay and no finding at `Inferred` or above.
 - [x] Every loader treats its input as hostile. A malformed header returns a typed
       error; it never panics and never allocates from an attacker-controlled count.
 - [ ] Later, behind a feature flag: WASM, .NET metadata, DEX, Java class files.
@@ -185,7 +193,12 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 - [x] AArch64 A64 decoder including Advanced SIMD. SVE is deliberately not
       decoded: it is a separate architecture's worth of encodings and the
       coverage number records its absence.
-- [ ] ARM32 and Thumb-2, including interworking and the IT block.
+- [x] ARM32 and Thumb-2, including interworking and the IT block. 3,568
+      instructions over twelve fixture objects against `llvm-objdump-18`, 0
+      wrong and 0 undecoded, after a development sweep of roughly 260,000
+      random and strided encodings that found about 15,000 disagreements.
+      NEON, the parallel arithmetic, the saturating and packing instructions
+      and the exception-return transfers are declined rather than guessed.
 - [ ] i386, the 32-bit mode of the x86 decoder. The loader already recognizes
       the architecture and the decoder then declines every instruction, which
       is the worst of both: a file that opens and says nothing. The work is the
@@ -286,13 +299,16 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       elimination needs to know what the caller reads after a return and the
       decompiler needs to name arguments. Per-function detection of the ones a
       compiler invents is still to do.
-- [ ] Value-set or range analysis, enough to bound a jump table index and to
-      prove a comparison constant.
+- [x] Value-set or range analysis, enough to bound a jump table index and to
+      prove a comparison constant. Interval domain with widening over eight
+      rounds; 117 results checked, 62 of them bounded.
 - [ ] Calling convention detection per function, including non-standard ones that
       a compiler invents for a static function.
-- [ ] Prototype recovery: parameter count, storage, return value, varargs.
-- [ ] Feedback edges. A prototype learned late re-runs the callers' dataflow. The
+- [x] Prototype recovery: parameter count, storage, return value, varargs.
+      186 prototypes recovered with no argument lost.
+- [x] Feedback edges. A prototype learned late re-runs the callers' dataflow. The
       schedule is explicit and budgeted, not a `while (changed)` around everything.
+      Callers also settle whether a function returns at all.
 - [x] An IR interpreter, landed with the lifter as planned. Ten semantic tests
       run real compiled functions through it and compare against the answer
       computed independently in Rust: arithmetic at every width, signed and
@@ -339,12 +355,13 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       the interpreter and compared against hardware.
 - [ ] C++ recovery beyond the tables: RTTI where present, constructor and
       destructor identification, `this` pointer typing.
-- [ ] Go: `pclntab` function names, `moduledata`, interface tables, the runtime
-      type descriptors.
-- [ ] Rust: the metadata that exists, which is less than people expect. Panic
+- [x] Go: `pclntab` function names and `moduledata`. 1,299 of 1,299 function
+      names recovered from a stripped Go binary. Interface tables and the
+      runtime type descriptors are still to do.
+- [x] Rust: the metadata that exists, which is less than people expect. Panic
       location strings carry file and line and are worth mining.
-- [ ] ObjC and Swift metadata, including Swift field descriptors and protocol
-      conformances.
+- [ ] ObjC metadata is read: class and method lists, with selectors. Swift is
+      not started, including its field descriptors and protocol conformances.
 
 ### M6. Decompiler
 
@@ -367,8 +384,11 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 - [ ] C emission with a position map, so every token maps back to an address and
       the CLI can highlight, slice and cross-reference the output.
 - [ ] Port Ghidra's 89 decompiler datatests to our format before the M6 gate
-      opens. They encode two decades of decompiler bugs and they are the cheapest
-      correctness signal available. Every bug fixed after that adds one case.
+      opens. 60 cases are ported, representing roughly 48 of the 89; the rest
+      need processors we do not decode, user-applied data types we have no way
+      to attach, or assert on Ghidra's own SSA dump. 44 pass and 16 stay
+      `#[ignore]`d, each naming a real defect, so the list of known defects
+      lives in the test suite rather than in someone's head.
 - [x] Quality gates: goto density per function against a ceiling that only
       comes down, and a recompilability check — every function recovered from
       the fixture corpus is decompiled into one translation unit that `clang`
@@ -403,8 +423,10 @@ designed before it gets coded, and the design lives in
       file, so regenerating them cannot conflict.
 - [x] Undo and redo as operations on the log.
 - [x] Provenance on every assertion: who, when, and optionally why.
-- [ ] A project file that records the binary hash, the load configuration and the
-      analysis options, and nothing else.
+- [x] A project file that records the binary hash, the load configuration and the
+      analysis options, and nothing else. It names the binary by content as well
+      as by path, so a rebuilt binary is refused and a moved one is a distinct,
+      usable verdict.
 - [x] Tests that run actual `git merge` on diverging annotation branches and
       assert the folded result.
 
@@ -423,7 +445,9 @@ designed before it gets coded, and the design lives in
       relative, file offset.
 - [ ] Paging, color, and a terminal-width-aware listing that stays diffable when
       piped.
-- [ ] Shell completion for bash, zsh and fish, and a generated man page.
+- [x] Shell completion for bash, zsh and fish, and a generated man page, both
+      generated from the command tree so neither can describe a command that
+      does not exist.
 - [ ] Progress reporting on stderr with an estimate, because analysis of a 500 MB
       binary is not instant even when it is fast.
 
@@ -441,7 +465,8 @@ designed before it gets coded, and the design lives in
       preview follow their features.
 - [ ] Cancellable jobs with a budget, so an agent that asks for the decompilation
       of a 40,000-function binary gets partial results and a reason.
-- [ ] A batch mode that runs a script of commands and emits one JSON document.
+- [x] A batch mode that runs a script of commands and emits one JSON document,
+      each result carried with the command that produced it.
 - [ ] Scripting. Start with the batch language above; add an embedded interpreter
       only when a real workflow needs control flow. Python via an extension
       module is the likely answer and it is explicitly not in the first year.
@@ -454,9 +479,11 @@ designed before it gets coded, and the design lives in
       known.
 - [ ] Diff at instruction granularity inside a changed function, so the answer
       is the line that changed rather than the function that contains it.
-- [ ] Patch sets. An auditable object describing byte edits, previewed before
-      write, applied to a sibling file by default, assembled from public
-      encodings. Never a silent overwrite of the input.
+- [x] Patch sets. An auditable object describing byte edits, previewed before
+      write, applied to a sibling file by default. A set applies as a whole or
+      not at all, overlapping edits are a conflict rather than an order-dependent
+      result, and an edit is always the same length as what it replaces.
+      Assembling an edit from mnemonics still waits on the assembler.
 - [x] Signature matching, in a sorted text format that reviews in a diff.
       A library built from a binary with symbols recovers 10 of 11 names in
       its stripped copy with none wrong. It refuses every coin flip: two
