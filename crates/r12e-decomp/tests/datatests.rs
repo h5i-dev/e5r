@@ -760,17 +760,15 @@ fn modulo() {
     }
 }
 
-/// statuscmp.xml in the sharpest form the port could find: `v < 5` and `v <= 5`
-/// come out as `v >= 4` and `v >= 5`, the complement of what the branch tests.
+/// statuscmp.xml: all four signed relations reach the output meaning what the
+/// branch tests.
 ///
-/// `>` and `>=` are negated correctly, into `6 <= v` and `5 <= v`: the operands
-/// are swapped and the operator flipped, which is one rewrite. `<` and `<=` get
-/// the operator flipped without the swap, which is the other half of the same
-/// rewrite applied alone, so every `<` and `<=` in a source program reaches the
-/// output meaning the opposite. Both architectures, both optimization levels.
+/// `x != y && y <= x` is `y < x`, and the rewrite that recognizes it used to
+/// emit `x < y`, so every `<` and `<=` in a source program came out as its
+/// complement. Nothing caught it: the output still compiled, and the
+/// interpreter runs the flag algebra rather than this rewrite.
 #[test]
-#[ignore = "an inverted signed less-than prints as >=: the operands are not swapped with the operator"]
-fn signed_compare_is_inverted() {
+fn signed_compare_keeps_its_relation() {
     case(&all("arith"), "cmp_lt", |c| {
         c.has_any(&["<= 4", "4 >= "]);
     });

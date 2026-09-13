@@ -731,14 +731,16 @@ pub fn patterns(f: &mut SsaFunction) -> Changes {
                 }
             }
 
-            // Not equal and not less is greater.
+            // Not equal and not less is greater. The inequality is on the
+            // subtraction's operands and the `<=` is on them reversed, so
+            // `x != y && y <= x` is `y < x`, which is the `<=`'s own order.
             if o == Op::BoolAnd {
                 if let (Some((x, y)), Some((px, py))) =
                     (as_inequality(&source, &a), as_signed_le(&source, &c))
                 {
                     if x == py && y == px {
                         op.kind = SsaKind::Op(Op::IntSLess);
-                        op.inputs = vec![py, px];
+                        op.inputs = vec![px, py];
                         changes.folded += 1;
                         continue;
                     }
