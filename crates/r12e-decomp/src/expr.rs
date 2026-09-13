@@ -692,15 +692,7 @@ impl<'a> Rebuilder<'a> {
                 .unwrap_or(Expr::Unknown("missing"))
         };
         let bin = |sym: &'static str| Expr::Binary(sym, Box::new(a()), Box::new(b()));
-        let signed_bin = |sym: &'static str| {
-            // The width of what is being compared, which is not the width of
-            // the answer: a comparison produces one byte.
-            let width = op
-                .inputs
-                .first()
-                .map(|i| i.size())
-                .unwrap_or(op.size)
-                .max(op.inputs.get(1).map(|i| i.size()).unwrap_or(0));
+        let signed_at = |width: u8, sym: &'static str| {
             let t = signed_type(width);
             Expr::Binary(
                 sym,
@@ -708,6 +700,20 @@ impl<'a> Rebuilder<'a> {
                 Box::new(Expr::Cast(t, Box::new(b()))),
             )
         };
+        // A comparison's answer is one byte whatever it compared, so its width
+        // comes from the operands. Signed arithmetic's answer is as wide as
+        // the operation, and its operands are read at that width however wide
+        // the location holding them is.
+        let compared = |sym: &'static str| {
+            let width = op
+                .inputs
+                .first()
+                .map(|i| i.size())
+                .unwrap_or(op.size)
+                .max(op.inputs.get(1).map(|i| i.size()).unwrap_or(0));
+            signed_at(width, sym)
+        };
+        let signed_bin = |sym: &'static str| signed_at(op.size, sym);
 
         // An operand is read as whatever the operation consuming it expects.
         // A value the machine holds in a register has no type of its own, so
@@ -754,6 +760,9 @@ impl<'a> Rebuilder<'a> {
             Some(o) => int_in(b(), o),
             None => b(),
         };
+        // The width of the operand an extension reads, which is the width it
+        // extends from.
+        let input_width = op.inputs.first().map(|i| i.size()).unwrap_or(op.size);
         let ibin = |sym: &'static str| Expr::Binary(sym, Box::new(ia()), Box::new(ib()));
         let fbin = |sym: &'static str| Expr::Binary(sym, Box::new(fa()), Box::new(fb()));
 
@@ -784,16 +793,26 @@ impl<'a> Rebuilder<'a> {
             Op::IntNotEqual => ibin("!="),
             Op::IntLess => ibin("<"),
             Op::IntLessEqual => ibin("<="),
-            Op::IntSLess => signed_bin("<"),
-            Op::IntSLessEqual => signed_bin("<="),
+            Op::IntSLess => compared("<"),
+            Op::IntSLessEqual => compared("<="),
             Op::BoolAnd => bin("&&"),
             Op::BoolOr => bin("||"),
             Op::BoolXor => bin("^"),
             // A negated comparison is the opposite comparison, which is what
             // the source said before the machine turned it into flags.
             Op::BoolNot => negate(a()),
-            Op::IntZExt => Expr::Cast(c_type(op.size), Box::new(ia())),
-            Op::IntSExt => Expr::Cast(signed_type(op.size), Box::new(ia())),
+            // Both extensions name the width they extend *from* as well as
+            // the one they extend to. Every local is declared at its whole
+            // register's width, so without the inner cast the bits above the
+            // source's width come along and the extension does nothing.
+            Op::IntZExt => Expr::Cast(
+                c_type(op.size),
+                Box::new(Expr::Cast(c_type(input_width), Box::new(ia()))),
+            ),
+            Op::IntSExt => Expr::Cast(
+                signed_type(op.size),
+                Box::new(Expr::Cast(signed_type(input_width), Box::new(ia()))),
+            ),
             // A shift by a byte count, which is how a narrow read is expressed.
             Op::SubPiece => match op.inputs.get(1).and_then(|i| i.as_const()) {
                 Some(0) => Expr::Cast(c_type(op.size), Box::new(ia())),
