@@ -26,6 +26,7 @@ pub fn decode(arch: &Arch, bytes: &[u8], addr: Addr) -> Option<Insn> {
     match arch {
         Arch::AArch64 => aarch64::decode(bytes, addr),
         Arch::X86_64 => x86::decode(bytes, addr),
+        Arch::X86 => x86::decode32(bytes, addr),
         Arch::Arm => arm::decode(bytes, addr),
         _ => None,
     }
@@ -35,7 +36,7 @@ pub fn decode(arch: &Arch, bytes: &[u8], addr: Addr) -> Option<Insn> {
 pub fn format(arch: &Arch, i: &Insn, objdump: bool) -> String {
     match arch {
         Arch::AArch64 => aarch64::format(i, aarch64::text::Style { objdump }),
-        Arch::X86_64 => x86::format(i, x86::Style::default()),
+        Arch::X86_64 | Arch::X86 => x86::format(i, x86::Style::default()),
         Arch::Arm => arm::format(i),
         _ => i.mnemonic.to_string(),
     }

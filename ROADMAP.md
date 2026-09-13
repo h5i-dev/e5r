@@ -199,19 +199,18 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       random and strided encodings that found about 15,000 disagreements.
       NEON, the parallel arithmetic, the saturating and packing instructions
       and the exception-return transfers are declined rather than guessed.
-- [ ] i386, the 32-bit mode of the x86 decoder. The loader already recognizes
-      the architecture and the decoder then declines every instruction, which
-      is the worst of both: a file that opens and says nothing. The work is the
-      mode rather than the opcodes, since the table is shared: no REX, a
-      different default operand and address size, `0x66` and `0x67` meaning the
-      opposite of what they mean in long mode, and the 16-bit addressing forms
-      long mode dropped. The gate is the existing x86 parity test with a
-      32-bit corpus added.
-- [x] Differential comparison of each decoder against `objdump` over the fixture
-      corpus and the system binaries. Parity is a gate with no allowance;
-      undecoded encodings are a separate number with a floor that only moves up.
-      AArch64 is at zero disagreements over 1,426,341 instructions, 99.377%
-      decoded. Random-byte fuzzing against the oracle is still to do.
+- [x] i386, the 32-bit mode of the x86 decoder. The mode rather than the
+      opcodes, since the table is shared: no REX, so 0x40-0x4f are `inc` and
+      `dec`; default operand and address size 32; ModRM mod=00 rm=101 is an
+      absolute displacement rather than rip-relative; eight registers; the
+      instructions valid only in 32-bit mode and the ones invalid in it.
+      Measured against `llvm-mc` and `llvm-objdump` over a sweep of 235,357
+      candidates, every one- and two-byte opcode crossed with prefix strings
+      and ModRM shapes, both three-byte maps, all 256 ModRM values of all eight
+      x87 escapes, and 200,000 random byte piles: 0 wrong, 99.711% decoded.
+      100.000% over the compiled fixtures. What it declines is what llvm
+      declines because it faults on hardware, and what it decodes where llvm
+      declines is listed with the reason.
 - [ ] SLEIGH runtime: load a compiled `.sla`, decode, and produce p-code.
       Loading is done: the format is worked out in
       [`docs/sla-format.md`](../docs/sla-format.md) and the reader consumes all

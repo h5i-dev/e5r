@@ -49,12 +49,23 @@ fn reg(out: &mut String, r: Reg) {
             let _ = write!(out, "xmm{n}");
         }
         RegClass::Seg => out.push_str(SEG[(r.num as usize).min(5)]),
-        RegClass::Pc => out.push_str("rip"),
+        // `0x67` shrinks the program counter a displacement is taken from,
+        // and the width says which one this is.
+        RegClass::Pc => out.push_str(match r.width {
+            Width::W32 => "eip",
+            Width::W16 => "ip",
+            _ => "rip",
+        }),
         RegClass::Sys => {
             let _ = write!(out, "cr{n}");
         }
         RegClass::Sp => out.push_str("rsp"),
-        RegClass::Zr => out.push('0'),
+        // The x86 zero register is the phantom SIB index llvm prints when the
+        // index field is empty but the scale still has to be shown.
+        RegClass::Zr => out.push_str(match r.width {
+            Width::W64 => "riz",
+            _ => "eiz",
+        }),
         RegClass::Flags => out.push_str("eflags"),
     }
 }
@@ -67,6 +78,7 @@ fn size_hint(size: u64) -> &'static str {
         2 => "word ptr ",
         4 => "dword ptr ",
         8 => "qword ptr ",
+        10 => "tbyte ptr ",
         16 => "xmmword ptr ",
         _ => "",
     }
@@ -92,7 +104,9 @@ fn mem(out: &mut String, m: Mem, _needs_size: bool) {
         if wrote {
             out.push_str(" + ");
         }
-        if scale > 0 {
+        // The scale is printed whenever it is not implied: a scale of one is
+        // silent next to a base register and explicit without one.
+        if scale > 0 || m.base.is_none() {
             let _ = write!(out, "{}*", 1u32 << scale);
         }
         reg(out, ix);
@@ -100,7 +114,13 @@ fn mem(out: &mut String, m: Mem, _needs_size: bool) {
     }
     if m.disp != 0 || !wrote {
         if !wrote {
-            let _ = write!(out, "{:#x}", m.disp);
+            // An absolute address prints signed, the same as a displacement:
+            // llvm spells the top of the 32-bit space `-0x80000000`.
+            if m.disp < 0 {
+                let _ = write!(out, "-{:#x}", m.disp.unsigned_abs());
+            } else {
+                let _ = write!(out, "{:#x}", m.disp);
+            }
         } else if m.disp > 0 {
             let _ = write!(out, " + {:#x}", m.disp);
         } else {

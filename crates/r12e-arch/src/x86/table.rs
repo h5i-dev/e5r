@@ -29,8 +29,13 @@ pub enum Op {
     Gd,
     /// ModRM reg at the operand size.
     Gv,
-    /// Immediate byte.
+    /// Immediate byte, printed signed. llvm prints every byte immediate of an
+    /// integer instruction as a signed number, so `add al, 0x80` reads back as
+    /// `add al, -0x80`.
     Ib,
+    /// Immediate byte, printed unsigned: a shift count, a port, an interrupt
+    /// number, or an SSE selector, none of which is a number line.
+    Ibu,
     /// Immediate byte, sign-extended to the operand size.
     Ibs,
     /// Immediate word.
@@ -67,6 +72,9 @@ pub enum Op {
     Ov,
     /// A segment register from ModRM reg.
     Sw,
+    /// A segment register named by bits 3 to 5 of the opcode, as the `push`
+    /// and `pop` of a segment do. These carry no ModRM byte.
+    Sr,
     /// The literal 1.
     One,
     /// ModRM reg as an SSE register.
@@ -83,6 +91,18 @@ pub enum Op {
     Pq,
     /// ModRM r/m as an MMX register or memory.
     Qq,
+    /// ModRM r/m as an MMX register only.
+    Nq,
+    /// A far pointer immediate: offset then segment, printed segment first.
+    Ap,
+    /// ModRM r/m: a word in memory, the operand size in a register. Only the
+    /// segment register store at 0x8c encodes this way.
+    Ewm,
+    /// `xmm0`, the implicit mask of the variable blends.
+    XMM0,
+    /// ModRM r/m: a byte in memory, the operand size in a register, which is
+    /// how the SSE4 byte extract and insert print.
+    Ebm,
 }
 
 /// One opcode's mnemonic and operands.
@@ -136,6 +156,16 @@ const fn g(n: u8, a: Op, b: Op) -> Entry {
     }
 }
 
+/// Like [`g`], with an explicit memory operand size.
+const fn gs(n: u8, a: Op, b: Op, msize: u8) -> Entry {
+    Entry {
+        m: "",
+        ops: [a, b, Op::None],
+        group: n,
+        msize,
+    }
+}
+
 use Op::*;
 
 /// Group numbers, matching the Intel manual's numbering where it has one.
@@ -181,6 +211,21 @@ pub const G_0FBA: u8 = 19;
 pub const G_0FAE: u8 = 20;
 /// Group selector for opcode 0x0fc7.
 pub const G_0FC7: u8 = 21;
+/// Group selector for `0x0f 0xae` with a register operand, which names the
+/// fences rather than the state-save instructions its memory forms do.
+pub const G_0FAE_REG: u8 = 22;
+/// Group selector for opcode 0x82, the 32-bit-only alias of 0x80.
+pub const G_82: u8 = 23;
+/// Group selector for `0x0f 0x0d`, the AMD prefetch hints.
+pub const G_0F0D: u8 = 24;
+/// Group selector for `0x0f 0x18`, the prefetch hints.
+pub const G_0F18: u8 = 25;
+/// Group selector for `0x0f 0x71`, the word shifts.
+pub const G_0F71: u8 = 26;
+/// Group selector for `0x0f 0x72`, the doubleword shifts.
+pub const G_0F72: u8 = 27;
+/// Group selector for `0x0f 0x73`, the quadword shifts.
+pub const G_0F73: u8 = 28;
 
 /// The eight instructions a group's ModRM reg field selects between.
 pub struct Group(pub [&'static str; 8]);
@@ -231,7 +276,68 @@ pub const GROUPS: &[Group] = &[
     ]),
     // 21: 0x0f 0xc7
     Group(["", "cmpxchg8b", "", "", "", "", "rdrand", "rdseed"]),
+    // 22: 0x0f 0xae, register forms
+    Group(["", "", "", "", "", "lfence", "mfence", "sfence"]),
+    // 23: 0x82
+    Group(["add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"]),
+    // 24: 0x0f 0x0d
+    Group(["prefetch", "prefetchw", "prefetchwt1", "", "", "", "", ""]),
+    // 25: 0x0f 0x18
+    Group([
+        "prefetchnta",
+        "prefetcht0",
+        "prefetcht1",
+        "prefetcht2",
+        "",
+        "",
+        "",
+        "",
+    ]),
+    // 26: 0x0f 0x71
+    Group(["", "", "psrlw", "", "psraw", "", "psllw", ""]),
+    // 27: 0x0f 0x72
+    Group(["", "", "psrld", "", "psrad", "", "pslld", ""]),
+    // 28: 0x0f 0x73
+    Group(["", "", "psrlq", "psrldq", "", "", "psllq", "pslldq"]),
 ];
+
+/// The memory operand size a group's slot touches, where it is not the
+/// operand size. Zero is a block with no scalar width, which llvm prints with
+/// no size hint at all. `None` means the entry's own size applies.
+pub fn group_msize(group: u8, sel: usize) -> Option<u8> {
+    // `Op::None` is in scope here, so the empty answer needs its full name.
+    let row: [i8; 8] = match group {
+        // 0x0f 0x00: every slot is a sixteen-bit selector.
+        G_0F00 => [2; 8],
+        // 0x0f 0x01: the descriptor tables have no scalar width, the machine
+        // status word is sixteen bits, and `invlpg` names a byte.
+        G_0F01 => [0, 0, 0, 0, 2, 2, 2, 1],
+        // 0x0f 0xae: the state blocks have no width, the control and status
+        // word are doublewords, and `clflush` names a byte.
+        G_0FAE => [0, 0, 4, 4, 0, 0, 0, 1],
+        // 0x0f 0xc7: `cmpxchg8b` touches eight bytes.
+        G_0FC7 => [-1, 8, -1, -1, -1, -1, -1, -1],
+        // The prefetch hints all name a byte.
+        G_0F0D | G_0F18 => [1; 8],
+        // 0xff /3 and /5 are the far indirect branches, which print no size.
+        G_FF => [-1, -1, -1, 0, -1, 0, -1, -1],
+        _ => return Option::None,
+    };
+    match row[sel & 7] {
+        -1 => Option::None,
+        n => Some(n as u8),
+    }
+}
+
+/// The same, for a group's register forms. `sldt` and `str` store into a
+/// register at the operand size, while everything else in their group names a
+/// sixteen-bit selector whatever the operand size is.
+pub fn group_msize_reg(group: u8, sel: usize) -> Option<u8> {
+    match (group, sel) {
+        (G_0F00, 2..=5) => Some(2),
+        _ => Option::None,
+    }
+}
 
 /// Condition names, indexed by the low four bits of a `jcc`, `setcc` or
 /// `cmovcc` opcode.
@@ -350,20 +456,20 @@ pub const ONE_BYTE: [Entry; 256] = {
     t[0x89] = e("mov", Ev, Gv, None);
     t[0x8a] = e("mov", Gb, Eb, None);
     t[0x8b] = e("mov", Gv, Ev, None);
-    t[0x8c] = e("mov", Ev, Sw, None);
+    t[0x8c] = e("mov", Ewm, Sw, None);
     t[0x8d] = e("lea", Gv, M, None);
-    t[0x8e] = e("mov", Sw, Ew, None);
+    t[0x8e] = e("mov", Sw, Ewm, None);
     t[0x8f] = g(G_8F, Ev, None);
 
     t[0x90] = e("nop", None, None, None);
     let mut i = 1;
     while i < 8 {
-        t[0x90 + i] = e("xchg", Rv, EAX, None);
+        t[0x90 + i] = e("xchg", EAX, Rv, None);
         i += 1;
     }
     t[0x98] = e("cwde", None, None, None);
     t[0x99] = e("cdq", None, None, None);
-    t[0x9b] = e("fwait", None, None, None);
+    t[0x9b] = e("wait", None, None, None);
     t[0x9c] = e("pushf", None, None, None);
     t[0x9d] = e("popf", None, None, None);
     t[0x9e] = e("sahf", None, None, None);
@@ -393,8 +499,8 @@ pub const ONE_BYTE: [Entry; 256] = {
         i += 1;
     }
 
-    t[0xc0] = g(G_C0, Eb, Ib);
-    t[0xc1] = g(G_C1, Ev, Ib);
+    t[0xc0] = g(G_C0, Eb, Ibu);
+    t[0xc1] = g(G_C1, Ev, Ibu);
     t[0xc2] = e("ret", Iw, None, None);
     t[0xc3] = e("ret", None, None, None);
     t[0xc6] = g(G_C6, Eb, Ib);
@@ -404,7 +510,7 @@ pub const ONE_BYTE: [Entry; 256] = {
     t[0xca] = e("lret", Iw, None, None);
     t[0xcb] = e("lret", None, None, None);
     t[0xcc] = e("int3", None, None, None);
-    t[0xcd] = e("int", Ib, None, None);
+    t[0xcd] = e("int", Ibu, None, None);
     t[0xcf] = e("iret", None, None, None);
 
     // The shift-by-one forms print with no count, as both objdumps do: the
@@ -413,15 +519,16 @@ pub const ONE_BYTE: [Entry; 256] = {
     t[0xd1] = g(G_D1, Ev, None);
     t[0xd2] = g(G_D2, Eb, CL);
     t[0xd3] = g(G_D3, Ev, CL);
+    t[0xd7] = e("xlatb", None, None, None);
 
     t[0xe0] = e("loopne", Jb, None, None);
     t[0xe1] = e("loope", Jb, None, None);
     t[0xe2] = e("loop", Jb, None, None);
     t[0xe3] = e("jrcxz", Jb, None, None);
-    t[0xe4] = e("in", AL, Ib, None);
-    t[0xe5] = e("in", EAX, Ib, None);
-    t[0xe6] = e("out", Ib, AL, None);
-    t[0xe7] = e("out", Ib, EAX, None);
+    t[0xe4] = e("in", AL, Ibu, None);
+    t[0xe5] = e("in", EAX, Ibu, None);
+    t[0xe6] = e("out", Ibu, AL, None);
+    t[0xe7] = e("out", Ibu, EAX, None);
     t[0xe8] = e("call", Jz, None, None);
     t[0xe9] = e("jmp", Jz, None, None);
     t[0xeb] = e("jmp", Jb, None, None);
@@ -445,6 +552,59 @@ pub const ONE_BYTE: [Entry; 256] = {
     t
 };
 
+/// The one-byte map as 32-bit mode sees it.
+///
+/// Same table, minus the encodings long mode reassigned and plus the ones it
+/// dropped. This is the whole difference that matters at the first byte: 0x40
+/// to 0x4f are `inc` and `dec` here rather than REX, and a decoder that gets
+/// that wrong desynchronizes on the most common byte in the map.
+pub const ONE_BYTE_32: [Entry; 256] = {
+    let mut t = ONE_BYTE;
+
+    // The segment push and pop pairs, which long mode dropped.
+    t[0x06] = e("push", Sr, None, None);
+    t[0x07] = e("pop", Sr, None, None);
+    t[0x0e] = e("push", Sr, None, None);
+    t[0x16] = e("push", Sr, None, None);
+    t[0x17] = e("pop", Sr, None, None);
+    t[0x1e] = e("push", Sr, None, None);
+    t[0x1f] = e("pop", Sr, None, None);
+
+    // The decimal adjust instructions.
+    t[0x27] = e("daa", None, None, None);
+    t[0x2f] = e("das", None, None, None);
+    t[0x37] = e("aaa", None, None, None);
+    t[0x3f] = e("aas", None, None, None);
+
+    // 0x40 to 0x4f: inc and dec of a register, not a REX prefix.
+    let mut i = 0;
+    while i < 8 {
+        t[0x40 + i] = e("inc", Rv, None, None);
+        t[0x48 + i] = e("dec", Rv, None, None);
+        i += 1;
+    }
+
+    t[0x60] = e("pushal", None, None, None);
+    t[0x61] = e("popal", None, None, None);
+    t[0x62] = e("bound", Gv, M, None);
+    // 0x63 is `arpl`, not `movsxd`, and it is a word operation at any size.
+    t[0x63] = e("arpl", Ew, Gw, None);
+
+    // 0x82 duplicates 0x80. Long mode reclaimed it; here it is a real alias.
+    t[0x82] = g(G_82, Eb, Ib);
+
+    t[0x9a] = e("lcall", Ap, None, None);
+
+    t[0xc4] = e("les", Gv, Mp, None);
+    t[0xc5] = e("lds", Gv, Mp, None);
+    t[0xce] = e("into", None, None, None);
+    t[0xd4] = e("aam", Ib, None, None);
+    t[0xd5] = e("aad", Ib, None, None);
+    t[0xd6] = e("salc", None, None, None);
+    t[0xea] = e("ljmp", Ap, None, None);
+    t
+};
+
 /// The two-byte map, for opcodes with no mandatory prefix.
 pub const TWO_BYTE: [Entry; 256] = {
     let mut t = [BAD; 256];
@@ -453,8 +613,10 @@ pub const TWO_BYTE: [Entry; 256] = {
     t[0x05] = e("syscall", None, None, None);
     t[0x06] = e("clts", None, None, None);
     t[0x07] = e("sysret", None, None, None);
+    t[0x02] = e("lar", Gv, Ew, None);
+    t[0x03] = e("lsl", Gv, Ew, None);
     t[0x0b] = e("ud2", None, None, None);
-    t[0x0d] = e("prefetch", M, None, None);
+    t[0x0d] = g(G_0F0D, M, None);
     t[0x10] = e("movups", Vx, Wx, None);
     t[0x11] = e("movups", Wx, Vx, None);
     t[0x12] = es("movlps", Vx, Wx, None, 8);
@@ -463,8 +625,7 @@ pub const TWO_BYTE: [Entry; 256] = {
     t[0x15] = e("unpckhps", Vx, Wx, None);
     t[0x16] = es("movhps", Vx, Wx, None, 8);
     t[0x17] = es("movhps", Wx, Vx, None, 8);
-    t[0x18] = e("prefetchnta", M, None, None);
-    t[0x1e] = e("nop", Ev, None, None);
+    t[0x18] = g(G_0F18, M, None);
     t[0x1f] = e("nop", Ev, None, None);
     t[0x20] = e("mov", Eq, Cd, None);
     t[0x21] = e("mov", Eq, Dd, None);
@@ -473,8 +634,8 @@ pub const TWO_BYTE: [Entry; 256] = {
     t[0x28] = e("movaps", Vx, Wx, None);
     t[0x29] = e("movaps", Wx, Vx, None);
     t[0x2a] = e("cvtpi2ps", Vx, Qq, None);
-    t[0x2c] = e("cvttps2pi", Pq, Wx, None);
-    t[0x2d] = e("cvtps2pi", Pq, Wx, None);
+    t[0x2c] = es("cvttps2pi", Pq, Wx, None, 8);
+    t[0x2d] = es("cvtps2pi", Pq, Wx, None, 8);
     t[0x2e] = es("ucomiss", Vx, Wx, None, 4);
     t[0x2f] = es("comiss", Vx, Wx, None, 4);
     t[0x31] = e("rdtsc", None, None, None);
@@ -490,14 +651,15 @@ pub const TWO_BYTE: [Entry; 256] = {
     }
 
     t[0x51] = e("sqrtps", Vx, Wx, None);
-    t[0xc2] = e("cmpps", Vx, Wx, Ib);
+    t[0xc2] = e("cmpps", Vx, Wx, Ibu);
+    t[0xc6] = e("shufps", Vx, Wx, Ibu);
     t[0x54] = e("andps", Vx, Wx, None);
     t[0x55] = e("andnps", Vx, Wx, None);
     t[0x56] = e("orps", Vx, Wx, None);
     t[0x57] = e("xorps", Vx, Wx, None);
     t[0x58] = e("addps", Vx, Wx, None);
     t[0x59] = e("mulps", Vx, Wx, None);
-    t[0x5a] = e("cvtps2pd", Vx, Wx, None);
+    t[0x5a] = es("cvtps2pd", Vx, Wx, None, 8);
     t[0x5b] = e("cvtdq2ps", Vx, Wx, None);
     t[0x5c] = e("subps", Vx, Wx, None);
     t[0x5d] = e("minps", Vx, Wx, None);
@@ -509,23 +671,29 @@ pub const TWO_BYTE: [Entry; 256] = {
     t[0x7e] = e("movd", Ev, Pq, None);
     t[0x7f] = e("movq", Qq, Pq, None);
 
-    t[0xa0] = e("push", Sw, None, None);
-    t[0xa1] = e("pop", Sw, None, None);
+    t[0xa0] = e("push", Sr, None, None);
+    t[0xa1] = e("pop", Sr, None, None);
     t[0xa2] = e("cpuid", None, None, None);
+    t[0xa8] = e("push", Sr, None, None);
+    t[0xa9] = e("pop", Sr, None, None);
     t[0xa3] = e("bt", Ev, Gv, None);
-    t[0xa4] = e("shld", Ev, Gv, Ib);
+    t[0xa4] = e("shld", Ev, Gv, Ibu);
     t[0xa5] = e("shld", Ev, Gv, CL);
     t[0xab] = e("bts", Ev, Gv, None);
-    t[0xac] = e("shrd", Ev, Gv, Ib);
+    t[0xac] = e("shrd", Ev, Gv, Ibu);
     t[0xad] = e("shrd", Ev, Gv, CL);
     t[0xae] = g(G_0FAE, M, None);
     t[0xaf] = e("imul", Gv, Ev, None);
     t[0xb0] = e("cmpxchg", Eb, Gb, None);
     t[0xb1] = e("cmpxchg", Ev, Gv, None);
+    t[0xb2] = e("lss", Gv, Mp, None);
     t[0xb3] = e("btr", Ev, Gv, None);
+    t[0xb4] = e("lfs", Gv, Mp, None);
+    t[0xb5] = e("lgs", Gv, Mp, None);
     t[0xb6] = e("movzx", Gv, Eb, None);
     t[0xb7] = e("movzx", Gv, Ew, None);
-    t[0xba] = g(G_0FBA, Ev, Ib);
+    t[0xba] = g(G_0FBA, Ev, Ibu);
+    t[0xb9] = e("ud1", Gv, Ev, None);
     t[0xbb] = e("btc", Ev, Gv, None);
     t[0xbc] = e("bsf", Gv, Ev, None);
     t[0xbd] = e("bsr", Gv, Ev, None);
@@ -533,14 +701,93 @@ pub const TWO_BYTE: [Entry; 256] = {
     t[0xbf] = e("movsx", Gv, Ew, None);
     t[0xc0] = e("xadd", Eb, Gb, None);
     t[0xc1] = e("xadd", Ev, Gv, None);
-    t[0xc3] = e("movnti", Ev, Gv, None);
-    t[0xc7] = g(G_0FC7, M, None);
+    t[0xc3] = e("movnti", Ed, Gd, None);
+    t[0xc7] = gs(G_0FC7, M, None, 8);
 
     let mut i = 0;
     while i < 8 {
         t[0xc8 + i] = e("bswap", Rv, None, None);
         i += 1;
     }
+
+    // The MMX register file, which has no mandatory prefix: the same opcodes
+    // with 0x66 are the SSE2 forms in [`TWO_BYTE_66`]. A compiler stopped
+    // emitting these long ago and a disassembler still meets them.
+    t[0x0e] = e("femms", None, None, None);
+    t[0x08] = e("invd", None, None, None);
+    t[0x09] = e("wbinvd", None, None, None);
+    t[0x30] = e("wrmsr", None, None, None);
+    t[0x32] = e("rdmsr", None, None, None);
+    t[0x33] = e("rdpmc", None, None, None);
+    t[0x2b] = e("movntps", Wx, Vx, None);
+    t[0x50] = e("movmskps", Gd, Ux, None);
+    t[0x52] = e("rsqrtps", Vx, Wx, None);
+    t[0x53] = e("rcpps", Vx, Wx, None);
+    t[0x60] = es("punpcklbw", Pq, Qq, None, 4);
+    t[0x61] = es("punpcklwd", Pq, Qq, None, 4);
+    t[0x62] = es("punpckldq", Pq, Qq, None, 4);
+    t[0x63] = es("packsswb", Pq, Qq, None, 8);
+    t[0x64] = es("pcmpgtb", Pq, Qq, None, 8);
+    t[0x65] = es("pcmpgtw", Pq, Qq, None, 8);
+    t[0x66] = es("pcmpgtd", Pq, Qq, None, 8);
+    t[0x67] = es("packuswb", Pq, Qq, None, 8);
+    t[0x68] = es("punpckhbw", Pq, Qq, None, 8);
+    t[0x69] = es("punpckhwd", Pq, Qq, None, 8);
+    t[0x6a] = es("punpckhdq", Pq, Qq, None, 8);
+    t[0x6b] = es("packssdw", Pq, Qq, None, 8);
+    t[0x70] = es("pshufw", Pq, Qq, Ibu, 8);
+    t[0x71] = g(G_0F71, Nq, Ibu);
+    t[0x72] = g(G_0F72, Nq, Ibu);
+    t[0x73] = g(G_0F73, Nq, Ibu);
+    t[0x74] = es("pcmpeqb", Pq, Qq, None, 8);
+    t[0x75] = es("pcmpeqw", Pq, Qq, None, 8);
+    t[0x76] = es("pcmpeqd", Pq, Qq, None, 8);
+    t[0x77] = e("emms", None, None, None);
+    t[0xc4] = e("pinsrw", Pq, Ewm, Ibu);
+    t[0xc5] = e("pextrw", Gd, Nq, Ibu);
+    t[0xd1] = es("psrlw", Pq, Qq, None, 8);
+    t[0xd2] = es("psrld", Pq, Qq, None, 8);
+    t[0xd3] = es("psrlq", Pq, Qq, None, 8);
+    t[0xd4] = es("paddq", Pq, Qq, None, 8);
+    t[0xd5] = es("pmullw", Pq, Qq, None, 8);
+    t[0xd7] = e("pmovmskb", Gd, Nq, None);
+    t[0xd8] = es("psubusb", Pq, Qq, None, 8);
+    t[0xd9] = es("psubusw", Pq, Qq, None, 8);
+    t[0xda] = es("pminub", Pq, Qq, None, 8);
+    t[0xdb] = es("pand", Pq, Qq, None, 8);
+    t[0xdc] = es("paddusb", Pq, Qq, None, 8);
+    t[0xdd] = es("paddusw", Pq, Qq, None, 8);
+    t[0xde] = es("pmaxub", Pq, Qq, None, 8);
+    t[0xdf] = es("pandn", Pq, Qq, None, 8);
+    t[0xe0] = es("pavgb", Pq, Qq, None, 8);
+    t[0xe1] = es("psraw", Pq, Qq, None, 8);
+    t[0xe2] = es("psrad", Pq, Qq, None, 8);
+    t[0xe3] = es("pavgw", Pq, Qq, None, 8);
+    t[0xe4] = es("pmulhuw", Pq, Qq, None, 8);
+    t[0xe5] = es("pmulhw", Pq, Qq, None, 8);
+    t[0xe7] = es("movntq", Qq, Pq, None, 8);
+    t[0xe8] = es("psubsb", Pq, Qq, None, 8);
+    t[0xe9] = es("psubsw", Pq, Qq, None, 8);
+    t[0xea] = es("pminsw", Pq, Qq, None, 8);
+    t[0xeb] = es("por", Pq, Qq, None, 8);
+    t[0xec] = es("paddsb", Pq, Qq, None, 8);
+    t[0xed] = es("paddsw", Pq, Qq, None, 8);
+    t[0xee] = es("pmaxsw", Pq, Qq, None, 8);
+    t[0xef] = es("pxor", Pq, Qq, None, 8);
+    t[0xf1] = es("psllw", Pq, Qq, None, 8);
+    t[0xf2] = es("pslld", Pq, Qq, None, 8);
+    t[0xf3] = es("psllq", Pq, Qq, None, 8);
+    t[0xf4] = es("pmuludq", Pq, Qq, None, 8);
+    t[0xf5] = es("pmaddwd", Pq, Qq, None, 8);
+    t[0xf6] = es("psadbw", Pq, Qq, None, 8);
+    t[0xf7] = e("maskmovq", Pq, Nq, None);
+    t[0xf8] = es("psubb", Pq, Qq, None, 8);
+    t[0xf9] = es("psubw", Pq, Qq, None, 8);
+    t[0xfa] = es("psubd", Pq, Qq, None, 8);
+    t[0xfb] = es("psubq", Pq, Qq, None, 8);
+    t[0xfc] = es("paddb", Pq, Qq, None, 8);
+    t[0xfd] = es("paddw", Pq, Qq, None, 8);
+    t[0xfe] = es("paddd", Pq, Qq, None, 8);
     t
 };
 
@@ -588,14 +835,40 @@ pub const TWO_BYTE_66: [Entry; 256] = {
     t[0x6d] = e("punpckhqdq", Vx, Wx, None);
     t[0x6e] = e("movd", Vx, Ev, None);
     t[0x6f] = e("movdqa", Vx, Wx, None);
-    t[0x70] = e("pshufd", Vx, Wx, Ib);
+    t[0x70] = e("pshufd", Vx, Wx, Ibu);
     t[0x74] = e("pcmpeqb", Vx, Wx, None);
-    t[0xc2] = e("cmppd", Vx, Wx, Ib);
-    t[0xc5] = e("pextrw", Gd, Ux, Ib);
+    t[0xc2] = e("cmppd", Vx, Wx, Ibu);
+    t[0xc5] = e("pextrw", Gd, Ux, Ibu);
+    t[0xc6] = e("shufpd", Vx, Wx, Ibu);
+    t[0x2a] = es("cvtpi2pd", Vx, Qq, None, 8);
+    t[0x2c] = e("cvttpd2pi", Pq, Wx, None);
+    t[0x2d] = e("cvtpd2pi", Pq, Wx, None);
+    t[0x7c] = e("haddpd", Vx, Wx, None);
+    t[0x7d] = e("hsubpd", Vx, Wx, None);
+    t[0xd0] = e("addsubpd", Vx, Wx, None);
+    t[0xe6] = e("cvttpd2dq", Vx, Wx, None);
     t[0x75] = e("pcmpeqw", Vx, Wx, None);
     t[0x76] = e("pcmpeqd", Vx, Wx, None);
     t[0x7e] = e("movd", Ev, Vx, None);
     t[0x7f] = e("movdqa", Wx, Vx, None);
+    t[0x2b] = e("movntpd", Wx, Vx, None);
+    t[0x50] = e("movmskpd", Gd, Ux, None);
+    t[0x71] = g(G_0F71, Ux, Ibu);
+    t[0x72] = g(G_0F72, Ux, Ibu);
+    t[0x73] = g(G_0F73, Ux, Ibu);
+    t[0xc4] = e("pinsrw", Vx, Ewm, Ibu);
+    t[0xd1] = e("psrlw", Vx, Wx, None);
+    t[0xd2] = e("psrld", Vx, Wx, None);
+    t[0xd3] = e("psrlq", Vx, Wx, None);
+    t[0xe1] = e("psraw", Vx, Wx, None);
+    t[0xe2] = e("psrad", Vx, Wx, None);
+    t[0xe4] = e("pmulhuw", Vx, Wx, None);
+    t[0xe5] = e("pmulhw", Vx, Wx, None);
+    t[0xe7] = e("movntdq", Wx, Vx, None);
+    t[0xf1] = e("psllw", Vx, Wx, None);
+    t[0xf2] = e("pslld", Vx, Wx, None);
+    t[0xf3] = e("psllq", Vx, Wx, None);
+    t[0xf7] = e("maskmovdqu", Vx, Ux, None);
     t[0xd4] = e("paddq", Vx, Wx, None);
     t[0xd5] = e("pmullw", Vx, Wx, None);
     t[0xd6] = es("movq", Wx, Vx, None, 8);
@@ -636,7 +909,6 @@ pub const TWO_BYTE_F3: [Entry; 256] = {
     let mut t = [BAD; 256];
     t[0x10] = es("movss", Vx, Wx, None, 4);
     t[0x11] = es("movss", Wx, Vx, None, 4);
-    t[0x1e] = e("endbr64", None, None, None);
     t[0x2a] = e("cvtsi2ss", Vx, Ev, None);
     t[0x2c] = es("cvttss2si", Gv, Wx, None, 4);
     t[0x2d] = es("cvtss2si", Gv, Wx, None, 4);
@@ -650,14 +922,20 @@ pub const TWO_BYTE_F3: [Entry; 256] = {
     t[0x5e] = es("divss", Vx, Wx, None, 4);
     t[0x5f] = es("maxss", Vx, Wx, None, 4);
     t[0x6f] = e("movdqu", Vx, Wx, None);
-    t[0xc2] = es("cmpss", Vx, Wx, Ib, 4);
-    t[0x70] = e("pshufhw", Vx, Wx, Ib);
+    t[0xc2] = es("cmpss", Vx, Wx, Ibu, 4);
+    t[0x70] = e("pshufhw", Vx, Wx, Ibu);
     t[0x7e] = es("movq", Vx, Wx, None, 8);
     t[0x7f] = e("movdqu", Wx, Vx, None);
     t[0xb8] = e("popcnt", Gv, Ev, None);
     t[0xbc] = e("tzcnt", Gv, Ev, None);
     t[0xbd] = e("lzcnt", Gv, Ev, None);
-    t[0xe6] = e("cvtdq2pd", Vx, Wx, None);
+    t[0xe6] = es("cvtdq2pd", Vx, Wx, None, 8);
+    t[0x09] = e("wbnoinvd", None, None, None);
+    t[0x12] = e("movsldup", Vx, Wx, None);
+    t[0x16] = e("movshdup", Vx, Wx, None);
+    t[0x2b] = es("movntss", Wx, Vx, None, 4);
+    t[0x52] = es("rsqrtss", Vx, Wx, None, 4);
+    t[0x53] = es("rcpss", Vx, Wx, None, 4);
     t
 };
 
@@ -678,9 +956,14 @@ pub const TWO_BYTE_F2: [Entry; 256] = {
     t[0x5d] = es("minsd", Vx, Wx, None, 8);
     t[0x5e] = es("divsd", Vx, Wx, None, 8);
     t[0x5f] = es("maxsd", Vx, Wx, None, 8);
-    t[0x70] = e("pshuflw", Vx, Wx, Ib);
-    t[0xc2] = es("cmpsd", Vx, Wx, Ib, 8);
+    t[0x70] = e("pshuflw", Vx, Wx, Ibu);
+    t[0xc2] = es("cmpsd", Vx, Wx, Ibu, 8);
     t[0xe6] = e("cvtpd2dq", Vx, Wx, None);
+    t[0x2b] = es("movntsd", Wx, Vx, None, 8);
+    t[0x7c] = e("haddps", Vx, Wx, None);
+    t[0x7d] = e("hsubps", Vx, Wx, None);
+    t[0xd0] = e("addsubps", Vx, Wx, None);
+    t[0xf0] = e("lddqu", Vx, Wx, None);
     t
 };
 
@@ -698,7 +981,9 @@ pub const THREE_BYTE_38_66: [Entry; 256] = {
     t[0x09] = e("psignw", Vx, Wx, None);
     t[0x0a] = e("psignd", Vx, Wx, None);
     t[0x0b] = e("pmulhrsw", Vx, Wx, None);
-    t[0x10] = e("pblendvb", Vx, Wx, None);
+    t[0x10] = e("pblendvb", Vx, Wx, XMM0);
+    t[0x14] = e("blendvps", Vx, Wx, XMM0);
+    t[0x15] = e("blendvpd", Vx, Wx, XMM0);
     t[0x17] = e("ptest", Vx, Wx, None);
     t[0x1c] = e("pabsb", Vx, Wx, None);
     t[0x1d] = e("pabsw", Vx, Wx, None);
@@ -728,28 +1013,180 @@ pub const THREE_BYTE_38_66: [Entry; 256] = {
     t
 };
 
+/// The `0x0f 0x38` map with no prefix, which is the MMX half of SSSE3.
+pub const THREE_BYTE_38: [Entry; 256] = {
+    let mut t = [BAD; 256];
+    t[0x00] = es("pshufb", Pq, Qq, None, 8);
+    t[0x01] = es("phaddw", Pq, Qq, None, 8);
+    t[0x02] = es("phaddd", Pq, Qq, None, 8);
+    t[0x03] = es("phaddsw", Pq, Qq, None, 8);
+    t[0x04] = es("pmaddubsw", Pq, Qq, None, 8);
+    t[0x05] = es("phsubw", Pq, Qq, None, 8);
+    t[0x06] = es("phsubd", Pq, Qq, None, 8);
+    t[0x07] = es("phsubsw", Pq, Qq, None, 8);
+    t[0x08] = es("psignb", Pq, Qq, None, 8);
+    t[0x09] = es("psignw", Pq, Qq, None, 8);
+    t[0x0a] = es("psignd", Pq, Qq, None, 8);
+    t[0x0b] = es("pmulhrsw", Pq, Qq, None, 8);
+    t[0x1c] = es("pabsb", Pq, Qq, None, 8);
+    t[0x1d] = es("pabsw", Pq, Qq, None, 8);
+    t[0x1e] = es("pabsd", Pq, Qq, None, 8);
+    t
+};
+
+/// The `0x0f 0x3a` map with no prefix, which holds one MMX instruction.
+pub const THREE_BYTE_3A: [Entry; 256] = {
+    let mut t = [BAD; 256];
+    t[0x0f] = es("palignr", Pq, Qq, Ibu, 8);
+    t
+};
+
 /// The `0x0f 0x3a` map with a mandatory `0x66`.
 pub const THREE_BYTE_3A_66: [Entry; 256] = {
     let mut t = [BAD; 256];
-    t[0x0b] = es("roundsd", Vx, Wx, Ib, 8);
-    t[0x0a] = es("roundss", Vx, Wx, Ib, 4);
-    t[0x08] = e("roundps", Vx, Wx, Ib);
-    t[0x09] = e("roundpd", Vx, Wx, Ib);
-    t[0x0e] = e("pblendw", Vx, Wx, Ib);
-    t[0x0f] = e("palignr", Vx, Wx, Ib);
-    t[0x14] = es("pextrb", Eb, Vx, Ib, 1);
-    t[0x15] = es("pextrw", Ew, Vx, Ib, 2);
-    t[0x16] = e("pextrd", Ev, Vx, Ib);
-    t[0x17] = es("extractps", Ed, Vx, Ib, 4);
-    t[0x20] = es("pinsrb", Vx, Eb, Ib, 1);
-    t[0x21] = es("insertps", Vx, Wx, Ib, 4);
-    t[0x22] = e("pinsrd", Vx, Ev, Ib);
-    t[0x60] = e("pcmpestrm", Vx, Wx, Ib);
-    t[0x61] = e("pcmpestri", Vx, Wx, Ib);
-    t[0x62] = e("pcmpistrm", Vx, Wx, Ib);
-    t[0x63] = e("pcmpistri", Vx, Wx, Ib);
+    t[0x0b] = es("roundsd", Vx, Wx, Ibu, 8);
+    t[0x0a] = es("roundss", Vx, Wx, Ibu, 4);
+    t[0x08] = e("roundps", Vx, Wx, Ibu);
+    t[0x09] = e("roundpd", Vx, Wx, Ibu);
+    t[0x0e] = e("pblendw", Vx, Wx, Ibu);
+    t[0x0f] = e("palignr", Vx, Wx, Ibu);
+    t[0x14] = e("pextrb", Ebm, Vx, Ibu);
+    t[0x15] = e("pextrw", Ewm, Vx, Ibu);
+    t[0x16] = e("pextrd", Ev, Vx, Ibu);
+    t[0x17] = es("extractps", Ed, Vx, Ibu, 4);
+    t[0x20] = e("pinsrb", Vx, Ebm, Ibu);
+    t[0x21] = es("insertps", Vx, Wx, Ibu, 4);
+    t[0x22] = e("pinsrd", Vx, Ev, Ibu);
+    t[0x60] = e("pcmpestrm", Vx, Wx, Ibu);
+    t[0x61] = e("pcmpestri", Vx, Wx, Ibu);
+    t[0x62] = e("pcmpistrm", Vx, Wx, Ibu);
+    t[0x63] = e("pcmpistri", Vx, Wx, Ibu);
     t
 };
 
 /// The comparison predicate that the immediate of `cmpps` and friends selects.
 pub const CMP_PRED: [&str; 8] = ["eq", "lt", "le", "unord", "neq", "nlt", "nle", "ord"];
+
+/// The memory forms of the x87 escapes, indexed by opcode minus 0xd8 and then
+/// by the ModRM reg field, as the mnemonic and the size in bytes it touches.
+/// A size of zero is the environment and state blocks, which llvm prints with
+/// no size hint because they have no scalar width.
+pub const X87_MEM: [[(&str, u8); 8]; 8] = [
+    // 0xd8: single precision arithmetic.
+    [
+        ("fadd", 4),
+        ("fmul", 4),
+        ("fcom", 4),
+        ("fcomp", 4),
+        ("fsub", 4),
+        ("fsubr", 4),
+        ("fdiv", 4),
+        ("fdivr", 4),
+    ],
+    // 0xd9: single precision load and store, and the control word.
+    [
+        ("fld", 4),
+        ("", 0),
+        ("fst", 4),
+        ("fstp", 4),
+        ("fldenv", 0),
+        ("fldcw", 2),
+        ("fnstenv", 0),
+        ("fnstcw", 2),
+    ],
+    // 0xda: doubleword integer arithmetic.
+    [
+        ("fiadd", 4),
+        ("fimul", 4),
+        ("ficom", 4),
+        ("ficomp", 4),
+        ("fisub", 4),
+        ("fisubr", 4),
+        ("fidiv", 4),
+        ("fidivr", 4),
+    ],
+    // 0xdb: doubleword integer transfers, and the 80-bit load and store.
+    [
+        ("fild", 4),
+        ("fisttp", 4),
+        ("fist", 4),
+        ("fistp", 4),
+        ("", 0),
+        ("fld", 10),
+        ("", 0),
+        ("fstp", 10),
+    ],
+    // 0xdc: double precision arithmetic.
+    [
+        ("fadd", 8),
+        ("fmul", 8),
+        ("fcom", 8),
+        ("fcomp", 8),
+        ("fsub", 8),
+        ("fsubr", 8),
+        ("fdiv", 8),
+        ("fdivr", 8),
+    ],
+    // 0xdd: double precision transfers, and the whole machine state.
+    [
+        ("fld", 8),
+        ("fisttp", 8),
+        ("fst", 8),
+        ("fstp", 8),
+        ("frstor", 0),
+        ("", 0),
+        ("fnsave", 0),
+        ("fnstsw", 2),
+    ],
+    // 0xde: word integer arithmetic.
+    [
+        ("fiadd", 2),
+        ("fimul", 2),
+        ("ficom", 2),
+        ("ficomp", 2),
+        ("fisub", 2),
+        ("fisubr", 2),
+        ("fidiv", 2),
+        ("fidivr", 2),
+    ],
+    // 0xdf: word integer transfers, the packed decimal pair, and int64.
+    [
+        ("fild", 2),
+        ("fisttp", 2),
+        ("fist", 2),
+        ("fistp", 2),
+        ("fbld", 10),
+        ("fild", 8),
+        ("fbstp", 10),
+        ("fistp", 8),
+    ],
+];
+
+/// `0xd9` with a ModRM byte of 0xe0 or above: no operands, and no pattern
+/// either, so this is a plain list indexed by the low five bits.
+pub const X87_D9_E0: [&str; 32] = [
+    "fchs", "fabs", "", "", "ftst", "fxam", "", "", "fld1", "fldl2t", "fldl2e", "fldpi", "fldlg2",
+    "fldln2", "fldz", "", "f2xm1", "fyl2x", "fptan", "fpatan", "fxtract", "fprem1", "fdecstp",
+    "fincstp", "fprem", "fyl2xp1", "fsqrt", "fsincos", "frndint", "fscale", "fsin", "fcos",
+];
+
+/// `0xd8` register forms, by ModRM reg. `fcom` and `fcomp` take one operand;
+/// the rest take `st` and a stack register.
+pub const X87_D8_REG: [&str; 8] = [
+    "fadd", "fmul", "fcom", "fcomp", "fsub", "fsubr", "fdiv", "fdivr",
+];
+
+/// `0xdc` register forms, by ModRM reg. The subtract and divide pairs are
+/// swapped against the memory forms, which is the architecture's own quirk.
+pub const X87_DC_REG: [&str; 8] = ["fadd", "fmul", "", "", "fsubr", "fsub", "fdivr", "fdiv"];
+
+/// `0xdd` register forms, by ModRM reg. Each takes one stack register.
+pub const X87_DD_REG: [&str; 8] = ["ffree", "", "fst", "fstp", "fucom", "fucomp", "", ""];
+
+/// `0xde` register forms, by ModRM reg, with the same swap as `0xdc`.
+pub const X87_DE_REG: [&str; 8] = [
+    "faddp", "fmulp", "", "", "fsubrp", "fsubp", "fdivrp", "fdivp",
+];
+
+/// The conditional moves at `0xda` and `0xdb`, by the ModRM reg field.
+pub const X87_FCMOV: [&str; 4] = ["b", "e", "be", "u"];
