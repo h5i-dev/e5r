@@ -10,5 +10,7 @@
 #![warn(missing_docs)]
 
 pub mod decompile;
+pub mod shapes;
 
 pub use decompile::{Decompiled, Unit, decompile_function, decompile_program};
+pub use shapes::{Pointer, shapes_of};

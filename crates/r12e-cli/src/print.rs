@@ -530,3 +530,57 @@ pub fn decompile(w: &mut Out, p: &Program, target: &str, as_json: bool) -> R {
     }
     Ok(exit::OK)
 }
+
+/// Report what a function's pointers point at.
+pub fn shapes(w: &mut Out, p: &Program, target: &str, as_json: bool) -> R {
+    let chosen: Vec<&r12e_analysis::Function> = if target == "all" {
+        p.functions_by_address().collect()
+    } else {
+        let Some(a) = addr::resolve(p, target) else {
+            return Err(format!("{target:?} is not an address, a symbol, or `all`"));
+        };
+        match p.function(a).or_else(|| p.function_at(a)) {
+            Some(f) => vec![f],
+            None => {
+                eprintln!("no function covers {a}");
+                return Ok(exit::NOT_FOUND);
+            }
+        }
+    };
+
+    let found: Vec<(&r12e_analysis::Function, Vec<r12e_api::Pointer>)> = chosen
+        .iter()
+        .map(|f| (*f, r12e_api::shapes_of(p, f)))
+        .filter(|(_, s)| !s.is_empty())
+        .collect();
+
+    if as_json {
+        return json::emit(w, &json::shapes(&found));
+    }
+    if found.is_empty() {
+        eprintln!("no pointers with a recoverable shape");
+        return Ok(exit::NOT_FOUND);
+    }
+    for (n, (f, pointers)) in found.iter().enumerate() {
+        if n > 0 {
+            outln!(w);
+        }
+        outln!(w, "{} <{}>:", f.entry, f.display_name());
+        for pointer in pointers {
+            let name = match pointer.argument {
+                Some(n) => format!("arg{n}"),
+                None => format!("reg{:x}", pointer.register),
+            };
+            let size = match pointer.size {
+                Some(s) => format!("{s} bytes"),
+                None => "size unknown".to_string(),
+            };
+            let access = if pointer.written { "read and written" } else { "read only" };
+            outln!(w, "  {name}: {size}, {access}");
+            for (offset, width) in &pointer.fields {
+                outln!(w, "    +{offset:<4} {width} byte(s)");
+            }
+        }
+    }
+    Ok(exit::OK)
+}

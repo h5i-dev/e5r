@@ -317,6 +317,57 @@ pub fn decompiled(items: Vec<(&Function, String, usize, usize, usize)>) -> Listi
     )
 }
 
+/// One pointer's inferred shape.
+#[derive(Serialize)]
+pub struct FieldOut {
+    offset: i64,
+    size: u8,
+}
+
+/// What one function's pointers point at.
+#[derive(Serialize)]
+pub struct ShapeOut {
+    function: FunctionOut,
+    pointers: Vec<PointerOut>,
+}
+
+#[derive(Serialize)]
+pub struct PointerOut {
+    argument: Option<usize>,
+    register: String,
+    size: Option<u64>,
+    written: bool,
+    fields: Vec<FieldOut>,
+}
+
+pub fn shapes(found: &[(&Function, Vec<r12e_api::Pointer>)]) -> Listing<ShapeOut> {
+    listing(
+        found
+            .iter()
+            .map(|(f, pointers)| ShapeOut {
+                function: function_out(f),
+                pointers: pointers
+                    .iter()
+                    .map(|p| PointerOut {
+                        argument: p.argument,
+                        register: format!("{:#x}", p.register),
+                        size: p.size,
+                        written: p.written,
+                        fields: p
+                            .fields
+                            .iter()
+                            .map(|(offset, size)| FieldOut {
+                                offset: *offset,
+                                size: *size,
+                            })
+                            .collect(),
+                    })
+                    .collect(),
+            })
+            .collect(),
+    )
+}
+
 pub fn disas(p: &Program, fns: &[&Function]) -> Listing<DisasOut> {
     listing(
         fns.iter()

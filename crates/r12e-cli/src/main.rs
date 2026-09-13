@@ -152,6 +152,17 @@ enum Command {
         /// Address, symbol, or `all`.
         target: String,
     },
+    /// Report what the pointers a function takes appear to point at.
+    ///
+    /// Inferred from the offsets the code touches through them, which is
+    /// evidence rather than a declaration: it says what was seen, not what the
+    /// type was.
+    Shapes {
+        #[command(flatten)]
+        common: Common,
+        /// Address, symbol, or `all`.
+        target: String,
+    },
     /// Speak the Model Context Protocol on stdin and stdout, so an agent can
     /// drive the analysis.
     Mcp,
@@ -215,6 +226,7 @@ impl Command {
             Command::Mcp => unreachable!("handled before a file is opened"),
             Command::Disas { common, .. }
             | Command::Decompile { common, .. }
+            | Command::Shapes { common, .. }
             | Command::Xrefs { common, .. }
             | Command::Strings { common, .. } => common,
         }
@@ -330,6 +342,7 @@ fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
         Command::Decompile { common, target } => {
             print::decompile(w, &program, target, common.json)
         }
+        Command::Shapes { common, target } => print::shapes(w, &program, target, common.json),
         Command::Xrefs {
             common,
             target,
