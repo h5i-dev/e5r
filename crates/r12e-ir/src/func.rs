@@ -29,6 +29,9 @@ pub struct Block {
 /// A function's IR.
 #[derive(Debug, Clone)]
 pub struct Function {
+    /// Which architecture the code came from, so a later pass can ask what the
+    /// calling convention is without being told again.
+    pub arch: Arch,
     /// Where the function starts.
     pub entry: Addr,
     /// Blocks by start address.
@@ -134,6 +137,7 @@ pub fn build(
     }
 
     Function {
+        arch: arch.clone(),
         entry,
         blocks: out,
         unlifted,

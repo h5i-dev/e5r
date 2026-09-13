@@ -140,6 +140,18 @@ enum Command {
         #[arg(long)]
         all: bool,
     },
+    /// Decompile a function to pseudo-C.
+    ///
+    /// The output says what the machine does in C's notation; it does not claim
+    /// to be the source. Where the control flow does not fit a loop or a
+    /// branch, a labelled goto appears rather than a shape that is not there,
+    /// and the count is printed.
+    Decompile {
+        #[command(flatten)]
+        common: Common,
+        /// Address, symbol, or `all`.
+        target: String,
+    },
     /// Speak the Model Context Protocol on stdin and stdout, so an agent can
     /// drive the analysis.
     Mcp,
@@ -202,6 +214,7 @@ impl Command {
             // The server takes its paths per call rather than up front.
             Command::Mcp => unreachable!("handled before a file is opened"),
             Command::Disas { common, .. }
+            | Command::Decompile { common, .. }
             | Command::Xrefs { common, .. }
             | Command::Strings { common, .. } => common,
         }
@@ -313,6 +326,9 @@ fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             target,
             bytes,
         } => print::disas(w, &program, target, *bytes, common.json),
+        Command::Decompile { common, target } => {
+            print::decompile(w, &program, target, common.json)
+        }
         Command::Xrefs {
             common,
             target,

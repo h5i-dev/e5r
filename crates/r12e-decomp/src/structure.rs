@@ -73,8 +73,14 @@ pub struct Structured {
 /// The graph structuring works over: successors per block.
 pub type Graph = BTreeMap<Addr, Vec<Addr>>;
 
+/// Which successor a conditional branch jumps to when its condition holds.
+///
+/// Guessing this from the order of the successors is how an `if` comes out
+/// inverted, so it is taken from the branch itself.
+pub type Taken = BTreeMap<Addr, Addr>;
+
 /// Structure a control flow graph.
-pub fn structure(entry: Addr, graph: &Graph) -> Structured {
+pub fn structure(entry: Addr, graph: &Graph, taken: &Taken) -> Structured {
     let order = reverse_postorder(entry, graph);
     let index: BTreeMap<Addr, usize> = order.iter().enumerate().map(|(i, a)| (*a, i)).collect();
     let preds = predecessors(graph);
@@ -99,15 +105,19 @@ pub fn structure(entry: Addr, graph: &Graph) -> Structured {
         .map(|h| (*h, loop_body(*h, &latches, &preds)))
         .collect();
 
+    let postdom = postdominators(graph, &order, &index);
+
     let mut ctx = Ctx {
         graph,
-        index: &index,
+        taken,
+        postdom: &postdom,
         loop_headers: &loop_headers,
         bodies: &bodies,
         emitted: BTreeSet::new(),
         labels: BTreeSet::new(),
         gotos: 0,
         depth: 0,
+        loops: Vec::new(),
     };
     let root = ctx.region(entry, None, None);
     Structured {
@@ -119,13 +129,24 @@ pub fn structure(entry: Addr, graph: &Graph) -> Structured {
 
 struct Ctx<'a> {
     graph: &'a Graph,
-    index: &'a BTreeMap<Addr, usize>,
+    taken: &'a Taken,
+    postdom: &'a BTreeMap<Addr, Addr>,
     loop_headers: &'a BTreeSet<Addr>,
     bodies: &'a BTreeMap<Addr, BTreeSet<Addr>>,
     emitted: BTreeSet<Addr>,
     labels: BTreeSet<Addr>,
     gotos: usize,
     depth: u32,
+    /// The loops currently being structured, innermost last. An edge to the
+    /// innermost loop's exit is a `break` and an edge to its header is a
+    /// `continue`; without this both come out as gotos.
+    loops: Vec<Nesting>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Nesting {
+    head: Addr,
+    exit: Option<Addr>,
 }
 
 impl Ctx<'_> {
@@ -154,10 +175,20 @@ impl Ctx<'_> {
             if !self.graph.contains_key(&cursor) {
                 break;
             }
-            // Reaching the enclosing loop's header again is a continue.
-            if Some(cursor) == enclosing && !parts.is_empty() {
-                parts.push(Region::Continue);
-                break;
+            // Reaching the innermost loop's header again is a continue, and
+            // reaching where it leaves to is a break. Checked before the stop
+            // address, because an arm of an `if` that ends by going back to the
+            // header has to say so: ending the arm silently would fall past the
+            // `if` instead of repeating.
+            if let Some(inner) = self.loops.last().copied() {
+                if cursor == inner.head {
+                    parts.push(Region::Continue);
+                    break;
+                }
+                if Some(cursor) == inner.exit {
+                    parts.push(Region::Break);
+                    break;
+                }
             }
             if self.emitted.contains(&cursor) {
                 self.gotos += 1;
@@ -191,8 +222,10 @@ impl Ctx<'_> {
                     let next = succs[0];
                     // A backward edge that is not a loop header is a goto.
                     if self.emitted.contains(&next) && !self.loop_headers.contains(&next) {
-                        if Some(next) == enclosing {
+                        if self.loops.last().map(|l| l.head) == Some(next) {
                             parts.push(Region::Continue);
+                        } else if self.loops.last().map(|l| l.exit) == Some(Some(next)) {
+                            parts.push(Region::Break);
                         } else {
                             self.gotos += 1;
                             self.labels.insert(next);
@@ -232,6 +265,14 @@ impl Ctx<'_> {
     /// Build a loop from its header.
     fn build_loop(&mut self, head: Addr) -> Region {
         self.emitted.insert(head);
+        let exit = self.loop_exit(head);
+        self.loops.push(Nesting { head, exit });
+        let region = self.build_loop_body(head);
+        self.loops.pop();
+        trim_trailing_continue(region)
+    }
+
+    fn build_loop_body(&mut self, head: Addr) -> Region {
         let body_blocks = self.bodies.get(&head).cloned().unwrap_or_default();
         let succs = self.graph.get(&head).cloned().unwrap_or_default();
 
@@ -244,10 +285,10 @@ impl Ctx<'_> {
                 (succs[1], succs[0])
             };
             if body_blocks.contains(&inside) && !body_blocks.contains(&outside) {
-                // The machine branch jumps when the condition holds; a `while`
-                // enters its body then, so whether to invert depends on which
-                // successor is the body.
-                let invert = inside == succs[1];
+                // A `while` enters its body when the condition holds, so the
+                // test needs inverting when the branch jumps out instead.
+                let taken = self.taken.get(&head).copied().unwrap_or(succs[0]);
+                let invert = inside != taken;
                 let body = self.region(inside, Some(head), Some(head));
                 return Region::While {
                     head,
@@ -271,22 +312,36 @@ impl Ctx<'_> {
     }
 
     /// Where a loop leaves to.
+    ///
+    /// A loop with several exits still has one the code continues at; the rest
+    /// become gotos. Choosing it as the one the header itself branches to, and
+    /// otherwise the one most of the body branches to, is what turns an
+    /// optimized loop's exits into `break` rather than a page of labels.
     fn loop_exit(&self, head: Addr) -> Option<Addr> {
         let body = self.bodies.get(&head)?;
-        // The single block outside the loop that something inside branches to.
-        let mut exits: BTreeSet<Addr> = BTreeSet::new();
+        let mut counts: BTreeMap<Addr, usize> = BTreeMap::new();
         for b in body {
             for s in self.graph.get(b).into_iter().flatten() {
                 if !body.contains(s) {
-                    exits.insert(*s);
+                    *counts.entry(*s).or_default() += 1;
                 }
             }
         }
-        if exits.len() == 1 {
-            exits.into_iter().next()
-        } else {
-            None
+        if counts.is_empty() {
+            return None;
         }
+        // The header's own way out, when it has one.
+        if let Some(succs) = self.graph.get(&head) {
+            if succs.len() == 2 {
+                if let Some(outside) = succs.iter().find(|s| !body.contains(*s)) {
+                    return Some(*outside);
+                }
+            }
+        }
+        counts
+            .into_iter()
+            .max_by_key(|(addr, n)| (*n, std::cmp::Reverse(*addr)))
+            .map(|(addr, _)| addr)
     }
 
     /// Build an `if` from a two-way branch, returning the region and where
@@ -298,9 +353,10 @@ impl Ctx<'_> {
         stop: Option<Addr>,
         enclosing: Option<Addr>,
     ) -> (Region, Option<Addr>) {
-        // The fall-through is the successor at the higher address, because a
-        // machine branch jumps to the other one.
-        let (taken, fallthrough) = (succs[0], succs[1]);
+        // The branch says which way it goes when the condition holds; the
+        // other successor is what falls through.
+        let taken = self.taken.get(&head).copied().unwrap_or(succs[1]);
+        let fallthrough = succs.iter().copied().find(|s| *s != taken).unwrap_or(succs[0]);
         let join = self.join_of(head);
 
         // One arm empty: a plain `if` with no else.
@@ -318,13 +374,16 @@ impl Ctx<'_> {
         // machine jumped past it.
         let invert = then_start == fallthrough;
 
-        let then = if Some(then_start) == join || Some(then_start) == stop {
+        // An arm that starts at the join does nothing. An arm that starts at
+        // the enclosing region's stop address is not empty: it may be a jump
+        // back to a loop header, which `region` turns into a `continue`.
+        let then = if Some(then_start) == join {
             Region::Empty
         } else {
             self.region(then_start, join.or(stop), enclosing)
         };
         let otherwise = other_start.and_then(|s| {
-            if Some(s) == join || Some(s) == stop {
+            if Some(s) == join {
                 None
             } else {
                 Some(Box::new(self.region(s, join.or(stop), enclosing)))
@@ -344,39 +403,50 @@ impl Ctx<'_> {
 
     /// Where the two arms of a branch come back together.
     ///
-    /// The nearest block both successors reach, found by walking forward from
-    /// each. A branch whose arms never reconverge has no join and its arms run
-    /// to the end of the function.
+    /// The immediate post-dominator: the first block every path from the
+    /// branch has to reach. Anything weaker, such as the earliest block both
+    /// arms can reach, picks a join too far away and turns each arm's tail
+    /// into a goto.
     fn join_of(&self, head: Addr) -> Option<Addr> {
         let succs = self.graph.get(&head)?;
         if succs.len() != 2 {
             return None;
         }
-        let from_a = self.reachable(succs[0]);
-        let from_b = self.reachable(succs[1]);
-        // The earliest block in reverse post-order that both reach, excluding
-        // the head itself so a loop does not look like a join.
-        from_a
-            .intersection(&from_b)
-            .filter(|a| **a != head)
-            .min_by_key(|a| self.index.get(a).copied().unwrap_or(usize::MAX))
-            .copied()
+        let join = self.postdom.get(&head).copied()?;
+        (join != head && self.graph.contains_key(&join)).then_some(join)
     }
+}
 
-    fn reachable(&self, from: Addr) -> BTreeSet<Addr> {
-        let mut seen = BTreeSet::new();
-        let mut work = vec![from];
-        while let Some(at) = work.pop() {
-            if !seen.insert(at) {
-                continue;
+/// Drop a `continue` in tail position, where repeating is what happens anyway.
+fn trim_trailing_continue(r: Region) -> Region {
+    match r {
+        Region::While { head, invert, body } => Region::While {
+            head,
+            invert,
+            body: Box::new(trim_tail(*body)),
+        },
+        Region::Infinite { head, body } => Region::Infinite {
+            head,
+            body: Box::new(trim_tail(*body)),
+        },
+        other => other,
+    }
+}
+
+fn trim_tail(r: Region) -> Region {
+    match r {
+        Region::Continue => Region::Empty,
+        Region::Seq(mut parts) => {
+            if matches!(parts.last(), Some(Region::Continue)) {
+                parts.pop();
             }
-            for s in self.graph.get(&at).into_iter().flatten() {
-                if !seen.contains(s) {
-                    work.push(*s);
-                }
+            match parts.len() {
+                0 => Region::Empty,
+                1 => parts.pop().unwrap(),
+                _ => Region::Seq(parts),
             }
         }
-        seen
+        other => other,
     }
 }
 
@@ -423,6 +493,132 @@ pub fn reverse_postorder(entry: Addr, graph: &Graph) -> Vec<Addr> {
     }
     post.reverse();
     post
+}
+
+/// Immediate post-dominators: for each block, the first block every path from
+/// it must pass through on the way out.
+///
+/// Computed as dominators on the reversed graph, with every block that leaves
+/// the function treated as a predecessor of one virtual exit.
+fn postdominators(
+    graph: &Graph,
+    order: &[Addr],
+    index: &BTreeMap<Addr, usize>,
+) -> BTreeMap<Addr, Addr> {
+    // The reversed graph, and the blocks that end the function.
+    let mut reverse: BTreeMap<Addr, Vec<Addr>> = BTreeMap::new();
+    let mut exits: Vec<Addr> = Vec::new();
+    for (from, succs) in graph {
+        reverse.entry(*from).or_default();
+        let live: Vec<Addr> = succs
+            .iter()
+            .copied()
+            .filter(|s| graph.contains_key(s))
+            .collect();
+        if live.is_empty() {
+            exits.push(*from);
+        }
+        for to in live {
+            reverse.entry(to).or_default().push(*from);
+        }
+    }
+    if exits.is_empty() {
+        // Every block continues somewhere, which happens when the function is
+        // one endless loop. The last block in order stands in for the exit.
+        if let Some(last) = order.last() {
+            exits.push(*last);
+        }
+    }
+
+    // Post-order from the exits over the reversed graph, which is the order
+    // the fixed point wants.
+    let mut seen: BTreeSet<Addr> = BTreeSet::new();
+    let mut post: Vec<Addr> = Vec::new();
+    for start in &exits {
+        let mut stack = vec![(*start, 0usize)];
+        if !seen.insert(*start) {
+            continue;
+        }
+        while let Some((at, i)) = stack.pop() {
+            let preds = reverse.get(&at).cloned().unwrap_or_default();
+            if i < preds.len() {
+                stack.push((at, i + 1));
+                let next = preds[i];
+                if seen.insert(next) {
+                    stack.push((next, 0));
+                }
+            } else {
+                post.push(at);
+            }
+        }
+    }
+    post.reverse();
+    let rank: BTreeMap<Addr, usize> = post.iter().enumerate().map(|(i, a)| (*a, i)).collect();
+
+    let mut ipdom: BTreeMap<Addr, Addr> = BTreeMap::new();
+    for e in &exits {
+        ipdom.insert(*e, *e);
+    }
+    let mut changed = true;
+    let mut rounds = 0;
+    while changed && rounds < 1000 {
+        changed = false;
+        rounds += 1;
+        for at in &post {
+            if exits.contains(at) {
+                continue;
+            }
+            let mut new: Option<Addr> = None;
+            for s in graph.get(at).into_iter().flatten() {
+                if !ipdom.contains_key(s) {
+                    continue;
+                }
+                new = Some(match new {
+                    None => *s,
+                    Some(cur) => intersect(&ipdom, &rank, cur, *s),
+                });
+            }
+            if let Some(n) = new {
+                if ipdom.get(at) != Some(&n) {
+                    ipdom.insert(*at, n);
+                    changed = true;
+                }
+            }
+        }
+    }
+    let _ = index;
+    ipdom
+}
+
+/// Walk two chains up until they meet, which is their nearest common ancestor.
+fn intersect(
+    tree: &BTreeMap<Addr, Addr>,
+    rank: &BTreeMap<Addr, usize>,
+    mut a: Addr,
+    mut b: Addr,
+) -> Addr {
+    let mut guard = 0;
+    while a != b && guard < 10_000 {
+        guard += 1;
+        let (ra, rb) = (
+            rank.get(&a).copied().unwrap_or(0),
+            rank.get(&b).copied().unwrap_or(0),
+        );
+        if ra > rb {
+            let next = tree.get(&a).copied().unwrap_or(a);
+            if next == a {
+                break;
+            }
+            a = next;
+        } else {
+            let next = tree.get(&b).copied().unwrap_or(b);
+            if next == b {
+                break;
+            }
+            b = next;
+        }
+    }
+    a
 }
 
 fn predecessors(graph: &Graph) -> BTreeMap<Addr, BTreeSet<Addr>> {
@@ -516,6 +712,10 @@ fn dominates(idom: &BTreeMap<Addr, Addr>, a: Addr, b: Addr) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn structure(entry: Addr, graph: &Graph) -> Structured {
+        super::structure(entry, graph, &Taken::new())
+    }
 
     fn g(edges: &[(u64, &[u64])]) -> Graph {
         edges

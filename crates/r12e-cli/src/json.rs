@@ -292,6 +292,31 @@ fn insn_out(p: &Program, i: &Insn) -> InsnOut {
     }
 }
 
+/// One decompiled function, with the numbers that say how well it went.
+#[derive(Serialize)]
+pub struct DecompileOut {
+    function: FunctionOut,
+    code: String,
+    gotos: usize,
+    locals: usize,
+    unmodelled: usize,
+}
+
+pub fn decompiled(items: Vec<(&Function, String, usize, usize, usize)>) -> Listing<DecompileOut> {
+    listing(
+        items
+            .into_iter()
+            .map(|(f, code, gotos, locals, unmodelled)| DecompileOut {
+                function: function_out(f),
+                code,
+                gotos,
+                locals,
+                unmodelled,
+            })
+            .collect(),
+    )
+}
+
 pub fn disas(p: &Program, fns: &[&Function]) -> Listing<DisasOut> {
     listing(
         fns.iter()

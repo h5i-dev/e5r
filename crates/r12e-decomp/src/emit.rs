@@ -4,17 +4,20 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
 use r12e_core::Addr;
-use r12e_ir::op::Op;
+use r12e_ir::op::{Op, Space};
 use r12e_ir::ssa::{Operand, SsaFunction, SsaKind, SsaOp, Value};
 
 use crate::expr::{Expr, Rebuilder, c_type, input_name};
-use crate::structure::{Graph, Region, structure};
+use crate::structure::{Graph, Region, Taken, structure};
 
 /// A decompiled function.
 #[derive(Debug, Clone)]
 pub struct Output {
     /// The C text.
     pub text: String,
+    /// Declarations the text needs to compile: the functions it calls and the
+    /// helpers for operations C has no operator for.
+    pub declarations: Vec<String>,
     /// Gotos the structuring needed; lower is better.
     pub gotos: usize,
     /// Named locals declared.
@@ -30,13 +33,30 @@ pub fn decompile(name: &str, f: &SsaFunction) -> Output {
         .iter()
         .map(|(a, b)| (*a, b.successors.clone()))
         .collect();
-    let s = structure(f.entry, &graph);
+    // Where each conditional branch goes when it is taken, read off the
+    // branch rather than guessed from the order of the successors.
+    let taken: Taken = f
+        .blocks
+        .iter()
+        .filter_map(|(a, b)| {
+            let op = b
+                .ops
+                .iter()
+                .rev()
+                .find(|op| op.kind == SsaKind::Op(Op::CBranch))?;
+            let target = op.inputs.first()?.as_const()?;
+            Some((*a, Addr(target)))
+        })
+        .collect();
+    let s = structure(f.entry, &graph, &taken);
     let rebuilder = Rebuilder::new(f);
 
+    let result = result_register(f, &rebuilder);
     let mut e = Emitter {
         f,
         r: &rebuilder,
         labels: &s.labels,
+        result,
         unmodelled: 0,
     };
 
@@ -46,13 +66,80 @@ pub fn decompile(name: &str, f: &SsaFunction) -> Output {
         out
     };
 
-    let mut text = String::new();
-    let _ = writeln!(text, "{} {}({})", return_type(f), name, parameters(f, &rebuilder));
-    text.push_str("{\n");
-    for (value, local) in &rebuilder.locals {
-        let _ = writeln!(text, "    {} {};", c_type(value.location.size), local);
+    // Values that arrive from outside and are not arguments: registers the
+    // function inherited. Declaring them says where they came from without
+    // pretending they are parameters.
+    let mut inherited: BTreeSet<String> = BTreeSet::new();
+    let mut called: BTreeSet<u64> = BTreeSet::new();
+    let mut helpers: BTreeSet<&'static str> = BTreeSet::new();
+    for b in f.blocks.values() {
+        for op in &b.ops {
+            for i in &op.inputs {
+                if let r12e_ir::ssa::Operand::Undefined(l) = i {
+                    let name = crate::expr::input_name(*l, &rebuilder.abi);
+                    if !name.starts_with("arg") && !name.starts_with("farg") {
+                        let ty = if rebuilder.floats.contains(l) {
+                            crate::expr::float_type(l.size)
+                        } else {
+                            c_type(l.size)
+                        };
+                        inherited.insert(format!("{ty} {name}"));
+                    }
+                }
+            }
+            if op.kind == SsaKind::Op(Op::Call) {
+                if let Some(target) = op.inputs.first().and_then(|i| i.as_const()) {
+                    called.insert(target);
+                }
+            }
+            if let SsaKind::Op(o) = op.kind {
+                if let Some(h) = helper_for(o) {
+                    helpers.insert(h);
+                }
+            }
+        }
     }
-    if !rebuilder.locals.is_empty() {
+
+    let mut declarations: Vec<String> = helpers.iter().map(|h| h.to_string()).collect();
+    declarations.extend(
+        called
+            .iter()
+            // No parameter list: what a called function takes is what
+            // prototype recovery is for, and guessing four would be a claim.
+            .map(|a| format!("uint64_t sub_{a:x}();")),
+    );
+
+    let mut text = String::new();
+    let _ = writeln!(
+        text,
+        "{} {}({})",
+        return_type(result, &rebuilder),
+        name,
+        parameters(f, &rebuilder)
+    );
+    text.push_str("{\n");
+    // Only the ones the body actually mentions: an inherited flag that every
+    // pass removed should not be declared.
+    let inherited: Vec<&String> = inherited
+        .iter()
+        .filter(|d| {
+            d.rsplit(' ')
+                .next()
+                .is_some_and(|name| mentions(&body, name))
+        })
+        .collect();
+    for d in &inherited {
+        let _ = writeln!(text, "    {d};  // inherited");
+    }
+    for (value, local) in &rebuilder.locals {
+        let ty = if rebuilder.floats.contains(&value.location) {
+            crate::expr::float_type(value.location.size)
+        } else {
+            c_type(value.location.size)
+        };
+        let _ = writeln!(text, "    {ty} {local};");
+    }
+    if !rebuilder.locals.is_empty() || !inherited.is_empty() {
         text.push('\n');
     }
     text.push_str(&body);
@@ -60,42 +147,163 @@ pub fn decompile(name: &str, f: &SsaFunction) -> Output {
 
     Output {
         text,
+        declarations,
         gotos: s.gotos,
         locals: rebuilder.locals.len(),
         unmodelled: e.unmodelled,
     }
 }
 
-/// The declared return type, guessed from whether the return register is set.
-fn return_type(f: &SsaFunction) -> &'static str {
-    let writes_x0 = f.blocks.values().any(|b| {
-        b.ops
+/// Declarations every unit needs: the reinterpretations between a value's bits
+/// and the number they stand for, which the machine does for free and C does
+/// not.
+const REINTERPRET: &str = "\
+static inline uint64_t __bits(double v){union{double d;uint64_t u;}x;x.d=v;return x.u;}
+static inline double __dbl(uint64_t v){union{double d;uint64_t u;}x;x.u=v;return x.d;}";
+
+/// True when a name appears in the text as a whole word.
+fn mentions(text: &str, name: &str) -> bool {
+    let mut at = 0;
+    while let Some(found) = text[at..].find(name) {
+        let start = at + found;
+        let end = start + name.len();
+        let before = text[..start].chars().next_back();
+        let after = text[end..].chars().next();
+        let word = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
+        if !word(before) && !word(after) {
+            return true;
+        }
+        at = end;
+    }
+    false
+}
+
+/// The declaration an operation's helper needs, when it has one.
+fn helper_for(o: Op) -> Option<&'static str> {
+    Some(match o {
+        Op::FloatAdd
+        | Op::FloatSub
+        | Op::FloatMul
+        | Op::FloatDiv
+        | Op::FloatNeg
+        | Op::FloatEqual
+        | Op::FloatNotEqual
+        | Op::FloatLess
+        | Op::FloatLessEqual => REINTERPRET,
+        Op::FloatAbs => "double __fabs(double);",
+        Op::FloatSqrt => "double __sqrt(double);",
+        Op::FloatMax => "double __fmax(double, double);",
+        Op::FloatMin => "double __fmin(double, double);",
+        Op::FloatNan => "int __isnan(double);",
+        Op::FloatTrunc => "double __trunc(double);",
+        Op::FloatRound => "double __rint(double);",
+        Op::FloatCeil => "double __ceil(double);",
+        Op::FloatFloor => "double __floor(double);",
+        Op::FloatMulAdd => "double __fma(double, double, double);",
+        Op::FloatConvert | Op::IntToFloat | Op::UIntToFloat | Op::FloatToInt | Op::FloatToUInt => {
+            REINTERPRET
+        }
+        Op::CallInd => "uint64_t __callind(uint64_t);",
+        Op::IntDiv128 => "uint64_t __udiv128(uint64_t, uint64_t, uint64_t);",
+        Op::IntSDiv128 => "uint64_t __sdiv128(uint64_t, uint64_t, uint64_t);",
+        Op::IntRem128 => "uint64_t __urem128(uint64_t, uint64_t, uint64_t);",
+        Op::IntSRem128 => "uint64_t __srem128(uint64_t, uint64_t, uint64_t);",
+        Op::IntMulHigh => "uint64_t __mulhi(uint64_t, uint64_t);",
+        Op::IntSMulHigh => "uint64_t __smulhi(uint64_t, uint64_t);",
+        Op::PopCount => "uint64_t __popcount(uint64_t);",
+        Op::LzCount => "uint64_t __clz(uint64_t);",
+        Op::IntCarry => "uint64_t __carry(uint64_t, uint64_t);",
+        Op::IntSCarry => "uint64_t __overflow(uint64_t, uint64_t);",
+        Op::IntSBorrow => "uint64_t __borrow(uint64_t, uint64_t);",
+        Op::Unimplemented => "void __unmodelled(uint64_t);",
+        _ => return None,
+    })
+}
+
+/// Which register the function leaves its result in, if any.
+///
+/// The convention lists the candidates; which one this function writes says
+/// whether it returns an integer, a floating point value, or nothing.
+fn result_register(f: &SsaFunction, r: &Rebuilder) -> Option<u64> {
+    // The one written latest before the return. A function that computes into
+    // a general register and then converts into a vector one writes both, and
+    // only the order says which the caller reads.
+    let mut best: Option<(usize, u64)> = None;
+    for b in f.blocks.values() {
+        let returns = b
+            .ops
             .iter()
-            .any(|op| op.out.is_some_and(|v| v.location.offset == 0))
-    });
-    if writes_x0 { "uint64_t" } else { "void" }
+            .any(|op| op.kind == SsaKind::Op(Op::Return));
+        if !returns {
+            continue;
+        }
+        for (n, op) in b.ops.iter().enumerate() {
+            let Some(v) = op.out else { continue };
+            if v.location.space != Space::Register || !r.abi.results.contains(&v.location.offset)
+            {
+                continue;
+            }
+            if best.map(|(at, _)| n > at).unwrap_or(true) {
+                best = Some((n, v.location.offset));
+            }
+        }
+    }
+    if let Some((_, offset)) = best {
+        return Some(offset);
+    }
+    // Nothing was written in the returning block, so whichever the function
+    // writes at all is the answer.
+    r.abi.results.iter().copied().find(|offset| {
+        f.blocks.values().any(|b| {
+            b.ops
+                .iter()
+                .any(|op| op.out.is_some_and(|v| v.location.offset == *offset))
+        })
+    })
+}
+
+/// The declared return type, from where the result was left.
+fn return_type(result: Option<u64>, r: &Rebuilder) -> &'static str {
+    match result {
+        None => "void",
+        Some(offset) if offset >= r.abi.vector_base => "double",
+        Some(_) => "uint64_t",
+    }
 }
 
 /// The parameters, taken from the argument registers read before being written.
 fn parameters(f: &SsaFunction, r: &Rebuilder) -> String {
-    let mut seen: BTreeSet<String> = BTreeSet::new();
+    // Ordered by where the convention puts them, not by name, so `arg10` does
+    // not sort before `arg2`.
+    let mut seen: BTreeMap<usize, String> = BTreeMap::new();
+    let order: Vec<u64> = r
+        .abi
+        .integer_arguments
+        .iter()
+        .chain(r.abi.float_arguments.iter())
+        .copied()
+        .collect();
     for b in f.blocks.values() {
         for op in &b.ops {
             for i in &op.inputs {
                 if let Operand::Undefined(l) = i {
-                    let name = input_name(*l);
-                    if name.starts_with("arg") {
-                        seen.insert(format!("{} {}", c_type(l.size), name));
+                    let name = input_name(*l, &r.abi);
+                    if let Some(n) = order.iter().position(|o| *o == l.offset) {
+                        let ty = if r.floats.contains(l) {
+                            crate::expr::float_type(l.size)
+                        } else {
+                            c_type(l.size)
+                        };
+                        seen.insert(n, format!("{ty} {name}"));
                     }
                 }
             }
         }
     }
-    let _ = r;
     if seen.is_empty() {
         "void".to_string()
     } else {
-        seen.into_iter().collect::<Vec<_>>().join(", ")
+        seen.into_values().collect::<Vec<_>>().join(", ")
     }
 }
 
@@ -103,6 +311,8 @@ struct Emitter<'a> {
     f: &'a SsaFunction,
     r: &'a Rebuilder<'a>,
     labels: &'a BTreeSet<Addr>,
+    /// Where the function leaves its result.
+    result: Option<u64>,
     unmodelled: usize,
 }
 
@@ -171,7 +381,7 @@ impl Emitter<'_> {
                 } else {
                     let _ = writeln!(out, "{pad}while (1) {{");
                     self.statements(out, *head, depth + 1);
-                    let _ = writeln!(out, "{pad}    if (!({cond})) break;");
+                    let _ = writeln!(out, "{pad}    if ({}) break;", negate(cond.clone()));
                     self.region(out, body, depth + 1);
                     let _ = writeln!(out, "{pad}}}");
                 }
@@ -223,6 +433,49 @@ impl Emitter<'_> {
 
     /// The statements of one block, branches excluded.
     fn statements(&mut self, out: &mut String, at: Addr, depth: usize) {
+        self.block_ops(out, at, depth);
+        self.phi_copies(out, at, depth);
+    }
+
+    /// The assignments a block's successors' phis stand for.
+    ///
+    /// A phi is not an instruction; it says that a value came from one path or
+    /// another. Leaving SSA means writing that down as an assignment at the end
+    /// of each path, which is the only place it can be said in C.
+    fn phi_copies(&mut self, out: &mut String, at: Addr, depth: usize) {
+        let pad = "    ".repeat(depth);
+        let Some(b) = self.f.blocks.get(&at) else {
+            return;
+        };
+        for successor in &b.successors {
+            let Some(s) = self.f.blocks.get(successor) else {
+                continue;
+            };
+            let Some(slot) = s.predecessors.iter().position(|p| *p == at) else {
+                continue;
+            };
+            for op in &s.ops {
+                if op.kind != SsaKind::Phi {
+                    continue;
+                }
+                let (Some(v), Some(input)) = (op.out, op.inputs.get(slot)) else {
+                    continue;
+                };
+                let Some(name) = self.r.locals.get(&v) else {
+                    continue;
+                };
+                // An assignment from itself says nothing.
+                let value = self.r.operand(input);
+                let text = format!("{value}");
+                if text == *name {
+                    continue;
+                }
+                let _ = writeln!(out, "{pad}{name} = {text};");
+            }
+        }
+    }
+
+    fn block_ops(&mut self, out: &mut String, at: Addr, depth: usize) {
         let pad = "    ".repeat(depth);
         let Some(b) = self.f.blocks.get(&at) else {
             return;
@@ -247,7 +500,12 @@ impl Emitter<'_> {
                     }
                 }
                 Op::Return => {
-                    let _ = writeln!(out, "{pad}return {};", self.result(at));
+                    let value = self.result(at);
+                    if value.is_empty() {
+                        let _ = writeln!(out, "{pad}return;");
+                    } else {
+                        let _ = writeln!(out, "{pad}return {value};");
+                    }
                 }
                 Op::Call | Op::CallInd => {
                     let e = self.r.expr(op);
@@ -299,15 +557,32 @@ impl Emitter<'_> {
 
     /// What a function returns: whatever last reached the result register.
     fn result(&self, at: Addr) -> String {
-        let Some(b) = self.f.blocks.get(&at) else {
+        let Some(offset) = self.result else {
             return String::new();
         };
-        let last = b
-            .ops
-            .iter()
-            .rev()
-            .find(|op| op.out.is_some_and(|v| v.location.offset == 0 && v.location.size == 8));
-        match last.and_then(|op| op.out) {
+        let in_block = self
+            .f
+            .blocks
+            .get(&at)
+            .and_then(|b| {
+                b.ops
+                    .iter()
+                    .rev()
+                    .filter_map(|op| op.out)
+                    .find(|v| v.location.space == Space::Register && v.location.offset == offset)
+            });
+        // Nothing in this block wrote it, so the value came from wherever it
+        // was last written: the newest version is the one that reaches here.
+        let value = in_block.or_else(|| {
+            self.f
+                .blocks
+                .values()
+                .flat_map(|b| b.ops.iter())
+                .filter_map(|op| op.out)
+                .filter(|v| v.location.space == Space::Register && v.location.offset == offset)
+                .max_by_key(|v| v.version)
+        });
+        match value {
             Some(v) => match self.r.locals.get(&v) {
                 Some(name) => name.clone(),
                 None => format!("{}", self.r.operand(&Operand::Value(v))),
@@ -334,7 +609,7 @@ fn negate(e: Expr) -> Expr {
 /// Wrap in parentheses unless it is already atomic.
 fn parenthesize(e: &Expr) -> String {
     match e {
-        Expr::Const(..) | Expr::Local(_) | Expr::Input(_) => format!("{e}"),
+        Expr::Const(..) | Expr::Local(_) | Expr::Input(..) => format!("{e}"),
         _ => format!("({e})"),
     }
 }

@@ -60,7 +60,9 @@ fn vector(op: &Operand) -> Option<(u8, u64, u8)> {
 fn clear_above(b: &mut Builder, num: u8, bytes: u64) {
     let mut at = bytes;
     while at < 16 {
-        let chunk = if 16 - at >= 8 { 8 } else { (16 - at) as u8 };
+        // Aligned pieces only: a write that crosses an eight-byte boundary is
+        // two writes as far as the dataflow is concerned.
+        let chunk = aligned_chunk(at, 16);
         b.emit(
             Op::Copy,
             Some(Varnode::register(vec_offset(num) + at, chunk)),
@@ -884,6 +886,15 @@ fn select(b: &mut Builder, cond: Varnode, t: Varnode, f: Varnode, size: u8) -> V
     let inverse = b.eval(Op::IntNot, size, &[mask]);
     let drop = b.eval(Op::IntAnd, size, &[f, inverse]);
     b.eval(Op::IntOr, size, &[keep, drop])
+}
+
+/// The largest aligned piece that starts at `at` and ends by `limit`.
+pub fn aligned_chunk(at: u64, limit: u64) -> u8 {
+    let mut chunk = 8u64;
+    while chunk > 1 && (at % chunk != 0 || at + chunk > limit) {
+        chunk /= 2;
+    }
+    chunk as u8
 }
 
 /// A sixteen-byte load or store, which the ordinary path cannot express

@@ -244,8 +244,10 @@ dependencies = [
  "r12e-arch",
  "r12e-core",
  "r12e-db",
+ "r12e-decomp",
  "r12e-diff",
  "r12e-format",
+ "r12e-ir",
  "r12e-types",
  "serde",
  "serde_json",
@@ -271,8 +273,11 @@ dependencies = [
 name = "r12e-decomp"
 version = "0.1.0"
 dependencies = [
+ "r12e-analysis",
  "r12e-arch",
  "r12e-core",
+ "r12e-decomp",
+ "r12e-format",
  "r12e-ir",
  "serde",
 ]

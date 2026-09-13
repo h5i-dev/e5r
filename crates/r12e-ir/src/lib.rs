@@ -11,6 +11,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod abi;
 pub mod exec;
 pub mod func;
 pub mod interp;

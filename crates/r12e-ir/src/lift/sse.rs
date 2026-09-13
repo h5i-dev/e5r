@@ -133,7 +133,7 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
                     // Everything above the moved bytes becomes zero.
                     let mut off = size as u64;
                     while off < 16 {
-                        let chunk = if 16 - off >= 8 { 8 } else { (16 - off) as u8 };
+                        let chunk = crate::lift::neon::aligned_chunk(off, 16);
                         b.emit(
                             Op::Copy,
                             Some(Varnode::register(vec_offset(d.num) + off, chunk)),
@@ -557,7 +557,7 @@ fn scalar_float(b: &mut Builder, i: &Insn) -> Option<Lifted> {
                 if matches!(src, Operand::Mem(_)) {
                     let mut off = size as u64;
                     while off < 16 {
-                        let chunk = if 16 - off >= 8 { 8 } else { (16 - off) as u8 };
+                        let chunk = crate::lift::neon::aligned_chunk(off, 16);
                         b.emit(
                             Op::Copy,
                             Some(Varnode::register(vec_offset(d.num) + off, chunk)),

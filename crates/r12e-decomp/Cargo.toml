@@ -13,3 +13,8 @@ r12e-core = { workspace = true }
 r12e-arch = { workspace = true }
 r12e-ir = { workspace = true }
 serde = { workspace = true }
+
+[dev-dependencies]
+r12e-analysis = { workspace = true }
+r12e-format = { workspace = true }
+r12e-decomp = { workspace = true }

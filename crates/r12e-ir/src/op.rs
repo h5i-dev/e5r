@@ -119,7 +119,7 @@ impl fmt::Display for Varnode {
 /// Every arithmetic opcode is unsigned unless its name says otherwise, because
 /// the machine's registers hold bits and signedness is a property of the
 /// operation rather than of the storage.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Op {
     /// `out = in0`, with truncation or the identity.

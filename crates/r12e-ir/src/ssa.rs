@@ -53,6 +53,13 @@ pub fn location(v: Varnode) -> Option<Location> {
                     size: 1,
                 });
             }
+            // An access that crosses an eight-byte boundary is not one
+            // location, and pretending it is would let a write to the upper
+            // half clobber the lower. Such an access has no canonical location
+            // and the builder treats it as opaque.
+            if v.offset % 8 + v.size as u64 > 8 {
+                return None;
+            }
             Some(Location {
                 space: Space::Register,
                 offset: v.offset & !7,
@@ -119,7 +126,7 @@ pub enum SsaKind {
 }
 
 /// An SSA operand.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Operand {
     /// A versioned value.
     Value(Value),
@@ -130,6 +137,15 @@ pub enum Operand {
 }
 
 impl Operand {
+    /// The width of an operand in bytes.
+    pub fn size(self) -> u8 {
+        match self {
+            Operand::Const(_, size) => size,
+            Operand::Value(v) => v.location.size,
+            Operand::Undefined(l) => l.size,
+        }
+    }
+
     /// The literal, if this is one.
     pub fn as_const(self) -> Option<u64> {
         match self {
@@ -171,6 +187,8 @@ pub struct SsaBlock {
 /// A function in SSA form.
 #[derive(Debug, Clone)]
 pub struct SsaFunction {
+    /// Which architecture the code came from.
+    pub arch: r12e_core::Arch,
     /// Where it starts.
     pub entry: Addr,
     /// Blocks by start address.
@@ -437,6 +455,7 @@ pub fn build(f: &Function) -> SsaFunction {
     }
 
     SsaFunction {
+        arch: f.arch.clone(),
         entry: f.entry,
         blocks: out,
     }

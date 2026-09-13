@@ -467,3 +467,96 @@ pub fn diff(w: &mut Out, old: &Program, new: &Program, all: bool, as_json: bool)
     }
     Ok(exit::OK)
 }
+
+/// Decompile one function, or every recovered function, to pseudo-C.
+pub fn decompile(w: &mut Out, p: &Program, target: &str, as_json: bool) -> R {
+    use std::collections::BTreeMap;
+
+    let chosen: Vec<&r12e_analysis::Function> = if target == "all" {
+        p.functions_by_address().collect()
+    } else {
+        let Some(a) = addr::resolve(p, target) else {
+            return Err(format!("{target:?} is not an address, a symbol, or `all`"));
+        };
+        match p.function(a).or_else(|| p.function_at(a)) {
+            Some(f) => vec![f],
+            None => {
+                eprintln!("no function covers {a}");
+                return Ok(exit::NOT_FOUND);
+            }
+        }
+    };
+    if chosen.is_empty() {
+        eprintln!("no functions recovered");
+        return Ok(exit::NOT_FOUND);
+    }
+
+    let mut outputs = Vec::new();
+    for f in &chosen {
+        let blocks: BTreeMap<Addr, (Addr, Vec<Addr>)> = f
+            .cfg
+            .blocks
+            .iter()
+            .map(|(a, b)| (*a, (b.range.end(), b.successors.clone())))
+            .collect();
+        let ir = r12e_ir::func::build(&p.object.memory, &p.object.arch, f.entry, &blocks);
+        let mut ssa = r12e_ir::ssa::build(&ir);
+        r12e_ir::opt::optimize(&mut ssa);
+        let name = f.display_name();
+        let out = r12e_decomp::decompile(&name, &ssa);
+        outputs.push((*f, out, ir.unlifted.len()));
+    }
+
+    if as_json {
+        let items = outputs
+            .iter()
+            .map(|(f, o, unlifted)| {
+                (
+                    *f,
+                    o.text.clone(),
+                    o.gotos,
+                    o.locals,
+                    o.unmodelled + unlifted,
+                )
+            })
+            .collect();
+        return json::emit(w, &json::decompiled(items));
+    }
+
+    // The declarations first, deduplicated, so the whole output is one
+    // translation unit a compiler will accept.
+    let mut declarations: Vec<String> = outputs
+        .iter()
+        .flat_map(|(_, o, _)| o.declarations.iter().cloned())
+        .collect();
+    declarations.sort();
+    declarations.dedup();
+    if !declarations.is_empty() {
+        outln!(w, "#include <stdint.h>");
+        for d in &declarations {
+            outln!(w, "{d}");
+        }
+        outln!(w);
+    }
+
+    for (n, (f, o, unlifted)) in outputs.iter().enumerate() {
+        if n > 0 {
+            outln!(w);
+        }
+        // What a reader needs to judge the output: where it came from, and how
+        // much of it the structuring and the lifter could not express.
+        outln!(w, "// {}", f.entry);
+        if o.gotos > 0 || o.unmodelled + unlifted > 0 {
+            outln!(
+                w,
+                "// {} goto(s), {} unmodelled instruction(s)",
+                o.gotos,
+                o.unmodelled + unlifted
+            );
+        }
+        for line in o.text.lines() {
+            outln!(w, "{line}");
+        }
+    }
+    Ok(exit::OK)
+}
