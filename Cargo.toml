@@ -20,6 +20,9 @@ authors = ["r12e contributors"]
 r12e-core = { path = "crates/r12e-core", version = "0.1.0" }
 r12e-format = { path = "crates/r12e-format", version = "0.1.0" }
 r12e-arch = { path = "crates/r12e-arch", version = "0.1.0" }
+r12e-asm = { path = "crates/r12e-asm", version = "0.1.0" }
+r12e-sla = { path = "crates/r12e-sla", version = "0.1.0" }
+r12e-sleigh = { path = "crates/r12e-sleigh", version = "0.1.0" }
 r12e-analysis = { path = "crates/r12e-analysis", version = "0.1.0" }
 r12e-db = { path = "crates/r12e-db", version = "0.1.0" }
 r12e-types = { path = "crates/r12e-types", version = "0.1.0" }

@@ -1,0 +1,14 @@
+[package]
+name = "r12e-sla"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Reader for Ghidra's compiled SLEIGH language files (.sla)"
+
+# No dependencies on purpose. The payload is a raw zlib stream and the
+# decompressor is in src/inflate.rs; see docs/sla-format.md for why the
+# workspace does not take a crate for it.
+[dependencies]

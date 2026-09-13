@@ -1,0 +1,21 @@
+define endian = little;
+define alignment = 1;
+define space ram       type=ram_space       size=8  default;
+define space register  type=register_space  size=4;
+define register offset=0x0 size=8 [ r0 r1 r2 r3 r4 r5 r6 r7 r8 r9 r10 r11 r12 r13 r14 sp ];
+define register offset=0x100 size=4   contextreg;
+define context contextreg
+  test=(0,0)
+;
+define token instr (16)
+   op  = (8,15)
+   rs  = (4,7)
+   rd  = (0,3)
+   imm = (0,7) signed
+;
+attach variables [ rs rd ] [ r0 r1 r2 r3 r4 r5 r6 r7 r8 r9 r10 r11 r12 r13 r14 sp ];
+define pcodeop myop;
+Mode: "x" is rs=0 { export 0:1; }
+Mode: "y" is rs=1 { export 1:1; }
+:cnd Mode is op=0x05 & Mode & rd { if (Mode) goto <skip>; rd = 0; <skip> }
+:usr rd is op=0x06 & rd { myop(rd); }
