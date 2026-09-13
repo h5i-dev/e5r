@@ -14,7 +14,7 @@ use r12e_arch::{AddrMode, Extend, Flow, Insn, Mem, Operand, Reg, RegClass, Shift
 use r12e_core::Addr;
 
 use crate::lift::{Builder, Lifted};
-use crate::op::{Op, Varnode};
+use crate::op::{Op, Space, Varnode};
 
 /// Byte offset of `x0` in the register file.
 const X_BASE: u64 = 0;
@@ -88,6 +88,23 @@ fn reg(r: Reg) -> Varnode {
     }
 }
 
+/// The low `size` bytes of a value.
+///
+/// Narrowing a register varnode to one byte would name storage of its own,
+/// because dataflow versions the register file in eight-byte units and keeps
+/// one-byte register locations for the flags. The byte a narrowing store
+/// writes has to be cut out of the register instead, so that the store depends
+/// on whatever last wrote it.
+fn narrow(b: &mut Builder, v: Varnode, size: u8) -> Varnode {
+    if v.size <= size {
+        return v;
+    }
+    if v.space == Space::Register && size == 1 {
+        return b.eval(Op::SubPiece, 1, &[v, Varnode::constant(0, 1)]);
+    }
+    Varnode { size, ..v }
+}
+
 /// Write a value to a register, including the upper-half zeroing a 32-bit
 /// write performs.
 fn write_reg(b: &mut Builder, r: Reg, value: Varnode) {
@@ -138,10 +155,7 @@ fn source(b: &mut Builder, op: &Operand, size: u8) -> Option<Varnode> {
                 Extend::Uxtw | Extend::Sxtw => 4,
                 _ => size,
             };
-            let narrowed = Varnode {
-                size: narrow_size.min(src.size),
-                ..src
-            };
+            let narrowed = narrow(b, src, narrow_size.min(src.size));
             let signed = matches!(
                 ext,
                 Extend::Sxtb | Extend::Sxth | Extend::Sxtw | Extend::Sxtx
@@ -615,10 +629,7 @@ pub fn lift(i: &Insn) -> Lifted {
                 "sxth" | "uxth" => 2,
                 _ => 4,
             };
-            let narrowed = Varnode {
-                size: narrow_size,
-                ..reg(*s)
-            };
+            let narrowed = narrow(&mut b, reg(*s), narrow_size);
             let signed = i.mnemonic.starts_with('s');
             let r = b.eval(
                 if signed { Op::IntSExt } else { Op::IntZExt },
@@ -1123,10 +1134,7 @@ fn store(mut b: Builder, i: &Insn, ops: &[Operand]) -> Lifted {
     let (addr, access) = address(&mut b, m, i.addr);
     let src = reg(*s);
     // A narrowing store writes the low bytes of the register.
-    let value = Varnode {
-        size: access.min(src.size),
-        ..src
-    };
+    let value = narrow(&mut b, src, access.min(src.size));
     b.emit(Op::Store, None, &[addr, value]);
     writeback(&mut b, m);
     b.finish(true)

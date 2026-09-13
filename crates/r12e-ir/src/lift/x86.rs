@@ -15,7 +15,7 @@ use r12e_arch::{Extend, Flow, Insn, Mem, Operand, Reg, RegClass, Width};
 use r12e_core::Addr;
 
 use crate::lift::{Builder, Lifted};
-use crate::op::{Op, Varnode};
+use crate::op::{Op, Space, Varnode};
 
 /// Byte offset of `rax`; the sixteen general registers are eight bytes each.
 const R_BASE: u64 = 0;
@@ -109,10 +109,57 @@ fn reg(r: Reg) -> Option<Varnode> {
     })
 }
 
+/// The whole register a one-byte operand sits in, and which byte of it that is.
+///
+/// Dataflow versions the register file in eight-byte units and keeps one-byte
+/// register locations for the flags, which sit above the registers. A varnode
+/// naming `al` on its own is therefore storage no write to `rax` ever reaches:
+/// the read misses its definition and the write is dead.
+fn byte_slot(v: Varnode) -> Option<(Varnode, u64)> {
+    (v.space == Space::Register && v.size == 1 && v.offset < CF)
+        .then(|| (Varnode::register(v.offset & !7, 8), v.offset % 8))
+}
+
+/// Read a varnode, cutting a byte operand out of the register that holds it.
+fn read(b: &mut Builder, v: Varnode) -> Varnode {
+    match byte_slot(v) {
+        Some((whole, index)) => b.eval(Op::SubPiece, 1, &[whole, Varnode::constant(index, 1)]),
+        None => v,
+    }
+}
+
+/// Write a varnode, merging a byte operand back into the register that holds
+/// it. The merge is what keeps the other seven bytes alive, which is the
+/// machine's behaviour: a write to `al` leaves the rest of `rax` untouched.
+fn write(b: &mut Builder, dest: Varnode, value: Varnode) {
+    let Some((whole, index)) = byte_slot(dest) else {
+        b.emit(Op::Copy, Some(dest), &[value]);
+        return;
+    };
+    let byte = if value.size == 1 {
+        value
+    } else {
+        b.eval(Op::SubPiece, 1, &[value, Varnode::constant(0, 1)])
+    };
+    let shift = index * 8;
+    let kept = b.eval(
+        Op::IntAnd,
+        8,
+        &[whole, Varnode::constant(!(0xffu64 << shift), 8)],
+    );
+    let wide = b.eval(Op::IntZExt, 8, &[byte]);
+    let placed = if shift == 0 {
+        wide
+    } else {
+        b.eval(Op::IntLeft, 8, &[wide, Varnode::constant(shift, 1)])
+    };
+    b.emit(Op::IntOr, Some(whole), &[kept, placed]);
+}
+
 /// Write a register, including the upper-half clear a 32-bit write performs.
 fn write_reg(b: &mut Builder, r: Reg, value: Varnode) {
     let Some(dest) = reg(r) else { return };
-    b.emit(Op::Copy, Some(dest), &[value]);
+    write(b, dest, value);
     if r.width == Width::W32 && r.class == RegClass::Gpr {
         b.emit(
             Op::Copy,
@@ -175,7 +222,7 @@ pub(crate) fn address(b: &mut Builder, m: &Mem, at: Addr) -> Option<Varnode> {
 /// Read an operand, loading from memory when it names memory.
 fn source(b: &mut Builder, op: &Operand, size: u8, at: Addr) -> Option<Varnode> {
     Some(match op {
-        Operand::Reg(r) => reg(*r)?,
+        Operand::Reg(r) => read(b, reg(*r)?),
         Operand::Imm(v) => Varnode::constant(*v as u64, size),
         Operand::UImm(v) => Varnode::constant(*v, size),
         Operand::Count(v) => Varnode::constant(*v as u64, size),
@@ -722,7 +769,7 @@ pub fn lift(i: &Insn) -> Lifted {
                 "cwd" => 2,
                 _ => 8,
             };
-            let acc = Varnode::register(gpr_offset(0), acc_size);
+            let acc = read(&mut b, Varnode::register(gpr_offset(0), acc_size));
             let sign = sign_of(&mut b, acc);
             let wide = if acc_size == 1 {
                 sign
@@ -1001,7 +1048,7 @@ fn imul(mut b: Builder, _i: &Insn, ops: &[Operand], size: u8, at: Addr) -> Lifte
         let Some(y) = source(&mut b, &ops[0], size, at) else {
             return b.unimplemented();
         };
-        let acc = Varnode::register(gpr_offset(0), size);
+        let acc = read(&mut b, Varnode::register(gpr_offset(0), size));
         let low = b.eval(Op::IntMul, size, &[acc, y]);
         let high = b.eval(Op::IntSMulHigh, size, &[acc, y]);
         let expected = b.eval(
@@ -1057,7 +1104,7 @@ fn mul_one(mut b: Builder, ops: &[Operand], size: u8, at: Addr) -> Lifted {
     let Some(y) = ops.first().and_then(|o| source(&mut b, o, size, at)) else {
         return b.unimplemented();
     };
-    let acc = Varnode::register(gpr_offset(0), size);
+    let acc = read(&mut b, Varnode::register(gpr_offset(0), size));
     let low = b.eval(Op::IntMul, size, &[acc, y]);
     let high = b.eval(Op::IntMulHigh, size, &[acc, y]);
     let overflow = b.eval(Op::IntNotEqual, 1, &[high, Varnode::constant(0, size)]);
@@ -1097,12 +1144,8 @@ fn divide(mut b: Builder, ops: &[Operand], size: u8, at: Addr, signed: bool) -> 
             2,
             &[ax, wide],
         );
-        b.emit(Op::Copy, Some(Varnode::register(gpr_offset(0), 1)), &[q]);
-        b.emit(
-            Op::Copy,
-            Some(Varnode::register(gpr_offset(0) + 1, 1)),
-            &[r],
-        );
+        write(&mut b, Varnode::register(gpr_offset(0), 1), q);
+        write(&mut b, Varnode::register(gpr_offset(0) + 1, 1), r);
         return b.finish(true);
     }
     let low = Varnode::register(gpr_offset(0), size);
