@@ -21,6 +21,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "r12e-arch"
+version = "0.1.0"
+dependencies = [
+ "r12e-core",
+]
+
+[[package]]
 name = "r12e-core"
 version = "0.1.0"
 dependencies = [
