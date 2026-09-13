@@ -511,9 +511,9 @@ designed before it gets coded, and the design lives in
 - [ ] Static musl builds for Linux, plus macOS and Windows binaries.
 - [ ] Packaging: `cargo install`, a Homebrew formula, and a release workflow that
       signs and attaches checksums.
-- [ ] `MANUAL.md` is written and a design document per subsystem lives under
-      `docs/design/`. Still missing: the tutorial that takes a reader from a
-      stripped binary to a named, typed, committed annotation log.
+- [x] `MANUAL.md`, a design document per subsystem under `docs/design/`, and a
+      tutorial that takes a reader from a stripped binary to a named, typed,
+      committed annotation log (`docs/tutorial.md`).
 
 ## Quality gates
 
