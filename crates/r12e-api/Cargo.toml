@@ -14,4 +14,5 @@ r12e-format = { workspace = true }
 r12e-analysis = { workspace = true }
 r12e-ir = { workspace = true }
 r12e-decomp = { workspace = true }
+r12e-db = { workspace = true }
 r12e-types = { workspace = true }

@@ -163,6 +163,17 @@ enum Command {
         /// Address, symbol, or `all`.
         target: String,
     },
+    /// Build and apply function signatures.
+    ///
+    /// A signature identifies a function by what it is rather than where it
+    /// is, so a library built from a binary with symbols names the same code
+    /// in one without them.
+    Sig {
+        #[command(subcommand)]
+        what: SigCommand,
+        #[command(flatten)]
+        common: Common,
+    },
     /// Speak the Model Context Protocol on stdin and stdout, so an agent can
     /// drive the analysis.
     Mcp,
@@ -176,6 +187,22 @@ enum Command {
         common: Common,
         #[command(subcommand)]
         what: Annotation,
+    },
+}
+
+/// What to do with signatures.
+#[derive(Subcommand)]
+enum SigCommand {
+    /// Write a signature for every named function.
+    Create {
+        /// Where to write them; standard output when absent.
+        #[arg(short, long)]
+        out: Option<PathBuf>,
+    },
+    /// Name what a signature library recognizes.
+    Apply {
+        /// The signature file.
+        library: PathBuf,
     },
 }
 
@@ -224,7 +251,8 @@ impl Command {
             Command::Annotate { common, .. } | Command::Diff { common, .. } => common,
             // The server takes its paths per call rather than up front.
             Command::Mcp => unreachable!("handled before a file is opened"),
-            Command::Disas { common, .. }
+            Command::Sig { common, .. }
+            | Command::Disas { common, .. }
             | Command::Decompile { common, .. }
             | Command::Shapes { common, .. }
             | Command::Xrefs { common, .. }
@@ -343,6 +371,34 @@ fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             print::decompile(w, &program, target, common.json)
         }
         Command::Shapes { common, target } => print::shapes(w, &program, target, common.json),
+        Command::Sig { what, common } => match what {
+            SigCommand::Create { out } => {
+                let library = r12e_api::collect_signatures(
+                    &program,
+                    &common.file.file_name().unwrap_or_default().to_string_lossy(),
+                );
+                match out {
+                    Some(path) => {
+                        std::fs::write(path, library.to_text())
+                            .map_err(|e| format!("{}: {e}", path.display()))?;
+                        eprintln!("{} signature(s) written", library.len());
+                        Ok(exit::OK)
+                    }
+                    None => {
+                        for line in library.to_text().lines() {
+                            out::outln!(w, "{line}");
+                        }
+                        Ok(exit::OK)
+                    }
+                }
+            }
+            SigCommand::Apply { library } => {
+                let text = std::fs::read_to_string(library)
+                    .map_err(|e| format!("{}: {e}", library.display()))?;
+                let library = r12e_db::signature::Library::from_text(&text);
+                print::identified(w, &program, &library, common.json)
+            }
+        },
         Command::Xrefs {
             common,
             target,

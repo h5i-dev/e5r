@@ -10,6 +10,7 @@
 
 pub mod anchor;
 pub mod log;
+pub mod signature;
 
 pub use anchor::{Anchor, AnchorIndex, Fnv, Resolution};
 pub use log::{Assertion, Field, Log};

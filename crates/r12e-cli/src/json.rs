@@ -368,6 +368,31 @@ pub fn shapes(found: &[(&Function, Vec<r12e_api::Pointer>)]) -> Listing<ShapeOut
     )
 }
 
+/// One function a signature library recognized.
+#[derive(Serialize)]
+pub struct IdentifiedOut {
+    addr: String,
+    name: String,
+    was: String,
+    r#match: String,
+    source: String,
+}
+
+pub fn identified(found: &[r12e_api::Identified]) -> Listing<IdentifiedOut> {
+    listing(
+        found
+            .iter()
+            .map(|i| IdentifiedOut {
+                addr: hex(i.addr),
+                name: i.name.clone(),
+                was: i.was.clone(),
+                r#match: i.resolution.as_str().to_string(),
+                source: i.source.clone(),
+            })
+            .collect(),
+    )
+}
+
 pub fn disas(p: &Program, fns: &[&Function]) -> Listing<DisasOut> {
     listing(
         fns.iter()

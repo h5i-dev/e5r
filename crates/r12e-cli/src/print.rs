@@ -584,3 +584,32 @@ pub fn shapes(w: &mut Out, p: &Program, target: &str, as_json: bool) -> R {
     }
     Ok(exit::OK)
 }
+
+/// Report what a signature library recognized.
+pub fn identified(
+    w: &mut Out,
+    p: &Program,
+    library: &r12e_db::signature::Library,
+    as_json: bool,
+) -> R {
+    let found = r12e_api::identify(p, library);
+    if as_json {
+        return json::emit(w, &json::identified(&found));
+    }
+    if found.is_empty() {
+        eprintln!("nothing in {} signature(s) matched", library.len());
+        return Ok(exit::NOT_FOUND);
+    }
+    outln!(w, "{:<20} {:<10} {:<28} {}", "address", "match", "name", "was");
+    for i in &found {
+        outln!(
+            w,
+            "{:<20} {:<10} {:<28} {}",
+            i.addr.to_string(),
+            i.resolution.as_str(),
+            i.name,
+            i.was
+        );
+    }
+    Ok(exit::OK)
+}

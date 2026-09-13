@@ -178,6 +178,11 @@ impl Provenance {
         self.best.strength()
     }
 
+    /// True when a piece of evidence is among what supports this.
+    pub fn has(&self, e: Evidence) -> bool {
+        self.best == e || self.corroborating.contains(&e)
+    }
+
     /// How many independent sources agree.
     pub fn support(&self) -> usize {
         1 + self.corroborating.len()

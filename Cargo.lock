@@ -233,6 +233,7 @@ version = "0.1.0"
 dependencies = [
  "r12e-analysis",
  "r12e-core",
+ "r12e-db",
  "r12e-decomp",
  "r12e-format",
  "r12e-ir",
