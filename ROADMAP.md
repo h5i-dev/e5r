@@ -105,6 +105,9 @@ Dependency edges run downward only. `r12e-cli` may depend on everything;
       Ground truth comes from DWARF where the fixture has it.
 - [ ] Bench harness that records wall time, peak RSS and output hash per fixture,
       so a regression shows up as a number and not a feeling.
+- [ ] Coverage and mutation tooling: `cargo llvm-cov` and `cargo mutants` in CI,
+      with the per-crate floors from "Test coverage targets" in a checked-in
+      config so raising or lowering one is a reviewed diff.
 
 ### M1. Containers
 
@@ -139,7 +142,8 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 - [ ] ARM32 and Thumb-2, including interworking and the IT block.
 - [ ] Differential fuzzing of each decoder against `objdump` and `iced-x86` over
       random and corpus-derived bytes. Parity on length and on operand semantics
-      is a gate, not a goal.
+      is a gate, not a goal. Divergences that are deliberate get a written reason
+      in a checked-in list; there is no third category.
 - [ ] SLEIGH runtime: load a compiled `.sla`, decode, and produce p-code.
 - [ ] SLEIGH compiler: `.slaspec` to `.sla`, so Ghidra's processor tree builds
       from source instead of shipping as binary blobs. This is the single largest
@@ -193,6 +197,12 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 - [ ] Prototype recovery: parameter count, storage, return value, varargs.
 - [ ] Feedback edges. A prototype learned late re-runs the callers' dataflow. The
       schedule is explicit and budgeted, not a `while (changed)` around everything.
+- [ ] An IR interpreter. This lands here and not in M10, because it is the only
+      way to test a lifter: compile a C body for the target, run it natively for
+      the answer, run the lifted IR under the interpreter, compare. Ghidra's
+      PCodeTest works exactly this way and it is why their 40 processor
+      specifications are trustworthy. Without it, every lifter is asserted
+      correct by eye.
 
 ### M5. Types
 
@@ -228,6 +238,9 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       register dump.
 - [ ] C emission with a position map, so every token maps back to an address and
       the CLI can highlight, slice and cross-reference the output.
+- [ ] Port Ghidra's 89 decompiler datatests to our format before the M6 gate
+      opens. They encode two decades of decompiler bugs and they are the cheapest
+      correctness signal available. Every bug fixed after that adds one case.
 - [ ] Quality gates: goto density per function against a baseline, and a
       recompilability check on a corpus where the output is expected to build.
 - [ ] Options are toggles, not rewrites. A user who wants low-level output and a
@@ -305,8 +318,9 @@ designed before it gets coded, and the design lives in `docs/design/db.md`.
 - [ ] Signature matching. An open format for library function identification with
       a corpus built from real distribution packages, so a statically linked
       binary stops being 8,000 anonymous functions.
-- [ ] Emulation of selected paths over the IR, for string decryption, for
-      resolving an obfuscated control flow, and for confirming a jump table.
+- [ ] Emulation of selected paths, built on the M4 IR interpreter with a memory
+      model and syscall stubs added: string decryption, resolving an obfuscated
+      control flow, confirming a jump table.
 - [ ] A query language over the program model. "Find every call to `memcpy` whose
       third argument is not bounded by a constant" is a question the incumbents
       answer with a throwaway script. Making it a first-class query, over a model
@@ -356,6 +370,104 @@ Green before every merge to main. Each one is a command, not a judgment call.
 | G7 | Decompiler goto density and recompilability against the recorded baseline |
 | G8 | Benchmark wall time and peak RSS inside the regression budget |
 | G9 | Annotation log merge scenarios fold to the expected state |
+| G10 | Line and branch coverage at or above the floor for the crate |
+| G11 | Mutation score at or above the floor for the crate |
+
+## Test coverage targets
+
+Ghidra has 1,946 test files and 18,999 `@Test` methods. Copying that number is
+the wrong target and it would take a decade. Look at where those tests actually
+are: 615 files cover `Features/Base`, 399 cover the framework, and most of the
+rest are GUI and integration tests for a UI r12e does not have. The decompiler,
+which is the hardest thing in the product, has 15 Java test files, because the
+real decompiler tests are 89 XML datatests driving the C++ engine. Processors
+have 17.
+
+So the count is not the measure. Four things are, and the first of them is backed by an
+oracle outside this repository, which means its numbers cannot be padded by
+writing more assertions about our own behavior.
+
+### Oracle-backed suites
+
+| Suite | What the oracle is | Reference point | r12e target |
+| --- | --- | --- | --- |
+| Decoder parity | `objdump` and `iced-x86` on the same bytes | rizin ships 6,333 named cases and 24,625 lines of assembly vectors | every instruction in the fixture corpus, plus 10^8 randomly generated encodings per architecture, with zero unexplained disagreements |
+| Semantic lift | native execution of the same code | Ghidra's PCodeTest compiles 21 C bodies per target and emulates them | the same C bodies plus our own, executed natively and under the r12e emulator, compared on every observable |
+| Function boundaries | DWARF and PE unwind records | none published | precision and recall per fixture, tracked per release |
+| Decompiler behavior | recorded baseline, reviewed on change | Ghidra 89 datatests, kuna 83 files and 675 assertions | 89 ported cases before the M6 gate opens, then one case per fixed bug, permanently |
+| Type recovery | DWARF types in the fixture that has them | none published | agreement rate per type category, tracked per release |
+| Annotation merge | `git merge` itself | none | every scenario in the design doc, run against real git |
+
+The decoder parity suite is the one that has to be enormous and it costs almost
+nothing to grow, because the oracle generates the expected answers. A disagreement
+is either a bug in our decoder or a known divergence with a written reason, and
+the list of written reasons is checked in.
+
+The semantic lift suite is the part most projects skip, and skipping it is why
+lifters quietly produce wrong p-code for years. Ghidra's approach works: compile
+a C body for the target, run it natively to get the answer, run it under the
+emulator, compare. It is also the only way to test 40 SLEIGH specifications
+without 40 experts.
+
+### Coverage floors
+
+Line coverage measured with `cargo llvm-cov`, enforced per crate, because a
+single workspace number lets a well-tested decoder hide an untested loader.
+
+| Crate | Line | Branch |
+| --- | --- | --- |
+| `r12e-format`, `r12e-arch`, `r12e-sleigh` | 90% | 85% |
+| `r12e-core`, `r12e-ir`, `r12e-db`, `r12e-types` | 85% | 80% |
+| `r12e-analysis`, `r12e-decomp`, `r12e-diff`, `r12e-patch` | 75% | 65% |
+| `r12e-cli`, `r12e-mcp` | 60% | 50% |
+
+Parsers and decoders get the high floor because their inputs are hostile and
+their failure mode is silent. The decompiler gets a lower one because a
+structuring pass has combinatorially many paths and the datatests cover what
+matters better than a coverage percentage does.
+
+### Mutation score
+
+Coverage says a line ran. It does not say a test would have noticed if the line
+were wrong, and on a decoder that distinction is the whole game: a table entry
+with the wrong operand size is executed by every test and caught by none.
+
+`cargo mutants` changes one operator, constant or return value at a time and
+reports whether the suite failed. The score is the fraction of mutants killed.
+
+| Crate | Floor |
+| --- | --- |
+| `r12e-format`, `r12e-arch`, `r12e-core` | 85% |
+| `r12e-ir`, `r12e-db`, `r12e-types` | 75% |
+| everything else | 60%, or an exemption with a written reason |
+
+Full mutation runs are slow, so CI mutates only the diff on a pull request and
+the whole workspace on a nightly. Neither Ghidra nor rizin publishes a mutation
+score. Publishing ours, and holding a floor, is a claim about test quality that
+a test count cannot make.
+
+### Fuzzing
+
+Counted by what it finds, not by whether it runs.
+
+- Every loader, decoder and demangler has a target, run in CI against a corpus
+  that is checked in and grows with every crash.
+- The metric is edge coverage plateau per target, recorded per release. A target
+  whose coverage stops growing has either been fully explored, which is worth
+  knowing, or has a harness bug, which is worth fixing.
+- A crash found by fuzzing becomes a unit test with the minimized input before
+  the fix lands.
+
+### Where the tests live
+
+- Unit tests next to the code, for anything with a contract.
+- `tests/` in each crate for behavior that crosses module boundaries.
+- `fixtures/` for the binaries, with a manifest recording the source, the build
+  flags and the ground truth available for each one.
+- `tests/golden/` for the recorded baselines, one file per case, reviewed as part
+  of the change that moves them. A baseline that moves without a reviewer saying
+  why is not a baseline.
+
 
 ## Scorecard
 
