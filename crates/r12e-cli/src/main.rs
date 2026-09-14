@@ -188,6 +188,21 @@ pub enum Command {
         #[command(flatten)]
         common: Common,
     },
+    /// Recover C++ classes, their hierarchy and their member functions.
+    ///
+    /// From the type information where the binary has it, and from the virtual
+    /// tables alone where it does not. Every claim says what it rests on: a
+    /// name read out of RTTI is proven, one inferred from what a function
+    /// writes is not, and the two are never printed as each other.
+    Classes {
+        #[command(flatten)]
+        common: Common,
+        /// Also list member functions and what each one touches through
+        /// `this`. This lifts every member function, which on a real C++
+        /// library takes tens of seconds.
+        #[arg(long)]
+        members: bool,
+    },
     /// Run a function in the interpreter.
     ///
     /// The same machine the lifter's semantics gate uses, which is measured
@@ -538,6 +553,7 @@ impl Command {
                 unreachable!("handled before a file is opened")
             }
             Command::Vtables { common, .. }
+            | Command::Classes { common, .. }
             | Command::Overlay { common, .. }
             | Command::Archive { common, .. }
             | Command::Patch { common, .. }
@@ -626,7 +642,14 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
         eh_frame: true,
         debug_info: true,
     };
-    let object = r12e_format::load(&data, &load_opts).map_err(|e| e.to_string())?;
+    let mut object = r12e_format::load(&data, &load_opts).map_err(|e| e.to_string())?;
+    // A position independent library writes zero wherever a pointer goes and
+    // leaves a relocation saying what belongs there, so every virtual table
+    // and every type-information pointer in a shared object reads as zeroes
+    // until these are applied. Reading them as they sit does not fail, it
+    // quietly answers "there is nothing here".
+    r12e_api::apply_relative_relocations(&mut object);
+    let object = object;
 
     // Commands that only need the container skip analysis entirely, which is
     // what makes `info` on a 500 MB binary instant.
@@ -725,6 +748,7 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             budget,
         } => print::emulate(w, &program, target, args, *depth, *budget, common.json),
         Command::Vtables { common } => print::vtables(w, &program, common.json),
+        Command::Classes { common, members } => print::classes(w, &program, *members, common.json),
         Command::Batch {
             common,
             script,

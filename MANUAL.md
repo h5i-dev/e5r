@@ -70,6 +70,30 @@ where it does not, they are recovered from what the code does with them.
 against. Nothing escapes the process: memory is a copy of the image, a system
 call stops the run, and a budget bounds it.
 
+## C++
+
+```
+r12e classes prog                # the hierarchy
+r12e classes prog --members      # and every member function, with its `this`
+```
+
+Classes come from the type information where a binary has it, and from the
+virtual tables alone where it does not. Both Itanium and Microsoft layouts are
+read. Every claim says what it rests on: a name read out of RTTI or a mangled
+symbol is proven, one inferred from what a function writes is not, and the two
+are never printed as each other.
+
+A binary built with `-fno-rtti` degrades and says which it is:
+
+```
+13 class(es) from 13 table(s); 9 named by symbol, 0 only by type information
+  (unknown, absent (-fno-rtti): vtables only, no hierarchy)
+```
+
+`--members` lifts every member function to see what it touches through
+`this`, which on a real C++ library takes tens of seconds, so it is off by
+default.
+
 ## Structure and types
 
 ```

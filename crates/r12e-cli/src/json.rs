@@ -725,3 +725,93 @@ pub fn archive(a: &r12e_format::archive::Archive) -> ArchiveOut {
         warnings: a.warnings.clone(),
     }
 }
+
+#[derive(Serialize)]
+pub struct BaseOut {
+    name: String,
+    offset: i64,
+    virtual_base: bool,
+    public: bool,
+}
+
+#[derive(Serialize)]
+pub struct ClassMemberOut {
+    address: String,
+    name: Option<String>,
+    role: String,
+    slot: Option<usize>,
+    basis: &'static str,
+    strength: &'static str,
+    this: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct ClassOut {
+    name: Option<String>,
+    mangled: Option<String>,
+    typeinfo: Option<String>,
+    size: Option<u64>,
+    basis: &'static str,
+    strength: &'static str,
+    bases: Vec<BaseOut>,
+    vtables: Vec<String>,
+    members: Vec<ClassMemberOut>,
+}
+
+#[derive(Serialize)]
+pub struct ClassesOut {
+    schema: &'static str,
+    abi: &'static str,
+    rtti: &'static str,
+    tables: usize,
+    named_by_symbol: usize,
+    named_by_rtti: usize,
+    classes: Vec<ClassOut>,
+}
+
+pub fn classes(c: &r12e_api::classes::Classes) -> ClassesOut {
+    ClassesOut {
+        schema: SCHEMA,
+        abi: c.abi.as_str(),
+        rtti: c.rtti.as_str(),
+        tables: c.tables,
+        named_by_symbol: c.named_by_symbol,
+        named_by_rtti: c.named_by_rtti,
+        classes: c
+            .classes
+            .iter()
+            .map(|k| ClassOut {
+                name: k.name.clone(),
+                mangled: k.mangled.clone(),
+                typeinfo: k.typeinfo.map(hex),
+                size: k.size(),
+                basis: k.basis.as_str(),
+                strength: k.basis.strength().as_str(),
+                bases: k
+                    .bases
+                    .iter()
+                    .map(|b| BaseOut {
+                        name: b.name.clone(),
+                        offset: b.offset,
+                        virtual_base: b.is_virtual,
+                        public: b.is_public,
+                    })
+                    .collect(),
+                vtables: k.vtables.iter().copied().map(hex).collect(),
+                members: k
+                    .members
+                    .iter()
+                    .map(|m| ClassMemberOut {
+                        address: hex(m.addr),
+                        name: m.name.clone(),
+                        role: format!("{:?}", m.role).to_lowercase(),
+                        slot: m.slot,
+                        basis: m.basis.as_str(),
+                        strength: m.basis.strength().as_str(),
+                        this: m.this.as_ref().map(|t| t.declaration.clone()),
+                    })
+                    .collect(),
+            })
+            .collect(),
+    }
+}

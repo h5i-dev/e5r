@@ -1034,3 +1034,69 @@ pub fn archive(w: &mut Out, data: &[u8], symbols: bool, as_json: bool) -> R {
     }
     Ok(exit::OK)
 }
+
+/// Recovered C++ classes, their hierarchy and their member functions.
+pub fn classes(w: &mut Out, p: &Program, members: bool, as_json: bool) -> R {
+    let opts = r12e_api::classes::Options {
+        stores: true,
+        // Recovering what each member touches through `this` lifts every
+        // member function, which on a real C++ library is tens of seconds. It
+        // is worth it only when the caller asked to see them.
+        fields: members,
+    };
+    let found = r12e_api::classes::classes_with(p, &opts);
+    if as_json {
+        return json::emit(w, &json::classes(&found));
+    }
+    if found.classes.is_empty() {
+        eprintln!(
+            "no classes: {} virtual table(s), type information {}",
+            found.tables,
+            found.rtti.as_str()
+        );
+        return Ok(exit::NOT_FOUND);
+    }
+    outln!(
+        w,
+        "{} class(es) from {} table(s); {} named by symbol, {} only by type information ({}, {})",
+        found.classes.len(),
+        found.tables,
+        found.named_by_symbol,
+        found.named_by_rtti,
+        found.abi.as_str(),
+        found.rtti.as_str()
+    );
+    outln!(w, "");
+    for c in &found.classes {
+        let name = c.display_name();
+        outln!(
+            w,
+            "{} {}",
+            w.paint(Role::Name, &name),
+            w.paint(Role::Weak, c.basis.as_str())
+        );
+        for b in &c.bases {
+            outln!(
+                w,
+                "    {} {} at {}{}",
+                if b.is_virtual { "virtual base" } else { "base" },
+                w.paint(Role::Name, &b.name),
+                b.offset,
+                if b.is_public { "" } else { " (not public)" }
+            );
+        }
+        if members {
+            for m in &c.members {
+                let what = m.name.clone().unwrap_or_else(|| m.addr.to_string());
+                outln!(
+                    w,
+                    "    {:<20}{:<24}{}",
+                    format!("{:?}", m.role).to_lowercase(),
+                    last(w, 48, &what),
+                    w.paint(Role::Weak, m.basis.as_str())
+                );
+            }
+        }
+    }
+    Ok(exit::OK)
+}
