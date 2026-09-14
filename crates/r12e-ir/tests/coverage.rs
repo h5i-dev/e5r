@@ -13,7 +13,7 @@ use r12e_format::LoadOptions;
 use r12e_ir::lift;
 
 /// Floor on the share of decoded instructions the lifter models. Only raised.
-const MIN_COVERAGE: f64 = 0.996;
+const MIN_COVERAGE: f64 = 0.998;
 /// The x86-64 floor, which has only the fixtures behind it: this host runs no
 /// x86 system binaries, so the corpus is smaller and the number is not
 /// comparable to the AArch64 one.
