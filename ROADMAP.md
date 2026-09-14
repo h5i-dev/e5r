@@ -350,8 +350,13 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 - [x] Value-set or range analysis, enough to bound a jump table index and to
       prove a comparison constant. Interval domain with widening over eight
       rounds; 117 results checked, 62 of them bounded.
-- [ ] Calling convention detection per function, including non-standard ones that
-      a compiler invents for a static function.
+- [x] Calling convention detection per function. Four answers rather than two:
+      standard, standard with fewer arguments where the gap in the register
+      order is the evidence, non-standard with the departures named by
+      register, and unknown where the lifter did not model everything, because
+      an unmodelled instruction's reads are not arguments. Gated against
+      `DW_TAG_call_site_parameter`, which is what the compiler knew: 33 of 37
+      recorded argument registers found.
 - [x] Prototype recovery: parameter count, storage, return value, varargs.
       186 prototypes recovered with no argument lost.
 - [x] Feedback edges. A prototype learned late re-runs the callers' dataflow. The
@@ -621,9 +626,12 @@ designed before it gets coded, and the design lives in
       function with given arguments and reports what came back and what it
       touched. Nothing escapes the process. Gated against the processor by
       running the oracle's case table through it.
-- [ ] Emulation of selected paths with a memory
-      model and syscall stubs added: string decryption, resolving an obfuscated
-      control flow, confirming a jump table.
+- [x] Emulation of selected paths, with a memory model and syscall stubs. All
+      three uses gated against a processor: a decrypted string equal to the
+      bytes the hardware produced, a masked pointer table yielding exactly its
+      three real targets after static analysis settled nothing, and five
+      recovered jump tables confirmed by running the branch for every index.
+      Nothing escapes the interpreter: the stubs are answers, not actions.
 - [x] A query language over the program model, over seven entities with
       boolean operators, brackets and JSON on the same command. A field that
       does not exist is a typo and says so rather than matching nothing.
@@ -648,8 +656,11 @@ designed before it gets coded, and the design lives in
       35% more than no cache at all. A key mismatch is a miss and never a
       partial reuse, and a damaged file is a miss with a warning, checked by
       corrupting real entries at 1,328 positions with no wrong answer.
-- [ ] Memory ceiling. A 500 MB binary must analyze inside 8 GB of RAM, which
-      means arenas, interning, and not storing a `String` per instruction.
+- [x] Memory ceiling. Peak resident falls 47.7% on the largest binary here and a
+      500 MB one extrapolates to 4.6 to 6.4 GB where every model before put it
+      at 8.0 to 8.7. Interning the block table by range is most of it: 8.47M
+      stored blocks were 2.69M distinct ranges, held once per function that
+      could reach them. Wall time is unchanged and is not claimed as a win.
 - [x] Profiling as a habit, with `scripts/flamegraph.sh` checked in and run
       rather than merely written. It found that `r12e funcs` spends 12.3% of
       its time computing content anchors for every function before printing
