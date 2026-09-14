@@ -521,6 +521,13 @@ fn move_wide(w: u32, addr: Addr) -> Option<Insn> {
             let mut i = ins(addr, "movz", Flow::Next);
             i.push(Operand::Reg(r(rd, sf)));
             i.push(Operand::Imm(imm16 as i64));
+            // Only a zero immediate reaches here, so the shift is the whole
+            // difference between this and any other encoding of the same
+            // value, and dropping it printed four distinct instructions the
+            // same way.
+            if shift != 0 {
+                i.push(Operand::ShiftOp(Shift::Lsl, shift as u8));
+            }
             Some(i)
         }
         0b11 => {

@@ -66,7 +66,9 @@ pub fn vtables(p: &Program) -> Vec<VTable> {
         // in than two words and the straight read finds no functions there.
         .or_else(|| {
             let entry = address_point(p, symbol.addr, symbol.size)?;
-            let past = symbol.addr.get() + symbol.size;
+            // The size is the file's to choose, so one large enough to wrap
+            // would put the end of the table before its start.
+            let past = symbol.addr.get().checked_add(symbol.size)?;
             let slots = past.checked_sub(entry.get()).map(|n| n as usize / 8);
             read(p, entry, Evidence::SymbolTable, slots)
         });

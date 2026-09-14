@@ -72,6 +72,68 @@ The corruptions are not uniformly random, because uniformly random bytes
 rarely produce a large count: they are runs of `0xff` and runs of ASCII `9`,
 which is how a size or an entry count becomes enormous in practice.
 
+### The gate over all of it
+
+Those are per format and each one proves a point about its own parser. The
+statement M12 asks for is one gate over the whole untrusted surface, and it is
+`crates/r12e-ir/tests/nopanic_gate.rs`. It lives in `r12e-ir` because that is
+the only crate whose dev-dependencies reach both `r12e-format` and
+`r12e-arch`, and a gate split across two test binaries is two gates.
+
+One function, `drive_every_entry_point`, calls every path in this workspace
+that takes bytes somebody else wrote: `load` for each container, the archive
+reader including `load_member`, raw mode, the overlay pass, DWARF through the
+loaded object, PDB from raw bytes and again with a section table, the Swift
+reader, the Go `pclntab` reader, the Objective-C class reader, the Rust panic
+site scan, and then `r12e_arch::decode` over every executable section the
+object claims. Adding a reader to the crate and not adding it there is a
+visible omission rather than an invisible one.
+
+The budget is **12 seconds**, split between four phases, and the point of the
+number is that it is small: a gate that runs on every `cargo test` finds
+things, and a nightly job on a machine where nobody runs nightly jobs does
+not. A measured run over 13 seed containers reaches roughly 30,000 poison-run
+cases, 20,000 random mutations, 2,300 truncations and 1.1 million decoder
+cases in under 8 seconds of wall time.
+
+The assertion is three things, not one: no panic, a bounded time per case, and
+an object that is self-consistent rather than merely returned. The third is
+the one worth spelling out, because it is where "an error rather than a wrong
+answer" becomes checkable:
+
+- Counts under their caps, and strings under `string_len`.
+- Every byte a memory segment holds traced back to a byte that was in the
+  file. A loader handing back content it could not have read is a fabrication,
+  and that is the failure this catches.
+- Deliberately **not** checked: that a `Section`'s declared `file_offset` and
+  `file_size` fit the file. A section record is a report of what the container
+  said, and reporting it faithfully is how a caller sees a truncated file at
+  all. What must be true is that nothing was *read* from outside the file.
+
+The gate found three defects in loader arithmetic on its first run. They are
+pinned at the bottom of the file, each with a minimal reproduction, each
+asserting the current wrong behaviour on purpose so that fixing the source
+turns the pin red and the pin comes out with the fix:
+
+1. A Mach-O section that runs off the end of the file is reported at its
+   declared size with nothing said about it: the section-body read's failure
+   becomes `.unwrap_or_default()`, where the ELF loader pushes a warning. A
+   224-byte file reports two sections of 246 GB and an empty `warnings`.
+2. The Mach-O relocatable layout wraps the address space. Sections are laid
+   out with `next_free = a + size` where `size` came from the file, so three
+   sections of `0x9393939393939393` bytes put the third below the first. In
+   release that is a silent wrong answer; with overflow checks on, which is
+   the dev profile CI builds, it is a panic.
+3. `Object::symbol_at` adds a file-chosen `st_size` to a symbol address
+   unchecked, and so does `r12e-api/src/vtables.rs`. One run of `0xff` over a
+   fixture's symbol table produces a symbol at `0xffff_ffff_0010_08c8` with
+   size `0xffff_ffff`; the same overflow, the same profile split.
+
+All three are the same mistake in three places, and it is the one this
+document's rule 1 exists to prevent, applied to an address rather than to a
+count: a number that came from the file was added to another number without
+asking whether the sum exists.
+
 ## `unsafe`
 
 Every crate is `#![forbid(unsafe_code)]` except `r12e-cli`, which is

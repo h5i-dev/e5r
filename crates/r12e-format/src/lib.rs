@@ -222,7 +222,12 @@ impl Object {
         self.symbols[..i]
             .iter()
             .rev()
-            .find(|s| s.addr <= addr && (s.size == 0 || addr.get() < s.addr.get() + s.size))
+            // The distance rather than the sum: the size comes from the file,
+            // and one large enough to wrap makes the comparison say a symbol
+            // covers an address nowhere near it.
+            .find(|s| {
+                s.addr <= addr && (s.size == 0 || addr.get().wrapping_sub(s.addr.get()) < s.size)
+            })
     }
 
     /// Section containing `addr`.

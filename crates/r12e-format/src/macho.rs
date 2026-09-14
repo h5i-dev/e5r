@@ -274,9 +274,22 @@ fn load_thin(data: &[u8], opts: &LoadOptions, base: u64) -> Result<Object> {
                     let full = format!("{segname},{sectname}");
 
                     let va = if relocatable {
+                        // A relocatable object gives every section address
+                        // zero, so they are laid out here. The size is the
+                        // file's to choose, and one large enough to wrap the
+                        // address space would place the next section back
+                        // inside this one: a later section would then appear
+                        // to contain the earlier one's code.
                         let alignment = 1u64 << align.min(16);
-                        let a = next_free.next_multiple_of(alignment.max(1));
-                        next_free = a + size;
+                        let Some(a) = next_free.checked_next_multiple_of(alignment.max(1)) else {
+                            warnings.push(format!("section {full} does not fit the address space"));
+                            continue;
+                        };
+                        let Some(end) = a.checked_add(size) else {
+                            warnings.push(format!("section {full} does not fit the address space"));
+                            continue;
+                        };
+                        next_free = end;
                         a
                     } else {
                         addr
@@ -289,9 +302,18 @@ fn load_thin(data: &[u8], opts: &LoadOptions, base: u64) -> Result<Object> {
                     let body = if zerofill {
                         Vec::new()
                     } else {
-                        r.bytes_at("section body", base + offset, file_size)
-                            .map(|b| b.to_vec())
-                            .unwrap_or_default()
+                        // A section whose bytes are not in the file is worth
+                        // saying: without this the object reports a section of
+                        // the declared size holding nothing, and a caller that
+                        // trusts `file_size` gets a wrong answer with no
+                        // signal. The ELF loader already warns at this point.
+                        match r.bytes_at("section body", base + offset, file_size) {
+                            Ok(b) => b.to_vec(),
+                            Err(e) => {
+                                warnings.push(format!("section {full}: {e}"));
+                                Vec::new()
+                            }
+                        }
                     };
                     if !range.is_empty() {
                         let perms = if relocatable {
