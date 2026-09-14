@@ -10,6 +10,7 @@
 //! Every pass runs to a fixed point and every pass is conservative: an
 //! operation whose effect is not understood is kept.
 
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::op::{Op, Space};
@@ -1048,6 +1049,16 @@ struct Scaled {
 struct Reciprocal<'a> {
     source: &'a BTreeMap<Value, (Op, Vec<Operand>, u8)>,
     known: &'a KnownBits,
+    /// What [`Reciprocal::scaled`] answered for an operand at a depth.
+    ///
+    /// It is a pure function of the two, and it branches: the `SubPiece` rule
+    /// falls through to a second reading when the first does not fit, `IntAdd`
+    /// tries two rules, and `combined` tries both operand orders. With
+    /// [`REACH`] at 24 that is a search of up to 2^24 states over a graph with
+    /// far fewer, and on one `IntRight` in a zlib function built at `-O0` it
+    /// took 28 seconds. Remembering the answers makes it linear in the states
+    /// that exist.
+    memo: RefCell<BTreeMap<(Operand, u32), Option<Scaled>>>,
 }
 
 impl Reciprocal<'_> {
@@ -1128,6 +1139,15 @@ impl Reciprocal<'_> {
 
     /// The exact value an operand computes, in reciprocal form.
     fn scaled(&self, o: &Operand, depth: u32) -> Option<Scaled> {
+        if let Some(hit) = self.memo.borrow().get(&(*o, depth)) {
+            return *hit;
+        }
+        let out = self.scaled_uncached(o, depth);
+        self.memo.borrow_mut().insert((*o, depth), out);
+        out
+    }
+
+    fn scaled_uncached(&self, o: &Operand, depth: u32) -> Option<Scaled> {
         if depth == 0 {
             return None;
         }
@@ -1826,6 +1846,7 @@ pub fn divisions(f: &mut SsaFunction) -> Changes {
     let rules = Reciprocal {
         source: &source,
         known: &known,
+        memo: RefCell::new(BTreeMap::new()),
     };
 
     let mut changes = Changes::default();
