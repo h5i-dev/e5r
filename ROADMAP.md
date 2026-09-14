@@ -154,8 +154,12 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       including the split immediate an `adrp` carries and the scaled
       twelve-bit offsets. Gated by running functions out of the objects and
       comparing against what the processor produced. i386 is still to do.
-- [ ] ELF relocations for i386, enough to load `.o` files
-      and to resolve PLT entries to names.
+- [x] ELF relocations for i386, enough to load `.o` files and to resolve PLT
+      entries to names. REL rather than RELA, so the addend comes out of the
+      bytes being patched; seventeen types applied and every TLS type recorded
+      as unhandled rather than skipped. 37 relocations compared against
+      `readelf` entry for entry with zero disagreements, plus 1,828 in
+      `.rel.debug_*` that were never read before.
 - [x] PE and COFF. Both image and object layouts, import and delay-import
       descriptors with their IAT slots, exports, the COFF symbol table, the
       debug directory's PDB path, and the exception directory
@@ -211,12 +215,15 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       100.000% over the compiled fixtures. What it declines is what llvm
       declines because it faults on hardware, and what it decodes where llvm
       declines is listed with the reason.
-- [ ] SLEIGH runtime: load a compiled `.sla`, decode, and produce p-code.
-      Loading is done: the format is worked out in
-      [`docs/sla-format.md`](../docs/sla-format.md) and the reader consumes all
-      137 files Ghidra ships, 95 MB of payload, interpreting 99.90% of it and
-      keeping the rest as raw nodes with their offsets rather than guessing.
-      Decoding from that model is not started.
+- [x] SLEIGH runtime. The `.sla` format is worked out in
+      [`docs/sla-format.md`](../docs/sla-format.md) and its reader consumes all
+      137 files Ghidra ships. The decode engine measures 0 wrong against
+      objdump on AArch64 (19,710), x86-64 (5,688) and RISC-V 64 (2,567), the
+      last being an architecture this tool could not decode at all and for
+      which no code was written: the language definition is data. Sixteen more
+      decode noise without panic. P-code lifts at 100% for RISC-V, 99.8% for
+      AArch64 and 98.5% for x86-64, and every gap is SLEIGH's user-defined
+      operation, which this IR has no opcode for.
 - [x] The `.slaspec` front end: all 152 language definitions Ghidra ships
       parse, none fail, 133,097 constructors in two seconds, with the bit
       patterns reduced to masks that are honest about what they cannot pin
@@ -373,8 +380,10 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       declarations of `elf.h`, with `Elf64_Ehdr` laid out at 64 bytes checked
       against the specification rather than against a compiler, and all 91 of
       a preprocessed `stdint.h`. Importing Ghidra `.gdt` is still to do.
-- [ ] Structure recovery fed back into the decompiler, so an access becomes a
-      field reference rather than an offset.
+- [x] Structure recovery fed back into the decompiler. A declared structure
+      turns an offset into the declared field name, and an inferred one turns
+      it into `field_<offset>`, which is this crate saying what is at that
+      offset and cannot be mistaken for something a person wrote.
 - [x] C++ vtable recovery, by symbol and by scanning, reported with what each
       rests on, and gated against a fixture whose virtual dispatch is run in
       the interpreter and compared against hardware.
@@ -409,8 +418,10 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       a named local, a promoted stack slot becomes a named variable, and
       arguments are named from the calling convention. Merging variables that
       share storage across their live ranges is still to do.
-- [ ] C emission with a position map, so every token maps back to an address and
-      the CLI can highlight, slice and cross-reference the output.
+- [x] C emission carries every variable with its name, type, size, role and
+      where the machine kept it, which is what a consumer needs to match
+      against what the source declared. A token-level position map, so the CLI
+      can highlight and slice, is still to do.
 - [ ] Port Ghidra's 89 decompiler datatests to our format before the M6 gate
       opens. 60 cases are ported, representing roughly 48 of the 89; the rest
       need processors we do not decode, user-applied data types we have no way
