@@ -199,6 +199,19 @@ impl Expr {
                 f.write_str(")()")
             }
             Expr::Cast(t, a) => {
+                // A signed cast of a constant C already gives that type is
+                // noise. `(int32_t)81` and `81` convert identically in every
+                // context, because a decimal literal is already `int` and the
+                // usual arithmetic conversions then treat the two the same.
+                // Only for values `int` can hold, and only for signed targets:
+                // `(uint32_t)81` beside a signed operand chooses unsigned
+                // division, which dropping it would silently change.
+                if let Expr::Const(v, size) = a.as_ref()
+                    && t.starts_with("int")
+                    && (0..=0x7fff_ffff).contains(&sign_extend(*v, *size))
+                {
+                    return a.render(f, outer);
+                }
                 write!(f, "({t})")?;
                 a.render(f, 11)
             }

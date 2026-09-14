@@ -403,10 +403,10 @@ fn statuscmp() {
 #[test]
 fn signed_compare_greater() {
     case(&all("arith"), "cmp_gt", |c| {
-        c.has_any(&["6 <= ", ">= (int32_t)6"]).times("sink1(", 1);
+        c.has_any(&["6 <= ", ">= 6"]).times("sink1(", 1);
     });
     case(&all("arith"), "cmp_ge", |c| {
-        c.has_any(&["5 <= ", ">= (int32_t)5"]).times("sink1(", 1);
+        c.has_any(&["5 <= ", ">= 5"]).times("sink1(", 1);
     });
 }
 
@@ -691,7 +691,6 @@ fn switchind() {
 /// reported incomplete, so it does not reach the decompiler, and the arms are
 /// never disassembled. AArch64 recovers the same source's table.
 #[test]
-#[ignore = "x86-64 jump tables are not recovered: the function stays incomplete"]
 fn switchind_x86_64() {
     case(&arch("control", "x64"), "switchind", |c| {
         c.at_least("0x", 1);
@@ -728,7 +727,6 @@ fn forloop_varused() {
 /// `x * 0xca4587e7 >> 38`. Seventeen unsigned constants and seventeen signed
 /// ones in the original; three of each here.
 #[test]
-#[ignore = "reciprocal division is not folded back into a division"]
 fn divopt() {
     for (f, by) in [
         ("divu81", "/ 81"),
@@ -748,7 +746,6 @@ fn divopt() {
 /// rounding correction and a shift, and the correction comes out as a
 /// `__borrow` of the value against zero rather than as a sign test.
 #[test]
-#[ignore = "signed division by a power of two leaves a __borrow in the output"]
 fn divopt_signed_power_of_two() {
     case(&all("arith"), "divs8", |c| {
         c.lacks("__borrow");
@@ -794,7 +791,6 @@ fn signed_compare_keeps_its_relation() {
 /// `setcc`, so `return x == 0` decompiles to `return 0`. Four instructions in,
 /// a constant out.
 #[test]
-#[ignore = "a setcc into a byte register is dropped: the comparison becomes a constant"]
 fn setcc_result_is_dropped() {
     case(&arch("arith", "x64"), "iszero", |c| {
         c.has("== 0");
@@ -812,7 +808,6 @@ fn setcc_result_is_dropped() {
 /// The same defect on the store side loses the value of an AArch64 `strb` of a
 /// register, which is why `heapstring` is checked on x86-64 only.
 #[test]
-#[ignore = "an 8-bit register operand resolves to a flag varnode"]
 fn byte_register_operand_reads_a_flag() {
     case(&all("arith"), "sbyte", |c| {
         c.lacks("flag0");
@@ -824,7 +819,6 @@ fn byte_register_operand_reads_a_flag() {
 /// `ucomisd` whose answer leaves through `setnp` and `setae`, so this is the
 /// floating point face of `setcc_result_is_dropped`.
 #[test]
-#[ignore = "x86-64 floating point comparisons are lost with their setcc"]
 fn nan_x86_64() {
     case(&arch("arith", "x64"), "nanfn", |c| {
         c.has("__isnan");
@@ -836,7 +830,6 @@ fn nan_x86_64() {
 /// double. Ghidra asks for `0.33333334`; we produce
 /// `0.000000...00015460065587`.
 #[test]
-#[ignore = "a 32-bit float constant prints as a denormal decimal"]
 fn floatprint() {
     case(&all("arith"), "i2f", |c| {
         c.lacks("0.0000000000000000000000000000000");
