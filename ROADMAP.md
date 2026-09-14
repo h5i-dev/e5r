@@ -217,10 +217,11 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       137 files Ghidra ships, 95 MB of payload, interpreting 99.90% of it and
       keeping the rest as raw nodes with their offsets rather than guessing.
       Decoding from that model is not started.
-- [ ] The `.slaspec` front end is done: all 152 language definitions Ghidra
-      ships parse, none fail, 133,097 constructors in two seconds, with the
-      bit patterns reduced to masks that are honest about what they cannot
-      pin down. What remains of this bullet is writing `.sla` back out.
+- [x] The `.slaspec` front end: all 152 language definitions Ghidra ships
+      parse, none fail, 133,097 constructors in two seconds, with the bit
+      patterns reduced to masks that are honest about what they cannot pin
+      down. 24 real encodings across ten architectures select their own
+      constructor and no other.
 - [ ] SLEIGH compiler: `.slaspec` to `.sla`, so Ghidra's processor tree builds
       from source instead of shipping as binary blobs. This is the single largest
       task in M2 and it unlocks RISC-V, MIPS, PowerPC, SPARC, SuperH, 6502, Z80,
@@ -354,18 +355,24 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       phi so a walk reports its element size, and the result is what was seen
       rather than a conclusion. Gated against the debug information: the
       recovery runs without looking at it and has to agree.
-- [ ] A C type model with structures, unions, arrays, enums, function pointers,
-      bitfields and typedefs, sized per architecture.
-- [ ] DWARF inlined frames, call sites and location lists, which the current
-      reader skips.
+- [x] A C type model with structures, unions, arrays, enums, function pointers,
+      bitfields and typedefs, sized per architecture, and a parser that reads
+      a declaration into it.
+- [x] DWARF inlined frames, call sites and location lists, compared against
+      `readelf` entry for entry: 39 inlined frames with their ranges and call
+      lines, 16 call sites by argument count, 198 variables with location
+      lists compared range for range. 230 variables in the fixtures change
+      storage inside their own body, which a single-location reader gets
+      wrong for most of the function.
 - [ ] PDB consumption for Windows binaries, from the public format documentation.
 - [x] Demanglers: Itanium C++ at 94% exact parity with `c++filt` over 5,953
       real libstdc++ symbols, Rust in both schemes, and MSVC qualified names.
       Swift and ObjC selectors are still to do, and MSVC's type grammar is a
       separate job from its names.
-- [ ] Type archives. Parse C headers into the type model so an analyst can apply
-      a known API signature. Importing Ghidra `.gdt` is worth doing if the format
-      holds still.
+- [x] Type archives. A whole translation unit parses into the type model: all 61
+      declarations of `elf.h`, with `Elf64_Ehdr` laid out at 64 bytes checked
+      against the specification rather than against a compiler, and all 91 of
+      a preprocessed `stdint.h`. Importing Ghidra `.gdt` is still to do.
 - [ ] Structure recovery fed back into the decompiler, so an access becomes a
       field reference rather than an offset.
 - [x] C++ vtable recovery, by symbol and by scanning, reported with what each
@@ -378,8 +385,11 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       runtime type descriptors are still to do.
 - [x] Rust: the metadata that exists, which is less than people expect. Panic
       location strings carry file and line and are worth mining.
-- [ ] ObjC metadata is read: class and method lists, with selectors. Swift is
-      not started, including its field descriptors and protocol conformances.
+- [x] ObjC class and method lists with selectors, and Swift nominal type
+      descriptors, field descriptors and protocol conformances. The Swift side
+      is measured against fixtures written from the published ABI, not against
+      compiler output, because there is no Swift toolchain here; that is a
+      weaker claim than the DWARF and Go gates and the scorecard says so.
 
 ### M6. Decompiler
 
@@ -534,23 +544,33 @@ designed before it gets coded, and the design lives in
 - [x] A query language over the program model, over seven entities with
       boolean operators, brackets and JSON on the same command. A field that
       does not exist is a typo and says so rather than matching nothing.
-- [ ] Query over dataflow facts: "find every call to `memcpy` whose
-      third argument is not bounded by a constant" is a question the incumbents
-      answer with a throwaway script. Making it a first-class query, over a model
-      that already records provenance, is the most useful thing r12e can offer a
-      vulnerability researcher.
+- [x] Query over dataflow facts. `calls to "memcpy" where arg3 is not bounded`
+      answers, and the value is in the negation: `unconstrained` is a claim
+      about the program, `unknown` is a claim about the analysis, and they are
+      separate verdicts never printed as each other. Every row carries a
+      strength. Still to do: interprocedural bounds, so a wrapper one level
+      deep stops hiding the answer, and relational bounds, so "bounded by the
+      size of the destination" becomes askable.
 
 ### M11. Performance
 
 - [ ] Published benchmark numbers against `rizin -A` and Ghidra headless on the
       fixture corpus, rerun in CI, with a regression budget.
-- [ ] Lazy analysis. Opening a binary costs a header parse and a symbol table
-      read; everything else happens when asked.
-- [ ] An on-disk analysis cache keyed by binary hash and options, so the second
-      open is instant. The cache is derived data and is gitignored.
+- [x] Lazy analysis. A session computes functions, cross references and strings
+      on first use, memoized, so a command no longer has to be told what to
+      switch off. `funcs` on libcrypto goes from 0.086s and 55.3 MB to 0.069s
+      and 50.7 MB.
+- [x] An on-disk analysis cache keyed by content hash, format version and the
+      option bytes each part reads. A hit is 2.7 to 3.1x; a miss costs 25 to
+      35% more than no cache at all. A key mismatch is a miss and never a
+      partial reuse, and a damaged file is a miss with a warning, checked by
+      corrupting real entries at 1,328 positions with no wrong answer.
 - [ ] Memory ceiling. A 500 MB binary must analyze inside 8 GB of RAM, which
       means arenas, interning, and not storing a `String` per instruction.
-- [ ] Profiling as a habit, with a flamegraph script checked in.
+- [x] Profiling as a habit, with `scripts/flamegraph.sh` checked in and run
+      rather than merely written. It found that `r12e funcs` spends 12.3% of
+      its time computing content anchors for every function before printing
+      anything.
 
 ### M12. Hardening and release
 
