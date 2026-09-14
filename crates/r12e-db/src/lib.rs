@@ -15,4 +15,4 @@ pub mod project;
 pub mod signature;
 
 pub use anchor::{Anchor, AnchorIndex, Fnv, Resolution};
-pub use log::{Assertion, Field, Log};
+pub use log::{Assertion, Declared, Field, Log, declared};

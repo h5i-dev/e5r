@@ -22,6 +22,8 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
 use r12e_core::{Addr, Error, Result};
+use r12e_types::cdecl;
+use r12e_types::ctype::{Signature, TypeId, Types};
 
 use crate::anchor::{Anchor, AnchorIndex, Fnv, Resolution};
 
@@ -68,6 +70,124 @@ impl Field {
             "comment" => Field::Comment,
             _ => return None,
         })
+    }
+
+    /// Check a value before it is written.
+    ///
+    /// The log stores a type as the source text a person typed, and this is
+    /// the reason that is safe rather than sloppy. Two properties have to hold
+    /// together and they pull in opposite directions:
+    ///
+    /// * **Reviewable.** The file is read in a pull request. A serialized type
+    ///   graph is not something anybody reviews, and a parser that improves
+    ///   would have to rewrite history to keep up with itself. Text does not.
+    /// * **Not write-only.** A typed declaration that is never parsed is a
+    ///   comment. Until this existed, `annotate type` wrote a line nothing
+    ///   read, which is the failure this whole path exists to fix.
+    ///
+    /// So: parse on read, and validate on write. A typo is rejected at the
+    /// moment it is typed, which is the only moment the person who made it is
+    /// still there to fix it. Reading deliberately does not validate: a log
+    /// written by a newer build must still fold, and refusing a whole file
+    /// because one type no longer parses would throw away the names and
+    /// comments beside it.
+    pub fn validate(self, value: &str) -> std::result::Result<(), String> {
+        match self {
+            Field::Comment => Ok(()),
+            Field::Name => {
+                if value.trim().is_empty() {
+                    return Err("a name cannot be blank; clear it instead".into());
+                }
+                // A demangled C++ name is full of spaces and punctuation, so
+                // the only thing refused is what would not survive a listing.
+                match value.chars().find(|c| c.is_control()) {
+                    Some(c) => Err(format!("a name cannot contain {c:?}")),
+                    None => Ok(()),
+                }
+            }
+            Field::Type => {
+                let mut types = Types::new();
+                declared(&mut types, value)
+                    .map(|_| ())
+                    .map_err(|e| e.to_string())
+            }
+        }
+    }
+}
+
+/// What a `type` assertion says, once it has been parsed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Declared {
+    /// A function declaration: a prototype to lay over what recovery found.
+    Function {
+        /// The name the declaration gave, when it gave one.
+        name: Option<String>,
+        /// What it takes and returns.
+        signature: Signature,
+        /// The function type itself.
+        ty: TypeId,
+    },
+    /// A type for a data object, or a bare type name.
+    Object {
+        /// The name the declaration gave, when it gave one.
+        name: Option<String>,
+        /// The type.
+        ty: TypeId,
+    },
+}
+
+impl Declared {
+    /// The type, whichever kind it is.
+    pub fn ty(&self) -> TypeId {
+        match self {
+            Declared::Function { ty, .. } | Declared::Object { ty, .. } => *ty,
+        }
+    }
+
+    /// The name the declaration gave, when it gave one.
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Declared::Function { name, .. } | Declared::Object { name, .. } => name.as_deref(),
+        }
+    }
+}
+
+/// Read a `type` assertion back into the type model.
+///
+/// Accepts both of the things an analyst writes: a declaration with a name,
+/// which is what a prototype is, and a bare type name, which is what a data
+/// object gets. Anything else comes back as an error naming what was not
+/// understood, because a type the reader will believe and that is wrong is
+/// worse than no type at all.
+pub fn declared(
+    types: &mut Types,
+    value: &str,
+) -> std::result::Result<Declared, cdecl::ParseError> {
+    match cdecl::declaration(types, value) {
+        Ok(d) => {
+            let resolved = types.resolve(d.ty);
+            match types.get(resolved) {
+                Some(r12e_types::ctype::Type::Function(sig)) => Ok(Declared::Function {
+                    name: d.name,
+                    signature: sig.clone(),
+                    ty: d.ty,
+                }),
+                _ => Ok(Declared::Object {
+                    name: d.name,
+                    ty: d.ty,
+                }),
+            }
+        }
+        // A bare type name declares nothing, which the declaration grammar
+        // refuses and an annotation on a data object is written as.
+        Err(first) => match cdecl::type_name(types, value) {
+            Ok(ty) => Ok(Declared::Object { name: None, ty }),
+            Err(second) => Err(if second.offset > first.offset {
+                second
+            } else {
+                first
+            }),
+        },
     }
 }
 
@@ -194,6 +314,26 @@ impl Log {
             .partition_point(|r| (r.id, r.seq) < (a.id, a.seq));
         self.records.insert(at, a);
         &self.records[at]
+    }
+
+    /// Record an assertion, refusing a value the field cannot hold.
+    ///
+    /// The checked form of [`Log::assert`], and the one every command that
+    /// takes a value from a person should use. See [`Field::validate`] for why
+    /// writing checks and reading does not.
+    pub fn assert_checked(
+        &mut self,
+        target: Anchor,
+        field: Field,
+        value: Option<String>,
+        who: &str,
+    ) -> Result<&Assertion> {
+        if let Some(v) = &value {
+            field.validate(v).map_err(|detail| Error::Inconsistent {
+                detail: format!("{field} assertion is not valid: {detail}"),
+            })?;
+        }
+        Ok(self.assert(target, field, value, who))
     }
 
     /// Undo the most recent assertion, returning it.

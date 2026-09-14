@@ -1,13 +1,19 @@
-//! Demangling, and eventually the type model.
+//! The type model and the demanglers.
 //!
 //! A demangled name is the single most visible quality difference in a listing
 //! of a C++ or Rust binary, and it costs nothing at analysis time. A name that
 //! cannot be demangled is returned unchanged: a wrong name is worse than a
 //! mangled one.
+//!
+//! [`ctype`] holds what a C type is and how to print a declaration of it;
+//! [`cdecl`] reads a declaration back. The second direction is what makes an
+//! analyst's assertion an input to the analysis rather than a note beside it,
+//! and it is what turns a header into a type archive.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod cdecl;
 pub mod ctype;
 pub mod itanium;
 pub mod msvc;

@@ -49,6 +49,149 @@ pub enum Type {
     Typedef(String, TypeId),
     /// A type the debug information named but did not define.
     Opaque(String),
+    /// A type with `const`, `volatile` or `restrict` on it.
+    ///
+    /// A qualifier is part of the type and not of the declarator: `const int *`
+    /// and `int *const` differ in which of the two this wraps, and a reader who
+    /// gets that backwards is told the wrong thing about what is writable.
+    Qualified {
+        /// What is qualified.
+        inner: TypeId,
+        /// Which qualifiers are on it.
+        quals: Qualifiers,
+    },
+}
+
+/// The C type qualifiers, as a set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct Qualifiers {
+    /// `const`.
+    pub is_const: bool,
+    /// `volatile`.
+    pub is_volatile: bool,
+    /// `restrict`, which only ever applies to a pointer.
+    pub is_restrict: bool,
+}
+
+impl Qualifiers {
+    /// True when nothing is set, in which case the qualifier wrapper is not
+    /// worth a type of its own.
+    pub fn is_empty(self) -> bool {
+        self == Qualifiers::default()
+    }
+
+    /// `const`, and only `const`.
+    pub fn constant() -> Qualifiers {
+        Qualifiers {
+            is_const: true,
+            ..Qualifiers::default()
+        }
+    }
+
+    /// The keywords, in the order C declarations conventionally spell them.
+    pub fn text(self) -> String {
+        let mut out = String::new();
+        for (set, word) in [
+            (self.is_const, "const"),
+            (self.is_volatile, "volatile"),
+            (self.is_restrict, "restrict"),
+        ] {
+            if set {
+                if !out.is_empty() {
+                    out.push(' ');
+                }
+                out.push_str(word);
+            }
+        }
+        out
+    }
+}
+
+/// Widths and alignments a target's C compiler uses.
+///
+/// A `long` is eight bytes on Linux and four on Windows, and `long double` is
+/// ten, twelve or sixteen depending on how the target aligns it. A declaration
+/// read for one target and laid out with another's rules gives wrong field
+/// offsets, which is worse than refusing, so the store carries the model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Model {
+    /// True when a plain `char` is signed, which it is not on ARM.
+    pub char_signed: bool,
+    /// `short`.
+    pub short: u8,
+    /// `int`.
+    pub int: u8,
+    /// `long`.
+    pub long: u8,
+    /// `long long`.
+    pub long_long: u8,
+    /// Every pointer.
+    pub pointer: u8,
+    /// `float`.
+    pub float: u8,
+    /// `double`.
+    pub double: u8,
+    /// `long double`.
+    pub long_double: u8,
+    /// The largest alignment a scalar gets. i386 caps it at four, which is why
+    /// a `double` there is eight bytes aligned to four.
+    pub max_align: u8,
+    /// The width a plain `enum` gets.
+    pub enum_size: u8,
+}
+
+impl Model {
+    /// Linux, macOS and the BSDs on a 64-bit machine.
+    pub fn lp64() -> Model {
+        Model {
+            char_signed: true,
+            short: 2,
+            int: 4,
+            long: 8,
+            long_long: 8,
+            pointer: 8,
+            float: 4,
+            double: 8,
+            long_double: 16,
+            max_align: 16,
+            enum_size: 4,
+        }
+    }
+
+    /// 32-bit x86 and ARM. `long double` is the x87 register spilled into
+    /// twelve bytes, and nothing aligns past four.
+    pub fn ilp32() -> Model {
+        Model {
+            long: 4,
+            pointer: 4,
+            long_double: 12,
+            max_align: 4,
+            ..Model::lp64()
+        }
+    }
+
+    /// 64-bit Windows, where `long` stayed at four bytes and `long double` is
+    /// an alias for `double`.
+    pub fn llp64() -> Model {
+        Model {
+            long: 4,
+            long_double: 8,
+            max_align: 8,
+            ..Model::lp64()
+        }
+    }
+
+    /// ARM, where a plain `char` is unsigned.
+    pub fn with_unsigned_char(mut self) -> Model {
+        self.char_signed = false;
+        self
+    }
+}
+
+impl Default for Model {
+    fn default() -> Model {
+        Model::lp64()
+    }
 }
 
 /// A structure or a union.
@@ -105,14 +248,35 @@ pub struct Types {
     types: Vec<Type>,
     /// Types that have a name, so a second reference finds the first.
     by_name: BTreeMap<String, TypeId>,
+    /// The target's widths and alignments.
+    model: Model,
 }
 
 impl Types {
     /// An empty store, with the basic types already in it.
     pub fn new() -> Types {
-        let mut t = Types::default();
+        Types::for_model(Model::default())
+    }
+
+    /// An empty store that lays types out the way `model` says.
+    pub fn for_model(model: Model) -> Types {
+        let mut t = Types {
+            model,
+            ..Types::default()
+        };
         t.add(Type::Void);
         t
+    }
+
+    /// The target's widths and alignments.
+    pub fn model(&self) -> Model {
+        self.model
+    }
+
+    /// Change the target model. Types already in the store keep the sizes they
+    /// were laid out with, so this belongs before anything is added.
+    pub fn set_model(&mut self, model: Model) {
+        self.model = model;
     }
 
     /// The void type, which is always first.
@@ -184,23 +348,121 @@ impl Types {
             Type::Void => None,
             Type::Bool => Some(1),
             Type::Int { size, .. } | Type::Float { size } => Some(*size as u64),
-            // Every pointer is eight bytes on the architectures this supports.
-            Type::Pointer(_) => Some(8),
+            Type::Pointer(_) => Some(self.model.pointer as u64),
             Type::Array(inner, Some(n)) => Some(self.size_of(*inner)? * n),
             Type::Array(_, None) => None,
             Type::Composite(c) => c.size,
             Type::Enum(e) => Some(e.size as u64),
             Type::Function(_) => None,
-            Type::Typedef(_, inner) => self.size_of(*inner),
+            Type::Typedef(_, inner) | Type::Qualified { inner, .. } => self.size_of(*inner),
             Type::Opaque(_) => None,
         }
     }
 
-    /// Follow typedefs to the type underneath.
+    /// The alignment a value of this type requires, when it is known.
+    ///
+    /// Laying out a structure needs this and the sizes are not enough to
+    /// derive it: the target caps it, which is the whole difference between a
+    /// `double` on i386 and one on x86-64.
+    pub fn align_of(&self, id: TypeId) -> Option<u64> {
+        self.align_at(id, 0)
+    }
+
+    fn align_at(&self, id: TypeId, depth: u32) -> Option<u64> {
+        if depth > 32 {
+            return None;
+        }
+        let cap = self.model.max_align.max(1) as u64;
+        Some(match self.get(id)? {
+            Type::Void | Type::Function(_) | Type::Opaque(_) => return None,
+            Type::Bool => 1,
+            Type::Int { size, .. } | Type::Float { size } => (*size as u64).clamp(1, cap),
+            Type::Pointer(_) => (self.model.pointer as u64).clamp(1, cap),
+            Type::Array(inner, _) => self.align_at(*inner, depth + 1)?,
+            // A structure aligns as strictly as its strictest member, and an
+            // empty one still occupies a byte boundary.
+            Type::Composite(c) => c
+                .fields
+                .iter()
+                .filter_map(|f| self.align_at(f.ty, depth + 1))
+                .max()
+                .unwrap_or(1),
+            Type::Enum(e) => (e.size as u64).clamp(1, cap),
+            Type::Typedef(_, inner) | Type::Qualified { inner, .. } => {
+                self.align_at(*inner, depth + 1)?
+            }
+        })
+    }
+
+    /// The id a `struct` or `union` tag already has in this store.
+    pub fn composite(&self, union: bool, tag: &str) -> Option<TypeId> {
+        let keyword = if union { "union" } else { "struct" };
+        self.by_name.get(&format!("{keyword} {tag}")).copied()
+    }
+
+    /// The id an `enum` tag already has.
+    pub fn enumeration(&self, tag: &str) -> Option<TypeId> {
+        self.by_name.get(&format!("enum {tag}")).copied()
+    }
+
+    /// The id a typedef name already has.
+    pub fn typedef(&self, name: &str) -> Option<TypeId> {
+        self.by_name.get(&format!("typedef {name}")).copied()
+    }
+
+    /// Qualify a type, which is a no-op when nothing is set: an unqualified
+    /// wrapper would make two spellings of one type compare unequal.
+    pub fn qualified(&mut self, inner: TypeId, quals: Qualifiers) -> TypeId {
+        if quals.is_empty() {
+            return inner;
+        }
+        // Qualifiers merge rather than nest, so `const const int` and
+        // `const volatile int` both have one wrapper.
+        if let Some(Type::Qualified {
+            inner: under,
+            quals: had,
+        }) = self.get(inner)
+        {
+            let merged = Qualifiers {
+                is_const: had.is_const || quals.is_const,
+                is_volatile: had.is_volatile || quals.is_volatile,
+                is_restrict: had.is_restrict || quals.is_restrict,
+            };
+            let under = *under;
+            return self.add(Type::Qualified {
+                inner: under,
+                quals: merged,
+            });
+        }
+        self.add(Type::Qualified { inner, quals })
+    }
+
+    /// The qualifiers on a type, looking through typedefs.
+    pub fn qualifiers(&self, mut id: TypeId) -> Qualifiers {
+        let mut out = Qualifiers::default();
+        for _ in 0..64 {
+            match self.get(id) {
+                Some(Type::Qualified { inner, quals }) => {
+                    out.is_const |= quals.is_const;
+                    out.is_volatile |= quals.is_volatile;
+                    out.is_restrict |= quals.is_restrict;
+                    id = *inner;
+                }
+                Some(Type::Typedef(_, inner)) => id = *inner,
+                _ => break,
+            }
+        }
+        out
+    }
+
+    /// Follow typedefs and qualifiers to the type underneath.
+    ///
+    /// A qualifier changes what may be done with a value, never how it is laid
+    /// out, so every caller asking what a type *is* wants to see past it.
     pub fn resolve(&self, mut id: TypeId) -> TypeId {
         for _ in 0..64 {
             match self.get(id) {
-                Some(Type::Typedef(_, inner)) => id = *inner,
+                Some(Type::Typedef(_, inner)) | Some(Type::Qualified { inner, .. }) => id = *inner,
                 _ => break,
             }
         }
@@ -287,7 +549,9 @@ impl Types {
             Some(Type::Pointer(inner)) | Some(Type::Array(inner, _)) => {
                 self.walk(*inner, seen, out, depth + 1)
             }
-            Some(Type::Typedef(_, inner)) => self.walk(*inner, seen, out, depth + 1),
+            Some(Type::Typedef(_, inner)) | Some(Type::Qualified { inner, .. }) => {
+                self.walk(*inner, seen, out, depth + 1)
+            }
             Some(Type::Composite(c)) => {
                 for f in c.fields.clone() {
                     self.walk(f.ty, seen, out, depth + 1);
@@ -332,7 +596,10 @@ impl Types {
             Some(Type::Int { size, signed }) => int_name(*size, *signed).to_string(),
             Some(Type::Float { size }) => match size {
                 4 => "float".to_string(),
-                16 => "long double".to_string(),
+                // The x87 register spills into ten, twelve or sixteen bytes
+                // depending on the target's alignment; all of them are the
+                // same declared type.
+                10 | 12 | 16 => "long double".to_string(),
                 _ => "double".to_string(),
             },
             Some(Type::Pointer(inner)) => {
@@ -375,6 +642,24 @@ impl Types {
                 match sig.returns {
                     Some(r) => self.build(r, declarator),
                     None => "void".to_string(),
+                }
+            }
+            Some(Type::Qualified { inner, quals }) => {
+                let quals = *quals;
+                match self.get(*inner) {
+                    // `int *const p`: the qualifier is on the pointer, so it
+                    // goes after the star rather than in front of the base.
+                    Some(Type::Pointer(pointee)) => {
+                        let pointee = *pointee;
+                        let sep = if declarator.is_empty() { "" } else { " " };
+                        declarator.insert_str(0, &format!("*{}{sep}", quals.text()));
+                        if self.needs_parentheses(pointee) {
+                            declarator.insert(0, '(');
+                            declarator.push(')');
+                        }
+                        self.build(pointee, declarator)
+                    }
+                    _ => format!("{} {}", quals.text(), self.build(*inner, declarator)),
                 }
             }
             Some(Type::Composite(c)) => {

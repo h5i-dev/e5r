@@ -11,4 +11,5 @@ authors.workspace = true
 [dependencies]
 r12e-core = { workspace = true }
 r12e-arch = { workspace = true }
+r12e-types = { workspace = true }
 serde = { workspace = true }
