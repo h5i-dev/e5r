@@ -277,6 +277,23 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       than by segment. Go string headers and Rust slices are still to do.
 - [ ] Data flow into the data sections: pointers, vtables, jump tables and
       literal pools marked as data so the code partition stops at them.
+- [ ] A jump table whose entries are bytes scaled from a separate `adr`
+      anchor, which is what gcc emits for a small dense switch at `-O1` and
+      `-Os` on AArch64:
+
+      ```
+      ldrb w1, [x1, w3, uxtw]     ; a one-byte entry
+      adr  x3, <anchor>           ; not the table's own address
+      add  x1, x3, w1, sxtb #2    ; sign extended and scaled by four
+      br   x1
+      ```
+
+      Recovery models a four-byte offset from the table's own base and not
+      this, so `pick` in `em-paths.a64.O1` stays incomplete while the same
+      source at `-O2` recovers. Found by the emulation gate, which confirms a
+      recovered table by running the branch for every index: a table that is
+      not recovered at all is the one thing that gate cannot confirm. The
+      `ldrh` form, for a switch too large for a byte, is the same shape.
 - [x] PLT thunk resolution from the relocation table, so a call through one
       prints the imported name. GOT and IAT still to do for the indirect
       forms.
