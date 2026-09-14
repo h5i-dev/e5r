@@ -250,6 +250,30 @@ thunks are excluded because they differ only in an offset.
 
 The file is sorted text, so a signature library reviews in a diff.
 
+## An interactive session
+
+```
+$ r12e repl prog
+38 function(s) in prog. `help` lists the commands, `quit` leaves.
+0x400144> f
+0x400144> seek parse_header
+0x400180> dec
+0x400180> q 'calls to "memcpy" where arg3 is not bounded'
+0x400180> quit
+```
+
+The commands are the ones above, spelled the same way and without the file, so
+nothing has to be learned twice. `seek` moves, and the commands that take an
+address use where you are when given none. Short forms exist only for the ones
+typed a hundred times an hour: `d` `dec` `f` `i` `s` `x` `q` `?`.
+
+The point is not saved typing. Analyzing a large binary takes seconds, and a
+session pays it once: five `funcs` on libcrypto is 1.26s as five invocations
+and 0.63s in one session, and the gap widens with the binary.
+
+A session runs the same code the command line does, so the two cannot disagree
+about what a command means.
+
 ## Telling it what you know
 
 An assertion is not a note on the side: it changes the analysis. Decompile,

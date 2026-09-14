@@ -18,6 +18,7 @@ mod out;
 mod patch;
 mod print;
 mod progress;
+mod repl;
 mod shell;
 
 use std::path::PathBuf;
@@ -315,6 +316,16 @@ pub enum Command {
     /// Speak the Model Context Protocol on stdin and stdout, so an agent can
     /// drive the analysis.
     Mcp,
+    /// Open an interactive session.
+    ///
+    /// One analysis, many questions. The commands are the ones below, spelled
+    /// the same way and without the file, so nothing has to be learned twice.
+    /// Analyzing a large binary takes seconds, and a session that paid that
+    /// per command would be unusable on exactly the binaries worth a session.
+    Repl {
+        #[command(flatten)]
+        common: Common,
+    },
     /// Read and write the annotation log.
     ///
     /// The log is a text file git can merge: every assertion is one line keyed
@@ -556,6 +567,7 @@ impl Command {
             | Command::Classes { common, .. }
             | Command::Overlay { common, .. }
             | Command::Archive { common, .. }
+            | Command::Repl { common }
             | Command::Patch { common, .. }
             | Command::Emulate { common, .. }
             | Command::Query { common, .. }
@@ -690,7 +702,29 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
         opts.xrefs = false;
     }
 
-    let mut program = r12e_analysis::analyze(object, &opts);
+    let program = r12e_analysis::analyze(object, &opts);
+
+    let mut program = program;
+    if let Command::Repl { common } = &cli.command {
+        return repl::run(w, cli, common, &mut program, &data);
+    }
+    dispatch(cli, w, &mut program, &data, &load_opts, &opts)
+}
+
+/// Run one command against a program that is already analyzed.
+///
+/// Split out so the interactive session can answer a hundred commands from one
+/// analysis. Everything before this point reads and analyzes the file, which on
+/// a large binary is seconds and would be paid per line otherwise.
+pub fn dispatch(
+    cli: &Cli,
+    w: &mut out::Out,
+    program: &mut r12e_analysis::Program,
+    data: &[u8],
+    load_opts: &LoadOptions,
+    opts: &Options,
+) -> Result<u8, String> {
+    let common = cli.command.common();
 
     // Names from the log override what the container said, because the point
     // of writing one down was to overrule the engine.
@@ -701,26 +735,40 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
     let mut comments = std::collections::BTreeMap::new();
     let mut declared = std::collections::BTreeMap::new();
     if !matches!(cli.command, Command::Annotate { .. }) {
-        for (at, name, _) in annotate::names(&program, &db) {
+        for (at, name, _) in annotate::names(program, &db) {
             if let Some(f) = program.functions.get_mut(&at) {
                 f.name = Some(name);
             }
         }
-        comments = annotate::comments(&program, &db);
-        declared = annotate::declarations(&program, &db);
+        comments = annotate::comments(program, &db);
+        declared = annotate::declarations(program, &db);
+    }
+
+    // These need only the container, and a session reaches them through here
+    // as well, so they are answered in the same place rather than twice.
+    match &cli.command {
+        Command::Info(c) => return print::info(w, &program.object, c.json),
+        Command::Sections(c) => return print::sections(w, &program.object, c.json),
+        Command::Symbols(c) => return print::symbols(w, &program.object, c.json),
+        Command::Imports(c) => return print::imports(w, &program.object, c.json),
+        Command::Exports(c) => return print::exports(w, &program.object, c.json),
+        Command::Overlay { common } => {
+            return print::overlay(w, &program.object, data, common.json);
+        }
+        _ => {}
     }
 
     match &cli.command {
-        Command::Funcs(c) => print::funcs(w, &program, c.json),
-        Command::Stats(c) => print::stats(w, &program, c.json),
-        Command::Strings { common, .. } => print::strings(w, &program, common.json),
+        Command::Funcs(c) => print::funcs(w, program, c.json),
+        Command::Stats(c) => print::stats(w, program, c.json),
+        Command::Strings { common, .. } => print::strings(w, program, common.json),
         Command::Disas {
             common,
             target,
             bytes,
         } => print::disas(
             w,
-            &program,
+            program,
             target,
             *bytes,
             common.json,
@@ -733,7 +781,7 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
         ),
         Command::Decompile { common, target } => print::decompile(
             w,
-            &program,
+            program,
             target,
             common.json,
             print::Limits {
@@ -743,28 +791,26 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
                 comments: &comments,
             },
         ),
-        Command::Shapes { common, target } => print::shapes(w, &program, target, common.json),
+        Command::Shapes { common, target } => print::shapes(w, program, target, common.json),
         Command::Emulate {
             common,
             target,
             args,
             depth,
             budget,
-        } => print::emulate(w, &program, target, args, *depth, *budget, common.json),
-        Command::Vtables { common } => print::vtables(w, &program, common.json),
-        Command::Classes { common, members } => print::classes(w, &program, *members, common.json),
+        } => print::emulate(w, program, target, args, *depth, *budget, common.json),
+        Command::Vtables { common } => print::vtables(w, program, common.json),
+        Command::Classes { common, members } => print::classes(w, program, *members, common.json),
         Command::Batch {
             common,
             script,
             command,
         } => batch::run(w, cli, common, script.as_deref(), command),
-        Command::Query { common, query } => {
-            print::query(w, &program, &query.join(" "), common.json)
-        }
+        Command::Query { common, query } => print::query(w, program, &query.join(" "), common.json),
         Command::Patch { what, common } => {
             let subject = patch::Subject {
-                program: &program,
-                file: &data,
+                program,
+                file: data,
                 binary: &common.file,
             };
             match what {
@@ -826,7 +872,7 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
         Command::Sig { what, common } => match what {
             SigCommand::Create { out } => {
                 let library = r12e_api::collect_signatures(
-                    &program,
+                    program,
                     &common
                         .file
                         .file_name()
@@ -852,29 +898,28 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
                 let text = std::fs::read_to_string(library)
                     .map_err(|e| format!("{}: {e}", library.display()))?;
                 let library = r12e_db::signature::Library::from_text(&text);
-                print::identified(w, &program, &library, common.json)
+                print::identified(w, program, &library, common.json)
             }
         },
         Command::Xrefs {
             common,
             target,
             from,
-        } => print::xrefs(w, &program, target, *from, common.json),
+        } => print::xrefs(w, program, target, *from, common.json),
         Command::Diff { common, other, all } => {
             let other_data = std::fs::File::open(other)
                 .and_then(|f| map_file(&f))
                 .map_err(|e| format!("{}: {e}", other.display()))?;
-            let other_obj =
-                r12e_format::load(&other_data, &load_opts).map_err(|e| e.to_string())?;
-            let other_prog = r12e_analysis::analyze(other_obj, &opts);
-            print::diff(w, &program, &other_prog, *all, common.json)
+            let other_obj = r12e_format::load(&other_data, load_opts).map_err(|e| e.to_string())?;
+            let other_prog = r12e_analysis::analyze(other_obj, opts);
+            print::diff(w, program, &other_prog, *all, common.json)
         }
         Command::Annotate { what, common } => {
             let who = whoami();
             match what {
                 Annotation::Name { target, value } => annotate::set(
                     w,
-                    &program,
+                    program,
                     &db,
                     r12e_db::Field::Name,
                     target,
@@ -883,7 +928,7 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
                 ),
                 Annotation::Comment { target, value } => annotate::set(
                     w,
-                    &program,
+                    program,
                     &db,
                     r12e_db::Field::Comment,
                     target,
@@ -892,14 +937,14 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
                 ),
                 Annotation::Type { target, value } => annotate::set(
                     w,
-                    &program,
+                    program,
                     &db,
                     r12e_db::Field::Type,
                     target,
                     value.clone(),
                     &who,
                 ),
-                Annotation::List => annotate::list(w, &program, &db, common.json),
+                Annotation::List => annotate::list(w, program, &db, common.json),
                 Annotation::Undo => annotate::step(w, &db, false),
                 Annotation::Redo => annotate::step(w, &db, true),
             }

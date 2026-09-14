@@ -110,7 +110,7 @@ fn one(cli: &Cli, common: &Common, line: &str) -> (u8, String) {
 }
 
 /// The words of a command line, respecting quotes.
-fn split(line: &str) -> Option<Vec<String>> {
+pub fn split(line: &str) -> Option<Vec<String>> {
     let mut out = Vec::new();
     let mut current = String::new();
     let mut quote: Option<char> = None;
