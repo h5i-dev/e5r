@@ -470,9 +470,9 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       against what the source declared. A token-level position map, so the CLI
       can highlight and slice, is still to do.
 - [ ] Port Ghidra's 89 decompiler datatests to our format before the M6 gate
-      opens. 60 cases are ported, representing roughly 48 of the 89; the rest
+      opens. 61 cases are ported, representing roughly 48 of the 89; the rest
       need processors we do not decode, user-applied data types we have no way
-      to attach, or assert on Ghidra's own SSA dump. 44 pass and 16 stay
+      to attach, or assert on Ghidra's own SSA dump. 56 pass and 5 stay
       `#[ignore]`d, each naming a real defect, so the list of known defects
       lives in the test suite rather than in someone's head.
 - [x] Quality gates: goto density per function against a ceiling that only
