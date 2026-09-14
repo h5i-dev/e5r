@@ -80,14 +80,11 @@ fn account(functions: &BTreeMap<Addr, Function>) {
         names += f.name.as_ref().map_or(0, |n| n.capacity());
         provenance += f.provenance.corroborating.capacity() * size_of::<r12e_core::Evidence>();
         nblocks += f.cfg.blocks.len();
-        blocks += btree_bytes(
-            f.cfg.blocks.len(),
-            size_of::<Addr>(),
-            size_of::<r12e_analysis::Block>(),
-        );
+        // Four bytes per stored block: the block itself is in the shared
+        // table, counted once below.
+        blocks += f.cfg.blocks.len() * size_of::<u32>() + 32;
         for b in f.cfg.blocks.values() {
             nsucc += b.successors.len();
-            succ += b.successors.capacity() * size_of::<Addr>();
         }
         ncalls += f.cfg.calls.len();
         calls += f.cfg.calls.capacity() * size_of::<Addr>();
@@ -97,7 +94,28 @@ fn account(functions: &BTreeMap<Addr, Function>) {
         }
         insns += f.cfg.insns() as u64;
     }
-    let total = map + names + blocks + succ + calls + tables + targets + provenance;
+    // The shared block table, counted once rather than once per function that
+    // names a block. An entry is the block plus the address it starts at.
+    let table = functions
+        .values()
+        .next()
+        .map(|f| f.cfg.blocks.table())
+        .expect("a program with no functions has nothing to account for");
+    let distinct = table.len();
+    let mut table_bytes = distinct * (size_of::<r12e_analysis::Block>() + size_of::<Addr>());
+    for b in table.blocks() {
+        // What the allocator hands out, not what the list holds: glibc rounds
+        // a request up to a 16-byte multiple with an 8-byte header and never
+        // gives out less than 32 bytes, so one or two successors cost 32.
+        let want = b.successors.capacity() * size_of::<Addr>();
+        succ += if want == 0 {
+            0
+        } else {
+            (want + 8).next_multiple_of(16).max(32)
+        };
+    }
+    table_bytes += succ;
+    let total = map + names + blocks + table_bytes + calls + tables + targets + provenance;
     let kb = |n: usize| n / 1024;
     println!();
     println!("accounted bytes, by what holds them");
@@ -108,11 +126,16 @@ fn account(functions: &BTreeMap<Addr, Function>) {
         size_of::<Function>()
     );
     println!(
-        "  block maps      {:>9} KB   {nblocks} blocks at {} B each, in B-tree nodes",
-        kb(blocks),
-        size_of::<r12e_analysis::Block>()
+        "  block ids       {:>9} KB   {nblocks} stored blocks at 4 B each",
+        kb(blocks)
     );
-    println!("  successor lists {:>9} KB   {nsucc} edges", kb(succ));
+    println!(
+        "  block table     {:>9} KB   {distinct} distinct blocks at {} B each, plus {} KB of \
+         successor lists for {nsucc} edges",
+        kb(table_bytes),
+        size_of::<r12e_analysis::Block>() + size_of::<Addr>(),
+        kb(succ)
+    );
     println!(
         "  call lists      {:>9} KB   {ncalls} call sites",
         kb(calls)

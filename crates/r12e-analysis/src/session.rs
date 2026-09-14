@@ -232,8 +232,14 @@ impl Session {
             let object = &self.object;
             let opts = &self.opts;
             let core = self.install(move || {
-                let (mut functions, rounds) = program::discover(object, opts);
-                let noreturn = program::refine_noreturn(object, &mut functions, opts);
+                // One block table for the whole program: discovery and the
+                // no-return re-walk share it, so a block the re-walk keeps is
+                // the one every other function already names.
+                let mut interner = crate::cfg::BlockInterner::default();
+                let (mut functions, rounds) = program::discover(object, opts, &mut interner);
+                let noreturn =
+                    program::refine_noreturn(object, &mut functions, opts, &mut interner);
+                program::publish_blocks(&mut functions, &mut interner);
                 Core {
                     functions,
                     noreturn,

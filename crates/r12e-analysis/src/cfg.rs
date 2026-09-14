@@ -6,6 +6,7 @@
 //! why the walk records instruction starts rather than assuming them.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use r12e_arch::{Flow, Insn};
 use r12e_core::{Addr, AddrRange, Arch, Caps, MemoryMap};
@@ -45,6 +46,322 @@ pub struct Block {
     pub terminator: Terminator,
 }
 
+/// Where one block sits in the program-wide table.
+pub type BlockId = u32;
+
+/// A block and the address it starts at, which is the key every consumer knows
+/// it by. Kept beside the block because a consumer iterating a function wants
+/// `(&Addr, &Block)` and an `AddrRange` cannot lend out its start.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Entry {
+    at: Addr,
+    block: Block,
+}
+
+/// Every distinct basic block of one program, held once.
+///
+/// A C++ binary's shared landing pads and cold paths are branch targets that
+/// no symbol names, so every function that can reach one absorbs it
+/// independently: on libLLVM, 8.47M blocks stored per function are 2.69M
+/// distinct ones, and a block map held per function was 82% of the live bytes.
+/// Functions name a block by id instead, which is 4 bytes against 84, and it
+/// makes a C and a C++ binary cost the same per byte of code.
+///
+/// Chunked because the table grows while functions already built hold a
+/// reference to it: a chunk is sealed once and never moves, and a snapshot is
+/// the list of chunks that existed when it was taken. An id means the same
+/// entry in every snapshot that is long enough to hold it.
+#[derive(Debug, Default)]
+pub struct BlockTable {
+    chunks: Vec<Arc<Vec<Entry>>>,
+    /// The first id in each chunk, so an id finds its chunk by binary search.
+    starts: Vec<BlockId>,
+}
+
+impl BlockTable {
+    fn entry(&self, id: BlockId) -> Option<&Entry> {
+        let c = self.starts.partition_point(|s| *s <= id).checked_sub(1)?;
+        self.chunks[c].get((id - self.starts[c]) as usize)
+    }
+
+    /// How many distinct blocks it holds.
+    pub fn len(&self) -> usize {
+        self.chunks.iter().map(|c| c.len()).sum()
+    }
+
+    /// True when it holds none.
+    pub fn is_empty(&self) -> bool {
+        self.chunks.iter().all(|c| c.is_empty())
+    }
+
+    /// Every distinct block, once each, in the order they were first seen.
+    pub fn blocks(&self) -> impl Iterator<Item = &Block> + '_ {
+        self.chunks.iter().flat_map(|c| c.iter().map(|e| &e.block))
+    }
+}
+
+/// The blocks of one function: ids into a table shared with every other
+/// function, in address order.
+///
+/// Reads like the `BTreeMap<Addr, Block>` it replaces, which is what every
+/// consumer in the workspace already asks for.
+#[derive(Clone, Default)]
+pub struct Blocks {
+    table: Arc<BlockTable>,
+    ids: Vec<BlockId>,
+}
+
+impl Blocks {
+    /// How many blocks the function has.
+    pub fn len(&self) -> usize {
+        self.ids.len()
+    }
+
+    /// True when the walk produced none.
+    pub fn is_empty(&self) -> bool {
+        self.ids.is_empty()
+    }
+
+    /// The block starting exactly at `at`.
+    pub fn get(&self, at: &Addr) -> Option<&Block> {
+        let pos = self
+            .ids
+            .partition_point(|id| self.table.entry(*id).is_some_and(|e| e.at < *at));
+        let e = self.table.entry(*self.ids.get(pos)?)?;
+        (e.at == *at).then_some(&e.block)
+    }
+
+    /// True when a block starts exactly at `at`.
+    pub fn contains_key(&self, at: &Addr) -> bool {
+        self.get(at).is_some()
+    }
+
+    /// Blocks with their start addresses, in address order.
+    pub fn iter(&self) -> BlocksIter<'_> {
+        BlocksIter {
+            table: &self.table,
+            ids: self.ids.iter(),
+        }
+    }
+
+    /// The blocks, in address order.
+    pub fn values(&self) -> impl Iterator<Item = &Block> + '_ {
+        self.iter().map(|(_, b)| b)
+    }
+
+    /// The start addresses, in order.
+    pub fn keys(&self) -> impl Iterator<Item = &Addr> + '_ {
+        self.iter().map(|(a, _)| a)
+    }
+
+    /// The table these blocks are held in, which is shared with every other
+    /// function of the same program.
+    pub fn table(&self) -> &BlockTable {
+        &self.table
+    }
+}
+
+impl std::fmt::Debug for Blocks {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_map().entries(self.iter()).finish()
+    }
+}
+
+impl<'a> IntoIterator for &'a Blocks {
+    type Item = (&'a Addr, &'a Block);
+    type IntoIter = BlocksIter<'a>;
+
+    fn into_iter(self) -> BlocksIter<'a> {
+        self.iter()
+    }
+}
+
+/// One function's blocks, in address order.
+pub struct BlocksIter<'a> {
+    table: &'a BlockTable,
+    ids: std::slice::Iter<'a, BlockId>,
+}
+
+impl<'a> Iterator for BlocksIter<'a> {
+    type Item = (&'a Addr, &'a Block);
+
+    fn next(&mut self) -> Option<(&'a Addr, &'a Block)> {
+        loop {
+            let id = *self.ids.next()?;
+            // An id with no entry cannot happen: a function only ever holds
+            // ids from a snapshot that already contains them. Skipped rather
+            // than unwrapped so a future caller cannot turn it into a panic.
+            if let Some(e) = self.table.entry(id) {
+                return Some((&e.at, &e.block));
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.ids.len()))
+    }
+}
+
+/// Empty slot in the interner's index.
+const NO_ID: BlockId = BlockId::MAX;
+
+/// Builds a [`BlockTable`], collapsing blocks that are identical.
+///
+/// Interning happens as each batch of walked functions is merged rather than
+/// afterwards, because a pass over finished functions would have to hold the
+/// duplicated form and the interned one at once, which is the peak the whole
+/// exercise is trying to avoid.
+///
+/// The index is open addressing over ids rather than a `HashMap` keyed by the
+/// block: a map would store every distinct block a second time as its own key,
+/// which costs more than it saves.
+pub(crate) struct BlockInterner {
+    chunks: Vec<Arc<Vec<Entry>>>,
+    starts: Vec<BlockId>,
+    /// Entries interned since the last seal.
+    open: Vec<Entry>,
+    /// The first id in `open`.
+    sealed: BlockId,
+    slots: Vec<BlockId>,
+    filled: usize,
+    /// Handed to a function whose table is not published yet, so installing
+    /// one costs no allocation.
+    empty: Arc<BlockTable>,
+}
+
+impl Default for BlockInterner {
+    fn default() -> BlockInterner {
+        BlockInterner {
+            chunks: Vec::new(),
+            starts: Vec::new(),
+            open: Vec::new(),
+            sealed: 0,
+            slots: vec![NO_ID; 1024],
+            filled: 0,
+            empty: Arc::new(BlockTable::default()),
+        }
+    }
+}
+
+impl BlockInterner {
+    fn entry(&self, id: BlockId) -> Option<&Entry> {
+        if id >= self.sealed {
+            return self.open.get((id - self.sealed) as usize);
+        }
+        let c = self.starts.partition_point(|s| *s <= id).checked_sub(1)?;
+        self.chunks[c].get((id - self.starts[c]) as usize)
+    }
+
+    fn intern(&mut self, at: Addr, block: Block) -> BlockId {
+        if (self.filled + 1) * 4 >= self.slots.len() * 3 {
+            self.grow();
+        }
+        let mask = self.slots.len() - 1;
+        let mut i = hash_block(at, &block) as usize & mask;
+        while self.slots[i] != NO_ID {
+            let id = self.slots[i];
+            if self
+                .entry(id)
+                .is_some_and(|e| e.at == at && e.block == block)
+            {
+                return id;
+            }
+            i = (i + 1) & mask;
+        }
+        let id = self.sealed + self.open.len() as BlockId;
+        self.open.push(Entry { at, block });
+        self.slots[i] = id;
+        self.filled += 1;
+        id
+    }
+
+    fn grow(&mut self) {
+        let mut slots = vec![NO_ID; self.slots.len() * 2];
+        let mask = slots.len() - 1;
+        for old in std::mem::take(&mut self.slots) {
+            if old == NO_ID {
+                continue;
+            }
+            let Some(e) = self.entry(old) else { continue };
+            let mut i = hash_block(e.at, &e.block) as usize & mask;
+            while slots[i] != NO_ID {
+                i = (i + 1) & mask;
+            }
+            slots[i] = old;
+        }
+        self.slots = slots;
+    }
+
+    /// Intern one walked function's blocks. The table it names is not
+    /// published yet; [`BlockInterner::publish`] does that for a whole batch.
+    pub(crate) fn install(&mut self, raw: RawCfg) -> Cfg {
+        let ids = raw
+            .blocks
+            .into_iter()
+            .map(|(at, b)| self.intern(at, b))
+            .collect();
+        Cfg {
+            entry: raw.entry,
+            blocks: Blocks {
+                table: self.empty.clone(),
+                ids,
+            },
+            calls: raw.calls,
+            has_indirect: raw.has_indirect,
+            tables: raw.tables,
+            halt: raw.halt,
+        }
+    }
+
+    /// Seal what has been interned and give it to these functions.
+    ///
+    /// Every function installed since the last call must be published before
+    /// anything reads its blocks.
+    pub(crate) fn publish<'a>(&mut self, cfgs: impl Iterator<Item = &'a mut Cfg>) {
+        let table = self.seal();
+        for c in cfgs {
+            c.blocks.table = table.clone();
+        }
+    }
+
+    fn seal(&mut self) -> Arc<BlockTable> {
+        if !self.open.is_empty() {
+            let mut chunk = std::mem::take(&mut self.open);
+            // Sealed chunks are kept for the life of the program, so the
+            // capacity a doubling push left over is worth one copy to return.
+            chunk.shrink_to_fit();
+            self.starts.push(self.sealed);
+            self.sealed += chunk.len() as BlockId;
+            self.chunks.push(Arc::new(chunk));
+        }
+        Arc::new(BlockTable {
+            chunks: self.chunks.clone(),
+            starts: self.starts.clone(),
+        })
+    }
+}
+
+/// A block's identity, for the interner's index.
+///
+/// FNV rather than the default hasher: this runs once per stored block, eight
+/// million times on a large C++ binary, and SipHash over a block costs more
+/// than the lookup it keys.
+fn hash_block(at: Addr, b: &Block) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut mix = |v: u64| {
+        h ^= v;
+        h = h.wrapping_mul(0x100_0000_01b3);
+    };
+    mix(at.get());
+    mix(b.range.end().get());
+    mix(b.insns as u64);
+    mix(b.unresolved as u64 | ((b.terminator as u64) << 1));
+    for s in &b.successors {
+        mix(s.get());
+    }
+    h
+}
+
 /// Why a walk stopped before it ran out of work.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Halt {
@@ -64,7 +381,7 @@ pub struct Cfg {
     /// Where the function starts.
     pub entry: Addr,
     /// Blocks by start address.
-    pub blocks: BTreeMap<Addr, Block>,
+    pub blocks: Blocks,
     /// Direct call targets found inside, sorted and deduplicated.
     pub calls: Vec<Addr>,
     /// Addresses reached by an indirect branch we could not resolve.
@@ -108,6 +425,21 @@ impl Cfg {
     }
 }
 
+/// A walked function before its blocks are interned.
+///
+/// The walk runs on every thread at once and interning is one shared table, so
+/// the two are separate steps: a thread produces this, and the merge that
+/// follows turns it into a [`Cfg`].
+pub(crate) struct RawCfg {
+    pub(crate) entry: Addr,
+    /// Blocks with their start addresses, in address order.
+    pub(crate) blocks: Vec<(Addr, Block)>,
+    pub(crate) calls: Vec<Addr>,
+    pub(crate) has_indirect: bool,
+    pub(crate) tables: Vec<JumpTable>,
+    pub(crate) halt: Halt,
+}
+
 /// Walk one function from `entry`.
 ///
 /// `stop_at` holds the entries of other known functions: reaching one means a
@@ -127,6 +459,10 @@ pub fn build(
 ///
 /// A call to one of those ends the block: continuing past it walks into
 /// whatever the compiler put next, which is usually a literal pool.
+///
+/// One function on its own gets a block table of its own. Discovery does not
+/// go through here: it shares one table across the whole program, which is
+/// where the interning pays.
 pub fn build_with(
     mem: &MemoryMap,
     arch: &Arch,
@@ -135,6 +471,22 @@ pub fn build_with(
     noreturn: &BTreeSet<Addr>,
     caps: &Caps,
 ) -> Cfg {
+    let raw = build_raw(mem, arch, entry, stop_at, noreturn, caps);
+    let mut interner = BlockInterner::default();
+    let mut cfg = interner.install(raw);
+    interner.publish(std::iter::once(&mut cfg));
+    cfg
+}
+
+/// The walk itself, leaving the blocks for a caller to intern.
+pub(crate) fn build_raw(
+    mem: &MemoryMap,
+    arch: &Arch,
+    entry: Addr,
+    stop_at: &BTreeSet<Addr>,
+    noreturn: &BTreeSet<Addr>,
+    caps: &Caps,
+) -> RawCfg {
     // The executable range the entry sits in bounds every jump table target:
     // a switch does not branch into another section.
     let section = mem
@@ -279,7 +631,9 @@ pub fn build_with(
 
     // Split blocks whose range covers another block's start. A conditional
     // branch backwards into a run already walked is the usual cause.
-    let mut blocks: BTreeMap<Addr, Block> = BTreeMap::new();
+    // A vector rather than a map: `ends` is a `BTreeMap`, so this fills in
+    // address order already, and the blocks are about to be interned anyway.
+    let mut blocks: Vec<(Addr, Block)> = Vec::with_capacity(ends.len());
     for (start, (end, succs, insns, unresolved, term)) in &ends {
         // An empty block has nothing to cut, and an excluded range whose
         // bounds are equal is a panic rather than an empty iterator.
@@ -304,7 +658,7 @@ pub fn build_with(
         if range.is_empty() {
             continue;
         }
-        blocks.insert(
+        blocks.push((
             *start,
             Block {
                 range,
@@ -313,7 +667,7 @@ pub fn build_with(
                 unresolved: real_unresolved,
                 terminator: real_term,
             },
-        );
+        ));
     }
     // Recount instructions in any block that was cut.
     for (start, b) in blocks.iter_mut() {
@@ -323,7 +677,7 @@ pub fn build_with(
     }
 
     tables.sort_by_key(|t| t.at);
-    Cfg {
+    RawCfg {
         entry,
         blocks,
         calls: calls.into_iter().collect(),

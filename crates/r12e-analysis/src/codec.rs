@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use r12e_core::{Addr, AddrRange, Evidence, Provenance};
 
 use crate::cache::{Dec, Enc};
-use crate::cfg::{Block, Cfg, Halt, Terminator};
+use crate::cfg::{Block, BlockInterner, Cfg, Halt, RawCfg, Terminator};
 use crate::jumptable::{JumpTable, TableKind};
 use crate::program::Function;
 use crate::strings::{Encoding, Found};
@@ -77,12 +77,15 @@ pub(crate) fn decode_functions(
     let rounds = usize::try_from(d.u64()?).ok()?;
     let n = d.count(MIN_FUNCTION)?;
     let mut functions = BTreeMap::new();
+    // A cache entry is read back into the same one-table-per-program shape the
+    // analysis builds, so a hit costs what a miss would have kept.
+    let mut interner = BlockInterner::default();
     for _ in 0..n {
         let entry = Addr::new(d.u64()?);
         let name = d.opt_str()?;
         let range = AddrRange::new(Addr::new(d.u64()?), Addr::new(d.u64()?))?;
         let provenance = decode_provenance(&mut d)?;
-        let cfg = decode_cfg(&mut d)?;
+        let cfg = interner.install(decode_cfg(&mut d)?);
         functions.insert(
             entry,
             Function {
@@ -94,6 +97,7 @@ pub(crate) fn decode_functions(
             },
         );
     }
+    interner.publish(functions.values_mut().map(|f| &mut f.cfg));
     let n = d.count(8)?;
     let mut noreturn = BTreeSet::new();
     for _ in 0..n {
@@ -153,10 +157,10 @@ fn encode_cfg(e: &mut Enc, c: &Cfg) {
     }
 }
 
-fn decode_cfg(d: &mut Dec<'_>) -> Option<Cfg> {
+fn decode_cfg(d: &mut Dec<'_>) -> Option<RawCfg> {
     let entry = Addr::new(d.u64()?);
     let n = d.count(MIN_BLOCK)?;
-    let mut blocks = BTreeMap::new();
+    let mut blocks = Vec::with_capacity(n);
     for _ in 0..n {
         let range = AddrRange::new(Addr::new(d.u64()?), Addr::new(d.u64()?))?;
         let insns = d.u32()?;
@@ -170,7 +174,7 @@ fn decode_cfg(d: &mut Dec<'_>) -> Option<Cfg> {
         for _ in 0..nsucc {
             successors.push(Addr::new(d.u64()?));
         }
-        blocks.insert(
+        blocks.push((
             range.start(),
             Block {
                 range,
@@ -179,7 +183,7 @@ fn decode_cfg(d: &mut Dec<'_>) -> Option<Cfg> {
                 unresolved,
                 terminator,
             },
-        );
+        ));
     }
     let ncalls = d.u32()? as usize;
     if ncalls.saturating_mul(8) > d.remaining() {
@@ -199,7 +203,7 @@ fn decode_cfg(d: &mut Dec<'_>) -> Option<Cfg> {
     for _ in 0..ntables {
         tables.push(decode_table(d)?);
     }
-    Some(Cfg {
+    Some(RawCfg {
         entry,
         blocks,
         calls,

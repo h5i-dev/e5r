@@ -12,7 +12,7 @@ use r12e_core::{Addr, AddrRange, Arch, Caps, Evidence, Provenance, Strength};
 use r12e_format::Object;
 use rayon::prelude::*;
 
-use crate::cfg::{self, Cfg, Halt};
+use crate::cfg::{self, BlockInterner, Cfg, Halt, RawCfg};
 use crate::noreturn;
 use crate::strings::{self, Found};
 use crate::xref::{self, Xref, XrefIndex};
@@ -226,6 +226,28 @@ pub fn analyze(object: Object, opts: &Options) -> Program {
     crate::Session::new(object, opts.clone()).into_program()
 }
 
+/// How many functions are walked in parallel before their blocks are interned.
+/// The batch is the only thing ever held in the duplicated form, so it bounds
+/// the peak; it is large enough to keep every thread busy.
+const WALK_BATCH: usize = 8192;
+
+/// Nothing is known never to return during discovery proper: the no-return
+/// pass runs after it and re-walks the callers it affects.
+static EMPTY: BTreeSet<Addr> = BTreeSet::new();
+
+/// Intern one batch of walked functions and give them the table they name.
+///
+/// Every function in a batch is published together, because a function must
+/// not be read before the table holding its blocks exists.
+fn intern_batch(interner: &mut BlockInterner, walked: Vec<(Addr, RawCfg)>) -> Vec<(Addr, Cfg)> {
+    let mut out: Vec<(Addr, Cfg)> = walked
+        .into_iter()
+        .map(|(a, raw)| (a, interner.install(raw)))
+        .collect();
+    interner.publish(out.iter_mut().map(|(_, c)| c));
+    out
+}
+
 /// One seed: an address to walk and the evidence that put it there.
 #[derive(Clone)]
 struct Seed {
@@ -238,7 +260,11 @@ struct Seed {
 ///
 /// The first stage and the only one the others depend on. Returns the
 /// functions and how many rounds of discovery it took.
-pub(crate) fn discover(object: &Object, opts: &Options) -> (BTreeMap<Addr, Function>, usize) {
+pub(crate) fn discover(
+    object: &Object,
+    opts: &Options,
+    interner: &mut BlockInterner,
+) -> (BTreeMap<Addr, Function>, usize) {
     let arch = object.arch.clone();
     let mem = &object.memory;
 
@@ -275,45 +301,52 @@ pub(crate) fn discover(object: &Object, opts: &Options) -> (BTreeMap<Addr, Funct
         batch.sort_by_key(|s| s.addr);
         batch.dedup_by_key(|s| s.addr);
 
-        let walked: Vec<(Addr, Cfg)> = batch
-            .par_iter()
-            .map(|s| (s.addr, cfg::build(mem, &arch, s.addr, &stop_at, &opts.caps)))
-            .collect();
+        for slice in batch.chunks(WALK_BATCH) {
+            let walked: Vec<(Addr, RawCfg)> = slice
+                .par_iter()
+                .map(|s| {
+                    (
+                        s.addr,
+                        cfg::build_raw(mem, &arch, s.addr, &stop_at, &EMPTY, &opts.caps),
+                    )
+                })
+                .collect();
 
-        for (addr, c) in walked {
-            if c.blocks.is_empty() {
-                continue;
-            }
-            if opts.follow_calls {
-                for t in &c.calls {
-                    if mem.is_executable(*t) && !evidence.contains_key(t) {
-                        let p = Provenance::new(Evidence::CallTarget);
-                        merge_evidence(&mut evidence, *t, &p, None);
-                        pending.push(Seed {
-                            addr: *t,
-                            name: None,
-                            provenance: p,
-                        });
-                    } else if mem.is_executable(*t) {
-                        let p = Provenance::new(Evidence::CallTarget);
-                        merge_evidence(&mut evidence, *t, &p, None);
+            for (addr, c) in intern_batch(interner, walked) {
+                if c.blocks.is_empty() {
+                    continue;
+                }
+                if opts.follow_calls {
+                    for t in &c.calls {
+                        if mem.is_executable(*t) && !evidence.contains_key(t) {
+                            let p = Provenance::new(Evidence::CallTarget);
+                            merge_evidence(&mut evidence, *t, &p, None);
+                            pending.push(Seed {
+                                addr: *t,
+                                name: None,
+                                provenance: p,
+                            });
+                        } else if mem.is_executable(*t) {
+                            let p = Provenance::new(Evidence::CallTarget);
+                            merge_evidence(&mut evidence, *t, &p, None);
+                        }
                     }
                 }
+                let (provenance, name) = evidence
+                    .get(&addr)
+                    .cloned()
+                    .unwrap_or((Provenance::new(Evidence::CallTarget), None));
+                known.insert(
+                    addr,
+                    Function {
+                        entry: addr,
+                        name,
+                        range: c.hull(),
+                        cfg: c,
+                        provenance,
+                    },
+                );
             }
-            let (provenance, name) = evidence
-                .get(&addr)
-                .cloned()
-                .unwrap_or((Provenance::new(Evidence::CallTarget), None));
-            known.insert(
-                addr,
-                Function {
-                    entry: addr,
-                    name,
-                    range: c.hull(),
-                    cfg: c,
-                    provenance,
-                },
-            );
         }
 
         // Gap scanning runs once, after the evidence-led rounds settle, so it
@@ -333,7 +366,7 @@ pub(crate) fn discover(object: &Object, opts: &Options) -> (BTreeMap<Addr, Funct
                 // One pass only: what the gap scan found is walked, and what
                 // that walk finds is not scanned for again.
                 let batch = std::mem::take(&mut pending);
-                walk_pending(object, &mut known, &mut evidence, batch, opts);
+                walk_pending(object, &mut known, &mut evidence, batch, opts, interner);
                 return (known, rounds);
             }
         }
@@ -349,6 +382,7 @@ fn walk_pending(
     evidence: &mut BTreeMap<Addr, (Provenance, Option<String>)>,
     pending: Vec<Seed>,
     opts: &Options,
+    interner: &mut BlockInterner,
 ) {
     if pending.is_empty() {
         return;
@@ -359,28 +393,35 @@ fn walk_pending(
     let mut batch = pending;
     batch.sort_by_key(|s| s.addr);
     batch.dedup_by_key(|s| s.addr);
-    let walked: Vec<(Addr, Cfg)> = batch
-        .par_iter()
-        .filter(|s| !known.contains_key(&s.addr))
-        .map(|s| (s.addr, cfg::build(mem, &arch, s.addr, &stop_at, &opts.caps)))
-        .collect();
-    for (addr, c) in walked {
-        if c.blocks.is_empty() {
-            continue;
+    for slice in batch.chunks(WALK_BATCH) {
+        let walked: Vec<(Addr, RawCfg)> = slice
+            .par_iter()
+            .filter(|s| !known.contains_key(&s.addr))
+            .map(|s| {
+                (
+                    s.addr,
+                    cfg::build_raw(mem, &arch, s.addr, &stop_at, &EMPTY, &opts.caps),
+                )
+            })
+            .collect();
+        for (addr, c) in intern_batch(interner, walked) {
+            if c.blocks.is_empty() {
+                continue;
+            }
+            let (provenance, name) = evidence
+                .remove(&addr)
+                .unwrap_or((Provenance::new(Evidence::ProloguePattern), None));
+            known.insert(
+                addr,
+                Function {
+                    entry: addr,
+                    name,
+                    range: c.hull(),
+                    cfg: c,
+                    provenance,
+                },
+            );
         }
-        let (provenance, name) = evidence
-            .remove(&addr)
-            .unwrap_or((Provenance::new(Evidence::ProloguePattern), None));
-        known.insert(
-            addr,
-            Function {
-                entry: addr,
-                name,
-                range: c.hull(),
-                cfg: c,
-                provenance,
-            },
-        );
     }
 }
 
@@ -395,6 +436,7 @@ pub(crate) fn refine_noreturn(
     object: &Object,
     known: &mut BTreeMap<Addr, Function>,
     opts: &Options,
+    interner: &mut BlockInterner,
 ) -> BTreeSet<Addr> {
     if !opts.noreturn {
         return BTreeSet::new();
@@ -411,37 +453,50 @@ pub(crate) fn refine_noreturn(
         .map(|(a, _)| *a)
         .collect();
     let stop_at: BTreeSet<Addr> = known.keys().copied().collect();
-    let rebuilt: Vec<(Addr, Cfg)> = affected
-        .par_iter()
-        .map(|a| {
-            (
-                *a,
-                cfg::build_with(mem, &arch, *a, &stop_at, &set, &opts.caps),
-            )
-        })
-        .collect();
-    for (a, c) in rebuilt {
-        if c.blocks.is_empty() {
-            continue;
-        }
-        if let Some(f) = known.get_mut(&a) {
-            f.range = c.hull();
-            f.cfg = c;
+    for slice in affected.chunks(WALK_BATCH) {
+        let rebuilt: Vec<(Addr, RawCfg)> = slice
+            .par_iter()
+            .map(|a| {
+                (
+                    *a,
+                    cfg::build_raw(mem, &arch, *a, &stop_at, &set, &opts.caps),
+                )
+            })
+            .collect();
+        for (a, c) in intern_batch(interner, rebuilt) {
+            if c.blocks.is_empty() {
+                continue;
+            }
+            if let Some(f) = known.get_mut(&a) {
+                f.range = c.hull();
+                f.cfg = c;
+            }
         }
     }
     set
+}
+
+/// Give every function the finished table, so the snapshots taken while
+/// discovery was running can be dropped.
+pub(crate) fn publish_blocks(known: &mut BTreeMap<Addr, Function>, interner: &mut BlockInterner) {
+    interner.publish(known.values_mut().map(|f| &mut f.cfg));
 }
 
 /// Every reference the recovered functions make.
 pub(crate) fn build_xrefs(object: &Object, known: &BTreeMap<Addr, Function>) -> XrefIndex {
     let arch = object.arch.clone();
     let mem = &object.memory;
+    // One list per unit of parallel work rather than one per function. A
+    // function makes 25 references on average, so a list of its own is a few
+    // hundred bytes that doubled its way there, and 127,229 of those left the
+    // allocator holding several times what the finished index needs: the stage
+    // cost 543 MB resident for 155 MB of index.
     let mut all: Vec<Vec<Xref>> = known
         .values()
         .collect::<Vec<_>>()
         .par_iter()
-        .map(|f| {
-            let mut out = Vec::new();
+        .fold(Vec::new, |mut out: Vec<Xref>, f| {
+            let start = out.len();
             // Streamed rather than decoded into a list first: this runs on
             // every thread at once, and a decoded instruction is an order of
             // magnitude larger than the references it produces.
@@ -451,17 +506,20 @@ pub(crate) fn build_xrefs(object: &Object, known: &BTreeMap<Addr, Function>) -> 
             if !ordered {
                 // Overlapping blocks, which nothing in the corpus produces.
                 // The tracker reads instructions in address order, so pay for
-                // the sort rather than answer differently.
-                out.clear();
+                // the sort rather than answer differently. Only this
+                // function's references are dropped, not the whole list.
+                out.truncate(start);
                 let insns = cfg::instructions(mem, &arch, &f.cfg);
                 xref::collect(&insns, mem, &mut out);
             }
             out
         })
         .collect();
-    // Sorted concatenation, so thread completion order cannot reach the
-    // result.
-    all.sort_by_key(|v| v.first().map(|x| x.from));
+    // Concatenation order is not part of the answer: [`XrefIndex::build`]
+    // sorts and deduplicates, and every field of a reference takes part in the
+    // ordering, so the arrays it produces are the same set in the same order
+    // whatever order the work finished in. That is gate G5.
+    //
     // Sized up front: collecting from a flattening iterator has no size hint,
     // so it doubles its way there and holds twice the final index at the peak.
     let mut flat: Vec<Xref> = Vec::with_capacity(all.iter().map(Vec::len).sum());

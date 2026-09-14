@@ -57,6 +57,9 @@ impl XrefIndex {
     pub fn build(mut refs: Vec<Xref>) -> XrefIndex {
         refs.sort_unstable();
         refs.dedup();
+        // The capacity that held the duplicates is returned before the second
+        // array is allocated, so the peak is two arrays rather than three.
+        refs.shrink_to_fit();
         let mut by_to = refs.clone();
         by_to.sort_unstable_by_key(|x| (x.to, x.from, x.kind));
         XrefIndex {
