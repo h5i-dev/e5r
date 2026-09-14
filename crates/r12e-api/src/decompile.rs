@@ -8,7 +8,7 @@
 use std::collections::BTreeMap;
 
 use r12e_analysis::{Function, Program};
-use r12e_core::Addr;
+use r12e_core::{Addr, Evidence};
 use r12e_decomp::{Callee, Output, Param, Prototype};
 
 /// One decompiled function.
@@ -24,6 +24,9 @@ pub struct Decompiled {
     pub text: String,
     /// Gotos the structuring needed.
     pub gotos: usize,
+    /// Reachable blocks the structuring never placed, so their code is missing
+    /// from the text. Zero unless the structurer has a defect.
+    pub lost: usize,
     /// Named locals declared.
     pub locals: usize,
     /// Operations no expression covered, including instructions the lifter did
@@ -76,6 +79,7 @@ pub fn decompile_function(p: &Program, f: &Function) -> Decompiled {
         signature: String::new(),
         text: String::new(),
         gotos: 0,
+        lost: 0,
         locals: 0,
         unmodelled: 0,
     })
@@ -139,6 +143,7 @@ pub fn decompile_program(p: &Program, targets: &[&Function]) -> Unit {
                 signature: out.signature,
                 text: out.text,
                 gotos: out.gotos,
+                lost: out.lost,
                 locals: out.locals,
                 unmodelled: out.unmodelled + unlifted,
             })
@@ -150,19 +155,25 @@ pub fn decompile_program(p: &Program, targets: &[&Function]) -> Unit {
 fn one(p: &Program, f: &Function, callees: &BTreeMap<u64, Callee>) -> Option<(Output, usize)> {
     // What each jump table means: the index the branch used and where that
     // index goes, which is what turns a many-successor block into a switch.
+    //
+    // Keyed by the block the branch ends, not by the branch's own address. The
+    // structurer knows blocks by where they start, and an indirect branch is
+    // the last instruction of its block rather than the first, so keying by
+    // `JumpTable::at` makes every lookup miss and no switch is ever built.
     let switches: r12e_decomp::Switches = f
         .cfg
         .tables
         .iter()
-        .map(|t| {
-            (
-                t.at,
+        .filter_map(|t| {
+            let (start, _) = f.cfg.blocks.iter().find(|(_, b)| b.range.contains(t.at))?;
+            Some((
+                *start,
                 t.targets
                     .iter()
                     .enumerate()
                     .map(|(n, target)| (n as u64, *target))
                     .collect(),
-            )
+            ))
         })
         .collect();
     let blocks: BTreeMap<Addr, (Addr, Vec<Addr>)> = f
@@ -190,7 +201,30 @@ fn one(p: &Program, f: &Function, callees: &BTreeMap<u64, Callee>) -> Option<(Ou
 /// anything is left for the caller. The second is weaker but it is what a
 /// stripped binary has.
 fn prototype(p: &Program, f: &Function) -> Option<Prototype> {
-    declared(p, f).or_else(|| recovered(p, f))
+    declared(p, f)
+        .or_else(|| import_thunk(f))
+        .or_else(|| recovered(p, f))
+}
+
+/// The shape of a jump into another image.
+///
+/// A PLT or IAT thunk's body is one indirect jump. It reads no argument
+/// register and writes no result, so recovering its shape from its own code
+/// says it takes nothing and returns nothing, and neither is a claim the
+/// binary supports: both belong to the imported function, which is not here.
+/// Saying `void` is the damaging half. Every caller that uses the result then
+/// has a local it reads and never assigns, which is undefined behaviour in the
+/// emitted C, so the result is kept and the parameter list is left empty, the
+/// same as for any callee nothing is known about.
+fn import_thunk(f: &Function) -> Option<Prototype> {
+    let thunk = f.provenance.best == Evidence::ImportThunk
+        || f.provenance.corroborating.contains(&Evidence::ImportThunk);
+    thunk.then(|| Prototype {
+        parameters: Vec::new(),
+        returns: Some("uint64_t".to_string()),
+        definitions: Vec::new(),
+        locals: BTreeMap::new(),
+    })
 }
 
 /// The shape the code implies, for a function nothing declared.

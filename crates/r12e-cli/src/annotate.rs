@@ -4,6 +4,7 @@
 //! built from a fresh analysis, so a log written against one build applies to
 //! the next one without anything being rewritten.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use r12e_analysis::Program;
@@ -112,7 +113,11 @@ pub fn set(
         return Err(format!("no function covers {at}"));
     };
     let mut log = load(db)?;
-    log.assert(anchor, field, value.clone(), who);
+    // Checked rather than bare, so a typo in a type is refused at the moment
+    // it is typed. An assertion that cannot be read is worse than no
+    // assertion: it sits in the log looking like work that was done.
+    log.assert_checked(anchor, field, value.clone(), who)
+        .map_err(|e| e.to_string())?;
     save(db, &log)?;
     match value {
         Some(v) => outln!(w, "{at} {field} = {v:?}"),
@@ -198,12 +203,41 @@ pub fn step(w: &mut Out, db: &Path, forward: bool) -> Result<u8, String> {
 
 /// Names from the log, by address, for a listing to show.
 pub fn names(p: &Program, db: &Path) -> Vec<(Addr, String, Resolution)> {
+    of_kind(p, db, Field::Name)
+}
+
+/// Type assertions from the log, by the address each one resolved to.
+///
+/// The text as it was written, not a parsed type: the log is reviewed in a
+/// diff, so what a person typed is what is stored, and parsing happens where
+/// the type is used.
+pub fn types(p: &Program, db: &Path) -> BTreeMap<Addr, String> {
+    of_kind(p, db, Field::Type)
+        .into_iter()
+        .map(|(a, v, _)| (a, v))
+        .collect()
+}
+
+/// Comments from the log, by the address each one resolved to.
+///
+/// A comment is the cheapest thing an analyst writes and the one they most
+/// expect to see again. Storing it and never rendering it makes the log
+/// write-only, which is the opposite of the point.
+pub fn comments(p: &Program, db: &Path) -> BTreeMap<Addr, String> {
+    of_kind(p, db, Field::Comment)
+        .into_iter()
+        .map(|(a, v, _)| (a, v))
+        .collect()
+}
+
+/// Assertions of one kind, resolved against this build.
+fn of_kind(p: &Program, db: &Path, want: Field) -> Vec<(Addr, String, Resolution)> {
     let Ok(log) = load(db) else {
         return Vec::new();
     };
     log.apply(&index(p))
         .into_iter()
-        .filter(|a| a.field == Field::Name)
+        .filter(|a| a.field == want)
         .map(|a| (a.addr, a.value, a.resolution))
         .collect()
 }

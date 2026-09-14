@@ -334,6 +334,7 @@ pub fn disas(
     as_json: bool,
     mut budget: Budget,
     progress: bool,
+    comments: &std::collections::BTreeMap<Addr, String>,
 ) -> R {
     let mut chosen: Vec<&r12e_analysis::Function> = if target == "all" {
         p.functions_by_address().collect()
@@ -407,9 +408,16 @@ pub fn disas(
                 String::new()
             };
             let annot = annotate(p, i);
+            // An asserted comment comes last, after the tool's own note, so
+            // the two are never confused: everything before it was worked out
+            // and everything after it was written down by a person.
+            let said = match comments.get(&i.addr) {
+                Some(c) => w.paint(Role::Weak, &format!("  ; {c}")),
+                None => String::new(),
+            };
             outln!(
                 w,
-                "  {}: {:<10}{}{}",
+                "  {}: {:<10}{}{}{said}",
                 w.paint(Role::Addr, &format!("{:>12x}", i.addr.get())),
                 raw,
                 text.replace('\t', " "),

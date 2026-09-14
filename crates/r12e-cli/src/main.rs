@@ -657,12 +657,14 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
         .db
         .clone()
         .unwrap_or_else(|| annotate::default_path(&common.file));
+    let mut comments = std::collections::BTreeMap::new();
     if !matches!(cli.command, Command::Annotate { .. }) {
         for (at, name, _) in annotate::names(&program, &db) {
             if let Some(f) = program.functions.get_mut(&at) {
                 f.name = Some(name);
             }
         }
+        comments = annotate::comments(&program, &db);
     }
 
     match &cli.command {
@@ -681,6 +683,7 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             common.json,
             budget::Budget::new(common.budget, common.limit),
             common.progress,
+            &comments,
         ),
         Command::Decompile { common, target } => print::decompile(
             w,
