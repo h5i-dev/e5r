@@ -476,12 +476,6 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
             let (Some(d), Some(amount)) = (ops.first().and_then(vector), ops.get(1)) else {
                 return b.unimplemented();
             };
-            let n = match amount {
-                Operand::Imm(v) => *v as u64,
-                Operand::UImm(v) => *v,
-                Operand::Count(v) => *v as u64,
-                _ => return b.unimplemented(),
-            };
             let Some(size) = lane_size(m) else {
                 return b.unimplemented();
             };
@@ -490,8 +484,39 @@ pub fn lift(mut b: Builder, i: &Insn) -> Lifted {
                 "psrl" => Op::IntRight,
                 _ => Op::IntSRight,
             };
-            let count = 16 / size as u64;
-            for k in 0..count {
+            let lanes = 16 / size as u64;
+            // A count in a register, which is the low 64 bits of the source
+            // vector. A count at or above the lane's width gives zero for a
+            // logical shift, so the shift is forced into range and the result
+            // masked to nothing, which is exact. The arithmetic form
+            // saturates to the sign instead and is declined rather than
+            // approximated.
+            if let Some(src) = vector(amount) {
+                if op == Op::IntSRight {
+                    return b.unimplemented();
+                }
+                let raw = lane(src, 0, 8);
+                let bits = Varnode::constant(u64::from(size) * 8, 8);
+                let ok = b.eval(Op::IntLess, 1, &[raw, bits]);
+                let wide = b.eval(Op::IntZExt, size, &[ok]);
+                let mask = b.eval(Op::IntSub, size, &[Varnode::constant(0, size), wide]);
+                let narrow = b.eval(Op::SubPiece, size, &[raw, Varnode::constant(0, 1)]);
+                let count = b.eval(Op::IntAnd, size, &[narrow, mask]);
+                for k in 0..lanes {
+                    let x = lane(d, k, size);
+                    let r = b.eval(op, size, &[x, count]);
+                    let r = b.eval(Op::IntAnd, size, &[r, mask]);
+                    b.emit(Op::Copy, Some(lane(d, k, size)), &[r]);
+                }
+                return b.finish(true);
+            }
+            let n = match amount {
+                Operand::Imm(v) => *v as u64,
+                Operand::UImm(v) => *v,
+                Operand::Count(v) => *v as u64,
+                _ => return b.unimplemented(),
+            };
+            for k in 0..lanes {
                 let x = lane(d, k, size);
                 let r = b.eval(op, size, &[x, Varnode::constant(n, 1)]);
                 b.emit(Op::Copy, Some(lane(d, k, size)), &[r]);

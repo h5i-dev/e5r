@@ -148,3 +148,11 @@ u64 many_args(u64 a, u64 b, u64 c, u64 d, u64 e, u64 f, u64 g, u64 h) {
 }
 
 i64 deep_recursion(i64 n) { return n <= 1 ? 1 : n * deep_recursion(n - 1) + deep_recursion(n - 2); }
+
+/* Byte reversals. The compiler turns these into the single instructions that
+   do them, which is the point: they are how the lifter's hand-written
+   shift-and-mask expansion gets checked against a processor. The bit
+   reversal is not here because no portable C expression compiles to it; it is
+   checked directly against the hardware instead. */
+u64 swap64(u64 x) { return __builtin_bswap64(x); }
+u32 swap32(u32 x) { return __builtin_bswap32(x); }

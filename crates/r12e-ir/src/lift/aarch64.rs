@@ -107,6 +107,71 @@ fn narrow(b: &mut Builder, v: Varnode, size: u8) -> Varnode {
 
 /// Write a value to a register, including the upper-half zeroing a 32-bit
 /// write performs.
+/// Reverse the bytes of every `lane`-byte group of a `size`-byte value.
+///
+/// Built from shifts and masks because the IR has no byte-swap operation. It
+/// is the exact computation and not an approximation, which is the only reason
+/// it belongs here at all.
+fn swap_bytes(b: &mut Builder, x: Varnode, size: u8, lane: u8) -> Varnode {
+    let mut out: Option<Varnode> = None;
+    for byte in 0..size {
+        // Where this byte lands: reversed within its own lane, and the lane
+        // itself does not move.
+        let within = byte % lane;
+        let to = byte - within + (lane - 1 - within);
+        let shift = i32::from(to) * 8 - i32::from(byte) * 8;
+        let moved = if shift >= 0 {
+            let masked = b.eval(
+                Op::IntAnd,
+                size,
+                &[x, Varnode::constant(0xffu64 << (byte * 8), size)],
+            );
+            b.eval(
+                Op::IntLeft,
+                size,
+                &[masked, Varnode::constant(shift as u64, 1)],
+            )
+        } else {
+            let shifted = b.eval(
+                Op::IntRight,
+                size,
+                &[x, Varnode::constant((-shift) as u64, 1)],
+            );
+            b.eval(
+                Op::IntAnd,
+                size,
+                &[shifted, Varnode::constant(0xffu64 << (to * 8), size)],
+            )
+        };
+        out = Some(match out {
+            None => moved,
+            Some(acc) => b.eval(Op::IntOr, size, &[acc, moved]),
+        });
+    }
+    out.unwrap_or(x)
+}
+
+/// Reverse every bit of a `size`-byte value.
+///
+/// Swap adjacent bits, then pairs, then nibbles, then reverse the bytes. Exact
+/// for the same reason as above.
+fn reverse_bits(b: &mut Builder, x: Varnode, size: u8) -> Varnode {
+    const PATTERNS: [(u64, u32); 3] = [
+        (0x5555_5555_5555_5555, 1),
+        (0x3333_3333_3333_3333, 2),
+        (0x0f0f_0f0f_0f0f_0f0f, 4),
+    ];
+    let mut v = x;
+    for (mask, by) in PATTERNS {
+        let low = b.eval(Op::IntAnd, size, &[v, Varnode::constant(mask, size)]);
+        let up = b.eval(Op::IntLeft, size, &[low, Varnode::constant(by as u64, 1)]);
+        let high = b.eval(Op::IntRight, size, &[v, Varnode::constant(by as u64, 1)]);
+        let high = b.eval(Op::IntAnd, size, &[high, Varnode::constant(mask, size)]);
+        v = b.eval(Op::IntOr, size, &[up, high]);
+    }
+    swap_bytes(b, v, size, size)
+}
+
 fn write_reg(b: &mut Builder, r: Reg, value: Varnode) {
     if r.class == RegClass::Zr {
         return;
@@ -851,10 +916,41 @@ pub fn lift(i: &Insn) -> Lifted {
                     write_reg(&mut b, d, r);
                     b.finish(true)
                 }
-                // The byte reversals and the bit reversal have no single IR
-                // operation and are not approximated.
+                // No single IR operation reverses bytes or bits, but both are
+                // exactly expressible in the ones there are, so they are
+                // written out rather than left unmodelled. A lane is the width
+                // the mnemonic names: `rev` reverses the whole register,
+                // `rev32` each word of a 64-bit one, `rev16` each halfword.
+                "rev" | "rev16" | "rev32" => {
+                    let lane = match i.mnemonic {
+                        "rev16" => 2,
+                        "rev32" => 4,
+                        _ => size,
+                    };
+                    let r = swap_bytes(&mut b, x, size, lane);
+                    write_reg(&mut b, d, r);
+                    b.finish(true)
+                }
+                "rbit" => {
+                    let r = reverse_bits(&mut b, x, size);
+                    write_reg(&mut b, d, r);
+                    b.finish(true)
+                }
                 _ => b.unimplemented(),
             }
+        }
+
+        // A system register holds something the processor knows and the
+        // program did not compute, so the destination becomes undefined: that
+        // is exactly what the operation does to the dataflow, and it is
+        // complete rather than a gap. A write to one leaves this model's state
+        // alone, so there is nothing to say about it.
+        "mrs" => {
+            let Some(d) = dest else {
+                return b.unimplemented();
+            };
+            b.emit(Op::Undefine, Some(reg(d)), &[]);
+            b.finish(true)
         }
 
         "extr" | "ror_extr" => {

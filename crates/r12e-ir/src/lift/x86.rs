@@ -629,6 +629,33 @@ pub fn lift(i: &Insn) -> Lifted {
             b.emit(Op::Copy, Some(bp), &[saved]);
             b.finish(true)
         }
+        // Bit test: the carry flag takes the selected bit and the rest are
+        // left undefined, which is what the manual says and what the IR can
+        // say exactly. The offset is taken modulo the operand width for a
+        // register destination, which is the only form the decoder produces
+        // here; a memory destination addresses a bit string and is declined.
+        "bt" => {
+            let (Some(x), Some(count)) = (
+                ops.first().and_then(|o| source(&mut b, o, size, at)),
+                ops.get(1).and_then(|o| source(&mut b, o, size, at)),
+            ) else {
+                return b.unimplemented();
+            };
+            if !matches!(ops.first(), Some(Operand::Reg(_))) {
+                return b.unimplemented();
+            }
+            let bits = u64::from(size) * 8 - 1;
+            let which = b.eval(Op::IntAnd, size, &[count, Varnode::constant(bits, size)]);
+            let moved = b.eval(Op::IntRight, size, &[x, which]);
+            let bit = b.eval(Op::IntAnd, size, &[moved, Varnode::constant(1, size)]);
+            let one = b.eval(Op::IntNotEqual, 1, &[bit, Varnode::constant(0, size)]);
+            b.emit(Op::Copy, Some(flag_cf()), &[one]);
+            for f in [flag_of(), flag_sf(), flag_zf(), flag_af(), flag_pf()] {
+                b.emit(Op::Undefine, Some(f), &[]);
+            }
+            b.finish(true)
+        }
+
         "add" | "sub" | "and" | "or" | "xor" | "cmp" | "test" => {
             let Some((x, y)) = two(&mut b, ops, size, at) else {
                 return b.unimplemented();
