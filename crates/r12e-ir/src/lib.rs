@@ -12,6 +12,8 @@
 #![warn(missing_docs)]
 
 pub mod abi;
+pub mod conv;
+pub mod dwreg;
 pub mod exec;
 pub mod func;
 pub mod interp;

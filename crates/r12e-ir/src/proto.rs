@@ -10,7 +10,7 @@
 //! used. A function that reads the third argument register and not the first
 //! two still takes three arguments: the first two are unused, not absent.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fmt;
 
 use r12e_core::Arch;
@@ -19,6 +19,7 @@ use r12e_types::cdecl;
 use r12e_types::ctype::{Model, Signature, Type, TypeId, Types};
 
 use crate::abi::Abi;
+use crate::conv::{self, Definitions, Detected, Observed};
 use crate::op::{Op, Space};
 use crate::ssa::{Location, Operand, SsaFunction, SsaKind};
 
@@ -46,9 +47,21 @@ pub struct Prototype {
     /// Callee-saved registers it writes without putting back, which is a
     /// convention the compiler invented rather than the standard one.
     pub unsaved: Vec<u64>,
-    /// True when nothing about the function contradicts the standard
-    /// convention.
+    /// True when the function puts back every callee-saved register it
+    /// touched, which is the part of the standard convention a function alone
+    /// can be checked against.
+    ///
+    /// Narrower than [`Prototype::detected`], which compares everything.
     pub standard: bool,
+    /// The convention the function actually uses, as opposed to the one the
+    /// platform declares.
+    ///
+    /// Recovery on its own fills the counts above from the platform default's
+    /// fixed order. This says whether that order is the one the function
+    /// keeps, names the registers when it is not, and says how strongly. A
+    /// detected convention that contradicts the default is reported here and
+    /// never normalised into it.
+    pub detected: Detected,
     /// The name a declaration gave the function, when one did.
     pub name: Option<String>,
     /// The parameters, with the types a declaration gave them.
@@ -367,6 +380,7 @@ fn apply(machine: Prototype, asserted: &Asserted, abi: &Abi) -> Prototype {
         // callee-saved registers the body clobbers, so the code keeps these.
         unsaved: machine.unsaved.clone(),
         standard: machine.standard,
+        detected: machine.detected.clone(),
         name: asserted.name.clone(),
         return_type: asserted.signature.returns,
         varargs: asserted.signature.varargs,
@@ -568,17 +582,28 @@ fn classify_return(
 
 /// Recover what a function takes and returns.
 pub fn recover(f: &SsaFunction, abi: &Abi) -> Prototype {
-    let live_in = live_in(f);
-    let written = written(f);
+    recover_observed(f, abi, &Observed::default())
+}
+
+/// The same, with what the function's callers said about it.
+///
+/// A function alone cannot settle whether it returns anything, and cannot
+/// corroborate a convention the compiler invented. Its callers can: see
+/// [`conv::observe`], which turns one caller's code into this.
+pub fn recover_observed(f: &SsaFunction, abi: &Abi, observed: &Observed) -> Prototype {
+    let facts = conv::facts(f);
+    let definitions = f.definitions();
+    let detected = conv::detect_from(f, abi, &facts, &definitions, observed);
 
     // The highest argument register read, plus one: a function that reads the
     // third and not the first two still takes three.
-    let integer_arguments = last_used(&live_in, &abi.integer_arguments);
-    let float_arguments = last_used(&live_in, &abi.float_arguments);
+    let integer_arguments = last_used(&facts.live_in, &abi.integer_arguments);
+    let float_arguments = last_used(&facts.live_in, &abi.float_arguments);
 
     // Arguments the caller left on the stack, which promotion turned into
     // locations above the entry stack pointer.
-    let mut stack_arguments: Vec<i64> = live_in
+    let mut stack_arguments: Vec<i64> = facts
+        .live_in
         .iter()
         .filter(|l| l.space == Space::Stack && (l.offset as i64) > 0)
         .map(|l| l.offset as i64)
@@ -586,18 +611,12 @@ pub fn recover(f: &SsaFunction, abi: &Abi) -> Prototype {
     stack_arguments.sort();
     stack_arguments.dedup();
 
-    // The result: a register the convention names, written somewhere that
-    // reaches a return.
-    let returns = returned(f, abi, &written);
-    let returns_float = returns.is_some_and(|r| r >= abi.vector_base);
+    // The result, once the callers have had their say.
+    let returns = detected.result;
+    let returns_float = detected.result_float;
 
     // A callee-saved register this function writes and does not put back.
-    let unsaved: Vec<u64> = abi
-        .callee_saved
-        .iter()
-        .copied()
-        .filter(|offset| written.contains(offset) && !restored(f, *offset))
-        .collect();
+    let unsaved = conv::clobbered(f, abi, &facts.written, &definitions);
 
     Prototype {
         integer_arguments,
@@ -607,43 +626,9 @@ pub fn recover(f: &SsaFunction, abi: &Abi) -> Prototype {
         returns_float,
         standard: unsaved.is_empty(),
         unsaved,
+        detected,
         ..Prototype::default()
     }
-}
-
-/// Locations read before this function wrote them.
-fn live_in(f: &SsaFunction) -> BTreeSet<Location> {
-    let mut out = BTreeSet::new();
-    for b in f.blocks.values() {
-        for op in &b.ops {
-            for i in &op.inputs {
-                if let Operand::Undefined(l) = i {
-                    out.insert(*l);
-                }
-            }
-        }
-    }
-    out
-}
-
-/// Register offsets this function writes.
-fn written(f: &SsaFunction) -> BTreeSet<u64> {
-    let mut out = BTreeSet::new();
-    for b in f.blocks.values() {
-        for op in &b.ops {
-            // An undefined value is not a write: it says the location holds
-            // something this function did not compute.
-            if op.kind == SsaKind::Op(Op::Undefine) {
-                continue;
-            }
-            if let Some(v) = op.out {
-                if v.location.space == Space::Register {
-                    out.insert(v.location.offset);
-                }
-            }
-        }
-    }
-    out
 }
 
 /// One past the last of `candidates` that appears among the live-in set.
@@ -667,8 +652,12 @@ fn last_used(live_in: &BTreeSet<Location>, candidates: &[u64]) -> usize {
 /// still holding what it arrived with was not a result: the caller put it
 /// there. The one written latest wins, because a function that computes into a
 /// general register and then converts into a vector one writes both.
-fn returned(f: &SsaFunction, abi: &Abi, written: &BTreeSet<u64>) -> Option<u64> {
-    let definitions = f.definitions();
+pub(crate) fn returned(
+    f: &SsaFunction,
+    abi: &Abi,
+    written: &BTreeSet<u64>,
+    definitions: &Definitions,
+) -> Option<u64> {
     let mut best: Option<(usize, u64)> = None;
     for b in f.blocks.values() {
         if !b.ops.iter().any(|op| op.kind == SsaKind::Op(Op::Return)) {
@@ -704,7 +693,7 @@ fn returned(f: &SsaFunction, abi: &Abi, written: &BTreeSet<u64>) -> Option<u64> 
                     (0, newest)
                 }
             };
-            if is_entry_value(f, &definitions, value, location, 0) {
+            if is_entry_value(f, definitions, value, location, 0) {
                 continue;
             }
             if best.is_none_or(|(at, _)| rank > at) {
@@ -715,45 +704,11 @@ fn returned(f: &SsaFunction, abi: &Abi, written: &BTreeSet<u64>) -> Option<u64> 
     best.map(|(_, offset)| offset)
 }
 
-/// True when a register's value at every return is the one it arrived with.
-fn restored(f: &SsaFunction, offset: u64) -> bool {
-    let location = Location {
-        space: Space::Register,
-        offset,
-        size: 8,
-    };
-    let definitions = f.definitions();
-    for b in f.blocks.values() {
-        if !b.ops.iter().any(|op| op.kind == SsaKind::Op(Op::Return)) {
-            continue;
-        }
-        // What the register holds at the return: the last definition in this
-        // block, or whatever reached it.
-        let last = b
-            .ops
-            .iter()
-            .rev()
-            .filter_map(|op| op.out)
-            .find(|v| v.location == location);
-        match last {
-            // Nothing in the returning block wrote it, so it still holds
-            // whatever the entry left there.
-            None => continue,
-            Some(v) => {
-                if !is_entry_value(f, &definitions, v, location, 0) {
-                    return false;
-                }
-            }
-        }
-    }
-    true
-}
-
 /// True when a value is the one the function was entered with, however many
 /// copies and merges it came through.
-fn is_entry_value(
+pub(crate) fn is_entry_value(
     f: &SsaFunction,
-    definitions: &BTreeMap<crate::ssa::Value, (r12e_core::Addr, usize)>,
+    definitions: &Definitions,
     value: crate::ssa::Value,
     location: Location,
     depth: u32,
