@@ -469,9 +469,11 @@ G12 has no previous release to compare against, so this run is its baseline.
 
 The recompile column is not a correctness score. byte_match compares
 recompiled assembly by Jaccard similarity, so output that drops every call
-argument still scores; the `roundtrip` gate, which actually runs the
-decompiled function against the interpreter, disagrees with the machine on
-over a thousand calls at this commit. Both are true of the same output.
+argument still scores. When this table was measured the `roundtrip` gate, which
+compiles each decompiled function and runs it against the interpreter,
+disagreed with the machine on over a thousand calls; both were true of the same
+output. That gate is at zero now, so the caveat about what byte_match does not
+see stands while the particular disagreement behind it does not.
 
 Not scored by DecBench but measured in the same run: r12e returned C for 780
 of 780 requested functions in 21s against angr's 760 and 278s, and 96.1% of

@@ -149,8 +149,11 @@ This repository's own `cargo test --release -p r12e-decomp --test roundtrip`
 gate compiles each pure decompiled function and runs it against the
 interpreter, and at the time of this run it reported over a thousand calls
 disagreeing with the machine across dozens of functions. Those two statements
-are consistent: 0.181 mean byte_match and semantically wrong output are the
-same output. The field-wide recompile floor, nobody above 3.0, is a statement
+were consistent: 0.181 mean byte_match and semantically wrong output were the
+same output. That gate is at zero now -- an inverted signed comparison, a
+32-bit `lea` that named a value nothing wrote, and a missing stack argument
+were most of it -- so the recompile column should be re-measured before it is
+read again. The point about what byte_match cannot see is unaffected. The field-wide recompile floor, nobody above 3.0, is a statement
 about the metric's strictness on perfect matches and not a licence to read the
 mean as a correctness score.
 
