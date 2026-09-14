@@ -297,7 +297,14 @@ fn same(a: &[Piece], b: &[Piece]) -> bool {
 
 /// The same, from the raw text on both sides.
 fn agree(ours: &str, theirs: &str) -> bool {
-    same(&pieces(&unprefixed(ours)), &pieces(&unprefixed(theirs)))
+    // Two readings of a trailing operand, and either agreeing is agreement.
+    // As written, because `#15` and `0xf` are the same immediate; and with the
+    // `0x` taken off, because objdump writes a branch target as bare hex and a
+    // decoder writes `0x`. Neither reading covers both: dropping the prefix
+    // turns `0xf` into the text `f`, and keeping it leaves `0xac` unequal to
+    // `ac`.
+    same(&pieces(ours), &pieces(theirs))
+        || same(&pieces(&unprefixed(ours)), &pieces(&unprefixed(theirs)))
 }
 
 /// Strip the `0x` from a branch target written as the last operand.
@@ -355,6 +362,70 @@ const DIVERGENCES: &[(&str, u32, u32, &str)] = &[
         4549,
         "objdump prefers the `mov` alias for `orr` against the zero register; \
          the specification has no alias constructor and prints `orr`",
+    ),
+    (
+        "AARCH64base.sinc",
+        3796,
+        3866,
+        "the specification spells every `movz` as `mov`; objdump applies the \
+         architecture's MoveWidePreferred test and keeps `movz` when the \
+         immediate is zero and the shift is not, because `mov` would then be \
+         ambiguous with a differently shifted encoding",
+    ),
+    (
+        "AARCH64base.sinc",
+        740,
+        766,
+        "the specification has no `bfi` alias constructor, so a bitfield move \
+         that objdump abbreviates prints as the `bfm` it encodes, with the \
+         rotate and width the encoding carries rather than the position and \
+         length the alias names",
+    ),
+    (
+        "AARCH64base.sinc",
+        4408,
+        4433,
+        "objdump prefers the `cmp` alias when a `subs` writes the zero \
+         register; the specification has no alias constructor and prints the \
+         `negs` its own display section names",
+    ),
+    (
+        "AARCH64base.sinc",
+        4258,
+        4259,
+        "a system register the specification's table does not name falls to \
+         its `sreg(op0, op1, cN, cM, op2)` catch-all; objdump has the name",
+    ),
+    (
+        "AARCH64base.sinc",
+        5340,
+        5355,
+        "the memory-set constructors write the phase letter after a mnemonic \
+         that already ends in one, so SETP prints as `setpp` and SETE as \
+         `setpe`. The phase reaches the p-code as an operand, so only the \
+         spelling is affected",
+    ),
+    (
+        "AARCH64base.sinc",
+        5460,
+        5460,
+        "`smstop` prints its mode operand in braces, and empty braces when \
+         there is none, where objdump writes the mode alone or nothing",
+    ),
+    (
+        "AARCH64neon.sinc",
+        973,
+        1045,
+        "the immediate `bic` constructors display the raw eight-bit immediate \
+         and not the shift applied to it, though the p-code uses the shifted \
+         value; objdump prints both",
+    ),
+    (
+        "AARCH64sve.sinc",
+        1019,
+        1050,
+        "objdump prefers the `mov` alias for an SVE `dup` from a general \
+         register; the specification prints `dup`",
     ),
     // RISC-V. The specification marks each of these `ALIAS` in its own
     // comment: they are constructors for the pseudo-instructions the assembler

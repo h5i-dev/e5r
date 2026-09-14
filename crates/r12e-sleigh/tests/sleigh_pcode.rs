@@ -159,12 +159,18 @@ impl Tally {
 }
 
 /// The fraction of decoded instructions that lift with nothing unmodelled.
-/// What remains is `define pcodeop`, which has no opcode in the IR. These only
-/// rise.
+/// These only rise.
+///
+/// A `define pcodeop` used to count against this, because it lifted to an
+/// `Unimplemented` that lost the operation's name and its arguments. It now
+/// lifts to `Opcode::Other` carrying both, which is what the specification
+/// said: a named operation with no p-code. What is left over is `cpool`,
+/// `newobject` and the delay-slot directives, and the corpus has none of them,
+/// so all three floors are at one.
 mod floor {
-    pub const AARCH64: f64 = 0.995;
-    pub const RISCV64: f64 = 0.99;
-    pub const X86_64: f64 = 0.98;
+    pub const AARCH64: f64 = 1.0;
+    pub const RISCV64: f64 = 1.0;
+    pub const X86_64: f64 = 1.0;
 }
 
 #[test]

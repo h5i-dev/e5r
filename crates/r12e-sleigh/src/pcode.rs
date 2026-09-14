@@ -9,13 +9,16 @@
 //! someone else's specification files, and `r12e-ir` pulls in a serialisation
 //! framework. The adapter belongs in a crate that already depends on both.
 //!
-//! Four SLEIGH constructs have no opcode in that list and are reported rather
+//! A `define pcodeop` is an operation the specification names and deliberately
+//! gives no semantics for, which is Ghidra's CALLOTHER. It lifts to
+//! [`Opcode::Other`] carrying that name, with the inputs and output the
+//! specification wrote, so a consumer knows exactly what it does not know.
+//! That is a complete lift of an opaque operation, not a failure to lift.
+//!
+//! Three SLEIGH constructs have no opcode in that list and are reported rather
 //! than approximated. Each one emits [`Opcode::Unimplemented`] carrying a note
 //! that says what it was, and [`Pcode::unsupported`] collects them:
 //!
-//! * `define pcodeop`, which Ghidra lifts to CALLOTHER. There is no opcode for
-//!   "a named operation this lifter does not model, with these inputs and this
-//!   output"; [`Opcode::Unimplemented`] loses the name and the inputs.
 //! * `cpool`, CPOOLREF, which resolves a constant pool reference.
 //! * `newobject`, NEW.
 //! * `delayslot` and `crossbuild`, which are not operations at all but
@@ -165,6 +168,11 @@ pub enum Opcode {
     FloatConvert,
     Piece,
     SubPiece,
+    /// A `define pcodeop`: an operation the specification names and gives no
+    /// semantics for, which is Ghidra's CALLOTHER. The note carries its name,
+    /// and the inputs and output are the ones the specification wrote, so a
+    /// consumer knows exactly what it does not know.
+    Other,
     /// Something with no opcode in this list. The note says what.
     Unimplemented,
 }
@@ -195,6 +203,17 @@ impl Insn {
             ins,
             relative: false,
             note: None,
+        }
+    }
+
+    /// A named operation the specification gives no semantics for.
+    fn other(name: impl Into<String>, out: Option<Varnode>, ins: Vec<Varnode>) -> Insn {
+        Insn {
+            op: Opcode::Other,
+            out,
+            ins,
+            relative: false,
+            note: Some(name.into()),
         }
     }
 
@@ -327,6 +346,15 @@ impl<'a> Lifter<'a> {
         }
         self.out.ops.push(insn);
         self.out.ops.len() - 1
+    }
+
+    /// What the specification calls a `define pcodeop`.
+    fn pcodeop_name(&self, op: crate::model::PcodeOpId) -> String {
+        self.spec
+            .pcodeops
+            .get(op.index())
+            .map(|p| p.name.clone())
+            .unwrap_or_else(|| "?".into())
     }
 
     fn unsupported(&mut self, what: impl Into<String>, out: Option<Varnode>) {
@@ -472,17 +500,13 @@ impl<'a> Lifter<'a> {
                 self.emit(Insn::new(Opcode::Return, None, vec![target]));
             }
             Stmt::Export(e) => self.export(node, c, e),
-            Stmt::UserOp { op, .. } => {
-                let name = self
-                    .spec
-                    .pcodeops
-                    .get(op.index())
-                    .map(|p| p.name.clone())
-                    .unwrap_or_else(|| "?".into());
-                self.unsupported(
-                    format!("`define pcodeop {name}`, which has no opcode (Ghidra's CALLOTHER)"),
-                    None,
-                );
+            Stmt::UserOp { op, args } => {
+                let name = self.pcodeop_name(*op);
+                let ins = args
+                    .iter()
+                    .map(|a| self.expr(node, c, a, None))
+                    .collect::<Vec<_>>();
+                self.emit(Insn::other(name, None, ins));
             }
             Stmt::MacroCall { mac, args } => self.macro_call(node, c, *mac, args),
             Stmt::DelaySlot(n) => self.unsupported(
@@ -708,18 +732,14 @@ impl<'a> Lifter<'a> {
             }
             Expr::Binary(op, a, b) => self.binary(node, c, *op, a, b, want),
             Expr::Intrinsic { op, args } => self.intrinsic(node, c, *op, args, want),
-            Expr::UserOp { op, .. } => {
-                let name = self
-                    .spec
-                    .pcodeops
-                    .get(op.index())
-                    .map(|p| p.name.clone())
-                    .unwrap_or_else(|| "?".into());
+            Expr::UserOp { op, args } => {
+                let name = self.pcodeop_name(*op);
+                let ins = args
+                    .iter()
+                    .map(|a| self.expr(node, c, a, None))
+                    .collect::<Vec<_>>();
                 let out = self.temp(want.unwrap_or(self.pointer_size()));
-                self.unsupported(
-                    format!("`define pcodeop {name}`, which has no opcode (Ghidra's CALLOTHER)"),
-                    Some(out),
-                );
+                self.emit(Insn::other(name, Some(out), ins));
                 out
             }
         }
@@ -1348,8 +1368,12 @@ attach variables [ rd rs ] [ r0 r1 r2 r3 ];
         assert_eq!(p.ops[0].op, Opcode::Unimplemented);
     }
 
+    /// A `define pcodeop` is the specification saying an operation has no
+    /// p-code, so naming it with its inputs and its output is a complete lift
+    /// of an opaque operation. Losing the name, which is what
+    /// `Opcode::Unimplemented` did, is what was incomplete.
     #[test]
-    fn a_user_operation_is_reported_rather_than_approximated() {
+    fn a_user_operation_is_named_with_its_inputs_and_its_output() {
         let s = crate::parse_str(
             r#"
 define endian=little;
@@ -1364,8 +1388,15 @@ attach variables [ rd ] [ r0 r1 ];
         )
         .expect("parses");
         let p = lift_bytes(&s, &[0x00]);
-        assert!(!p.is_complete());
-        assert!(p.unsupported[0].contains("arctan"), "{:?}", p.unsupported);
+        assert!(p.is_complete(), "{:?}", p.unsupported);
+        let call = p
+            .ops
+            .iter()
+            .find(|i| i.op == Opcode::Other)
+            .expect("the user operation is in the p-code");
+        assert_eq!(call.note.as_deref(), Some("arctan"));
+        assert_eq!(call.ins.len(), 1, "its argument is carried: {:?}", call.ins);
+        assert!(call.out.is_some(), "and its result: {call:?}");
     }
 
     #[test]
