@@ -393,7 +393,14 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       lists compared range for range. 230 variables in the fixtures change
       storage inside their own body, which a single-location reader gets
       wrong for most of the function.
-- [ ] PDB consumption for Windows binaries, from the public format documentation.
+- [x] PDB consumption for Windows binaries, from the public format
+      documentation. Measured against `llvm-pdbutil` record by record on real
+      databases built here by clang and lld: 14 procedures, 27 public symbols,
+      24 frame-relative locals, 33 register locations by range and register
+      name, 9 inlined frames, 25 section contributions. It fills the same
+      structures the DWARF reader does, so nothing above that layer knows
+      which format the information came from, and a database whose identity
+      does not match the image is refused with a note rather than believed.
 - [x] Demanglers: Itanium C++ at 94% exact parity with `c++filt` over 5,953
       real libstdc++ symbols, Rust in both schemes, and MSVC qualified names.
       Swift and ObjC selectors are still to do, and MSVC's type grammar is a

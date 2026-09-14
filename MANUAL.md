@@ -152,6 +152,28 @@ where it does not, they are recovered from what the code does with them.
 against. Nothing escapes the process: memory is a copy of the image, a system
 call stops the run, and a budget bounds it.
 
+## Windows
+
+A PE keeps its debug information in a separate `.pdb`, so it is looked for: at
+the path the linker recorded, and beside the binary, which is where the file
+usually actually is.
+
+**A database from the wrong build is refused**, with a note saying so. Symbols
+from a different build are worse than no symbols, because they are confidently
+wrong, so the identity the image asks for is checked before anything in the
+database is believed.
+
+```
+$ r12e funcs prog.exe
+0x140001000  ...  proven  program database  compare_points
+0x140001020  ...  proven  program database  walk
+```
+
+Without it, the same binary yields only its entry point.
+
+`r12e info` reports `pe.pdb`, `pe.pdb.key` and `pe.pdb.age`, which together
+are what a symbol server is indexed by.
+
 ## C++
 
 ```

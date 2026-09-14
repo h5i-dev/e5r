@@ -1004,6 +1004,13 @@ fn read_debug(r: &Reader<'_>, dir: &Dir, base: u64, obj: &mut Object, caps: &Cap
             obj.metadata
                 .insert("pe.pdb".into(), String::from_utf8_lossy(path).into_owned());
         }
+        // The signature and age as well as the path, because a database from
+        // the wrong build is worse than none: it is confidently wrong. A
+        // caller that fetches one has to check these before believing it.
+        if let Some((id, _)) = crate::pdb::codeview_identity(cv.data()) {
+            obj.metadata.insert("pe.pdb.key".into(), id.key());
+            obj.metadata.insert("pe.pdb.age".into(), id.age.to_string());
+        }
     }
     let _ = base;
 }

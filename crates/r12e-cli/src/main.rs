@@ -649,6 +649,10 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
     // until these are applied. Reading them as they sit does not fail, it
     // quietly answers "there is nothing here".
     r12e_api::apply_relative_relocations(&mut object);
+    // A PE keeps its debug information in a separate file, so the loader,
+    // which only sees bytes, cannot reach it. This is the first layer that
+    // can.
+    annotate::load_pdb(&mut object, &common.file);
     let object = object;
 
     // Commands that only need the container skip analysis entirely, which is

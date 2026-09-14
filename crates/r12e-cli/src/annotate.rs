@@ -241,3 +241,36 @@ fn of_kind(p: &Program, db: &Path, want: Field) -> Vec<(Addr, String, Resolution
         .map(|a| (a.addr, a.value, a.resolution))
         .collect()
 }
+
+/// Load the program database a PE names, if it is there and it matches.
+///
+/// Symbols from the wrong build are worse than no symbols, because they are
+/// confidently wrong, so the identity is checked before anything is believed.
+/// The path in the image is where the linker wrote it, which is rarely where
+/// the file is now, so the database is also looked for beside the binary.
+pub fn load_pdb(obj: &mut r12e_format::Object, binary: &Path) -> Option<String> {
+    let named = obj.metadata.get("pe.pdb")?.clone();
+    let stem = Path::new(&named).file_name()?;
+    let beside = binary.parent().unwrap_or(Path::new(".")).join(stem);
+    let (data, from) = [Path::new(&named), beside.as_path()]
+        .into_iter()
+        .find_map(|p| std::fs::read(p).ok().map(|d| (d, p.display().to_string())))?;
+
+    let want = obj.metadata.get("pe.pdb.key").cloned();
+    let db = r12e_format::pdb::read(&data, &obj.sections)?;
+    if want.is_some_and(|k| k != db.identity.key()) {
+        eprintln!(
+            "note: {from} is not the database {} was built with",
+            binary.display()
+        );
+        return None;
+    }
+    let hints = db.hints();
+    let found = hints.len();
+    obj.function_hints.extend(hints);
+    obj.debug = Some(db.debug);
+    for w in &db.warnings {
+        eprintln!("note: {from}: {w}");
+    }
+    Some(format!("{from}: {found} function(s)"))
+}
