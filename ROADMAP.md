@@ -275,9 +275,15 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       to do.
 - [x] String extraction: ASCII, UTF-8 and UTF-16LE, scanned by section rather
       than by segment. Go string headers and Rust slices are still to do.
-- [ ] Data flow into the data sections: pointers, vtables, jump tables and
-      literal pools marked as data so the code partition stops at them.
-- [ ] A jump table whose entries are bytes scaled from a separate `adr`
+- [x] Data flow into the data sections: pointers, vtables, jump tables and
+      literal pools marked as data so the code partition stops at them. Five
+      proofs, each something observed rather than inferred; a candidate
+      overlapping a block some function walked is dropped. 55,577 regions over
+      154 images, 8.72% of the bytes the gap scan sweeps. It changed no
+      function anywhere -- no word inside a marked region matches a prologue
+      pattern -- so it is a guard measured at zero firings, gated by a
+      hand-built image whose literal-pool word *is* `stp x29, x30, [sp, #-16]!`.
+- [x] A jump table whose entries are bytes scaled from a separate `adr`
       anchor, which is what gcc emits for a small dense switch at `-O1` and
       `-Os` on AArch64:
 
@@ -537,10 +543,13 @@ designed before it gets coded, and the design lives in
 - [x] Shell completion for bash, zsh and fish, and a generated man page, both
       generated from the command tree so neither can describe a command that
       does not exist.
-- [ ] Progress reporting on stderr with an estimate. `--progress` covers the
+- [x] Progress reporting on stderr with an estimate. `--progress` covers the
       loops the CLI drives, with a rate-based estimate, silent unless stderr is
-      a terminal. What it does not yet cover is the inside of `analyze()`,
-      which needs a stage callback in `r12e-analysis`.
+      a terminal. The inside of `analyze()` now reports too:
+      `Session::with_progress` takes a callback, five stages report through it,
+      the `Update` allocates nothing, and every report is made from the
+      sequential merge between parallel batches so nothing contends. Cost is
+      indistinguishable from noise.
 
 ### M9. Automation and agents
 
@@ -648,8 +657,14 @@ designed before it gets coded, and the design lives in
 
 ### M11. Performance
 
-- [ ] Published benchmark numbers against `rizin -A` and Ghidra headless on the
-      fixture corpus, rerun in CI, with a regression budget.
+- [x] Published benchmark numbers against `rizin -A` on the fixture corpus,
+      rerun in CI, with a regression budget. 16 binaries, 21x to 3,291x faster
+      and 2.4x to 8.6x less memory, with the three qualifications that ratio
+      needs in the table rather than under it, and the one row r12e loses left
+      in. `docs/benchmarks.md`, `scripts/bench-budget.json`. Ghidra's headless
+      analyzer is wired and opt-in behind `GHIDRA_INSTALL_DIR`, but its
+      decompiler ships x86-64 only, so on this aarch64 host the comparison that
+      would matter most cannot be made.
 - [x] Lazy analysis. A session computes functions, cross references and strings
       on first use, memoized, so a command no longer has to be told what to
       switch off. `funcs` on libcrypto goes from 0.086s and 55.3 MB to 0.069s

@@ -190,6 +190,7 @@ pub fn structure_with(
         duplication: duplication_budget(graph.len()),
         loops: Vec::new(),
         keep_single: BTreeSet::new(),
+        switch_depth: 0,
         tight,
         reasons: BTreeMap::new(),
     };
@@ -221,6 +222,7 @@ pub fn structure_with(
             duplication: duplication_budget(graph.len()),
             loops: Vec::new(),
             keep_single,
+            switch_depth: 0,
             tight,
             reasons: BTreeMap::new(),
         };
@@ -401,6 +403,12 @@ struct Ctx<'a> {
     loops: Vec<Nesting>,
     /// Blocks that must appear once, because a goto names them.
     keep_single: BTreeSet<Addr>,
+    /// Switch arms entered since the innermost loop was pushed.
+    ///
+    /// `break` leaves the innermost loop *or* switch, so a loop exit reached
+    /// from inside an arm cannot be written as one. `continue` is unaffected:
+    /// it skips switches and binds to the loop.
+    switch_depth: u32,
     /// Whether a copied tail is measured as what the walk would write rather
     /// than as everything reachable past it. A measurement switch.
     tight: bool,
@@ -451,7 +459,20 @@ impl Ctx<'_> {
                     break;
                 }
                 if Some(cursor) == inner.exit {
-                    parts.push(Region::Break);
+                    if self.switch_depth == 0 {
+                        parts.push(Region::Break);
+                    } else {
+                        // Inside a switch arm a `break` would leave the switch
+                        // and run what follows it, not leave the loop, so the
+                        // exit has to be named.
+                        *self
+                            .reasons
+                            .entry("a loop exit reached from inside a switch arm")
+                            .or_default() += 1;
+                        self.gotos += 1;
+                        self.labels.insert(cursor);
+                        parts.push(Region::Goto(cursor));
+                    }
                     break;
                 }
             }
@@ -631,7 +652,11 @@ impl Ctx<'_> {
         self.emitted.insert(head);
         let exit = self.loop_exit(head);
         self.loops.push(Nesting { head, exit });
+        // A loop entered inside a switch arm takes `break` back, so the count
+        // is of arms entered since *this* loop, not since the function.
+        let outer = std::mem::take(&mut self.switch_depth);
         let region = self.build_loop_body(head);
+        self.switch_depth = outer;
         self.loops.pop();
         trim_trailing_continue(region)
     }
@@ -828,7 +853,9 @@ impl Ctx<'_> {
                 });
                 continue;
             }
+            self.switch_depth += 1;
             let body = self.region(target, join.or(stop), enclosing);
+            self.switch_depth -= 1;
             cases.push(Case { values, body });
         }
 
@@ -841,8 +868,13 @@ impl Ctx<'_> {
             .into_iter()
             .flatten()
             .find(|s| !named.contains(s) && Some(**s) != join)
-            .copied()
-            .map(|s| Box::new(self.region(s, join.or(stop), enclosing)));
+            .copied();
+        let default = default.map(|s| {
+            self.switch_depth += 1;
+            let d = Box::new(self.region(s, join.or(stop), enclosing));
+            self.switch_depth -= 1;
+            d
+        });
 
         (
             Region::Switch {
@@ -2342,6 +2374,59 @@ mod tests {
         let mut counts = BTreeMap::new();
         occurrences(&s.root, &mut counts);
         assert_eq!(counts.get(&Addr(5)), Some(&2), "{:?}", s.root);
+    }
+
+    /// A loop exit reached from inside a switch arm is not written as a
+    /// `break`: C binds that to the switch, so it leaves the switch and runs
+    /// what follows it inside the loop, then repeats.
+    ///
+    /// Found in `__gettextparse` of `hello.static.a64`, where the `break` sat
+    /// inside a `case` thirty levels deep and the loop exit is at the
+    /// function's top level. The output compiled either way.
+    #[test]
+    fn a_loop_exit_inside_a_switch_arm_is_not_written_as_a_break() {
+        // The shape that makes it visible: the switch's join is not the loop's
+        // exit, so falling out of the switch is not falling out of the loop.
+        // Two ways out of the loop, 30 and 40, put the join past both.
+        let graph = g(&[
+            (0, &[1]),
+            (1, &[2]),
+            (2, &[3, 4]),
+            (3, &[30, 9]),
+            (4, &[9, 40]),
+            (9, &[1, 30]),
+            (30, &[31]),
+            (40, &[31]),
+            (31, &[]),
+        ]);
+        let switches: Switches = [(Addr(2), vec![(0, Addr(3)), (1, Addr(4))])]
+            .into_iter()
+            .collect();
+        let s = super::structure_with(Addr(0), &graph, &Taken::new(), &switches);
+
+        assert!(s.lost.is_empty(), "lost {:?}", s.lost);
+        let arms = switch_arms(&s.root).expect("a switch was built");
+        for arm in &arms {
+            assert!(
+                !breaks_out(arm),
+                "an arm leaves the loop with a `break` C binds to the switch: {:?}",
+                s.root
+            );
+        }
+    }
+
+    /// The arms of the first switch in a tree.
+    fn switch_arms(r: &Region) -> Option<Vec<Region>> {
+        collect(r).into_iter().find_map(|x| match x {
+            Region::Switch { cases, default, .. } => Some(
+                cases
+                    .into_iter()
+                    .map(|c| c.body)
+                    .chain(default.map(|d| *d))
+                    .collect(),
+            ),
+            _ => None,
+        })
     }
 
     /// Every region in a tree, flattened.

@@ -286,7 +286,8 @@ which is the only way two structuring numbers are comparable.
 | single-place classification and tail copying | 4,489 | 1,001 | |
 | ...re-measured on the grown corpus | 8,898 | 1,478 | 0.1871 |
 | sinking a shared tail instead of jumping to it | 8,580 | 1,474 | 0.1866 |
-| break-sinking and a tail measured as what is written | **7,177** | **973** | **0.1232** |
+| break-sinking and a tail measured as what is written | 7,177 | 973 | 0.1232 |
+| a loop exit inside a switch arm named rather than broken | **7,284** | **973** | **0.1232** |
 
 The rise in the second row is the price of emitting 2,389 blocks that used to
 disappear: a dropped block costs no gotos. The fourth row is not a regression
@@ -324,6 +325,14 @@ The fixture ceiling in `quality.rs`, the share of functions needing at least
 one label, came down from 0.13 to **0.07**, and is unmoved by this work -- the
 twenty fixtures it measures were already the easy ones. The corpus share is
 the number that moved.
+
+The last row is a second piece of wrong code, found the same way and costing
+107 gotos. C binds `break` to the innermost loop *or switch*, and a loop exit
+reached from inside a switch arm was being written as one -- so it left the
+switch, ran whatever followed it inside the loop, and repeated, where the
+machine had left the loop. In `__gettextparse` of `hello.static.a64` the
+`break` sat inside a `case` thirty levels deep and the loop exit is at the
+function's top level. It compiled either way.
 
 What remains is 1,654 refusals per translation unit of one shape: a block
 written inside a loop or a switch arm and jumped to from outside it, which is a
