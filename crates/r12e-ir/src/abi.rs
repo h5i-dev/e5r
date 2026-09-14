@@ -31,6 +31,12 @@ pub struct Abi {
     pub stack_pointer: u64,
     /// Where the vector registers start, for naming.
     pub vector_base: u64,
+    /// Offset from the entry stack pointer of the first argument passed there.
+    ///
+    /// x86 pushes the return address as part of the call, so its stack
+    /// arguments start one slot past the entry pointer; AArch64 puts the
+    /// return address in a register and starts at zero.
+    pub stack_argument_base: i64,
 }
 
 impl Abi {
@@ -91,6 +97,7 @@ pub fn of(arch: &Arch) -> Abi {
                 .collect(),
             stack_pointer: x86::sp_offset(),
             vector_base: x86::vec_offset(0),
+            stack_argument_base: 8,
         },
         _ => Abi {
             integer_arguments: (0..8).map(aarch64::gpr_offset).collect(),
@@ -106,6 +113,7 @@ pub fn of(arch: &Arch) -> Abi {
             caller_saved: (0..=18).map(aarch64::gpr_offset).collect(),
             stack_pointer: aarch64::sp_offset(),
             vector_base: aarch64::vec_offset(0),
+            stack_argument_base: 0,
         },
     }
 }

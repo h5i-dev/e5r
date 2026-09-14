@@ -13,11 +13,11 @@ use r12e_format::LoadOptions;
 use r12e_ir::lift;
 
 /// Floor on the share of decoded instructions the lifter models. Only raised.
-const MIN_COVERAGE: f64 = 0.995;
+const MIN_COVERAGE: f64 = 0.996;
 /// The x86-64 floor, which has only the fixtures behind it: this host runs no
 /// x86 system binaries, so the corpus is smaller and the number is not
 /// comparable to the AArch64 one.
-const MIN_X86_COVERAGE: f64 = 0.998;
+const MIN_X86_COVERAGE: f64 = 0.999;
 
 fn targets(arch: &Arch) -> Vec<PathBuf> {
     let mut out = Vec::new();
@@ -107,7 +107,7 @@ fn check(arch: &Arch, floor: f64, minimum: u64) {
         .collect();
     assert!(
         coverage >= floor,
-        "{arch:?}: lifted {:.2}% of {decoded} decoded instructions, floor is {:.0}%\n\
+        "{arch:?}: lifted {:.2}% of {decoded} decoded instructions, floor is {:.2}%\n\
          biggest gaps: {}",
         coverage * 100.0,
         floor * 100.0,

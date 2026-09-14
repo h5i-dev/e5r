@@ -389,7 +389,21 @@ pub fn lift(i: &Insn) -> Lifted {
             b.emit(Op::BranchInd, None, &[reg(*r)]);
             return b.finish(true);
         }
-        Flow::Trap | Flow::Syscall => return b.unimplemented(),
+        // A trap raises an exception and changes no register on the way; a
+        // supervisor call leaves the result and the caller-saved registers to
+        // the kernel, which is not knowable from here, so they are undefined
+        // rather than guessed. Both flows already stop the interpreter.
+        Flow::Trap => return b.finish(true),
+        Flow::Syscall => {
+            let abi = crate::abi::of(&r12e_core::Arch::AArch64);
+            for offset in &abi.caller_saved {
+                b.emit(Op::Undefine, Some(Varnode::register(*offset, 8)), &[]);
+            }
+            for r in &abi.results {
+                b.emit(Op::Undefine, Some(Varnode::register(*r, 8)), &[]);
+            }
+            return b.finish(true);
+        }
         Flow::Next => {}
     }
 

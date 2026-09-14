@@ -503,10 +503,26 @@ pub fn lift(i: &Insn) -> Lifted {
             return b.finish(true);
         }
         Flow::Trap => {
-            return b.unimplemented();
+            // A trap raises an exception and nothing after it runs, which the
+            // flow already says. It changes no register on the way, so there
+            // is nothing to model and nothing missing: complete, with no ops.
+            return b.finish(true);
         }
         Flow::Syscall => {
-            return b.unimplemented();
+            // What the instruction itself does to the register file is
+            // specified: RCX takes the return address and R11 the flags. What
+            // the kernel does is not knowable from here, so the result and
+            // everything the convention lets it change is undefined rather
+            // than guessed, and the flow still stops the interpreter.
+            let next = Varnode::constant(i.next().get(), 8);
+            b.emit(Op::Copy, Some(Varnode::register(gpr_offset(1), 8)), &[next]);
+            b.emit(
+                Op::Undefine,
+                Some(Varnode::register(gpr_offset(11), 8)),
+                &[],
+            );
+            b.emit(Op::Undefine, Some(Varnode::register(gpr_offset(0), 8)), &[]);
+            return b.finish(true);
         }
         Flow::Next => {}
     }
