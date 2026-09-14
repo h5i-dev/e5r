@@ -22,7 +22,7 @@ use r12e_format::LoadOptions;
 /// The share rather than the count: one function of forty nested loops can
 /// need twenty labels, and averaging those over the corpus says more about
 /// that one function than about the structuring.
-const MAX_UNSTRUCTURED: f64 = 0.13;
+const MAX_UNSTRUCTURED: f64 = 0.07;
 
 fn build_dir() -> Option<PathBuf> {
     let d = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/build");

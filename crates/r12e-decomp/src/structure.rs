@@ -13,6 +13,24 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use r12e_core::Addr;
 
+/// The most blocks one copied tail may span.
+///
+/// Past this a copy stops reading as the same few statements written twice and
+/// starts reading as a second piece of code, which is worse than the goto it
+/// replaces. Measured over the corpus: four is where the curve flattens, and
+/// every block past it costs more output than it saves gotos.
+const MAX_COPIED_TAIL: usize = 4;
+
+/// How many blocks in total a function may write out a second time.
+///
+/// Proportional to the function, because a shared tail is a fact about how many
+/// arms a function has, plus a floor for the small ones where one copy is the
+/// whole difference. Bounded so that duplication cannot turn a chain of
+/// comparisons into an exponential one.
+fn duplication_budget(blocks: usize) -> u32 {
+    8 + blocks as u32
+}
+
 /// A recovered region.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Region {
@@ -158,7 +176,7 @@ pub fn structure_with(
         labels: BTreeSet::new(),
         gotos: 0,
         depth: 0,
-        duplication: 8,
+        duplication: duplication_budget(graph.len()),
         loops: Vec::new(),
         keep_single: BTreeSet::new(),
         reasons: BTreeMap::new(),
@@ -188,7 +206,7 @@ pub fn structure_with(
             labels: BTreeSet::new(),
             gotos: 0,
             depth: 0,
-            duplication: 8,
+            duplication: duplication_budget(graph.len()),
             loops: Vec::new(),
             keep_single,
             reasons: BTreeMap::new(),
@@ -338,10 +356,9 @@ struct Ctx<'a> {
     labels: BTreeSet<Addr>,
     gotos: usize,
     depth: u32,
-    /// How much duplication is left. A tail that several arms share can be
-    /// written out in each of them instead of jumped to, which reads far
-    /// better, but only while it stays small: unbounded duplication turns a
-    /// chain of comparisons into an exponential one.
+    /// How many more blocks may be written out a second time. Counted in
+    /// blocks rather than in copies, because what has to stay bounded is how
+    /// much text the duplication adds, not how often it happens.
     duplication: u32,
     /// The loops currently being structured, innermost last. An edge to the
     /// innermost loop's exit is a `break` and an edge to its header is a
@@ -402,8 +419,8 @@ impl Ctx<'_> {
             }
             if self.emitted.contains(&cursor) {
                 // A small tail is written out again rather than jumped to.
-                if self.duplication > 0 && self.small_tail(cursor, stop) {
-                    self.duplication -= 1;
+                if let Some(blocks) = self.copyable_tail(cursor, stop) {
+                    self.duplication -= blocks as u32;
                     parts.push(self.duplicate(cursor, stop, enclosing));
                     break;
                 }
@@ -444,35 +461,21 @@ impl Ctx<'_> {
                     break;
                 }
                 1 => {
+                    // Where the successor goes is the top of this loop's
+                    // decision, not this arm's: the top is the one place that
+                    // knows a `continue` from a `break` from a tail worth
+                    // copying. Settling it here instead is what turned every
+                    // fall into an already written block into a goto with no
+                    // copy considered, which was 42% of them.
                     parts.push(Region::Block(cursor));
-                    let next = succs[0];
-                    // A backward edge that is not a loop header is a goto.
-                    if self.emitted.contains(&next) && !self.loop_headers.contains(&next) {
-                        if self.loops.last().map(|l| l.head) == Some(next) {
-                            parts.push(Region::Continue);
-                        } else if self.loops.last().map(|l| l.exit) == Some(Some(next)) {
-                            parts.push(Region::Break);
-                        } else {
-                            *self
-                                .reasons
-                                .entry("back edge that is not a natural loop")
-                                .or_default() += 1;
-                            self.gotos += 1;
-                            self.labels.insert(next);
-                            parts.push(Region::Goto(next));
-                        }
-                        break;
-                    }
-                    cursor = next;
+                    cursor = succs[0];
                 }
                 _ if self.switches.contains_key(&cursor) => {
                     let (region, after) = self.build_switch(cursor, stop, enclosing);
                     parts.push(Region::Block(cursor));
                     parts.push(region);
                     match after {
-                        Some(next) if Some(next) != stop && !self.emitted.contains(&next) => {
-                            cursor = next;
-                        }
+                        Some(next) if Some(next) != stop => cursor = next,
                         _ => break,
                     }
                 }
@@ -480,17 +483,11 @@ impl Ctx<'_> {
                     let (region, after) = self.build_if(cursor, &succs, stop, enclosing);
                     parts.push(Region::Block(cursor));
                     parts.push(region);
+                    // Likewise: an `if` whose arms rejoin at a block already
+                    // written is the same decision one level up, and the top
+                    // of this loop is where it is made.
                     match after {
-                        Some(next) if Some(next) != stop && !self.emitted.contains(&next) => {
-                            cursor = next;
-                        }
-                        Some(next) if Some(next) != stop => {
-                            *self.reasons.entry("join already written").or_default() += 1;
-                            self.gotos += 1;
-                            self.labels.insert(next);
-                            parts.push(Region::Goto(next));
-                            break;
-                        }
+                        Some(next) if Some(next) != stop => cursor = next,
                         _ => break,
                     }
                 }
@@ -508,8 +505,16 @@ impl Ctx<'_> {
         self.graph.values().filter(|s| s.contains(&at)).count()
     }
 
-    /// True when a block starts a tail small enough to write out again.
-    fn small_tail(&self, at: Addr, stop: Option<Addr>) -> bool {
+    /// How many blocks a tail would copy, when copying it is allowed.
+    ///
+    /// A compiler merges identical tails: every path that ends in the same
+    /// `return`, and cross-jumping for the rest. That merge is what leaves one
+    /// block with several predecessors, and a single walk can place it under
+    /// only one of them, so every other predecessor becomes a goto. Writing the
+    /// tail out again in each arm undoes the merge rather than inventing
+    /// structure, and over this corpus it is where most of the removable gotos
+    /// are.
+    fn copyable_tail(&self, at: Addr, stop: Option<Addr>) -> Option<usize> {
         let mut seen: BTreeSet<Addr> = BTreeSet::new();
         let mut work = vec![at];
         while let Some(block) = work.pop() {
@@ -523,13 +528,13 @@ impl Ctx<'_> {
             // structured is never a tail, because writing it out again inside
             // itself would not terminate.
             if self.loops.iter().any(|l| l.head == block) || self.keep_single.contains(&block) {
-                return false;
+                return None;
             }
             if !seen.insert(block) {
                 continue;
             }
-            if seen.len() > 2 {
-                return false;
+            if seen.len() > MAX_COPIED_TAIL || seen.len() as u32 > self.duplication {
+                return None;
             }
             for s in self.graph.get(&block).into_iter().flatten() {
                 if !seen.contains(s) {
@@ -537,7 +542,7 @@ impl Ctx<'_> {
                 }
             }
         }
-        !seen.is_empty()
+        (!seen.is_empty()).then_some(seen.len())
     }
 
     /// Structure a tail again, as a copy.
@@ -1205,6 +1210,60 @@ mod tests {
             blocks.len() <= graph.len() * 4,
             "{} blocks emitted for a graph of {}",
             blocks.len(),
+            graph.len()
+        );
+    }
+
+    /// The shape the corpus is mostly made of: two arms reach one tail, and
+    /// only one of them can be the place it is written. Copying the tail into
+    /// the other is what a compiler's tail merging undid.
+    #[test]
+    fn a_tail_two_arms_share_is_copied_rather_than_jumped_to() {
+        // 0 branches to 1 or 2; 1 branches to 3 or 4; 2 falls into 4; both 3
+        // and 4 reach 5. Block 4 post-dominates nothing, so no join places it.
+        let graph = g(&[
+            (0, &[1, 2]),
+            (1, &[3, 4]),
+            (2, &[4]),
+            (3, &[5]),
+            (4, &[5]),
+            (5, &[]),
+        ]);
+        let s = structure(Addr(0), &graph);
+        assert_eq!(s.gotos, 0, "{:?}", s.root);
+        assert!(s.labels.is_empty());
+        assert!(s.lost.is_empty());
+    }
+
+    /// Copying is bounded. A fan of arms that all end at one long tail must not
+    /// write the tail out once per arm.
+    #[test]
+    fn copying_a_tail_stays_within_its_budget() {
+        // A chain of ten two-way branches, every one of whose taken arms lands
+        // on the same eight-block tail.
+        let mut edges: Vec<(u64, Vec<u64>)> = Vec::new();
+        for i in 0..10u64 {
+            edges.push((i, vec![i + 1, 100]));
+        }
+        edges.push((10, vec![100]));
+        for j in 0..7u64 {
+            edges.push((100 + j, vec![101 + j]));
+        }
+        edges.push((107, vec![]));
+        let graph: Graph = edges
+            .iter()
+            .map(|(f, t)| (Addr(*f), t.iter().map(|a| Addr(*a)).collect()))
+            .collect();
+        let s = structure(Addr(0), &graph);
+        assert!(s.lost.is_empty(), "lost {:?}", s.lost);
+        let blocks = collect(&s.root)
+            .iter()
+            .filter(|r| matches!(r, Region::Block(_)))
+            .count();
+        let ceiling = graph.len() + duplication_budget(graph.len()) as usize;
+        assert!(
+            blocks <= ceiling,
+            "{blocks} blocks emitted for a graph of {}, ceiling {ceiling}",
             graph.len()
         );
     }
