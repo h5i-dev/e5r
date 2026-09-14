@@ -390,6 +390,42 @@ fn count_insns(mem: &MemoryMap, arch: &Arch, start: Addr, end: Addr) -> u32 {
     n
 }
 
+/// Decode every instruction of a function and hand each one straight to `f`,
+/// without building a list of them.
+///
+/// Returns false when an instruction arrived at a lower address than the one
+/// before it, which can only happen if two blocks of the function overlap. A
+/// caller that needs address order then has to fall back to [`instructions`],
+/// which sorts. No binary in the corpus does this, and the check is one
+/// comparison per instruction against a whole function's worth of decoded
+/// instructions held in memory: 224 bytes each, and the largest function in
+/// `libcrypto.so.3` has 4,510 of them, on every thread at once.
+pub fn for_each_instruction(
+    mem: &MemoryMap,
+    arch: &Arch,
+    cfg: &Cfg,
+    mut f: impl FnMut(Insn),
+) -> bool {
+    let mut ordered = true;
+    let mut last: Option<Addr> = None;
+    for b in cfg.blocks.values() {
+        let mut at = b.range.start();
+        while at < b.range.end() {
+            let Some(w) = mem.decode_window(at, arch.max_insn_len()) else {
+                break;
+            };
+            let Some(i) = r12e_arch::decode(arch, w, at) else {
+                break;
+            };
+            at = i.next();
+            ordered &= last.is_none_or(|p| p <= i.addr);
+            last = Some(i.addr);
+            f(i);
+        }
+    }
+    ordered
+}
+
 /// Decode every instruction of a function in address order.
 ///
 /// Walks the blocks rather than the whole hull, so bytes between a function's

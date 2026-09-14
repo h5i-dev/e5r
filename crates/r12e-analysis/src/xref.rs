@@ -119,28 +119,79 @@ impl Regs {
 
 /// Collect references from one function's instructions.
 ///
-/// `in_block_order` must be instructions in address order; the tracker resets
-/// whenever the previous instruction did not fall through, which is a cheap
-/// stand-in for block boundaries and never carries a value across a join.
+/// `insns` must be instructions in address order; the tracker resets whenever
+/// the previous instruction did not fall through, which is a cheap stand-in
+/// for block boundaries and never carries a value across a join.
 pub fn collect(insns: &[Insn], mem: &MemoryMap, out: &mut Vec<Xref>) {
-    let mut regs = Regs::default();
-    let mut fresh = true;
+    let mut c = Collector::new(mem, out);
+    for i in insns {
+        c.push(*i);
+    }
+    c.finish();
+}
 
-    for (n, i) in insns.iter().enumerate() {
-        if !fresh {
-            regs = Regs::default();
+/// The same walk, fed one instruction at a time.
+///
+/// Whether an instruction falls through to the next is a fact about a pair, so
+/// the collector holds one instruction back and decides about it when its
+/// successor arrives. That is the whole reason [`collect`] wanted a slice, and
+/// removing the need for one is what lets the caller decode a function without
+/// keeping it: an `Insn` is 224 bytes, and a large function on every thread at
+/// once is the memory this stage actually spends.
+pub struct Collector<'a> {
+    mem: &'a MemoryMap,
+    out: &'a mut Vec<Xref>,
+    regs: Regs,
+    /// Whether the instruction processed last fell through to this one.
+    fresh: bool,
+    /// The instruction whose successor is not known yet.
+    pending: Option<Insn>,
+}
+
+impl<'a> Collector<'a> {
+    /// Start collecting into `out`.
+    pub fn new(mem: &'a MemoryMap, out: &'a mut Vec<Xref>) -> Collector<'a> {
+        Collector {
+            mem,
+            out,
+            regs: Regs::default(),
+            fresh: true,
+            pending: None,
         }
-        // The next instruction continues this run only if this one falls
-        // through to exactly it.
-        fresh = i.flow == Flow::Next && insns.get(n + 1).map(|nx| nx.addr) == Some(i.next());
+    }
+
+    /// Offer the next instruction, in address order.
+    pub fn push(&mut self, i: Insn) {
+        if let Some(prev) = self.pending.take() {
+            // The next instruction continues this run only if the previous one
+            // falls through to exactly it.
+            let falls_through = prev.flow == Flow::Next && i.addr == prev.next();
+            self.process(prev, falls_through);
+        }
+        self.pending = Some(i);
+    }
+
+    /// Process the instruction still held back. Nothing follows it, so it
+    /// cannot fall through to anything.
+    pub fn finish(mut self) {
+        if let Some(prev) = self.pending.take() {
+            self.process(prev, false);
+        }
+    }
+
+    fn process(&mut self, i: Insn, falls_through: bool) {
+        if !self.fresh {
+            self.regs = Regs::default();
+        }
+        self.fresh = falls_through;
 
         match i.flow {
-            Flow::Call(t) => out.push(Xref {
+            Flow::Call(t) => self.out.push(Xref {
                 from: i.addr,
                 to: t,
                 kind: XrefKind::Call,
             }),
-            Flow::Branch(t) | Flow::CondBranch(t) => out.push(Xref {
+            Flow::Branch(t) | Flow::CondBranch(t) => self.out.push(Xref {
                 from: i.addr,
                 to: t,
                 kind: XrefKind::Branch,
@@ -148,7 +199,7 @@ pub fn collect(insns: &[Insn], mem: &MemoryMap, out: &mut Vec<Xref>) {
             _ => {}
         }
 
-        track(i, &mut regs, mem, out);
+        track(&i, &mut self.regs, self.mem, self.out);
     }
 }
 

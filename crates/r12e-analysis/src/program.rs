@@ -93,6 +93,46 @@ impl Default for Options {
     }
 }
 
+impl Options {
+    /// The option bytes one cache part depends on.
+    ///
+    /// Exactly the inputs that determine that part's value, and nothing else.
+    /// Thread count is deliberately absent: the answer may not depend on it
+    /// (gate G5), so keying on it would be admitting that it does. Including
+    /// too much would only cost hit rate; including too little would return a
+    /// wrong answer, so anything doubtful goes in.
+    pub fn cache_bytes(&self, part: crate::cache::Part) -> Vec<u8> {
+        let mut v = Vec::with_capacity(64);
+        let c = &self.caps;
+        for n in [
+            c.sections,
+            c.symbols,
+            c.relocations,
+            c.string_len,
+            c.function_insns,
+            c.function_blocks,
+            c.jump_table_entries,
+        ] {
+            v.extend_from_slice(&n.to_le_bytes());
+        }
+        match part {
+            // Cross references are read off the functions, so what changes the
+            // functions changes them too.
+            crate::cache::Part::Functions | crate::cache::Part::Xrefs => {
+                v.push(self.follow_calls as u8);
+                v.push(self.scan_gaps as u8);
+                v.push(self.noreturn as u8);
+            }
+            crate::cache::Part::Strings => {
+                v.extend_from_slice(&(self.string_opts.min_len as u64).to_le_bytes());
+                v.push(self.string_opts.utf16 as u8);
+                v.push(self.string_opts.in_code as u8);
+            }
+        }
+        v
+    }
+}
+
 /// A binary, analyzed.
 pub struct Program {
     /// What the loader produced.
@@ -176,16 +216,14 @@ impl Program {
     }
 }
 
-/// Analyze a loaded object.
+/// Analyze a loaded object, eagerly.
+///
+/// Everything the options ask for is computed before this returns. It is a
+/// [`Session`](crate::Session) with every part forced, and it stays because a
+/// `Program` is what the rest of the workspace wants; a caller that needs only
+/// one part should open a session and ask for that part instead.
 pub fn analyze(object: Object, opts: &Options) -> Program {
-    match opts.threads {
-        Some(n) if n > 0 => rayon::ThreadPoolBuilder::new()
-            .num_threads(n)
-            .build()
-            .map(|pool| pool.install(|| run(object.clone(), opts)))
-            .unwrap_or_else(|_| run(object, opts)),
-        _ => run(object, opts),
-    }
+    crate::Session::new(object, opts.clone()).into_program()
 }
 
 /// One seed: an address to walk and the evidence that put it there.
@@ -196,7 +234,11 @@ struct Seed {
     provenance: Provenance,
 }
 
-fn run(object: Object, opts: &Options) -> Program {
+/// Find functions and walk each one's control flow.
+///
+/// The first stage and the only one the others depend on. Returns the
+/// functions and how many rounds of discovery it took.
+pub(crate) fn discover(object: &Object, opts: &Options) -> (BTreeMap<Addr, Function>, usize) {
     let arch = object.arch.clone();
     let mem = &object.memory;
 
@@ -277,7 +319,7 @@ fn run(object: Object, opts: &Options) -> Program {
         // Gap scanning runs once, after the evidence-led rounds settle, so it
         // never invents a function the real evidence would have found.
         if pending.is_empty() && opts.scan_gaps {
-            let found = scan_gaps(&object, &known, &opts.caps);
+            let found = scan_gaps(object, &known, &opts.caps);
             for a in found {
                 let p = Provenance::new(Evidence::ProloguePattern);
                 merge_evidence(&mut evidence, a, &p, None);
@@ -288,131 +330,145 @@ fn run(object: Object, opts: &Options) -> Program {
                 });
             }
             if !pending.is_empty() {
-                // One pass only.
-                let mut opts2 = opts.clone();
-                opts2.scan_gaps = false;
-                return finish(object, known, evidence, pending, &opts2, rounds);
+                // One pass only: what the gap scan found is walked, and what
+                // that walk finds is not scanned for again.
+                let batch = std::mem::take(&mut pending);
+                walk_pending(object, &mut known, &mut evidence, batch, opts);
+                return (known, rounds);
             }
         }
     }
 
-    finish(object, known, evidence, Vec::new(), opts, rounds)
+    (known, rounds)
 }
 
-/// Walk whatever is still pending, then build the references and strings.
-fn finish(
-    object: Object,
-    mut known: BTreeMap<Addr, Function>,
-    mut evidence: BTreeMap<Addr, (Provenance, Option<String>)>,
+/// Walk seeds that are left over, without following what they call.
+fn walk_pending(
+    object: &Object,
+    known: &mut BTreeMap<Addr, Function>,
+    evidence: &mut BTreeMap<Addr, (Provenance, Option<String>)>,
     pending: Vec<Seed>,
     opts: &Options,
-    rounds: usize,
-) -> Program {
+) {
+    if pending.is_empty() {
+        return;
+    }
     let arch = object.arch.clone();
     let mem = &object.memory;
+    let stop_at: BTreeSet<Addr> = evidence.keys().copied().collect();
+    let mut batch = pending;
+    batch.sort_by_key(|s| s.addr);
+    batch.dedup_by_key(|s| s.addr);
+    let walked: Vec<(Addr, Cfg)> = batch
+        .par_iter()
+        .filter(|s| !known.contains_key(&s.addr))
+        .map(|s| (s.addr, cfg::build(mem, &arch, s.addr, &stop_at, &opts.caps)))
+        .collect();
+    for (addr, c) in walked {
+        if c.blocks.is_empty() {
+            continue;
+        }
+        let (provenance, name) = evidence
+            .remove(&addr)
+            .unwrap_or((Provenance::new(Evidence::ProloguePattern), None));
+        known.insert(
+            addr,
+            Function {
+                entry: addr,
+                name,
+                range: c.hull(),
+                cfg: c,
+                provenance,
+            },
+        );
+    }
+}
 
-    if !pending.is_empty() {
-        let stop_at: BTreeSet<Addr> = evidence.keys().copied().collect();
-        let mut batch = pending;
-        batch.sort_by_key(|s| s.addr);
-        batch.dedup_by_key(|s| s.addr);
-        let walked: Vec<(Addr, Cfg)> = batch
-            .par_iter()
-            .filter(|s| !known.contains_key(&s.addr))
-            .map(|s| (s.addr, cfg::build(mem, &arch, s.addr, &stop_at, &opts.caps)))
-            .collect();
-        for (addr, c) in walked {
-            if c.blocks.is_empty() {
-                continue;
-            }
-            let (provenance, name) = evidence
-                .remove(&addr)
-                .unwrap_or((Provenance::new(Evidence::ProloguePattern), None));
-            known.insert(
-                addr,
-                Function {
-                    entry: addr,
-                    name,
-                    range: c.hull(),
-                    cfg: c,
-                    provenance,
-                },
-            );
+/// Which functions never come back, and a re-walk of the callers that assumed
+/// they did.
+///
+/// One pass: the set is computed from complete functions, and a re-walk only
+/// ever shortens a function, so a second pass finds nothing the first did not.
+/// Part of discovery rather than a stage after it, because it corrects the
+/// functions themselves.
+pub(crate) fn refine_noreturn(
+    object: &Object,
+    known: &mut BTreeMap<Addr, Function>,
+    opts: &Options,
+) -> BTreeSet<Addr> {
+    if !opts.noreturn {
+        return BTreeSet::new();
+    }
+    let arch = object.arch.clone();
+    let mem = &object.memory;
+    let named: BTreeMap<Addr, Option<String>> =
+        known.iter().map(|(a, f)| (*a, f.name.clone())).collect();
+    let graph: BTreeMap<Addr, &Cfg> = known.iter().map(|(a, f)| (*a, &f.cfg)).collect();
+    let set = noreturn::compute(&named, &graph);
+    let affected: Vec<Addr> = known
+        .iter()
+        .filter(|(a, f)| !set.contains(a) && f.cfg.calls.iter().any(|c| set.contains(c)))
+        .map(|(a, _)| *a)
+        .collect();
+    let stop_at: BTreeSet<Addr> = known.keys().copied().collect();
+    let rebuilt: Vec<(Addr, Cfg)> = affected
+        .par_iter()
+        .map(|a| {
+            (
+                *a,
+                cfg::build_with(mem, &arch, *a, &stop_at, &set, &opts.caps),
+            )
+        })
+        .collect();
+    for (a, c) in rebuilt {
+        if c.blocks.is_empty() {
+            continue;
+        }
+        if let Some(f) = known.get_mut(&a) {
+            f.range = c.hull();
+            f.cfg = c;
         }
     }
+    set
+}
 
-    // Which functions never return, and a re-walk of the callers that assumed
-    // they did. One pass: the set is computed from complete functions, and a
-    // re-walk only ever shortens a function, so a second pass finds nothing
-    // the first did not.
-    let noreturn = if opts.noreturn {
-        let named: BTreeMap<Addr, Option<String>> =
-            known.iter().map(|(a, f)| (*a, f.name.clone())).collect();
-        let graph: BTreeMap<Addr, &Cfg> = known.iter().map(|(a, f)| (*a, &f.cfg)).collect();
-        let set = noreturn::compute(&named, &graph);
-        let affected: Vec<Addr> = known
-            .iter()
-            .filter(|(a, f)| !set.contains(a) && f.cfg.calls.iter().any(|c| set.contains(c)))
-            .map(|(a, _)| *a)
-            .collect();
-        let stop_at: BTreeSet<Addr> = known.keys().copied().collect();
-        let rebuilt: Vec<(Addr, Cfg)> = affected
-            .par_iter()
-            .map(|a| {
-                (
-                    *a,
-                    cfg::build_with(mem, &arch, *a, &stop_at, &set, &opts.caps),
-                )
-            })
-            .collect();
-        for (a, c) in rebuilt {
-            if c.blocks.is_empty() {
-                continue;
-            }
-            if let Some(f) = known.get_mut(&a) {
-                f.range = c.hull();
-                f.cfg = c;
-            }
-        }
-        set
-    } else {
-        BTreeSet::new()
-    };
-
-    let xrefs = if opts.xrefs {
-        let mut all: Vec<Vec<Xref>> = known
-            .values()
-            .collect::<Vec<_>>()
-            .par_iter()
-            .map(|f| {
+/// Every reference the recovered functions make.
+pub(crate) fn build_xrefs(object: &Object, known: &BTreeMap<Addr, Function>) -> XrefIndex {
+    let arch = object.arch.clone();
+    let mem = &object.memory;
+    let mut all: Vec<Vec<Xref>> = known
+        .values()
+        .collect::<Vec<_>>()
+        .par_iter()
+        .map(|f| {
+            let mut out = Vec::new();
+            // Streamed rather than decoded into a list first: this runs on
+            // every thread at once, and a decoded instruction is an order of
+            // magnitude larger than the references it produces.
+            let mut c = xref::Collector::new(mem, &mut out);
+            let ordered = cfg::for_each_instruction(mem, &arch, &f.cfg, |i| c.push(i));
+            c.finish();
+            if !ordered {
+                // Overlapping blocks, which nothing in the corpus produces.
+                // The tracker reads instructions in address order, so pay for
+                // the sort rather than answer differently.
+                out.clear();
                 let insns = cfg::instructions(mem, &arch, &f.cfg);
-                let mut out = Vec::new();
                 xref::collect(&insns, mem, &mut out);
-                out
-            })
-            .collect();
-        // Sorted concatenation, so thread completion order cannot reach the
-        // result.
-        all.sort_by_key(|v| v.first().map(|x| x.from));
-        XrefIndex::build(all.into_iter().flatten().collect())
-    } else {
-        XrefIndex::default()
-    };
-
-    let strings = if opts.strings {
-        string_ranges(&object, &opts.string_opts)
-    } else {
-        Vec::new()
-    };
-
-    Program {
-        object,
-        functions: known,
-        xrefs,
-        strings,
-        rounds,
-        noreturn,
+            }
+            out
+        })
+        .collect();
+    // Sorted concatenation, so thread completion order cannot reach the
+    // result.
+    all.sort_by_key(|v| v.first().map(|x| x.from));
+    // Sized up front: collecting from a flattening iterator has no size hint,
+    // so it doubles its way there and holds twice the final index at the peak.
+    let mut flat: Vec<Xref> = Vec::with_capacity(all.iter().map(Vec::len).sum());
+    for v in all.drain(..) {
+        flat.extend_from_slice(&v);
     }
+    XrefIndex::build(flat)
 }
 
 /// Where to look for strings.
@@ -420,7 +476,7 @@ fn finish(
 /// Sections when the container has them, because `.rodata` sits inside an
 /// executable segment in the usual ELF layout and the segment's permission
 /// says nothing useful about it. Segments otherwise.
-fn string_ranges(object: &Object, opts: &strings::Options) -> Vec<Found> {
+pub(crate) fn scan_strings(object: &Object, opts: &strings::Options) -> Vec<Found> {
     let mem = &object.memory;
     let ranges: Vec<AddrRange> = object
         .sections
