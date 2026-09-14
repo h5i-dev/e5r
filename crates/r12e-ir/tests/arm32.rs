@@ -190,6 +190,14 @@ const THUMB_CASES: &[(&str, &str)] = &[
         "it_four",
         "movs r0, #0\n cmp r0, #0\n itttt eq\n addeq r0, #1\n addeq r0, #2\n addeq r0, #4\n addeq r0, #8\n",
     ),
+    // The epilogue a Thumb function writes when it cannot say `pop {.., pc}`:
+    // it reads the return address off the stack straight into the program
+    // counter. The low bit of what it loads is the instruction set to switch
+    // to and is not part of the address.
+    (
+        "ldr_pc_returns",
+        "movs r0, #0x11\n ldr r1, =1f + 1\n push {r1}\n ldr pc, [sp], #4\n          movs r0, #0x99\n b 2f\n1:\n movs r0, #0x42\n2:\n",
+    ),
     // cbz and cbnz, which exist only in Thumb.
     (
         "cbz_taken",
@@ -348,7 +356,10 @@ fn assemble(text: &str, thumb: bool) -> Option<(Vec<u8>, usize)> {
 /// The image is placed where the assembler put it so a pc-relative literal
 /// load reads the pool that follows the instructions.
 fn interpreted(bytes: &[u8], end: usize, thumb: bool) -> Option<u32> {
-    const BASE: u64 = 0x1000;
+    // Where the assembler thinks the code is. A case that loads a label out
+    // of its literal pool gets the address the object file holds, which is
+    // measured from the start of its section, so the image goes there.
+    const BASE: u64 = 0;
     let mut m = Machine::new();
     m.set_reg(lift::arm::sp_offset(), 4, STACK);
     m.write_mem(BASE, bytes);
@@ -379,7 +390,9 @@ fn interpreted(bytes: &[u8], end: usize, thumb: bool) -> Option<u32> {
         for op in &lifted.ops {
             match step(&mut m, op) {
                 Step::Next => {}
-                Step::Jump(to) => {
+                // A return inside the run is a jump: these cases have no
+                // caller, so the address it goes to is one of their own.
+                Step::Jump(to) | Step::Leave(to) => {
                     jumped = Some(usize::try_from(to.get().checked_sub(BASE)?).ok()?);
                     break;
                 }

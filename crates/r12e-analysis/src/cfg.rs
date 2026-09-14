@@ -376,6 +376,18 @@ pub enum Halt {
     Undecodable,
 }
 
+impl Halt {
+    /// What to call it in a report.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Halt::Complete => "complete",
+            Halt::InstructionCap => "instruction cap",
+            Halt::BlockCap => "block cap",
+            Halt::Undecodable => "undecodable",
+        }
+    }
+}
+
 /// The control flow graph of one function.
 #[derive(Debug, Clone)]
 pub struct Cfg {

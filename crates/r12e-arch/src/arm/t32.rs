@@ -1151,7 +1151,15 @@ fn ldst(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
     let size = bits(w, 22, 21);
     let load = bit(w, 20) == 1;
     let (rn, rt) = (bits(w, 19, 16), bits(w, 15, 12));
-    if size == 3 || (signed && (!load || size == 2)) || rt == 15 {
+    // `rt == 15` on a store, or on anything narrower than a word, is the
+    // preload hint rather than a transfer. On a word load it is a load into
+    // the program counter, which is a branch and is decoded as one: A32 has
+    // always read it that way, and a Thumb epilogue that cannot use
+    // `pop {.., pc}` writes `ldr pc, [sp], #4` instead.
+    if size == 3 || (signed && (!load || size == 2)) {
+        return None;
+    }
+    if rt == 15 && !(load && !signed && size == 2) {
         return None;
     }
     let bytes = 1u64 << size;
@@ -1200,20 +1208,35 @@ fn ldst(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
         if !wide_imm && off == 0 {
             m = minus_zero(m);
         }
-        let mut i = at(addr, 4, cm(pick(true), cond), Flow::Next);
+        let flow = if rt == 15 {
+            Flow::IndirectBranch
+        } else {
+            Flow::Next
+        };
+        let mut i = at(addr, 4, cm(pick(true), cond), flow);
         i.push(Operand::Reg(reg(rt))).push(Operand::Mem(m));
         return Some(i);
     }
     if wide_imm {
         let m = Mem::base_disp(reg(rn), bits(w, 11, 0) as i64, bytes);
-        let mut i = at(addr, 4, cm(pick(true), cond), Flow::Next);
+        let flow = if rt == 15 {
+            Flow::IndirectBranch
+        } else {
+            Flow::Next
+        };
+        let mut i = at(addr, 4, cm(pick(true), cond), flow);
         i.push(Operand::Reg(reg(rt))).push(Operand::Mem(m));
         return Some(i);
     }
     if bits(w, 11, 6) == 0 {
         let mut m = Mem::base_disp(reg(rn), 0, bytes);
         m.index = index(reg(bits(w, 3, 0)), bits(w, 5, 4) as u8);
-        let mut i = at(addr, 4, cm(pick(true), cond), Flow::Next);
+        let flow = if rt == 15 {
+            Flow::IndirectBranch
+        } else {
+            Flow::Next
+        };
+        let mut i = at(addr, 4, cm(pick(true), cond), flow);
         i.push(Operand::Reg(reg(rt))).push(Operand::Mem(m));
         return Some(i);
     }
@@ -1261,7 +1284,16 @@ fn ldst(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
     if !u && off == 0 {
         m = minus_zero(m);
     }
-    let mut i = at(addr, 4, cm(pick(false), cond), Flow::Next);
+    // A word load into the program counter off the stack with a post-increment
+    // is the return idiom a Thumb epilogue uses when it cannot say
+    // `pop {.., pc}`: it reads the return address and jumps to it. Any other
+    // load into the program counter is a branch whose target is in memory.
+    let flow = match (rt, rn, mode) {
+        (15, 13, AddrMode::PostIndex) => Flow::Return,
+        (15, _, _) => Flow::IndirectBranch,
+        _ => Flow::Next,
+    };
+    let mut i = at(addr, 4, cm(pick(false), cond), flow);
     i.push(Operand::Reg(reg(rt))).push(Operand::Mem(m));
     Some(i)
 }

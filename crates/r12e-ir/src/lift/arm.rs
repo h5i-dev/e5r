@@ -552,12 +552,15 @@ pub fn lift_mode(i: &Insn, thumb: bool) -> Lifted {
             return b.finish(true);
         }
         Flow::Return => {
-            // Two spellings. `bx lr` returns through a register, and
+            // Three spellings. `bx lr` returns through a register,
             // `pop {.., pc}` restores the frame and returns through the last
-            // word it loads, which is the whole instruction and not just its
-            // flow.
+            // word it loads, and `ldr pc, [sp], #4` is that for one register.
+            // Each is the whole instruction and not just its flow.
             if p.base == "pop" {
                 return stack_multiple(b, &p, ops);
+            }
+            if p.base.starts_with("ldr") {
+                return load_to_pc(b, i, &p, ops, thumb, true);
             }
             let Some((target, _)) = ops.first().and_then(|o| source(&mut b, o)) else {
                 return b.unimplemented();
@@ -566,6 +569,11 @@ pub fn lift_mode(i: &Insn, thumb: bool) -> Lifted {
             return b.finish(true);
         }
         Flow::IndirectBranch => {
+            // `ldr pc, [...]` branches to what it reads, not to the program
+            // counter: the operand names where the target goes, not what it is.
+            if p.base.starts_with("ldr") {
+                return load_to_pc(b, i, &p, ops, thumb, false);
+            }
             let Some((target, _)) = ops.first().and_then(|o| source(&mut b, o)) else {
                 return b.unimplemented();
             };
@@ -1211,6 +1219,43 @@ fn register_named(name: &str) -> Option<u8> {
             .ok()
             .filter(|n| *n < 16),
     }
+}
+
+/// `ldr pc, [...]`: a load whose destination is the program counter.
+///
+/// The value it reads is where control goes, so the instruction is a branch
+/// and the word it loads is the target -- not the program counter, which is
+/// only where the encoding puts the destination. Off the stack with a
+/// post-increment it is the return idiom and returns; anywhere else it is an
+/// indirect branch. The base still gets its writeback either way.
+fn load_to_pc(
+    mut b: Builder,
+    i: &Insn,
+    p: &Parts,
+    ops: &[Operand],
+    thumb: bool,
+    returns: bool,
+) -> Lifted {
+    if p.cond != 14 {
+        return b.unimplemented();
+    }
+    let Some(Operand::Mem(m)) = ops.get(1) else {
+        return b.unimplemented();
+    };
+    let Some((at, updated)) = address(&mut b, m, i.addr, thumb) else {
+        return b.unimplemented();
+    };
+    let target = b.eval(Op::Load, 4, &[at]);
+    writeback(&mut b, m, updated);
+    // The low bit of a loaded code address says which instruction set to
+    // switch to and is not part of the address.
+    let target = b.eval(Op::IntAnd, 4, &[target, Varnode::constant(!1u64, 4)]);
+    b.emit(
+        if returns { Op::Return } else { Op::BranchInd },
+        None,
+        &[target],
+    );
+    b.finish(true)
 }
 
 /// The loads and stores.

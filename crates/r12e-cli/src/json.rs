@@ -185,6 +185,12 @@ pub struct FunctionOut {
     blocks: usize,
     insns: u32,
     complete: bool,
+    /// Why the walk stopped, so "incomplete" says what to look at: an
+    /// undecodable encoding is a decoder gap, a cap is a resource limit, and
+    /// `complete` here with `complete: false` above is an indirect branch
+    /// nothing resolved.
+    halt: &'static str,
+    indirect: bool,
     strength: &'static str,
     evidence: Vec<String>,
 }
@@ -205,6 +211,8 @@ fn function_out(f: &Function) -> FunctionOut {
         blocks: f.cfg.blocks.len(),
         insns: f.cfg.insns(),
         complete: f.is_complete(),
+        halt: f.cfg.halt.as_str(),
+        indirect: f.cfg.has_indirect,
         strength: crate::print::strength_name(f.provenance.strength()),
         evidence,
     }
