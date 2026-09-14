@@ -53,6 +53,42 @@ impl Range {
         }
     }
 
+    /// Everything a value of this many bytes can hold, read as signed.
+    pub fn signed(size: u8) -> Range {
+        match size {
+            1 => Range::new(-0x80, 0x7f),
+            2 => Range::new(-0x8000, 0x7fff),
+            4 => Range::new(-0x8000_0000, 0x7fff_ffff),
+            _ => Range::ANY,
+        }
+    }
+
+    /// This interval with its `size` bytes read as signed rather than
+    /// unsigned, which is what a sign extension does to its source.
+    ///
+    /// A narrow read gives an unsigned interval, so `0..=0xff` on a byte is
+    /// every byte and not every non-negative byte. Passing that through a sign
+    /// extension unchanged claims `(int8_t)b` cannot be negative, which is how
+    /// a range came to exclude a value the processor produced.
+    pub fn reinterpret_signed(self, size: u8) -> Range {
+        let bits = size as u32 * 8;
+        if bits >= 64 {
+            return self;
+        }
+        let modulus = 1i64 << bits;
+        let half = modulus >> 1;
+        // Wholly inside one half: shift it or leave it, and the interval stays
+        // exact. Straddling the halves means the wrap is inside it, and the
+        // only sound answer is everything the width can hold.
+        if self.low >= 0 && self.high < half {
+            self
+        } else if self.low >= half && self.high < modulus {
+            Range::new(self.low - modulus, self.high - modulus)
+        } else {
+            Range::signed(size)
+        }
+    }
+
     /// True when nothing outside this interval can happen.
     pub fn contains(&self, v: i64) -> bool {
         self.low <= v && v <= self.high
@@ -244,7 +280,13 @@ fn evaluate(op: &crate::ssa::SsaOp, known: &BTreeMap<Value, Range>) -> Range {
                     Range::unsigned(from)
                 }
             }
-            Op::IntSExt => a(),
+            // The source of a sign extension is usually a narrow read, whose
+            // interval is unsigned; reading it as signed is the whole point of
+            // the operation.
+            Op::IntSExt => {
+                let from = op.inputs.first().map(|i| i.size()).unwrap_or(op.size);
+                a().reinterpret_signed(from)
+            }
             Op::SubPiece => match op.inputs.get(1).and_then(|i| i.as_const()) {
                 Some(0) => {
                     let source = a();
