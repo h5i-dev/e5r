@@ -1,0 +1,232 @@
+name: release
+
+# Cut by pushing a tag. Everything a user downloads is built here, checksummed
+# here and signed here, so the tag is the only thing a maintainer types.
+#
+# What has actually been run, and what has not. The project's rule is that a
+# gate nobody has exercised is a gate that always passes, and a release
+# workflow is no different:
+#   * The `install` and `linux` jobs run commands that were run by hand on the
+#     maintainer's machine before this file was written. The two musl builds,
+#     the archive layout and the checksum file are the output of
+#     scripts/build-release.sh, which is the same script this workflow calls.
+#   * The `macos` and `windows` jobs are UNVERIFIED. Neither can be run on the
+#     development machine, which is aarch64 Linux with no macOS SDK and no
+#     Windows import libraries, and cross-compiling is a different claim from
+#     cross-testing in any case. The first tag that runs them is the first time
+#     they have ever run; that is why the release is created as a draft below.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build and attach to"
+        required: true
+
+permissions:
+  contents: write
+  # Sigstore keyless signing uses this token as the identity. It is what lets
+  # the release be signed without a private key in the repository secrets.
+  id-token: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # M12 promises `cargo install` works. That claim is about a copy of the crate
+  # with no fixtures/, no tests/ and no scripts/ beside it, so it is checked by
+  # installing into an empty root and running the binary there, not by reading
+  # the manifest. Verified locally before this file existed.
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo install into an empty root
+        run: cargo install --path crates/r12e-cli --root "$RUNNER_TEMP/inst" --locked
+      - name: The installed binary runs with nothing else around it
+        run: |
+          cd "$RUNNER_TEMP"
+          ./inst/bin/r12e --version
+          ./inst/bin/r12e info /bin/ls
+          ./inst/bin/r12e funcs --json /bin/ls | head -c 200
+
+  # Static musl, both architectures, linked with the rust-lld that ships in
+  # every toolchain: no musl-gcc, no cross, no container. Verified on the
+  # maintainer's machine for both targets.
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl,aarch64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+      - run: ./scripts/build-release.sh x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+      # The runner is x86_64, so one of the two can be run rather than merely
+      # linked. `file` reports the other, which is all this job can honestly
+      # claim about it.
+      - name: Say what came out
+        run: |
+          file dist/*.tar.gz
+          tar -tzf dist/r12e-*-x86_64-unknown-linux-musl.tar.gz
+          tmp=$(mktemp -d)
+          tar -xzf dist/r12e-*-x86_64-unknown-linux-musl.tar.gz -C "$tmp"
+          bin=$(find "$tmp" -name r12e -type f)
+          file "$bin"
+          # The build script already fails the job if either archive carries a
+          # NEEDED or an INTERP. This is the same fact in the form a reader of
+          # the log recognizes.
+          ldd "$bin" || true
+          "$bin" --version
+          "$bin" info /bin/ls
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-linux
+          path: dist/*.tar.gz
+
+  # UNVERIFIED. No macOS machine and no SDK here, and Apple's linker cannot be
+  # had on Linux, so a macOS binary can only be built on a macOS runner. The
+  # runner is arm64; the x86_64 half is a cross-compile even there and is not
+  # executed, so this job claims a build and not a test.
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - run: ./scripts/build-release.sh aarch64-apple-darwin x86_64-apple-darwin
+      - name: Run the native one
+        run: |
+          tmp=$(mktemp -d)
+          tar -xzf dist/r12e-*-aarch64-apple-darwin.tar.gz -C "$tmp"
+          bin=$(find "$tmp" -name r12e -type f)
+          otool -L "$bin"
+          "$bin" --version
+          "$bin" info /bin/ls
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-macos
+          path: dist/*.tar.gz
+
+  # UNVERIFIED. x86_64-pc-windows-msvc needs the MSVC libraries, which exist
+  # only on a Windows runner; x86_64-pc-windows-gnu was tried on the
+  # development machine and stops at the mingw-w64 import libraries, which
+  # rustup does not ship (only crt2.o). The code itself does compile for
+  # Windows: `cargo check --target x86_64-pc-windows-msvc` passes here, so what
+  # is untested is the link and the run, not the source.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        shell: pwsh
+        env:
+          RUSTFLAGS: -C strip=symbols
+        run: cargo build --release --target x86_64-pc-windows-msvc -p r12e-cli --bin r12e
+      - name: Archive
+        shell: pwsh
+        run: |
+          $version = (cargo metadata --no-deps --format-version 1 | ConvertFrom-Json).packages |
+            Where-Object { $_.name -eq "r12e-cli" } | ForEach-Object { $_.version }
+          $name = "r12e-$version-x86_64-pc-windows-msvc"
+          New-Item -ItemType Directory -Force -Path "dist/$name" | Out-Null
+          Copy-Item "target/x86_64-pc-windows-msvc/release/r12e.exe" "dist/$name/"
+          Copy-Item README.md, LICENSE, MANUAL.md "dist/$name/"
+          & "dist/$name/r12e.exe" --version
+          Compress-Archive -Path "dist/$name" -DestinationPath "dist/$name.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows
+          path: dist/*.zip
+
+  # One checksum file over every archive, one signature over that file.
+  # Linux is the floor: if macOS or Windows fails, the release still happens
+  # with what built, and the notes say which platforms are in it. A missing
+  # platform should be visible, not a blocked release.
+  publish:
+    needs: [install, linux, macos, windows]
+    if: always() && needs.linux.result == 'success' && needs.install.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Checksums
+        run: |
+          cd dist
+          rm -f SHA256SUMS
+          sha256sum r12e-* > SHA256SUMS
+          cat SHA256SUMS
+
+      # Keyless: the signing identity is this workflow's OIDC token, so there
+      # is no key to store and nothing to rotate. It needs the id-token
+      # permission above and nothing else. If it fails anyway (a fork, a
+      # policy, Sigstore being down) the release still goes out with its
+      # checksums rather than not going out at all, and the notes below say
+      # whether a signature is present.
+      - name: Sign the checksum file
+        id: sign
+        continue-on-error: true
+        run: |
+          cosign sign-blob --yes \
+            --output-signature dist/SHA256SUMS.sig \
+            --output-certificate dist/SHA256SUMS.pem \
+            dist/SHA256SUMS
+
+      - name: Release notes
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          repo="${{ github.repository }}"
+          {
+            echo "## Downloads"
+            echo
+            echo "| File | SHA256 |"
+            echo "| --- | --- |"
+            while read -r sum file; do echo "| \`$file\` | \`$sum\` |"; done < dist/SHA256SUMS
+            echo
+            echo "The Linux archives are static musl binaries: no dynamic loader,"
+            echo "no glibc version to match, no runtime dependency of any kind."
+            echo
+            if [ -f dist/SHA256SUMS.sig ]; then
+              echo "### Verifying"
+              echo
+              echo '```'
+              echo "sha256sum -c SHA256SUMS"
+              echo "cosign verify-blob --signature SHA256SUMS.sig --certificate SHA256SUMS.pem \\"
+              echo "  --certificate-identity-regexp '^https://github.com/$repo/' \\"
+              echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com \\"
+              echo "  SHA256SUMS"
+              echo '```'
+            else
+              echo "Signing did not run for this release; the checksums are unsigned."
+            fi
+            echo
+            echo "Built from \`$tag\`. The macOS and Windows archives are"
+            echo "cross-built and only smoke-tested on their own runner."
+          } > notes.md
+          cat notes.md
+
+      # A draft on purpose while the macOS and Windows jobs are unproven: the
+      # first tag that runs them is the first time they have ever run, and a
+      # human should look at the assets before anyone downloads them. Drop
+      # --draft once a real tag has produced a full set.
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          gh release create "$tag" --draft --title "$tag" --notes-file notes.md \
+            dist/SHA256SUMS dist/r12e-* $(ls dist/SHA256SUMS.sig dist/SHA256SUMS.pem 2>/dev/null)

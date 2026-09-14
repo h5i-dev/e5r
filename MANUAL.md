@@ -13,6 +13,88 @@ cargo build --release
 ./target/release/r12e info /bin/ls
 ```
 
+## Installing
+
+### A release binary
+
+Every release attaches one archive per platform, a `SHA256SUMS` file and a
+signature over it. Unpack and put `r12e` on your path:
+
+```
+tar -xzf r12e-0.1.0-x86_64-unknown-linux-musl.tar.gz
+install -m755 r12e-0.1.0-x86_64-unknown-linux-musl/r12e /usr/local/bin/
+```
+
+Check what you downloaded first. The checksums cover the archives, and the
+signature covers the checksum file. Signing is Sigstore keyless, so the
+identity is the release workflow itself and there is no key to distribute:
+
+```
+sha256sum -c SHA256SUMS
+cosign verify-blob --signature SHA256SUMS.sig --certificate SHA256SUMS.pem \
+  --certificate-identity-regexp '^https://github.com/h5i-dev/r12e/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  SHA256SUMS
+```
+
+| Platform | Archive |
+| --- | --- |
+| Linux x86-64 | `r12e-VERSION-x86_64-unknown-linux-musl.tar.gz` |
+| Linux AArch64 | `r12e-VERSION-aarch64-unknown-linux-musl.tar.gz` |
+| macOS Apple silicon | `r12e-VERSION-aarch64-apple-darwin.tar.gz` |
+| macOS Intel | `r12e-VERSION-x86_64-apple-darwin.tar.gz` |
+| Windows x86-64 | `r12e-VERSION-x86_64-pc-windows-msvc.zip` |
+
+### What the Linux build guarantees
+
+The Linux archives are static musl binaries. There is no dynamic loader, no
+`libc.so` to find and no glibc version to match, so one file runs on any Linux
+with the same architecture: a current distribution, an eight-year-old one,
+Alpine, a distroless container, or a rescue initramfs. `ldd` on it says it is
+not a dynamic executable, and that is the whole claim:
+
+```
+$ file r12e
+r12e: ELF 64-bit LSB pie executable, x86-64, static-pie linked, stripped
+```
+
+Nothing outside the binary is needed at run time. The fixture corpus under
+`fixtures/` is what the test suite measures against; an installed `r12e` never
+reads it, and no data file, configuration or cache directory is required to
+start.
+
+### From source
+
+```
+cargo install --git https://github.com/h5i-dev/r12e r12e-cli
+cargo install --path crates/r12e-cli          # from a checkout
+```
+
+The dependency list is deliberately short (`serde` and `serde_json`, `clap`,
+`memmap2`, `rayon`, and nothing else), and no crate in the workspace has a
+build script or links against a C library. That is what makes cross-compiling
+a matter of naming a target rather than assembling a sysroot: the loaders and
+decoders are written here rather than pulled in, so nothing in the graph needs
+a platform toolchain.
+
+To build the release archives yourself, for any target whose standard library
+rustup has installed:
+
+```
+scripts/build-release.sh x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+```
+
+It links the musl targets with the `rust-lld` that comes with the toolchain, so
+cross-building the other architecture's static binary needs no musl gcc, no
+`cross` and no container. The archives and the `SHA256SUMS` land in `dist/`.
+The tarball adds no variation of its own: entries are sorted and ownership and
+timestamps are zeroed, so the same binary always packs to the same checksum.
+
+### Homebrew
+
+`packaging/homebrew/r12e.rb` is a draft formula, not yet published in a tap and
+not yet run against `brew`.
+
 ## What it will and will not tell you
 
 Every recovered fact carries the evidence for it, and the strength of that

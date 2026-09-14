@@ -540,8 +540,20 @@ designed before it gets coded, and the design lives in
       by call graph neighborhood, reporting matched, changed, added and removed
       with a similarity score, gated on a patched build where the change is
       known.
-- [ ] Diff at instruction granularity inside a changed function, so the answer
+- [x] Diff at instruction granularity inside a changed function, so the answer
       is the line that changed rather than the function that contains it.
+      Patience alignment over a per-instruction shape token that leaves out
+      exactly what an insertion moves, which is the address a branch or a
+      pc-relative computation resolves to. An aligned pair whose addresses then
+      differ is either displaced, which the alignment inside the function and
+      the function matching outside it can prove, or retargeted, which is a
+      claim about the program and is never folded into the other. Gated on
+      three build pairs whose source difference is one line, with the edit list
+      asserted instruction for instruction: an operator substituted is one
+      replacement and nothing else, a statement added is four insertions and
+      one displaced branch, a statement removed is three deletions and one.
+      `_start`, which the function-level diff calls changed because every byte
+      of its calls moved, reports no change in it at all.
 - [x] Patch sets. An auditable object describing byte edits, previewed before
       write, applied to a sibling file by default. A set applies as a whole or
       not at all, overlapping edits are a conflict rather than an order-dependent
@@ -554,9 +566,33 @@ designed before it gets coded, and the design lives in
       than twenty-four instructions is not identified by shape, and import
       thunks are excluded because four instructions that differ only in an
       offset match across binaries by coincidence.
-- [ ] Signature matching against published libraries: an importer for the
-      a corpus built from real distribution packages, so a statically linked
-      binary stops being 8,000 anonymous functions.
+- [x] Signature matching against published libraries: a corpus built from real
+      distribution packages, so a statically linked binary stops being 8,000
+      anonymous functions. `scripts/build-siglib.sh` takes `.deb`, `.rpm` or
+      tarball packages, installed packages by name, or bare `.a` files,
+      extracts the static libraries, and turns every named function in every
+      archive member into one signature with the member it came from recorded
+      beside it. Measured on a stripped `-static` build of `hello.c` against
+      this distribution's own `libc.a`, `libm.a` and `libc_nonshared.a`: 3,228
+      signatures from 2,016 archive members recover 497 of the binary's 908
+      names, 54.7%, with 0 wrong. The oracle is the unstripped copy's symbol
+      table, read as the set of names at each address, because a linker puts
+      `strlen` and `__strlen` on the same byte and either is right.
+
+      The sentence this replaces read "an importer for the a corpus built from
+      real distribution packages": the format's name was lost in an edit, and
+      the format was IDA's FLIRT `.sig`. That importer is declined rather than
+      postponed. Hex-Rays publishes the FLAIR tools and documents the text
+      `.pat` files they emit; it does not publish the byte layout of the `.sig`
+      container, and every description of that layout in circulation is
+      somebody's reverse engineering of the tool, which CONTRIBUTING.md's
+      clean-room rule forbids reading. Even the documented `.pat` half could
+      not *match* anything without reimplementing FLIRT's own CRC16 over the
+      bytes past the leading pattern, and that polynomial is written down in
+      the same reverse engineering and nowhere else. The archives in a
+      distribution's development packages carry the same code under the same
+      names, are what a statically linked binary was built from, and need no
+      reading of anyone's format.
 - [x] Emulation, built on the M4 IR interpreter: `r12e emulate` runs a
       function with given arguments and reports what came back and what it
       touched. Nothing escapes the process. Gated against the processor by
@@ -614,9 +650,22 @@ designed before it gets coded, and the design lives in
       [`docs/design/limits.md`](../docs/design/limits.md).
 - [ ] A no-panic gate on the loader and decoder paths, checked by fuzzing rather
       than asserted in a README.
-- [ ] Static musl builds for Linux, plus macOS and Windows binaries.
-- [ ] Packaging: `cargo install`, a Homebrew formula, and a release workflow that
-      signs and attaches checksums.
+- [x] Static musl builds for Linux, both architectures, built and run: 4.4 MB
+      aarch64 and 5.5 MB x86-64, no interpreter and no shared library, with
+      the x86-64 one executed under qemu and the aarch64 one producing output
+      byte-identical to the glibc build. The recipe needs no musl-gcc, no
+      `cross` and no container, because rust-lld and the self-contained crt
+      objects ship with rustup. macOS and Windows compile here and cannot be
+      linked or run here, and the workflow marks both unverified rather than
+      implying otherwise.
+- [x] Packaging. `cargo install` works and is checked by the workflow rather
+      than asserted: installed into an empty root and run from outside the
+      checkout, where the absent fixtures break nothing. `cargo package
+      --workspace` succeeds for all 14 crates. Signing is Sigstore keyless
+      through the workflow's own identity, so no secret is stored, and it
+      degrades to unsigned checksums rather than failing the release. The
+      Homebrew formula is a draft and its first line says so, because there is
+      no brew here to run it.
 - [x] `MANUAL.md`, a design document per subsystem under `docs/design/`, and a
       tutorial that takes a reader from a stripped binary to a named, typed,
       committed annotation log (`docs/tutorial.md`).

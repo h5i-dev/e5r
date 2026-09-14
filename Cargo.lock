@@ -287,8 +287,10 @@ dependencies = [
 name = "r12e-db"
 version = "0.1.0"
 dependencies = [
+ "r12e-analysis",
  "r12e-arch",
  "r12e-core",
+ "r12e-format",
  "r12e-types",
  "serde",
 ]

@@ -616,3 +616,175 @@ if [ -e fixtures/cpp/hierarchy.cpp ] && [ -n "${lld:-}" ]; then
   done
   rm -f "$out"/cpp-hierarchy.win-*.obj
 fi
+
+# Windows program databases, which this machine can produce after all.
+#
+# The earlier note that there is no Windows toolchain here was about a *linker
+# and a CRT*, not about debug information: clang emits CodeView with
+# `-gcodeview`, and rust-lld under its link flavour writes the .pdb when it is
+# given /debug. So the PDB reader is measured against databases a real producer
+# wrote rather than only against ones the test synthesized, and llvm-pdbutil
+# dumps the same files as an external oracle.
+#
+# The source is written here rather than under fixtures/ because it exists only
+# to make a producer emit one of everything the reader claims to read: a struct
+# with a bitfield and a function pointer, a union, an enum, an array, globals
+# with internal and external linkage, and a static helper called from three
+# places so that -O2 inlines it and the producer emits S_INLINESITE. -O0 keeps
+# the locals on the stack (S_DEFRANGE_FRAMEPOINTER_REL) and -O2 puts them in
+# registers (S_DEFRANGE_REGISTER), which are different code paths in the
+# reader. `_fltused` is what the CRT would normally supply for the float.
+if command -v "$xcc" >/dev/null 2>&1 && [ -n "${lld:-}" ]; then
+  cat > "$out/pdb.c" <<'PDBC'
+int _fltused = 0;
+
+enum Color { RED = 0, GREEN = 1, BLUE = 7 };
+
+struct Point { int x; int y; float w; };
+
+union Word { unsigned u; float f; unsigned char b[4]; };
+
+struct Node {
+  struct Point at;
+  enum Color color;
+  unsigned flags : 3;
+  unsigned kind : 5;
+  struct Node *next;
+  int (*compare)(struct Point *, struct Point *);
+};
+
+int global_counter = 7;
+static struct Point origin = {0, 0, 0.0f};
+struct Node the_head;
+
+static int scale(int a, int b) { int t = a * b; return t + 1; }
+
+int compare_points(struct Point *a, struct Point *b) {
+  int dx = a->x - b->x;
+  int dy = a->y - b->y;
+  return scale(dx, 3) + scale(dy, 5);
+}
+
+int walk(struct Node *n, int k) {
+  int total = 0;
+  while (n) { total += scale(n->at.x, k) + (int)n->color; n = n->next; }
+  return total;
+}
+
+int mainCRTStartup(void) {
+  struct Point p = {1, 2, 3.0f};
+  union Word w;
+  w.u = 0x41424344;
+  the_head.at = p;
+  the_head.color = BLUE;
+  the_head.compare = compare_points;
+  return compare_points(&p, &origin) + walk(&the_head, 2) + (int)w.f + global_counter;
+}
+PDBC
+  for opt in O0 O2; do
+    for t in "x64:x86_64-pc-windows-msvc:x64" "a64:aarch64-pc-windows-msvc:arm64"; do
+      tag=${t%%:*}; rest=${t#*:}; triple=${rest%%:*}; machine=${rest##*:}
+      "$xcc" --target="$triple" -g -gcodeview -"$opt" -ffreestanding -c \
+        -o "$out/pdb.$tag.$opt.obj" "$out/pdb.c" 2>/dev/null || continue
+      # /debug is what makes the linker write the database at all, and the
+      # image's debug directory then points at the path /pdb names.
+      "$lld" -flavor link /machine:"$machine" /nodefaultlib /entry:mainCRTStartup \
+        /subsystem:console /debug /pdb:"$out/pdb.$tag.$opt.pdb" \
+        /out:"$out/pdb.$tag.$opt.exe" "$out/pdb.$tag.$opt.obj" 2>/dev/null || true
+    done
+  done
+  rm -f "$out"/pdb.*.obj "$out/pdb.c"
+fi
+
+# Instruction-granularity diff: the same program four times over, with one
+# source line different each time, so the expected edit list is exact rather
+# than "some difference was found".
+#
+# -O0 and gcc on purpose. The question this pair asks is whether the alignment
+# survives the shift an edit causes; an optimizer rewriting the function would
+# make the expected list a property of the compiler's scheduling instead. The
+# function under test carries no global and no string literal either, because a
+# data address the linker moves would surface as a retargeted operand and make
+# the list depend on section layout.
+cat > "$out/insndiff.c" <<'IDC'
+__attribute__((noinline)) static int mix(int n) {
+    int acc = 1;
+    for (int i = 0; i < n; i++) {
+        acc = acc + i;
+        acc = acc ^ (acc >> 3);
+        acc = acc - 7;
+        acc = acc * 3;
+        /* INSERT */
+    }
+    return acc;
+}
+
+__attribute__((noinline)) static int other(int n) { return n * 5 + 1; }
+
+volatile int keep;
+
+void _start(void) {
+    for (;;) keep = mix(keep) + other(keep);
+}
+IDC
+# One operator changed, so one instruction is replaced and nothing moves.
+sed 's|acc = acc + i;|acc = acc - i;|' "$out/insndiff.c" > "$out/insndiff-sub.c"
+# One statement added, so instructions appear and everything after them shifts.
+sed 's|/\* INSERT \*/|acc = acc ^ 21;|' "$out/insndiff.c" > "$out/insndiff-ins.c"
+# One statement removed, which is the same test in the other direction.
+sed '/acc = acc - 7;/d' "$out/insndiff.c" > "$out/insndiff-del.c"
+for v in "" -sub -ins -del; do
+  "$cc" -O0 -ffreestanding -fno-stack-protector -fno-builtin -fno-pie -no-pie \
+    -nostdlib -static -o "$out/insndiff${v}.a64" "$out/insndiff${v}.c" 2>/dev/null || true
+done
+rm -f "$out"/insndiff*.c
+
+# A statically linked binary, which is what signature matching exists for: the
+# same program as hello.a64 with every libc function it uses copied into it out
+# of the distribution's own libc.a. Unstripped as the oracle and stripped as the
+# thing to be measured, so a name the signature library recovers can be checked
+# against the name the linker actually gave that address.
+if [ -e fixtures/src/hello.c ]; then
+  "$cc" -O2 -static -fno-pie -no-pie -o "$out/hello.static.a64" fixtures/src/hello.c \
+    2>/dev/null || true
+  if [ -e "$out/hello.static.a64" ]; then
+    cp "$out/hello.static.a64" "$out/hello.static.a64.stripped"
+    strip "$out/hello.static.a64.stripped"
+  fi
+fi
+
+# Emulation fixtures: the three things M10 says emulation is for, plus a run
+# that does not terminate. Built for both architectures and executed, so the
+# emulation tests compare against what a processor produced rather than against
+# the emulator.
+#
+# gcc for AArch64 and clang for x86-64 on purpose, and not because of the
+# sysroot: clang compiles this switch into a decision tree on AArch64 and into a
+# jump table on x86-64, and gcc does the opposite, so this pairing is the one
+# that leaves a real table on each architecture for the confirmation gate to
+# check. The AArch64 one is the compact byte-offset form, which is exactly the
+# form that cannot be bounded by scanning.
+if [ -e fixtures/emulate/paths.c ]; then
+  for opt in O1 O2; do
+    "$cc" -g -"$opt" -ffreestanding -fno-stack-protector -fno-builtin -fno-pie \
+      -no-pie -nostdlib -static -o "$out/em-paths.a64.$opt" fixtures/emulate/paths.c \
+      2>/dev/null || true
+    if [ -n "${lld:-}" ]; then
+      "$xcc" --target=x86_64-unknown-linux-gnu -B"$out/ld" -fuse-ld=lld -g -"$opt" \
+        -ffreestanding -fno-stack-protector -fno-builtin -fno-pie -nostdlib -static \
+        -o "$out/em-paths.x64.$opt" fixtures/emulate/paths.c 2>/dev/null || true
+    fi
+    if [ -x "$out/em-paths.a64.$opt" ]; then
+      "$out/em-paths.a64.$opt" > "$out/em-paths.a64.$opt.out" || true
+    fi
+    if [ -x "$out/em-paths.x64.$opt" ] && command -v qemu-x86_64 > /dev/null; then
+      qemu-x86_64 "$out/em-paths.x64.$opt" > "$out/em-paths.x64.$opt.out" || true
+    fi
+    # The two architectures computing the same answers is the oracle checking
+    # itself before anything is measured against it.
+    if [ -s "$out/em-paths.a64.$opt.out" ] && [ -s "$out/em-paths.x64.$opt.out" ]; then
+      cmp -s "$out/em-paths.a64.$opt.out" "$out/em-paths.x64.$opt.out" \
+        || echo "warning: em-paths.$opt disagrees across architectures" >&2
+    fi
+  done
+fi

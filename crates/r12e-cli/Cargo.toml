@@ -1,12 +1,23 @@
 [package]
 name = "r12e-cli"
-description = "r12e — the command line."
+description = "r12e — the command line. Load a binary, recover functions, disassemble, decompile, diff."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+# Inherited, so the path is the workspace README rather than a second copy.
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+# No `include` list on purpose: everything under the crate directory is the
+# package, so a file added later cannot be left out of it silently. Nothing in
+# the build reads a file outside the package either (no build script, no
+# include_str! of a fixture), which is what makes the published copy build
+# where fixtures/ and scripts/ do not exist.
 
 [[bin]]
 name = "r12e"

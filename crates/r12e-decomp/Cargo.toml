@@ -17,5 +17,9 @@ serde = { workspace = true }
 [dev-dependencies]
 r12e-analysis = { workspace = true }
 r12e-format = { workspace = true }
-r12e-decomp = { workspace = true }
-r12e-api = { workspace = true }
+# Path only, with no version. A dev-dependency that carries a version is
+# resolved against the registry when the crate is packaged, and these two
+# point back at this crate and at one that depends on it, which is a cycle
+# nothing can publish. Stripped from the published manifest without one.
+r12e-decomp = { path = "." }
+r12e-api = { path = "../r12e-api" }

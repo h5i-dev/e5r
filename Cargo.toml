@@ -15,6 +15,13 @@ rust-version = "1.85"
 license = "Apache-2.0"
 repository = "https://github.com/h5i-dev/r12e"
 authors = ["r12e contributors"]
+# Publishing metadata. Here rather than in each crate so a crate that becomes
+# publishable only has to opt in; r12e-cli is the one that is published today.
+homepage = "https://github.com/h5i-dev/r12e"
+documentation = "https://docs.rs/r12e-cli"
+readme = "README.md"
+keywords = ["reverse-engineering", "disassembler", "decompiler", "binary", "elf"]
+categories = ["command-line-utilities", "development-tools::debugging"]
 
 [workspace.dependencies]
 r12e-core = { path = "crates/r12e-core", version = "0.1.0" }
