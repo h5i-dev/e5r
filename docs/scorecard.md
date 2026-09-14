@@ -467,6 +467,16 @@ the roadmap bet was open. **M6's exit criterion is not met:** it asks for
 Ghidra's published 32.2 union and 29.3 structure, and this is 23.4 and 22.9.
 G12 has no previous release to compare against, so this run is its baseline.
 
+Re-run on 2026-09-14 against a tree whose `roundtrip` gate had gone from 39
+disagreeing functions to zero: **every headline number identical**, the same
+182 functions perfect of 779. GED did not move at all, mean and median
+included, because zlib at `-O0` has control flow the structuring pass already
+handled the same way. type_match moved where the headline cannot see it -- mean
+0.1872 to 0.2055 and median 0.0586 to 0.1000 after dereferenced arguments
+started being declared as pointers -- with the perfect count unchanged at 43.
+A metric that is all-or-nothing per function is blind to most functions
+becoming less wrong. See [`decbench.md`](decbench.md).
+
 The recompile column is not a correctness score. byte_match compares
 recompiled assembly by Jaccard similarity, so output that drops every call
 argument still scores. When this table was measured the `roundtrip` gate, which

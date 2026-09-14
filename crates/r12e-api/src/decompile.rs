@@ -485,13 +485,20 @@ fn recovered(p: &Program, f: &Function, ssa: &SsaFunction) -> Option<Prototype> 
     for n in 0..recovered.integer_arguments {
         let name = format!("arg{n}");
         let offset = abi.integer_arguments.get(n).copied().unwrap_or(u64::MAX);
-        // Two or more fields is a structure worth naming; one is a pointer to
-        // a value, which `*p` already says.
-        let (fields, stride) = shapes
-            .get(&offset)
+        // Two or more fields is a structure worth naming. One is a pointer to
+        // a plain value, which needs no structure but is still a pointer:
+        // saying `uint64_t` for something the body dereferences is a worse
+        // description than saying what it points at.
+        let shape = shapes.get(&offset);
+        let (fields, stride) = shape
             .filter(|(f, _)| f.len() > 1)
             .cloned()
             .unwrap_or_default();
+        let single = shape
+            .filter(|(f, _)| f.len() == 1)
+            .and_then(|(f, _)| f.first().copied())
+            .filter(|(at, _)| *at == 0)
+            .map(|(_, size)| size);
         // The name carries the function, because two functions rarely hand
         // the same structure to the same argument register and a shared name
         // would claim they did.
@@ -501,11 +508,13 @@ fn recovered(p: &Program, f: &Function, ssa: &SsaFunction) -> Option<Prototype> 
         // what lets a caller's `-512` print as itself rather than as
         // `0xfffffe00`.
         let width = recovered.integer_widths.get(n).copied().unwrap_or(8);
-        let (decl, pointer) = if fields.is_empty() {
-            (format!("{} {name}", r12e_decomp::c_type(width)), false)
-        } else {
-            definitions.push(structure(&tag, &fields));
-            (format!("struct s_{tag} *{name}"), true)
+        let (decl, pointer) = match (fields.is_empty(), single) {
+            (false, _) => {
+                definitions.push(structure(&tag, &fields));
+                (format!("struct s_{tag} *{name}"), true)
+            }
+            (true, Some(size)) => (format!("{} *{name}", r12e_decomp::c_type(size)), true),
+            (true, None) => (format!("{} {name}", r12e_decomp::c_type(width)), false),
         };
         parameters.push(Param {
             decl,

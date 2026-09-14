@@ -287,16 +287,47 @@ thing, and it is a `docs/design/decompiling.md` violation: the design says the
 decompiler does not silently drop anything, and this drops every argument at
 the call.
 
-### The working tree has already moved
+### Re-measured 2026-09-14, and what did not move
 
-Checked the same day, after the run: the binary at `0edd06e` decompiles the
-same 158 functions of `example` into 133 identical bodies and 25 changed ones,
-and the goto count over that fixed set rises from 289 to 407. Structuring is
-the metric this document says costs us the most, and it has got worse by 41%
-on this corpus since the measured commit. That tree has several agents mid-edit
-in it and is not a release, so this is a warning rather than a number: whoever
-re-runs this benchmark should expect the GED column to move, and should check
-which direction before quoting it.
+The same corpus, re-run three times against a tree that had since fixed an
+inverted signed comparison, a 32-bit `lea` that named a value nothing wrote,
+missing stack arguments, and argument widths -- work that took the `roundtrip`
+gate from 39 disagreeing functions to zero, and the fixture corpus from 8,898
+gotos to 7,284.
+
+**Every headline number is unchanged.** 23.4 union, 22.9 GED, 5.6 type_match,
+0.6 byte_match, the same 182 functions perfect of 779.
+
+Two different reasons, and they should not be confused.
+
+**GED is unchanged because nothing changed.** Not merely the percentage: the
+mean is 21.61111111111111 and the median 13.0 in both runs, and the perfect
+count is 177 of 774 in both. zlib built at `-O0` has control flow the
+structuring pass already handled identically; the goto reductions came from
+optimized builds, and there are none here.
+
+**type_match is unchanged only in the headline.** Declaring a dereferenced
+argument as a pointer to what it points at, rather than as `uint64_t`, moved
+the distribution and not the count:
+
+| | perfect | mean | median |
+| --- | --- | --- | --- |
+| before | 43 of 764 | 0.1872 | 0.0586 |
+| after | 43 of 764 | 0.2055 | 0.1000 |
+
+The mean is 9.8% better and the median 71% better, and the metric this
+benchmark reports cannot see either. `adler32_z` now comes out as
+`(uint64_t, uint8_t *, uint64_t)` where the source wrote
+`(uLong, const Bytef *, z_size_t)` -- two of three right where it was one --
+and a function scores perfect only when every type matches.
+
+**So the M6 exit criterion is insensitive to incremental work**, and a session
+that measurably improved the output moved it by nothing. That is a fact about
+the criterion, not a reason to drop it: 32.2 union is still the bar, and the
+way to it is whole functions becoming exactly right rather than most functions
+becoming less wrong. The mean and the median belong beside the percentage in
+every future run, because they are what says whether a change did anything at
+all.
 
 ### What this run does not say
 
