@@ -388,6 +388,7 @@ fn asserted_prototype(a: &Asserted, recovered: &r12e_ir::proto::Prototype) -> Pr
                 size: with_pointer.size_of(ptr).unwrap_or(0).min(255) as u8,
                 fields: Vec::new(),
                 stride: None,
+                stack: None,
             });
             mentioned.push(ty);
         }
@@ -407,6 +408,7 @@ fn asserted_prototype(a: &Asserted, recovered: &r12e_ir::proto::Prototype) -> Pr
             // declaration the same output prints.
             fields: Vec::new(),
             stride: None,
+            stack: None,
         });
         mentioned.push(param.ty);
     }
@@ -513,6 +515,7 @@ fn recovered(p: &Program, f: &Function, ssa: &SsaFunction) -> Option<Prototype> 
             size: if pointer { 8 } else { width },
             fields,
             stride,
+            stack: None,
         });
     }
     for n in 0..recovered.float_arguments {
@@ -529,8 +532,30 @@ fn recovered(p: &Program, f: &Function, ssa: &SsaFunction) -> Option<Prototype> 
             size: width,
             fields: Vec::new(),
             stride: None,
+            stack: None,
         });
     }
+    // Arguments past the registers, which the caller left on the stack. Without
+    // these the signature is short and every call to such a function passes
+    // rubbish for the rest: `many_args` takes eight and was declared taking six.
+    for offset in &recovered.stack_arguments {
+        let name = r12e_decomp::slot_name(r12e_ir::ssa::Location {
+            space: r12e_ir::op::Space::Stack,
+            offset: *offset as u64,
+            size: 8,
+        });
+        parameters.push(Param {
+            decl: format!("uint64_t {name}"),
+            name,
+            floating: false,
+            pointer: false,
+            size: 8,
+            fields: Vec::new(),
+            stride: None,
+            stack: Some(*offset),
+        });
+    }
+
     Some(Prototype {
         parameters,
         // A function that leaves nothing behind returns nothing, and saying
@@ -599,6 +624,7 @@ fn declared(p: &Program, f: &Function) -> Option<Prototype> {
                 // The declared type already names the fields.
                 fields: Vec::new(),
                 stride: None,
+                stack: None,
             }
         })
         .collect();

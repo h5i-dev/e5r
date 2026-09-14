@@ -95,6 +95,10 @@ pub struct Param {
     pub fields: Vec<(i64, u8)>,
     /// The element size, when it walks an array of them.
     pub stride: Option<u64>,
+    /// Its offset above the entry stack pointer, when the convention ran out
+    /// of registers and the caller left it on the stack. `None` for the ones
+    /// that arrive in registers.
+    pub stack: Option<i64>,
 }
 
 /// Decompile an SSA function to pseudo-C.

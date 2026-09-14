@@ -944,6 +944,12 @@ impl<'a> Rebuilder<'a> {
     pub fn declare(&mut self, p: &Prototype) {
         let (mut ints, mut floats) = (0usize, 0usize);
         for param in &p.parameters {
+            // A stack argument already carries the name the body gives it, and
+            // it occupies no register, so laying the declaration over the
+            // convention has nothing to do for it.
+            if param.stack.is_some() {
+                continue;
+            }
             let offset = if param.floating {
                 let o = self.abi.float_arguments.get(floats).copied();
                 floats += 1;
@@ -1086,14 +1092,22 @@ pub fn variables(f: &SsaFunction, prototype: Option<&Prototype>, body: &str) -> 
         Some(p) => {
             let (mut ints, mut floats) = (0usize, 0usize);
             for param in &p.parameters {
-                let offset = if param.floating {
-                    let o = r.abi.float_arguments.get(floats).copied();
-                    floats += 1;
-                    o
-                } else {
-                    let o = r.abi.integer_arguments.get(ints).copied();
-                    ints += 1;
-                    o
+                // One the convention ran out of registers for is on the stack
+                // and takes no register slot.
+                let home = match param.stack {
+                    Some(offset) => Home::Stack(offset),
+                    None => {
+                        let offset = if param.floating {
+                            let o = r.abi.float_arguments.get(floats).copied();
+                            floats += 1;
+                            o
+                        } else {
+                            let o = r.abi.integer_arguments.get(ints).copied();
+                            ints += 1;
+                            o
+                        };
+                        offset.map_or(Home::Anywhere, Home::Register)
+                    }
                 };
                 push(
                     &mut out,
@@ -1102,7 +1116,7 @@ pub fn variables(f: &SsaFunction, prototype: Option<&Prototype>, body: &str) -> 
                         name: param.name.clone(),
                         size: param.size,
                         role: Role::Parameter,
-                        home: offset.map_or(Home::Anywhere, Home::Register),
+                        home,
                     },
                 );
             }

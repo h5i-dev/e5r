@@ -330,6 +330,7 @@ fn a_declared_field_name_beats_the_one_the_offset_implies() {
             size: 8,
             fields: vec![(4, 4), (12, 4)],
             stride: Some(4),
+            stack: None,
         }],
         returns: Some("uint64_t".to_string()),
         definitions: Vec::new(),

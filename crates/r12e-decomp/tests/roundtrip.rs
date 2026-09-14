@@ -23,14 +23,16 @@ use r12e_format::LoadOptions;
 
 /// How many functions may still return something the machine does not.
 ///
-/// Zero is the only acceptable end state: a decompiler that produces a wrong
-/// answer is worse than one that refuses. Until then this is a ratchet, like
-/// the goto ceiling in `quality.rs`, and it only ever comes down. A gate that
-/// is permanently red is a gate everyone learns to skip, so this one fails
-/// both when the number rises and when it falls without being recorded.
+/// Zero, and it was a ratchet until it got here. A decompiler that produces a
+/// wrong answer is worse than one that refuses, so nothing above zero was ever
+/// going to be the end state; the number came down as the defects behind it
+/// were found, and the gate failed both when it rose and when it fell without
+/// being recorded, so that neither direction could pass unnoticed.
 ///
-/// Each remaining function is a real defect and the failure message names it.
-const MAX_DISAGREEING: usize = 7;
+/// Every function that can be compiled and run is now run, on every argument
+/// vector, and agrees with the interpreter. Any future disagreement is a
+/// regression and the failure message names the function and the arguments.
+const MAX_DISAGREEING: usize = 0;
 
 /// Argument vectors every eligible function is run on.
 ///
@@ -99,6 +101,11 @@ fn cc() -> Option<String> {
 ///
 /// Counted from the `argN` names rather than from the commas, because a
 /// parameter's type can itself be a generated name containing `arg`.
+///
+/// The ones the convention ran out of registers for are named `arg_s<offset>`
+/// by where the caller left them, not by their position, so they are counted
+/// rather than maximised over. They come after the register arguments in the
+/// declaration, which is the order a caller passes them in.
 fn arity(text: &str) -> usize {
     let head = &text[..text.find(')').map(|i| i + 1).unwrap_or(text.len())];
     let b = head.as_bytes();
@@ -115,7 +122,10 @@ fn arity(text: &str) -> usize {
             highest = Some(highest.map_or(n, |h: usize| h.max(n)));
         }
     }
-    highest.map_or(0, |h| h + 1)
+    let on_stack = head
+        .match_indices("arg_s")
+        .filter(|(i, _)| *i == 0 || !(b[*i - 1].is_ascii_alphanumeric() || b[*i - 1] == b'_'));
+    highest.map_or(0, |h| h + 1) + on_stack.count()
 }
 
 /// One function the gate can run: its C, its name, and what the interpreter
@@ -236,6 +246,10 @@ fn execute(text: &str, tag: &str) -> Option<Vec<(usize, usize, u64)>> {
 /// Every pure function in the corpus computes, when compiled and run, what the
 /// machine computes.
 #[test]
+// `<= 0` is `== 0`, and the comparison is written against the constant on
+// purpose: it is the ratchet, and the assertion should still read as a ceiling
+// the day one has to be allowed again.
+#[allow(clippy::absurd_extreme_comparisons)]
 fn decompiled_c_computes_what_the_machine_computes() {
     let Some(dir) = build_dir() else { return };
     if cc().is_none() {
@@ -313,12 +327,6 @@ fn decompiled_c_computes_what_the_machine_computes() {
             .cloned()
             .collect::<Vec<_>>()
             .join("\n")
-    );
-    assert!(
-        names.len() >= MAX_DISAGREEING || MAX_DISAGREEING == 0,
-        "{} function(s) disagree, under the ceiling of {MAX_DISAGREEING}. Lower the ceiling \
-         to this number so it cannot drift back up.",
-        names.len()
     );
     eprintln!("{checked} call(s) over {functions} function(s) agree");
 }
