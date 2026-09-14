@@ -39,6 +39,10 @@ pub struct Prototype {
     /// four is the width it was written against. Empty when nothing was
     /// recovered; otherwise one entry per integer argument.
     pub integer_widths: Vec<u8>,
+    /// The same for each floating point argument, which is how a `float`
+    /// argument is told from a `double` one: both arrive in the same register
+    /// and only the reads say which was declared.
+    pub float_widths: Vec<u8>,
     /// Offsets from the entry stack pointer of the arguments passed there.
     pub stack_arguments: Vec<i64>,
     /// Where it leaves a value the caller could read, when it leaves one.
@@ -384,6 +388,7 @@ fn apply(machine: Prototype, asserted: &Asserted, abi: &Abi) -> Prototype {
         // An asserted declaration carries its own types, so the widths the
         // body reads at are the recovered prototype's business, not this one's.
         integer_widths: Vec::new(),
+        float_widths: Vec::new(),
         stack_arguments,
         returns,
         returns_float,
@@ -635,11 +640,18 @@ pub fn recover_observed(f: &SsaFunction, abi: &Abi, observed: &Observed) -> Prot
             None => 8,
         })
         .collect();
+    let float_widths = (0..float_arguments)
+        .map(|n| match abi.float_arguments.get(n) {
+            Some(offset) => read_width(f, &facts.live_in, *offset),
+            None => 8,
+        })
+        .collect();
 
     Prototype {
         integer_arguments,
         float_arguments,
         integer_widths,
+        float_widths,
         stack_arguments,
         returns,
         returns_float,

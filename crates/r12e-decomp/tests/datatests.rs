@@ -836,11 +836,18 @@ fn floatprint() {
 }
 
 /// floatcast.xml: a `float` widened to `double`, computed on, and narrowed
-/// back. The arguments arrive as `(double)(uint32_t)__bits(farg0)`, which reads
-/// the bit pattern of the float as an integer and then converts it, so the
-/// value is wrong rather than merely ugly.
+/// back.
+///
+/// The arguments are right now: they arrive as `float` and read as
+/// `(double)farg0`. What is left is the other end. The function returns a
+/// `float` and is declared returning `double`, so the result goes back through
+/// `(uint64_t)(uint32_t)__bits32(...)` to fill the register it is declared to
+/// fill. Fixing it needs the width of the value that reaches the return, which
+/// the recovery does not have: a narrow write is a masked merge with the old
+/// whole register, so the definition it finds is eight bytes wide whatever was
+/// computed.
 #[test]
-#[ignore = "a float argument is read through its bit pattern instead of its value"]
+#[ignore = "a float result is returned through its bit pattern: the return width is not recovered"]
 fn floatcast() {
     case(&all("arith"), "floatcast", |c| {
         c.lacks("(uint32_t)__bits");

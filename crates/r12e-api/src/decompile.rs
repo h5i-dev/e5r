@@ -517,12 +517,16 @@ fn recovered(p: &Program, f: &Function, ssa: &SsaFunction) -> Option<Prototype> 
     }
     for n in 0..recovered.float_arguments {
         let name = format!("farg{n}");
+        // A `float` and a `double` arrive in the same register; only what the
+        // body reads says which was declared.
+        let width = recovered.float_widths.get(n).copied().unwrap_or(8);
+        let ty = if width == 4 { "float" } else { "double" };
         parameters.push(Param {
-            decl: format!("double {name}"),
+            decl: format!("{ty} {name}"),
             name,
             floating: true,
             pointer: false,
-            size: 8,
+            size: width,
             fields: Vec::new(),
             stride: None,
         });

@@ -852,6 +852,11 @@ impl<'a> Rebuilder<'a> {
             ),
             // A shift by a byte count, which is how a narrow read is expressed.
             Op::SubPiece => match op.inputs.get(1).and_then(|i| i.as_const()) {
+                // Taking the low bytes of a register that holds a narrower
+                // float is that float, not its bit pattern: a `float`
+                // argument arrives in the low half of a vector register, and
+                // `__bits32` around it would say the caller passed bits.
+                Some(0) if self.narrow_float(op) => a(),
                 Some(0) => Expr::Cast(c_type(op.size), Box::new(ia())),
                 Some(n) => Expr::Cast(
                     c_type(op.size),
@@ -966,13 +971,37 @@ impl<'a> Rebuilder<'a> {
             // the body does arithmetic on it: at O0 it is stored to the stack
             // before anything touches it.
             if param.floating {
-                self.floats.insert(Location {
-                    space: r12e_ir::op::Space::Register,
-                    offset: o,
-                    size: 8,
-                });
+                // At the whole register, and at the width the parameter is
+                // declared with: a `float` argument is read as the low four
+                // bytes of the register it arrives in, and that piece is
+                // floating too.
+                for size in [8, param.size] {
+                    self.floats.insert(Location {
+                        space: r12e_ir::op::Space::Register,
+                        offset: o,
+                        size,
+                    });
+                }
             }
         }
+    }
+
+    /// Whether a `SubPiece` is taking a float out of the register it came in.
+    ///
+    /// Only when the location is floating and the piece is exactly as wide as
+    /// the width that location was declared at, so the piece is the whole
+    /// value and not part of it.
+    fn narrow_float(&self, op: &SsaOp) -> bool {
+        let Some(l) = op.inputs.first().and_then(|i| match i {
+            Operand::Value(v) => Some(v.location),
+            Operand::Undefined(l) => Some(*l),
+            Operand::Const(..) => None,
+        }) else {
+            return false;
+        };
+        self.floats.contains(&l)
+            && l.space == r12e_ir::op::Space::Register
+            && self.sizes.get(&l.offset).copied() == Some(op.size)
     }
 
     /// The type the body declares a value of this location with.
