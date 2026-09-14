@@ -302,6 +302,12 @@ pub fn stats(w: &mut Out, p: &Program, as_json: bool) -> R {
         s.table_targets,
         s.indirect
     );
+    outln!(
+        w,
+        "data        {} regions, {} bytes proved not to be instructions",
+        s.data_regions,
+        s.data_bytes
+    );
     outln!(w, "insns       {}", s.insns);
     outln!(w, "xrefs       {}", s.xrefs);
     outln!(w, "strings     {}", s.strings);

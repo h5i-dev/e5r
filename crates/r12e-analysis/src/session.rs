@@ -30,7 +30,9 @@ use r12e_format::Object;
 
 use crate::cache::{Cache, ContentHash, Key, Lookup, Part};
 use crate::codec;
+use crate::data::{self, DataMap};
 use crate::program::{self, Function, Options, Program};
+use crate::progress::{Sink, Update};
 use crate::strings::Found;
 use crate::xref::XrefIndex;
 
@@ -57,9 +59,16 @@ pub struct Session {
     /// Damaged cache files and unwritable cache directories. A library does
     /// not print; the caller decides whether a person sees these.
     warnings: Mutex<Vec<String>>,
+    /// Where stage progress goes. `None` is the default and costs one branch
+    /// per batch; see [`crate::progress`].
+    progress: Option<Box<dyn Fn(Update) + Send + Sync>>,
     core: OnceLock<Core>,
     xrefs: OnceLock<XrefIndex>,
     strings: OnceLock<Vec<Found>>,
+    /// Not cached, unlike the three above. It is derived from the functions
+    /// and the container alone, so a cache hit on the functions would have to
+    /// carry it or contradict it, and recomputing it costs one pass.
+    data: OnceLock<DataMap>,
 }
 
 impl std::fmt::Debug for Session {
@@ -70,6 +79,7 @@ impl std::fmt::Debug for Session {
             .field("functions_computed", &self.core.get().is_some())
             .field("xrefs_computed", &self.xrefs.get().is_some())
             .field("strings_computed", &self.strings.get().is_some())
+            .field("data_computed", &self.data.get().is_some())
             .finish()
     }
 }
@@ -91,9 +101,11 @@ impl Session {
             cache: None,
             content: None,
             warnings: Mutex::new(Vec::new()),
+            progress: None,
             core: OnceLock::new(),
             xrefs: OnceLock::new(),
             strings: OnceLock::new(),
+            data: OnceLock::new(),
         }
     }
 
@@ -107,6 +119,27 @@ impl Session {
         self.cache = Some(cache);
         self.content = Some(content);
         self
+    }
+
+    /// Be told which stage is running and how far through it is.
+    ///
+    /// The callback is entered from the sequential merge between parallel
+    /// batches, so it is never called from two threads at once and never from
+    /// inside an inner loop. It must still be `Send + Sync`, because which
+    /// thread makes the call depends on the pool. A session with no callback
+    /// pays one branch per batch; see [`crate::progress`] for the shape of an
+    /// update and what a stage can and cannot say about its total.
+    pub fn with_progress(mut self, f: impl Fn(Update) + Send + Sync + 'static) -> Session {
+        self.progress = Some(Box::new(f));
+        self
+    }
+
+    /// The sink the stages are handed.
+    fn sink(&self) -> Sink<'_> {
+        match &self.progress {
+            Some(f) => Sink::new(f.as_ref()),
+            None => Sink::none(),
+        }
     }
 
     /// What the loader produced.
@@ -169,7 +202,8 @@ impl Session {
             // the closure that runs on it.
             let functions = &self.core().functions;
             let object = &self.object;
-            let index = self.install(move || program::build_xrefs(object, functions));
+            let sink = self.sink();
+            let index = self.install(move || program::build_xrefs(object, functions, sink));
             self.store(Part::Xrefs, || codec::encode_xrefs(&index));
             index
         })
@@ -188,9 +222,29 @@ impl Session {
             }
             let object = &self.object;
             let opts = &self.opts.string_opts;
-            let found = self.install(move || program::scan_strings(object, opts));
+            let sink = self.sink();
+            let found = self.install(move || program::scan_strings(object, opts, sink));
             self.store(Part::Strings, || codec::encode_strings(&found));
             found
+        })
+    }
+
+    /// Regions that are provably data, computing them if needed. Empty when
+    /// the option is off.
+    ///
+    /// Needs the functions, because a recovered jump table and a literal pool
+    /// are both read off them, so asking for this computes those first.
+    pub fn data(&self) -> &DataMap {
+        self.data.get_or_init(|| {
+            if !self.opts.data {
+                return DataMap::default();
+            }
+            let functions = &self.core().functions;
+            let object = &self.object;
+            let sink = self.sink();
+            self.install(move || {
+                data::build(object, functions, data::Sources { pointers: true }, sink)
+            })
         })
     }
 
@@ -206,6 +260,12 @@ impl Session {
         let _ = self.functions();
         let _ = self.xrefs();
         let _ = self.strings();
+        // Not the data map: `Program` computes it on the first ask, so a
+        // caller that never reads it does not pay a second decode of every
+        // instruction. Off in the options still means empty, not deferred.
+        if !self.opts.data {
+            let _ = self.data();
+        }
         let core = self.core.into_inner().unwrap_or_default();
         Program {
             object: self.object,
@@ -214,6 +274,11 @@ impl Session {
             strings: self.strings.into_inner().unwrap_or_default(),
             rounds: core.rounds,
             noreturn: core.noreturn,
+            data: self
+                .data
+                .into_inner()
+                .map(OnceLock::from)
+                .unwrap_or_default(),
         }
     }
 
@@ -231,14 +296,15 @@ impl Session {
             }
             let object = &self.object;
             let opts = &self.opts;
+            let sink = self.sink();
             let core = self.install(move || {
                 // One block table for the whole program: discovery and the
                 // no-return re-walk share it, so a block the re-walk keeps is
                 // the one every other function already names.
                 let mut interner = crate::cfg::BlockInterner::default();
-                let (mut functions, rounds) = program::discover(object, opts, &mut interner);
+                let (mut functions, rounds) = program::discover(object, opts, &mut interner, sink);
                 let noreturn =
-                    program::refine_noreturn(object, &mut functions, opts, &mut interner);
+                    program::refine_noreturn(object, &mut functions, opts, &mut interner, sink);
                 program::publish_blocks(&mut functions, &mut interner);
                 Core {
                     functions,

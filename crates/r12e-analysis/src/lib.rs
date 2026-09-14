@@ -16,17 +16,21 @@
 pub mod cache;
 pub mod cfg;
 mod codec;
+pub mod data;
 pub mod jumptable;
 pub mod noreturn;
 pub mod program;
+pub mod progress;
 pub mod session;
 pub mod strings;
 pub mod xref;
 
 pub use cache::{Cache, ContentHash, Part};
 pub use cfg::{Block, Cfg, Halt, Terminator};
+pub use data::{DataMap, Proof, Region};
 pub use jumptable::{JumpTable, TableKind};
 pub use program::{Function, Options, Program, Stats, analyze};
+pub use progress::{Sink, Stage, Update};
 pub use session::Session;
 pub use strings::Found;
 pub use xref::{Xref, XrefIndex, XrefKind};

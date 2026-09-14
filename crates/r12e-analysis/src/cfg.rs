@@ -11,6 +11,7 @@ use std::sync::Arc;
 use r12e_arch::{Flow, Insn};
 use r12e_core::{Addr, AddrRange, Arch, Caps, MemoryMap};
 
+use crate::data::DataMap;
 use crate::jumptable::{self, JumpTable};
 
 /// Why a block ended, which is what tells a returning function from one that
@@ -471,7 +472,15 @@ pub fn build_with(
     noreturn: &BTreeSet<Addr>,
     caps: &Caps,
 ) -> Cfg {
-    let raw = build_raw(mem, arch, entry, stop_at, noreturn, caps);
+    let raw = build_raw(
+        mem,
+        arch,
+        entry,
+        stop_at,
+        noreturn,
+        caps,
+        &DataMap::default(),
+    );
     let mut interner = BlockInterner::default();
     let mut cfg = interner.install(raw);
     interner.publish(std::iter::once(&mut cfg));
@@ -486,6 +495,7 @@ pub(crate) fn build_raw(
     stop_at: &BTreeSet<Addr>,
     noreturn: &BTreeSet<Addr>,
     caps: &Caps,
+    data: &DataMap,
 ) -> RawCfg {
     // The executable range the entry sits in bounds every jump table target:
     // a switch does not branch into another section.
@@ -534,6 +544,16 @@ pub(crate) fn build_raw(
             // a new block starts, so stop as soon as we reach a known start.
             if at != start && starts.contains(&at) {
                 break (vec![at], false);
+            }
+            // Bytes something proved are data. Decoding them produces
+            // instructions that were never executed and a block that runs on
+            // into whatever follows, so the walk stops here and says it did
+            // not finish. Empty for the evidence-led rounds, which run before
+            // anything has been proved.
+            if !data.is_empty() && data.contains(at) {
+                halt = Halt::Undecodable;
+                term = Terminator::Unresolved;
+                break (Vec::new(), true);
             }
             let Some(window) = mem.decode_window(at, arch.max_insn_len()) else {
                 halt = Halt::Undecodable;

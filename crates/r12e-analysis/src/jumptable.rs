@@ -12,10 +12,13 @@
 //! target, so scanning until an entry looks wrong never stops. The bound has to
 //! come from the compare that guards the switch, and the compare has to be
 //! matched to the register the table is indexed by. Without that match a stray
-//! comparison elsewhere in the function would size the table. x86 makes that
-//! matching harder than AArch64 does: it copies the switch value into the
-//! register the table is indexed by, so the compare and the branch name
-//! different registers and the moves between them have to be followed.
+//! comparison elsewhere in the function would size the table. Following the
+//! moves between the compared register and the indexed one is needed on both
+//! architectures, not just on x86: x86 copies the switch value into the
+//! register the table is indexed by, and gcc on AArch64 does the same and then
+//! reuses the index register for the `adr` anchor, two instructions after the
+//! load. So the alias chain is captured where the table is read rather than
+//! read back at the branch, where it has already been overwritten.
 
 use std::collections::BTreeMap;
 
@@ -120,6 +123,14 @@ struct Regs {
     /// reloads it, so without this the index is unknown by the time the branch
     /// reads it and the table cannot be bounded.
     slots: BTreeMap<(RegKey, i64), Val>,
+    /// The registers the index value lived in at the moment a table read named
+    /// that index, newest first.
+    ///
+    /// The bound is looked for at the branch, but the chain has to be read
+    /// where the load is: gcc's `-O1` AArch64 switch indexes the table by `w3`
+    /// and then writes the `adr` anchor into `x3` two instructions later, which
+    /// erases the move that carried the compared value there.
+    index_chains: BTreeMap<RegKey, Vec<RegKey>>,
 }
 
 impl Regs {
@@ -270,8 +281,17 @@ pub fn recover(
     }
 
     // The compare that guards the switch, matched to the index register or to
-    // whichever register the index was copied from.
-    let bound = index.and_then(|ix| bound_for(&aliases(ix, &regs), &insns[..insns.len() - 1]));
+    // whichever register the index was copied from. The chain recorded at the
+    // table read wins over the one the registers show now, because the code
+    // between the read and the branch may have written the index register.
+    let bound = index.and_then(|ix| {
+        let chain = regs
+            .index_chains
+            .get(&ix)
+            .cloned()
+            .unwrap_or_else(|| aliases(ix, &regs));
+        bound_for(&chain, &insns[..insns.len() - 1])
+    });
     // A compact table of byte or halfword offsets cannot be bounded by
     // scanning: every value in range yields a plausible target, so the scan
     // would stop wherever the following bytes happened to look wrong. Without
@@ -431,7 +451,17 @@ fn step(i: &Insn, regs: &mut Regs) {
     };
 
     if let Some(d) = dest {
-        regs.set(d, value.unwrap_or(Val::Unknown));
+        let v = value.unwrap_or(Val::Unknown);
+        // Captured before the write, because `set` invalidates the aliases
+        // that name the register being written.
+        if let Val::Entry {
+            index: Some(ix), ..
+        } = v
+        {
+            let chain = aliases(ix, regs);
+            regs.index_chains.insert(ix, chain);
+        }
+        regs.set(d, v);
         return;
     }
     // A spill: the destination is memory and the source a register whose value
@@ -738,6 +768,23 @@ mod tests {
         i
     }
 
+    /// `adr xd, #imm`, which is how gcc forms the anchor a compact table's
+    /// offsets are measured from.
+    fn adr(at: u64, d: u8, v: u64) -> Insn {
+        let mut i = Insn::new(Addr(at), 4, "adr", Flow::Next);
+        i.push(Operand::Reg(gpr(d)));
+        i.push(Operand::Addr(Addr(v)));
+        i
+    }
+
+    /// `mov xd, xs`.
+    fn mov_reg(at: u64, d: u8, s: u8) -> Insn {
+        let mut i = Insn::new(Addr(at), 4, "mov", Flow::Next);
+        i.push(Operand::Reg(gpr(d)));
+        i.push(Operand::Reg(gpr(s)));
+        i
+    }
+
     fn br(at: u64, r: u8) -> Insn {
         let mut i = Insn::new(Addr(at), 4, "br", Flow::IndirectBranch);
         i.push(Operand::Reg(gpr(r)));
@@ -979,6 +1026,61 @@ mod tests {
         assert_eq!(t.targets.len(), 4);
         assert_eq!(t.targets[0], CODE);
         assert_eq!(t.targets[3], Addr(CODE.get() + 12));
+    }
+
+    /// The gcc `-O1` and `-Os` shape: the anchor is written into the very
+    /// register the table was indexed by.
+    ///
+    ///     cmp  w2, #3
+    ///     mov  x3, x2
+    ///     adrp x1, table
+    ///     ldrb w1, [x1, x3]
+    ///     adr  x3, anchor       ; x3 stops holding the index here
+    ///     add  x1, x3, w1, sxtb #2
+    ///     br   x1
+    ///
+    /// The guard names `w2` and the load names `w3`, so the bound is only
+    /// reachable through the move, and the move is only visible before the
+    /// `adr` overwrites it. Reading the alias chain at the branch finds
+    /// nothing and refuses the table, which is a whole switch lost.
+    fn anchored_switch(reuse_index: bool) -> Vec<Insn> {
+        let anchor = if reuse_index { 3 } else { 4 };
+        vec![
+            cmp_imm(0x40_0000, 2, 3),
+            mov_reg(0x40_0004, 3, 2),
+            adrp(0x40_0008, 1, table_addr().get()),
+            ldr_indexed(0x40_000c, 1, 1, 3, 1, false),
+            adr(0x40_0010, anchor, CODE.get()),
+            add_scaled(0x40_0014, 1, anchor, 1, 2),
+            br(0x40_0018, 1),
+        ]
+    }
+
+    #[test]
+    fn the_anchor_may_land_in_the_index_register() {
+        let mem = map_with(&[0, 1, 2, 3], 1);
+        let spare = recover(
+            &anchored_switch(false),
+            &mem,
+            section(),
+            &Caps::default(),
+            4,
+        )
+        .expect("anchor in a spare register");
+        let reused = recover(&anchored_switch(true), &mem, section(), &Caps::default(), 4)
+            .expect("anchor in the index register");
+
+        // Which register the anchor went to is not a property of the switch,
+        // so the two have to agree entry for entry.
+        assert_eq!(spare, reused);
+        assert_eq!(reused.kind, TableKind::RelativeToBase);
+        assert_eq!(reused.base, CODE);
+        assert_eq!(reused.entry_size, 1);
+        assert_eq!(reused.shift, 2);
+        assert!(!reused.bounded_by_scan);
+        assert_eq!(reused.targets.len(), 4);
+        assert_eq!(reused.targets[0], CODE);
+        assert_eq!(reused.targets[3], Addr(CODE.get() + 12));
     }
 
     #[test]

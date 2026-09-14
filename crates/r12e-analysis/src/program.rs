@@ -6,6 +6,7 @@
 //! finished first, which is gate G5.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::OnceLock;
 
 use r12e_arch::Insn;
 use r12e_core::{Addr, AddrRange, Arch, Caps, Evidence, Provenance, Strength};
@@ -13,7 +14,9 @@ use r12e_format::Object;
 use rayon::prelude::*;
 
 use crate::cfg::{self, BlockInterner, Cfg, Halt, RawCfg};
+use crate::data::{self, DataMap};
 use crate::noreturn;
+use crate::progress::{Sink, Stage};
 use crate::strings::{self, Found};
 use crate::xref::{self, Xref, XrefIndex};
 
@@ -74,6 +77,12 @@ pub struct Options {
     /// Work out which functions never return and re-walk the callers that
     /// assumed they did.
     pub noreturn: bool,
+    /// Prove which regions hold data, and stop the code partition at them.
+    ///
+    /// Off leaves [`Program::data`](crate::Program::data) empty and lets the
+    /// gap scan read a literal pool as candidate code again. It exists so the
+    /// difference can be measured, not so it can be switched off.
+    pub data: bool,
     /// Threads to use. `None` means rayon's default.
     pub threads: Option<usize>,
 }
@@ -88,6 +97,7 @@ impl Default for Options {
             string_opts: strings::Options::default(),
             xrefs: true,
             noreturn: true,
+            data: true,
             threads: None,
         }
     }
@@ -122,6 +132,9 @@ impl Options {
                 v.push(self.follow_calls as u8);
                 v.push(self.scan_gaps as u8);
                 v.push(self.noreturn as u8);
+                // The data map decides where the gap scan stops looking, so
+                // it changes which functions exist.
+                v.push(self.data as u8);
             }
             crate::cache::Part::Strings => {
                 v.extend_from_slice(&(self.string_opts.min_len as u64).to_le_bytes());
@@ -147,9 +160,28 @@ pub struct Program {
     pub rounds: usize,
     /// Functions found never to return.
     pub noreturn: BTreeSet<Addr>,
+    /// Regions that are provably data, each with its proof.
+    ///
+    /// Computed on the first ask rather than eagerly: finding literal pools
+    /// means decoding every instruction a second time, and the partition has
+    /// already stopped at what it needed. Pre-filled empty when the options
+    /// turn it off.
+    pub(crate) data: OnceLock<DataMap>,
 }
 
 impl Program {
+    /// Regions that are provably data, computing them if needed.
+    pub fn data(&self) -> &DataMap {
+        self.data.get_or_init(|| {
+            data::build(
+                &self.object,
+                &self.functions,
+                data::Sources { pointers: true },
+                Sink::none(),
+            )
+        })
+    }
+
     /// Function whose blocks contain `addr`.
     pub fn function_at(&self, addr: Addr) -> Option<&Function> {
         // Hulls can overlap when a function is split, so a hull hit still has
@@ -264,9 +296,13 @@ pub(crate) fn discover(
     object: &Object,
     opts: &Options,
     interner: &mut BlockInterner,
+    sink: Sink<'_>,
 ) -> (BTreeMap<Addr, Function>, usize) {
     let arch = object.arch.clone();
     let mem = &object.memory;
+    // Nothing is proved data yet: the proofs are read off the functions these
+    // rounds are about to find.
+    let nothing = DataMap::default();
 
     // Seeds from the loader, strongest evidence first. Only executable
     // addresses: a symbol table can name a function in a section that is not
@@ -301,13 +337,19 @@ pub(crate) fn discover(
         batch.sort_by_key(|s| s.addr);
         batch.dedup_by_key(|s| s.addr);
 
+        // A round's own total is known; the stage's is not, because what this
+        // round walks is what queues the next one.
+        let round_total = Some(batch.len() as u64);
+        let mut done = 0u64;
+        sink.report(Stage::Discovery, rounds as u32, 0, round_total);
+
         for slice in batch.chunks(WALK_BATCH) {
             let walked: Vec<(Addr, RawCfg)> = slice
                 .par_iter()
                 .map(|s| {
                     (
                         s.addr,
-                        cfg::build_raw(mem, &arch, s.addr, &stop_at, &EMPTY, &opts.caps),
+                        cfg::build_raw(mem, &arch, s.addr, &stop_at, &EMPTY, &opts.caps, &nothing),
                     )
                 })
                 .collect();
@@ -347,12 +389,29 @@ pub(crate) fn discover(
                     },
                 );
             }
+            // Between batches, so the callback is entered from one thread and
+            // never from inside the parallel walk.
+            done += slice.len() as u64;
+            sink.report(Stage::Discovery, rounds as u32, done, round_total);
         }
 
         // Gap scanning runs once, after the evidence-led rounds settle, so it
         // never invents a function the real evidence would have found.
         if pending.is_empty() && opts.scan_gaps {
-            let found = scan_gaps(object, &known, &opts.caps);
+            // What is provably data, worked out from everything the
+            // evidence-led rounds found, and then used to keep the sweep out
+            // of it. This is the one place the partition guesses, so it is the
+            // one place the marking has to reach.
+            //
+            // Only where the sweep runs. It costs a pass over the instructions
+            // to find the literal pools, and paying that for an architecture
+            // whose gaps are never swept would be paying for nothing.
+            let data = if opts.data && object.arch == Arch::AArch64 {
+                data::build(object, &known, data::Sources { pointers: false }, sink)
+            } else {
+                DataMap::default()
+            };
+            let found = scan_gaps(object, &known, &opts.caps, &data);
             for a in found {
                 let p = Provenance::new(Evidence::ProloguePattern);
                 merge_evidence(&mut evidence, a, &p, None);
@@ -366,7 +425,19 @@ pub(crate) fn discover(
                 // One pass only: what the gap scan found is walked, and what
                 // that walk finds is not scanned for again.
                 let batch = std::mem::take(&mut pending);
-                walk_pending(object, &mut known, &mut evidence, batch, opts, interner);
+                walk_pending(
+                    object,
+                    &mut known,
+                    &mut evidence,
+                    batch,
+                    interner,
+                    Leftovers {
+                        opts,
+                        data: &data,
+                        sink,
+                        round: rounds as u32 + 1,
+                    },
+                );
                 return (known, rounds);
             }
         }
@@ -375,24 +446,52 @@ pub(crate) fn discover(
     (known, rounds)
 }
 
+/// What one leftover batch is walked under.
+///
+/// Bundled rather than passed one by one: these four travel together and
+/// nothing else needs them.
+#[derive(Clone, Copy)]
+struct Leftovers<'a> {
+    opts: &'a Options,
+    /// What is known to be data by the time the gap scan runs.
+    data: &'a DataMap,
+    sink: Sink<'a>,
+    /// The round number to report these under, which follows the last real
+    /// round.
+    round: u32,
+}
+
 /// Walk seeds that are left over, without following what they call.
+///
+/// These are the gap scan's guesses, so unlike the evidence-led rounds they
+/// get the data map: a prologue pattern a few words before a literal pool
+/// would otherwise decode straight into it.
 fn walk_pending(
     object: &Object,
     known: &mut BTreeMap<Addr, Function>,
     evidence: &mut BTreeMap<Addr, (Provenance, Option<String>)>,
     pending: Vec<Seed>,
-    opts: &Options,
     interner: &mut BlockInterner,
+    over: Leftovers<'_>,
 ) {
     if pending.is_empty() {
         return;
     }
+    let Leftovers {
+        opts,
+        data,
+        sink,
+        round,
+    } = over;
     let arch = object.arch.clone();
     let mem = &object.memory;
     let stop_at: BTreeSet<Addr> = evidence.keys().copied().collect();
     let mut batch = pending;
     batch.sort_by_key(|s| s.addr);
     batch.dedup_by_key(|s| s.addr);
+    let total = Some(batch.len() as u64);
+    let mut done = 0u64;
+    sink.report(Stage::Discovery, round, 0, total);
     for slice in batch.chunks(WALK_BATCH) {
         let walked: Vec<(Addr, RawCfg)> = slice
             .par_iter()
@@ -400,7 +499,7 @@ fn walk_pending(
             .map(|s| {
                 (
                     s.addr,
-                    cfg::build_raw(mem, &arch, s.addr, &stop_at, &EMPTY, &opts.caps),
+                    cfg::build_raw(mem, &arch, s.addr, &stop_at, &EMPTY, &opts.caps, data),
                 )
             })
             .collect();
@@ -422,6 +521,8 @@ fn walk_pending(
                 },
             );
         }
+        done += slice.len() as u64;
+        sink.report(Stage::Discovery, round, done, total);
     }
 }
 
@@ -437,12 +538,16 @@ pub(crate) fn refine_noreturn(
     known: &mut BTreeMap<Addr, Function>,
     opts: &Options,
     interner: &mut BlockInterner,
+    sink: Sink<'_>,
 ) -> BTreeSet<Addr> {
     if !opts.noreturn {
         return BTreeSet::new();
     }
     let arch = object.arch.clone();
     let mem = &object.memory;
+    // The re-walk only ever shortens a function, so it cannot reach bytes the
+    // first walk did not.
+    let nothing = DataMap::default();
     let named: BTreeMap<Addr, Option<String>> =
         known.iter().map(|(a, f)| (*a, f.name.clone())).collect();
     let graph: BTreeMap<Addr, &Cfg> = known.iter().map(|(a, f)| (*a, &f.cfg)).collect();
@@ -453,13 +558,16 @@ pub(crate) fn refine_noreturn(
         .map(|(a, _)| *a)
         .collect();
     let stop_at: BTreeSet<Addr> = known.keys().copied().collect();
+    let total = Some(affected.len() as u64);
+    let mut rebuilt_count = 0u64;
+    sink.report(Stage::NoReturn, 1, 0, total);
     for slice in affected.chunks(WALK_BATCH) {
         let rebuilt: Vec<(Addr, RawCfg)> = slice
             .par_iter()
             .map(|a| {
                 (
                     *a,
-                    cfg::build_raw(mem, &arch, *a, &stop_at, &set, &opts.caps),
+                    cfg::build_raw(mem, &arch, *a, &stop_at, &set, &opts.caps, &nothing),
                 )
             })
             .collect();
@@ -472,6 +580,8 @@ pub(crate) fn refine_noreturn(
                 f.cfg = c;
             }
         }
+        rebuilt_count += slice.len() as u64;
+        sink.report(Stage::NoReturn, 1, rebuilt_count, total);
     }
     set
 }
@@ -483,7 +593,11 @@ pub(crate) fn publish_blocks(known: &mut BTreeMap<Addr, Function>, interner: &mu
 }
 
 /// Every reference the recovered functions make.
-pub(crate) fn build_xrefs(object: &Object, known: &BTreeMap<Addr, Function>) -> XrefIndex {
+pub(crate) fn build_xrefs(
+    object: &Object,
+    known: &BTreeMap<Addr, Function>,
+    sink: Sink<'_>,
+) -> XrefIndex {
     let arch = object.arch.clone();
     let mem = &object.memory;
     // One list per unit of parallel work rather than one per function. A
@@ -491,30 +605,41 @@ pub(crate) fn build_xrefs(object: &Object, known: &BTreeMap<Addr, Function>) -> 
     // hundred bytes that doubled its way there, and 127,229 of those left the
     // allocator holding several times what the finished index needs: the stage
     // cost 543 MB resident for 155 MB of index.
-    let mut all: Vec<Vec<Xref>> = known
-        .values()
-        .collect::<Vec<_>>()
-        .par_iter()
-        .fold(Vec::new, |mut out: Vec<Xref>, f| {
-            let start = out.len();
-            // Streamed rather than decoded into a list first: this runs on
-            // every thread at once, and a decoded instruction is an order of
-            // magnitude larger than the references it produces.
-            let mut c = xref::Collector::new(mem, &mut out);
-            let ordered = cfg::for_each_instruction(mem, &arch, &f.cfg, |i| c.push(i));
-            c.finish();
-            if !ordered {
-                // Overlapping blocks, which nothing in the corpus produces.
-                // The tracker reads instructions in address order, so pay for
-                // the sort rather than answer differently. Only this
-                // function's references are dropped, not the whole list.
-                out.truncate(start);
-                let insns = cfg::instructions(mem, &arch, &f.cfg);
-                xref::collect(&insns, mem, &mut out);
-            }
-            out
-        })
-        .collect();
+    let functions: Vec<&Function> = known.values().collect();
+    let total = Some(functions.len() as u64);
+    let mut done = 0u64;
+    sink.report(Stage::Xrefs, 1, 0, total);
+    let mut all: Vec<Vec<Xref>> = Vec::new();
+    // Walked in batches rather than in one sweep, so there is a sequential
+    // point to report from. The answer does not depend on the batching: the
+    // index sorts what it is given.
+    for slice in functions.chunks(WALK_BATCH) {
+        let part: Vec<Vec<Xref>> = slice
+            .par_iter()
+            .fold(Vec::new, |mut out: Vec<Xref>, f| {
+                let start = out.len();
+                // Streamed rather than decoded into a list first: this runs on
+                // every thread at once, and a decoded instruction is an order of
+                // magnitude larger than the references it produces.
+                let mut c = xref::Collector::new(mem, &mut out);
+                let ordered = cfg::for_each_instruction(mem, &arch, &f.cfg, |i| c.push(i));
+                c.finish();
+                if !ordered {
+                    // Overlapping blocks, which nothing in the corpus produces.
+                    // The tracker reads instructions in address order, so pay for
+                    // the sort rather than answer differently. Only this
+                    // function's references are dropped, not the whole list.
+                    out.truncate(start);
+                    let insns = cfg::instructions(mem, &arch, &f.cfg);
+                    xref::collect(&insns, mem, &mut out);
+                }
+                out
+            })
+            .collect();
+        all.extend(part);
+        done += slice.len() as u64;
+        sink.report(Stage::Xrefs, 1, done, total);
+    }
     // Concatenation order is not part of the answer: [`XrefIndex::build`]
     // sorts and deduplicates, and every field of a reference takes part in the
     // ordering, so the arrays it produces are the same set in the same order
@@ -534,19 +659,36 @@ pub(crate) fn build_xrefs(object: &Object, known: &BTreeMap<Addr, Function>) -> 
 /// Sections when the container has them, because `.rodata` sits inside an
 /// executable segment in the usual ELF layout and the segment's permission
 /// says nothing useful about it. Segments otherwise.
-pub(crate) fn scan_strings(object: &Object, opts: &strings::Options) -> Vec<Found> {
+pub(crate) fn scan_strings(object: &Object, opts: &strings::Options, sink: Sink<'_>) -> Vec<Found> {
     let mem = &object.memory;
-    let ranges: Vec<AddrRange> = object
+    let mut ranges: Vec<AddrRange> = object
         .sections
         .iter()
         .filter(|s| !s.range.is_empty() && s.file_size > 0 && (opts.in_code || !s.exec))
         .map(|s| s.range)
         .collect();
     if ranges.is_empty() {
-        strings::scan(mem, opts)
-    } else {
-        strings::scan_ranges(mem, &ranges, opts)
+        ranges = mem
+            .segments()
+            .iter()
+            .filter(|s| opts.in_code || !s.perms.exec)
+            .map(|s| s.range)
+            .collect();
     }
+    // One range at a time, which is a section, so the report says which part
+    // of the image is being read. Scanning them together and scanning them one
+    // by one give the same answer: the sort and the deduplication below are
+    // what the combined scan ends with anyway.
+    let total = Some(ranges.len() as u64);
+    sink.report(Stage::Strings, 1, 0, total);
+    let mut out: Vec<Found> = Vec::new();
+    for (n, r) in ranges.iter().enumerate() {
+        out.extend(strings::scan_ranges(mem, std::slice::from_ref(r), opts));
+        sink.report(Stage::Strings, 1, n as u64 + 1, total);
+    }
+    out.sort_by_key(|f| (f.addr, f.len));
+    out.dedup_by_key(|f| f.addr);
+    out
 }
 
 /// Record evidence for an address, keeping the strongest name.
@@ -578,7 +720,12 @@ fn merge_evidence(
 /// walks the gaps between them. Testing each address against every block
 /// instead is quadratic, and on a libc-sized binary that is the difference
 /// between eight seconds and a tenth of one.
-fn scan_gaps(object: &Object, known: &BTreeMap<Addr, Function>, caps: &Caps) -> Vec<Addr> {
+fn scan_gaps(
+    object: &Object,
+    known: &BTreeMap<Addr, Function>,
+    caps: &Caps,
+    data: &DataMap,
+) -> Vec<Addr> {
     if object.arch != Arch::AArch64 {
         return Vec::new();
     }
@@ -597,6 +744,19 @@ fn scan_gaps(object: &Object, known: &BTreeMap<Addr, Function>, caps: &Caps) -> 
         for gap in gaps_in(seg.range, &covered) {
             let mut at = gap.start();
             while at < gap.end() {
+                // A literal pool, a jump table or a declared object. Four
+                // bytes of any of them match a prologue as readily as any
+                // other four do, and a function invented there is a function
+                // that does not exist.
+                if let Some(end) = data.end_of_run(at) {
+                    let past = Addr(end.get().next_multiple_of(4));
+                    at = if past > at {
+                        past
+                    } else {
+                        at.wrapping_offset(4)
+                    };
+                    continue;
+                }
                 if is_prologue(mem, at) {
                     out.push(at);
                 }
@@ -613,7 +773,7 @@ fn scan_gaps(object: &Object, known: &BTreeMap<Addr, Function>, caps: &Caps) -> 
 }
 
 /// Sort and coalesce ranges into a disjoint list.
-fn merge_ranges(it: impl Iterator<Item = AddrRange>) -> Vec<AddrRange> {
+pub(crate) fn merge_ranges(it: impl Iterator<Item = AddrRange>) -> Vec<AddrRange> {
     let mut v: Vec<AddrRange> = it.filter(|r| !r.is_empty()).collect();
     v.sort_unstable_by_key(|r| (r.start(), r.end()));
     let mut out: Vec<AddrRange> = Vec::with_capacity(v.len());
@@ -703,6 +863,10 @@ pub struct Stats {
     pub table_targets: usize,
     /// Functions still holding an unresolved indirect branch.
     pub indirect: usize,
+    /// Regions proved to hold data.
+    pub data_regions: usize,
+    /// Bytes those regions cover, counted once where proofs overlap.
+    pub data_bytes: u64,
 }
 
 impl Program {
@@ -733,6 +897,8 @@ impl Program {
                 .values()
                 .filter(|f| f.cfg.has_indirect)
                 .count(),
+            data_regions: self.data().len(),
+            data_bytes: self.data().bytes(),
         }
     }
 
