@@ -5,7 +5,7 @@
 //! says anything, and the functions of a program come out as one translation
 //! unit with everything declared before it is used.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use r12e_analysis::{Function, Program};
 use r12e_core::{Addr, Evidence};
@@ -136,9 +136,32 @@ pub fn decompile_program_with(
     let mut callees: BTreeMap<u64, Callee> = BTreeMap::new();
     let mut outputs: Vec<(Addr, String, One)> = Vec::new();
 
-    for _ in 0..2 {
+    // Everything the targets call, so that asking for one function gives the
+    // same body as asking for all of them. Without this the callee table holds
+    // only the targets, and a call to anything else renders as an anonymous
+    // name with no arguments: two different answers for one function,
+    // depending on how it was asked for.
+    let wanted: BTreeSet<Addr> = targets.iter().map(|f| f.entry).collect();
+    let mut around: Vec<&Function> = Vec::new();
+    for f in targets {
+        for site in &f.cfg.calls {
+            if wanted.contains(site) {
+                continue;
+            }
+            if let Some(callee) = p.function(*site)
+                && !around.iter().any(|c| c.entry == callee.entry)
+            {
+                around.push(callee);
+            }
+        }
+    }
+
+    for pass in 0..2 {
         outputs.clear();
-        for f in targets {
+        // The neighbours are prototyped but never emitted: they are here to
+        // fill the table, and on the last pass their bodies would be thrown
+        // away anyway.
+        for (n, f) in targets.iter().chain(around.iter()).enumerate() {
             let Some(one) = one(p, f, &callees, declarations) else {
                 continue;
             };
@@ -153,8 +176,11 @@ pub fn decompile_program_with(
                     returns_value: !out.signature.starts_with("void "),
                 },
             );
-            outputs.push((f.entry, name, one));
+            if n < targets.len() {
+                outputs.push((f.entry, name, one));
+            }
         }
+        let _ = pass;
     }
 
     // Deduplicated but not sorted: a type definition has to come after the

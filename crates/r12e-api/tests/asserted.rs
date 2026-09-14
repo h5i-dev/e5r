@@ -363,3 +363,34 @@ fn a_declared_field_name_beats_the_one_the_offset_implies() {
 fn word(text: &str, name: &str) -> bool {
     r12e_decomp::expr::mentions(text, name)
 }
+
+/// Asking for one function gives the same body as asking for all of them.
+///
+/// The callee table used to hold only what was asked for, so a call to
+/// anything else rendered as an anonymous name with no arguments. That is two
+/// different answers for one function depending on how the question was
+/// phrased, and the one you get alone is the wrong one: it drops the
+/// arguments, which is undefined behaviour in the emitted C.
+#[test]
+fn a_function_decompiles_the_same_alone_as_in_a_whole_program() {
+    for name in ["dt-calls.a64.O2", "driver.a64.O2", "dt-control.x64.O2"] {
+        let Some(p) = open(name) else { continue };
+        let every: Vec<&r12e_analysis::Function> = p
+            .functions_by_address()
+            .filter(|f| f.is_complete())
+            .collect();
+        let whole = r12e_api::decompile_program(&p, &every);
+        assert!(!whole.functions.is_empty(), "{name} decompiled nothing");
+        for d in &whole.functions {
+            let Some(f) = p.function(d.addr) else {
+                continue;
+            };
+            let alone = r12e_api::decompile_function(&p, f);
+            assert_eq!(
+                alone.text, d.text,
+                "{name}: {} differs alone from how it reads in the whole program",
+                d.name
+            );
+        }
+    }
+}
