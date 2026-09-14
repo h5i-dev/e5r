@@ -221,8 +221,15 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       from source instead of shipping as binary blobs. This is the single largest
       task in M2 and it unlocks RISC-V, MIPS, PowerPC, SPARC, SuperH, 6502, Z80,
       AVR, MSP430 and the rest in one step.
-- [ ] Assembler for x86-64 and AArch64, needed by M10 patching. Encoding only
-      from public manuals.
+- [x] Assembler for x86-64 and AArch64, needed by M10 patching. Encoding only,
+      from public manuals, built around the decoder so it accepts our own
+      disassembly verbatim: a user can copy a line out of `r12e disas`, change
+      it, and assemble it back. Round trip over the whole fixture corpus, 0
+      wrong on both architectures; byte-identical to `as` and
+      `aarch64-linux-gnu-as` on every one of 2,535 and 1,272 comparable forms.
+      A branch whose target does not fit is a typed error naming the range,
+      never a truncated displacement. SIMD and floating point are refused by
+      name rather than guessed.
 - [x] Text formatting for each architecture, with Intel and AT&T syntax for x86
       and a formatter trait so a caller can render its own.
 
