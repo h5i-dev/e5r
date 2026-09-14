@@ -185,6 +185,7 @@ fn the_token_fixture_reads_its_fields_and_pcode() {
         .expect("op field");
     match &op.body {
         r12e_sla::SymbolBody::Value { field: Some(f) } => {
+            let f = f.token().expect("op is cut from an instruction token");
             assert_eq!((f.start_bit, f.end_bit), (8, 15));
             assert_eq!((f.start_byte, f.end_byte, f.shift), (1, 1, 0));
             assert!(!f.signed);
@@ -198,7 +199,9 @@ fn the_token_fixture_reads_its_fields_and_pcode() {
         .find(|s| s.name.as_deref() == Some("imm"))
         .unwrap();
     match &imm.body {
-        r12e_sla::SymbolBody::Value { field: Some(f) } => assert!(f.signed),
+        r12e_sla::SymbolBody::Value { field: Some(f) } => {
+            assert!(f.token().expect("a token field").signed);
+        }
         _ => panic!("imm should be a token field value"),
     }
     // `attach variables [ rs rd ] [ r0 .. sp ]` gives sixteen entries.

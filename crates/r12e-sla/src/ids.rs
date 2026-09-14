@@ -58,9 +58,21 @@ pub fn element_name(id: u32) -> Option<&'static str> {
         44 => "end_sym_head",
         45 => "space_other",
         46 => "space_unique",
+        47 => "pexp_and",
+        48 => "pexp_div",
+        49 => "pexp_lshift",
+        50 => "pexp_minus",
         51 => "pexp_mult",
+        52 => "pexp_not",
+        53 => "pexp_or",
         54 => "pexp_plus",
+        55 => "pexp_rshift",
+        56 => "pexp_sub",
+        57 => "pexp_xor",
         58 => "pexp_constant",
+        59 => "pexp_inst_next",
+        60 => "pexp_inst_next2",
+        61 => "pexp_inst_start",
         64 => "name_sym",
         65 => "name_sym_head",
         66 => "name_entry",
@@ -75,7 +87,12 @@ pub fn element_name(id: u32) -> Option<&'static str> {
         75 => "valuemap_entry",
         76 => "varnode_list_sym",
         77 => "varnode_list_sym_head",
+        79 => "globalset",
+        80 => "const_inst_start",
         81 => "const_inst_next",
+        82 => "const_inst_next2",
+        83 => "const_curspace",
+        84 => "const_curspace_size",
         _ => return None,
     })
 }
@@ -129,6 +146,7 @@ pub fn attribute_name(id: u32) -> Option<&'static str> {
         48 => "low",
         49 => "high",
         50 => "flow",
+        52 => "word",
         53 => "numct",
         54 => "section",
         55 => "labels",
@@ -166,6 +184,7 @@ pub mod el {
     pub const CONTEXT_FIELD: u32 = 29;
     pub const HANDLE_TPL: u32 = 30;
     pub const CONST_RELATIVE: u32 = 31;
+    pub const CONTEXT_CHANGE: u32 = 32;
     pub const SLEIGH: u32 = 33;
     pub const SPACES: u32 = 34;
     pub const SOURCEFILES: u32 = 35;
@@ -185,7 +204,33 @@ pub mod el {
     pub const VALUEMAP_SYM: u32 = 73;
     pub const VALUEMAP_ENTRY: u32 = 75;
     pub const VARNODE_LIST_SYM: u32 = 76;
+    pub const VARNODE_LIST_SYM_HEAD: u32 = 77;
+    pub const GLOBALSET: u32 = 79;
+    pub const CONST_INST_START: u32 = 80;
     pub const CONST_INST_NEXT: u32 = 81;
+    pub const CONST_INST_NEXT2: u32 = 82;
+    pub const CONST_CURSPACE: u32 = 83;
+    pub const CONST_CURSPACE_SIZE: u32 = 84;
+
+    /// Pattern expression operators, settled one experiment each; see
+    /// `docs/sla-format.md`. The run is alphabetical by the operator's name
+    /// in the SLEIGH source, which is why it is contiguous.
+    pub const PEXP_AND: u32 = 47;
+    pub const PEXP_DIV: u32 = 48;
+    pub const PEXP_LSHIFT: u32 = 49;
+    pub const PEXP_MINUS: u32 = 50;
+    pub const PEXP_MULT: u32 = 51;
+    pub const PEXP_NOT: u32 = 52;
+    pub const PEXP_OR: u32 = 53;
+    pub const PEXP_PLUS: u32 = 54;
+    pub const PEXP_RSHIFT: u32 = 55;
+    pub const PEXP_SUB: u32 = 56;
+    pub const PEXP_XOR: u32 = 57;
+    pub const PEXP_CONSTANT: u32 = 58;
+    pub const PEXP_INST_NEXT: u32 = 59;
+    pub const PEXP_INST_NEXT2: u32 = 60;
+    pub const PEXP_INST_START: u32 = 61;
+    pub const OPERAND_VALUE: u32 = 12;
 }
 
 /// Attribute ids used by the tree walk.
@@ -235,4 +280,13 @@ pub mod at {
     pub const NUMCT: u32 = 53;
     pub const SECTION: u32 = 54;
     pub const LABELS: u32 = 55;
+    pub const WORD: u32 = 52;
+    /// On a constructor: where the mnemonic ends among the print pieces.
+    pub const FLOWTHRU: u32 = 27;
+    /// On an operand symbol body, the two values whose meaning is not
+    /// established. They are carried through so the file can be written back.
+    pub const OPERAND_18: u32 = 18;
+    pub const OPERAND_19: u32 = 19;
+    /// On a const_handle template leaf.
+    pub const HANDLE_28: u32 = 28;
 }

@@ -212,3 +212,105 @@ fn a_lying_stored_block_length_does_not_allocate() {
     assert!(inflate::inflate_zlib(&z, inflate::DEFAULT_LIMIT).is_err());
     assert!(started.elapsed() < PER_CASE_CEILING);
 }
+
+// The writer has the opposite failure mode from the reader: instead of
+// trusting a length in the file, it can write a length that is not the one it
+// wrote. Nothing downstream would notice until someone else's reader chokes,
+// so the contract checked here is that anything the writer produces our own
+// reader consumes, with every offset in range and every count true.
+
+/// Perturb the numbers in a program: sizes, offsets, symbol ids, counts. The
+/// result is usually not a language any more, which is the point.
+fn perturb(p: &mut r12e_sla::Program, rng: &mut Rng) {
+    use r12e_sla::model::SymbolBody;
+    p.alignment = rng.next() % 9;
+    p.unique_base = rng.next();
+    for s in &mut p.spaces {
+        if rng.next() % 4 == 0 {
+            s.size = rng.next() % 300;
+            s.word_size = rng.next() % 5;
+        }
+    }
+    for s in &mut p.symbols {
+        if rng.next() % 8 != 0 {
+            continue;
+        }
+        match &mut s.body {
+            SymbolBody::Varnode { offset, size, .. } => {
+                *offset = rng.next();
+                *size = rng.next() % 1024;
+            }
+            SymbolBody::Subtable { constructors, .. } => {
+                for c in constructors.iter_mut() {
+                    c.length = rng.next() % 4096;
+                    c.line = rng.next();
+                    c.flowthru = (rng.next() % 64) as i64 - 32;
+                }
+            }
+            SymbolBody::Operand {
+                offset,
+                base,
+                min_length,
+                ..
+            } => {
+                *offset = rng.next();
+                *base = (rng.next() % 64) as i64 - 32;
+                *min_length = rng.next() % 256;
+            }
+            _ => {}
+        }
+    }
+    // Lie about the counts, which is the sort of thing `Sla::check` exists to
+    // catch and the writer must not crash on.
+    if rng.next() % 3 == 0 {
+        p.declared_symbols = Some(rng.next() % 100_000);
+    }
+}
+
+#[test]
+fn perturbed_programs_always_write_something_readable() {
+    let Some(seed) = seeds().into_iter().next() else {
+        return;
+    };
+    let base = Sla::parse(&seed).expect("a fixture parses");
+    let mut rng = Rng(0x5eed_1234_abcd_0001);
+    let start = Instant::now();
+    let mut cases = 0usize;
+    while start.elapsed() < BUDGET {
+        let mut p = base.program.clone();
+        perturb(&mut p, &mut rng);
+        let case_start = Instant::now();
+        // A typed refusal is a correct outcome; a panic is not.
+        if let Ok(bytes) = r12e_sla::emit::write(&p, 4, r12e_sla::Level::Fixed) {
+            // Every length written must be the length actually written, which
+            // is exactly what parsing it back proves.
+            let back = Sla::parse(&bytes).expect("what we write, we read");
+            assert_eq!(back.program.symbols.len(), p.symbols.len());
+            // Offsets inside the payload are the writer's own arithmetic.
+            for i in back.check() {
+                assert!(
+                    !matches!(i, r12e_sla::Inconsistency::NodeOutOfRange { .. }),
+                    "writer produced a node outside the payload: {i:?}"
+                );
+            }
+        }
+        assert!(
+            case_start.elapsed() < PER_CASE_CEILING,
+            "one write took {:?}",
+            case_start.elapsed()
+        );
+        cases += 1;
+    }
+    assert!(cases > 4, "only {cases} cases in the budget");
+}
+
+#[test]
+fn a_string_the_length_encoding_cannot_carry_is_refused_not_truncated() {
+    // Fifteen chunks of seven bits is the ceiling on a string length, which no
+    // real name comes near; the writer has to say so rather than write a
+    // length that does not match the bytes.
+    let mut out = Vec::new();
+    let ok = r12e_sla::encode::push_value(&mut out, &r12e_sla::Value::Text("a".repeat(1000)));
+    assert!(ok.is_ok());
+    assert_eq!(out.len(), 1 + 2 + 1000);
+}

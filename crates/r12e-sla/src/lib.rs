@@ -17,15 +17,26 @@
 //!   constructors. Anything whose meaning is not established stays in the tree
 //!   as raw bytes, and [`Coverage`] reports how many bytes that is, so the gap
 //!   is a number rather than a feeling.
+//!
+//! It also writes. [`encode`] is the exact inverse of [`decode`], [`deflate`]
+//! the inverse of [`inflate`], and [`write_sla`] puts a tree back in a
+//! container. The gate on all three is that every `.sla` Ghidra ships
+//! re-encodes to the byte it was read from.
 
 #![forbid(unsafe_code)]
 
 pub mod decode;
+pub mod deflate;
+pub mod emit;
+pub mod encode;
 pub mod ids;
 pub mod inflate;
 pub mod model;
 
 pub use decode::{DecodeError, Node, Value};
+pub use deflate::Level;
+pub use emit::EmitError;
+pub use encode::{Build, EncodeError};
 pub use inflate::InflateError;
 pub use model::{Coverage, Program, Symbol, SymbolBody};
 
@@ -49,6 +60,8 @@ pub enum SlaError {
         root: u32,
     },
     Io(std::io::Error),
+    Encode(EncodeError),
+    Emit(EmitError),
 }
 
 impl core::fmt::Display for SlaError {
@@ -60,6 +73,8 @@ impl core::fmt::Display for SlaError {
             Self::Decode(e) => write!(f, "element stream: {e}"),
             Self::NotSleigh { root } => write!(f, "root element is {root}, expected 33 (sleigh)"),
             Self::Io(e) => write!(f, "{e}"),
+            Self::Encode(e) => write!(f, "writing element stream: {e}"),
+            Self::Emit(e) => write!(f, "building element tree: {e}"),
         }
     }
 }
@@ -75,6 +90,12 @@ impl From<InflateError> for SlaError {
 impl From<DecodeError> for SlaError {
     fn from(e: DecodeError) -> Self {
         Self::Decode(e)
+    }
+}
+
+impl From<EncodeError> for SlaError {
+    fn from(e: EncodeError) -> Self {
+        Self::Encode(e)
     }
 }
 
@@ -154,6 +175,34 @@ impl Sla {
     pub fn version_is_known(&self) -> bool {
         self.format_version == KNOWN_VERSION
     }
+
+    /// Write this file back out: the same version byte, the same tree, in a
+    /// fresh zlib stream.
+    ///
+    /// The bytes of the container will not match the file this was read from,
+    /// because the compressor here is not zlib's. The *payload* will match to
+    /// the byte, and that is the claim the corpus test makes.
+    ///
+    /// # Errors
+    /// Only if the tree holds something the tag encoding cannot carry, which a
+    /// tree that was read cannot.
+    pub fn to_bytes(&self, level: Level) -> Result<Vec<u8>, SlaError> {
+        write_sla(&self.tree, self.format_version, level)
+    }
+}
+
+/// Put a tagged element tree in a `.sla` container: the magic, a version
+/// byte, and the payload as a zlib stream.
+///
+/// # Errors
+/// See [`encode::encode`].
+pub fn write_sla(tree: &Node, version: u8, level: Level) -> Result<Vec<u8>, SlaError> {
+    let payload = encode::encode(tree)?;
+    let mut out = Vec::with_capacity(payload.len() / 2 + 16);
+    out.extend_from_slice(&MAGIC);
+    out.push(version);
+    out.extend_from_slice(&deflate::deflate_zlib(&payload, level));
+    Ok(out)
 }
 
 /// What a file says about itself that a reader can check against what it

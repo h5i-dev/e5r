@@ -70,8 +70,108 @@ pub struct ContextField {
     pub shift: u64,
 }
 
-/// A pattern expression. Only the operators this reader has established are
-/// named; the rest keep their element id so nothing is invented.
+/// Where a symbol reads its value from: a slice of the instruction stream, or
+/// a slice of the context register. Both shapes occur for `value`, `name`,
+/// `valuemap` and `attach variables` symbols.
+#[derive(Debug, Clone)]
+pub enum FieldDef {
+    /// A field of an instruction token.
+    Token(TokenField),
+    /// A field of the context register.
+    Context(ContextField),
+}
+
+impl FieldDef {
+    /// The token field, if this is one.
+    #[must_use]
+    pub fn token(&self) -> Option<&TokenField> {
+        match self {
+            Self::Token(t) => Some(t),
+            Self::Context(_) => None,
+        }
+    }
+
+    /// The context field, if this is one.
+    #[must_use]
+    pub fn context(&self) -> Option<&ContextField> {
+        match self {
+            Self::Context(c) => Some(c),
+            Self::Token(_) => None,
+        }
+    }
+}
+
+/// An operator inside a pattern expression, which is what a disassembly
+/// action computes with. Element ids 47 to 57 in alphabetical order of the
+/// operator's name, each settled by compiling a spec that uses only it; see
+/// `docs/sla-format.md`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PatternOp {
+    /// `$and`, two operands.
+    And,
+    /// `/`, two operands.
+    Div,
+    /// `<<`, two operands.
+    LeftShift,
+    /// Unary `-`, one operand.
+    Minus,
+    /// `*`, two operands.
+    Mult,
+    /// Unary `~`, one operand.
+    Not,
+    /// `$or`, two operands.
+    Or,
+    /// `+`, two operands.
+    Plus,
+    /// `>>`, two operands.
+    RightShift,
+    /// `-`, two operands.
+    Sub,
+    /// `$xor`, two operands.
+    Xor,
+}
+
+impl PatternOp {
+    /// The element id that carries it.
+    #[must_use]
+    pub fn element(self) -> u32 {
+        match self {
+            Self::And => el::PEXP_AND,
+            Self::Div => el::PEXP_DIV,
+            Self::LeftShift => el::PEXP_LSHIFT,
+            Self::Minus => el::PEXP_MINUS,
+            Self::Mult => el::PEXP_MULT,
+            Self::Not => el::PEXP_NOT,
+            Self::Or => el::PEXP_OR,
+            Self::Plus => el::PEXP_PLUS,
+            Self::RightShift => el::PEXP_RSHIFT,
+            Self::Sub => el::PEXP_SUB,
+            Self::Xor => el::PEXP_XOR,
+        }
+    }
+
+    /// The operator an element id stands for, if it is one.
+    #[must_use]
+    pub fn from_element(id: u32) -> Option<Self> {
+        Some(match id {
+            el::PEXP_AND => Self::And,
+            el::PEXP_DIV => Self::Div,
+            el::PEXP_LSHIFT => Self::LeftShift,
+            el::PEXP_MINUS => Self::Minus,
+            el::PEXP_MULT => Self::Mult,
+            el::PEXP_NOT => Self::Not,
+            el::PEXP_OR => Self::Or,
+            el::PEXP_PLUS => Self::Plus,
+            el::PEXP_RSHIFT => Self::RightShift,
+            el::PEXP_SUB => Self::Sub,
+            el::PEXP_XOR => Self::Xor,
+            _ => return None,
+        })
+    }
+}
+
+/// A pattern expression: what a disassembly action computes, evaluated when an
+/// instruction is decoded rather than when it runs.
 #[derive(Debug, Clone)]
 pub enum Expr {
     /// The value of operand `index` of constructor `ct` in table `table`.
@@ -81,9 +181,26 @@ pub enum Expr {
         ct: u64,
     },
     Constant(i128),
-    Mult(Vec<Expr>),
-    Plus(Vec<Expr>),
-    /// An operator whose element id has no established meaning.
+    /// A context field read inline, carrying its own bit layout rather than
+    /// naming a symbol.
+    Context(ContextField),
+    /// A token field read inline. This is how an operand body names the bits
+    /// it is cut from.
+    TokenField(TokenField),
+    /// The address of the instruction being decoded.
+    InstStart,
+    /// The address after it.
+    InstNext,
+    /// The address after that. Appears in no file Ghidra ships; it was found
+    /// by writing a spec that uses it.
+    InstNext2,
+    /// An operator and its operands, left to right.
+    Op {
+        op: PatternOp,
+        operands: Vec<Expr>,
+    },
+    /// An element id with no established meaning. Nothing in the corpus
+    /// produces one any more, and it is kept so a future format still reads.
     Unknown {
         element: u32,
         operands: Vec<Expr>,
@@ -107,10 +224,18 @@ pub struct PatternBlock {
 }
 
 /// What one branch of the decision tree matches on.
+///
+/// A file carries either half alone or both wrapped in a `combine_pattern`,
+/// and an empty block list is not the same bytes as an absent half, so the
+/// shape is recorded rather than flattened.
 #[derive(Debug, Clone, Default)]
 pub struct Pattern {
     pub context: Vec<PatternBlock>,
     pub instruction: Vec<PatternBlock>,
+    /// The two halves were wrapped in a `combine_pattern`.
+    pub combined: bool,
+    pub has_context: bool,
+    pub has_instruction: bool,
 }
 
 /// The decision tree a subtable uses to pick a constructor. `start_bit` counts
@@ -146,8 +271,17 @@ pub enum ConstTemplate {
     },
     /// A label, by index.
     Relative(i128),
+    /// The address of the instruction.
+    InstStart,
     /// The address after the instruction.
     InstNext,
+    /// The address after that.
+    InstNext2,
+    /// In a space slot: the space the instruction was decoded from, rather
+    /// than a fixed space index. Always paired with [`ConstTemplate::CurSpaceSize`].
+    CurSpace,
+    /// In a size slot: how many bytes an address in that space takes.
+    CurSpaceSize,
     /// A leaf whose element id has no established meaning.
     Unknown(u32),
 }
@@ -178,6 +312,36 @@ pub struct ConstructTemplate {
     pub ops: Vec<OpTemplate>,
 }
 
+/// What a constructor does to the context register, in the order the file
+/// lists it. A disassembly action can both change context for the rest of the
+/// current parse and publish a change from an address onwards, and the two are
+/// different records.
+#[derive(Debug, Clone)]
+pub enum ContextOp {
+    /// `field = expr` in a disassembly action: element 32.
+    Set {
+        /// Which 32-bit word of the context register.
+        word: u64,
+        /// Right shift that brings the field to bit zero.
+        shift: u64,
+        /// Which bits of that word the field owns.
+        mask: u64,
+        /// The value, as a pattern expression.
+        value: Vec<Expr>,
+    },
+    /// `globalset(address, field)`: element 79.
+    Commit {
+        /// Symbol id of the address argument.
+        symbol: u32,
+        /// Which 32-bit word of the context register.
+        word: u64,
+        /// Which bits of that word are published.
+        mask: u64,
+        /// False when the field was declared `noflow`.
+        flow: bool,
+    },
+}
+
 #[derive(Debug, Clone)]
 pub struct Constructor {
     /// Symbol id of the subtable this constructor belongs to.
@@ -187,9 +351,13 @@ pub struct Constructor {
     pub line: u64,
     /// Instruction length in bytes, before any operand extends it.
     pub length: u64,
+    /// Where the mnemonic ends among the print pieces. Negative values occur.
+    pub flowthru: i64,
     /// Symbol ids of the operands, in definition order.
     pub operands: Vec<u32>,
     pub print: Vec<PrintPiece>,
+    /// Context changes and `globalset` commits, in file order.
+    pub context_ops: Vec<ContextOp>,
     pub templates: Vec<ConstructTemplate>,
 }
 
@@ -209,22 +377,23 @@ pub enum SymbolBody {
     },
     /// A token field used directly as a value.
     Value {
-        field: Option<TokenField>,
+        field: Option<FieldDef>,
     },
     /// `attach values`.
     ValueMap {
-        field: Option<TokenField>,
+        field: Option<FieldDef>,
         values: Vec<i128>,
     },
-    /// `attach names`.
+    /// `attach names`. A `None` entry is an encoding the attachment leaves
+    /// undefined, which the file writes as an entry with no name at all.
     Name {
-        field: Option<TokenField>,
-        names: Vec<String>,
+        field: Option<FieldDef>,
+        names: Vec<Option<String>>,
     },
     /// `attach variables`: the varnode symbol id per field value, `None` for a
     /// hole in the list.
     VarnodeList {
-        field: Option<TokenField>,
+        field: Option<FieldDef>,
         entries: Vec<Option<u32>>,
     },
     /// A field of the context register.
@@ -240,6 +409,16 @@ pub enum SymbolBody {
         index: u64,
         offset: u64,
         sub_symbol: Option<u32>,
+        /// Attribute 19: the operand this one's offset is measured from the
+        /// end of, with -1 meaning the start of the instruction.
+        base: i64,
+        /// Attribute 18. It equals the width of the operand's token in every
+        /// case observed, and no experiment isolated it, so it is carried
+        /// rather than named.
+        min_length: u64,
+        /// Attribute 7, a flag present on a minority of operands. Not
+        /// isolated by any experiment, so it is carried and not named.
+        flag: Option<bool>,
         expr: Vec<Expr>,
     },
     /// `inst_start`.
@@ -381,24 +560,37 @@ fn context_field(n: &Node) -> ContextField {
     }
 }
 
-fn first_token_field(n: &Node) -> Option<TokenField> {
-    n.child(el::TOKEN_FIELD).map(token_field)
+/// The field element a symbol body carries, whichever of the two it is.
+fn field_def(n: &Node) -> Option<FieldDef> {
+    n.children.iter().find_map(|c| match c.id {
+        el::TOKEN_FIELD => Some(FieldDef::Token(token_field(c))),
+        el::CONTEXT_FIELD => Some(FieldDef::Context(context_field(c))),
+        _ => None,
+    })
 }
 
 fn expr(n: &Node) -> Expr {
-    let kids: Vec<Expr> = n.children.iter().map(expr).collect();
+    if let Some(op) = PatternOp::from_element(n.id) {
+        return Expr::Op {
+            op,
+            operands: n.children.iter().map(expr).collect(),
+        };
+    }
     match n.id {
-        12 => Expr::OperandValue {
+        el::OPERAND_VALUE => Expr::OperandValue {
             index: u64_of(n, at::INDEX).unwrap_or(0),
             table: u64_of(n, at::TABLE).unwrap_or(0),
             ct: u64_of(n, at::CT).unwrap_or(0),
         },
-        58 => Expr::Constant(i128_of(n, at::VAL)),
-        51 => Expr::Mult(kids),
-        54 => Expr::Plus(kids),
+        el::PEXP_CONSTANT => Expr::Constant(i128_of(n, at::VAL)),
+        el::CONTEXT_FIELD => Expr::Context(context_field(n)),
+        el::TOKEN_FIELD => Expr::TokenField(token_field(n)),
+        el::PEXP_INST_START => Expr::InstStart,
+        el::PEXP_INST_NEXT => Expr::InstNext,
+        el::PEXP_INST_NEXT2 => Expr::InstNext2,
         other => Expr::Unknown {
             element: other,
-            operands: kids,
+            operands: n.children.iter().map(expr).collect(),
         },
     }
 }
@@ -421,7 +613,11 @@ fn const_template(n: &Node) -> ConstTemplate {
             }),
         },
         el::CONST_RELATIVE => ConstTemplate::Relative(i128_of(n, at::VAL)),
+        el::CONST_INST_START => ConstTemplate::InstStart,
         el::CONST_INST_NEXT => ConstTemplate::InstNext,
+        el::CONST_INST_NEXT2 => ConstTemplate::InstNext2,
+        el::CONST_CURSPACE => ConstTemplate::CurSpace,
+        el::CONST_CURSPACE_SIZE => ConstTemplate::CurSpaceSize,
         other => ConstTemplate::Unknown(other),
     }
 }
@@ -491,6 +687,7 @@ fn pattern_block(n: &Node) -> PatternBlock {
 fn pattern(n: &Node, out: &mut Pattern) {
     match n.id {
         el::CONTEXT_PATTERN => {
+            out.has_context = true;
             out.context.extend(
                 n.children
                     .iter()
@@ -499,6 +696,7 @@ fn pattern(n: &Node, out: &mut Pattern) {
             );
         }
         el::INSTRUCTION_PATTERN => {
+            out.has_instruction = true;
             out.instruction.extend(
                 n.children
                     .iter()
@@ -507,6 +705,7 @@ fn pattern(n: &Node, out: &mut Pattern) {
             );
         }
         el::COMBINE_PATTERN => {
+            out.combined = true;
             for c in &n.children {
                 pattern(c, out);
             }
@@ -549,8 +748,10 @@ fn constructor(n: &Node) -> Constructor {
         source: u64_of(n, at::SOURCE).unwrap_or(0),
         line: u64_of(n, at::LINE).unwrap_or(0),
         length: u64_of(n, at::LENGTH).unwrap_or(0),
+        flowthru: i64_of(n, at::FLOWTHRU).unwrap_or(0),
         operands: Vec::new(),
         print: Vec::new(),
+        context_ops: Vec::new(),
         templates: Vec::new(),
     };
     for k in &n.children {
@@ -568,6 +769,20 @@ fn constructor(n: &Node) -> Constructor {
             el::PRINT_OPERAND => c
                 .print
                 .push(PrintPiece::Operand(u64_of(k, at::ID).unwrap_or(0))),
+            el::CONTEXT_CHANGE => c.context_ops.push(ContextOp::Set {
+                word: u64_of(k, at::WORD).unwrap_or(0),
+                shift: u64_of(k, at::SHIFT).unwrap_or(0),
+                mask: u64_of(k, at::MASK).unwrap_or(0),
+                value: k.children.iter().map(expr).collect(),
+            }),
+            el::GLOBALSET => c.context_ops.push(ContextOp::Commit {
+                symbol: u64_of(k, at::ID)
+                    .and_then(|v| u32::try_from(v).ok())
+                    .unwrap_or(u32::MAX),
+                word: u64_of(k, at::NUMBER).unwrap_or(0),
+                mask: u64_of(k, at::MASK).unwrap_or(0),
+                flow: bool_of(k, at::FLOW),
+            }),
             el::CONSTRUCT_TPL => c.templates.push(construct_template(k)),
             _ => {}
         }
@@ -589,10 +804,10 @@ fn symbol_body(n: &Node) -> SymbolBody {
             index: u64_of(n, at::INDEX).unwrap_or(0),
         },
         el::VALUE_SYM => SymbolBody::Value {
-            field: first_token_field(n),
+            field: field_def(n),
         },
         el::VALUEMAP_SYM => SymbolBody::ValueMap {
-            field: first_token_field(n),
+            field: field_def(n),
             values: n
                 .children
                 .iter()
@@ -601,16 +816,16 @@ fn symbol_body(n: &Node) -> SymbolBody {
                 .collect(),
         },
         el::NAME_SYM => SymbolBody::Name {
-            field: first_token_field(n),
+            field: field_def(n),
             names: n
                 .children
                 .iter()
                 .filter(|c| c.id == el::NAME_ENTRY)
-                .map(|c| text_of(c, at::NAME).unwrap_or_default())
+                .map(|c| text_of(c, at::NAME))
                 .collect(),
         },
         el::VARNODE_LIST_SYM => SymbolBody::VarnodeList {
-            field: first_token_field(n),
+            field: field_def(n),
             entries: n
                 .children
                 .iter()
@@ -637,6 +852,9 @@ fn symbol_body(n: &Node) -> SymbolBody {
             index: u64_of(n, at::INDEX).unwrap_or(0),
             offset: u64_of(n, at::OFF).unwrap_or(0),
             sub_symbol: u64_of(n, at::SUBSYM).and_then(|v| u32::try_from(v).ok()),
+            base: i64_of(n, at::OPERAND_19).unwrap_or(-1),
+            min_length: u64_of(n, at::OPERAND_18).unwrap_or(0),
+            flag: n.attr(at::CODE).and_then(Value::as_bool),
             expr: n.children.iter().map(expr).collect(),
         },
         el::START_SYM => SymbolBody::Start,
@@ -669,6 +887,12 @@ pub(crate) fn build(root: &Node) -> Program {
         big_endian: bool_of(root, at::BIGENDIAN),
         alignment: u64_of(root, at::ALIGN).unwrap_or(1),
         unique_base: u64_of(root, at::UNIQBASE).unwrap_or(0),
+        extra_root_attrs: root
+            .attrs
+            .iter()
+            .filter(|(a, _)| !matches!(*a, at::VERSION | at::BIGENDIAN | at::ALIGN | at::UNIQBASE))
+            .cloned()
+            .collect(),
         ..Program::default()
     };
     for top in &root.children {
@@ -770,6 +994,11 @@ pub struct Program {
     pub big_endian: bool,
     pub alignment: u64,
     pub unique_base: u64,
+    /// Attributes on the root element beyond the four that are established.
+    /// Thirteen of the shipped files carry attribute 38 and one carries 39 and
+    /// 40; nothing says what they mean, so they are carried through rather
+    /// than dropped, and the writer puts them back where they were.
+    pub extra_root_attrs: Vec<(u32, Value)>,
     pub source_files: Vec<SourceFile>,
     pub default_space: Option<String>,
     pub spaces: Vec<Space>,
@@ -786,6 +1015,32 @@ pub struct Program {
 }
 
 impl Program {
+    /// An empty program, for a compiler to fill in.
+    ///
+    /// Every field is public except the symbol id index, which has to stay in
+    /// step with `symbols`; [`Program::reindex`] is how that is said.
+    #[must_use]
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    /// Rebuild the symbol id index.
+    ///
+    /// A program that was read from a file has one already. A program a
+    /// compiler built has to say when its symbol list is final, and the index
+    /// is not derived lazily because every lookup would then have to decide
+    /// whether it is stale.
+    pub fn reindex(&mut self) {
+        let mut by_id: Vec<(u32, usize)> = self
+            .symbols
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (s.id, i))
+            .collect();
+        by_id.sort_unstable();
+        self.symbol_index = by_id;
+    }
+
     #[must_use]
     pub fn symbol(&self, id: u32) -> Option<&Symbol> {
         let k = self
