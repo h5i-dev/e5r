@@ -64,3 +64,44 @@ fn corpus_structuring_totals() {
         unstructured as f64 / functions.max(1) as f64
     );
 }
+
+/// The whole corpus's decompiled text, for comparing two structurings.
+///
+/// A change that moves output size has to show what moved. Dumping every
+/// function twice and comparing the multiset of lines is what proves a
+/// difference is the gotos and the labels rather than code appearing or
+/// disappearing. Writes to the path in `R12E_DUMP`.
+#[test]
+#[ignore = "a dump for comparing two builds, written rather than asserted"]
+fn corpus_dump() {
+    use std::io::Write;
+
+    let Some(dir) = build_dir() else { return };
+    let Some(out) = std::env::var_os("R12E_DUMP") else {
+        return;
+    };
+    let mut names: Vec<String> = std::fs::read_dir(&dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+
+    let mut w = std::io::BufWriter::new(std::fs::File::create(out).unwrap());
+    for name in names {
+        let Some(p) = open(&name) else { continue };
+        let targets: Vec<&r12e_analysis::Function> = p
+            .functions_by_address()
+            .filter(|f| f.is_complete())
+            .collect();
+        if targets.is_empty() {
+            continue;
+        }
+        for d in r12e_api::decompile_program(&p, &targets).functions {
+            let _ = writeln!(w, "// {name} {}", d.name);
+            let _ = w.write_all(d.text.as_bytes());
+        }
+    }
+}

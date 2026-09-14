@@ -201,26 +201,63 @@ zero and asserted on every run.
 ### Gotos
 
 A goto is honest, and it is also the thing to improve, so the count is a
-ceiling that only comes down.
+ceiling that only comes down. All of these are one binary over one corpus of
+7,898 complete functions in 188 fixtures, switched by environment variable,
+which is the only way two structuring numbers are comparable.
 
-| | gotos over the corpus | functions needing a label |
-| --- | --- | --- |
-| before blocks stopped being dropped | 7,081 | |
-| after, which is the honest baseline | 7,286 | 1,153 |
-| after single-place block classification and tail copying | **4,489** | **1,001** |
+| | gotos | functions needing a label | share |
+| --- | --- | --- | --- |
+| before blocks stopped being dropped | 7,081 | | |
+| after, which is the honest baseline | 7,286 | 1,153 | |
+| single-place classification and tail copying | 4,489 | 1,001 | |
+| ...re-measured on the grown corpus | 8,898 | 1,478 | 0.1871 |
+| sinking a shared tail instead of jumping to it | 8,580 | 1,474 | 0.1866 |
+| break-sinking and a tail measured as what is written | **7,177** | **973** | **0.1232** |
 
-The rise in the middle row is the price of emitting 2,389 blocks that used to
-disappear: a dropped block costs no gotos. The fall is 38.4%, and it cost 6.2%
-more output text.
+The rise in the second row is the price of emitting 2,389 blocks that used to
+disappear: a dropped block costs no gotos. The fourth row is not a regression
+either -- it is the third row's corpus grown from 49 fixtures to 188, so only
+rows four onward compare to each other.
+
+**318 of the shipped row's removals were wrong code.** `exits` folded a hole
+into `Exit::Other`, so a goto buried in an `if` whose other side carried on was
+deleted, and what had jumped *over* a statement fell into it instead. The
+output still compiled and no reader could have told. Fixing it costs 318 gotos
+of honesty, which is why the sound baseline is 8,898 and not 8,580; the 7,177
+is measured against the honest number.
+
+Two mechanisms bought the rest:
+
+- **A goto out of a switch arm or an endless loop becomes the `break` of it**,
+  and the tail is written after the construct. Guarded on four conditions, of
+  which the load-bearing one is that no hole sits deeper than one construct,
+  since C's `break` binds to the innermost. `while` is refused outright: its
+  test failing is a second way out, landing exactly where the tail is going.
+- **A copied tail is measured as what the walk would write**, not as everything
+  reachable past it. `region()` stops at the innermost loop's header and at
+  what it leaves to, one line each and no blocks, so a one-block tail ending in
+  `continue` was being measured as the rest of the function and refused. This
+  is where most of the win came from.
+
+Output text grew 3.4%. Dumping the whole corpus under both configurations and
+comparing line multisets: **146,122 distinct statement lines under each, and
+zero on either side alone** -- no code was lost and none invented. `goto` 8,898
+to 7,177 and labels 6,247 to 4,887 against `continue` 3,555 to 5,417 and
+`break` 3,637 to 3,997, which is the trade: the copied tails end in a jump C
+already has a keyword for. Worst per-function growth is 1.64x.
 
 The fixture ceiling in `quality.rs`, the share of functions needing at least
-one label, came down from 0.13 to **0.07**.
+one label, came down from 0.13 to **0.07**, and is unmoved by this work -- the
+twenty fixtures it measures were already the easy ones. The corpus share is
+the number that moved.
 
-What remains splits by target shape rather than by cause: 45% target a region
-above 24 blocks, where duplication is the wrong tool; 31% target a region
-containing a loop, where two copies would read as two different loops; 24% are
-acyclic and above the copy cap, and buying those costs about 6 KB of output
-per goto.
+What remains is 1,654 refusals per translation unit of one shape: a block
+written inside a loop or a switch arm and jumped to from outside it, which is a
+jump *into* a construct, so the answer is choosing where to write the block and
+not sinking it afterwards. Reaching conditions, the other large bucket, are
+blocked outside this pass: rebuilding a condition to emit it a second time is
+unsafe for phi outputs, because `phi_copies` assigns a phi's local once per
+incoming edge, and structuring is handed only the graph.
 
 ### Types
 

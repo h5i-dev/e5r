@@ -11,9 +11,13 @@
 //!
 //! Two environment variables exist for measuring that, and only for that.
 //! `R12E_GOTO_STATS` prints the histogram of why each goto was needed and why
-//! each sink was refused, on stderr, per function. `R12E_NO_SINK` turns the
-//! sinking pass off, so a before and an after can come from one build over one
-//! corpus, which is the only way two structuring numbers are comparable.
+//! each sink was refused, on stderr, per function. Three switches turn one
+//! mechanism each off, so a before and an after can come from one build over
+//! one corpus, which is the only way two structuring numbers are comparable:
+//! `R12E_NO_SINK` for writing a shared tail after the branch, `R12E_NO_BREAK_SINK`
+//! for doing that when the jumps to it come out of a loop or a switch arm, and
+//! `R12E_NO_TIGHT_TAIL` for measuring a copied tail as what the walk would
+//! write rather than as everything reachable past it.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -170,6 +174,7 @@ pub fn structure_with(
         .collect();
 
     let postdom = postdominators(graph, &order, &index);
+    let tight = std::env::var_os("R12E_NO_TIGHT_TAIL").is_none();
 
     let mut ctx = Ctx {
         graph,
@@ -185,6 +190,7 @@ pub fn structure_with(
         duplication: duplication_budget(graph.len()),
         loops: Vec::new(),
         keep_single: BTreeSet::new(),
+        tight,
         reasons: BTreeMap::new(),
     };
 
@@ -215,6 +221,7 @@ pub fn structure_with(
             duplication: duplication_budget(graph.len()),
             loops: Vec::new(),
             keep_single,
+            tight,
             reasons: BTreeMap::new(),
         };
         root = ctx.region(entry, None, None);
@@ -225,8 +232,11 @@ pub fn structure_with(
     // over the finished tree, because whether an arm falls into the tail or
     // has to skip it is a question about the tree and not about the walk.
     let mut refused: BTreeMap<&'static str, usize> = BTreeMap::new();
+    // Off switch for the second mechanism only, so a before and an after come
+    // from one build over one corpus.
+    let breaks = std::env::var_os("R12E_NO_BREAK_SINK").is_none();
     if std::env::var_os("R12E_NO_SINK").is_none() {
-        for at in sink_shared_tails(&mut root, graph, &mut ctx.labels, &mut refused) {
+        for at in sink_shared_tails(&mut root, graph, &mut ctx.labels, &mut refused, breaks) {
             ctx.gotos = ctx.gotos.saturating_sub(1);
             let reason = ctx.goto_reason(at);
             if let Some(n) = ctx.reasons.get_mut(reason) {
@@ -391,6 +401,9 @@ struct Ctx<'a> {
     loops: Vec<Nesting>,
     /// Blocks that must appear once, because a goto names them.
     keep_single: BTreeSet<Addr>,
+    /// Whether a copied tail is measured as what the walk would write rather
+    /// than as everything reachable past it. A measurement switch.
+    tight: bool,
     reasons: BTreeMap<&'static str, usize>,
 }
 
@@ -445,8 +458,8 @@ impl Ctx<'_> {
             if self.emitted.contains(&cursor) {
                 // A small tail is written out again rather than jumped to.
                 if let Some(blocks) = self.copyable_tail(cursor, stop) {
-                    self.duplication -= blocks as u32;
-                    parts.push(self.duplicate(cursor, stop, enclosing));
+                    self.duplication -= blocks.len() as u32;
+                    parts.push(self.duplicate(cursor, stop, enclosing, &blocks));
                     break;
                 }
                 *self.reasons.entry(self.goto_reason(cursor)).or_default() += 1;
@@ -545,19 +558,31 @@ impl Ctx<'_> {
     /// tail out again in each arm undoes the merge rather than inventing
     /// structure, and over this corpus it is where most of the removable gotos
     /// are.
-    fn copyable_tail(&self, at: Addr, stop: Option<Addr>) -> Option<usize> {
+    fn copyable_tail(&self, at: Addr, stop: Option<Addr>) -> Option<BTreeSet<Addr>> {
         let mut seen: BTreeSet<Addr> = BTreeSet::new();
         let mut work = vec![at];
         while let Some(block) = work.pop() {
             if Some(block) == stop || !self.graph.contains_key(&block) {
                 continue;
             }
-            // A loop is written out again only when it lies wholly inside the
-            // tail, which the size bound below decides: every block of a
-            // natural loop is reachable from its header, so a loop that does
-            // not fit makes the walk exceed the bound. A loop currently being
-            // structured is never a tail, because writing it out again inside
-            // itself would not terminate.
+            // The walk writes `continue` where the tail reaches the top of the
+            // loop it is in and `break` where it reaches what the loop leaves
+            // to, one line each and no blocks. Counting everything past those
+            // two, which is most of the function, is what refused tails the
+            // walk would have written as two statements.
+            if self.tight {
+                if let Some(inner) = self.loops.last() {
+                    if block == inner.head || Some(block) == inner.exit {
+                        continue;
+                    }
+                }
+            }
+            // An outer loop is written out again only when it lies wholly
+            // inside the tail, which the size bound below decides: every block
+            // of a natural loop is reachable from its header, so a loop that
+            // does not fit makes the walk exceed the bound. A loop currently
+            // being structured is never a tail, because writing it out again
+            // inside itself would not terminate.
             if self.loops.iter().any(|l| l.head == block) || self.keep_single.contains(&block) {
                 return None;
             }
@@ -573,27 +598,25 @@ impl Ctx<'_> {
                 }
             }
         }
-        (!seen.is_empty()).then_some(seen.len())
+        (!seen.is_empty()).then_some(seen)
     }
 
     /// Structure a tail again, as a copy.
-    fn duplicate(&mut self, at: Addr, stop: Option<Addr>, enclosing: Option<Addr>) -> Region {
-        // The blocks are already marked as emitted, so they are unmarked for
-        // the duration of the copy and put back afterwards.
+    ///
+    /// Exactly the blocks `copyable_tail` counted are unmarked, so what is
+    /// written out again is what the budget was charged for. Anything the copy
+    /// reaches beyond them is still marked and comes out as the jump it was.
+    fn duplicate(
+        &mut self,
+        at: Addr,
+        stop: Option<Addr>,
+        enclosing: Option<Addr>,
+        blocks: &BTreeSet<Addr>,
+    ) -> Region {
         let mut restored: Vec<Addr> = Vec::new();
-        let mut work = vec![at];
-        let mut seen: BTreeSet<Addr> = BTreeSet::new();
-        while let Some(block) = work.pop() {
-            if Some(block) == stop || !seen.insert(block) {
-                continue;
-            }
-            if self.emitted.remove(&block) {
-                restored.push(block);
-            }
-            for s in self.graph.get(&block).into_iter().flatten() {
-                if !seen.contains(s) {
-                    work.push(*s);
-                }
+        for block in blocks {
+            if self.emitted.remove(block) {
+                restored.push(*block);
             }
         }
         let region = self.region(at, stop, enclosing);
@@ -1186,8 +1209,23 @@ impl Holes<'_> {
 
     /// True when a hole lies strictly inside a region.
     fn inside(&self, path: &[Step]) -> bool {
-        let deeper = |h: &[Step]| h.len() > path.len() && h.starts_with(path);
-        deeper(self.tail) || self.gotos.iter().any(|g| deeper(g))
+        self.def_inside(path) || self.goto_inside(path)
+    }
+
+    /// True when the tail's own definition lies strictly inside a region.
+    ///
+    /// Kept apart from a goto because the two refusals want different work:
+    /// a goto inside a loop can become a `break`, and a tail written inside
+    /// one cannot be lifted out of it at all.
+    fn def_inside(&self, path: &[Step]) -> bool {
+        self.tail.len() > path.len() && self.tail.starts_with(path)
+    }
+
+    /// True when some goto to the tail lies strictly inside a region.
+    fn goto_inside(&self, path: &[Step]) -> bool {
+        self.gotos
+            .iter()
+            .any(|g| g.len() > path.len() && g.starts_with(path))
     }
 }
 
@@ -1213,18 +1251,19 @@ fn sink_shared_tails(
     graph: &Graph,
     labels: &mut BTreeSet<Addr>,
     refused: &mut BTreeMap<&'static str, usize>,
+    breaks: bool,
 ) -> Vec<Addr> {
     let mut removed: Vec<Addr> = Vec::new();
     // Sinking one tail exposes the next: the arm that stopped jumping now ends
     // where the following tail begins. Bounded, and each round either removes a
     // goto or stops.
-    let mut last = BTreeMap::new();
+    let mut last: BTreeMap<&'static str, usize> = BTreeMap::new();
     for _ in 0..8 {
         let targets: Vec<Addr> = labels.iter().copied().collect();
         let mut progress = false;
         last = BTreeMap::new();
         for target in targets {
-            let n = sink_one(root, graph, target, &mut last);
+            let n = sink_one(root, graph, target, &mut last, breaks);
             if n == 0 {
                 continue;
             }
@@ -1255,6 +1294,7 @@ fn sink_one(
     graph: &Graph,
     target: Addr,
     refused: &mut BTreeMap<&'static str, usize>,
+    breaks: bool,
 ) -> usize {
     let mut defs: Vec<Vec<Step>> = Vec::new();
     let mut gotos: Vec<Vec<Step>> = Vec::new();
@@ -1314,7 +1354,8 @@ fn sink_one(
     let Some(region) = node(root, &common) else {
         return 0;
     };
-    match exits(region, &mut Vec::new(), &holes, graph) {
+    let mut why: Option<&'static str> = None;
+    match exits(region, &mut Vec::new(), &holes, graph, &mut why, breaks) {
         Some(Exit::Hole) => {}
         // The arms that have to skip the tail do not all leave by themselves,
         // so one of them would fall into it. This is the bucket a reaching
@@ -1329,18 +1370,25 @@ fn sink_one(
         // does not go where the goto went.
         None => {
             *refused
-                .entry("jumped out of a loop or a switch arm")
+                .entry(why.unwrap_or("jumped out of a loop or a switch arm"))
                 .or_default() += gotos.len();
             return 0;
         }
     }
 
+    // Which gotos have to leave a `break` behind, decided before anything
+    // moves: a path into the tail being cut out would stop resolving.
+    let leave_break: Vec<bool> = gotos
+        .iter()
+        .map(|g| needs_break(region, &g[cut..]))
+        .collect();
+
     // Sound: take the tail out, drop the gotos, write the tail after.
     let removed = gotos.len();
     let tail = take_tail(root, &container, from);
-    for g in &gotos {
+    for (g, brk) in gotos.iter().zip(leave_break) {
         if let Some(slot) = node_mut(root, g) {
-            *slot = Region::Empty;
+            *slot = if brk { Region::Break } else { Region::Empty };
         }
     }
     let Some(slot) = node_mut(root, &common) else {
@@ -1497,13 +1545,87 @@ fn sites(
     }
 }
 
+/// True when every hole under `path` would bind its `break` to the construct
+/// at `path`.
+///
+/// C's `break` leaves the innermost loop or switch, so a goto written two
+/// constructs deep cannot be turned into one break: it would leave the inner
+/// construct and carry on there. Rather than emit two, refuse.
+fn holes_bind_here(r: &Region, path: &mut Vec<Step>, holes: &Holes) -> bool {
+    if holes.at(path) {
+        return true;
+    }
+    match r {
+        Region::Seq(parts) => {
+            for (i, p) in parts.iter().enumerate() {
+                path.push(Step::Part(i));
+                let ok = holes_bind_here(p, path, holes);
+                path.pop();
+                if !ok {
+                    return false;
+                }
+            }
+            true
+        }
+        Region::If {
+            then, otherwise, ..
+        } => {
+            path.push(Step::Then);
+            let ok = holes_bind_here(then, path, holes);
+            path.pop();
+            if !ok {
+                return false;
+            }
+            match otherwise {
+                Some(o) => {
+                    path.push(Step::Else);
+                    let ok = holes_bind_here(o, path, holes);
+                    path.pop();
+                    ok
+                }
+                None => true,
+            }
+        }
+        Region::While { .. } | Region::Infinite { .. } | Region::Switch { .. } => {
+            !holes.inside(path)
+        }
+        _ => true,
+    }
+}
+
+/// True when a goto being removed has to leave a `break` behind.
+///
+/// It sits inside a loop or a switch arm and the tail is being written after
+/// that construct, so falling off the end of it would repeat the loop or run
+/// the next case instead of reaching the tail.
+fn needs_break(region: &Region, path: &[Step]) -> bool {
+    (0..path.len()).any(|i| {
+        matches!(
+            node(region, &path[..i]),
+            Some(Region::While { .. } | Region::Infinite { .. } | Region::Switch { .. })
+        )
+    })
+}
+
 /// How control leaves a region once the holes are cut out of it.
 ///
 /// `None` rejects the sink: a hole where falling through would not reach the
 /// sunk tail. That is a hole inside a loop, where it falls to the next
 /// iteration; inside a switch arm, where C falls into the next case; or with
 /// statements written after it, which it would then run on the way.
-fn exits(r: &Region, path: &mut Vec<Step>, holes: &Holes, graph: &Graph) -> Option<Exit> {
+///
+/// `breaks` allows the second answer to the first two: a goto written inside a
+/// loop or a switch arm becomes the `break` of it, which lands exactly where
+/// the sunk tail is about to be written. `why` names the refusal, so the
+/// histogram says which shape is left rather than only how many.
+fn exits(
+    r: &Region,
+    path: &mut Vec<Step>,
+    holes: &Holes,
+    graph: &Graph,
+    why: &mut Option<&'static str>,
+    breaks: bool,
+) -> Option<Exit> {
     if holes.at(path) {
         return Some(Exit::Hole);
     }
@@ -1528,14 +1650,40 @@ fn exits(r: &Region, path: &mut Vec<Step>, holes: &Holes, graph: &Graph) -> Opti
             for (i, p) in parts.iter().enumerate() {
                 path.push(Step::Part(i));
                 let cut_here = path.as_slice() == holes.tail;
-                let e = exits(p, path, holes, graph);
+                path.pop();
+                // The tail may begin at the very next statement, in which case
+                // everything from there on moves and this sequence ends here
+                // too. A hole at this position then falls straight into the
+                // tail's new home rather than over anything.
+                path.push(Step::Part(i + 1));
+                let cut_next = i < last && path.as_slice() == holes.tail;
+                path.pop();
+                path.push(Step::Part(i));
+                let e = exits(p, path, holes, graph, why, breaks);
                 path.pop();
                 match e? {
                     // The tail itself: what follows it in this sequence is part
                     // of it and moves with it, so the sequence ends here.
-                    Exit::Hole if cut_here => return Some(Exit::Hole),
-                    Exit::Hole if i < last => return None,
-                    Exit::Other if i < last => {}
+                    Exit::Hole if cut_here || cut_next => return Some(Exit::Hole),
+                    Exit::Hole if i < last => {
+                        *why = Some("a goto has statements written after it");
+                        return None;
+                    }
+                    Exit::Other if i < last => {
+                        // A goto buried in a part whose other paths carry on
+                        // is lost here: `join` folds a hole into `Other`, and
+                        // deleting the goto would leave it falling into what
+                        // comes next rather than jumping over it.
+                        path.push(Step::Part(i));
+                        let hidden = holes.goto_inside(path);
+                        path.pop();
+                        // Unless the tail begins at the very next statement,
+                        // where falling through and jumping land together.
+                        if hidden && !cut_next {
+                            *why = Some("a goto sits in a part that also falls through");
+                            return None;
+                        }
+                    }
                     Exit::Never if i < last => return Some(Exit::Never),
                     e => return Some(e),
                 }
@@ -1546,12 +1694,12 @@ fn exits(r: &Region, path: &mut Vec<Step>, holes: &Holes, graph: &Graph) -> Opti
             then, otherwise, ..
         } => {
             path.push(Step::Then);
-            let t = exits(then, path, holes, graph);
+            let t = exits(then, path, holes, graph, why, breaks);
             path.pop();
             let f = match otherwise {
                 Some(o) => {
                     path.push(Step::Else);
-                    let f = exits(o, path, holes, graph);
+                    let f = exits(o, path, holes, graph, why, breaks);
                     path.pop();
                     f?
                 }
@@ -1560,20 +1708,97 @@ fn exits(r: &Region, path: &mut Vec<Step>, holes: &Holes, graph: &Graph) -> Opti
             };
             Some(join(t?, f))
         }
-        Region::While { .. } => (!holes.inside(path)).then_some(Exit::Other),
+        // A `while` is left whenever its test fails, and that path would land
+        // on the sunk tail without ever having jumped to it. No `break` helps.
+        Region::While { .. } => {
+            if !holes.inside(path) {
+                return Some(Exit::Other);
+            }
+            *why = Some(if holes.def_inside(path) {
+                "the tail is written inside a while"
+            } else {
+                "a while is also left by its test failing"
+            });
+            None
+        }
         Region::Infinite { body, .. } => {
-            if holes.inside(path) {
+            if !holes.inside(path) {
+                return Some(if breaks_out(body) {
+                    Exit::Other
+                } else {
+                    Exit::Never
+                });
+            }
+            if !breaks {
+                *why = Some("jumped out of a loop");
                 return None;
             }
-            Some(if breaks_out(body) {
-                Exit::Other
-            } else {
-                Exit::Never
-            })
+            // Lifting the tail out of the loop it is written in is a different
+            // program, whatever the jumps to it do.
+            if holes.def_inside(path) {
+                *why = Some("the tail is written inside a loop");
+                return None;
+            }
+            // Another way out already lands after the loop, which is where the
+            // tail is going, so the two would be the same place and are not.
+            if breaks_out(body) {
+                *why = Some("the loop is also left by a break");
+                return None;
+            }
+            path.push(Step::Body);
+            let bound = holes_bind_here(body, path, holes);
+            path.pop();
+            if !bound {
+                *why = Some("the goto sits deeper than the loop it would break");
+                return None;
+            }
+            Some(Exit::Hole)
         }
-        // Conservative: an arm that runs off its end falls into the next one,
-        // and whether every arm leaves is not worth deciding here.
-        Region::Switch { .. } => (!holes.inside(path)).then_some(Exit::Other),
+        Region::Switch { cases, default, .. } => {
+            if !holes.inside(path) {
+                return Some(Exit::Other);
+            }
+            if !breaks {
+                *why = Some("jumped out of a switch arm");
+                return None;
+            }
+            if holes.def_inside(path) {
+                *why = Some("the tail is written inside a switch arm");
+                return None;
+            }
+            // Every arm has to end by leaving the function or at a hole. A
+            // hole becomes the `break` C writes at the end of an arm anyway,
+            // so the switch as a whole is left only where the gotos went.
+            let arms = cases
+                .iter()
+                .enumerate()
+                .map(|(i, c)| (Step::Case(i), &c.body))
+                .chain(default.as_deref().map(|d| (Step::Default, d)));
+            for (step, arm) in arms {
+                // A `break` already written in the arm leaves the switch by
+                // falling out of it, which is where the tail is going.
+                if breaks_out(arm) {
+                    *why = Some("a switch arm is also left by a break");
+                    return None;
+                }
+                path.push(step);
+                let bound = !holes.inside(path) || holes_bind_here(arm, path, holes);
+                let e = exits(arm, path, holes, graph, why, breaks);
+                path.pop();
+                if !bound {
+                    *why = Some("the goto sits deeper than the switch arm it would break");
+                    return None;
+                }
+                match e? {
+                    Exit::Hole | Exit::Never => {}
+                    Exit::Other => {
+                        *why = Some("a switch arm falls out of the switch");
+                        return None;
+                    }
+                }
+            }
+            Some(Exit::Hole)
+        }
     }
 }
 
@@ -1905,6 +2130,218 @@ mod tests {
                 s.root
             );
         }
+    }
+
+    /// A goto out of a switch arm is the `break` C writes there anyway, so the
+    /// tail can be written after the switch rather than jumped to.
+    #[test]
+    fn a_goto_out_of_a_switch_arm_becomes_a_break() {
+        // One arm reaches the tail at 10, the other returns at 2. The tail is
+        // written in the `if`'s other side, so reaching it from the arm needs
+        // a goto unless the switch is left by falling out of it.
+        let graph = g(&[
+            (0, &[5, 6]),
+            (5, &[10]),
+            (6, &[1, 2]),
+            (1, &[10]),
+            (2, &[]),
+            (10, &[11]),
+            (11, &[]),
+        ]);
+        let mut root = Region::Seq(vec![
+            Region::Block(Addr(0)),
+            Region::If {
+                head: Addr(0),
+                invert: false,
+                then: Box::new(Region::Seq(vec![
+                    Region::Block(Addr(5)),
+                    Region::Block(Addr(10)),
+                    Region::Block(Addr(11)),
+                ])),
+                otherwise: Some(Box::new(Region::Switch {
+                    head: Addr(6),
+                    cases: vec![
+                        Case {
+                            values: vec![0],
+                            body: Region::Seq(vec![Region::Block(Addr(1)), Region::Goto(Addr(10))]),
+                        },
+                        Case {
+                            values: vec![1],
+                            body: Region::Block(Addr(2)),
+                        },
+                    ],
+                    default: None,
+                })),
+            },
+        ]);
+        let mut labels: BTreeSet<Addr> = [Addr(10)].into_iter().collect();
+        let mut refused = BTreeMap::new();
+        let removed = sink_shared_tails(&mut root, &graph, &mut labels, &mut refused, true);
+
+        assert_eq!(removed, vec![Addr(10)], "{root:?}\n{refused:?}");
+        assert!(!mentions_goto(&root, Addr(10)), "{root:?}");
+        let mut counts = BTreeMap::new();
+        occurrences(&root, &mut counts);
+        assert_eq!(counts.get(&Addr(10)), Some(&1), "{root:?}");
+        assert_eq!(counts.get(&Addr(11)), Some(&1), "{root:?}");
+        // The arm has to say it leaves the switch; running off its end would
+        // fall into the next case.
+        assert!(
+            collect(&root).contains(&Region::Break),
+            "no break left behind in {root:?}"
+        );
+    }
+
+    /// The same for a loop with no other way out: the goto is the only exit,
+    /// so it becomes the `break` and the tail goes after the loop.
+    #[test]
+    fn a_goto_out_of_an_endless_loop_becomes_a_break() {
+        let graph = g(&[
+            (0, &[5, 6]),
+            (5, &[10]),
+            (6, &[6, 10]),
+            (10, &[11]),
+            (11, &[]),
+        ]);
+        let mut root = Region::Seq(vec![
+            Region::Block(Addr(0)),
+            Region::If {
+                head: Addr(0),
+                invert: false,
+                then: Box::new(Region::Seq(vec![
+                    Region::Block(Addr(5)),
+                    Region::Block(Addr(10)),
+                    Region::Block(Addr(11)),
+                ])),
+                otherwise: Some(Box::new(Region::Infinite {
+                    head: Addr(6),
+                    body: Box::new(Region::If {
+                        head: Addr(6),
+                        invert: false,
+                        then: Box::new(Region::Goto(Addr(10))),
+                        otherwise: None,
+                    }),
+                })),
+            },
+        ]);
+        let mut labels: BTreeSet<Addr> = [Addr(10)].into_iter().collect();
+        let mut refused = BTreeMap::new();
+        let removed = sink_shared_tails(&mut root, &graph, &mut labels, &mut refused, true);
+
+        assert_eq!(removed, vec![Addr(10)], "{root:?}\n{refused:?}");
+        assert!(!mentions_goto(&root, Addr(10)), "{root:?}");
+        assert!(
+            collect(&root).contains(&Region::Break),
+            "no break left behind in {root:?}"
+        );
+    }
+
+    /// A loop with another way out already lands after itself, which is where
+    /// the tail would go, so the two exits would become one place.
+    #[test]
+    fn a_loop_with_another_exit_keeps_its_goto() {
+        let graph = g(&[
+            (0, &[5, 6]),
+            (5, &[10]),
+            (6, &[6, 10]),
+            (10, &[11]),
+            (11, &[]),
+        ]);
+        let mut root = Region::Seq(vec![
+            Region::Block(Addr(0)),
+            Region::If {
+                head: Addr(0),
+                invert: false,
+                then: Box::new(Region::Seq(vec![
+                    Region::Block(Addr(5)),
+                    Region::Block(Addr(10)),
+                    Region::Block(Addr(11)),
+                ])),
+                otherwise: Some(Box::new(Region::Infinite {
+                    head: Addr(6),
+                    body: Box::new(Region::Seq(vec![
+                        Region::If {
+                            head: Addr(6),
+                            invert: false,
+                            then: Box::new(Region::Break),
+                            otherwise: None,
+                        },
+                        Region::If {
+                            head: Addr(7),
+                            invert: false,
+                            then: Box::new(Region::Goto(Addr(10))),
+                            otherwise: None,
+                        },
+                    ])),
+                })),
+            },
+        ]);
+        let mut labels: BTreeSet<Addr> = [Addr(10)].into_iter().collect();
+        let mut refused = BTreeMap::new();
+        let removed = sink_shared_tails(&mut root, &graph, &mut labels, &mut refused, true);
+        assert!(removed.is_empty(), "{root:?}");
+        assert!(mentions_goto(&root, Addr(10)), "{root:?}");
+    }
+
+    /// The soundness hole `exits` had: a goto buried in an `if` whose other
+    /// side carries on folds into `Exit::Other`, and the hole goes with it. The
+    /// sink then deleted the goto, and what had jumped over block 20 fell into
+    /// it instead. Nothing downstream could tell: the output still compiled.
+    ///
+    #[test]
+    fn a_goto_that_jumps_over_a_statement_is_not_deleted() {
+        let graph = g(&[(10, &[20, 30]), (20, &[30]), (30, &[31]), (31, &[])]);
+        let mut root = Region::Seq(vec![
+            Region::If {
+                head: Addr(10),
+                invert: false,
+                then: Box::new(Region::Goto(Addr(30))),
+                otherwise: None,
+            },
+            Region::Block(Addr(20)),
+            Region::Block(Addr(30)),
+            Region::Block(Addr(31)),
+        ]);
+        let mut labels: BTreeSet<Addr> = [Addr(30)].into_iter().collect();
+        let mut refused = BTreeMap::new();
+        let removed = sink_shared_tails(&mut root, &graph, &mut labels, &mut refused, true);
+        assert!(removed.is_empty(), "{root:?}");
+        assert!(
+            mentions_goto(&root, Addr(30)),
+            "the jump over block 20 was deleted: {root:?}"
+        );
+    }
+
+    /// A tail that only goes back to the top of the loop is one block and a
+    /// `continue`, and used to be measured as the whole graph beyond the
+    /// header. Counting what the walk would write is what makes it copyable.
+    #[test]
+    fn a_tail_that_only_continues_the_loop_is_copied() {
+        // 1 is a `while` whose body branches at 2. Both arms reach 5, which
+        // goes back to the top. The branch's join is 20, outside the loop, so
+        // the walk from 5 does not stop before the header.
+        let graph = g(&[
+            (0, &[1]),
+            (1, &[2, 20]),
+            (2, &[3, 4]),
+            (3, &[5]),
+            (4, &[5, 7]),
+            (5, &[1]),
+            (7, &[20]),
+            (20, &[21]),
+            (21, &[22]),
+            (22, &[23]),
+            (23, &[24]),
+            (24, &[]),
+        ]);
+        let s = structure(Addr(0), &graph);
+        assert_eq!(s.gotos, 0, "{:?}", s.root);
+        assert!(s.labels.is_empty(), "{:?}", s.labels);
+        assert!(s.lost.is_empty(), "lost {:?}", s.lost);
+        // The answer is a copy of one block, not a label.
+        let mut counts = BTreeMap::new();
+        occurrences(&s.root, &mut counts);
+        assert_eq!(counts.get(&Addr(5)), Some(&2), "{:?}", s.root);
     }
 
     /// Every region in a tree, flattened.
