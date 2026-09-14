@@ -521,3 +521,70 @@ if [ -e fixtures/src/hello.c ]; then
   "$cc" -gdwarf-4 -O2 -fno-pie -no-pie -o "$out/hello.a64.dwarf4" fixtures/src/hello.c \
     2>/dev/null || true
 fi
+
+# i386 relocations, for the M1 relocation gate. Two memory models, because the
+# relocation types barely overlap: -fno-pic emits R_386_32 and R_386_PC32,
+# -fpic emits the whole GOT family (R_386_GOTPC, R_386_GOTOFF, R_386_GOT32X)
+# plus R_386_PLT32. Relocatable objects only: the binutils here is built for
+# aarch64 alone and there is no lld, so nothing on this machine can link an
+# i386 image. The dynamic case with a real PLT is synthesized inside
+# crates/r12e-format/tests/ instead.
+cat > "$out/relocs32.c" <<'EOF'
+/* One call that stays inside the file, one that leaves it, a reference to a
+   local datum, to a local string and to an external datum, and a function
+   pointer in .data. noinline so the intra-file call survives -O2, which is the
+   relocation the call graph is actually about. */
+extern int outside(int);
+extern int outside_data;
+int glob = 5;
+static int stat_var = 9;
+static const char msg[] = "relocated";
+__attribute__((noinline)) int leaf(int x) { return x + stat_var; }
+const char *name(void) { return msg; }
+int caller(int x) { return leaf(x) + glob + outside(x) + outside_data; }
+int (*fp)(int) = leaf;
+int tail(int x) { return outside(x + 1); }
+EOF
+for opt in O0 O2; do
+  "$xcc" --target=i386-linux-gnu -g -"$opt" -fno-pic -ffreestanding -c \
+    -o "$out/relocs32.nopic.${opt}.o" "$out/relocs32.c" 2>/dev/null || true
+  "$xcc" --target=i386-linux-gnu -g -"$opt" -fpic -ffreestanding -c \
+    -o "$out/relocs32.pic.${opt}.o" "$out/relocs32.c" 2>/dev/null || true
+done
+rm -f "$out/relocs32.c"
+
+# The C++ hierarchy fixture, built twice over: once with type information and
+# once with -fno-rtti, so what RTTI adds and what its absence costs are
+# measured rather than assumed. Both architectures at two optimization levels.
+# The link is freestanding and static: the fixture defines the ABI's own
+# type-info class vtable symbols itself, which is the only thing a -nostdlib
+# link is missing when RTTI is on.
+xcxx=${XCXX:-clang++}
+if [ -e fixtures/cpp/hierarchy.cpp ]; then
+  for opt in O0 O2; do
+    for rtti in rtti nortti; do
+      flag=""
+      [ "$rtti" = nortti ] && flag="-fno-rtti"
+      "$cxx" -g -"$opt" $flag -fno-exceptions -ffreestanding -fno-pie -no-pie \
+        -nostdlib -static -o "$out/cpp-hierarchy.a64.${opt}.${rtti}" \
+        fixtures/cpp/hierarchy.cpp fixtures/cpp/start.cpp 2>/dev/null || true
+      if [ -n "${lld:-}" ]; then
+        "$xcxx" --target=x86_64-unknown-linux-gnu -B"$out/ld" -fuse-ld=lld \
+          -g -"$opt" $flag -fno-exceptions -ffreestanding -nostdlib -static \
+          -o "$out/cpp-hierarchy.x64.${opt}.${rtti}" \
+          fixtures/cpp/hierarchy.cpp fixtures/cpp/start.cpp 2>/dev/null || true
+      fi
+    done
+    # Stripped, so the reader is measured with no symbols to lean on: the
+    # degradation from proven to inferred is the point of the pair.
+    for rtti in rtti nortti; do
+      if [ -e "$out/cpp-hierarchy.a64.${opt}.${rtti}" ]; then
+        cp "$out/cpp-hierarchy.a64.${opt}.${rtti}" \
+           "$out/cpp-hierarchy.a64.${opt}.${rtti}.stripped"
+        strip "$out/cpp-hierarchy.a64.${opt}.${rtti}.stripped"
+        "$out/cpp-hierarchy.a64.${opt}.${rtti}" \
+          > "$out/cpp-hierarchy.a64.${opt}.${rtti}.out" || true
+      fi
+    done
+  done
+fi

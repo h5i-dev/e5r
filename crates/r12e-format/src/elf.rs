@@ -74,6 +74,29 @@ const STT_GNU_IFUNC: u8 = 10;
 
 const SHN_UNDEF: u16 = 0;
 
+// i386 relocation types, from the psABI. Spelled out because the numbering is
+// dense and unmemorable, and because half of them differ from the x86-64 type
+// with the same number.
+const R_386_NONE: u64 = 0;
+const R_386_32: u64 = 1;
+const R_386_PC32: u64 = 2;
+const R_386_GOT32: u64 = 3;
+const R_386_PLT32: u64 = 4;
+const R_386_COPY: u64 = 5;
+const R_386_GLOB_DAT: u64 = 6;
+const R_386_JMP_SLOT: u64 = 7;
+const R_386_RELATIVE: u64 = 8;
+const R_386_GOTOFF: u64 = 9;
+const R_386_GOTPC: u64 = 10;
+const R_386_32PLT: u64 = 11;
+const R_386_16: u64 = 20;
+const R_386_PC16: u64 = 21;
+const R_386_8: u64 = 22;
+const R_386_PC8: u64 = 23;
+const R_386_SIZE32: u64 = 38;
+const R_386_IRELATIVE: u64 = 42;
+const R_386_GOT32X: u64 = 43;
+
 /// Raw section header, before names are resolved.
 struct SecHdr {
     name_off: u32,
@@ -263,14 +286,14 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
         // A relocatable object writes zero where an address goes: without the
         // relocations, every call inside it points at itself and the call
         // graph is fiction.
-        apply_code_relocations(&r, &shdrs, &mut obj);
+        apply_code_relocations(&r, &shdrs, &mut obj, caps);
     }
 
     if opts.debug_info {
         // A relocatable object's debug addresses are section-relative and need
         // the relocations applied; its symbol table already names every
         // function, so the types and lines are read and the hints are not.
-        read_debug_info(&r, &shdrs, &mut obj, !relocatable);
+        read_debug_info(&r, &shdrs, &mut obj, !relocatable, caps);
     }
 
     if let Some(entry) = obj.entry {
@@ -948,16 +971,41 @@ fn read_plt_relocations(
     };
 
     let is_rela = sh.kind == SHT_RELA;
-    let step = match (wide, is_rela) {
-        (true, true) => 24,
-        (true, false) => 16,
-        (false, true) => 12,
-        (false, false) => 8,
-    };
-    let count = sh.size / step;
-    if count == 0 || caps.check("relocations", count, caps.relocations).is_err() {
+    let step = reloc_step(wide, is_rela);
+    let table_offset = sh.offset;
+    let declared = sh.size / step;
+    // Bounded by what fits in the file before anything is walked: a `sh_size`
+    // of 2^60 is a number, not a table.
+    let count = relocation_count(r, sh, step, caps);
+    if count == 0 {
         return;
     }
+    if declared > count {
+        obj.warnings.push(format!(
+            "the PLT relocation table declares {declared} entries but only {count} fit"
+        ));
+    }
+
+    // i386 decodes its entries rather than counting them. Both forms begin
+    // with an indirect jump through a GOT slot, and that slot is exactly what
+    // a `R_386_JMP_SLOT` relocation names, so the pairing survives an IFUNC
+    // entry in the middle of `.plt`, which shifts every later slot under the
+    // index-order rule below.
+    if obj.arch == Arch::X86
+        && name_i386_plt(
+            r,
+            table_offset,
+            step,
+            is_rela,
+            count,
+            dynsym_names,
+            &plt,
+            obj,
+        )
+    {
+        return;
+    }
+
     // The PLT's layout is fixed per architecture: a resolver stub of one size
     // followed by entries of another. Dividing the section's length by the
     // relocation count instead gives the wrong answer whenever the section
@@ -1006,6 +1054,125 @@ fn read_plt_relocations(
             });
         }
     }
+}
+
+/// Where `_GLOBAL_OFFSET_TABLE_` is, for the `%ebx`-relative form of a PLT
+/// entry.
+///
+/// `DT_PLTGOT` is the authority and the linker always emits it; the symbol and
+/// the section are there for an image whose dynamic section was stripped.
+fn i386_got_base(obj: &Object) -> Option<u64> {
+    if let Some(v) = obj
+        .metadata
+        .get("elf.pltgot")
+        .and_then(|v| u64::from_str_radix(v.trim_start_matches("0x"), 16).ok())
+    {
+        return Some(v);
+    }
+    if let Some(s) = obj
+        .symbols
+        .iter()
+        .find(|s| s.name == "_GLOBAL_OFFSET_TABLE_")
+    {
+        return Some(s.addr.get());
+    }
+    obj.section(".got.plt")
+        .or_else(|| obj.section(".got"))
+        .map(|s| s.range.start().get())
+}
+
+/// Name i386 PLT entries by decoding the slot each one jumps through.
+///
+/// Returns false when nothing could be named, so the caller falls back to the
+/// index-order rule. The two entry shapes are `jmp *abs32` (`ff 25`) in a
+/// position-dependent image and `jmp *disp32(%ebx)` (`ff a3`) in a position
+/// independent one, either optionally behind an `endbr32`.
+#[allow(clippy::too_many_arguments)]
+fn name_i386_plt(
+    r: &Reader<'_>,
+    table_offset: u64,
+    step: u64,
+    is_rela: bool,
+    count: u64,
+    dynsym_names: &[String],
+    plt: &Section,
+    obj: &mut Object,
+) -> bool {
+    // Slot address to the name the relocation gives it. A linear scan: a PLT
+    // with thousands of entries is a few thousand comparisons once.
+    let mut by_slot: Vec<(u64, String)> = Vec::with_capacity(count as usize);
+    for i in 0..count {
+        let Some(rel) = read_reloc(r, table_offset + i * step, false, is_rela) else {
+            break;
+        };
+        if rel.kind != R_386_JMP_SLOT {
+            continue;
+        }
+        let Some(name) = dynsym_names
+            .get(rel.symbol as usize)
+            .filter(|n| !n.is_empty())
+        else {
+            continue;
+        };
+        by_slot.push((rel.offset, name.clone()));
+    }
+    if by_slot.is_empty() {
+        return false;
+    }
+    // Sorted so the lookup per entry is a search rather than a scan: a PLT of
+    // a few thousand entries would otherwise be quadratic.
+    by_slot.sort_by_key(|(slot, _)| *slot);
+    let got = i386_got_base(obj);
+
+    const ENTRY: u64 = 16;
+    let entries = plt.range.len() / ENTRY;
+    let mut found = Vec::new();
+    for i in 0..entries {
+        let at = plt.range.start().get().wrapping_add(i * ENTRY);
+        let Some(code) = obj.memory.slice(Addr(at), 10) else {
+            continue;
+        };
+        // An IBT-enabled PLT puts `endbr32` in front of the jump.
+        let body = if code.starts_with(&[0xf3, 0x0f, 0x1e, 0xfb]) {
+            &code[4..]
+        } else {
+            code
+        };
+        if body.len() < 6 || body[0] != 0xff {
+            continue;
+        }
+        let imm = u32::from_le_bytes([body[2], body[3], body[4], body[5]]) as u64;
+        let slot = match body[1] {
+            // jmp *abs32, the position-dependent form.
+            0x25 => imm,
+            // jmp *disp32(%ebx), where %ebx holds the GOT base.
+            0xa3 => match got {
+                Some(g) => g.wrapping_add(imm) & 0xffff_ffff,
+                None => continue,
+            },
+            _ => continue,
+        };
+        let Ok(k) = by_slot.binary_search_by_key(&slot, |(s, _)| *s) else {
+            continue;
+        };
+        found.push((Addr(at), by_slot[k].1.clone()));
+    }
+    if found.is_empty() {
+        return false;
+    }
+    obj.metadata.insert("elf.plt.form".into(), "decoded".into());
+    for (at, name) in found {
+        if let Some(imp) = obj.imports.iter_mut().find(|im| im.name == name) {
+            imp.thunk = Some(at);
+        }
+        obj.function_hints.push(FunctionHint {
+            addr: at,
+            size: Some(ENTRY),
+            name: Some(format!("{name}@plt")),
+            provenance: Provenance::new(Evidence::ImportThunk),
+        });
+    }
+    true
 }
 
 /// The size of a PLT's resolver stub and of each entry after it.
@@ -1082,7 +1249,13 @@ fn read_notes(r: &Reader<'_>, phdrs: &[ProgHdr], shdrs: &[SecHdr], obj: &mut Obj
 /// A function the debug information names is a fact, not an inference, so the
 /// hint it produces outranks everything the analysis would work out for
 /// itself.
-fn read_debug_info(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object, hints: bool) {
+fn read_debug_info(
+    r: &Reader<'_>,
+    shdrs: &[SecHdr],
+    obj: &mut Object,
+    hints: bool,
+    caps: &r12e_core::Caps,
+) {
     let section = |name: &str| -> &[u8] {
         match obj.section(name) {
             Some(s) if s.file_size > 0 => r
@@ -1094,12 +1267,12 @@ fn read_debug_info(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object, hints: bo
     // A relocatable object writes zero where an address goes and leaves a
     // relocation to fill it in, so every function would appear to start at the
     // same place until they are applied.
-    let info_bytes = relocated(r, shdrs, obj, ".debug_info", section(".debug_info"));
-    let line_bytes = relocated(r, shdrs, obj, ".debug_line", section(".debug_line"));
+    let info_bytes = relocated(r, shdrs, obj, caps, ".debug_info", section(".debug_info"));
+    let line_bytes = relocated(r, shdrs, obj, caps, ".debug_line", section(".debug_line"));
     // DWARF 5 puts the addresses in a table of their own and refers to them by
     // index, so that table needs its relocations as much as the rest: without
     // them every function in the unit resolves to zero.
-    let addr_bytes = relocated(r, shdrs, obj, ".debug_addr", section(".debug_addr"));
+    let addr_bytes = relocated(r, shdrs, obj, caps, ".debug_addr", section(".debug_addr"));
     // The string offsets are relocated too: an index resolves through this
     // table, and unrelocated it points every name at the first string in the
     // section, which is the producer.
@@ -1107,15 +1280,37 @@ fn read_debug_info(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object, hints: bo
         r,
         shdrs,
         obj,
+        caps,
         ".debug_str_offsets",
         section(".debug_str_offsets"),
     );
-    let rnglist_bytes = relocated(r, shdrs, obj, ".debug_rnglists", section(".debug_rnglists"));
+    let rnglist_bytes = relocated(
+        r,
+        shdrs,
+        obj,
+        caps,
+        ".debug_rnglists",
+        section(".debug_rnglists"),
+    );
     // The range and location lists carry addresses too, so a relocatable
     // object needs them applied here for the same reason `.debug_addr` does.
-    let range_bytes = relocated(r, shdrs, obj, ".debug_ranges", section(".debug_ranges"));
-    let loclist_bytes = relocated(r, shdrs, obj, ".debug_loclists", section(".debug_loclists"));
-    let loc_bytes = relocated(r, shdrs, obj, ".debug_loc", section(".debug_loc"));
+    let range_bytes = relocated(
+        r,
+        shdrs,
+        obj,
+        caps,
+        ".debug_ranges",
+        section(".debug_ranges"),
+    );
+    let loclist_bytes = relocated(
+        r,
+        shdrs,
+        obj,
+        caps,
+        ".debug_loclists",
+        section(".debug_loclists"),
+    );
+    let loc_bytes = relocated(r, shdrs, obj, caps, ".debug_loc", section(".debug_loc"));
     let sections = crate::dwarf::Sections {
         info: &info_bytes,
         abbrev: section(".debug_abbrev"),
@@ -1151,27 +1346,127 @@ fn read_debug_info(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object, hints: bo
 /// How many relocations a section really holds.
 ///
 /// The declared size is a number from the file and can say anything; what
-/// bounds the work is how many entries actually fit in the file.
-fn relocation_count(r: &Reader<'_>, sh: &SecHdr, step: u64) -> u64 {
+/// bounds the work is how many entries actually fit in the file, and then the
+/// cap. A `sh_size` of 7x10^17 divided by an entry size is not a table, it is
+/// 87 seconds of a test run.
+fn relocation_count(r: &Reader<'_>, sh: &SecHdr, step: u64, caps: &r12e_core::Caps) -> u64 {
     let step = step.max(1);
     let declared = sh.size / step;
     let available = (r.len() as u64).saturating_sub(sh.offset) / step;
-    declared.min(available)
+    declared.min(available).min(caps.relocations)
+}
+
+/// Bytes per entry. `REL` has no addend field, `RELA` does, and both double
+/// between the classes.
+fn reloc_step(wide: bool, rela: bool) -> u64 {
+    match (wide, rela) {
+        (true, true) => 24,
+        (true, false) => 16,
+        (false, true) => 12,
+        (false, false) => 8,
+    }
+}
+
+/// One relocation, after the class and table kind have been read away.
+struct Reloc {
+    offset: u64,
+    kind: u64,
+    symbol: u64,
+    /// Present only for `RELA`. A `REL` entry's addend is in the bytes being
+    /// patched and cannot be read until the place is known.
+    explicit_addend: Option<i64>,
+}
+
+/// Read one entry of a `REL` or `RELA` table.
+fn read_reloc(r: &Reader<'_>, at: u64, wide: bool, rela: bool) -> Option<Reloc> {
+    let mut e = r.slice_at("relocation", at, reloc_step(wide, rela)).ok()?;
+    let (offset, info, addend) = if wide {
+        let o = e.u64("r_offset").ok()?;
+        let i = e.u64("r_info").ok()?;
+        let a = rela.then(|| e.i64("r_addend")).transpose().ok()?;
+        (o, i, a)
+    } else {
+        let o = e.u32("r_offset").ok()? as u64;
+        let i = e.u32("r_info").ok()? as u64;
+        let a = rela.then(|| e.i32("r_addend")).transpose().ok()?;
+        (o, i, a.map(|v| v as i64))
+    };
+    Some(Reloc {
+        offset,
+        kind: if wide {
+            info & 0xffff_ffff
+        } else {
+            info & 0xff
+        },
+        symbol: if wide { info >> 32 } else { info >> 8 },
+        explicit_addend: addend,
+    })
+}
+
+/// The outcome of computing one relocation.
+enum Fixup {
+    /// Bytes to write at the place.
+    Write(Vec<u8>),
+    /// Understood, and writes nothing: `R_386_NONE`, and `R_386_COPY`, which
+    /// the dynamic loader performs by copying at run time.
+    Nothing,
+    /// Not implemented. Counted by type number rather than dropped, so the
+    /// gap is visible instead of looking like a clean load.
+    Unhandled,
+}
+
+/// What an i386 fixup needs beyond the relocation itself.
+///
+/// The psABI writes its formulas in terms of `S`, `A`, `P`, `B`, `G` and
+/// `GOT`; this carries the three that are not properties of the relocation.
+#[derive(Default)]
+struct RelocContext {
+    /// Where `_GLOBAL_OFFSET_TABLE_` sits. A relocatable object has no GOT,
+    /// so one is invented below and this is where it was put.
+    got: u64,
+    /// Offset from the GOT base of this symbol's slot, when it has one.
+    got_slot: Option<u64>,
+    /// `st_size`, which one relocation writes rather than reads.
+    size: u64,
+    /// `B`, where the image was loaded.
+    base: u64,
 }
 
 /// Apply the relocations that name code and data addresses.
 ///
-/// Only the kinds a compiler emits inside an object file, and only where the
-/// symbol resolves to something this file defines: an external symbol has no
-/// address here, and writing a guess would produce a call graph that points
-/// somewhere wrong rather than nowhere.
-fn apply_code_relocations(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object) {
+/// Only where the symbol resolves to something this file defines: an external
+/// symbol has no address here, and writing a guess would produce a call graph
+/// that points somewhere wrong rather than nowhere.
+fn apply_code_relocations(
+    r: &Reader<'_>,
+    shdrs: &[SecHdr],
+    obj: &mut Object,
+    caps: &r12e_core::Caps,
+) {
     let wide = obj.bits == Bits::Bits64;
-    let step: u64 = if wide { 24 } else { 12 };
     let arch = obj.arch.clone();
+    let base = obj.image_base.get();
 
+    // i386 code reaches its own data through the GOT, and a relocatable object
+    // has no GOT: the link makes one. Make one here too, so that the `%ebx`
+    // the `R_386_GOTPC` establishes and the `@GOTOFF` displacements measured
+    // from it agree, and a `@GOT` slot holds the address it would hold.
+    let got_layout = (arch == Arch::X86)
+        .then(|| plan_got(r, shdrs, obj, caps))
+        .flatten();
+    let got = got_layout.as_ref().map(|g| g.base).unwrap_or(0);
+
+    let mut applied: u64 = 0;
+    let mut unresolved: u64 = 0;
+    let mut unhandled: BTreeMap<u64, u64> = BTreeMap::new();
     let mut patches: Vec<(Addr, Vec<u8>)> = Vec::new();
-    for sh in shdrs.iter().filter(|s| s.kind == SHT_RELA) {
+
+    for sh in shdrs
+        .iter()
+        .filter(|s| s.kind == SHT_RELA || s.kind == SHT_REL)
+    {
+        let rela = sh.kind == SHT_RELA;
+        let step = reloc_step(wide, rela);
         let Some(target) = obj.sections.get(sh.info as usize).cloned() else {
             continue;
         };
@@ -1180,52 +1475,268 @@ fn apply_code_relocations(r: &Reader<'_>, shdrs: &[SecHdr], obj: &mut Object) {
         if target.range.is_empty() || target.name.starts_with(".debug") {
             continue;
         }
-        for i in 0..relocation_count(r, sh, step) {
-            let Ok(mut e) = r.slice_at("relocation", sh.offset + i * step, step) else {
+        let count = relocation_count(r, sh, step, caps);
+        let declared = sh.size / step.max(1);
+        if declared > count {
+            // Warn rather than error: the rest of the table is still readable
+            // and the file is still worth analyzing.
+            obj.warnings.push(format!(
+                "{} declares {declared} relocations but only {count} fit; the rest are ignored",
+                target.name
+            ));
+        }
+        for i in 0..count {
+            let Some(rel) = read_reloc(r, sh.offset + i * step, wide, rela) else {
                 break;
-            };
-            let (offset, info, addend) = if wide {
-                let (Ok(o), Ok(n), Ok(a)) = (e.u64("r_offset"), e.u64("r_info"), e.i64("r_addend"))
-                else {
-                    continue;
-                };
-                (o, n, a)
-            } else {
-                let (Ok(o), Ok(n), Ok(a)) = (e.u32("r_offset"), e.u32("r_info"), e.i32("r_addend"))
-                else {
-                    continue;
-                };
-                (o as u64, n as u64, a as i64)
-            };
-            let symbol = if wide { info >> 32 } else { info >> 8 };
-            let kind = if wide {
-                info & 0xffff_ffff
-            } else {
-                info & 0xff
-            };
-            let Some(value) = symbol_value(r, shdrs, obj, symbol) else {
-                continue;
             };
             // Where the fixup goes, which is an offset into the section the
             // relocation names.
-            let place = target.range.start().get().wrapping_add(offset);
+            let place = target.range.start().get().wrapping_add(rel.offset);
             // However much is there: the last entry of a table sits at the
             // end of its section, and asking for eight bytes there fails.
             let mut word = [0u8; 8];
             let available = (1..=8).rev().find_map(|n| obj.memory.slice(Addr(place), n));
             let Some(existing) = available else { continue };
             word[..existing.len()].copy_from_slice(existing);
-            if let Some(bytes) = fixup(&arch, kind, value, addend, place, &word) {
-                patches.push((Addr(place), bytes));
+
+            // The order of operations that `REL` forces. A `RELA` entry hands
+            // over its addend before anything is read from the image; a `REL`
+            // entry's addend is whatever the assembler already encoded at the
+            // place, so the width has to be known and the bytes read first.
+            // Reading it after an earlier patch landed would add the addend
+            // twice, which is why every patch is held back to the end.
+            let width = reloc_width(&arch, rel.kind);
+            let addend = match rel.explicit_addend {
+                Some(a) => a,
+                None => match implicit_addend(existing, width) {
+                    Some(a) => a,
+                    None => continue,
+                },
+            };
+
+            let value = symbol_value(r, shdrs, obj, rel.symbol);
+            if value.is_none() && needs_symbol(&arch, rel.kind) {
+                unresolved += 1;
+                continue;
+            }
+            let cx = RelocContext {
+                got,
+                got_slot: got_layout.as_ref().and_then(|g| g.slot(rel.symbol)),
+                // Read only for the one type that writes a size: every other
+                // relocation would pay a second symbol table read for nothing.
+                size: match (&arch, rel.kind) {
+                    (Arch::X86, R_386_SIZE32) => {
+                        symbol_size(r, shdrs, obj, rel.symbol).unwrap_or(0)
+                    }
+                    _ => 0,
+                },
+                base,
+            };
+            match fixup(
+                &arch,
+                rel.kind,
+                value.unwrap_or(0),
+                addend,
+                place,
+                &word,
+                &cx,
+            ) {
+                Fixup::Write(bytes) => {
+                    applied += 1;
+                    patches.push((Addr(place), bytes));
+                }
+                Fixup::Nothing => applied += 1,
+                Fixup::Unhandled => *unhandled.entry(rel.kind).or_default() += 1,
             }
         }
+    }
+
+    if let Some(g) = got_layout {
+        g.map_into(obj);
     }
     for (at, bytes) in patches {
         obj.memory.patch(at, &bytes);
     }
+
+    obj.metadata
+        .insert("elf.relocations.applied".into(), applied.to_string());
+    if unresolved > 0 {
+        obj.metadata
+            .insert("elf.relocations.unresolved".into(), unresolved.to_string());
+    }
+    if !unhandled.is_empty() {
+        let listed = unhandled
+            .iter()
+            .map(|(kind, n)| format!("type {kind}: {n}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        obj.metadata
+            .insert("elf.relocations.unhandled".into(), listed.clone());
+        obj.warnings
+            .push(format!("relocations not applied ({listed})"));
+    }
 }
 
-/// The bytes one relocation writes, or nothing when its kind is not handled.
+/// The bytes a relocation writes, which for a `REL` table is also the width of
+/// the addend already sitting there.
+fn reloc_width(arch: &Arch, kind: u64) -> u64 {
+    match arch {
+        Arch::X86 => match kind {
+            R_386_8 | R_386_PC8 => 1,
+            R_386_16 | R_386_PC16 => 2,
+            _ => 4,
+        },
+        _ => 4,
+    }
+}
+
+/// The addend a `REL` entry does not carry, sign extended from the bytes being
+/// patched. i386 is little endian in every configuration that exists.
+fn implicit_addend(existing: &[u8], width: u64) -> Option<i64> {
+    match width {
+        1 => Some(*existing.first()? as i8 as i64),
+        2 => Some(i16::from_le_bytes([*existing.first()?, *existing.get(1)?]) as i64),
+        _ => {
+            let b = existing.get(..4)?;
+            Some(i32::from_le_bytes([b[0], b[1], b[2], b[3]]) as i64)
+        }
+    }
+}
+
+/// True when the formula for this type reads `S`.
+///
+/// Three of them do not. `R_386_GOTPC` names `_GLOBAL_OFFSET_TABLE_`, which is
+/// undefined in every relocatable object that uses it, so requiring a value
+/// would drop exactly the relocation that establishes the GOT base. The two
+/// `GOT32` forms write a slot offset, which is known whether or not the slot's
+/// eventual contents are: `outside_data@GOT(%ebx)` is a real address in this
+/// image even when `outside_data` is defined in some other file.
+fn needs_symbol(arch: &Arch, kind: u64) -> bool {
+    match arch {
+        Arch::X86 => !matches!(
+            kind,
+            R_386_NONE
+                | R_386_COPY
+                | R_386_GOTPC
+                | R_386_GOT32
+                | R_386_GOT32X
+                | R_386_RELATIVE
+                | R_386_IRELATIVE
+        ),
+        _ => true,
+    }
+}
+
+/// Which symbols need a GOT slot, and where the GOT goes.
+struct GotPlan {
+    base: u64,
+    /// Symbol index to slot offset. Offsets are handed out in first-use
+    /// order, so the layout is a function of the file; the map is ordered, so
+    /// the lookup does not turn a large table quadratic.
+    slots: BTreeMap<u64, u64>,
+    /// Slot contents, already laid out.
+    bytes: Vec<u8>,
+}
+
+impl GotPlan {
+    fn slot(&self, symbol: u64) -> Option<u64> {
+        self.slots.get(&symbol).copied()
+    }
+
+    /// Map the invented GOT, so a load through a slot reads the address the
+    /// link would have put there rather than failing as unmapped.
+    fn map_into(self, obj: &mut Object) {
+        // The base is recorded whether or not there are slots: `@GOTOFF` and
+        // `@GOTPC` are measured from it and appear in code that never loads a
+        // slot, and a displacement whose origin is unstated is one nobody can
+        // check.
+        obj.metadata
+            .insert("elf.got_base".into(), format!("{:#x}", self.base));
+        if self.bytes.is_empty() {
+            return;
+        }
+        let Some(range) = AddrRange::sized(Addr(self.base), self.bytes.len() as u64) else {
+            return;
+        };
+        // No file offset: nothing in the file backs it. Named so that anything
+        // reporting an address inside it says where it came from.
+        if let Ok(seg) = Segment::new(
+            range,
+            Perms::new(true, true, false),
+            ".got.synthetic",
+            0,
+            self.bytes,
+        ) {
+            obj.memory.add(seg);
+        }
+    }
+}
+
+/// Lay out a GOT for a relocatable i386 object.
+///
+/// It goes past everything the sections were mapped at, so it collides with
+/// nothing, and the slots are assigned in the order the relocations mention
+/// them, which makes the layout deterministic.
+fn plan_got(
+    r: &Reader<'_>,
+    shdrs: &[SecHdr],
+    obj: &Object,
+    caps: &r12e_core::Caps,
+) -> Option<GotPlan> {
+    // Past everything the sections were mapped at, so it collides with
+    // nothing. `checked_`, because the end of the map is where a caller's
+    // chosen load address put it and that can be anywhere.
+    let base = obj
+        .memory
+        .bounds()
+        .map(|b| b.end().get())
+        .unwrap_or(0x10_0000)
+        .checked_next_multiple_of(16)?;
+    let mut slots: BTreeMap<u64, u64> = BTreeMap::new();
+    // True once anything in the file measures from the GOT base.
+    let mut wanted = false;
+    for sh in shdrs
+        .iter()
+        .filter(|s| s.kind == SHT_RELA || s.kind == SHT_REL)
+    {
+        let rela = sh.kind == SHT_RELA;
+        let step = reloc_step(false, rela);
+        for i in 0..relocation_count(r, sh, step, caps) {
+            let Some(rel) = read_reloc(r, sh.offset + i * step, false, rela) else {
+                break;
+            };
+            if matches!(rel.kind, R_386_GOTOFF | R_386_GOTPC) {
+                wanted = true;
+            }
+            if !matches!(rel.kind, R_386_GOT32 | R_386_GOT32X) {
+                continue;
+            }
+            wanted = true;
+            let off = slots.len() as u64 * 4;
+            slots.entry(rel.symbol).or_insert(off);
+        }
+    }
+    // An object that never mentions the GOT gets no GOT, and no invented
+    // address range to go with it.
+    if !wanted {
+        return None;
+    }
+    let mut bytes = vec![0u8; slots.len() * 4];
+    for (symbol, off) in &slots {
+        // An undefined symbol has no address here, so its slot stays zero:
+        // the slot's own address is still correct, which is what the code
+        // computing `x@GOT(%ebx)` needs.
+        let value = symbol_value(r, shdrs, obj, *symbol).unwrap_or(0) as u32;
+        let at = *off as usize;
+        if let Some(slot) = bytes.get_mut(at..at + 4) {
+            slot.copy_from_slice(&value.to_le_bytes());
+        }
+    }
+    Some(GotPlan { base, slots, bytes })
+}
+
+/// The bytes one relocation writes, or `Unhandled` when its kind is not one
+/// this understands.
 fn fixup(
     arch: &Arch,
     kind: u64,
@@ -1233,22 +1744,25 @@ fn fixup(
     addend: i64,
     place: u64,
     existing: &[u8; 8],
-) -> Option<Vec<u8>> {
+    cx: &RelocContext,
+) -> Fixup {
     let value = symbol.wrapping_add(addend as u64);
     let relative = value.wrapping_sub(place);
     let word = u32::from_le_bytes([existing[0], existing[1], existing[2], existing[3]]);
 
     match arch {
-        Arch::X86_64 => Some(match kind {
+        Arch::X86 => fixup_i386(kind, symbol, addend, place, cx),
+        Arch::X86_64 => Fixup::Write(match kind {
             // R_X86_64_64.
             1 => value.to_le_bytes().to_vec(),
             // PC32 and PLT32, which differ only in whether a stub may be used.
             2 | 4 => (relative as u32).to_le_bytes().to_vec(),
             // The 32-bit absolute forms.
             10 | 11 => (value as u32).to_le_bytes().to_vec(),
-            _ => return None,
+            0 => return Fixup::Nothing,
+            _ => return Fixup::Unhandled,
         }),
-        Arch::AArch64 => Some(match kind {
+        Arch::AArch64 => Fixup::Write(match kind {
             // ABS64.
             257 => value.to_le_bytes().to_vec(),
             // ABS32.
@@ -1293,10 +1807,53 @@ fn fixup(
                 let imm = ((relative as i64 >> 2) as u32 & 0x7ffff) << 5;
                 ((word & !0x00ff_ffe0) | imm).to_le_bytes().to_vec()
             }
-            _ => return None,
+            0 => return Fixup::Nothing,
+            _ => return Fixup::Unhandled,
         }),
-        _ => None,
+        _ => Fixup::Unhandled,
     }
+}
+
+/// The bytes one i386 relocation writes.
+///
+/// The psABI's formulas, with `S` the symbol, `A` the addend, `P` the place,
+/// `B` the load address, `G` the symbol's offset in the GOT and `GOT` the GOT
+/// base. The one liberty is `L`, the PLT entry: a relocatable object has no
+/// PLT, so a call that asked for a stub resolves to the symbol itself, which
+/// is what a link needing no stub leaves behind.
+fn fixup_i386(kind: u64, s: u64, a: i64, p: u64, cx: &RelocContext) -> Fixup {
+    let a = a as u64;
+    let (width, value): (usize, u64) = match kind {
+        R_386_NONE | R_386_COPY => return Fixup::Nothing,
+        // S + A.
+        R_386_32 | R_386_32PLT => (4, s.wrapping_add(a)),
+        // S + A - P.
+        R_386_PC32 | R_386_PLT32 => (4, s.wrapping_add(a).wrapping_sub(p)),
+        // G + A, the slot's offset from the GOT base.
+        R_386_GOT32 | R_386_GOT32X => match cx.got_slot {
+            Some(g) => (4, g.wrapping_add(a)),
+            None => return Fixup::Unhandled,
+        },
+        // S, written into a GOT slot by the dynamic loader.
+        R_386_GLOB_DAT | R_386_JMP_SLOT => (4, s),
+        // B + A.
+        R_386_RELATIVE | R_386_IRELATIVE => (4, cx.base.wrapping_add(a)),
+        // S + A - GOT.
+        R_386_GOTOFF => (4, s.wrapping_add(a).wrapping_sub(cx.got)),
+        // GOT + A - P.
+        R_386_GOTPC => (4, cx.got.wrapping_add(a).wrapping_sub(p)),
+        // The symbol's size rather than its address.
+        R_386_SIZE32 => (4, cx.size.wrapping_add(a)),
+        R_386_16 => (2, s.wrapping_add(a)),
+        R_386_PC16 => (2, s.wrapping_add(a).wrapping_sub(p)),
+        R_386_8 => (1, s.wrapping_add(a)),
+        R_386_PC8 => (1, s.wrapping_add(a).wrapping_sub(p)),
+        // Every thread-local form. A relocatable object has no thread block
+        // and no module id, so there is no address to write; the count says
+        // so rather than the bytes claiming a wrong one.
+        _ => return Fixup::Unhandled,
+    };
+    Fixup::Write(value.to_le_bytes()[..width].to_vec())
 }
 
 /// A copy of a section with its relocations applied.
@@ -1305,7 +1862,14 @@ fn fixup(
 /// written is the symbol's address plus the addend. Anything else is left
 /// alone, because writing a guess into a debug section produces confident
 /// nonsense rather than a gap.
-fn relocated(r: &Reader<'_>, shdrs: &[SecHdr], obj: &Object, name: &str, data: &[u8]) -> Vec<u8> {
+fn relocated(
+    r: &Reader<'_>,
+    shdrs: &[SecHdr],
+    obj: &Object,
+    caps: &r12e_core::Caps,
+    name: &str,
+    data: &[u8],
+) -> Vec<u8> {
     let mut out = data.to_vec();
     if data.is_empty() {
         return out;
@@ -1314,52 +1878,53 @@ fn relocated(r: &Reader<'_>, shdrs: &[SecHdr], obj: &Object, name: &str, data: &
         return out;
     };
     let wide = obj.bits == Bits::Bits64;
-    let step: u64 = if wide { 24 } else { 12 };
 
-    for (n, sh) in shdrs.iter().enumerate() {
-        if sh.kind != SHT_RELA || sh.info as usize != target {
+    for sh in shdrs.iter() {
+        if (sh.kind != SHT_RELA && sh.kind != SHT_REL) || sh.info as usize != target {
             continue;
         }
-        let _ = n;
-        for i in 0..relocation_count(r, sh, step) {
-            let at = sh.offset + i * step;
-            let Ok(mut e) = r.slice_at("relocation", at, step) else {
+        let rela = sh.kind == SHT_RELA;
+        let step = reloc_step(wide, rela);
+        for i in 0..relocation_count(r, sh, step, caps) {
+            let Some(rel) = read_reloc(r, sh.offset + i * step, wide, rela) else {
                 continue;
             };
-            let (offset, info, addend) = if wide {
-                let Ok(o) = e.u64("r_offset") else { continue };
-                let Ok(i) = e.u64("r_info") else { continue };
-                let Ok(a) = e.i64("r_addend") else { continue };
-                (o, i, a)
-            } else {
-                let Ok(o) = e.u32("r_offset") else { continue };
-                let Ok(i) = e.u32("r_info") else { continue };
-                let Ok(a) = e.i32("r_addend") else { continue };
-                (o as u64, i as u64, a as i64)
-            };
-            let symbol = if wide { info >> 32 } else { info >> 8 };
-            let kind = if wide {
-                info & 0xffff_ffff
-            } else {
-                info & 0xff
-            };
             // The absolute relocations, which are the only ones a debug
-            // section uses: 1 is 64-bit on both architectures this supports,
-            // and the 32-bit ones differ by number.
-            let size = match (&obj.arch, kind) {
+            // section uses: 1 is 64-bit on both 64-bit architectures, and the
+            // 32-bit ones differ by number. On i386 the number 1 is the
+            // 32-bit absolute form instead.
+            let size = match (&obj.arch, rel.kind) {
                 (Arch::X86_64, 1) | (Arch::AArch64, 257) => 8,
                 (Arch::X86_64, 10) | (Arch::X86_64, 11) | (Arch::AArch64, 258) => 4,
+                (Arch::X86, R_386_32) => 4,
                 _ => continue,
             };
-            let Some(value) = symbol_value(r, shdrs, obj, symbol) else {
+            // The offset comes from the file, so it can be anything.
+            let Ok(start) = usize::try_from(rel.offset) else {
+                continue;
+            };
+            let Some(end) = start.checked_add(size) else {
+                continue;
+            };
+            // `REL` again: the addend is the value the assembler already wrote
+            // at the place. It is read out of the untouched `data` rather than
+            // out of `out`, so an earlier fixup at the same offset cannot be
+            // counted into this one's addend.
+            let addend = match rel.explicit_addend {
+                Some(a) => a,
+                None => match data
+                    .get(start..end)
+                    .and_then(|b| implicit_addend(b, size as u64))
+                {
+                    Some(a) => a,
+                    None => continue,
+                },
+            };
+            let Some(value) = symbol_value(r, shdrs, obj, rel.symbol) else {
                 continue;
             };
             let result = value.wrapping_add(addend as u64);
-            // The offset comes from the file, so it can be anything.
-            let Ok(start) = usize::try_from(offset) else {
-                continue;
-            };
-            let Some(slot) = out.get_mut(start..start.saturating_add(size)) else {
+            let Some(slot) = out.get_mut(start..end) else {
                 continue;
             };
             for (k, byte) in slot.iter_mut().enumerate() {
@@ -1370,30 +1935,61 @@ fn relocated(r: &Reader<'_>, shdrs: &[SecHdr], obj: &Object, name: &str, data: &
     out
 }
 
-/// The address a relocation's symbol resolves to, which for a section symbol
-/// is where the loader put that section.
-fn symbol_value(r: &Reader<'_>, shdrs: &[SecHdr], obj: &Object, index: u64) -> Option<u64> {
-    let wide = obj.bits == Bits::Bits64;
+/// One symbol table entry, read for what a relocation needs from it.
+struct SymEntry {
+    value: u64,
+    size: u64,
+    shndx: u16,
+}
+
+fn symbol_entry(r: &Reader<'_>, shdrs: &[SecHdr], wide: bool, index: u64) -> Option<SymEntry> {
     let entsize: u64 = if wide { 24 } else { 16 };
     let sh = shdrs.iter().find(|s| s.kind == SHT_SYMTAB)?;
-    let at = sh.offset + index * entsize;
+    // A symbol index from the file is not bounded by the table; asking for an
+    // entry past the end has to fail rather than read the next section.
+    if index >= sh.size / entsize {
+        return None;
+    }
+    let at = sh.offset.checked_add(index.checked_mul(entsize)?)?;
     let mut e = r.slice_at("symbol", at, entsize).ok()?;
+    // ELF32 and ELF64 interleave these differently.
     if wide {
         let _name = e.u32("st_name").ok()?;
         let _info = e.u8("st_info").ok()?;
         let _other = e.u8("st_other").ok()?;
         let shndx = e.u16("st_shndx").ok()?;
         let value = e.u64("st_value").ok()?;
-        Some(section_base(obj, shndx)? + value)
+        let size = e.u64("st_size").ok()?;
+        Some(SymEntry { value, size, shndx })
     } else {
         let _name = e.u32("st_name").ok()?;
         let value = e.u32("st_value").ok()? as u64;
-        let _size = e.u32("st_size").ok()?;
+        let size = e.u32("st_size").ok()? as u64;
         let _info = e.u8("st_info").ok()?;
         let _other = e.u8("st_other").ok()?;
         let shndx = e.u16("st_shndx").ok()?;
-        Some(section_base(obj, shndx)? + value)
+        Some(SymEntry { value, size, shndx })
     }
+}
+
+/// The address a relocation's symbol resolves to, which for a section symbol
+/// is where the loader put that section.
+///
+/// An undefined symbol resolves to nothing. Section index zero is a real
+/// section header with address zero, so without this the answer would be a
+/// confident zero and every call to an external function would be relocated
+/// to point at address zero rather than left as the compiler wrote it.
+fn symbol_value(r: &Reader<'_>, shdrs: &[SecHdr], obj: &Object, index: u64) -> Option<u64> {
+    let e = symbol_entry(r, shdrs, obj.bits == Bits::Bits64, index)?;
+    if e.shndx == SHN_UNDEF {
+        return None;
+    }
+    Some(section_base(obj, e.shndx)?.wrapping_add(e.value))
+}
+
+/// `st_size`, which `R_386_SIZE32` writes instead of an address.
+fn symbol_size(r: &Reader<'_>, shdrs: &[SecHdr], obj: &Object, index: u64) -> Option<u64> {
+    symbol_entry(r, shdrs, obj.bits == Bits::Bits64, index).map(|e| e.size)
 }
 
 fn section_base(obj: &Object, index: u16) -> Option<u64> {
