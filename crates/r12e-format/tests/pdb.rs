@@ -1,15 +1,26 @@
 //! Reading a Windows program database.
 //!
-//! There is no Windows toolchain on this machine and clang cannot produce a
-//! database at all, so the test builds one byte by byte the way the PE tests
-//! build an image. That is the stronger gate anyway: a synthesized database
-//! pins exactly which bytes the reader is supposed to have read, so an
-//! assertion fails when the layout is misread rather than when a tool is
-//! missing.
+//! Two gates, and they measure different things.
+//!
+//! The first builds a database byte by byte the way the PE tests build an
+//! image. A synthesized database pins exactly which bytes the reader is
+//! supposed to have read, so an assertion fails when the layout is misread
+//! rather than when a tool is missing, and it is the only gate a checkout with
+//! no corpus can run.
+//!
+//! The second reads the databases `scripts/build-fixtures.sh` produces with
+//! clang and rust-lld, and compares them against `llvm-pdbutil`, record by
+//! record rather than by counting. An earlier note here said this machine
+//! could not produce a database; that was wrong. It has no Windows linker and
+//! no CRT, but `-gcodeview` and lld's `/debug` need neither.
 
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::{Duration, Instant};
 
-use r12e_core::{Addr, AddrRange};
+use r12e_core::{Addr, AddrRange, Evidence, Strength};
+use r12e_format::dwarf::Location;
 use r12e_format::{Section, pdb};
 
 /// A little-endian writer, so the builder reads like the layout it produces.
@@ -771,4 +782,634 @@ fn a_real_database_reads_when_one_is_present() {
         info.types.len()
     );
     assert!(!info.is_empty(), "a real database describes something");
+}
+
+// The corpus gate. Everything below reads databases a real producer wrote and
+// compares them against llvm-pdbutil, which is the only external tool on this
+// machine that reads the format.
+
+fn corpus() -> Option<PathBuf> {
+    let d = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/build");
+    d.is_dir().then(|| d.canonicalize().unwrap())
+}
+
+/// Every fixture database, or an empty list when the corpus is not built.
+fn fixtures() -> Vec<(String, Vec<u8>)> {
+    let Some(dir) = corpus() else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for arch in ["x64", "a64"] {
+        for opt in ["O0", "O2"] {
+            let name = format!("pdb.{arch}.{opt}.pdb");
+            if let Ok(data) = std::fs::read(dir.join(&name)) {
+                out.push((name, data));
+            }
+        }
+    }
+    out
+}
+
+/// Ask llvm-pdbutil, so the expectations are not our own reader's opinion.
+/// `None` when it is not installed, which downgrades the gate to the
+/// synthesized database rather than failing.
+fn pdbutil(name: &str, args: &[&str]) -> Option<String> {
+    let p = corpus()?.join(name);
+    for tool in [
+        "llvm-pdbutil",
+        "llvm-pdbutil-20",
+        "llvm-pdbutil-19",
+        "llvm-pdbutil-18",
+        "llvm-pdbutil-17",
+        "llvm-pdbutil-16",
+        "llvm-pdbutil-15",
+    ] {
+        let Ok(out) = Command::new(tool).arg("dump").args(args).arg(&p).output() else {
+            continue;
+        };
+        if out.status.success() {
+            return Some(String::from_utf8_lossy(&out.stdout).into_owned());
+        }
+    }
+    None
+}
+
+/// Where each section starts, from the oracle rather than from us, so a
+/// `0001:0010` in its output can be compared with an address in ours.
+fn oracle_sections(name: &str) -> Option<Vec<u64>> {
+    let text = pdbutil(name, &["--section-headers"])?;
+    let mut out = Vec::new();
+    for line in text.lines() {
+        let line = line.trim();
+        if let Some(hex) = line.strip_suffix(" virtual address") {
+            out.push(u64::from_str_radix(hex.trim(), 16).ok()?);
+        }
+    }
+    (!out.is_empty()).then_some(out)
+}
+
+/// `0001:0010` as a relative address.
+fn oracle_addr(sections: &[u64], spec: &str) -> Option<Addr> {
+    let (section, offset) = spec.split_once(':')?;
+    let section: usize = section.trim().parse().ok()?;
+    let offset: u64 = offset.trim().parse().ok()?;
+    Some(Addr(sections.get(section.checked_sub(1)?)? + offset))
+}
+
+/// The value of `key = ` in one of the oracle's detail lines.
+fn field<'a>(line: &'a str, key: &str) -> Option<&'a str> {
+    let at = line.find(&format!("{key} = "))? + key.len() + 3;
+    let rest = &line[at..];
+    Some(rest.split(',').next().unwrap_or(rest).trim())
+}
+
+#[test]
+fn procedures_match_the_oracle_name_address_and_size() {
+    let mut checked = 0;
+    for (name, data) in fixtures() {
+        let Some(text) = pdbutil(&name, &["--symbols"]) else {
+            continue;
+        };
+        let Some(sections) = oracle_sections(&name) else {
+            continue;
+        };
+        // Every procedure record the oracle saw, as name, entry and length.
+        let mut want: Vec<(String, Addr, u64)> = Vec::new();
+        let mut lines = text.lines().peekable();
+        while let Some(line) = lines.next() {
+            let is_proc = line.contains("S_GPROC32 [") || line.contains("S_LPROC32 [");
+            if !is_proc {
+                continue;
+            }
+            let symbol = line.rsplit('`').nth(1).expect("a quoted name").to_string();
+            let detail = lines.next().expect("a procedure has a detail line");
+            let addr = oracle_addr(&sections, field(detail, "addr").expect("addr"));
+            let size: u64 = field(detail, "code size")
+                .expect("code size")
+                .parse()
+                .expect("a number");
+            want.push((symbol, addr.expect("a section the headers list"), size));
+        }
+        assert!(!want.is_empty(), "{name}: the oracle saw no procedures");
+
+        let db = pdb::read(&data, &[]).expect("a fixture database parses");
+        // Record by record, not by count: a reader that found the right number
+        // of the wrong functions would pass a count.
+        for (symbol, addr, size) in &want {
+            let found = db
+                .debug
+                .functions
+                .get(addr)
+                .unwrap_or_else(|| panic!("{name}: nothing at {addr:?} for {symbol}"));
+            assert_eq!(&found.name, symbol, "{name}: name at {addr:?}");
+            assert_eq!(found.size, Some(*size), "{name}: size of {symbol}");
+            checked += 1;
+        }
+        // And nothing invented: every function we report is one the oracle saw
+        // as a procedure or as a public.
+        let publics = pdbutil(&name, &["--publics"]).unwrap_or_default();
+        for (addr, f) in &db.debug.functions {
+            let known = want.iter().any(|(n, a, _)| n == &f.name && a == addr)
+                || publics.contains(&format!("`{}`", f.name));
+            assert!(known, "{name}: {} at {addr:?} is ours alone", f.name);
+        }
+    }
+    assert!(checked > 0, "no corpus or no llvm-pdbutil: gate not run");
+    println!("procedures checked against llvm-pdbutil: {checked}");
+}
+
+#[test]
+fn public_function_symbols_match_the_oracle() {
+    let mut checked = 0;
+    for (name, data) in fixtures() {
+        let Some(text) = pdbutil(&name, &["--publics"]) else {
+            continue;
+        };
+        let Some(sections) = oracle_sections(&name) else {
+            continue;
+        };
+        let db = pdb::read(&data, &[]).expect("parses");
+        let mut lines = text.lines().peekable();
+        while let Some(line) = lines.next() {
+            if !line.contains("S_PUB32 [") {
+                continue;
+            }
+            let symbol = line.rsplit('`').nth(1).expect("a quoted name").to_string();
+            let detail = lines.next().expect("a public has a detail line");
+            let addr = oracle_addr(&sections, field(detail, "addr").expect("addr"))
+                .expect("a section the headers list");
+            let code = field(detail, "flags").is_some_and(|f| f.contains("function"));
+            if code {
+                let found = db
+                    .debug
+                    .functions
+                    .get(&addr)
+                    .unwrap_or_else(|| panic!("{name}: no function at {addr:?} for {symbol}"));
+                assert_eq!(found.name, symbol, "{name}: public at {addr:?}");
+            } else {
+                let found = db
+                    .debug
+                    .variables
+                    .get(&addr)
+                    .unwrap_or_else(|| panic!("{name}: no variable at {addr:?} for {symbol}"));
+                assert_eq!(found.name, symbol, "{name}: public data at {addr:?}");
+            }
+            checked += 1;
+        }
+    }
+    assert!(checked > 0, "no corpus or no llvm-pdbutil: gate not run");
+    println!("public symbols checked against llvm-pdbutil: {checked}");
+}
+
+#[test]
+fn frame_relative_locals_match_the_oracle_offsets() {
+    let mut checked = 0;
+    for (name, data) in fixtures() {
+        let Some(text) = pdbutil(&name, &["--symbols"]) else {
+            continue;
+        };
+        let Some(sections) = oracle_sections(&name) else {
+            continue;
+        };
+        // (procedure entry, local name) -> frame offset, as the oracle read it.
+        let mut want: BTreeMap<(Addr, String), i64> = BTreeMap::new();
+        let mut procedure = None;
+        let mut local = None;
+        let mut lines = text.lines().peekable();
+        while let Some(line) = lines.next() {
+            if line.contains("S_GPROC32 [") || line.contains("S_LPROC32 [") {
+                let detail = lines.next().expect("a detail line");
+                procedure = oracle_addr(&sections, field(detail, "addr").expect("addr"));
+                local = None;
+            } else if line.contains("S_LOCAL [") {
+                local = line.rsplit('`').nth(1).map(str::to_string);
+            } else if line.contains("S_DEFRANGE_FRAMEPOINTER_REL [")
+                || line.contains("S_DEFRANGE_REGISTER_REL [")
+            {
+                let detail = lines.next().expect("a detail line");
+                // The register relative form only names a frame slot when its
+                // register is the one the frame record calls the local base.
+                if line.contains("S_DEFRANGE_REGISTER_REL [")
+                    && !field(detail, "register").is_some_and(|r| r.ends_with("SP"))
+                {
+                    continue;
+                }
+                let offset: i64 = field(detail, "offset")
+                    .expect("offset")
+                    .parse()
+                    .expect("a number");
+                if let (Some(p), Some(l)) = (procedure, local.clone()) {
+                    want.insert((p, l), offset);
+                }
+            } else if line.contains("S_INLINESITE [") {
+                // Locals inside an inlined call belong to the frame, not to
+                // the procedure, and are compared by the inline site gate.
+                local = None;
+                while let Some(next) = lines.peek() {
+                    if next.contains("S_INLINESITE_END [") {
+                        break;
+                    }
+                    lines.next();
+                }
+            }
+        }
+        // At -O2 a target can keep every local in a register, and then there
+        // is nothing here to compare; the register gate covers those.
+        let db = pdb::read(&data, &[]).expect("parses");
+        for ((at, local), offset) in &want {
+            let f = db
+                .debug
+                .functions
+                .get(at)
+                .unwrap_or_else(|| panic!("{name}: no function at {at:?}"));
+            let found = f
+                .locals
+                .iter()
+                .find(|l| &l.name == local)
+                .unwrap_or_else(|| panic!("{name}: {} has no local {local}", f.name));
+            assert_eq!(
+                found.frame_offset,
+                Some(*offset),
+                "{name}: {}::{local}",
+                f.name
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked > 0, "no corpus or no llvm-pdbutil: gate not run");
+    println!("frame locals checked against llvm-pdbutil: {checked}");
+}
+
+#[test]
+fn register_locations_name_the_register_the_oracle_named() {
+    // CodeView and DWARF number registers differently and for unrelated
+    // reasons, so the translation is worth nothing unless it is checked
+    // against something that prints the name. Only the registers these
+    // fixtures use are covered here; the rest of the table is unverified and
+    // the scorecard must not say otherwise.
+    let names: BTreeMap<&str, u16> = BTreeMap::from([
+        ("RAX", 0),
+        ("EAX", 0),
+        ("RDX", 1),
+        ("EDX", 1),
+        ("RCX", 2),
+        ("ECX", 2),
+        ("RSP", 7),
+        ("ARM64_X0", 0),
+        ("ARM64_W0", 0),
+        ("ARM64_X1", 1),
+        ("ARM64_W1", 1),
+        ("ARM64_X8", 8),
+        ("ARM64_W8", 8),
+        ("ARM64_X9", 9),
+        ("ARM64_W9", 9),
+        ("ARM64_X10", 10),
+        ("ARM64_W10", 10),
+        ("ARM64_SP", 31),
+    ]);
+    let mut checked = 0;
+    for (name, data) in fixtures() {
+        let Some(text) = pdbutil(&name, &["--symbols"]) else {
+            continue;
+        };
+        let Some(sections) = oracle_sections(&name) else {
+            continue;
+        };
+        // Each range the oracle printed, with the register it named over it.
+        let mut want: Vec<(AddrRange, u16, &str)> = Vec::new();
+        let mut lines = text.lines().peekable();
+        while let Some(line) = lines.next() {
+            let Some(reg) = field(line, "register") else {
+                continue;
+            };
+            let Some(number) = names.get(reg) else {
+                continue;
+            };
+            // The plain register form prints its range on the same line; the
+            // register relative form prints it on the next one.
+            let range = match field(line, "range start") {
+                Some(spec) => {
+                    let len: u64 = field(line, "length").expect("length").parse().expect("n");
+                    AddrRange::sized(oracle_addr(&sections, spec).expect("a section"), len)
+                }
+                None => lines.next().and_then(|next| {
+                    let at = next.find("range = [")? + 9;
+                    let (spec, rest) = next[at..].split_once(",+")?;
+                    let len: u64 = rest.split(')').next()?.parse().ok()?;
+                    AddrRange::sized(oracle_addr(&sections, spec)?, len)
+                }),
+            };
+            want.push((range.expect("a range the oracle printed"), *number, reg));
+        }
+        if want.is_empty() {
+            continue;
+        }
+
+        let db = pdb::read(&data, &[]).expect("parses");
+        // Every register location we report, keyed by the range it covers.
+        let mut ours: Vec<(AddrRange, u16)> = Vec::new();
+        for f in db.debug.functions.values() {
+            let inner = f.inlines.iter().flat_map(|i| i.locals.iter());
+            for l in f.locals.iter().chain(inner) {
+                for r in &l.locations {
+                    match r.location {
+                        Location::Register(n) | Location::RegisterOffset(n, _) => {
+                            ours.push((r.range, n));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        for (range, number, reg) in &want {
+            // Our ranges are the oracle's with the record's gaps punched out,
+            // so they sit inside it and together reach both of its ends.
+            let mine: Vec<AddrRange> = ours
+                .iter()
+                .filter(|(r, n)| n == number && range.contains_range(*r))
+                .map(|(r, _)| *r)
+                .collect();
+            assert!(
+                mine.iter().any(|r| r.start() == range.start())
+                    && mine.iter().any(|r| r.end() == range.end()),
+                "{name}: the oracle names {reg} over {range:?}, we report {mine:?} for {number}"
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked > 0, "no corpus or no llvm-pdbutil: gate not run");
+    println!("register locations checked against llvm-pdbutil: {checked}");
+}
+
+#[test]
+fn inlined_frames_match_the_oracle_inlinee_and_extent() {
+    let mut checked = 0;
+    let mut files = 0;
+    for (name, data) in fixtures() {
+        let Some(text) = pdbutil(&name, &["--symbols"]) else {
+            continue;
+        };
+        let Some(sections) = oracle_sections(&name) else {
+            continue;
+        };
+        // The oracle prints each site's accumulated code offset and the end it
+        // computes, both relative to the procedure the site sits in.
+        let mut want: Vec<(Addr, String, u64, u64)> = Vec::new();
+        let mut procedure = Addr::ZERO;
+        let mut lines = text.lines().peekable();
+        while let Some(line) = lines.next() {
+            if line.contains("S_GPROC32 [") || line.contains("S_LPROC32 [") {
+                let detail = lines.next().expect("a detail line");
+                procedure = oracle_addr(&sections, field(detail, "addr").expect("addr"))
+                    .expect("a section the headers list");
+            } else if line.contains("S_INLINESITE [") || line.contains("S_INLINESITE2 [") {
+                let detail = lines.next().expect("a detail line");
+                let inlinee = detail
+                    .rsplit_once('(')
+                    .and_then(|(_, r)| r.split(')').next())
+                    .expect("an inlinee name")
+                    .to_string();
+                // The annotation lines follow until the next record, and a
+                // site can describe more than one range.
+                let mut start = None;
+                while let Some(next) = lines.peek() {
+                    if next.contains('|') {
+                        break;
+                    }
+                    let hex = |s: &str| u64::from_str_radix(s.trim_start_matches("0x"), 16).ok();
+                    if let Some(at) = next.find("code end 0x") {
+                        let end = hex(next[at + 9..].split_whitespace().next().unwrap_or(""));
+                        if let (Some(from), Some(end)) = (start.take(), end) {
+                            want.push((procedure, inlinee.clone(), from, end));
+                        }
+                    } else if let Some(at) = next.find("code 0x") {
+                        start = hex(next[at + 5..].split_whitespace().next().unwrap_or(""));
+                    }
+                    lines.next();
+                }
+            }
+        }
+        if want.is_empty() {
+            continue;
+        }
+        files += 1;
+
+        let db = pdb::read(&data, &[]).expect("parses");
+        for (at, inlinee, start, end) in &want {
+            let f = db
+                .debug
+                .functions
+                .get(at)
+                .unwrap_or_else(|| panic!("{name}: no function at {at:?}"));
+            let range = AddrRange::new(Addr(at.get() + start), Addr(at.get() + end))
+                .expect("a range the oracle printed");
+            let found = f.inlines.iter().find(|i| i.ranges.contains(&range));
+            let found = found.unwrap_or_else(|| {
+                panic!("{name}: {} has no inlined frame over {range:?}", f.name)
+            });
+            assert_eq!(&found.name, inlinee, "{name}: inlinee over {range:?}");
+            checked += 1;
+        }
+        // Nothing invented the other way either.
+        let mine: usize = db.debug.functions.values().map(|f| f.inlines.len()).sum();
+        assert_eq!(mine, want.len(), "{name}: inlined frame count");
+    }
+    assert!(files > 0, "no corpus or no llvm-pdbutil: gate not run");
+    println!("inlined frames checked against llvm-pdbutil: {checked}");
+}
+
+#[test]
+fn section_contributions_match_the_oracle() {
+    let mut checked = 0;
+    for (name, data) in fixtures() {
+        let Some(text) = pdbutil(&name, &["--section-contribs"]) else {
+            continue;
+        };
+        let Some(sections) = oracle_sections(&name) else {
+            continue;
+        };
+        let mut want: Vec<(Addr, u64, u16)> = Vec::new();
+        for line in text.lines() {
+            let Some((_, rest)) = line.split_once("| mod = ") else {
+                continue;
+            };
+            let mut parts = rest.split(',').map(str::trim);
+            let module: u16 = parts.next().expect("a module").parse().expect("a number");
+            let addr =
+                oracle_addr(&sections, parts.next().expect("an address")).expect("a section");
+            let size: u64 = parts
+                .next()
+                .and_then(|s| s.strip_prefix("size = "))
+                .expect("a size")
+                .parse()
+                .expect("a number");
+            want.push((addr, size, module));
+        }
+        assert!(!want.is_empty(), "{name}: the oracle saw no contributions");
+
+        let db = pdb::read(&data, &[]).expect("parses");
+        assert_eq!(db.contributions.len(), want.len(), "{name}: count");
+        for ((addr, size, module), got) in want.iter().zip(&db.contributions) {
+            assert_eq!(got.range.start(), *addr, "{name}: contribution start");
+            assert_eq!(got.range.len(), *size, "{name}: contribution size");
+            assert_eq!(got.module, *module, "{name}: contribution module");
+            assert!(
+                (got.module as usize) < db.modules.len(),
+                "{name}: a contribution names a module that is not listed"
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked > 0, "no corpus or no llvm-pdbutil: gate not run");
+    println!("section contributions checked against llvm-pdbutil: {checked}");
+}
+
+#[test]
+fn the_identity_is_the_one_the_image_asks_for() {
+    let Some(dir) = corpus() else { return };
+    let mut checked = 0;
+    for arch in ["x64", "a64"] {
+        for opt in ["O0", "O2"] {
+            let Ok(image) = std::fs::read(dir.join(format!("pdb.{arch}.{opt}.exe"))) else {
+                continue;
+            };
+            let Ok(data) = std::fs::read(dir.join(format!("pdb.{arch}.{opt}.pdb"))) else {
+                continue;
+            };
+            // The debug directory's CodeView record: the signature, then the
+            // GUID and the age the linker stamped into both files.
+            let at = image
+                .windows(4)
+                .position(|w| w == b"RSDS")
+                .expect("the image carries a CodeView record");
+            let guid: [u8; 16] = image[at + 4..at + 20].try_into().expect("sixteen bytes");
+            let age = u32::from_le_bytes(image[at + 20..at + 24].try_into().expect("four"));
+            let id = pdb::identity(&data).expect("an identity");
+            assert!(
+                id.matches(&guid, age),
+                "pdb.{arch}.{opt}: the database is not the one the image names"
+            );
+            assert_eq!(id.age, age);
+            checked += 1;
+        }
+    }
+    assert!(checked > 0, "no corpus: gate not run");
+}
+
+#[test]
+fn hints_are_proven_and_name_what_the_records_named() {
+    let mut checked = 0;
+    for (name, data) in fixtures() {
+        let db = pdb::read(&data, &[]).expect("parses");
+        let hints = db.hints();
+        assert!(!hints.is_empty(), "{name}: a database proves some entries");
+        for h in &hints {
+            assert_eq!(h.provenance.best, Evidence::Pdb);
+            assert_eq!(h.provenance.strength(), Strength::Proven);
+            let f = db.debug.functions.get(&h.addr).expect("a function");
+            assert_eq!(h.name.as_deref(), Some(f.name.as_str()));
+            assert!(!f.name.is_empty(), "{name}: a hint with no name");
+            checked += 1;
+        }
+    }
+    assert!(checked > 0, "no corpus: gate not run");
+    println!("function hints from real databases: {checked}");
+}
+
+#[test]
+fn a_real_database_fills_the_same_shape_dwarf_does() {
+    let mut seen = 0;
+    for (name, data) in fixtures() {
+        let db = pdb::read(&data, &[]).expect("parses");
+        assert!(!db.debug.is_empty(), "{name}: describes nothing");
+        assert!(db.warnings.is_empty(), "{name}: {:?}", db.warnings);
+        assert_eq!(db.debug.units, db.modules.len());
+        // The producer string is the one fact that says which compiler wrote
+        // it, and both modules of a fixture have one.
+        assert!(
+            db.modules.iter().any(|m| m.producer.is_some()),
+            "{name}: no module named its producer"
+        );
+        // Types, line rows and locals: a reader that found the functions and
+        // nothing else would still pass the boundary gates.
+        assert!(db.debug.types.len() > 8, "{name}: no type graph");
+        assert!(!db.debug.lines.is_empty(), "{name}: no line rows");
+        let locals: usize = db.debug.functions.values().map(|f| f.locals.len()).sum();
+        assert!(locals >= 7, "{name}: {locals} locals");
+        // Every function the line table covers resolves back to itself.
+        for (addr, f) in &db.debug.functions {
+            assert_eq!(db.debug.function_at(*addr).map(|f| &f.name), Some(&f.name));
+            for frame in &f.inlines {
+                for r in &frame.ranges {
+                    assert!(f.covers(r.start()), "{name}: {} inline outside", f.name);
+                }
+            }
+        }
+        seen += 1;
+    }
+    assert!(seen > 0, "no corpus: gate not run");
+}
+
+#[test]
+fn hostile_databases_are_survived_in_bounded_time() {
+    // The page directory, the stream directory and the symbol records are the
+    // three places a count comes out of the file and decides an allocation.
+    let Some((name, base)) = fixtures().into_iter().next() else {
+        return;
+    };
+    let started = Instant::now();
+    let mut cases = 0;
+
+    // Truncation at every block boundary, and at a handful of byte offsets
+    // inside the first block where the superblock's own fields live.
+    for n in (0..base.len()).step_by(4096).chain(0..64) {
+        let _ = pdb::read(&base[..n], &[]);
+        let _ = pdb::identity(&base[..n]);
+        cases += 1;
+    }
+
+    // Saturate every little endian word in the superblock and in the first two
+    // blocks, which is where the page count, the directory size and the
+    // directory's own block list are.
+    for at in (0..8192.min(base.len() - 4)).step_by(2) {
+        for word in [u32::MAX, u32::MAX / 2, 0, 1] {
+            let mut case = base.clone();
+            case[at..at + 4].copy_from_slice(&word.to_le_bytes());
+            let _ = pdb::read(&case, &[]);
+            cases += 1;
+        }
+    }
+
+    // And the record streams: a length field that claims more than the stream
+    // holds, or claims nothing at all, in every stream the file has.
+    let msf = pdb::Msf::open(&base).expect("the fixture opens");
+    for n in 0..msf.count() {
+        let Some(stream) = msf.stream(n) else {
+            continue;
+        };
+        if stream.is_empty() {
+            continue;
+        }
+        // Where the stream's bytes sit in the file, so its record lengths can
+        // be rewritten in place.
+        let window = stream.len().min(256);
+        let Some(at) = base.windows(window).position(|w| w == &stream[..window]) else {
+            continue;
+        };
+        for word in [0u16, 1, 2, u16::MAX, 0x8000] {
+            let mut case = base.clone();
+            for step in (0..window - 2).step_by(4) {
+                case[at + step..at + step + 2].copy_from_slice(&word.to_le_bytes());
+            }
+            let _ = pdb::read(&case, &[]);
+            cases += 1;
+        }
+    }
+
+    let took = started.elapsed();
+    assert!(
+        took < Duration::from_secs(20),
+        "{name}: {cases} hostile cases took {took:?}"
+    );
+    println!("{cases} hostile cases in {took:?}");
 }

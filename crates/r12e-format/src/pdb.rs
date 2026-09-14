@@ -13,10 +13,13 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
-use r12e_core::{Addr, Reader};
+use r12e_core::{Addr, AddrRange, Evidence, Provenance, Reader};
 use r12e_types::ctype::{Composite, Enumeration, Field, Signature, Type, TypeId, Types};
 
-use crate::dwarf::{DebugFunction, DebugInfo, DebugLocal, DebugVariable, LineRow};
+use crate::dwarf::{
+    DebugFunction, DebugInfo, DebugLocal, DebugVariable, InlinedFrame, LineRow, Location,
+    LocationRange,
+};
 
 /// A cursor over one stream.
 ///
@@ -143,15 +146,21 @@ impl<'a> Msf<'a> {
         }
         let mut streams = Vec::with_capacity(count);
         for size in sizes {
-            // A stream cannot be longer than the file it is stored in, and the
-            // block list that follows is read through the directory's own
-            // cursor, so a lying length runs out of directory rather than
-            // memory.
+            // A stream cannot be longer than the file it is stored in. The
+            // block list is then reserved against what is left of the
+            // directory rather than against the claimed size: the blocks are
+            // read through the directory's own cursor, so a lying length runs
+            // out of directory, but reserving for it first would have
+            // allocated four bytes per claimed block before finding out.
             if size > data.len() {
                 return None;
             }
-            let mut blocks = Vec::with_capacity(size.div_ceil(block_size));
-            for _ in 0..size.div_ceil(block_size) {
+            let want = size.div_ceil(block_size);
+            if want > d.remaining() / 4 {
+                return None;
+            }
+            let mut blocks = Vec::with_capacity(want);
+            for _ in 0..want {
                 blocks.push(d.u32()?);
             }
             streams.push((size, blocks));
@@ -227,6 +236,23 @@ impl Identity {
     }
 }
 
+/// The identity and path a PE debug directory's CodeView record names.
+///
+/// This is the other half of matching: the image says which database it wants,
+/// [`identity`] says what a database is, and [`Identity::matches`] decides. It
+/// takes the record's bytes rather than the image so that the PE loader, which
+/// already has them, needs one line to use it.
+pub fn codeview_identity(record: &[u8]) -> Option<(Identity, String)> {
+    let mut r = Cur::new(record);
+    if r.bytes(4)? != CODEVIEW_RSDS {
+        return None;
+    }
+    let mut out = Identity::default();
+    out.guid.copy_from_slice(r.bytes(16)?);
+    out.age = r.u32()?;
+    Some((out, r.cstr()?))
+}
+
 /// What a program database says it is, without reading the rest of it.
 ///
 /// Matching is what a caller needs first: symbols from the wrong build are
@@ -300,15 +326,85 @@ struct Dbi {
     /// The linker's copy of the image's section headers, which is how a
     /// section and offset pair becomes an address without the image.
     section_headers: Option<u16>,
+    /// What the image targets, which decides how a register number in a
+    /// location record is read.
+    machine: u16,
+    /// Which module contributed each run of bytes to which section.
+    contributions: Vec<RawContribution>,
 }
 
 /// One module: where its symbols and its line information are.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct Module {
     stream: u16,
     symbol_bytes: u32,
     c11_bytes: u32,
     c13_bytes: u32,
+    /// The object file, or the archive member, the entry names.
+    name: String,
+    /// The object the linker read it out of, which is the archive for a
+    /// member and the same name again otherwise.
+    object: String,
+}
+
+/// A section contribution before the section bases are known.
+#[derive(Debug, Clone, Copy)]
+struct RawContribution {
+    section: u16,
+    offset: u32,
+    size: u32,
+    characteristics: u32,
+    module: u16,
+}
+
+/// One run of bytes a module put into a section.
+///
+/// This is the map from address back to object file, which is what says which
+/// translation unit a piece of code came from when the symbol records do not.
+#[derive(Debug, Clone)]
+pub struct Contribution {
+    /// The addresses it covers.
+    pub range: AddrRange,
+    /// Index into [`Pdb::modules`].
+    pub module: u16,
+    /// The section characteristics the linker recorded for the run.
+    pub characteristics: u32,
+}
+
+/// What a module entry says about itself.
+#[derive(Debug, Clone, Default)]
+pub struct ModuleInfo {
+    /// The object file the entry names.
+    pub name: String,
+    /// The archive it came out of, when it came out of one.
+    pub object: String,
+    /// The producer string from the module's `S_COMPILE3` record, when it has
+    /// one. `* Linker *` modules carry the linker's own version here.
+    pub producer: Option<String>,
+}
+
+/// What a procedure's frame record says about its stack frame.
+///
+/// `DebugFunction` has nowhere to put this because DWARF describes a frame
+/// with an expression rather than a size, so it is reported alongside rather
+/// than folded in.
+#[derive(Debug, Clone, Default)]
+pub struct Frame {
+    /// Bytes of stack frame, not counting the return address.
+    pub total_bytes: u32,
+    /// Bytes of that which are padding.
+    pub padding_bytes: u32,
+    /// Bytes of callee saved registers inside the frame.
+    pub callee_saved_bytes: u32,
+    /// The exception handler the frame installs, when it installs one.
+    pub exception_handler: Option<Addr>,
+    /// Which register locals are addressed from, as a DWARF register number,
+    /// when the encoding names one this knows.
+    pub local_base: Option<u16>,
+    /// The same for parameters.
+    pub param_base: Option<u16>,
+    /// The flag word as the record spells it.
+    pub flags: u32,
 }
 
 /// Stream three: the header, then substreams laid end to end in a fixed order.
@@ -336,21 +432,21 @@ fn dbi(data: &[u8]) -> Option<Dbi> {
     let optional = usize::try_from(r.i32()?).ok()?;
     let edit_continue = usize::try_from(r.i32()?).ok()?;
     let _flags = r.u16()?;
-    let _machine = r.u16()?;
+    let machine = r.u16()?;
     let _padding = r.u32()?;
 
     let start = r.position();
     let mut at = start.checked_add(modules)?;
     let modules = module_list(data.get(start..at).unwrap_or_default());
-    // The optional header is last, behind five substreams whose lengths are
-    // all from the file, so the walk to it is checked at every step.
-    for n in [
-        contributions,
-        section_map,
-        sources,
-        type_servers,
-        edit_continue,
-    ] {
+    let contributions = {
+        let end = at.checked_add(contributions)?;
+        let body = data.get(at..end).unwrap_or_default();
+        at = end;
+        contribution_list(body)
+    };
+    // The optional header is last, behind four more substreams whose lengths
+    // are all from the file, so the walk to it is checked at every step.
+    for n in [section_map, sources, type_servers, edit_continue] {
         at = at.checked_add(n)?;
     }
     let header = data.get(at..at.checked_add(optional)?).unwrap_or_default();
@@ -362,7 +458,58 @@ fn dbi(data: &[u8]) -> Option<Dbi> {
         symbols,
         modules,
         section_headers,
+        machine,
+        contributions,
     })
+}
+
+/// The section contribution substream: a version word, then fixed size
+/// entries. The later version appends a field to each entry rather than
+/// changing the ones in front of it.
+fn contribution_list(data: &[u8]) -> Vec<RawContribution> {
+    let mut r = Cur::new(data);
+    let Some(version) = r.u32() else {
+        return Vec::new();
+    };
+    let each = match version {
+        SECTION_CONTRIB_V2 => CONTRIBUTION_ENTRY + 4,
+        SECTION_CONTRIB_V1 => CONTRIBUTION_ENTRY,
+        // An unknown version has an unknown entry size, so stepping through it
+        // would be guessing at where each one ends.
+        _ => return Vec::new(),
+    };
+    // Every entry costs `each` bytes, so the substream bounds the count.
+    let mut out = Vec::with_capacity(r.remaining() / each);
+    while r.remaining() >= each {
+        let before = r.position();
+        let (Some(section), Some(_pad), Some(offset), Some(size)) =
+            (r.u16(), r.u16(), r.i32(), r.i32())
+        else {
+            break;
+        };
+        let (Some(characteristics), Some(module)) = (r.u32(), r.u16()) else {
+            break;
+        };
+        if !r.seek(before + each) {
+            break;
+        }
+        // A negative offset or size is not a short run, it is a malformed
+        // entry, and a zero length run covers nothing worth reporting.
+        let (Ok(offset), Ok(size)) = (u32::try_from(offset), u32::try_from(size)) else {
+            continue;
+        };
+        if size == 0 {
+            continue;
+        }
+        out.push(RawContribution {
+            section,
+            offset,
+            size,
+            characteristics,
+            module,
+        });
+    }
+    out
 }
 
 /// The modules a DBI substream lists.
@@ -397,13 +544,15 @@ fn one_module(r: &mut Cur<'_>) -> Option<Module> {
     let _unused = r.u32()?;
     let _source_name = r.u32()?;
     let _pdb_path = r.u32()?;
-    let _module = r.cstr()?;
-    let _object = r.cstr()?;
+    let name = r.cstr()?;
+    let object = r.cstr()?;
     Some(Module {
         stream,
         symbol_bytes,
         c11_bytes,
         c13_bytes,
+        name,
+        object,
     })
 }
 
@@ -439,6 +588,55 @@ fn address(bases: &[Addr], section: u16, offset: u32) -> Option<Addr> {
     base.checked_add(offset as u64)
 }
 
+/// A CodeView register number as the DWARF number for the same register.
+///
+/// The two numberings are unrelated, and [`Location::Register`] is documented
+/// as a DWARF number, so a register is translated here or reported as unknown.
+/// A register the tables do not cover yields `None` rather than some other
+/// register: a location naming the wrong register is worse than no location.
+fn dwarf_register(machine: u16, reg: u16) -> Option<u16> {
+    match machine {
+        MACHINE_AMD64 => amd64_register(reg),
+        MACHINE_ARM64 => arm64_register(reg),
+        // i386 and 32-bit ARM are readable the same way, but nothing here has
+        // produced one to measure against, so they are left unmapped.
+        _ => None,
+    }
+}
+
+/// x86-64. The byte, word and doubleword names are the same machine register
+/// at another width, and DWARF numbers the register rather than the width.
+fn amd64_register(reg: u16) -> Option<u16> {
+    // ax cx dx bx sp bp si di, in the System V numbering.
+    const WIDE: [u16; 8] = [0, 2, 1, 3, 7, 6, 4, 5];
+    // al cl dl bl ah ch dh bh, which name the same four registers twice.
+    const LOW: [u16; 8] = [0, 2, 1, 3, 0, 2, 1, 3];
+    // rax rbx rcx rdx rsi rdi rbp rsp r8..r15, in the order CodeView lists
+    // them, which is not the order DWARF numbers them in.
+    const QUAD: [u16; 16] = [0, 3, 2, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    Some(match reg {
+        CV_AMD64_AL..=CV_AMD64_BH => LOW[(reg - CV_AMD64_AL) as usize],
+        CV_AMD64_AX..=CV_AMD64_DI => WIDE[(reg - CV_AMD64_AX) as usize],
+        CV_AMD64_EAX..=CV_AMD64_EDI => WIDE[(reg - CV_AMD64_EAX) as usize],
+        CV_AMD64_RAX..=CV_AMD64_R15 => QUAD[(reg - CV_AMD64_RAX) as usize],
+        _ => return None,
+    })
+}
+
+/// AArch64. The vector registers are deliberately absent: the enumeration's
+/// numbering for them has not been checked against a producer here, and a
+/// guess would be an invention.
+fn arm64_register(reg: u16) -> Option<u16> {
+    Some(match reg {
+        CV_ARM64_W0..=CV_ARM64_W30 => reg - CV_ARM64_W0,
+        CV_ARM64_X0..=CV_ARM64_X28 => reg - CV_ARM64_X0,
+        CV_ARM64_FP => 29,
+        CV_ARM64_LR => 30,
+        CV_ARM64_SP => 31,
+        _ => return None,
+    })
+}
+
 /// Type ids already built, so a graph with a cycle in it is walked once.
 type Made = BTreeMap<u32, TypeId>;
 
@@ -449,6 +647,9 @@ struct TypeTable<'a> {
     /// The defining record for each tag, so a forward reference reaches the
     /// members instead of the empty shell that names them.
     definitions: BTreeMap<String, u32>,
+    /// True when the stream defers to a type server, which is a separate file
+    /// holding the records the modules that used it refer to.
+    type_server: bool,
 }
 
 /// What a field list yielded: members for a structure, values for an enum.
@@ -486,6 +687,9 @@ impl<'a> TypeTable<'a> {
             };
             let kind = u16::from_le_bytes([body[0], body[1]]);
             let body = &body[2..];
+            if kind == LF_TYPESERVER2 {
+                out.type_server = true;
+            }
             if let Some(tag) = tag(kind, body) {
                 out.definitions.entry(tag).or_insert(index);
             }
@@ -806,6 +1010,18 @@ impl<'a> TypeTable<'a> {
         (ty, None)
     }
 
+    /// The name a function identity record carries, which is how an inlined
+    /// call says which function was inlined.
+    fn item_name(&self, index: u32) -> Option<String> {
+        let (kind, body) = self.records.get(&index).copied()?;
+        if kind != LF_FUNC_ID && kind != LF_MFUNC_ID {
+            return None;
+        }
+        let mut r = Cur::new(body);
+        let (_scope, _ty) = (r.u32()?, r.u32()?);
+        r.cstr()
+    }
+
     /// The type index a function identity record points at, for the symbol
     /// records that name the item stream rather than the type stream.
     fn function_type(&self, index: u32) -> Option<u32> {
@@ -934,10 +1150,27 @@ struct Symbols<'a> {
     tpi: &'a TypeTable<'a>,
     ipi: &'a TypeTable<'a>,
     bases: &'a [Addr],
+    /// Which machine, so a register number can be translated.
+    machine: u16,
     types: &'a mut Types,
     made: Made,
     functions: Vec<DebugFunction>,
     variables: Vec<DebugVariable>,
+    /// Frame descriptions, keyed by the procedure they belong to.
+    frames: BTreeMap<Addr, Frame>,
+}
+
+/// What one scope held, gathered before it is attached to anything.
+///
+/// A scope's contents cannot be written straight into the function it belongs
+/// to, because an inlined call's locals belong to the frame rather than to the
+/// function, and the frame is itself one of the things being collected.
+#[derive(Default)]
+struct Scope {
+    locals: Vec<DebugLocal>,
+    inlines: Vec<InlinedFrame>,
+    /// Separated code the scope declared, which is body outside the main run.
+    ranges: Vec<AddrRange>,
 }
 
 impl Symbols<'_> {
@@ -956,30 +1189,144 @@ impl Symbols<'_> {
                     }
                 }
                 S_GPROC32 | S_LPROC32 | S_GPROC32_ID | S_LPROC32_ID => {
-                    let Some(mut f) = self.procedure(kind, body) else {
-                        continue;
-                    };
-                    // Locals live in the scope the record opened, and it runs
-                    // to the end record that closes it.
-                    let mut depth = 1usize;
-                    while n < records.len() && depth > 0 {
-                        let (kind, body) = records[n];
-                        n += 1;
-                        match kind {
-                            S_BLOCK32 | S_THUNK32 | S_INLINESITE | S_SEPCODE => depth += 1,
-                            S_END | S_INLINESITE_END | S_PROC_ID_END => depth -= 1,
-                            _ => {
-                                if let Some(local) = self.local(kind, body) {
-                                    f.locals.push(local);
-                                }
-                            }
+                    let mut found = self.procedure(kind, body);
+                    // A record that could not be read still opened a scope,
+                    // and its contents have to be stepped over rather than
+                    // attributed to whatever procedure comes after it.
+                    let mut sink = DebugFunction::default();
+                    let at = found.as_ref().map(|f| f.low_pc).unwrap_or(Addr::ZERO);
+                    let scope = self.scope(&records, &mut n, at, 0);
+                    let f = found.as_mut().unwrap_or(&mut sink);
+                    f.locals = scope.locals;
+                    f.inlines = scope.inlines;
+                    // Ranges are only worth listing when the body is in more
+                    // than one piece; otherwise the start and size say it.
+                    if !scope.ranges.is_empty() {
+                        if let Some(main) = f.size.and_then(|n| AddrRange::sized(f.low_pc, n)) {
+                            f.ranges.push(main);
                         }
+                        f.ranges.extend(scope.ranges);
+                        f.ranges.sort_by_key(|r| r.start());
                     }
-                    self.functions.push(f);
+                    if let Some(f) = found {
+                        self.functions.push(f);
+                    }
+                }
+                // A thunk is real code with a real name, and nothing else in
+                // the file says the name belongs to that address.
+                S_THUNK32 => {
+                    let found = self.thunk(body);
+                    let at = found.as_ref().map(|f| f.low_pc).unwrap_or(Addr::ZERO);
+                    let _ = self.scope(&records, &mut n, at, 0);
+                    if let Some(f) = found {
+                        self.functions.push(f);
+                    }
+                }
+                // A scope opened by something this does not model is still
+                // stepped over as a scope, so its end record is consumed.
+                _ if opens_scope(kind) => {
+                    let _ = self.scope(&records, &mut n, Addr::ZERO, 0);
                 }
                 _ => {}
             }
         }
+    }
+
+    /// Consume one scope's records, up to and including the record closing it.
+    ///
+    /// `base` is the procedure the scope sits inside, which is what an inline
+    /// site's code offsets are measured from. `depth` is how many inlined
+    /// calls deep the scope already is.
+    fn scope(&mut self, records: &[(u16, &[u8])], n: &mut usize, base: Addr, depth: u32) -> Scope {
+        self.scope_at(records, n, base, depth, 0)
+    }
+
+    /// The same, counting how deep the recursion is. Nesting comes out of the
+    /// file, so a stream that opens a scope and never closes it would descend
+    /// as far as it has records; past the limit the opening records are read
+    /// as plain ones and the next end record closes the scope that is open.
+    fn scope_at(
+        &mut self,
+        records: &[(u16, &[u8])],
+        n: &mut usize,
+        base: Addr,
+        depth: u32,
+        nesting: u32,
+    ) -> Scope {
+        let mut out = Scope::default();
+        let deep = nesting >= MAX_NESTING;
+        // A local is described by the record naming it and then by however
+        // many range records follow, so it is held until something else ends
+        // it.
+        let mut pending: Option<DebugLocal> = None;
+        let mut ranges: Vec<LocationRange> = Vec::new();
+        while *n < records.len() {
+            let (kind, body) = records[*n];
+            *n += 1;
+            if !is_range_record(kind) {
+                finish_local(&mut pending, &mut ranges, &mut out.locals);
+            }
+            match kind {
+                S_END | S_INLINESITE_END | S_PROC_ID_END => break,
+                S_FRAMEPROC => {
+                    if let Some(frame) = self.frame(body) {
+                        self.frames.insert(base, frame);
+                    }
+                }
+                S_LOCAL => pending = self.local(body),
+                k if is_range_record(k) => {
+                    if pending.is_some() {
+                        self.location(k, body, &mut ranges);
+                    }
+                }
+                S_BPREL32 | S_REGREL32 => {
+                    if let Some(local) = self.frame_local(kind, body) {
+                        out.locals.push(local);
+                    }
+                }
+                // A value the optimizer folded away still has a name and a
+                // type, and the value itself is the only place it lives.
+                S_CONSTANT => {
+                    if let Some(local) = self.constant(body) {
+                        out.locals.push(local);
+                    }
+                }
+                S_INLINESITE | S_INLINESITE2 if !deep => {
+                    let frame = self.inline_site(kind, body, base, depth);
+                    let inner = self.scope_at(records, n, base, depth + 1, nesting + 1);
+                    match frame {
+                        Some(mut frame) => {
+                            frame.locals = inner.locals;
+                            out.inlines.push(frame);
+                            // Deeper frames are kept beside this one rather
+                            // than inside it, which is the shape the DWARF
+                            // reader produces.
+                            out.inlines.extend(inner.inlines);
+                        }
+                        None => out.locals.extend(inner.locals),
+                    }
+                    out.ranges.extend(inner.ranges);
+                }
+                S_SEPCODE if !deep => {
+                    if let Some(range) = self.separated(body) {
+                        out.ranges.push(range);
+                    }
+                    let inner = self.scope_at(records, n, base, depth, nesting + 1);
+                    out.locals.extend(inner.locals);
+                    out.inlines.extend(inner.inlines);
+                    out.ranges.extend(inner.ranges);
+                }
+                k if opens_scope(k) && !deep => {
+                    let inner = self.scope_at(records, n, base, depth, nesting + 1);
+                    out.locals.extend(inner.locals);
+                    out.inlines.extend(inner.inlines);
+                    out.ranges.extend(inner.ranges);
+                }
+                _ => {}
+            }
+        }
+        finish_local(&mut pending, &mut ranges, &mut out.locals);
+        out
     }
 
     /// A procedure: the name, where it starts, and how long it is.
@@ -1015,6 +1362,70 @@ impl Symbols<'_> {
             signature,
             ..Default::default()
         })
+    }
+
+    /// A thunk: a stub the linker generated, with its own name and extent.
+    fn thunk(&mut self, body: &[u8]) -> Option<DebugFunction> {
+        let mut r = Cur::new(body);
+        let _links = r.bytes(12)?;
+        let offset = r.u32()?;
+        let section = r.u16()?;
+        let length = r.u16()?;
+        let _ordinal = r.u8()?;
+        let name = r.cstr()?;
+        Some(DebugFunction {
+            name,
+            low_pc: address(self.bases, section, offset)?,
+            size: Some(length as u64),
+            ..Default::default()
+        })
+    }
+
+    /// Separated code: a piece of a function the linker put somewhere else.
+    fn separated(&mut self, body: &[u8]) -> Option<AddrRange> {
+        let mut r = Cur::new(body);
+        let _links = r.bytes(8)?;
+        let length = r.u32()?;
+        let _flags = r.u32()?;
+        let offset = r.u32()?;
+        let _parent_offset = r.u32()?;
+        let section = r.u16()?;
+        AddrRange::sized(address(self.bases, section, offset)?, length as u64)
+    }
+
+    /// The frame description a procedure carries.
+    fn frame(&mut self, body: &[u8]) -> Option<Frame> {
+        let mut r = Cur::new(body);
+        let total_bytes = r.u32()?;
+        let padding_bytes = r.u32()?;
+        let _padding_offset = r.u32()?;
+        let callee_saved_bytes = r.u32()?;
+        let handler_offset = r.u32()?;
+        let handler_section = r.u16()?;
+        let flags = r.u32()?;
+        Some(Frame {
+            total_bytes,
+            padding_bytes,
+            callee_saved_bytes,
+            exception_handler: address(self.bases, handler_section, handler_offset),
+            local_base: self.base_register((flags >> FRAME_LOCAL_BASE_SHIFT) & 3),
+            param_base: self.base_register((flags >> FRAME_PARAM_BASE_SHIFT) & 3),
+            flags,
+        })
+    }
+
+    /// The two bit encoding a frame record uses for the register its offsets
+    /// are measured from. Which register each code means depends on the
+    /// machine, and zero means the frame has no base register at all.
+    fn base_register(&self, code: u32) -> Option<u16> {
+        match (self.machine, code) {
+            (MACHINE_AMD64, 1) => Some(7),  // rsp
+            (MACHINE_AMD64, 2) => Some(6),  // rbp
+            (MACHINE_AMD64, 3) => Some(13), // r13
+            (MACHINE_ARM64, 1) => Some(31), // sp
+            (MACHINE_ARM64, 2) => Some(29), // fp
+            _ => None,
+        }
     }
 
     /// A data symbol: a variable at a fixed address.
@@ -1057,29 +1468,329 @@ impl Symbols<'_> {
         }
     }
 
-    /// A local at a frame offset, which is the only location this models.
-    fn local(&mut self, kind: u16, body: &[u8]) -> Option<DebugLocal> {
-        if kind != S_BPREL32 && kind != S_REGREL32 {
-            return None;
-        }
+    /// A local at a frame offset, which is how the older records spell one.
+    fn frame_local(&mut self, kind: u16, body: &[u8]) -> Option<DebugLocal> {
         let mut r = Cur::new(body);
         let offset = r.i32()?;
         let index = r.u32()?;
-        if kind == S_REGREL32 {
-            let _register = r.u16()?;
-        }
+        let register = match kind {
+            S_REGREL32 => Some(r.u16()?),
+            _ => None,
+        };
         let name = r.cstr()?;
-        let ty = self
-            .tpi
-            .build(index, self.types, &mut self.made, 0)
-            .unwrap_or(Types::VOID);
+        let ty = self.type_of(index);
+        // A frame relative record names the register itself, so it can say
+        // where the value is and not only how far up the frame it sits.
+        let location = match register.and_then(|n| dwarf_register(self.machine, n)) {
+            Some(n) => Some(Location::RegisterOffset(n, offset as i64)),
+            None if kind == S_BPREL32 => Some(Location::FrameOffset(offset as i64)),
+            None => None,
+        };
         Some(DebugLocal {
             name,
             ty,
             frame_offset: Some(offset as i64),
+            location,
             ..Default::default()
         })
     }
+
+    /// A constant the optimizer folded into the code it generated.
+    fn constant(&mut self, body: &[u8]) -> Option<DebugLocal> {
+        let mut r = Cur::new(body);
+        let index = r.u32()?;
+        let value = numeric(&mut r)?;
+        let name = r.cstr()?;
+        Some(DebugLocal {
+            name,
+            ty: self.type_of(index),
+            location: Some(Location::Constant(value)),
+            ..Default::default()
+        })
+    }
+
+    /// The record naming a local, before the records saying where it lives.
+    fn local(&mut self, body: &[u8]) -> Option<DebugLocal> {
+        let mut r = Cur::new(body);
+        let index = r.u32()?;
+        let _flags = r.u16()?;
+        let name = r.cstr()?;
+        Some(DebugLocal {
+            name,
+            ty: self.type_of(index),
+            ..Default::default()
+        })
+    }
+
+    /// One range record: where a local lives over some run of addresses.
+    fn location(&mut self, kind: u16, body: &[u8], out: &mut Vec<LocationRange>) {
+        let mut r = Cur::new(body);
+        let where_ = match kind {
+            S_DEFRANGE_REGISTER => {
+                let (Some(reg), Some(_attr)) = (r.u16(), r.u16()) else {
+                    return;
+                };
+                match dwarf_register(self.machine, reg) {
+                    Some(n) => Location::Register(n),
+                    None => return,
+                }
+            }
+            S_DEFRANGE_FRAMEPOINTER_REL => {
+                let Some(offset) = r.i32() else { return };
+                Location::FrameOffset(offset as i64)
+            }
+            S_DEFRANGE_REGISTER_REL => {
+                let (Some(reg), Some(flags), Some(offset)) = (r.u16(), r.u16(), r.i32()) else {
+                    return;
+                };
+                // The spilled-member bit says the record describes part of an
+                // aggregate rather than the whole local, which nothing here
+                // can express.
+                if flags & DEFRANGE_SPILLED_MEMBER != 0 {
+                    return;
+                }
+                match dwarf_register(self.machine, reg) {
+                    Some(n) => Location::RegisterOffset(n, offset as i64),
+                    None => return,
+                }
+            }
+            // The full scope form has no range at all: it is where the local
+            // lives for as long as the scope lasts.
+            S_DEFRANGE_FRAMEPOINTER_REL_FULL_SCOPE => {
+                let Some(offset) = r.i32() else { return };
+                out.push(LocationRange {
+                    range: AddrRange::empty_at(Addr::ZERO),
+                    location: Location::FrameOffset(offset as i64),
+                });
+                return;
+            }
+            _ => return,
+        };
+        self.ranges_of(&mut r, where_, out);
+    }
+
+    /// The addresses a range record covers, with the gaps it lists punched
+    /// out of them.
+    fn ranges_of(&self, r: &mut Cur<'_>, location: Location, out: &mut Vec<LocationRange>) {
+        let (Some(offset), Some(section), Some(length)) = (r.u32(), r.u16(), r.u16()) else {
+            return;
+        };
+        let Some(start) = address(self.bases, section, offset) else {
+            return;
+        };
+        let length = length as u64;
+        // Gaps are offsets from the start of the range, in order. Anything out
+        // of order ends the walk rather than producing a range running
+        // backwards.
+        let mut pieces = Vec::new();
+        let mut at = 0u64;
+        while r.remaining() >= 4 {
+            let (Some(gap), Some(gap_len)) = (r.u16(), r.u16()) else {
+                break;
+            };
+            let gap = gap as u64;
+            if gap < at || gap > length {
+                break;
+            }
+            if gap > at {
+                pieces.push((at, gap - at));
+            }
+            at = (gap + gap_len as u64).min(length);
+        }
+        if at < length {
+            pieces.push((at, length - at));
+        }
+        for (from, n) in pieces {
+            let piece = start.checked_add(from).and_then(|a| AddrRange::sized(a, n));
+            if let Some(range) = piece {
+                out.push(LocationRange {
+                    range,
+                    location: location.clone(),
+                });
+            }
+        }
+    }
+
+    /// An inlined call: which function, and which addresses it occupies.
+    fn inline_site(
+        &mut self,
+        kind: u16,
+        body: &[u8],
+        base: Addr,
+        depth: u32,
+    ) -> Option<InlinedFrame> {
+        let mut r = Cur::new(body);
+        let (_parent, _end) = (r.u32()?, r.u32()?);
+        let inlinee = r.u32()?;
+        if kind == S_INLINESITE2 {
+            let _invocations = r.u32()?;
+        }
+        let ranges = annotations(&mut r, base);
+        Some(InlinedFrame {
+            name: self.ipi.item_name(inlinee).unwrap_or_default(),
+            // The item stream index takes the place DWARF gives the abstract
+            // origin's offset: it is what joins this to the out-of-line copy.
+            abstract_origin: Some(inlinee as u64),
+            entry_pc: ranges.iter().map(|r| r.start()).min(),
+            ranges,
+            depth,
+            ..Default::default()
+        })
+    }
+
+    /// A type index as a type, remembering what was built.
+    fn type_of(&mut self, index: u32) -> TypeId {
+        self.tpi
+            .build(index, self.types, &mut self.made, 0)
+            .unwrap_or(Types::VOID)
+    }
+}
+
+/// Attach the local that the records just walked described.
+fn finish_local(
+    pending: &mut Option<DebugLocal>,
+    ranges: &mut Vec<LocationRange>,
+    out: &mut Vec<DebugLocal>,
+) {
+    let Some(mut local) = pending.take() else {
+        ranges.clear();
+        return;
+    };
+    let found = std::mem::take(ranges);
+    // A whole scope record has no addresses to attach, so it is the one
+    // location rather than one entry in a list.
+    if let [one] = found.as_slice() {
+        if one.range.is_empty() {
+            local.frame_offset = match one.location {
+                Location::FrameOffset(n) => Some(n),
+                _ => None,
+            };
+            local.location = Some(one.location.clone());
+            out.push(local);
+            return;
+        }
+    }
+    // The frame offset is only stated when every range agrees on one: a local
+    // that is in a register for part of the function does not have one.
+    let mut offsets = found.iter().map(|r| match r.location {
+        Location::FrameOffset(n) => Some(n),
+        _ => None,
+    });
+    let first = offsets.next().flatten();
+    local.frame_offset = first.filter(|n| offsets.all(|o| o == Some(*n)));
+    local.locations = found;
+    out.push(local);
+}
+
+/// True for the records that say where the local in front of them lives.
+fn is_range_record(kind: u16) -> bool {
+    (S_DEFRANGE..=S_DEFRANGE_REGISTER_REL).contains(&kind)
+}
+
+/// True for the records that open a scope, which then runs to an end record.
+fn opens_scope(kind: u16) -> bool {
+    matches!(
+        kind,
+        S_GPROC32
+            | S_LPROC32
+            | S_GPROC32_ID
+            | S_LPROC32_ID
+            | S_BLOCK32
+            | S_THUNK32
+            | S_SEPCODE
+            | S_INLINESITE
+            | S_INLINESITE2
+    )
+}
+
+/// A compressed unsigned integer, as the binary annotation stream spells one:
+/// the top bits of the first byte say how many bytes it occupies.
+fn compressed(r: &mut Cur<'_>) -> Option<u32> {
+    let b0 = r.u8()? as u32;
+    if b0 & 0x80 == 0 {
+        return Some(b0);
+    }
+    if b0 & 0xc0 == 0x80 {
+        return Some(((b0 & 0x3f) << 8) | r.u8()? as u32);
+    }
+    if b0 & 0xe0 == 0xc0 {
+        let (b1, b2, b3) = (r.u8()? as u32, r.u8()? as u32, r.u8()? as u32);
+        return Some(((b0 & 0x1f) << 24) | (b1 << 16) | (b2 << 8) | b3);
+    }
+    // The remaining prefixes are not assigned, so the stream stops here rather
+    // than being read as something else.
+    None
+}
+
+/// The code ranges an inline site's binary annotations describe.
+///
+/// Offsets are relative to the procedure the site sits in, and start again at
+/// zero for each record, including a record nested inside another site. A
+/// range is emitted only when the stream said how long it is: a start with no
+/// length is dropped rather than extended to somewhere it might not reach.
+fn annotations(r: &mut Cur<'_>, base: Addr) -> Vec<AddrRange> {
+    let mut out = Vec::new();
+    let mut offset = 0u64;
+    let mut open: Option<u64> = None;
+    let emit = |start: u64, len: u64, out: &mut Vec<AddrRange>| {
+        if let Some(range) = base
+            .checked_add(start)
+            .and_then(|a| AddrRange::sized(a, len))
+        {
+            out.push(range);
+        }
+    };
+    while !r.is_empty() {
+        let Some(op) = compressed(r) else { break };
+        match op {
+            BA_END => break,
+            BA_CODE_OFFSET | BA_CHANGE_CODE_OFFSET => {
+                let Some(delta) = compressed(r) else { break };
+                offset += delta as u64;
+                open = Some(offset);
+            }
+            BA_CHANGE_CODE_OFFSET_AND_LINE_OFFSET => {
+                let Some(packed) = compressed(r) else { break };
+                // The low nibble is the code delta; the rest is a line delta,
+                // which nothing here records.
+                offset += (packed & 0xf) as u64;
+                open = Some(offset);
+            }
+            BA_CHANGE_CODE_LENGTH => {
+                let Some(len) = compressed(r) else { break };
+                if let Some(start) = open.take() {
+                    emit(start, len as u64, &mut out);
+                }
+                offset += len as u64;
+            }
+            BA_CHANGE_CODE_LENGTH_AND_CODE_OFFSET => {
+                let (Some(len), Some(delta)) = (compressed(r), compressed(r)) else {
+                    break;
+                };
+                offset += delta as u64;
+                emit(offset, len as u64, &mut out);
+                offset += len as u64;
+                open = None;
+            }
+            // One operand each, and none of them moves the code offset.
+            BA_CHANGE_FILE
+            | BA_CHANGE_LINE_OFFSET
+            | BA_CHANGE_LINE_END_DELTA
+            | BA_CHANGE_RANGE_KIND
+            | BA_CHANGE_COLUMN_START
+            | BA_CHANGE_COLUMN_END_DELTA
+            | BA_CHANGE_COLUMN_END => {
+                if compressed(r).is_none() {
+                    break;
+                }
+            }
+            // Changing the section the offsets are measured in is something
+            // this does not model, so the walk stops rather than placing the
+            // rest of the ranges in the wrong section.
+            _ => break,
+        }
+    }
+    out
 }
 
 /// The line rows one module's debug subsections carry.
@@ -1215,14 +1926,67 @@ fn line_block(body: &[u8], files: &BTreeMap<u32, String>, bases: &[Addr], out: &
     });
 }
 
+/// Everything one program database says.
+///
+/// [`Pdb::debug`] is the same shape the DWARF reader produces, so nothing
+/// above this layer has to know which format the information came from. The
+/// other fields are what a database carries and DWARF does not.
+#[derive(Debug, Clone)]
+pub struct Pdb {
+    /// What the database says it is, for matching against an image.
+    pub identity: Identity,
+    /// What the compiler knew, in the shape the DWARF reader also produces.
+    pub debug: DebugInfo,
+    /// The object files that went into the link, in the order the DBI stream
+    /// lists them, which is the order a contribution's index refers to.
+    pub modules: Vec<ModuleInfo>,
+    /// Which module contributed which addresses.
+    pub contributions: Vec<Contribution>,
+    /// Stack frame descriptions, by the procedure they belong to.
+    pub frames: BTreeMap<Addr, Frame>,
+    /// The machine the DBI stream names, as a PE machine number.
+    pub machine: u16,
+    /// What was noticed but not acted on, for the report.
+    pub warnings: Vec<String>,
+}
+
+impl Pdb {
+    /// The function entries the database proves.
+    ///
+    /// A symbol record naming a procedure is a declaration by the compiler
+    /// that a function starts there, which is as strong as evidence gets; a
+    /// public symbol flagged as code is the same claim with no size attached.
+    pub fn hints(&self) -> Vec<crate::FunctionHint> {
+        let mut out = Vec::with_capacity(self.debug.functions.len());
+        for (addr, f) in &self.debug.functions {
+            if f.name.is_empty() {
+                continue;
+            }
+            out.push(crate::FunctionHint {
+                addr: *addr,
+                size: f.size.filter(|n| *n > 0),
+                name: Some(f.name.clone()),
+                provenance: Provenance::new(Evidence::Pdb),
+            });
+        }
+        out
+    }
+}
+
 /// Read a program database, or `None` when the bytes are not one.
 ///
 /// The image's section headers turn the section and offset pairs the records
 /// carry into addresses. Without them the linker's own copy is used instead,
 /// and the addresses come out relative to the image base.
 pub fn parse(data: &[u8], sections: &[crate::Section]) -> Option<DebugInfo> {
+    read(data, sections).map(|p| p.debug)
+}
+
+/// Read a program database whole, including what does not fit in
+/// [`DebugInfo`].
+pub fn read(data: &[u8], sections: &[crate::Section]) -> Option<Pdb> {
     let msf = Msf::open(data)?;
-    let (_, named) = msf
+    let (identity, named) = msf
         .stream(STREAM_INFO)
         .and_then(|s| info(&s))
         .unwrap_or_default();
@@ -1240,19 +2004,36 @@ pub fn parse(data: &[u8], sections: &[crate::Section]) -> Option<DebugInfo> {
         .and_then(|n| msf.stream(*n as usize))
         .unwrap_or_default();
 
+    let mut warnings = Vec::new();
+    // A type server holds the records for every module that used it, and it is
+    // a separate file this was not given. Saying so is the difference between
+    // "no types" and "the types are somewhere else".
+    if tpi.type_server {
+        warnings.push("types live in a type server this was not given".into());
+    }
+
     let mut types = Types::new();
     let mut symbols = Symbols {
         tpi: &tpi,
         ipi: &ipi,
         bases: &bases,
+        machine: dbi.machine,
         types: &mut types,
         made: Made::new(),
         functions: Vec::new(),
         variables: Vec::new(),
+        frames: BTreeMap::new(),
     };
     let mut rows = Vec::new();
+    let mut modules = Vec::with_capacity(dbi.modules.len());
     for module in &dbi.modules {
+        let mut info = ModuleInfo {
+            name: module.name.clone(),
+            object: module.object.clone(),
+            producer: None,
+        };
         let Some(stream) = msf.stream(module.stream as usize) else {
+            modules.push(info);
             continue;
         };
         // A module stream is a signature, then the symbols, then the two
@@ -1264,20 +2045,43 @@ pub fn parse(data: &[u8], sections: &[crate::Section]) -> Option<DebugInfo> {
         let c11_end = symbols_end + module.c11_bytes as usize;
         let c13_end = c11_end + module.c13_bytes as usize;
         if symbols_end > 4 {
-            symbols.walk(stream.get(4..symbols_end).unwrap_or_default());
+            let body = stream.get(4..symbols_end).unwrap_or_default();
+            info.producer = producer(body);
+            symbols.walk(body);
         }
         if let Some(c13) = stream.get(c11_end..c13_end) {
             lines(c13, &names, &bases, &mut rows);
         }
+        modules.push(info);
     }
     // The global records last: a public says less than a procedure record
     // about the same address, so it must not displace one.
     if let Some(stream) = msf.stream(dbi.symbols as usize) {
         symbols.walk(&stream);
     }
-    let (mut functions, variables) = (symbols.functions, symbols.variables);
+    let (mut functions, variables, frames) = (symbols.functions, symbols.variables, symbols.frames);
 
     rows.sort_by_key(|r| r.addr);
+    // A local addressed from the register the frame record names as the local
+    // base is at a frame offset, which is the same fact the older records
+    // state directly. Saying it both ways costs nothing and means a caller
+    // that only reads `frame_offset` sees the stack slots either way.
+    for f in &mut functions {
+        let Some(base) = frames.get(&f.low_pc).and_then(|frame| frame.local_base) else {
+            continue;
+        };
+        for local in &mut f.locals {
+            if local.frame_offset.is_some() {
+                continue;
+            }
+            let mut offsets = local.locations.iter().map(|r| match r.location {
+                Location::RegisterOffset(reg, n) if reg == base => Some(n),
+                _ => None,
+            });
+            let first = offsets.next().flatten();
+            local.frame_offset = first.filter(|n| offsets.all(|o| o == Some(*n)));
+        }
+    }
     // The declaration site is in the line table rather than on the record, so
     // it comes from the row the function starts at.
     for f in &mut functions {
@@ -1286,21 +2090,79 @@ pub fn parse(data: &[u8], sections: &[crate::Section]) -> Option<DebugInfo> {
             f.decl_file = Some(row.file.clone());
             f.decl_line = Some(row.line as u64);
         }
+        // An inlined call's own lines are in its annotation stream, but the
+        // line table proper attributes inlined code to where the outermost
+        // call was written, which is exactly the call site of a frame inlined
+        // directly into this function. It says nothing about where a nested
+        // frame was called from, so those are left unanswered.
+        for frame in &mut f.inlines {
+            let Some(at) = frame.entry_pc.filter(|_| frame.depth == 0) else {
+                continue;
+            };
+            let n = rows.partition_point(|r| r.addr <= at);
+            if let Some(row) = n
+                .checked_sub(1)
+                .and_then(|n| rows.get(n))
+                .filter(|r| !r.end)
+            {
+                frame.call_file = Some(row.file.clone());
+                frame.call_line = Some(row.line);
+                frame.call_column = Some(row.column);
+            }
+        }
     }
 
-    let mut out = DebugInfo {
+    let contributions = dbi
+        .contributions
+        .iter()
+        .filter_map(|c| {
+            let start = address(&bases, c.section, c.offset)?;
+            Some(Contribution {
+                range: AddrRange::sized(start, c.size as u64)?,
+                module: c.module,
+                characteristics: c.characteristics,
+            })
+        })
+        .collect();
+
+    let mut debug = DebugInfo {
         types,
         units: dbi.modules.len(),
         lines: rows,
         ..Default::default()
     };
     for f in functions {
-        out.functions.entry(f.low_pc).or_insert(f);
+        debug.functions.entry(f.low_pc).or_insert(f);
     }
     for v in variables {
-        out.variables.entry(v.addr).or_insert(v);
+        debug.variables.entry(v.addr).or_insert(v);
     }
-    Some(out)
+    Some(Pdb {
+        identity,
+        debug,
+        modules,
+        contributions,
+        frames,
+        machine: dbi.machine,
+        warnings,
+    })
+}
+
+/// The compiler string a module's first records carry, when it has one.
+fn producer(symbols: &[u8]) -> Option<String> {
+    for (kind, body) in records(symbols) {
+        if kind != S_COMPILE3 {
+            continue;
+        }
+        let mut r = Cur::new(body);
+        // Flags and language, the machine, then four version numbers as pairs
+        // of words, and the string behind them.
+        let _flags = r.u32()?;
+        let _machine = r.u16()?;
+        r.bytes(16)?;
+        return r.cstr();
+    }
+    None
 }
 
 /// The signature every version of the container since 7.00 starts with.
@@ -1311,6 +2173,9 @@ const STREAM_INFO: usize = 1;
 const STREAM_TPI: usize = 2;
 const STREAM_DBI: usize = 3;
 const STREAM_IPI: usize = 4;
+/// The signature a debug directory's CodeView record carries when it names a
+/// program database by GUID.
+const CODEVIEW_RSDS: &[u8] = b"RSDS";
 /// The name the line information's string table is filed under.
 const NAMES_STREAM: &str = "/names";
 const NAMES_MAGIC: u32 = 0xeffe_effe;
@@ -1324,6 +2189,10 @@ const DBG_SECTION_HEADERS: usize = 5;
 const MODULE_ENTRY: usize = 64;
 /// Bytes of one image section header.
 const SECTION_HEADER: usize = 40;
+/// How deep one scope may open another. Blocks nest a handful deep in real
+/// code and inlined calls a little more; this is only here so that a file
+/// claiming a million nested scopes cannot exhaust the stack.
+const MAX_NESTING: u32 = 64;
 /// Smallest type stream header, which is where the records begin.
 const TPI_HEADER: usize = 56;
 /// Below this a type index is one of the built-in types, not a record.
@@ -1332,6 +2201,60 @@ const FIRST_RECORD: u32 = 0x1000;
 const FORWARD_REFERENCE: u16 = 0x0080;
 /// The public symbol flag that says the address is code.
 const PUBLIC_FUNCTION: u32 = 0x0002;
+/// Bytes of one section contribution entry, before the later version's extra
+/// field.
+const CONTRIBUTION_ENTRY: usize = 28;
+/// The two versions of the section contribution substream, which differ only
+/// in the field the later one appends to each entry.
+const SECTION_CONTRIB_V1: u32 = 0xeffe_0000 + 19970605;
+const SECTION_CONTRIB_V2: u32 = 0xeffe_0000 + 20140516;
+/// Where a frame record's flag word encodes the register locals and parameters
+/// are addressed from.
+const FRAME_LOCAL_BASE_SHIFT: u32 = 14;
+const FRAME_PARAM_BASE_SHIFT: u32 = 16;
+/// In a register relative range record, the bit saying the record describes a
+/// member spilled out of an aggregate and the field giving that member's
+/// offset. Either one means the record is about part of the local rather than
+/// all of it, which nothing here can express.
+const DEFRANGE_SPILLED_MEMBER: u16 = 0xfff1;
+
+// PE machine numbers, which is how the DBI stream names the target.
+const MACHINE_AMD64: u16 = 0x8664;
+const MACHINE_ARM64: u16 = 0xaa64;
+
+// CodeView register numbers. The byte, word and doubleword names of the first
+// eight x86-64 registers are numbered in the order the 8086 numbered them, and
+// the sixty four bit names are a separate block added later.
+const CV_AMD64_AL: u16 = 1;
+const CV_AMD64_BH: u16 = 8;
+const CV_AMD64_AX: u16 = 9;
+const CV_AMD64_DI: u16 = 16;
+const CV_AMD64_EAX: u16 = 17;
+const CV_AMD64_EDI: u16 = 24;
+const CV_AMD64_RAX: u16 = 328;
+const CV_AMD64_R15: u16 = 343;
+const CV_ARM64_W0: u16 = 10;
+const CV_ARM64_W30: u16 = 40;
+const CV_ARM64_X0: u16 = 50;
+const CV_ARM64_X28: u16 = 78;
+const CV_ARM64_FP: u16 = 79;
+const CV_ARM64_LR: u16 = 80;
+const CV_ARM64_SP: u16 = 81;
+
+// Binary annotation opcodes, which describe an inlined call's extent.
+const BA_END: u32 = 0;
+const BA_CODE_OFFSET: u32 = 1;
+const BA_CHANGE_CODE_OFFSET: u32 = 3;
+const BA_CHANGE_CODE_LENGTH: u32 = 4;
+const BA_CHANGE_FILE: u32 = 5;
+const BA_CHANGE_LINE_OFFSET: u32 = 6;
+const BA_CHANGE_LINE_END_DELTA: u32 = 7;
+const BA_CHANGE_RANGE_KIND: u32 = 8;
+const BA_CHANGE_COLUMN_START: u32 = 9;
+const BA_CHANGE_COLUMN_END_DELTA: u32 = 10;
+const BA_CHANGE_CODE_OFFSET_AND_LINE_OFFSET: u32 = 11;
+const BA_CHANGE_CODE_LENGTH_AND_CODE_OFFSET: u32 = 12;
+const BA_CHANGE_COLUMN_END: u32 = 13;
 /// The lines subsection flag that says columns follow the rows.
 const LINES_HAVE_COLUMNS: u16 = 0x0001;
 
@@ -1389,6 +2312,7 @@ const LF_METHOD: u16 = 0x150f;
 const LF_NESTTYPE: u16 = 0x1510;
 const LF_ONEMETHOD: u16 = 0x1511;
 const LF_INTERFACE: u16 = 0x1519;
+const LF_TYPESERVER2: u16 = 0x1515;
 const LF_FUNC_ID: u16 = 0x1601;
 const LF_MFUNC_ID: u16 = 0x1602;
 
@@ -1414,6 +2338,18 @@ const LF_PAD: u8 = 0xf0;
 
 // Symbol records.
 const S_END: u16 = 0x0006;
+const S_FRAMEPROC: u16 = 0x1012;
+const S_CONSTANT: u16 = 0x1107;
+const S_COMPILE3: u16 = 0x113c;
+const S_LOCAL: u16 = 0x113e;
+/// The range records, which are contiguous: everything from here to
+/// `S_DEFRANGE_REGISTER_REL` says where the local in front of it lives.
+const S_DEFRANGE: u16 = 0x113f;
+const S_DEFRANGE_REGISTER: u16 = 0x1141;
+const S_DEFRANGE_FRAMEPOINTER_REL: u16 = 0x1142;
+const S_DEFRANGE_FRAMEPOINTER_REL_FULL_SCOPE: u16 = 0x1144;
+const S_DEFRANGE_REGISTER_REL: u16 = 0x1145;
+const S_INLINESITE2: u16 = 0x115d;
 const S_THUNK32: u16 = 0x1102;
 const S_BLOCK32: u16 = 0x1103;
 const S_LDATA32: u16 = 0x110c;
