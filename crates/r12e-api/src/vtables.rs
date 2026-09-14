@@ -55,12 +55,22 @@ pub fn vtables(p: &Program) -> Vec<VTable> {
         // hold a stub the object file has not resolved, and a scan that stops
         // at the first one would cut the table short.
         let slots = (symbol.size >= 24).then(|| (symbol.size as usize - 16) / 8);
-        let Some(table) = read(
+        let table = read(
             p,
             symbol.addr.wrapping_offset(16),
             Evidence::SymbolTable,
             slots,
-        ) else {
+        )
+        // A class with virtual bases has its virtual base offsets in front of
+        // the offset-to-top word, so the address its objects carry is further
+        // in than two words and the straight read finds no functions there.
+        .or_else(|| {
+            let entry = address_point(p, symbol.addr, symbol.size)?;
+            let past = symbol.addr.get() + symbol.size;
+            let slots = past.checked_sub(entry.get()).map(|n| n as usize / 8);
+            read(p, entry, Evidence::SymbolTable, slots)
+        });
+        let Some(table) = table else {
             continue;
         };
         claimed.push((table.addr.get(), extent(&table)));
@@ -171,12 +181,34 @@ fn is_code(p: &Program, at: Addr) -> bool {
             .any(|s| s.exec && s.range.contains(at))
 }
 
+/// Where a virtual table group's address point is.
+///
+/// The group a `_ZTV` symbol names is a run of sub-tables, and each is some
+/// number of virtual call and virtual base offsets followed by the
+/// offset-to-top word, the type information and the functions. Only a class
+/// with virtual bases has anything in front, so this walks forward a word at a
+/// time to the first place where two words are followed by a function.
+fn address_point(p: &Program, start: Addr, size: u64) -> Option<Addr> {
+    // A prefix of more than a few words would mean a class with dozens of
+    // virtual bases, and walking further than the symbol says is not walking
+    // inside this table any more.
+    let words = (size / 8).min(64);
+    for i in 1..words.saturating_sub(2) {
+        let at = start.wrapping_offset(i as i64 * 8);
+        if is_code(p, Addr(word(p, at.wrapping_offset(16))?)) {
+            return Some(at.wrapping_offset(16));
+        }
+    }
+    None
+}
+
 /// The class a vtable symbol names, demangled.
 fn class_of(symbol: &str) -> Option<String> {
-    // `_ZTV` followed by the mangled name of the class.
-    // The mangled name of the class follows `_ZTV`, so wrapping it in a name
-    // the demangler recognizes gives the class back.
+    // The mangled name of the class follows `_ZTV`, so putting a prefix the
+    // demangler recognizes back on it gives the class name. `_ZTI` rather
+    // than a wrapped nested name, because a class that is already nested
+    // carries its own `N...E` and wrapping that in another one is not a name.
     let inner = symbol.strip_prefix("_ZTV")?;
-    let (_, demangled) = r12e_types::demangle(&format!("_ZN{inner}E"))?;
-    Some(demangled)
+    let (_, demangled) = r12e_types::demangle(&format!("_ZTI{inner}"))?;
+    Some(demangled.strip_prefix("typeinfo for ")?.to_string())
 }

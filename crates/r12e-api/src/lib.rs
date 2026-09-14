@@ -13,6 +13,7 @@ pub mod classes;
 pub mod dataflow;
 pub mod decompile;
 pub mod emulate;
+mod msvc;
 pub mod prototypes;
 pub mod query;
 pub mod relocate;
@@ -21,7 +22,7 @@ pub mod signatures;
 pub mod vtables;
 
 pub use classes::{
-    BaseClass, Class, Classes, Member, Role, Rtti, This, TypeInfoKind, classes, classes_with,
+    Abi, BaseClass, Class, Classes, Member, Role, Rtti, This, TypeInfoKind, classes, classes_with,
 };
 pub use dataflow::{ArgumentFact, Basis, CallSite, Source, Verdict, call_sites, call_sites_in};
 pub use decompile::{

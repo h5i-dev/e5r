@@ -588,3 +588,31 @@ if [ -e fixtures/cpp/hierarchy.cpp ]; then
     done
   done
 fi
+
+# The same hierarchy in the Microsoft C++ ABI, which writes its type
+# information down in a different shape: a complete object locator before each
+# vftable, naming a type descriptor and a class hierarchy descriptor, all of it
+# in relative virtual addresses. clang targets that ABI without a Windows SDK
+# because the fixture is freestanding, and lld links a PE. `/opt:noref` keeps
+# the type information a linker would otherwise drop as unreferenced, which is
+# what a real image keeps too because the runtime reaches it through the
+# tables. Both machines, because a relative address is read the same way on
+# each and the claim is worth nothing if only one was tried.
+if [ -e fixtures/cpp/hierarchy.cpp ] && [ -n "${lld:-}" ]; then
+  for opt in O0 O2; do
+    for t in "x64:x86_64-pc-windows-msvc:x64" "a64:aarch64-pc-windows-msvc:arm64"; do
+      tag=${t%%:*}; rest=${t#*:}; triple=${rest%%:*}; machine=${rest##*:}
+      for rtti in rtti nortti; do
+        flag="-frtti"
+        [ "$rtti" = nortti ] && flag="-fno-rtti"
+        obj="$out/cpp-hierarchy.win-$tag.$opt.$rtti.obj"
+        "$xcxx" --target="$triple" -"$opt" -ffreestanding -fno-exceptions \
+          $flag -c -o "$obj" fixtures/cpp/hierarchy.cpp 2>/dev/null || continue
+        "$lld" -flavor link /machine:"$machine" /nodefaultlib /opt:noref \
+          /entry:mainCRTStartup /subsystem:console \
+          /out:"$out/cpp-hierarchy.win-$tag.$opt.$rtti.exe" "$obj" 2>/dev/null || true
+      done
+    done
+  done
+  rm -f "$out"/cpp-hierarchy.win-*.obj
+fi
