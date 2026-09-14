@@ -18,11 +18,25 @@ const MIN_COVERAGE: f64 = 0.998;
 /// x86 system binaries, so the corpus is smaller and the number is not
 /// comparable to the AArch64 one.
 const MIN_X86_COVERAGE: f64 = 0.999;
+/// The ARM32 floor, which has only the relocatable fixtures behind it: this
+/// host runs no ARM binaries, so the corpus is smaller than the AArch64 one
+/// and the number is not comparable to it.
+///
+/// Lower than the other two for one reason, which is measurable rather than
+/// arguable: every instruction this corpus decodes and the lifter does not
+/// model is VFP, and floating point is not modelled on any architecture here.
+/// These fixtures are simply full of it, where the AArch64 and x86-64 ones are
+/// not.
+const MIN_ARM_COVERAGE: f64 = 0.93;
 
 fn targets(arch: &Arch) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/build");
-    let tag = if *arch == Arch::AArch64 { "a64" } else { "x64" };
+    let tag = match arch {
+        Arch::AArch64 => "a64",
+        Arch::Arm => ".arm.",
+        _ => "x64",
+    };
     if let Ok(entries) = std::fs::read_dir(&dir) {
         for e in entries.flatten() {
             let p = e.path();
@@ -92,6 +106,11 @@ fn the_x86_lifter_models_most_of_what_the_decoder_decodes() {
     check(&Arch::X86_64, MIN_X86_COVERAGE, 2_000);
 }
 
+#[test]
+fn the_arm_lifter_models_most_of_what_the_decoder_decodes() {
+    check(&Arch::Arm, MIN_ARM_COVERAGE, 1_000);
+}
+
 fn check(arch: &Arch, floor: f64, minimum: u64) {
     let (decoded, lifted, missing) = measure(arch);
     if decoded < minimum {
@@ -123,7 +142,7 @@ fn check(arch: &Arch, floor: f64, minimum: u64) {
 #[test]
 #[ignore]
 fn lift_coverage_report() {
-    for arch in [Arch::AArch64, Arch::X86_64] {
+    for arch in [Arch::AArch64, Arch::X86_64, Arch::Arm] {
         report(&arch);
     }
 }

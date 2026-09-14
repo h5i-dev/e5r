@@ -112,7 +112,7 @@ fn narrow(b: &mut Builder, v: Varnode, size: u8) -> Varnode {
 /// Built from shifts and masks because the IR has no byte-swap operation. It
 /// is the exact computation and not an approximation, which is the only reason
 /// it belongs here at all.
-fn swap_bytes(b: &mut Builder, x: Varnode, size: u8, lane: u8) -> Varnode {
+pub(crate) fn swap_bytes(b: &mut Builder, x: Varnode, size: u8, lane: u8) -> Varnode {
     let mut out: Option<Varnode> = None;
     for byte in 0..size {
         // Where this byte lands: reversed within its own lane, and the lane
@@ -155,7 +155,7 @@ fn swap_bytes(b: &mut Builder, x: Varnode, size: u8, lane: u8) -> Varnode {
 ///
 /// Swap adjacent bits, then pairs, then nibbles, then reverse the bytes. Exact
 /// for the same reason as above.
-fn reverse_bits(b: &mut Builder, x: Varnode, size: u8) -> Varnode {
+pub(crate) fn reverse_bits(b: &mut Builder, x: Varnode, size: u8) -> Varnode {
     const PATTERNS: [(u64, u32); 3] = [
         (0x5555_5555_5555_5555, 1),
         (0x3333_3333_3333_3333, 2),

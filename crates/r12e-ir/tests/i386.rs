@@ -228,9 +228,10 @@ fn the_i386_lifter_computes_what_the_processor_computes() {
     };
     let mut checked = 0;
     for ((name, asm), want) in CASES.iter().zip(expected) {
-        let Some(bytes) = assemble(asm) else {
-            return; // no assembler or no objcopy here
-        };
+        // Not a silent skip: `on_hardware` has already built and run a
+        // program with these same cases in it, so an assembler that cannot
+        // assemble one of them now is a broken harness reporting a pass.
+        let bytes = assemble(asm).unwrap_or_else(|| panic!("{name}: did not assemble"));
         let got = interpreted(&bytes).unwrap_or_else(|| panic!("{name}: did not run"));
         assert_eq!(
             got, want,

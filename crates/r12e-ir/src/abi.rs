@@ -19,7 +19,7 @@
 
 use r12e_core::Arch;
 
-use crate::lift::{aarch64, x86};
+use crate::lift::{aarch64, arm, x86};
 use crate::op::Space;
 use crate::ssa::Location;
 
@@ -35,6 +35,9 @@ pub enum Named {
     SysV,
     /// AAPCS64, the default on AArch64 everywhere including Windows.
     Aapcs64,
+    /// AAPCS32, the default on 32-bit ARM: four integer registers and the
+    /// stack, with the return address in the link register.
+    Aapcs32,
     /// The Microsoft x64 convention: four integer registers, four vector
     /// ones, and thirty-two bytes of shadow space the caller reserves.
     Win64,
@@ -57,6 +60,7 @@ impl Named {
         match self {
             Named::SysV => "sysv",
             Named::Aapcs64 => "aapcs64",
+            Named::Aapcs32 => "aapcs32",
             Named::Win64 => "win64",
             Named::Cdecl => "cdecl",
             Named::Stdcall => "stdcall",
@@ -191,6 +195,7 @@ pub fn of(arch: &Arch) -> Abi {
     match arch {
         Arch::X86_64 => of_named(arch, Named::SysV),
         Arch::X86 => of_named(arch, Named::Cdecl),
+        Arch::Arm => of_named(arch, Named::Aapcs32),
         _ => of_named(arch, Named::Aapcs64),
     }
 }
@@ -212,6 +217,7 @@ pub fn of_named(arch: &Arch, name: Named) -> Abi {
     match name {
         Named::Win64 => win64(),
         Named::SysV if *arch == Arch::X86_64 => sysv64(),
+        Named::Aapcs32 => aapcs32(),
         Named::Cdecl | Named::Stdcall | Named::Fastcall | Named::Thiscall | Named::Vectorcall => {
             x86_32(name)
         }
@@ -289,6 +295,42 @@ fn win64() -> Abi {
 
 /// The 32-bit x86 conventions, which differ from each other only in how many
 /// registers they use and who pops.
+/// AAPCS32, the 32-bit ARM convention.
+///
+/// Four integer registers and then the stack, the result in r0 and r1, and the
+/// return address in the link register rather than on the stack -- the same
+/// shape as AAPCS64 with half the registers.
+fn aapcs32() -> Abi {
+    Abi {
+        name: Named::Aapcs32,
+        integer_arguments: (0..4).map(arm::gpr_offset).collect(),
+        // Floating point arguments go in the VFP registers under the hard
+        // float variant and in the integer ones under the soft float variant.
+        // The hard float set is named here; a soft float call still resolves,
+        // because its arguments are in the integer registers above.
+        float_arguments: (0..8).map(arm::vec_offset).collect(),
+        results: vec![arm::gpr_offset(0), arm::gpr_offset(1), arm::vec_offset(0)],
+        // r4 through r11.
+        callee_saved: (4..=11).map(arm::gpr_offset).collect(),
+        // r0 through r3, and r12, which is the intra-procedure scratch.
+        caller_saved: (0..=3)
+            .chain(std::iter::once(12))
+            .map(arm::gpr_offset)
+            .collect(),
+        stack_pointer: arm::sp_offset(),
+        vector_base: arm::vec_offset(0),
+        stack_argument_base: 0,
+        // The call leaves the return address in the link register.
+        return_address_bytes: 0,
+        callee_pops: false,
+        this_register: None,
+        // A result too large for the registers is written through a pointer
+        // the caller passes in r0, which shifts every declared argument along.
+        indirect_result: Some(arm::gpr_offset(0)),
+        varargs_count: None,
+    }
+}
+
 fn x86_32(name: Named) -> Abi {
     let integer_arguments: Vec<u64> = match name {
         // ecx, edx.

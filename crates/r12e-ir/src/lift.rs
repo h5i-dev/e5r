@@ -11,6 +11,7 @@
 //! would make a wrong answer look like a right one.
 
 pub mod aarch64;
+pub mod arm;
 pub mod neon;
 pub mod sse;
 pub mod x86;
@@ -129,6 +130,7 @@ pub fn lift(arch: &Arch, insn: &Insn) -> Lifted {
         Arch::AArch64 => aarch64::lift(insn),
         Arch::X86_64 => x86::lift(insn),
         Arch::X86 => x86::lift32(insn),
+        Arch::Arm => arm::lift(insn),
         _ => Builder::new(insn.addr).unimplemented(),
     }
 }
