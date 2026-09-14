@@ -136,6 +136,27 @@ struct Parts {
 /// this lifter does not model reaches [`Builder::unimplemented`] rather than
 /// being guessed at.
 fn parts(mnemonic: &str) -> Option<Parts> {
+    // Thumb spells the wide and narrow encodings of one instruction `add.w`
+    // and `add.n`. Which encoding it is changes nothing this lifter models --
+    // the operands say the rest -- so the qualifier comes off first.
+    let mnemonic = mnemonic
+        .strip_suffix(".w")
+        .or_else(|| mnemonic.strip_suffix(".n"))
+        .unwrap_or(mnemonic);
+    // `it` through `itttt`: the letters after the first two say how many of
+    // the instructions that follow run under the condition and how many under
+    // its inverse, and there are fifteen spellings. The shape is the rule, so
+    // it is written as the rule rather than as fifteen table entries.
+    if let Some(rest) = mnemonic.strip_prefix("it")
+        && rest.len() < 4
+        && rest.bytes().all(|b| b == b't' || b == b'e')
+    {
+        return Some(Parts {
+            base: "it",
+            flags: false,
+            cond: 14,
+        });
+    }
     // Every candidate split, unconditional first so `teq` is `teq` and not
     // `t` + `eq`.
     for (cond, tail) in
@@ -563,7 +584,12 @@ pub fn lift_mode(i: &Insn, thumb: bool) -> Lifted {
     }
 
     match p.base {
+        // `it` says how the next few instructions are conditional and does
+        // nothing else. The decoder has already folded that into each of their
+        // mnemonics, which is where this lifter reads it, so there is nothing
+        // left for the instruction itself to do.
         "nop" => b.finish(true),
+        "it" => b.finish(true),
         "push" | "pop" => stack_multiple(b, &p, ops),
         m if m.starts_with("ldm") || m.starts_with("stm") => block_transfer(b, &p, ops),
         "add" | "sub" | "rsb" | "adc" | "sbc" | "rsc" | "and" | "eor" | "orr" | "orn" | "bic"
@@ -583,10 +609,19 @@ pub fn lift_mode(i: &Insn, thumb: bool) -> Lifted {
 
 /// `add`, `sub` and the rest of the two-source data-processing forms.
 fn arithmetic(mut b: Builder, p: &Parts, ops: &[Operand]) -> Lifted {
-    let (Some(dest), Some(x), Some(y)) = (
-        ops.first().and_then(writable),
-        ops.get(1).and_then(|o| source(&mut b, o)),
-        ops.get(2).and_then(|o| source(&mut b, o)),
+    let Some(dest) = ops.first().and_then(writable) else {
+        return b.unimplemented();
+    };
+    // Thumb's narrow encodings write back into the first source and name it
+    // once: `adds r0, r1` is `r0 = r0 + r1`. A32 always names three.
+    let (first, second) = match ops.len() {
+        0 | 1 => return b.unimplemented(),
+        2 => (ops.first(), ops.get(1)),
+        _ => (ops.get(1), ops.get(2)),
+    };
+    let (Some(x), Some(y)) = (
+        first.and_then(|o| source(&mut b, o)),
+        second.and_then(|o| source(&mut b, o)),
     ) else {
         return b.unimplemented();
     };
@@ -649,7 +684,10 @@ fn moves(mut b: Builder, p: &Parts, ops: &[Operand]) -> Lifted {
     };
     let (value, carry) = match p.base {
         "lsl" | "lsr" | "asr" | "ror" => {
-            let Some((x, _)) = ops.get(1).and_then(|o| source(&mut b, o)) else {
+            // Thumb's narrow encoding shifts the destination in place and
+            // names it once: `rors r0, r1` is `r0 = r0 ror r1`.
+            let (value_at, amount_at) = if ops.len() > 2 { (1, 2) } else { (0, 1) };
+            let Some((x, _)) = ops.get(value_at).and_then(|o| source(&mut b, o)) else {
                 return b.unimplemented();
             };
             let sh = match p.base {
@@ -658,20 +696,21 @@ fn moves(mut b: Builder, p: &Parts, ops: &[Operand]) -> Lifted {
                 "asr" => Shift::Asr,
                 _ => Shift::Ror,
             };
-            match ops.get(2).and_then(shift_amount) {
+            match ops.get(amount_at).and_then(shift_amount) {
                 Some(amount) => shifter(&mut b, x, sh, amount),
                 // A shift by a register. The amount is the low byte of it, and
                 // an amount of 32 or more gives zero for the logical shifts
                 // and the sign for the arithmetic one -- a rule the IR's shift
-                // does not have, so it is written as the mask it is. The carry
-                // the shifter leaves depends on the amount and is not modelled,
-                // so the flag-setting form is declined.
-                None if p.flags => return b.unimplemented(),
+                // does not have, so it is written as the mask it is.
                 None => {
-                    let Some((rs, _)) = ops.get(2).and_then(|o| source(&mut b, o)) else {
+                    let Some((rs, _)) = ops.get(amount_at).and_then(|o| source(&mut b, o)) else {
                         return b.unimplemented();
                     };
-                    (register_shift(&mut b, x, sh, rs), None)
+                    let value = register_shift(&mut b, x, sh, rs);
+                    let carry = p
+                        .flags
+                        .then(|| register_shift_carry(&mut b, x, value, sh, rs));
+                    (value, carry)
                 }
             }
         }
@@ -735,6 +774,56 @@ fn register_shift(b: &mut Builder, x: Varnode, sh: Shift, rs: Varnode) -> Varnod
         return value;
     }
     select(b, wide, Varnode::constant(0, 4), value, 4)
+}
+
+/// The carry a shift by a register leaves.
+///
+/// The bit that left the register last, which is at a position the amount
+/// decides, so it is computed rather than selected from a table. An amount of
+/// zero leaves the flag alone, which is the one case with no bit to report.
+fn register_shift_carry(
+    b: &mut Builder,
+    x: Varnode,
+    value: Varnode,
+    sh: Shift,
+    rs: Varnode,
+) -> Varnode {
+    let amount = b.eval(Op::IntAnd, 4, &[rs, Varnode::constant(0xff, 4)]);
+    let zero = b.eval(Op::IntEqual, 1, &[amount, Varnode::constant(0, 4)]);
+    if sh == Shift::Ror {
+        // A rotate keeps every bit, so the last one out is the top one in.
+        let top = b.eval(Op::IntRight, 4, &[value, Varnode::constant(31, 1)]);
+        let bit = b.eval(Op::IntNotEqual, 1, &[top, Varnode::constant(0, 4)]);
+        return select(b, zero, flag_c(), bit, 1);
+    }
+    // `lsl` pushes bit 32-n out of the top; the right shifts push bit n-1 out
+    // of the bottom. Past the width the logical shifts have pushed everything
+    // out and leave zero, and the arithmetic one leaves the sign.
+    let wide = b.eval(Op::IntLessEqual, 1, &[Varnode::constant(32, 4), amount]);
+    let at = match sh {
+        Shift::Lsl => b.eval(Op::IntSub, 4, &[Varnode::constant(32, 4), amount]),
+        _ => b.eval(Op::IntSub, 4, &[amount, Varnode::constant(1, 4)]),
+    };
+    let at = select(b, wide, Varnode::constant(31, 4), at, 4);
+    let shifted = b.eval(
+        if sh == Shift::Asr {
+            Op::IntSRight
+        } else {
+            Op::IntRight
+        },
+        4,
+        &[x, at],
+    );
+    let bit = b.eval(Op::IntAnd, 4, &[shifted, Varnode::constant(1, 4)]);
+    let bit = b.eval(Op::IntNotEqual, 1, &[bit, Varnode::constant(0, 4)]);
+    let past = if sh == Shift::Asr {
+        // The sign, which is what an arithmetic shift keeps producing.
+        bit
+    } else {
+        Varnode::constant(0, 1)
+    };
+    let bit = select(b, wide, past, bit, 1);
+    select(b, zero, flag_c(), bit, 1)
 }
 
 /// A shift amount, which is a count and not a register.

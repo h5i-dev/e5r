@@ -305,6 +305,9 @@ pub fn load(data: &[u8], opts: &LoadOptions) -> Result<Object> {
         });
     }
 
+    resolve_arm_mode(&mut obj, arm_profile(&r, &shdrs, shstr.as_ref()));
+    read_arm_vectors(&mut obj);
+
     // What a language's own runtime needs to find at run time: Go's function
     // table names every function in a stripped binary, which no other evidence
     // in the file does.
@@ -322,6 +325,224 @@ fn type_name(t: u16) -> &'static str {
         ET_DYN => "shared object or PIE",
         ET_CORE => "core dump",
         _ => "unknown",
+    }
+}
+
+/// Function entries read out of a Cortex-M vector table.
+///
+/// An M-profile image begins with a table of exception handlers: the initial
+/// stack pointer, then the reset handler, then one word per exception. Every
+/// handler is a Thumb address and so has its low bit set, and in a stripped
+/// firmware image nothing else says where any of them are -- `e_entry` often
+/// points into a library routine rather than at the reset handler, and there
+/// are no symbols. These are the roots the whole program hangs off.
+///
+/// A word is taken only when its low bit is set and it points inside
+/// executable memory, which the initial stack pointer and an unused slot both
+/// fail. The table is read from the lowest mapped address, which is where the
+/// architecture puts it out of reset.
+fn read_arm_vectors(obj: &mut Object) {
+    /// Cortex-M has sixteen system exceptions and up to 240 external ones.
+    const MAX_ENTRIES: u64 = 256;
+    if obj.arch != Arch::Thumb {
+        return;
+    }
+    let Some(bounds) = obj.memory.bounds() else {
+        return;
+    };
+    let executable: Vec<_> = obj
+        .memory
+        .segments()
+        .iter()
+        .filter(|s| s.perms.exec)
+        .map(|s| s.range)
+        .collect();
+    if executable.is_empty() {
+        return;
+    }
+    let base = bounds.start();
+    let mut found = Vec::new();
+    for n in 1..MAX_ENTRIES {
+        let Some(at) = base.get().checked_add(n * 4).map(Addr) else {
+            break;
+        };
+        let Ok(word) = obj
+            .memory
+            .read_ptr(at, 4, obj.endian == r12e_core::Endian::Little)
+        else {
+            break;
+        };
+        if word & 1 == 0 {
+            continue;
+        }
+        let target = Addr(word & !1);
+        if executable.iter().any(|r| r.contains(target)) {
+            found.push(target);
+        }
+    }
+    found.sort();
+    found.dedup();
+    for addr in found {
+        obj.function_hints.push(FunctionHint {
+            addr,
+            size: None,
+            name: None,
+            provenance: Provenance::new(Evidence::EntryPoint),
+        });
+    }
+}
+
+/// The CPU architecture profile an `.ARM.attributes` section declares.
+///
+/// `Tag_CPU_arch_profile` is `'M'` for the microcontroller profile, whose
+/// processors execute T32 and have no A32 at all. That is a stronger statement
+/// than any address's low bit, and it is what says so in a Cortex-M image whose
+/// entry point was written without its Thumb bit -- which is most of them.
+///
+/// The section is a version byte, then subsections of a four-byte length, a
+/// vendor name and a body. The `aeabi` vendor's body is a sequence of tagged
+/// blocks, of which tag 1 holds the file attributes: pairs of ULEB128 tag and
+/// value. Everything here is bounds-checked and anything unexpected gives
+/// `None` rather than a guess.
+fn arm_profile(r: &Reader<'_>, shdrs: &[SecHdr], names: Option<&Reader<'_>>) -> Option<u8> {
+    const SHT_ARM_ATTRIBUTES: u32 = 0x7000_0003;
+    let sh = shdrs.iter().find(|s| {
+        s.kind == SHT_ARM_ATTRIBUTES
+            || names.is_some_and(|n| {
+                n.cstr_at("section name", s.name_off as u64, 32)
+                    .is_ok_and(|name| name == b".ARM.attributes")
+            })
+    })?;
+    let body = r.bytes_at("arm attributes", sh.offset, sh.size).ok()?;
+    let (first, rest) = body.split_first()?;
+    if *first != b'A' {
+        return None;
+    }
+    // One subsection. Its length counts the four bytes it is written in, and
+    // is measured from them rather than from the version byte above.
+    let len = u32::from_le_bytes(rest.get(..4)?.try_into().ok()?) as usize;
+    let sub = rest.get(..len)?.get(4..)?;
+    let vendor_end = sub.iter().position(|b| *b == 0)?;
+    if &sub[..vendor_end] != b"aeabi" {
+        return None;
+    }
+    let mut at = vendor_end + 1;
+    // The tagged blocks. Tag 1 is the file attributes, which is the only one
+    // that carries the profile.
+    while at + 5 <= sub.len() {
+        let tag = sub[at];
+        let size = u32::from_le_bytes(sub.get(at + 1..at + 5)?.try_into().ok()?) as usize;
+        if size < 5 || at + size > sub.len() {
+            return None;
+        }
+        if tag == 1 {
+            return file_attribute(&sub[at + 5..at + size], 7);
+        }
+        at += size;
+    }
+    None
+}
+
+/// The value of one file attribute, read out of a run of ULEB128 pairs.
+///
+/// Every tag before the one asked for has to be stepped over, and stepping
+/// over one means knowing whether its value is a number or a string, which the
+/// tag decides. The two string-valued tags below 32 are named; above 32 the
+/// low bit of the tag says which, as the ABI specifies.
+fn file_attribute(mut body: &[u8], want: u64) -> Option<u8> {
+    fn uleb(b: &mut &[u8]) -> Option<u64> {
+        let (mut out, mut shift) = (0u64, 0u32);
+        loop {
+            let (byte, rest) = b.split_first()?;
+            *b = rest;
+            out |= u64::from(byte & 0x7f).checked_shl(shift)?;
+            if byte & 0x80 == 0 {
+                return Some(out);
+            }
+            shift += 7;
+            if shift >= 64 {
+                return None;
+            }
+        }
+    }
+    while !body.is_empty() {
+        let tag = uleb(&mut body)?;
+        let string = tag == 4 || tag == 5 || tag == 67 || (tag > 32 && tag % 2 == 1);
+        if string {
+            let end = body.iter().position(|b| *b == 0)?;
+            body = body.get(end + 1..)?;
+            continue;
+        }
+        let value = uleb(&mut body)?;
+        if tag == want {
+            return u8::try_from(value).ok();
+        }
+    }
+    None
+}
+
+/// Which instruction set an ARM image holds, and the bit that said so.
+///
+/// On ARM the low bit of a code address is not part of the address: it is what
+/// `bx` reads to decide which instruction set to switch to. A function symbol
+/// or an entry point with that bit set is Thumb, and the address itself is the
+/// value with the bit cleared -- leaving it on puts every function one byte
+/// past where it starts and decodes the file from the wrong offset.
+///
+/// The bytes never say which set an address holds, so something has to. What
+/// says it here is those bits: an image whose code addresses are mostly odd is
+/// Thumb, which is every Cortex-M image and every Thumb-compiled object. An
+/// image that genuinely mixes the two in one file gets whichever its majority
+/// is, and the minority decodes wrongly; separating those needs the `$a` and
+/// `$t` mapping symbols, which a stripped image does not have.
+fn resolve_arm_mode(obj: &mut Object, profile: Option<u8>) {
+    if obj.arch != Arch::Arm {
+        return;
+    }
+    let mut thumb = 0usize;
+    let mut total = 0usize;
+    let mut count = |addr: Addr| {
+        total += 1;
+        if addr.get() & 1 == 1 {
+            thumb += 1;
+        }
+    };
+    if let Some(entry) = obj.entry {
+        count(entry);
+    }
+    for s in &obj.symbols {
+        if s.kind == SymbolKind::Function && s.addr != Addr::ZERO {
+            count(s.addr);
+        }
+    }
+    if total == 0 {
+        return;
+    }
+    let strip = |a: Addr| Addr(a.get() & !1);
+    if let Some(entry) = obj.entry {
+        obj.entry = Some(strip(entry));
+    }
+    for s in &mut obj.symbols {
+        if s.kind == SymbolKind::Function {
+            s.addr = strip(s.addr);
+        }
+    }
+    for h in &mut obj.function_hints {
+        h.addr = strip(h.addr);
+    }
+    // The profile outranks the bits: an M-profile processor has no A32 to
+    // switch to, so an even entry point in one of its images is a linker that
+    // wrote the address without the bit rather than an A32 function.
+    let m_profile = profile == Some(b'M');
+    if m_profile || thumb * 2 > total {
+        obj.arch = Arch::Thumb;
+        obj.metadata.insert("arm.mode".into(), "thumb".into());
+    } else {
+        obj.metadata.insert("arm.mode".into(), "a32".into());
+    }
+    if let Some(p) = profile {
+        obj.metadata
+            .insert("arm.profile".into(), (p as char).to_string());
     }
 }
 
@@ -1180,7 +1401,7 @@ fn plt_layout(arch: &Arch) -> (u64, u64) {
     match arch {
         Arch::AArch64 => (32, 16),
         Arch::X86_64 | Arch::X86 => (16, 16),
-        Arch::Arm => (20, 12),
+        Arch::Arm | Arch::Thumb => (20, 12),
         _ => (16, 16),
     }
 }

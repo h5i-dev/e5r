@@ -195,7 +195,7 @@ pub fn of(arch: &Arch) -> Abi {
     match arch {
         Arch::X86_64 => of_named(arch, Named::SysV),
         Arch::X86 => of_named(arch, Named::Cdecl),
-        Arch::Arm => of_named(arch, Named::Aapcs32),
+        Arch::Arm | Arch::Thumb => of_named(arch, Named::Aapcs32),
         _ => of_named(arch, Named::Aapcs64),
     }
 }

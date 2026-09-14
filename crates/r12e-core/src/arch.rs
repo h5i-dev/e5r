@@ -62,8 +62,15 @@ pub enum Arch {
     X86,
     /// 64-bit x86, the `amd64` / `x86-64` naming both appear in the wild.
     X86_64,
-    /// 32-bit ARM, A32 and T32.
+    /// 32-bit ARM in the A32 instruction set, whose instructions are one
+    /// aligned word.
     Arm,
+    /// 32-bit ARM in the T32 instruction set: the same registers and the same
+    /// calling convention, and instructions of two or four bytes. A separate
+    /// variant rather than a flag because the bytes never say which set an
+    /// address holds, exactly as x86's two modes need telling apart, and a
+    /// decoder that guesses produces plausible nonsense rather than nothing.
+    Thumb,
     /// 64-bit ARM, A64.
     AArch64,
     /// Decoded by a SLEIGH language rather than by a hand-written decoder.
@@ -76,7 +83,7 @@ impl Arch {
     /// The width this architecture's pointers have by default.
     pub fn bits(&self) -> Bits {
         match self {
-            Arch::X86 | Arch::Arm => Bits::Bits32,
+            Arch::X86 | Arch::Arm | Arch::Thumb => Bits::Bits32,
             Arch::X86_64 | Arch::AArch64 => Bits::Bits64,
             Arch::Sleigh(_) | Arch::Unknown(_) => Bits::Bits64,
         }
@@ -84,14 +91,18 @@ impl Arch {
 
     /// True when r12e has a native decoder for this architecture.
     pub fn has_native_decoder(&self) -> bool {
-        matches!(self, Arch::X86 | Arch::X86_64 | Arch::AArch64)
+        matches!(
+            self,
+            Arch::X86 | Arch::X86_64 | Arch::AArch64 | Arch::Arm | Arch::Thumb
+        )
     }
 
     /// Instruction alignment. One byte is what makes x86 sweep ambiguous.
     pub fn insn_alignment(&self) -> u64 {
         match self {
             Arch::X86 | Arch::X86_64 => 1,
-            Arch::Arm => 2,
+            Arch::Arm => 4,
+            Arch::Thumb => 2,
             Arch::AArch64 => 4,
             Arch::Sleigh(_) | Arch::Unknown(_) => 1,
         }
@@ -101,7 +112,7 @@ impl Arch {
     pub fn max_insn_len(&self) -> u64 {
         match self {
             Arch::X86 | Arch::X86_64 => 15,
-            Arch::Arm => 4,
+            Arch::Arm | Arch::Thumb => 4,
             Arch::AArch64 => 4,
             Arch::Sleigh(_) | Arch::Unknown(_) => 16,
         }
@@ -113,6 +124,7 @@ impl Arch {
             Arch::X86 => "x86",
             Arch::X86_64 => "x86-64",
             Arch::Arm => "arm",
+            Arch::Thumb => "thumb",
             Arch::AArch64 => "aarch64",
             Arch::Sleigh(id) => id,
             Arch::Unknown(_) => "unknown",
@@ -137,7 +149,8 @@ impl FromStr for Arch {
         Ok(match s.to_ascii_lowercase().replace('_', "-").as_str() {
             "x86" | "i386" | "i686" | "x86-32" => Arch::X86,
             "x86-64" | "amd64" | "x64" => Arch::X86_64,
-            "arm" | "armv7" | "thumb" => Arch::Arm,
+            "arm" | "armv7" => Arch::Arm,
+            "thumb" => Arch::Thumb,
             "aarch64" | "arm64" | "armv8" => Arch::AArch64,
             other => return Err(format!("unknown architecture {other:?}")),
         })

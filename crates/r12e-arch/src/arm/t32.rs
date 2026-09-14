@@ -923,8 +923,16 @@ fn control(w: u32, cond: u32, in_it: bool, addr: Addr) -> Option<Insn> {
     let s = bit(w, 26);
     let (j1, j2) = (bit(w, 13), bit(w, 11));
     match (bit(w, 14), bit(w, 12)) {
-        (0, 0) if bits(w, 26, 23) == 0b1111 => misc_control(w, cond, addr),
         (0, 0) => {
+            // The barriers, the hints and the system register moves share this
+            // space with the conditional branch, in the rows where the field
+            // the branch reads as its condition is 1110 or 1111 and is not one.
+            // `misc_control` tests for those rows exactly, so asking it first
+            // is what distinguishes them; a conditional branch cannot match its
+            // guards, because its condition is below 1110 by construction.
+            if let Some(i) = misc_control(w, cond, addr) {
+                return Some(i);
+            }
             let c = bits(w, 25, 22);
             if c >= 0b1110 {
                 return None;

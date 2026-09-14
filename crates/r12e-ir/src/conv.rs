@@ -621,7 +621,7 @@ fn housekeeping(arch: &Arch, abi: &Abi, offset: u64) -> bool {
     }
     match arch {
         Arch::X86_64 | Arch::X86 => offset == crate::lift::x86::pc_offset(),
-        Arch::Arm => offset == crate::lift::arm::pc_offset(),
+        Arch::Arm | Arch::Thumb => offset == crate::lift::arm::pc_offset(),
         // x30 arrives with the return address under every AArch64 convention.
         Arch::AArch64 => offset == crate::lift::aarch64::gpr_offset(30),
         _ => false,

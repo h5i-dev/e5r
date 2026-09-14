@@ -28,6 +28,10 @@ pub fn decode(arch: &Arch, bytes: &[u8], addr: Addr) -> Option<Insn> {
         Arch::X86_64 => x86::decode(bytes, addr),
         Arch::X86 => x86::decode32(bytes, addr),
         Arch::Arm => arm::decode(bytes, addr),
+        // Outside an IT block, which is where a caller that hands over one
+        // address at a time always is. `arm::Thumb` walks a run and carries
+        // the state across it; this is the single-instruction view.
+        Arch::Thumb => arm::decode_thumb(bytes, addr, arm::ItState::default()).map(|(i, _)| i),
         _ => None,
     }
 }
@@ -37,7 +41,7 @@ pub fn format(arch: &Arch, i: &Insn, objdump: bool) -> String {
     match arch {
         Arch::AArch64 => aarch64::format(i, aarch64::text::Style { objdump }),
         Arch::X86_64 | Arch::X86 => x86::format(i, x86::Style::default()),
-        Arch::Arm => arm::format(i),
+        Arch::Arm | Arch::Thumb => arm::format(i),
         _ => i.mnemonic.to_string(),
     }
 }

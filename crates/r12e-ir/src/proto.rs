@@ -285,7 +285,7 @@ pub fn model_of(arch: &Arch) -> Model {
         // against a byte means.
         Arch::AArch64 => Model::lp64().with_unsigned_char(),
         Arch::X86 => Model::ilp32(),
-        Arch::Arm => Model::ilp32().with_unsigned_char(),
+        Arch::Arm | Arch::Thumb => Model::ilp32().with_unsigned_char(),
         _ => Model::lp64(),
     }
 }

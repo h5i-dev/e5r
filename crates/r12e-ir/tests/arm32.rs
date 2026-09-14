@@ -144,6 +144,63 @@ const CASES: &[(&str, &str)] = &[
     ),
 ];
 
+/// Thumb-specific cases, which A32 cannot express.
+///
+/// The narrow encodings write back into the first source and name it once, the
+/// wide ones carry a `.w`, and an IT block makes the instructions after it
+/// conditional with nothing in their own halfwords saying so -- the decoder
+/// has to carry that state from one to the next, and this is what says it does.
+const THUMB_CASES: &[(&str, &str)] = &[
+    (
+        "two_operand_add",
+        "movs r0, #10\n movs r1, #7\n adds r0, r1\n",
+    ),
+    (
+        "two_operand_sub",
+        "movs r0, #10\n movs r1, #7\n subs r0, r1\n",
+    ),
+    (
+        "two_operand_shift",
+        "movs r0, #1\n movs r1, #4\n lsls r0, r1\n",
+    ),
+    (
+        "two_operand_ror",
+        "ldr r0, =0x12345678\n movs r1, #4\n rors r0, r1\n",
+    ),
+    ("wide_add", "movs r1, #5\n add.w r0, r1, #0x1000\n"),
+    (
+        "wide_load",
+        "sub sp, #16\n ldr r1, =0xcafe\n str.w r1, [sp, #4]\n ldr.w r0, [sp, #4]\n add sp, #16\n",
+    ),
+    // An IT block: the instructions after it are conditional and their own
+    // halfwords do not say so.
+    (
+        "it_taken",
+        "movs r0, #1\n cmp r0, #1\n itt eq\n moveq r0, #0x33\n addeq r0, #1\n",
+    ),
+    (
+        "it_skipped",
+        "movs r0, #1\n cmp r0, #2\n itt eq\n moveq r0, #0x33\n addeq r0, #1\n",
+    ),
+    (
+        "it_else",
+        "movs r0, #1\n cmp r0, #2\n ite eq\n moveq r0, #0x44\n movne r0, #0x55\n",
+    ),
+    (
+        "it_four",
+        "movs r0, #0\n cmp r0, #0\n itttt eq\n addeq r0, #1\n addeq r0, #2\n addeq r0, #4\n addeq r0, #8\n",
+    ),
+    // cbz and cbnz, which exist only in Thumb.
+    (
+        "cbz_taken",
+        "movs r0, #0\n cbz r0, 1f\n movs r0, #0x99\n1:\n",
+    ),
+    (
+        "cbnz_taken",
+        "movs r0, #7\n cbnz r0, 1f\n movs r0, #0x99\n1:\n",
+    ),
+];
+
 fn tool(name: &str) -> Option<String> {
     Command::new(name)
         .arg("--version")
@@ -154,7 +211,7 @@ fn tool(name: &str) -> Option<String> {
 }
 
 /// Run every case on a processor and hand back the `r0` each one leaves.
-fn on_hardware() -> Option<Vec<u32>> {
+fn on_hardware(cases: &[(&str, &str)], thumb: bool) -> Option<Vec<u32>> {
     let cc = tool("clang")?;
     let qemu = tool("qemu-arm").or_else(|| tool("qemu-arm-static"))?;
     // A test runs with its crate as the working directory, not the workspace.
@@ -162,7 +219,10 @@ fn on_hardware() -> Option<Vec<u32>> {
     if !lld.join("ld.lld").exists() {
         return None; // the corpus has not been built
     }
-    let dir = std::env::temp_dir().join(format!("r12e-arm32-{}", std::process::id()));
+    // The two instruction sets are two tests and run at once, so the
+    // directory is named for the set as well as the process.
+    let set = if thumb { "t32" } else { "a32" };
+    let dir = std::env::temp_dir().join(format!("r12e-arm32-{set}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).ok()?;
     let src = dir.join("m.s");
     let bin = dir.join("m");
@@ -172,8 +232,12 @@ fn on_hardware() -> Option<Vec<u32>> {
     // through a raw `write` and the program exits with a raw `_exit`, both
     // through `svc #0` with the number in r7, which is how a 32-bit ARM
     // process reaches the kernel.
-    let mut body = String::from(".text\n.arm\n.globl _start\n_start:\n");
-    for (_, asm) in CASES {
+    let mut body = String::from(if thumb {
+        ".text\n.thumb\n.syntax unified\n.globl _start\n.thumb_func\n_start:\n"
+    } else {
+        ".text\n.arm\n.globl _start\n_start:\n"
+    });
+    for (_, asm) in cases {
         body.push_str(asm);
         body.push_str("  ldr r4, =out\n  str r0, [r4]\n");
         body.push_str("  mov r7, #4\n  mov r0, #1\n  mov r1, r4\n  mov r2, #4\n  svc #0\n");
@@ -208,7 +272,7 @@ fn on_hardware() -> Option<Vec<u32>> {
     let ran = Command::new(&qemu).arg(&bin).output().ok()?;
     let _ = std::fs::remove_dir_all(&dir);
     let raw = ran.stdout;
-    if raw.len() != CASES.len() * 4 {
+    if raw.len() != cases.len() * 4 {
         return None;
     }
     Some(
@@ -220,20 +284,22 @@ fn on_hardware() -> Option<Vec<u32>> {
 
 /// Assemble one case, with its literal pool, and hand back the bytes and where
 /// in them the instructions stop.
-fn assemble(text: &str) -> Option<(Vec<u8>, usize)> {
+fn assemble(text: &str, thumb: bool) -> Option<(Vec<u8>, usize)> {
     let cc = tool("clang")?;
-    let dir = std::env::temp_dir().join(format!("r12e-arm32asm-{}", std::process::id()));
+    let set = if thumb { "t32" } else { "a32" };
+    let dir = std::env::temp_dir().join(format!("r12e-arm32asm-{set}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).ok()?;
     let src = dir.join("a.s");
     let obj = dir.join("a.o");
     let bin = dir.join("a.bin");
     // A marker instruction after the case, so the interpreter knows where to
     // stop without having to tell an instruction from a literal.
-    std::fs::write(
-        &src,
-        format!(".text\n.arm\n{text}\n  udf #0xdead\n  .ltorg\n"),
-    )
-    .ok()?;
+    let head = if thumb {
+        ".text\n.thumb\n.syntax unified\n"
+    } else {
+        ".text\n.arm\n"
+    };
+    std::fs::write(&src, format!("{head}{text}\n  udf.w #0xdead\n  .ltorg\n")).ok()?;
     let ok = Command::new(&cc)
         .args([
             "--target=arm-unknown-linux-gnueabi",
@@ -266,11 +332,14 @@ fn assemble(text: &str) -> Option<(Vec<u8>, usize)> {
     }
     let out = std::fs::read(&bin).ok()?;
     let _ = std::fs::remove_dir_all(&dir);
-    // The marker: `udf #0xdead` assembles to e7fdeafd on A32.
-    let end = out
-        .chunks_exact(4)
-        .position(|w| w == [0xfd, 0xea, 0xfd, 0xe7])?
-        * 4;
+    // The marker: the wide `udf` is e7fdeafd on A32 and f7ff addead on Thumb,
+    // both four bytes and neither a shape a case ends with.
+    let want: [u8; 4] = if thumb {
+        [0xfd, 0xf7, 0xad, 0xae]
+    } else {
+        [0xfd, 0xea, 0xfd, 0xe7]
+    };
+    let end = out.windows(4).position(|w| w == want)?;
     Some((out, end))
 }
 
@@ -278,48 +347,81 @@ fn assemble(text: &str) -> Option<(Vec<u8>, usize)> {
 ///
 /// The image is placed where the assembler put it so a pc-relative literal
 /// load reads the pool that follows the instructions.
-fn interpreted(bytes: &[u8], end: usize) -> Option<u32> {
+fn interpreted(bytes: &[u8], end: usize, thumb: bool) -> Option<u32> {
     const BASE: u64 = 0x1000;
     let mut m = Machine::new();
     m.set_reg(lift::arm::sp_offset(), 4, STACK);
     m.write_mem(BASE, bytes);
     let mut at = 0usize;
+    // Thumb's IT block predicates the instructions after it, and the state has
+    // to be carried from one decode to the next exactly as the analysis does.
+    let mut it = r12e_arch::arm::ItState::default();
     while at < end {
-        let insn = r12e_arch::arm::decode(&bytes[at..], Addr(BASE + at as u64))?;
-        let lifted = lift::arm::lift(&insn);
+        let arch = if thumb { Arch::Thumb } else { Arch::Arm };
+        let insn = if thumb {
+            let (i, next) = r12e_arch::arm::decode_thumb(&bytes[at..], Addr(BASE + at as u64), it)?;
+            it = next;
+            i
+        } else {
+            r12e_arch::arm::decode(&bytes[at..], Addr(BASE + at as u64))?
+        };
+        let lifted = lift::arm::lift_mode(&insn, thumb);
         assert!(
             lifted.complete,
             "{} is not modelled",
-            r12e_arch::format(&Arch::Arm, &insn, false)
+            r12e_arch::format(&arch, &insn, false)
         );
+        // A case may branch over an instruction, which `cbz` exists to do, so
+        // a jump inside the run is followed rather than treated as the end.
+        // An IT block does not branch: the decoder folds its condition into
+        // the instructions after it, which is the state carried above.
+        let mut jumped = None;
         for op in &lifted.ops {
-            if !matches!(step(&mut m, op), Step::Next) {
-                return None;
+            match step(&mut m, op) {
+                Step::Next => {}
+                Step::Jump(to) => {
+                    jumped = Some(usize::try_from(to.get().checked_sub(BASE)?).ok()?);
+                    break;
+                }
+                _ => return None,
             }
         }
-        at += insn.len as usize;
+        at = match jumped {
+            Some(to) => to,
+            None => at + insn.len as usize,
+        };
     }
     Some(m.reg(lift::arm::gpr_offset(0), 4) as u32)
 }
 
 #[test]
 fn the_arm32_lifter_computes_what_the_processor_computes() {
-    let Some(expected) = on_hardware() else {
+    check(CASES, false, "A32");
+}
+
+#[test]
+fn the_thumb_lifter_computes_what_the_processor_computes() {
+    check(THUMB_CASES, true, "Thumb");
+}
+
+fn check(cases: &[(&str, &str)], thumb: bool, what: &str) {
+    let Some(expected) = on_hardware(cases, thumb) else {
         return; // no clang, no qemu-arm, or the corpus has not been built
     };
     let mut checked = 0;
-    for ((name, asm), want) in CASES.iter().zip(expected) {
+    for ((name, asm), want) in cases.iter().zip(expected) {
         // Not a silent skip: `on_hardware` has already built and run a
         // program with these same cases in it, so an assembler that cannot
         // assemble one of them now is a broken harness reporting a pass.
-        let (bytes, end) = assemble(asm).unwrap_or_else(|| panic!("{name}: did not assemble"));
-        let got = interpreted(&bytes, end).unwrap_or_else(|| panic!("{name}: did not run"));
+        let (bytes, end) =
+            assemble(asm, thumb).unwrap_or_else(|| panic!("{name}: did not assemble"));
+        let got = interpreted(&bytes, end, thumb).unwrap_or_else(|| panic!("{name}: did not run"));
         assert_eq!(
             got, want,
             "{name}: the processor says {want:#x}, the lifter says {got:#x}"
         );
         checked += 1;
     }
-    assert_eq!(checked, CASES.len());
-    eprintln!("{checked} ARM32 case(s) agree with the processor");
+    assert_eq!(checked, cases.len());
+    eprintln!("{checked} {what} case(s) agree with the processor");
 }

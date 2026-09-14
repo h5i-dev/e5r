@@ -130,7 +130,8 @@ pub fn lift(arch: &Arch, insn: &Insn) -> Lifted {
         Arch::AArch64 => aarch64::lift(insn),
         Arch::X86_64 => x86::lift(insn),
         Arch::X86 => x86::lift32(insn),
-        Arch::Arm => arm::lift(insn),
+        Arch::Arm => arm::lift_mode(insn, false),
+        Arch::Thumb => arm::lift_mode(insn, true),
         _ => Builder::new(insn.addr).unimplemented(),
     }
 }

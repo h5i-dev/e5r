@@ -35,6 +35,7 @@ fn targets(arch: &Arch) -> Vec<PathBuf> {
     let tag = match arch {
         Arch::AArch64 => "a64",
         Arch::Arm => ".arm.",
+        Arch::Thumb => ".thumb.",
         _ => "x64",
     };
     if let Ok(entries) = std::fs::read_dir(&dir) {
@@ -111,6 +112,11 @@ fn the_arm_lifter_models_most_of_what_the_decoder_decodes() {
     check(&Arch::Arm, MIN_ARM_COVERAGE, 1_000);
 }
 
+#[test]
+fn the_thumb_lifter_models_most_of_what_the_decoder_decodes() {
+    check(&Arch::Thumb, MIN_ARM_COVERAGE, 1_000);
+}
+
 fn check(arch: &Arch, floor: f64, minimum: u64) {
     let (decoded, lifted, missing) = measure(arch);
     if decoded < minimum {
@@ -142,7 +148,7 @@ fn check(arch: &Arch, floor: f64, minimum: u64) {
 #[test]
 #[ignore]
 fn lift_coverage_report() {
-    for arch in [Arch::AArch64, Arch::X86_64, Arch::Arm] {
+    for arch in [Arch::AArch64, Arch::X86_64, Arch::Arm, Arch::Thumb] {
         report(&arch);
     }
 }

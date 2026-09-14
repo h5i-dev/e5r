@@ -363,3 +363,34 @@ fn arm_parity_report() {
         println!("{n:>6}  {k}");
     }
 }
+
+/// The barriers, which share their encoding space with the branches.
+///
+/// `dsb`, `dmb` and `isb` sit in the rows of the branch-and-miscellaneous
+/// space where the field a conditional branch reads as its condition is 1110
+/// or 1111 and is not one. A dispatch that tests the wrong bits sends them to
+/// the branch decoder, which rejects them, and every function containing one
+/// then stops at it: firmware is full of them and a Cortex-M image lost its
+/// whole reset path to this.
+#[test]
+fn the_thumb_barriers_decode() {
+    for (bytes, want) in [
+        ([0xbfu8, 0xf3, 0x4f, 0x8f], "dsb"),
+        ([0xbf, 0xf3, 0x5f, 0x8f], "dmb"),
+        ([0xbf, 0xf3, 0x6f, 0x8f], "isb"),
+    ] {
+        let (i, _) = arm::decode_thumb(&bytes, Addr(0x1000), ItState::default())
+            .unwrap_or_else(|| panic!("{want} does not decode"));
+        assert_eq!(i.mnemonic, want);
+        assert_eq!(i.len, 4);
+    }
+    // And a conditional branch in the same space still decodes as one, which
+    // is the half that would pass if the barriers simply took everything.
+    let (i, _) = arm::decode_thumb(
+        &[0x00u8, 0xf0, 0x02, 0x80],
+        Addr(0x1000),
+        ItState::default(),
+    )
+    .expect("a wide conditional branch decodes");
+    assert!(i.mnemonic.starts_with('b'), "{}", i.mnemonic);
+}

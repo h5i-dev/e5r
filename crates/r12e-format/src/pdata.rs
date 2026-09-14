@@ -227,7 +227,7 @@ fn entry_size(arch: &Arch) -> Option<u64> {
         Arch::X86_64 => Some(12),
         // Both ARM forms store a start and one word of unwind data, with no
         // end address: the length is inside the unwind data.
-        Arch::AArch64 | Arch::Arm => Some(8),
+        Arch::AArch64 | Arch::Arm | Arch::Thumb => Some(8),
         _ => None,
     }
 }

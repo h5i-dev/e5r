@@ -726,9 +726,14 @@ fn scan_gaps(
     caps: &Caps,
     data: &DataMap,
 ) -> Vec<Addr> {
-    if object.arch != Arch::AArch64 {
-        return Vec::new();
-    }
+    // Two architectures whose instructions are aligned and whose prologues are
+    // a short list of encodings. x86 is not one of them: a one-byte alignment
+    // makes every offset a candidate and every candidate plausible.
+    let step = match object.arch {
+        Arch::AArch64 => 4,
+        Arch::Thumb => 2,
+        _ => return Vec::new(),
+    };
     let mem = &object.memory;
     let covered = merge_ranges(
         known
@@ -749,18 +754,18 @@ fn scan_gaps(
                 // other four do, and a function invented there is a function
                 // that does not exist.
                 if let Some(end) = data.end_of_run(at) {
-                    let past = Addr(end.get().next_multiple_of(4));
+                    let past = Addr(end.get().next_multiple_of(step));
                     at = if past > at {
                         past
                     } else {
-                        at.wrapping_offset(4)
+                        at.wrapping_offset(step as i64)
                     };
                     continue;
                 }
-                if is_prologue(mem, at) {
+                if is_prologue(mem, at, &object.arch) {
                     out.push(at);
                 }
-                at = at.wrapping_offset(4);
+                at = at.wrapping_offset(step as i64);
             }
         }
         if out.len() as u64 > caps.function_blocks {
@@ -822,7 +827,10 @@ fn gaps_in(span: AddrRange, covered: &[AddrRange]) -> Vec<AddrRange> {
 /// `stp x29, x30, [sp, #-N]!` is the frame setup, `paciasp`/`bti c` open a
 /// pointer-authenticated or branch-target-hardened function, and `sub sp, sp,
 /// #N` opens a leaf that needs stack.
-fn is_prologue(mem: &r12e_core::MemoryMap, at: Addr) -> bool {
+fn is_prologue(mem: &r12e_core::MemoryMap, at: Addr, arch: &Arch) -> bool {
+    if *arch == Arch::Thumb {
+        return is_thumb_prologue(mem, at);
+    }
     let Some(w) = mem.slice(at, 4) else {
         return false;
     };
@@ -836,6 +844,34 @@ fn is_prologue(mem: &r12e_core::MemoryMap, at: Addr) -> bool {
     // sub sp, sp, #imm.
     let sub_sp = word & 0xffc0_03ff == 0xd100_03ff;
     stp_frame || pac || bti || sub_sp
+}
+
+/// The start of a Thumb function.
+///
+/// Every non-leaf function begins by saving the link register, which is the
+/// `push` with bit 8 of its register list set, or its wide form. A leaf that
+/// only needs stack space begins by taking it. Those three cover what a
+/// compiler emits; a function that begins with anything else is found by a
+/// call to it rather than by this.
+fn is_thumb_prologue(mem: &r12e_core::MemoryMap, at: Addr) -> bool {
+    let Some(w) = mem.slice(at, 2) else {
+        return false;
+    };
+    let half = u16::from_le_bytes([w[0], w[1]]);
+    // push {..., lr}
+    if half & 0xff00 == 0xb500 {
+        return true;
+    }
+    // push.w {..., lr}: the wide encoding, whose second halfword carries the
+    // register list with the link register in bit 14.
+    let Some(w) = mem.slice(at, 4) else {
+        return false;
+    };
+    let (hi, lo) = (
+        u16::from_le_bytes([w[0], w[1]]),
+        u16::from_le_bytes([w[2], w[3]]),
+    );
+    hi == 0xe92d && lo & 0x4000 != 0
 }
 
 /// Summary counts, for reporting and for the JSON surface.

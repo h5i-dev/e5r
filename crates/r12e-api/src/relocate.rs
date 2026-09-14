@@ -160,7 +160,7 @@ fn kinds_of(arch: &Arch) -> Option<Kinds> {
             absolute: 257,
             global: 1025,
         }),
-        Arch::Arm => Some(Kinds {
+        Arch::Arm | Arch::Thumb => Some(Kinds {
             relative: 23,
             absolute: 2,
             global: 21,

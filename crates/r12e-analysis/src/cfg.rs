@@ -534,6 +534,13 @@ pub(crate) fn build_raw(
         // Kept so an indirect branch can be resolved against what led to it.
         let mut body: Vec<Insn> = Vec::new();
         let mut term = Terminator::Flow;
+        // Thumb's IT block makes the next few instructions conditional with
+        // nothing in their own halfwords saying so, so the state has to be
+        // carried from one decode to the next. It starts empty at every block:
+        // an IT block is a straight run of at most four instructions, and
+        // branching into the middle of one is unpredictable, so no block ever
+        // begins inside another's.
+        let mut it = r12e_arch::arm::ItState::default();
         let (succs, unresolved) = loop {
             if insn_budget == 0 {
                 halt = Halt::InstructionCap;
@@ -560,7 +567,7 @@ pub(crate) fn build_raw(
                 term = Terminator::Unresolved;
                 break (Vec::new(), true);
             };
-            let Some(insn) = r12e_arch::decode(arch, window, at) else {
+            let Some(insn) = decode_stateful(arch, window, at, &mut it) else {
                 halt = Halt::Undecodable;
                 term = Terminator::Unresolved;
                 break (Vec::new(), true);
@@ -821,4 +828,22 @@ pub fn instructions(mem: &MemoryMap, arch: &Arch, cfg: &Cfg) -> Vec<Insn> {
     }
     out.sort_by_key(|i| i.addr);
     out
+}
+
+/// Decode one instruction, carrying the state a run of them needs.
+///
+/// Only Thumb has any: every other instruction set this decodes is a function
+/// of its own bytes and its address.
+fn decode_stateful(
+    arch: &Arch,
+    window: &[u8],
+    at: Addr,
+    it: &mut r12e_arch::arm::ItState,
+) -> Option<Insn> {
+    if *arch == Arch::Thumb {
+        let (insn, next) = r12e_arch::arm::decode_thumb(window, at, *it)?;
+        *it = next;
+        return Some(insn);
+    }
+    r12e_arch::decode(arch, window, at)
 }
