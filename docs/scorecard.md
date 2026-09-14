@@ -35,6 +35,80 @@ for.
 rizin and Ghidra are not installed here, so the comparison the roadmap names is
 not yet made. That is a gap in the scorecard, not a result.
 
+### Against rizin
+
+`scripts/compare-tools.sh`, measured 2026-09-14 against **rizin 0.8.2-1 arm64**
+from the project's own Ubuntu repository. Both tools are given the invocation
+their own documentation recommends: `rizin -N -q -A -c aflj <file>` against
+`r12e stats <file> --json`, with the function list for scoring taken from an
+untimed `r12e funcs`. Fastest of three runs, except the two largest libraries,
+measured once because a single `rizin -A` on `libstdc++` takes over twelve
+minutes. Full method, every command, and the recall breakdown are in
+[`benchmarks.md`](benchmarks.md).
+
+| binary | r12e | rizin -A | faster by | r12e peak | rizin peak |
+| --- | --- | --- | --- | --- | --- |
+| ls | 0.02s | 0.91s | 45x | 12 MB | 35 MB |
+| objdump | 0.03s | 0.62s | 21x | 16 MB | 52 MB |
+| bash | 0.11s | 9.81s | 89x | 33 MB | 142 MB |
+| libc.so.6 | 0.14s | 12.25s | 88x | 43 MB | 153 MB |
+| libstdc++.so.6 | 0.23s | 756.84s | 3,291x | 48 MB | 239 MB |
+| libcrypto.so.3 | 0.24s | 65.55s | 273x | 53 MB | 452 MB |
+| hello.static.a64 | 0.05s | 7.13s | 143x | 17 MB | 58 MB |
+| panicky (Rust) | 0.14s | 5.12s | 37x | 56 MB | 136 MB |
+
+Three things have to be said with that table or it is not honest.
+
+**`rizin -A` runs `aaa`, which does more than r12e's analysis does.** It also
+autonames functions, recovers variables and signatures per function, and
+searches the image for values, none of which r12e produces. rizin's own `aa`,
+function recovery without those passes, is 1.3x to 54x slower than r12e rather
+than 21x to 3,291x, and that comparison is in `benchmarks.md` too.
+
+**`libstdc++` is an outlier and should not be read as a typical ratio.** rizin
+reports 18,392 functions there, of which 13,260 are at addresses in sections
+that never become executable; `aa` on the same file takes 5.55s and reports
+4,274 with none outside executable memory. Something in the passes `aaa` adds
+is scanning non-code, and most of the twelve minutes is that.
+
+**Memory points the other way from the objdump table above.** Against objdump,
+r12e uses about ten times the memory; against rizin it uses 2.4x to 8.6x less,
+on every binary measured. objdump streams and keeps nothing; r12e and rizin
+both hold a program model.
+
+Function recovery against the symbol table, on the fixtures where the oracle is
+a complete `.symtab` so recall and false positives are separable:
+
+| fixture | r12e recall | rizin recall | r12e unnamed | rizin unnamed |
+| --- | --- | --- | --- | --- |
+| hello.static.a64 | 99.6% | 96.5% | 8 | 89 |
+| hello.static.a64.stripped | 99.5% | 78.9% | 7 | 102 |
+| hello.go.stripped | 99.9% | 98.7% | 12 | 69 |
+| panicky | 100% | 99.7% | 0 | 75 |
+| cpp-hierarchy.a64.O2.rtti.stripped | 100% | 5.1% | 0 | 0 |
+
+Most of rizin's misses are boundary disagreements rather than functions it
+never found: on `bash` all 291 are its entry placed one instruction into the
+function, because aarch64 `_init` starts with a `nop`. The `cpp-hierarchy` row
+is not that. It is a stripped C++ binary whose boundaries survive stripping in
+`.eh_frame`; r12e reads those FDEs and rizin does not, so rizin is left with
+recursive descent through virtual dispatch and finds two functions.
+
+**One row goes against us.** `r12e info` on `panicky` takes 0.08s and 56 MB
+where `rz-bin -I` takes 0.02s and 19 MB, because `r12e info` parses the
+binary's 2.8 MB of DWARF to print a container header that needs none of it.
+Stripping the debug sections takes it to 0.00s and 5.4 MB.
+
+Ghidra is not in this table. Its headless analyzer does run here and
+`scripts/compare-tools.sh` includes it when `GHIDRA_INSTALL_DIR` is set; the
+function-recovery comparison against Ghidra 12.1.3 is further down this file.
+Its decompiler ships as an x86-64 binary only, so on this aarch64 host the
+comparison that would matter most cannot be made at all.
+
+The numbers above are held to a budget in `scripts/bench-budget.json`, checked
+by `scripts/check-bench-budget.py`: a ceiling that only comes down for time and
+memory, a floor that only rises for recall.
+
 ## Decoder correctness
 
 The gate is a differential comparison against an external disassembler over
@@ -348,8 +422,8 @@ threads, twice each. All 105 runs produce identical output. Green.
 
 ## What is not measured
 
-- rizin, because it is not installed here, and Ghidra's decompiler, because
-  the 12.1.3 install here ships it as an x86-64 binary and this host is arm64.
+- Ghidra's decompiler, because the 12.1.3 install here ships it as an x86-64
+  binary and this host is arm64. rizin is measured; see the speed section.
 - DecBench beyond one project, one optimization level and one architecture:
   see the DecBench section below for what was and was not run.
 - Coverage and mutation scores as numbers: the CI jobs report them, but no
