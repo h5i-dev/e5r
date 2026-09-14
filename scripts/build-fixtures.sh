@@ -788,3 +788,15 @@ if [ -e fixtures/emulate/paths.c ]; then
     fi
   done
 fi
+
+# The DecBench corpus, which is real projects rather than the C files above.
+#
+# Not built here: it fetches upstream sources over the network and takes tens of
+# minutes, which is not what `build-fixtures.sh` is for. It is a separate script
+# with its own cache outside the checkout, and the G4 boundary gate uses it when
+# it is there and the local fixtures when it is not:
+#
+#   scripts/decbench-fixtures.sh zlib bzip2 gzip   # or --all, or --list
+#   scripts/boundary-gate.sh                       # G4, both corpora
+#
+# See docs/decbench.md.

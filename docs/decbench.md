@@ -368,3 +368,44 @@ Steps 2 and 3 both send something to DecBench, and its `AGENTS.md` refuses
 end-to-end autonomous contributions: a person has to read, own and send the
 submission or the pull request. Nothing in this document has been sent
 anywhere.
+
+## The corpus as fixtures, separately from the score
+
+Everything above is DecBench grading our decompiler. The corpus itself is
+worth having for a second reason, which `ROADMAP.md` states as an M12 task:
+39 projects built at several optimization levels **with DWARF retained** is
+function-boundary ground truth that already exists, and it feeds the G4 gate
+as much as it feeds the decompiler work.
+
+`scripts/decbench-fixtures.sh` makes that corpus available without copying it
+into the checkout, and without any of the machinery `scripts/decbench.sh`
+needs. It reads each project's recipe out of the DecBench TOML and drives gcc
+itself: no virtualenv, no `decbench` package, no angr, no Joern, no JDK. The
+DecBench checkout stays read-only, which is the same rule the backend follows.
+
+```bash
+scripts/decbench-fixtures.sh --list          # the recipes the checkout has
+scripts/decbench-fixtures.sh zlib bzip2      # named projects
+scripts/decbench-fixtures.sh --all           # everything that builds here
+```
+
+Where things go: the sources, the object trees and the binaries live in
+`~/.cache/r12e/decbench` (`DECBENCH_FIXTURES` moves it). The only thing that
+lands under `fixtures/` is `fixtures/build/decbench/manifest.tsv`, a text file
+listing, per binary, the unstripped image, a stripped copy and a TSV of DWARF
+function bounds read by `readelf`. `fixtures/build/` is gitignored, so nothing
+is added to the repository.
+
+The manifest is rebuilt from the cache on every run rather than from that run,
+so asking for one more project adds to the corpus instead of replacing it, and
+deleting a cache directory removes it by itself.
+
+Recipes that need an autotools bootstrap, a sysroot or a missing dependency are
+reported and skipped; each failure names its build log under
+`~/.cache/r12e/decbench/log/`. The corpus is whatever actually builds here.
+
+What consumes it is `scripts/boundary-gate.sh`, which is G4:
+[`docs/boundaries.md`](boundaries.md) has the method and the numbers. The
+decompiler score in this document and that boundary score are independent: one
+is DecBench's metrics on our C output, the other is DWARF read by `readelf`
+against our function list, and neither borrows the other's corpus preparation.

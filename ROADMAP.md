@@ -686,8 +686,12 @@ designed before it gets coded, and the design lives in
       `#![deny(unsafe_code)]` so one audited call can opt in. There is exactly
       one exception, the memory map, and its justification is in
       [`docs/design/limits.md`](../docs/design/limits.md).
-- [ ] A no-panic gate on the loader and decoder paths, checked by fuzzing rather
-      than asserted in a README.
+- [x] A no-panic gate on every path that reads foreign bytes, 1.26 million cases
+      inside a 12-second budget so it runs every time rather than nightly. It
+      asserts three things and not one: no panic, a per-case ceiling, and that
+      the object which comes back is self-consistent. It found three defects,
+      all the same mistake of adding a number the file chose to an address
+      without checking, and all three are fixed.
 - [x] Static musl builds for Linux, both architectures, built and run: 4.4 MB
       aarch64 and 5.5 MB x86-64, no interpreter and no shared library, with
       the x86-64 one executed under qemu and the aarch64 one producing output
@@ -910,10 +914,14 @@ Four things follow for this roadmap.
 
 Tasks:
 
-- [ ] Use the DecBench dataset as part of the M0 fixture corpus. 39 projects
-      built at several optimization levels with DWARF retained is ground truth
-      that already exists, and it feeds the G4 function-boundary gate as much as
-      it feeds the decompiler work.
+- [x] Use the DecBench dataset as part of the fixture corpus, and G4 with it.
+      16 of its 39 projects build here, 592 binaries at three optimization
+      levels, outside the checkout. Boundary recall and precision are measured
+      against `readelf`'s DWARF rather than our own reader, over 95,697
+      ground-truth functions: 1.000 and 1.000 stripped, and 0.766 and 0.937
+      with `.eh_frame` removed as well, which is the number that says what the
+      analysis can do with nothing but code. See
+      [`docs/boundaries.md`](../docs/boundaries.md).
 - [x] A DecBench backend for r12e, as `scripts/decbench_r12e.py`. Out of tree,
       which DecBench's own documentation permits, so the benchmark checkout
       stays untouched. Driven by `scripts/decbench.sh`.
