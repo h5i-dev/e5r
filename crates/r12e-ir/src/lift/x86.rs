@@ -180,41 +180,42 @@ pub(crate) fn address(b: &mut Builder, m: &Mem, at: Addr) -> Option<Varnode> {
             return None;
         }
     }
+    let p = b.ptr;
     let mut addr = match m.base {
-        Some(r) if r.class == RegClass::Pc => Varnode::constant(at.get(), 8),
-        Some(r) => Varnode { size: 8, ..reg(r)? },
-        None => Varnode::constant(0, 8),
+        Some(r) if r.class == RegClass::Pc => Varnode::constant(at.get(), p),
+        Some(r) => Varnode { size: p, ..reg(r)? },
+        None => Varnode::constant(0, p),
     };
     if let Some((ix, ext, scale)) = m.index {
         let base = reg(ix)?;
         let narrow = if matches!(ext, Extend::Uxtw | Extend::Sxtw) {
             Varnode { size: 4, ..base }
         } else {
-            Varnode { size: 8, ..base }
+            Varnode { size: p, ..base }
         };
-        let widened = if narrow.size == 8 {
+        let widened = if narrow.size == p {
             narrow
         } else {
             let signed = matches!(ext, Extend::Sxtw);
-            b.eval(if signed { Op::IntSExt } else { Op::IntZExt }, 8, &[narrow])
+            b.eval(if signed { Op::IntSExt } else { Op::IntZExt }, p, &[narrow])
         };
         let scaled = if scale == 0 {
             widened
         } else {
             b.eval(
                 Op::IntLeft,
-                8,
+                p,
                 &[widened, Varnode::constant(scale as u64, 1)],
             )
         };
         addr = if m.base.is_none() {
             scaled
         } else {
-            b.eval(Op::IntAdd, 8, &[addr, scaled])
+            b.eval(Op::IntAdd, p, &[addr, scaled])
         };
     }
     if m.disp != 0 {
-        addr = b.eval(Op::IntAdd, 8, &[addr, Varnode::constant(m.disp as u64, 8)]);
+        addr = b.eval(Op::IntAdd, p, &[addr, Varnode::constant(m.disp as u64, p)]);
     }
     Some(addr)
 }
@@ -226,7 +227,7 @@ fn source(b: &mut Builder, op: &Operand, size: u8, at: Addr) -> Option<Varnode> 
         Operand::Imm(v) => Varnode::constant(*v as u64, size),
         Operand::UImm(v) => Varnode::constant(*v, size),
         Operand::Count(v) => Varnode::constant(*v as u64, size),
-        Operand::Addr(a) => Varnode::constant(a.get(), 8),
+        Operand::Addr(a) => Varnode::constant(a.get(), b.ptr),
         Operand::Mem(m) => {
             let addr = address(b, m, at)?;
             let bytes = if m.size == 0 {
@@ -416,28 +417,65 @@ fn suffix<'a>(mnemonic: &'a str, prefix: &str) -> Option<&'a str> {
         .filter(|s| !s.is_empty() && !s.contains(' '))
 }
 
-/// Push a value, which is always eight bytes in 64-bit code.
+/// Write a pointer-wide value into a register that holds one.
+///
+/// In protected mode that is four bytes of an eight-byte slot, and the rest of
+/// the slot does not exist on the machine. Zeroing it rather than leaving it
+/// makes the write a whole-register write, which is the same rule the
+/// architecture already applies to every 32-bit destination. Without it every
+/// stack adjustment reads back as `sp & 0xffffffff00000000 | ...`, which is
+/// true of the model and not of the machine.
+fn write_ptr(b: &mut Builder, offset: u64, value: Varnode) {
+    let p = b.ptr;
+    b.emit(Op::Copy, Some(Varnode::register(offset, p)), &[value]);
+    if p < 8 {
+        b.emit(
+            Op::Copy,
+            Some(Varnode::register(offset + p as u64, 8 - p)),
+            &[Varnode::constant(0, 8 - p)],
+        );
+    }
+}
+
+/// Push a value, which is one pointer wide: eight bytes in long mode, four in
+/// protected mode.
 fn push(b: &mut Builder, value: Varnode) {
-    let sp = Varnode::register(RSP, 8);
-    let lowered = b.eval(Op::IntSub, 8, &[sp, Varnode::constant(8, 8)]);
-    b.emit(Op::Copy, Some(sp), &[lowered]);
-    b.emit(Op::Store, None, &[sp, value]);
+    let p = b.ptr;
+    let sp = Varnode::register(RSP, p);
+    let lowered = b.eval(Op::IntSub, p, &[sp, Varnode::constant(p as u64, p)]);
+    write_ptr(b, RSP, lowered);
+    b.emit(Op::Store, None, &[Varnode::register(RSP, p), value]);
 }
 
 /// Pop into a varnode.
 fn pop(b: &mut Builder, size: u8) -> Varnode {
-    let sp = Varnode::register(RSP, 8);
+    let p = b.ptr;
+    let sp = Varnode::register(RSP, p);
     let value = b.eval(Op::Load, size, &[sp]);
-    let raised = b.eval(Op::IntAdd, 8, &[sp, Varnode::constant(8, 8)]);
-    b.emit(Op::Copy, Some(sp), &[raised]);
+    let raised = b.eval(Op::IntAdd, p, &[sp, Varnode::constant(p as u64, p)]);
+    write_ptr(b, RSP, raised);
     value
 }
 
 /// Lift one x86-64 instruction.
 pub fn lift(i: &Insn) -> Lifted {
-    let mut b = Builder::new(i.addr);
+    lift_sized(i, 8)
+}
+
+/// Lift one i386 instruction.
+///
+/// The same decoder and the same rules at half the pointer width. The two
+/// modes differ in what a push moves the stack by, how wide a return address
+/// is, and how wide an effective address is computed -- everything the
+/// architecture calls the operand size is already carried by the operands.
+pub fn lift32(i: &Insn) -> Lifted {
+    lift_sized(i, 4)
+}
+
+fn lift_sized(i: &Insn, ptr: u8) -> Lifted {
+    let mut b = Builder::sized(i.addr, ptr);
     let ops = i.operands();
-    let next = Varnode::constant(i.next().get(), 8);
+    let next = Varnode::constant(i.next().get(), ptr);
     let at = i.next();
 
     // A repeated string operation is a loop, not one instruction, and is not
@@ -448,7 +486,7 @@ pub fn lift(i: &Insn) -> Lifted {
 
     match i.flow {
         Flow::Branch(t) => {
-            b.emit(Op::Branch, None, &[Varnode::constant(t.get(), 8)]);
+            b.emit(Op::Branch, None, &[Varnode::constant(t.get(), ptr)]);
             return b.finish(true);
         }
         Flow::CondBranch(t) => {
@@ -458,46 +496,46 @@ pub fn lift(i: &Insn) -> Lifted {
             let Some(cond) = condition(&mut b, s) else {
                 return b.unimplemented();
             };
-            b.emit(Op::CBranch, None, &[Varnode::constant(t.get(), 8), cond]);
+            b.emit(Op::CBranch, None, &[Varnode::constant(t.get(), ptr), cond]);
             return b.finish(true);
         }
         Flow::Call(t) => {
             push(&mut b, next);
             b.emit(
                 Op::Call,
-                Some(Varnode::register(gpr_offset(0), 8)),
-                &[Varnode::constant(t.get(), 8)],
+                Some(Varnode::register(gpr_offset(0), ptr)),
+                &[Varnode::constant(t.get(), ptr)],
             );
             clobber(&mut b);
             return b.finish(true);
         }
         Flow::IndirectCall => {
-            let Some(target) = ops.first().and_then(|o| source(&mut b, o, 8, at)) else {
+            let Some(target) = ops.first().and_then(|o| source(&mut b, o, ptr, at)) else {
                 return b.unimplemented();
             };
             push(&mut b, next);
             b.emit(
                 Op::CallInd,
-                Some(Varnode::register(gpr_offset(0), 8)),
+                Some(Varnode::register(gpr_offset(0), ptr)),
                 &[target],
             );
             clobber(&mut b);
             return b.finish(true);
         }
         Flow::IndirectBranch => {
-            let Some(target) = ops.first().and_then(|o| source(&mut b, o, 8, at)) else {
+            let Some(target) = ops.first().and_then(|o| source(&mut b, o, ptr, at)) else {
                 return b.unimplemented();
             };
             b.emit(Op::BranchInd, None, &[target]);
             return b.finish(true);
         }
         Flow::Return => {
-            let target = pop(&mut b, 8);
+            let target = pop(&mut b, ptr);
             // `ret imm16` also drops the arguments the caller pushed.
             if let Some(Operand::Imm(n)) = ops.first() {
-                let sp = Varnode::register(RSP, 8);
-                let raised = b.eval(Op::IntAdd, 8, &[sp, Varnode::constant(*n as u64, 8)]);
-                b.emit(Op::Copy, Some(sp), &[raised]);
+                let sp = Varnode::register(RSP, ptr);
+                let raised = b.eval(Op::IntAdd, ptr, &[sp, Varnode::constant(*n as u64, ptr)]);
+                write_ptr(&mut b, RSP, raised);
             }
             b.emit(Op::Return, None, &[target]);
             return b.finish(true);
@@ -514,13 +552,18 @@ pub fn lift(i: &Insn) -> Lifted {
             // the kernel does is not knowable from here, so the result and
             // everything the convention lets it change is undefined rather
             // than guessed, and the flow still stops the interpreter.
-            let next = Varnode::constant(i.next().get(), 8);
-            b.emit(Op::Copy, Some(Varnode::register(gpr_offset(1), 8)), &[next]);
-            b.emit(
-                Op::Undefine,
-                Some(Varnode::register(gpr_offset(11), 8)),
-                &[],
-            );
+            // Only `syscall` does that to RCX and R11. An i386 image reaches
+            // the kernel through `int 0x80`, which leaves them alone, so the
+            // one thing both forms have in common is the result.
+            if ptr == 8 {
+                let next = Varnode::constant(i.next().get(), 8);
+                b.emit(Op::Copy, Some(Varnode::register(gpr_offset(1), 8)), &[next]);
+                b.emit(
+                    Op::Undefine,
+                    Some(Varnode::register(gpr_offset(11), 8)),
+                    &[],
+                );
+            }
             b.emit(Op::Undefine, Some(Varnode::register(gpr_offset(0), 8)), &[]);
             return b.finish(true);
         }
@@ -605,19 +648,19 @@ pub fn lift(i: &Insn) -> Lifted {
             }
         }
         "push" => {
-            let Some(v) = ops.first().and_then(|o| source(&mut b, o, 8, at)) else {
+            let Some(v) = ops.first().and_then(|o| source(&mut b, o, ptr, at)) else {
                 return b.unimplemented();
             };
-            let wide = if v.size == 8 {
+            let wide = if v.size == ptr {
                 v
             } else {
-                b.eval(Op::IntSExt, 8, &[v])
+                b.eval(Op::IntSExt, ptr, &[v])
             };
             push(&mut b, wide);
             b.finish(true)
         }
         "pop" => {
-            let v = pop(&mut b, 8);
+            let v = pop(&mut b, ptr);
             match store(&mut b, &ops[0], v, at) {
                 Some(()) => b.finish(true),
                 None => b.unimplemented(),
@@ -625,11 +668,10 @@ pub fn lift(i: &Insn) -> Lifted {
         }
         "leave" => {
             // `mov rsp, rbp` then `pop rbp`.
-            let sp = Varnode::register(RSP, 8);
-            let bp = Varnode::register(gpr_offset(5), 8);
-            b.emit(Op::Copy, Some(sp), &[bp]);
-            let saved = pop(&mut b, 8);
-            b.emit(Op::Copy, Some(bp), &[saved]);
+            let bp = Varnode::register(gpr_offset(5), ptr);
+            write_ptr(&mut b, RSP, bp);
+            let saved = pop(&mut b, ptr);
+            write_ptr(&mut b, gpr_offset(5), saved);
             b.finish(true)
         }
         // Bit test: the carry flag takes the selected bit and the rest are

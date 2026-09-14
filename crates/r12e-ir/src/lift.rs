@@ -45,15 +45,28 @@ pub struct Builder {
     addr: r12e_core::Addr,
     ops: Vec<IrOp>,
     next_temp: u64,
+    /// How wide a pointer is on the machine this came from.
+    ///
+    /// The same instruction set is lifted at two widths -- x86 in long mode
+    /// and in protected mode -- and every address, stack adjustment and return
+    /// address differs by exactly this. Carrying it here rather than in each
+    /// lifter's own threading keeps one number in one place.
+    pub ptr: u8,
 }
 
 impl Builder {
-    /// A builder for the instruction at `addr`.
+    /// A builder for the instruction at `addr`, on a 64-bit machine.
     pub fn new(addr: r12e_core::Addr) -> Builder {
+        Builder::sized(addr, 8)
+    }
+
+    /// The same, for a machine whose pointers are `ptr` bytes.
+    pub fn sized(addr: r12e_core::Addr, ptr: u8) -> Builder {
         Builder {
             addr,
             ops: Vec::new(),
             next_temp: 0,
+            ptr,
         }
     }
 
@@ -115,6 +128,7 @@ pub fn lift(arch: &Arch, insn: &Insn) -> Lifted {
     match arch {
         Arch::AArch64 => aarch64::lift(insn),
         Arch::X86_64 => x86::lift(insn),
+        Arch::X86 => x86::lift32(insn),
         _ => Builder::new(insn.addr).unimplemented(),
     }
 }
