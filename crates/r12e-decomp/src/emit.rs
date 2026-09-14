@@ -65,6 +65,10 @@ pub struct Callee {
     /// False when it was declared to return nothing, so its result is not
     /// assigned to anything.
     pub returns_value: bool,
+    /// Its declaration, without a body. Every name the emitter can write has
+    /// to be declared somewhere, including a callee nobody asked to see: a
+    /// call to an undeclared function is not C a compiler will accept.
+    pub signature: String,
 }
 
 /// One declared parameter.

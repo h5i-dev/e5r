@@ -174,6 +174,7 @@ pub fn decompile_program_with(
                     arity: out.arity,
                     pointer_parameters: out.pointer_parameters.clone(),
                     returns_value: !out.signature.starts_with("void "),
+                    signature: out.signature.clone(),
                 },
             );
             if n < targets.len() {
@@ -194,9 +195,20 @@ pub fn decompile_program_with(
         }
     }
     // Every function declared before any is defined, so a call to one defined
-    // later still type-checks.
+    // later still type-checks. The callee table is declared too, not just the
+    // targets: a call to a function nobody asked to see is still written by
+    // name, and a call to an undeclared name is not C a compiler will accept.
     for (_, _, one) in &outputs {
         let declaration = format!("{};", one.output.signature);
+        if !declared.contains(&declaration) {
+            declared.push(declaration);
+        }
+    }
+    for callee in callees.values() {
+        if callee.signature.is_empty() {
+            continue;
+        }
+        let declaration = format!("{};", callee.signature);
         if !declared.contains(&declaration) {
             declared.push(declaration);
         }
