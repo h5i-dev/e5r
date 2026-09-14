@@ -753,9 +753,8 @@ fn divopt_signed_power_of_two() {
 }
 
 /// modulo.xml and modulo2.xml: the remainder forms built on the same
-/// reciprocal, which are not folded either.
+/// reciprocal. `x - 10 * (x / 10)` has to come back as `x % 10`.
 #[test]
-#[ignore = "reciprocal remainder is not folded back into a modulo"]
 fn modulo() {
     for (f, by) in [
         ("modu10", "% 10"),

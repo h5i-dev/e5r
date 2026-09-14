@@ -562,10 +562,13 @@ pub fn lift(i: &Insn) -> Lifted {
             let Some(addr) = address(&mut b, mem, at) else {
                 return b.unimplemented();
             };
-            let value = if size == 8 {
+            // Narrowing by relabelling the varnode names a location nothing
+            // ever wrote: the address was computed at eight bytes, and its low
+            // four are a piece of it, not a value of their own.
+            let value = if size == addr.size {
                 addr
             } else {
-                Varnode { size, ..addr }
+                b.eval(Op::SubPiece, size, &[addr, Varnode::constant(0, 1)])
             };
             match store(&mut b, &ops[0], value, at) {
                 Some(()) => b.finish(true),

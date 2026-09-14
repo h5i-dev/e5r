@@ -30,7 +30,7 @@ use r12e_format::LoadOptions;
 /// both when the number rises and when it falls without being recorded.
 ///
 /// Each remaining function is a real defect and the failure message names it.
-const MAX_DISAGREEING: usize = 39;
+const MAX_DISAGREEING: usize = 7;
 
 /// Argument vectors every eligible function is run on.
 ///
