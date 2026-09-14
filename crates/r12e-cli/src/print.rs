@@ -231,6 +231,22 @@ fn truncate(s: &str, n: usize) -> String {
     }
 }
 
+/// What a listing command is allowed to spend, and what the log has told it.
+///
+/// One struct rather than three parameters, because `disas` and `decompile`
+/// take the same three and a caller that passes them in the wrong order to one
+/// of them would not be caught by the types.
+pub struct Limits<'a> {
+    /// Time and item budget.
+    pub budget: Budget,
+    /// Whether to draw a counter on stderr.
+    pub progress: bool,
+    /// Type assertions from the annotation log, by address.
+    pub declared: &'a std::collections::BTreeMap<Addr, String>,
+    /// Comments from the annotation log, by address.
+    pub comments: &'a std::collections::BTreeMap<Addr, String>,
+}
+
 /// A fixed-width cell, padded before it is coloured so the escape sequences do
 /// not count toward the width.
 fn cell(w: &Out, role: Role, text: &str, width: usize) -> String {
@@ -332,10 +348,9 @@ pub fn disas(
     target: &str,
     show_bytes: bool,
     as_json: bool,
-    mut budget: Budget,
-    progress: bool,
-    comments: &std::collections::BTreeMap<Addr, String>,
+    limits: Limits<'_>,
 ) -> R {
+    let (mut budget, progress, comments) = (limits.budget, limits.progress, limits.comments);
     let mut chosen: Vec<&r12e_analysis::Function> = if target == "all" {
         p.functions_by_address().collect()
     } else {
@@ -554,14 +569,8 @@ pub fn diff(w: &mut Out, old: &Program, new: &Program, all: bool, as_json: bool)
 }
 
 /// Decompile one function, or every recovered function, to pseudo-C.
-pub fn decompile(
-    w: &mut Out,
-    p: &Program,
-    target: &str,
-    as_json: bool,
-    mut budget: Budget,
-    progress: bool,
-) -> R {
+pub fn decompile(w: &mut Out, p: &Program, target: &str, as_json: bool, limits: Limits<'_>) -> R {
+    let (mut budget, progress, declared) = (limits.budget, limits.progress, limits.declared);
     let chosen: Vec<&r12e_analysis::Function> = if target == "all" {
         p.functions_by_address().collect()
     } else {
@@ -591,7 +600,7 @@ pub fn decompile(
     let mut unit = r12e_api::Unit::default();
     let mut why = Stopped::Finished;
     if budget.unlimited() {
-        unit = r12e_api::decompile_program(p, &chosen);
+        unit = r12e_api::decompile_program_with(p, &chosen, declared);
         bar.step();
     } else {
         for group in chosen.chunks(CHUNK) {
@@ -604,7 +613,7 @@ pub fn decompile(
                 taking.push(f);
             }
             if !taking.is_empty() {
-                let part = r12e_api::decompile_program(p, &taking);
+                let part = r12e_api::decompile_program_with(p, &taking, declared);
                 unit.declarations.extend(part.declarations);
                 unit.functions.extend(part.functions);
                 for _ in 0..taking.len() {
@@ -625,10 +634,7 @@ pub fn decompile(
         let items = unit
             .functions
             .iter()
-            .map(|d| {
-                let f = p.function(d.addr).unwrap_or(chosen[0]);
-                (f, d.text.clone(), d.gotos, d.locals, d.unmodelled)
-            })
+            .map(|d| (p.function(d.addr).unwrap_or(chosen[0]), d))
             .collect();
         return json::emit(w, &json::decompiled(items));
     }

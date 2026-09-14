@@ -292,6 +292,21 @@ fn insn_out(p: &Program, i: &Insn) -> InsnOut {
     }
 }
 
+/// One variable a decompiled function declares.
+///
+/// The name, the type and where the machine kept it, rather than a count. A
+/// count cannot be checked against what the source declared, which is why
+/// every consumer that tried to score our type recovery scored zero.
+#[derive(Serialize)]
+pub struct VariableOut {
+    name: String,
+    #[serde(rename = "type")]
+    ty: String,
+    size: u8,
+    role: &'static str,
+    storage: String,
+}
+
 /// One decompiled function, with the numbers that say how well it went.
 #[derive(Serialize)]
 pub struct DecompileOut {
@@ -300,21 +315,48 @@ pub struct DecompileOut {
     gotos: usize,
     locals: usize,
     unmodelled: usize,
+    /// True when a type assertion in the log changed this signature.
+    asserted: bool,
+    /// What the assertion overrode, where it disagreed with the machine.
+    conflicts: Vec<String>,
+    variables: Vec<VariableOut>,
 }
 
-pub fn decompiled(items: Vec<(&Function, String, usize, usize, usize)>) -> Listing<DecompileOut> {
+pub fn decompiled(items: Vec<(&Function, &r12e_api::Decompiled)>) -> Listing<DecompileOut> {
     listing(
         items
             .into_iter()
-            .map(|(f, code, gotos, locals, unmodelled)| DecompileOut {
+            .map(|(f, d)| DecompileOut {
                 function: function_out(f),
-                code,
-                gotos,
-                locals,
-                unmodelled,
+                code: d.text.clone(),
+                gotos: d.gotos,
+                locals: d.locals,
+                unmodelled: d.unmodelled,
+                asserted: d.asserted,
+                conflicts: d.conflicts.clone(),
+                variables: d.variables.iter().map(variable_out).collect(),
             })
             .collect(),
     )
+}
+
+fn variable_out(v: &r12e_decomp::expr::Variable) -> VariableOut {
+    use r12e_decomp::expr::{Home, Role};
+    VariableOut {
+        name: v.name.clone(),
+        ty: v.ty.clone(),
+        size: v.size,
+        role: match v.role {
+            Role::Parameter => "parameter",
+            Role::Local => "local",
+            Role::Inherited => "inherited",
+        },
+        storage: match v.home {
+            Home::Register(o) => format!("register+{o}"),
+            Home::Stack(o) => format!("stack{o:+}"),
+            Home::Anywhere => "anywhere".to_string(),
+        },
+    }
 }
 
 /// One pointer's inferred shape.

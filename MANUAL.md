@@ -122,6 +122,55 @@ thunks are excluded because they differ only in an offset.
 
 The file is sorted text, so a signature library reviews in a diff.
 
+## Telling it what you know
+
+An assertion is not a note on the side: it changes the analysis. Decompile,
+see what the engine could not work out, say what it is, decompile again.
+
+```
+$ r12e decompile prog nestedoffset
+uint64_t nestedoffset(uint64_t arg0, uint64_t arg1, uint64_t arg2)
+{
+    return (uint64_t)((uint64_t)(uint32_t)*(uint32_t *)(arg0 +
+        ((int64_t)(int32_t)((uint32_t)arg1 + (uint32_t)arg2) << 2) + 12));
+}
+
+$ r12e annotate prog type nestedoffset \
+    "int nestedoffset(struct outer { int header; int pad; int array[8]; } *ptr, int a, int b)"
+
+$ r12e decompile prog nestedoffset
+struct outer { int32_t header; int32_t pad; int32_t array[8]; };
+
+int32_t nestedoffset(struct outer *ptr, int32_t a, int32_t b)
+{
+    return (int32_t)((uint64_t)(uint32_t)*(uint32_t *)((uint64_t)ptr +
+        ((int64_t)(int32_t)((uint32_t)a + (uint32_t)b) << 2) + 12));
+}
+```
+
+The binary above has no debug information at all. The declaration is refused
+if it does not parse, so a typo is caught when it is typed.
+
+An assertion outranks what the engine recovered, and where the two disagree
+the disagreement is recorded rather than hidden: declare two parameters where
+the code reads four argument registers and `--json` reports the other two as
+conflicts. That is the point of the strength ladder, not a caveat on it.
+
+`--json` also carries every variable with its name, type, size, role and
+where the machine kept it, so a program driving this can see what there is to
+assert:
+
+```
+$ r12e decompile prog nestedoffset --json
+  ...
+  "asserted": true,
+  "variables": [
+    { "name": "ptr", "type": "struct outer *", "role": "parameter", "storage": "register+56" },
+    { "name": "a",   "type": "int32_t",        "role": "parameter", "storage": "register+48" },
+    { "name": "b",   "type": "int32_t",        "role": "parameter", "storage": "register+16" }
+  ]
+```
+
 ## Annotations
 
 ```

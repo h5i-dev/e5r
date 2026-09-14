@@ -9,20 +9,29 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod classes;
 pub mod dataflow;
 pub mod decompile;
 pub mod emulate;
 pub mod prototypes;
 pub mod query;
+pub mod relocate;
 pub mod shapes;
 pub mod signatures;
 pub mod vtables;
 
+pub use classes::{
+    BaseClass, Class, Classes, Member, Role, Rtti, This, TypeInfoKind, classes, classes_with,
+};
 pub use dataflow::{ArgumentFact, Basis, CallSite, Source, Verdict, call_sites, call_sites_in};
-pub use decompile::{Decompiled, Unit, decompile_function, decompile_program};
+pub use decompile::{
+    Decompiled, Unit, decompile_function, decompile_function_with, decompile_program,
+    decompile_program_with,
+};
 pub use emulate::{Run, Setup};
 pub use prototypes::{Recovered, prototypes};
 pub use query::{Answer, Entity, Fact, Query, Row, Want};
+pub use relocate::apply_relative_relocations;
 pub use shapes::{Pointer, shapes_of};
 pub use signatures::{Identified, anchor_of, collect_signatures, identify};
 pub use vtables::{VTable, vtables};

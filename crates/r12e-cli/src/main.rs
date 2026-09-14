@@ -672,6 +672,7 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
         .clone()
         .unwrap_or_else(|| annotate::default_path(&common.file));
     let mut comments = std::collections::BTreeMap::new();
+    let mut declared = std::collections::BTreeMap::new();
     if !matches!(cli.command, Command::Annotate { .. }) {
         for (at, name, _) in annotate::names(&program, &db) {
             if let Some(f) = program.functions.get_mut(&at) {
@@ -679,6 +680,7 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             }
         }
         comments = annotate::comments(&program, &db);
+        declared = annotate::declarations(&program, &db);
     }
 
     match &cli.command {
@@ -695,17 +697,24 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             target,
             *bytes,
             common.json,
-            budget::Budget::new(common.budget, common.limit),
-            common.progress,
-            &comments,
+            print::Limits {
+                budget: budget::Budget::new(common.budget, common.limit),
+                progress: common.progress,
+                declared: &declared,
+                comments: &comments,
+            },
         ),
         Command::Decompile { common, target } => print::decompile(
             w,
             &program,
             target,
             common.json,
-            budget::Budget::new(common.budget, common.limit),
-            common.progress,
+            print::Limits {
+                budget: budget::Budget::new(common.budget, common.limit),
+                progress: common.progress,
+                declared: &declared,
+                comments: &comments,
+            },
         ),
         Command::Shapes { common, target } => print::shapes(w, &program, target, common.json),
         Command::Emulate {

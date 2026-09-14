@@ -206,6 +206,18 @@ pub fn names(p: &Program, db: &Path) -> Vec<(Addr, String, Resolution)> {
     of_kind(p, db, Field::Name)
 }
 
+/// Type assertions from the log, by the address each one resolved to.
+///
+/// The text as it was written, not a parsed type: the log is reviewed in a
+/// diff, so what a person typed is what is stored, and it is parsed where it
+/// is used, against the types that program already knows about.
+pub fn declarations(p: &Program, db: &Path) -> BTreeMap<Addr, String> {
+    of_kind(p, db, Field::Type)
+        .into_iter()
+        .map(|(a, v, _)| (a, v))
+        .collect()
+}
+
 /// Comments from the log, by the address each one resolved to.
 ///
 /// A comment is the cheapest thing an analyst writes and the one they most
