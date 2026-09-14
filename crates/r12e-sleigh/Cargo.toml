@@ -12,3 +12,11 @@ description = "SLEIGH processor specification front end: .slaspec source to an i
 # solver over text; anything it pulled in would be a liability at the same
 # trust boundary as the loaders.
 [dependencies]
+
+# The gates compare the decode engine against the hand-written decoders and
+# against objdump, so the test binaries need them. A dev dependency, so the
+# library itself still pulls in nothing and `r12e-arch` stays free to depend on
+# this crate.
+[dev-dependencies]
+r12e-arch = { workspace = true }
+r12e-core = { workspace = true }

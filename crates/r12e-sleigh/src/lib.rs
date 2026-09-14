@@ -32,17 +32,25 @@
 
 #![deny(missing_docs)]
 
+pub mod context;
+pub mod decode;
 pub mod error;
+pub mod index;
 pub mod lex;
 pub mod model;
 mod parse;
 mod pattern;
+pub mod pcode;
 pub mod preprocess;
 
 use std::path::Path;
 
+pub use context::{Commit, Context, ContextDb};
+pub use decode::{DecodeError, DecodeLimits, Decoded, Decoder, Node, ResolvedOperand, Value};
 pub use error::{Error, Limits, Location, Result};
+pub use index::Index;
 pub use model::Spec;
+pub use pcode::{Pcode, lift};
 
 /// Parse one specification file and everything it includes.
 pub fn parse_file(path: &Path) -> Result<Spec> {
