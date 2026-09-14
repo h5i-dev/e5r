@@ -1,0 +1,14 @@
+[package]
+name = "r12e-sleigh"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "SLEIGH processor specification front end: .slaspec source to an in-memory model"
+
+# No dependencies on purpose. The front end is a lexer, a parser and a bit
+# solver over text; anything it pulled in would be a liability at the same
+# trust boundary as the loaders.
+[dependencies]

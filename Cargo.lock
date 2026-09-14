@@ -264,6 +264,7 @@ dependencies = [
  "r12e-analysis",
  "r12e-api",
  "r12e-arch",
+ "r12e-asm",
  "r12e-core",
  "r12e-db",
  "r12e-decomp",

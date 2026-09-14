@@ -217,6 +217,10 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       137 files Ghidra ships, 95 MB of payload, interpreting 99.90% of it and
       keeping the rest as raw nodes with their offsets rather than guessing.
       Decoding from that model is not started.
+- [ ] The `.slaspec` front end is done: all 152 language definitions Ghidra
+      ships parse, none fail, 133,097 constructors in two seconds, with the
+      bit patterns reduced to masks that are honest about what they cannot
+      pin down. What remains of this bullet is writing `.sla` back out.
 - [ ] SLEIGH compiler: `.slaspec` to `.sla`, so Ghidra's processor tree builds
       from source instead of shipping as binary blobs. This is the single largest
       task in M2 and it unlocks RISC-V, MIPS, PowerPC, SPARC, SuperH, 6502, Z80,

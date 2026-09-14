@@ -1,0 +1,21 @@
+# The complete specification from section 7.8.2 of the SLEIGH manual,
+# "Specific Symbol Trees". It is the smallest thing in the published
+# documentation that exercises tokens, attached registers, a subtable with
+# three constructors, an export of a dynamic reference, and a root table.
+define endian=big;
+define space ram type=ram_space size=4 default;
+define space register type=register_space size=4;
+define register offset=0 size=4 [ r0 r1 r2 r3 r4 r5 r6 r7 ];
+
+define token instr(16)
+  op=(10,15) mode=(6,9) reg1=(3,5) reg2=(0,2) imm=(0,2)
+;
+attach variables [ reg1 reg2 ] [ r0 r1 r2 r3 r4 r5 r6 r7 ];
+
+op2: reg2 is mode=0 & reg2   { export reg2; }
+op2: imm is mode=1 & imm     { export *[const]:4 imm; }
+op2: [reg2] is mode=2 & reg2 { tmp = *:4 reg2; export tmp;}
+
+:and reg1,op2 is op=0x10 & reg1 & op2 { reg1 = reg1 & op2; }
+:xor reg1,op2 is op=0x11 & reg1 & op2 { reg1 = reg1 ^ op2; }
+:or  reg1,op2 is op=0x12 & reg1 & op2 { reg1 = reg1 | op2; }
