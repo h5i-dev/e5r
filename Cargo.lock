@@ -343,10 +343,17 @@ dependencies = [
 [[package]]
 name = "r12e-sla"
 version = "0.1.0"
+dependencies = [
+ "r12e-sleigh",
+]
 
 [[package]]
 name = "r12e-sleigh"
 version = "0.1.0"
+dependencies = [
+ "r12e-arch",
+ "r12e-core",
+]
 
 [[package]]
 name = "r12e-types"
