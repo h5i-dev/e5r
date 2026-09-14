@@ -375,29 +375,38 @@ scripts/check-bench-budget.py target/bench-tools.json --portable-only --no-timin
 scripts/check-bench-budget.py target/bench-tools.json --update              # move it
 ```
 
-## In CI
+## What CI does, and what it deliberately does not
 
-[`.github/workflows/bench.yaml`](../.github/workflows/bench.yaml), split the
-same way the budget is.
+**No benchmark runs in CI.** Wall time and peak memory are facts about a
+machine. A GitHub runner is shared hardware with a neighbour you cannot see, so
+a timing number measured there cannot be compared against the ceilings in
+`bench-budget.json`, which were recorded on the machine at the top of this file
+-- and cannot be compared against the next run on a different runner either. A
+gate that fails for reasons unrelated to the commit is a gate people learn to
+skip, and a published number that means nothing is worse than no number.
 
-- **Every push and pull request:** r12e alone on the fixtures, checked with
-  `--portable-only --no-timing`. It needs no tool but this repository's own
-  build, takes seconds, and gates the half of the budget that is deterministic.
-- **Weekly, and on request:** the same measurement with rizin installed from the
-  distribution beside it, uploaded as an artifact. It is not a per-push job
-  because its numbers move when rizin moves, which is not a fact about this
-  repository's last commit.
+What does run, as the `recall` job in
+[`.github/workflows/ci.yaml`](../.github/workflows/ci.yaml), is the half of the
+budget that is deterministic: recall against the symbol table, and the count of
+entries no symbol names. Those are the same bytes in and the same numbers out on
+any machine at any thread count, so they gate on every push. It needs no tool but
+this repository's own build and takes seconds. One run per binary, because the
+fastest of three exists to beat down timing noise and there is no timing here.
 
-Ghidra is deliberately not installed on a runner. It is a 400 MB download plus a
-JDK, and a per-push job that spends four minutes fetching a JVM to analyze a
-71 KB fixture is a job people turn off. `scripts/compare-tools.sh` picks it up
-from `GHIDRA_INSTALL_DIR` if a runner ever has one cached, so adding it later is
-setting a variable rather than rewriting a script.
+Comparing against rizin is done by hand, on the machine named at the top of this
+file, and the result is written down here. It was briefly a weekly CI job and
+should not have been: it installed rizin to produce numbers that could not be
+compared with the published ones, then checked a budget that had nothing to do
+with rizin.
 
-**Neither job has been run.** They are written against the same scripts that
-produced the numbers here, and those scripts run, but GitHub Actions cannot be
-exercised from this machine and nothing below should be read as verified: that
-`rizin` is in the runner image's package set, that `build-fixtures.sh` produces
+Ghidra is not installed on a runner either. It is a 400 MB download plus a JDK,
+and a per-push job that spends four minutes fetching a JVM to analyze a 71 KB
+fixture is a job people turn off. `scripts/compare-tools.sh` picks it up from
+`GHIDRA_INSTALL_DIR` if a runner ever has one cached.
+
+**The `recall` job has not been run.** It is written against the same scripts
+that produced the numbers here, and those scripts run, but GitHub Actions cannot
+be exercised from this machine. Unverified: that `build-fixtures.sh` produces
 the same fixtures there, and that a release build plus a fixture build fits the
 job's time budget.
 

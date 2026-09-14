@@ -107,7 +107,10 @@ comparison that would matter most cannot be made at all.
 
 The numbers above are held to a budget in `scripts/bench-budget.json`, checked
 by `scripts/check-bench-budget.py`: a ceiling that only comes down for time and
-memory, a floor that only rises for recall.
+memory, a floor that only rises for recall. Only the recall half is checked in
+CI, on every push. Timing is not measured on a shared runner, because a number
+from hardware with an unseen neighbour cannot be compared either with the
+ceilings above or with the next run.
 
 ## Decoder correctness
 

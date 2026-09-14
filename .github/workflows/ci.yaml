@@ -63,6 +63,32 @@ jobs:
       - run: cargo build --release
       - run: ./scripts/check-determinism.sh
 
+  # G8: what the analysis FOUND, against the floors in scripts/bench-budget.json.
+  #
+  # Not a benchmark, and deliberately not run as one. Recall against the symbol
+  # table and the count of entries no symbol names are the same bytes in, same
+  # numbers out, on any machine at any thread count, so they gate. Wall time
+  # and peak memory are facts about a machine, and a shared runner with a noisy
+  # neighbour is not the machine the ceilings were recorded on -- so timing is
+  # not measured here, not gated here, and not published from here. It is
+  # measured by hand on a known machine and written down in docs/benchmarks.md.
+  #
+  # One run per binary for the same reason: the fastest of three exists to beat
+  # down timing noise, and there is no timing to beat down.
+  recall:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update && sudo apt-get install -y clang binutils
+      - run: ./scripts/build-fixtures.sh
+      # Release, like determinism above: the recall numbers have to come from
+      # the code path a user runs.
+      - run: cargo build --release
+      - run: RUNS=1 SKIP=rizin OUT=target/recall.json ./scripts/compare-tools.sh
+      - run: ./scripts/check-bench-budget.py target/recall.json --portable-only --no-timing
+
   # G10: line coverage per crate. Reported rather than enforced until the
   # floors in ROADMAP.md are met, because a gate nobody can pass is a gate
   # everyone learns to skip.
