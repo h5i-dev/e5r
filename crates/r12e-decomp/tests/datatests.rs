@@ -646,10 +646,15 @@ fn paramnodirect() {
 
 /// inline.xml: a callee small enough that a decompiler is tempted to inline it,
 /// called twice with different arguments. Both calls have to stay calls.
+///
+/// Three occurrences, not two: the caller's own name ends in the callee's, so
+/// its signature matches as well as its two calls. The second of those is a
+/// tail call, and it was missing from the output until a branch out of the
+/// function was recognized as the call it is.
 #[test]
 fn inline() {
     case(&all("calls"), "callsadd50", |c| {
-        c.times("add50(", 2);
+        c.times("add50(", 3);
     });
 }
 
@@ -661,18 +666,24 @@ fn inline() {
 /// switchind.xml, switchmask.xml, switchloop.xml, switchmulti.xml,
 /// switchhide.xml, ifswitch.xml: a jump table is a `switch`.
 ///
-/// The table is recovered — `r12e funcs` reports the function complete and
-/// every arm reachable — but no `switch` is ever emitted, here or anywhere:
-/// four hundred functions of `libc.so.6` produce none. `decompile_program`
-/// keys the `Switches` map by `JumpTable::at`, the address of the indirect
-/// branch, while the structurer looks the block up by its *start* address, so
-/// the lookup only matches when the branch is the first instruction of its
-/// block, which it never is.
+/// `decompile_program` hands the structurer its tables keyed by the block the
+/// indirect branch ends, not by the branch's own address, so the lookup
+/// matches and the arms come out as cases rather than as a page of labels.
+///
+/// Only the x86-64 builds are asserted on: the AArch64 compiler turns this
+/// same source into a ladder of compares with no table in it, so there is
+/// nothing there for a switch to be recovered from.
+///
+/// The out-of-range arm is the `else` of the compare that guards the table
+/// rather than a `default:` label, because that is where the machine puts it:
+/// the indirect branch itself has no successor outside the table.
 #[test]
-#[ignore = "a jump table never structures as a switch: Switches is keyed by the branch address, the structurer looks up block starts"]
 fn switchind() {
-    case(&arch("control", "a64"), "switchind", |c| {
-        c.has("switch (").at_least("case ", 10).has("default:");
+    case(&arch("control", "x64"), "switchind", |c| {
+        c.has("switch (")
+            .at_least("case ", 10)
+            .has("0xffffffff")
+            .lacks("__indirect_branch");
     });
 }
 
@@ -687,12 +698,14 @@ fn switchind_x86_64() {
     });
 }
 
-/// Nested counted loops: the inner loop and everything in it disappear. The
-/// outer loop comes out with its increment and its exit test, and the body is
-/// the assignments that carry the argument registers round — the call to
-/// `sink` is gone. Eight blocks go in, one loop comes out.
+/// Nested counted loops: both loops survive, with the call inside the inner
+/// one.
+///
+/// The outer loop has no test at its top, so its header is a branch like any
+/// other and both of its arms have to be structured. Following only the first
+/// successor used to drop every block the other arm reached, which here is the
+/// whole inner loop.
 #[test]
-#[ignore = "an inner loop is dropped: the outer loop keeps its latch and loses its body"]
 fn nested_loops() {
     case(&all("control"), "nested", |c| {
         c.at_least("while (", 2).has("sink(");
@@ -700,11 +713,10 @@ fn nested_loops() {
 }
 
 /// forloop_varused.xml: a loop whose body is guarded by a test. The guarded
-/// block is dropped exactly as the inner loop is in `nested_loops`: the `tst`
-/// and the call under it are both gone, leaving a loop that counts and does
-/// nothing. This is the same defect seen from a second angle.
+/// block and the call under it stay inside the loop, which is the same
+/// property `nested_loops` pins seen from a second angle: the loop header's
+/// branch is structured rather than half-followed.
 #[test]
-#[ignore = "a block reached only through a branch inside a loop is dropped"]
 fn forloop_varused() {
     case(&all("control"), "forloop_varused", |c| {
         c.has("while (").has("& 3").has("sink(");
@@ -881,14 +893,63 @@ fn retstruct() {
 }
 
 /// switchreturn.xml in the portable form it has here: a function whose last act
-/// is a tail call decompiles to an empty body. The branch out of the function
-/// is not recognized as the call it is, and nothing is emitted for it — not the
-/// call, not a return. Every arm of `sbyte` was lost this way until the fixture
-/// grew a statement after the ladder.
+/// is a tail call says so. A branch whose target is no block of this function
+/// is the callee returning on this function's behalf, and the emitter writes
+/// it out as the call and the return it stands for. Nothing marks it in the
+/// IR, and a branch is not otherwise a statement, so both used to vanish and
+/// the body came out empty.
 #[test]
-#[ignore = "a tail call is dropped and the function decompiles to an empty body"]
 fn tailcall() {
     case(&all("calls"), "tailcall", |c| {
         c.has("realfunc");
     });
+}
+
+// --- structuring covers the graph -------------------------------------------
+
+/// Every reachable block of every function of every fixture reaches the output.
+///
+/// Code that disappears between the control flow graph and the text is the
+/// worst thing the structurer can do, because nothing downstream can tell: the
+/// output still compiles, still reads as a function, and does less than the
+/// function does. `nested_loops`, `forloop_varused` and `tailcall` above are
+/// three shapes that lost blocks; this is the check that finds the fourth
+/// rather than waiting for someone to notice it.
+#[test]
+fn no_block_is_lost() {
+    let Some(dir) = build_dir() else { return };
+    let mut names: Vec<String> = std::fs::read_dir(&dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_file()))
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+
+    let mut lost = 0usize;
+    let mut where_from: Vec<String> = Vec::new();
+    let mut checked = 0usize;
+    for name in names {
+        let Some(p) = open(&name) else { continue };
+        let targets: Vec<&r12e_analysis::Function> = p
+            .functions_by_address()
+            .filter(|f| f.is_complete())
+            .collect();
+        if targets.is_empty() {
+            continue;
+        }
+        for d in r12e_api::decompile_program(&p, &targets).functions {
+            checked += 1;
+            if d.lost > 0 {
+                lost += d.lost;
+                where_from.push(format!("{name} {}: {} block(s)", d.name, d.lost));
+            }
+        }
+    }
+    assert!(
+        lost == 0,
+        "{lost} block(s) missing from the output of {checked} functions:\n{}",
+        where_from.join("\n")
+    );
 }

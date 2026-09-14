@@ -86,6 +86,13 @@ pub struct Structured {
     pub labels: BTreeSet<Addr>,
     /// How many gotos the structuring had to emit. The quality signal.
     pub gotos: usize,
+    /// Reachable blocks the region tree never mentions.
+    ///
+    /// Their code would be missing from the output with nothing downstream able
+    /// to tell, which is worse than any number of gotos. Correct structuring
+    /// leaves this empty; it is reported rather than asserted so a caller can
+    /// decide what to do about it.
+    pub lost: BTreeSet<Addr>,
 }
 
 /// The graph structuring works over: successors per block.
@@ -153,12 +160,170 @@ pub fn structure_with(
         depth: 0,
         duplication: 8,
         loops: Vec::new(),
+        keep_single: BTreeSet::new(),
+        reasons: BTreeMap::new(),
     };
-    let root = ctx.region(entry, None, None);
+
+    // Writing a tail out twice and then jumping to it are each fine and
+    // together are not: two copies of a labelled block are two definitions of
+    // one C label. Which copy a later goto would want is not knowable while
+    // the copy is being made, so the block is barred from duplication and the
+    // function structured again. The bar only grows, so this settles.
+    let mut root = ctx.region(entry, None, None);
+    for _ in 0..4 {
+        let clashing = labelled_twice(&root, &ctx.labels);
+        if clashing.is_empty() {
+            break;
+        }
+        let mut keep_single = std::mem::take(&mut ctx.keep_single);
+        keep_single.extend(clashing);
+        ctx = Ctx {
+            graph,
+            taken,
+            switches,
+            postdom: &postdom,
+            loop_headers: &loop_headers,
+            bodies: &bodies,
+            emitted: BTreeSet::new(),
+            labels: BTreeSet::new(),
+            gotos: 0,
+            depth: 0,
+            duplication: 8,
+            loops: Vec::new(),
+            keep_single,
+            reasons: BTreeMap::new(),
+        };
+        root = ctx.region(entry, None, None);
+    }
+
+    // Why each goto was needed, which is what says where to spend the next
+    // piece of work. Off by default and per function, so aggregating it is the
+    // caller's job: a whole-corpus run is the only useful unit. Note that
+    // `decompile_program` structures every function twice, once to learn what
+    // the callees take and once to use it, so raw totals are double.
+    if std::env::var_os("R12E_GOTO_STATS").is_some() {
+        for (reason, n) in &ctx.reasons {
+            eprintln!("GOTOREASON\t{reason}\t{n}");
+        }
+    }
+    let lost = lost_blocks(entry, graph, &root);
     Structured {
         root,
         labels: ctx.labels,
         gotos: ctx.gotos,
+        lost,
+    }
+}
+
+/// Blocks a region tree both writes out more than once and labels.
+fn labelled_twice(root: &Region, labels: &BTreeSet<Addr>) -> BTreeSet<Addr> {
+    let mut counts: BTreeMap<Addr, usize> = BTreeMap::new();
+    occurrences(root, &mut counts);
+    counts
+        .into_iter()
+        .filter(|(at, n)| *n > 1 && labels.contains(at))
+        .map(|(at, _)| at)
+        .collect()
+}
+
+/// How many times each block's statements appear in a region tree.
+fn occurrences(r: &Region, out: &mut BTreeMap<Addr, usize>) {
+    match r {
+        Region::Seq(parts) => {
+            for p in parts {
+                occurrences(p, out);
+            }
+        }
+        Region::If {
+            head,
+            then,
+            otherwise,
+            ..
+        } => {
+            *out.entry(*head).or_default() += 1;
+            occurrences(then, out);
+            if let Some(o) = otherwise {
+                occurrences(o, out);
+            }
+        }
+        Region::While { head, body, .. } | Region::Infinite { head, body } => {
+            *out.entry(*head).or_default() += 1;
+            occurrences(body, out);
+        }
+        Region::Switch {
+            head,
+            cases,
+            default,
+        } => {
+            *out.entry(*head).or_default() += 1;
+            for c in cases {
+                occurrences(&c.body, out);
+            }
+            if let Some(d) = default {
+                occurrences(d, out);
+            }
+        }
+        Region::Block(at) => {
+            *out.entry(*at).or_default() += 1;
+        }
+        Region::Goto(_) | Region::Break | Region::Continue | Region::Empty => {}
+    }
+}
+
+/// Reachable blocks the region tree does not mention.
+fn lost_blocks(entry: Addr, graph: &Graph, root: &Region) -> BTreeSet<Addr> {
+    let mut seen = BTreeSet::new();
+    mentioned(root, &mut seen);
+    reverse_postorder(entry, graph)
+        .into_iter()
+        .filter(|a| !seen.contains(a))
+        .collect()
+}
+
+/// Every block a region tree emits the statements of.
+///
+/// A `goto` target does not count: it is a reference to a block, not a copy of
+/// it, and a label with no block under it is itself a defect.
+fn mentioned(r: &Region, out: &mut BTreeSet<Addr>) {
+    match r {
+        Region::Block(at) => {
+            out.insert(*at);
+        }
+        Region::Seq(parts) => {
+            for p in parts {
+                mentioned(p, out);
+            }
+        }
+        Region::If {
+            head,
+            then,
+            otherwise,
+            ..
+        } => {
+            out.insert(*head);
+            mentioned(then, out);
+            if let Some(o) = otherwise {
+                mentioned(o, out);
+            }
+        }
+        Region::While { head, body, .. } | Region::Infinite { head, body } => {
+            out.insert(*head);
+            mentioned(body, out);
+        }
+        Region::Switch {
+            head,
+            cases,
+            default,
+        } => {
+            out.insert(*head);
+            for c in cases {
+                mentioned(&c.body, out);
+            }
+            if let Some(d) = default {
+                mentioned(d, out);
+            }
+        }
+        Region::Goto(_) | Region::Break | Region::Continue | Region::Empty => {}
     }
 }
 
@@ -182,6 +347,9 @@ struct Ctx<'a> {
     /// innermost loop's exit is a `break` and an edge to its header is a
     /// `continue`; without this both come out as gotos.
     loops: Vec<Nesting>,
+    /// Blocks that must appear once, because a goto names them.
+    keep_single: BTreeSet<Addr>,
+    reasons: BTreeMap<&'static str, usize>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -202,6 +370,7 @@ impl Ctx<'_> {
     fn region_inner(&mut self, at: Addr, stop: Option<Addr>, enclosing: Option<Addr>) -> Region {
         // A guard, because a graph from hostile input need not be reducible.
         if self.depth > 200 {
+            *self.reasons.entry("depth limit").or_default() += 1;
             self.gotos += 1;
             self.labels.insert(at);
             return Region::Goto(at);
@@ -238,6 +407,16 @@ impl Ctx<'_> {
                     parts.push(self.duplicate(cursor, stop, enclosing));
                     break;
                 }
+                *self
+                    .reasons
+                    .entry(if self.loop_headers.contains(&cursor) {
+                        "already written: loop entered a second way"
+                    } else if self.preds_of(cursor) > 1 {
+                        "already written: shared tail"
+                    } else {
+                        "already written: other"
+                    })
+                    .or_default() += 1;
                 self.gotos += 1;
                 self.labels.insert(cursor);
                 parts.push(Region::Goto(cursor));
@@ -274,6 +453,10 @@ impl Ctx<'_> {
                         } else if self.loops.last().map(|l| l.exit) == Some(Some(next)) {
                             parts.push(Region::Break);
                         } else {
+                            *self
+                                .reasons
+                                .entry("back edge that is not a natural loop")
+                                .or_default() += 1;
                             self.gotos += 1;
                             self.labels.insert(next);
                             parts.push(Region::Goto(next));
@@ -302,6 +485,7 @@ impl Ctx<'_> {
                             cursor = next;
                         }
                         Some(next) if Some(next) != stop => {
+                            *self.reasons.entry("join already written").or_default() += 1;
                             self.gotos += 1;
                             self.labels.insert(next);
                             parts.push(Region::Goto(next));
@@ -320,6 +504,10 @@ impl Ctx<'_> {
         }
     }
 
+    fn preds_of(&self, at: Addr) -> usize {
+        self.graph.values().filter(|s| s.contains(&at)).count()
+    }
+
     /// True when a block starts a tail small enough to write out again.
     fn small_tail(&self, at: Addr, stop: Option<Addr>) -> bool {
         let mut seen: BTreeSet<Addr> = BTreeSet::new();
@@ -328,7 +516,13 @@ impl Ctx<'_> {
             if Some(block) == stop || !self.graph.contains_key(&block) {
                 continue;
             }
-            if self.loop_headers.contains(&block) {
+            // A loop is written out again only when it lies wholly inside the
+            // tail, which the size bound below decides: every block of a
+            // natural loop is reachable from its header, so a loop that does
+            // not fit makes the walk exceed the bound. A loop currently being
+            // structured is never a tail, because writing it out again inside
+            // itself would not terminate.
+            if self.loops.iter().any(|l| l.head == block) || self.keep_single.contains(&block) {
                 return false;
             }
             if !seen.insert(block) {
@@ -411,14 +605,36 @@ impl Ctx<'_> {
 
         // Otherwise the loop has no condition at the top; the exits inside
         // become breaks.
-        let next = succs.first().copied();
-        let body = match next {
-            Some(n) => self.region(n, Some(head), Some(head)),
-            None => Region::Empty,
-        };
+        let body = self.after_head(head, &succs);
         Region::Infinite {
             head,
             body: Box::new(body),
+        }
+    }
+
+    /// What runs after a loop header whose test is not at the top.
+    ///
+    /// The header still ends in whatever branch it ends in. Following one
+    /// successor and forgetting the other drops every block only the other arm
+    /// reaches, which is how an inner loop vanishes out of an outer one, so the
+    /// branch is structured here the same way it would be anywhere else and the
+    /// walk carries on where its arms rejoin.
+    fn after_head(&mut self, head: Addr, succs: &[Addr]) -> Region {
+        let stop = Some(head);
+        let (branch, after) = match succs.len() {
+            0 => return Region::Empty,
+            1 => return self.region(succs[0], stop, stop),
+            _ if self.switches.contains_key(&head) => self.build_switch(head, stop, stop),
+            _ => self.build_if(head, succs, stop, stop),
+        };
+        let mut parts = vec![branch];
+        match after {
+            Some(next) if Some(next) != stop => parts.push(self.region(next, stop, stop)),
+            _ => {}
+        }
+        match parts.len() {
+            1 => parts.pop().unwrap(),
+            _ => Region::Seq(parts),
         }
     }
 

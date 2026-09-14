@@ -20,6 +20,9 @@ pub struct Output {
     pub declarations: Vec<String>,
     /// Gotos the structuring needed; lower is better.
     pub gotos: usize,
+    /// Reachable blocks the structuring never placed, whose code is therefore
+    /// missing from the text. Zero in a correct decompilation.
+    pub lost: usize,
     /// Named locals declared.
     pub locals: usize,
     /// Operations no expression covered.
@@ -186,10 +189,12 @@ pub fn decompile_full(
 
     let result = result_register(f, &rebuilder);
     let returns = prototype.and_then(|p| p.returns.clone());
+    let structured_switches = switch_heads(&s.root);
     let mut e = Emitter {
         f,
         r: &rebuilder,
         labels: &s.labels,
+        switches: &structured_switches,
         result,
         callees,
         returns,
@@ -245,6 +250,9 @@ pub fn decompile_full(
                     called.insert(target);
                 }
             }
+            if let Some(target) = tail_call(f, op) {
+                called.insert(target);
+            }
             if let SsaKind::Op(o) = op.kind {
                 if let Some(h) = helper_for(o) {
                     helpers.insert(h);
@@ -264,6 +272,12 @@ pub fn decompile_full(
             // prototype recovery is for, and guessing four would be a claim.
             .map(|a| format!("uint64_t sub_{a:x}();")),
     );
+
+    // The unknown-result return is written during emission, after the helpers
+    // the operations need have been collected, so it declares its own.
+    if body.contains("__clobbered(") && !declarations.iter().any(|d| d.contains("__clobbered")) {
+        declarations.push("uint64_t __clobbered(void);".to_string());
+    }
 
     let mut text = String::new();
     let declared_return = prototype
@@ -332,6 +346,7 @@ pub fn decompile_full(
         pointer_parameters,
         declarations,
         gotos: s.gotos,
+        lost: s.lost.len(),
         locals: rebuilder.locals.len(),
         unmodelled: e.unmodelled,
     }
@@ -345,6 +360,20 @@ static inline uint64_t __bits(double v){union{double d;uint64_t u;}x;x.d=v;retur
 static inline double __dbl(uint64_t v){union{double d;uint64_t u;}x;x.u=v;return x.d;}
 static inline uint32_t __bits32(float v){union{float f;uint32_t u;}x;x.f=v;return x.u;}
 static inline float __flt(uint64_t v){union{float f;uint32_t u;}x;x.u=(uint32_t)v;return x.f;}";
+
+/// The function a branch tails into, when it leaves this function entirely.
+///
+/// A tail call is a plain branch to something that is no block of this
+/// function: the callee returns on the caller's behalf. Nothing else in the IR
+/// marks it, and a branch is not otherwise a statement, so without this both
+/// the call and the return it stands for vanish and the body comes out empty.
+fn tail_call(f: &SsaFunction, op: &SsaOp) -> Option<u64> {
+    if op.kind != SsaKind::Op(Op::Branch) {
+        return None;
+    }
+    let target = op.inputs.first()?.as_const()?;
+    (!f.blocks.contains_key(&Addr(target))).then_some(target)
+}
 
 /// True when a region always leaves by itself, so no `break` is needed after.
 fn ends_control(r: &Region) -> bool {
@@ -523,10 +552,57 @@ fn parameter_list(f: &SsaFunction, r: &Rebuilder) -> Vec<String> {
     seen.into_values().collect()
 }
 
+/// The blocks a region tree turned into a `switch`.
+///
+/// Their indirect branch is the switch itself, so writing it out as well would
+/// say the control transfer twice.
+fn switch_heads(r: &Region) -> BTreeSet<Addr> {
+    let mut out = BTreeSet::new();
+    collect_switch_heads(r, &mut out);
+    out
+}
+
+fn collect_switch_heads(r: &Region, out: &mut BTreeSet<Addr>) {
+    match r {
+        Region::Seq(parts) => {
+            for p in parts {
+                collect_switch_heads(p, out);
+            }
+        }
+        Region::If {
+            then, otherwise, ..
+        } => {
+            collect_switch_heads(then, out);
+            if let Some(o) = otherwise {
+                collect_switch_heads(o, out);
+            }
+        }
+        Region::While { body, .. } | Region::Infinite { body, .. } => {
+            collect_switch_heads(body, out);
+        }
+        Region::Switch {
+            head,
+            cases,
+            default,
+        } => {
+            out.insert(*head);
+            for c in cases {
+                collect_switch_heads(&c.body, out);
+            }
+            if let Some(d) = default {
+                collect_switch_heads(d, out);
+            }
+        }
+        _ => {}
+    }
+}
+
 struct Emitter<'a> {
     f: &'a SsaFunction,
     r: &'a Rebuilder<'a>,
     labels: &'a BTreeSet<Addr>,
+    /// Blocks whose indirect branch the region tree already says as a `switch`.
+    switches: &'a BTreeSet<Addr>,
     /// Where the function leaves its result.
     result: Option<u64>,
     /// How many arguments each callee defined in this unit takes.
@@ -742,11 +818,16 @@ impl Emitter<'_> {
                 self.scaled_index(a, depth + 1)
                     .or_else(|| Some(self.r.operand(a)))
             }
-            Op::IntZExt | Op::IntSExt | Op::SubPiece | Op::Copy => {
+            Op::IntZExt | Op::IntSExt | Op::Copy => {
                 let a = op.inputs.first()?;
                 self.scaled_index(a, depth + 1)
                     .or_else(|| Some(self.r.operand(a)))
             }
+            // A truncation is where the index starts: the table was indexed by
+            // the narrow value, so walking past it switches on the wide one
+            // and every argument whose low half is in range falls off the end
+            // of the switch instead of into its arm.
+            Op::SubPiece => Some(self.r.operand(operand)),
             _ => None,
         }
     }
@@ -910,11 +991,26 @@ impl Emitter<'_> {
                     self.unmodelled += 1;
                     let _ = writeln!(out, "{pad}__unmodelled(0x{:x});", op.addr.0);
                 }
+                Op::Branch => {
+                    let Some(target) = tail_call(self.f, op) else {
+                        continue;
+                    };
+                    let callee = self.callees.get(&target);
+                    let name = callee
+                        .map(|c| c.name.clone())
+                        .unwrap_or_else(|| crate::expr::default_call_name(target));
+                    let e = Expr::Call(name, self.arguments(at, index, callee));
+                    let _ = writeln!(out, "{pad}{e};");
+                    let _ = writeln!(out, "{pad}{}", self.return_statement(at));
+                }
                 Op::BranchInd => {
                     // A computed branch that structuring did not turn into a
                     // switch. C's own computed goto needs a label table this
                     // does not have, so the target is named and the control
                     // transfer is said rather than spelled.
+                    if self.switches.contains(&at) {
+                        continue;
+                    }
                     if let Some(t) = op.inputs.first().map(|i| self.r.operand(i)) {
                         let target = self.r.integer(t, &op.inputs[0]);
                         let _ = writeln!(out, "{pad}__indirect_branch({target});");
@@ -942,7 +1038,10 @@ impl Emitter<'_> {
             Op::Store | Op::Return | Op::Call | Op::CallInd | Op::Unimplemented | Op::BranchInd => {
                 true
             }
-            Op::Branch | Op::CBranch => false,
+            // A branch out of the function is a tail call and has to be said.
+            // Any other branch is control flow the region tree already carries.
+            Op::Branch => tail_call(self.f, op).is_some(),
+            Op::CBranch => false,
             // Everything else is an expression, needed as a statement only when
             // its result got a name.
             _ => op.out.is_some_and(|v| self.r.locals.contains_key(&v)),
@@ -958,7 +1057,11 @@ impl Emitter<'_> {
             // parentheses: a cast binds tighter than anything in an
             // expression and would otherwise apply to the first term.
             (Some(ty), false) => format!("return ({ty})({value});"),
-            (Some(ty), true) => format!("return ({ty})0;"),
+            // Declared to return something, with nothing found that it
+            // returns: an import thunk, or a result the rebuilder could not
+            // name. Zero would be a claim about the value; the helper says
+            // only that it is not known, which is what was established.
+            (Some(ty), true) => format!("return ({ty})__clobbered();"),
             (None, false) => format!("return {value};"),
             (None, true) => "return;".to_string(),
         }

@@ -295,7 +295,12 @@ fn decompiled_c_computes_what_the_machine_computes() {
             .map(|(head, _)| head.to_string())
             .collect::<std::collections::BTreeSet<_>>()
             .len(),
-        wrong.iter().take(400).cloned().collect::<Vec<_>>().join("\n")
+        wrong
+            .iter()
+            .take(400)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
     );
     eprintln!("{checked} call(s) over {functions} function(s) agree");
 }
