@@ -13,6 +13,7 @@ pub mod classes;
 pub mod dataflow;
 pub mod decompile;
 pub mod emulate;
+pub mod kernel;
 mod msvc;
 pub mod prototypes;
 pub mod query;
@@ -29,7 +30,10 @@ pub use decompile::{
     Decompiled, Unit, decompile_function, decompile_function_with, decompile_program,
     decompile_program_with,
 };
-pub use emulate::{Run, Setup};
+pub use emulate::{
+    Confirmed, Ending, Indirect, Place, Region, Resolved, Run, Setup, Span, confirm, resolve,
+};
+pub use kernel::{Call, Kernel, Output};
 pub use prototypes::{Recovered, prototypes};
 pub use query::{Answer, Entity, Fact, Query, Row, Want};
 pub use relocate::apply_relative_relocations;
