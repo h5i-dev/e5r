@@ -10,6 +10,11 @@ use std::collections::BTreeMap;
 use r12e_analysis::{Function, Program};
 use r12e_core::{Addr, Evidence};
 use r12e_decomp::{Callee, Output, Param, Prototype};
+use r12e_ir::proto::Asserted;
+use r12e_ir::ssa::SsaFunction;
+use r12e_types::ctype::{Type, TypeId, Types};
+
+pub use r12e_decomp::expr::{Home, Role, Variable};
 
 /// One decompiled function.
 #[derive(Debug, Clone)]
@@ -29,6 +34,18 @@ pub struct Decompiled {
     pub lost: usize,
     /// Named locals declared.
     pub locals: usize,
+    /// Every variable the text declares, with its name, its type and where the
+    /// machine kept it.
+    ///
+    /// A count of locals is not a fact anything can be checked against. This
+    /// is what a benchmark matching recovered variables against the ones the
+    /// source declared has to read, and what an analyst renames one by.
+    pub variables: Vec<Variable>,
+    /// Where an asserted declaration and the code disagreed, in the analyst's
+    /// favour. Empty unless something was asserted about this function.
+    pub conflicts: Vec<String>,
+    /// True when a declaration somebody wrote down decided this signature.
+    pub asserted: bool,
     /// Operations no expression covered, including instructions the lifter did
     /// not model.
     pub unmodelled: usize,
@@ -72,7 +89,19 @@ impl Unit {
 
 /// Decompile one function, with whatever the program knows about it.
 pub fn decompile_function(p: &Program, f: &Function) -> Decompiled {
-    let mut unit = decompile_program(p, std::slice::from_ref(&f));
+    decompile_function_with(p, f, &BTreeMap::new())
+}
+
+/// The same, with the declarations an analyst asserted about the program.
+///
+/// Keyed by the address each declaration resolved to, which is the shape the
+/// annotation log folds to and the same one comments reach the disassembler in.
+pub fn decompile_function_with(
+    p: &Program,
+    f: &Function,
+    declarations: &BTreeMap<Addr, String>,
+) -> Decompiled {
+    let mut unit = decompile_program_with(p, std::slice::from_ref(&f), declarations);
     unit.functions.pop().unwrap_or(Decompiled {
         addr: f.entry,
         name: f.display_name(),
@@ -81,25 +110,39 @@ pub fn decompile_function(p: &Program, f: &Function) -> Decompiled {
         gotos: 0,
         lost: 0,
         locals: 0,
+        variables: Vec::new(),
+        conflicts: Vec::new(),
+        asserted: false,
         unmodelled: 0,
     })
 }
 
 /// Decompile a set of functions as one unit.
+pub fn decompile_program(p: &Program, targets: &[&Function]) -> Unit {
+    decompile_program_with(p, targets, &BTreeMap::new())
+}
+
+/// Decompile a set of functions as one unit, honouring what an analyst
+/// declared about them.
 ///
 /// Two passes: the first works out how many parameters each function declares,
 /// and the second uses that so every call passes the number its callee expects.
 /// Nothing knows the count until the parameters have been worked out.
-pub fn decompile_program(p: &Program, targets: &[&Function]) -> Unit {
+pub fn decompile_program_with(
+    p: &Program,
+    targets: &[&Function],
+    declarations: &BTreeMap<Addr, String>,
+) -> Unit {
     let mut callees: BTreeMap<u64, Callee> = BTreeMap::new();
-    let mut outputs: Vec<(Addr, String, Output, usize)> = Vec::new();
+    let mut outputs: Vec<(Addr, String, One)> = Vec::new();
 
     for _ in 0..2 {
         outputs.clear();
         for f in targets {
-            let Some((out, unlifted)) = one(p, f, &callees) else {
+            let Some(one) = one(p, f, &callees, declarations) else {
                 continue;
             };
+            let out = &one.output;
             let name = f.display_name();
             callees.insert(
                 f.entry.get(),
@@ -110,49 +153,67 @@ pub fn decompile_program(p: &Program, targets: &[&Function]) -> Unit {
                     returns_value: !out.signature.starts_with("void "),
                 },
             );
-            outputs.push((f.entry, name, out, unlifted));
+            outputs.push((f.entry, name, one));
         }
     }
 
     // Deduplicated but not sorted: a type definition has to come after the
     // ones it mentions, and alphabetical order is not that.
-    let mut declarations: Vec<String> = Vec::new();
-    for (_, _, out, _) in &outputs {
-        for d in &out.declarations {
-            if !declarations.contains(d) {
-                declarations.push(d.clone());
+    let mut declared: Vec<String> = Vec::new();
+    for (_, _, one) in &outputs {
+        for d in &one.output.declarations {
+            if !declared.contains(d) {
+                declared.push(d.clone());
             }
         }
     }
     // Every function declared before any is defined, so a call to one defined
     // later still type-checks.
-    for (_, _, out, _) in &outputs {
-        let declaration = format!("{};", out.signature);
-        if !declarations.contains(&declaration) {
-            declarations.push(declaration);
+    for (_, _, one) in &outputs {
+        let declaration = format!("{};", one.output.signature);
+        if !declared.contains(&declaration) {
+            declared.push(declaration);
         }
     }
 
     Unit {
-        declarations,
+        declarations: declared,
         functions: outputs
             .into_iter()
-            .map(|(addr, name, out, unlifted)| Decompiled {
+            .map(|(addr, name, one)| Decompiled {
                 addr,
                 name,
-                signature: out.signature,
-                text: out.text,
-                gotos: out.gotos,
-                lost: out.lost,
-                locals: out.locals,
-                unmodelled: out.unmodelled + unlifted,
+                signature: one.output.signature,
+                text: one.output.text,
+                gotos: one.output.gotos,
+                lost: one.output.lost,
+                locals: one.output.locals,
+                variables: one.variables,
+                conflicts: one.conflicts,
+                asserted: one.asserted,
+                unmodelled: one.output.unmodelled + one.unlifted,
             })
             .collect(),
     }
 }
 
+/// One function's way through the pipeline, and what was learned on the way.
+struct One {
+    output: Output,
+    /// Instructions the lifter did not model, which the emitter never saw.
+    unlifted: usize,
+    variables: Vec<Variable>,
+    conflicts: Vec<String>,
+    asserted: bool,
+}
+
 /// One function through the whole pipeline.
-fn one(p: &Program, f: &Function, callees: &BTreeMap<u64, Callee>) -> Option<(Output, usize)> {
+fn one(
+    p: &Program,
+    f: &Function,
+    callees: &BTreeMap<u64, Callee>,
+    declarations: &BTreeMap<Addr, String>,
+) -> Option<One> {
     // What each jump table means: the index the branch used and where that
     // index goes, which is what turns a many-successor block into a switch.
     //
@@ -186,25 +247,160 @@ fn one(p: &Program, f: &Function, callees: &BTreeMap<u64, Callee>) -> Option<(Ou
     r12e_ir::stack::promote(&mut ir);
     let mut ssa = r12e_ir::ssa::build(&ir);
     r12e_ir::opt::optimize(&mut ssa);
-    let prototype = prototype(p, f);
+    // The SSA the emitter runs on is the SSA prototype recovery reads, rather
+    // than a second build of the same thing: lifting a function twice is not
+    // free and the two could drift apart.
+    let shape = prototype(p, f, &ssa, declarations);
     let name = f.display_name();
-    Some((
-        r12e_decomp::decompile_full(&name, &ssa, prototype.as_ref(), callees, &switches),
-        ir.unlifted.len(),
-    ))
+    let output =
+        r12e_decomp::decompile_full(&name, &ssa, shape.prototype.as_ref(), callees, &switches);
+    Some(One {
+        variables: r12e_decomp::expr::variables(&ssa, shape.prototype.as_ref(), &output.text),
+        output,
+        unlifted: ir.unlifted.len(),
+        conflicts: shape.conflicts,
+        asserted: shape.asserted,
+    })
+}
+
+/// What is known about a function's shape, in the form the emitter wants, and
+/// what had to be overruled to get there.
+struct Shape {
+    prototype: Option<Prototype>,
+    conflicts: Vec<String>,
+    asserted: bool,
 }
 
 /// What is known about a function's shape, in the form the emitter wants.
 ///
-/// The debug information where there is any, and otherwise what the code
-/// itself says: how many argument registers arrive with values and whether
-/// anything is left for the caller. The second is weaker but it is what a
-/// stripped binary has.
-fn prototype(p: &Program, f: &Function) -> Option<Prototype> {
-    declared(p, f)
-        .or_else(|| import_thunk(f))
-        .or_else(|| recovered(p, f))
+/// In order: what an analyst wrote down, then the debug information, then what
+/// the code itself says, which is how many argument registers arrive with
+/// values and whether anything is left for the caller. The last is weakest and
+/// it is all a stripped binary has.
+///
+/// An assertion outranks the other two because writing one down is the only
+/// way an analyst has of telling the engine it was wrong, and an assertion
+/// that changed nothing would make the whole loop pointless. What the machine
+/// found is not thrown away: it is kept beside the declaration and the
+/// disagreements come back as conflicts.
+fn prototype(
+    p: &Program,
+    f: &Function,
+    ssa: &SsaFunction,
+    declarations: &BTreeMap<Addr, String>,
+) -> Shape {
+    if let Some(a) = asserted(p, f, declarations) {
+        let abi = r12e_ir::abi::of(&p.object.arch);
+        let recovered = r12e_ir::proto::recover_with(ssa, &abi, Some(&a));
+        return Shape {
+            conflicts: recovered.conflicts.iter().map(|c| c.to_string()).collect(),
+            prototype: Some(asserted_prototype(&a, &recovered)),
+            asserted: true,
+        };
+    }
+    Shape {
+        prototype: declared(p, f)
+            .or_else(|| import_thunk(f))
+            .or_else(|| recovered(p, f, ssa)),
+        conflicts: Vec::new(),
+        asserted: false,
+    }
 }
+
+/// The declaration an analyst wrote down for this function, parsed.
+///
+/// Parsed against the program's own types, so a declaration may name a
+/// structure the debug information already described rather than having to
+/// restate it. A declaration that does not parse is not a reason to refuse to
+/// decompile: the engine's own answer is still there and the annotation
+/// commands are where a person is told their C is malformed.
+fn asserted(p: &Program, f: &Function, declarations: &BTreeMap<Addr, String>) -> Option<Asserted> {
+    let text = declarations.get(&f.entry)?;
+    let mut types = match p.object.debug.as_ref() {
+        Some(d) => d.types.clone(),
+        None => Types::new(),
+    };
+    // The store carries the types and the architecture carries how wide they
+    // are, and a declaration mentioning `long` needs both.
+    types.set_model(r12e_ir::proto::model_of(&p.object.arch));
+    Asserted::parse_into(types, text).ok()
+}
+
+/// The emitter's form of an asserted declaration, laid over the convention.
+fn asserted_prototype(a: &Asserted, recovered: &r12e_ir::proto::Prototype) -> Prototype {
+    let types = &a.types;
+    let mut parameters: Vec<Param> = Vec::new();
+    let mut mentioned: Vec<TypeId> = Vec::new();
+
+    // A result too large for the result registers is written through a pointer
+    // the caller passes in the first argument register, so every declared
+    // parameter sits one register further along than it looks. Declaring the
+    // pointer is what keeps the body's names on the right registers, and it is
+    // also what the machine code actually does.
+    if recovered.returns_via_memory {
+        if let Some(ty) = a.signature.returns {
+            let mut with_pointer = types.clone();
+            let ptr = with_pointer.pointer(ty);
+            parameters.push(Param {
+                decl: with_pointer.declare(ptr, RESULT),
+                name: RESULT.to_string(),
+                floating: false,
+                pointer: true,
+                size: with_pointer.size_of(ptr).unwrap_or(0).min(255) as u8,
+                fields: Vec::new(),
+                stride: None,
+            });
+            mentioned.push(ty);
+        }
+    }
+
+    for (n, param) in recovered.parameters.iter().enumerate() {
+        let name = param.name.clone().unwrap_or_else(|| format!("arg{n}"));
+        let resolved = types.get(types.resolve(param.ty));
+        parameters.push(Param {
+            decl: types.declare(param.ty, &name),
+            name,
+            floating: matches!(resolved, Some(Type::Float { size: 4 | 8 })),
+            pointer: matches!(resolved, Some(Type::Pointer(_))),
+            size: param.size.min(255) as u8,
+            // A declared type names its own fields. Inventing `field_8` for a
+            // parameter whose structure is written down would contradict the
+            // declaration the same output prints.
+            fields: Vec::new(),
+            stride: None,
+        });
+        mentioned.push(param.ty);
+    }
+
+    let returns = match a.signature.returns {
+        // The result does not come back in a register at all; it is already a
+        // parameter, and a function that returns nothing returns nothing.
+        Some(_) if recovered.returns_via_memory => "void".to_string(),
+        Some(ty) => types.name_of(ty),
+        None => "void".to_string(),
+    };
+
+    let mut definitions: Vec<String> = Vec::new();
+    for t in mentioned {
+        for d in types.dependencies(t) {
+            if let Some(text) = types.definition(d) {
+                if !definitions.contains(&text) {
+                    definitions.push(text);
+                }
+            }
+        }
+    }
+
+    Prototype {
+        parameters,
+        returns: Some(returns),
+        definitions,
+        locals: BTreeMap::new(),
+    }
+}
+
+/// What the hidden pointer to a memory-returned result is called.
+const RESULT: &str = "__result";
 
 /// The shape of a jump into another image.
 ///
@@ -228,26 +424,16 @@ fn import_thunk(f: &Function) -> Option<Prototype> {
 }
 
 /// The shape the code implies, for a function nothing declared.
-fn recovered(p: &Program, f: &Function) -> Option<Prototype> {
-    let blocks: BTreeMap<Addr, (Addr, Vec<Addr>)> = f
-        .cfg
-        .blocks
-        .iter()
-        .map(|(a, b)| (*a, (b.range.end(), b.successors.clone())))
-        .collect();
-    if blocks.is_empty() {
+fn recovered(p: &Program, f: &Function, ssa: &SsaFunction) -> Option<Prototype> {
+    if f.cfg.blocks.is_empty() {
         return None;
     }
-    let mut ir = r12e_ir::func::build(&p.object.memory, &p.object.arch, f.entry, &blocks);
-    r12e_ir::stack::promote(&mut ir);
-    let mut ssa = r12e_ir::ssa::build(&ir);
-    r12e_ir::opt::optimize(&mut ssa);
     let abi = r12e_ir::abi::of(&p.object.arch);
-    let recovered = r12e_ir::proto::recover(&ssa, &abi);
+    let recovered = r12e_ir::proto::recover(ssa, &abi);
 
     // What each incoming pointer was used as, so an access at a known offset
     // reads as a field rather than as arithmetic.
-    let shapes: BTreeMap<u64, Layout> = r12e_ir::shape::shapes(&ssa)
+    let shapes: BTreeMap<u64, Layout> = r12e_ir::shape::shapes(ssa)
         .into_iter()
         .filter(|(l, _)| l.offset != abi.stack_pointer)
         .map(|(l, shape)| (l.offset, (shape.fields(), shape.size())))
@@ -346,8 +532,6 @@ fn structure(name: &str, fields: &[(i64, u8)]) -> String {
 
 /// What the debug information said about a function.
 fn declared(p: &Program, f: &Function) -> Option<Prototype> {
-    use r12e_types::ctype::Type;
-
     let d = p.object.debug.as_ref()?;
     let df = d.functions.get(&f.entry)?;
     let parameters = df

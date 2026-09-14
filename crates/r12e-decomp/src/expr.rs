@@ -17,6 +17,8 @@ use r12e_ir::abi::Abi;
 use r12e_ir::op::Op;
 use r12e_ir::ssa::{Location, Operand, SsaFunction, SsaKind, SsaOp, Value};
 
+use crate::emit::Prototype;
+
 /// A rebuilt expression.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
@@ -444,6 +446,14 @@ pub struct Rebuilder<'a> {
     pub fields: BTreeMap<u64, Vec<(i64, u8)>>,
     /// The element size of each of those, when the pointer walks an array.
     pub strides: BTreeMap<u64, u64>,
+    /// What a declaration called the field at an offset, by pointer register.
+    ///
+    /// An offset missing from here is named after itself, which is how the
+    /// output tells the two apart: `p->tag` is a name somebody wrote down and
+    /// `p->field_8` is one this crate made up from the offset the code used.
+    /// Nothing is lost by the fallback except the name, so a shape nobody
+    /// declared still reads as a structure.
+    pub field_names: BTreeMap<u64, BTreeMap<i64, String>>,
 }
 
 impl<'a> Rebuilder<'a> {
@@ -477,6 +487,7 @@ impl<'a> Rebuilder<'a> {
             sizes: BTreeMap::new(),
             fields: BTreeMap::new(),
             strides: BTreeMap::new(),
+            field_names: BTreeMap::new(),
             floats: float_locations(f),
             abi: r12e_ir::abi::of(&f.arch),
             defs,
@@ -541,15 +552,28 @@ impl<'a> Rebuilder<'a> {
             },
             name,
         );
+        let field = self.field_label(walk.register, *at);
         match walk.index {
             // An index scaled by the element size is an array subscript; one
             // scaled by anything else is arithmetic this does not understand.
-            Some((index, scale)) if self.strides.get(&walk.register) == Some(&scale) => Some(
-                Expr::Element(Box::new(base), Box::new(index), field_name(*at)),
-            ),
+            Some((index, scale)) if self.strides.get(&walk.register) == Some(&scale) => {
+                Some(Expr::Element(Box::new(base), Box::new(index), field))
+            }
             Some(_) => None,
-            None => Some(Expr::Field(Box::new(base), field_name(*at))),
+            None => Some(Expr::Field(Box::new(base), field)),
         }
+    }
+
+    /// What to call the field at an offset through one incoming pointer.
+    ///
+    /// The declared name when a declaration gave one, and otherwise a name
+    /// built from the offset, which says on its face that nothing declared it.
+    fn field_label(&self, register: u64, offset: i64) -> String {
+        self.field_names
+            .get(&register)
+            .and_then(|m| m.get(&offset))
+            .cloned()
+            .unwrap_or_else(|| field_name(offset))
     }
 
     /// An address written as an incoming register, a constant, and at most one
@@ -892,6 +916,285 @@ impl<'a> Rebuilder<'a> {
     pub fn uses(&self, v: Value) -> usize {
         self.uses.get(&v).copied().unwrap_or(0)
     }
+
+    /// Wire in what a prototype says about the values arriving from outside.
+    ///
+    /// A declared parameter arrives in a register the convention chooses, so
+    /// once the declaration is laid over the convention the body can use the
+    /// name, the width and the fields the declaration gave rather than the
+    /// register it happened to come in.
+    pub fn declare(&mut self, p: &Prototype) {
+        let (mut ints, mut floats) = (0usize, 0usize);
+        for param in &p.parameters {
+            let offset = if param.floating {
+                let o = self.abi.float_arguments.get(floats).copied();
+                floats += 1;
+                o
+            } else {
+                let o = self.abi.integer_arguments.get(ints).copied();
+                ints += 1;
+                o
+            };
+            let Some(o) = offset else { continue };
+            self.names.insert(o, param.name.clone());
+            if param.pointer {
+                self.pointers.insert(o);
+            }
+            if param.size > 0 {
+                self.sizes.insert(o, param.size);
+            }
+            if !param.fields.is_empty() {
+                self.fields.insert(o, param.fields.clone());
+                if let Some(stride) = param.stride {
+                    self.strides.insert(o, stride);
+                }
+            }
+            // A parameter declared floating is floating even when nothing in
+            // the body does arithmetic on it: at O0 it is stored to the stack
+            // before anything touches it.
+            if param.floating {
+                self.floats.insert(Location {
+                    space: r12e_ir::op::Space::Register,
+                    offset: o,
+                    size: 8,
+                });
+            }
+        }
+    }
+
+    /// The type the body declares a value of this location with.
+    fn type_of(&self, l: Location) -> &'static str {
+        if self.floats.contains(&l) {
+            float_type(l.size)
+        } else {
+            c_type(l.size)
+        }
+    }
+}
+
+/// Where the machine kept a variable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Home {
+    /// A register, by its offset in the register file.
+    Register(u64),
+    /// A slot at this offset from the stack pointer on entry, which is what a
+    /// frame offset means once the stack has been promoted.
+    Stack(i64),
+    /// Somewhere the rebuilder did not have to name: a value that exists only
+    /// between the operation that made it and the one that reads it.
+    Anywhere,
+}
+
+/// What a variable is to the function that declares it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Role {
+    /// Something the caller passed.
+    Parameter,
+    /// Something the body computes and names.
+    Local,
+    /// A register or slot read before anything in this function wrote it,
+    /// which the convention does not pass arguments in either. Neither a
+    /// parameter nor anything this function made.
+    Inherited,
+}
+
+/// One variable a decompiled function declares.
+///
+/// The count of these is not a fact anything can be checked against: matching
+/// what was recovered to what the source declared needs the name, the type and
+/// where the value lived.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Variable {
+    /// What the body calls it.
+    pub name: String,
+    /// Its type, as the declaration spells it.
+    pub ty: String,
+    /// Its width in bytes, zero when nothing said.
+    pub size: u8,
+    /// Parameter, local, or inherited.
+    pub role: Role,
+    /// Where the machine kept it.
+    pub home: Home,
+}
+
+/// Every variable one decompiled function declares.
+///
+/// Rebuilt from the same SSA and the same prototype the emitter used, so these
+/// are the names that appear in its text rather than a second opinion. `body`
+/// is that text: an inherited register every optimization removed is declared
+/// by neither, and whether the text mentions it is how the emitter decides.
+pub fn variables(f: &SsaFunction, prototype: Option<&Prototype>, body: &str) -> Vec<Variable> {
+    let mut r = Rebuilder::new(f);
+    if let Some(p) = prototype {
+        r.declare(p);
+    }
+    let r = r;
+
+    let mut out: Vec<Variable> = Vec::new();
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    let mut push = |out: &mut Vec<Variable>, v: Variable| {
+        if seen.insert(v.name.clone()) {
+            out.push(v);
+        }
+    };
+
+    // Parameters in the order the declaration gives them, which is the order
+    // they appear in the signature.
+    match prototype.filter(|p| !p.parameters.is_empty()) {
+        Some(p) => {
+            let (mut ints, mut floats) = (0usize, 0usize);
+            for param in &p.parameters {
+                let offset = if param.floating {
+                    let o = r.abi.float_arguments.get(floats).copied();
+                    floats += 1;
+                    o
+                } else {
+                    let o = r.abi.integer_arguments.get(ints).copied();
+                    ints += 1;
+                    o
+                };
+                push(
+                    &mut out,
+                    Variable {
+                        ty: declared_type(&param.decl, &param.name),
+                        name: param.name.clone(),
+                        size: param.size,
+                        role: Role::Parameter,
+                        home: offset.map_or(Home::Anywhere, Home::Register),
+                    },
+                );
+            }
+        }
+        // Nothing declared anything: the convention's argument registers that
+        // arrive with values are the parameters, in the convention's order.
+        None => {
+            let order: Vec<u64> = r
+                .abi
+                .integer_arguments
+                .iter()
+                .chain(r.abi.float_arguments.iter())
+                .copied()
+                .collect();
+            let mut by_slot: BTreeMap<usize, Variable> = BTreeMap::new();
+            for l in undefined(f) {
+                let name = r.name_of(l);
+                let slot = if l.space == r12e_ir::op::Space::Register {
+                    order.iter().position(|o| *o == l.offset)
+                } else if is_stack_argument(l) {
+                    Some(order.len() + l.offset as usize)
+                } else {
+                    None
+                };
+                let Some(slot) = slot else { continue };
+                by_slot.entry(slot).or_insert(Variable {
+                    name,
+                    ty: r.type_of(l).to_string(),
+                    size: l.size,
+                    role: Role::Parameter,
+                    home: home_of(l),
+                });
+            }
+            for v in by_slot.into_values() {
+                push(&mut out, v);
+            }
+        }
+    }
+
+    // Registers and slots the function inherited: declared by the emitter only
+    // where the body still mentions them.
+    let parameters: BTreeSet<String> = out.iter().map(|v| v.name.clone()).collect();
+    for l in undefined(f) {
+        let name = r.name_of(l);
+        if parameters.contains(&name) || !mentions(body, &name) {
+            continue;
+        }
+        push(
+            &mut out,
+            Variable {
+                name,
+                ty: r.type_of(l).to_string(),
+                size: l.size,
+                role: Role::Inherited,
+                home: home_of(l),
+            },
+        );
+    }
+
+    for (value, name) in &r.locals {
+        push(
+            &mut out,
+            Variable {
+                name: name.clone(),
+                ty: r.type_of(value.location).to_string(),
+                size: value.location.size,
+                role: Role::Local,
+                home: home_of(value.location),
+            },
+        );
+    }
+    out
+}
+
+/// Every location read before anything in the function wrote it.
+fn undefined(f: &SsaFunction) -> Vec<Location> {
+    let mut out = Vec::new();
+    for b in f.blocks.values() {
+        for op in &b.ops {
+            for i in &op.inputs {
+                if let Operand::Undefined(l) = i {
+                    out.push(*l);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Where a location lives, in the terms a reader of the output cares about.
+fn home_of(l: Location) -> Home {
+    match l.space {
+        r12e_ir::op::Space::Register => Home::Register(l.offset),
+        r12e_ir::op::Space::Stack => Home::Stack(l.offset as i64),
+        _ => Home::Anywhere,
+    }
+}
+
+/// The type half of a declaration.
+///
+/// C wraps the type around the name rather than putting the two side by side,
+/// so this is a removal and not a split: `struct Point *p` is a `struct Point
+/// *` and `int (*f)(int)` is an `int (*)(int)`.
+pub fn declared_type(decl: &str, name: &str) -> String {
+    let Some(at) = word(decl, name) else {
+        return decl.trim().to_string();
+    };
+    let (head, tail) = (&decl[..at], &decl[at + name.len()..]);
+    let joined = format!("{}{tail}", head.trim_end());
+    joined.trim().to_string()
+}
+
+/// Where a name appears in a text as a whole word, last occurrence first.
+fn word(text: &str, name: &str) -> Option<usize> {
+    if name.is_empty() {
+        return None;
+    }
+    let mut found = None;
+    let mut at = 0;
+    while let Some(next) = text[at..].find(name) {
+        let start = at + next;
+        let end = start + name.len();
+        let part = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
+        if !part(text[..start].chars().next_back()) && !part(text[end..].chars().next()) {
+            found = Some(start);
+        }
+        at = end;
+    }
+    found
+}
+
+/// True when a name appears in a text as a whole word.
+pub fn mentions(text: &str, name: &str) -> bool {
+    word(text, name).is_some()
 }
 
 #[cfg(test)]
