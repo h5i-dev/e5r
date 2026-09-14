@@ -49,6 +49,10 @@ impl Signature {
 pub struct Library {
     /// Every signature, sorted so the file is stable.
     pub signatures: Vec<Signature>,
+    /// True when a file was longer than the reader would accept and the rest
+    /// of it was dropped. The library is then a prefix of what the file said,
+    /// which a caller has to be told rather than left to assume.
+    pub truncated: bool,
     by_bytes: BTreeMap<u64, Vec<usize>>,
     by_shape: BTreeMap<u64, Vec<usize>>,
 }
@@ -75,6 +79,7 @@ impl Library {
         }
         Library {
             signatures,
+            truncated: false,
             by_bytes,
             by_shape,
         }
@@ -153,9 +158,29 @@ impl Library {
     }
 
     /// Read the text form, ignoring lines it does not understand.
+    ///
+    /// A signature library is a file somebody else wrote: it travels between
+    /// machines, it is checked into other people's repositories, and it is the
+    /// output of a script that ran over packages nobody here chose. So an
+    /// unreadable line is skipped rather than fatal, and the length of the
+    /// file is bounded before the result is built.
     pub fn from_text(text: &str) -> Library {
+        Library::from_text_capped(text, MAX_SIGNATURES)
+    }
+
+    /// The same, with the ceiling given explicitly.
+    ///
+    /// The text form carries no count for a hostile file to lie about, so the
+    /// bound has to be on the result instead: reading stops at `max` and says
+    /// it stopped, rather than growing until the allocator decides.
+    pub fn from_text_capped(text: &str, max: usize) -> Library {
         let mut signatures = Vec::new();
+        let mut truncated = false;
         for line in text.lines() {
+            if signatures.len() >= max {
+                truncated = true;
+                break;
+            }
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') {
                 continue;
@@ -181,19 +206,29 @@ impl Library {
                 source: parts.next().unwrap_or("").to_string(),
             });
         }
-        Library::build(signatures)
+        let mut library = Library::build(signatures);
+        library.truncated = truncated;
+        library
     }
 
     /// Merge another library in.
     pub fn merge(&mut self, other: Library) {
+        let truncated = self.truncated || other.truncated;
         let mut all = std::mem::take(&mut self.signatures);
         all.extend(other.signatures);
         *self = Library::build(all);
+        self.truncated = truncated;
     }
 }
 
 /// Below this many instructions a shape match means nothing.
 const MIN_SHAPE_INSNS: u32 = 24;
+
+/// The most signatures one file may contribute.
+///
+/// Two million is more than every static archive a distribution ships, and it
+/// is a number rather than an allocator failure.
+pub const MAX_SIGNATURES: usize = 2_000_000;
 
 #[cfg(test)]
 mod tests {

@@ -16,7 +16,7 @@
 
 use std::fmt;
 
-use r12e_arch::{Flow, Insn};
+use r12e_arch::{Extend, Flow, Insn, Mem, Operand, Reg, Shift};
 use r12e_core::Addr;
 
 /// FNV-1a 64-bit, chosen for being byte-order fixed and reproducible across
@@ -76,6 +76,185 @@ fn flow_class(f: Flow) -> u8 {
         Flow::Trap => 7,
         Flow::Syscall => 8,
     }
+}
+
+/// Fingerprint one instruction by everything about it a relink cannot change.
+///
+/// [`Anchor::function`] folds `(length, flow class)` per instruction. That is
+/// enough to identify a whole stream, and cheap enough to compute for every
+/// function in a binary, but it is far too coarse to align two streams
+/// *against* each other: at that granularity a third of a function's
+/// instructions share a token, and an alignment anchored on a token dozens of
+/// instructions carry is anchored on nothing.
+///
+/// So this folds the mnemonic and the operands too, and leaves out only what
+/// moves when an instruction is inserted ahead of it: the absolute address a
+/// branch or a pc-relative computation resolves to, and the displacement of a
+/// pc-relative memory operand. Two instructions with the same token are the
+/// same instruction wherever the linker put them; whether their targets agree
+/// is the separate question the caller asks next.
+pub fn shape_token(i: &Insn) -> u64 {
+    let mut h = Fnv::new();
+    h.slice(i.mnemonic.as_bytes());
+    h.byte(0);
+    h.slice(i.prefix.unwrap_or("").as_bytes());
+    h.byte(0);
+    h.byte(i.len);
+    h.byte(flow_class(i.flow));
+    h.byte(i.operands().len() as u8);
+    for op in i.operands() {
+        fold_operand(&mut h, op);
+    }
+    h.finish()
+}
+
+fn fold_reg(h: &mut Fnv, r: &Reg) {
+    h.byte(r.class as u8);
+    h.byte(r.num);
+    h.byte(r.width as u8);
+}
+
+fn fold_shift(h: &mut Fnv, s: Shift, amount: u8) {
+    h.byte(s as u8);
+    h.byte(amount);
+}
+
+fn fold_extend(h: &mut Fnv, e: Extend, amount: u8) {
+    h.byte(e as u8);
+    h.byte(amount);
+}
+
+fn fold_mem(h: &mut Fnv, m: &Mem) {
+    match m.seg {
+        Some(r) => {
+            h.byte(1);
+            fold_reg(h, &r);
+        }
+        None => h.byte(0),
+    }
+    match m.base {
+        Some(r) => {
+            h.byte(1);
+            fold_reg(h, &r);
+        }
+        None => h.byte(0),
+    }
+    match m.index {
+        Some((r, e, s)) => {
+            h.byte(1);
+            fold_reg(h, &r);
+            fold_extend(h, e, s);
+        }
+        None => h.byte(0),
+    }
+    h.byte(m.mode as u8);
+    h.u64(m.size);
+    // A pc-relative displacement is an address wearing a disguise: it changes
+    // when anything ahead of the instruction moves, so it is left out for the
+    // same reason a branch target is.
+    if m.is_pc_relative() {
+        h.byte(0xff);
+    } else {
+        h.u64(m.disp as u64);
+    }
+}
+
+fn fold_operand(h: &mut Fnv, op: &Operand) {
+    match op {
+        Operand::Reg(r) => {
+            h.byte(0);
+            fold_reg(h, r);
+        }
+        Operand::Shifted(r, s, a) => {
+            h.byte(1);
+            fold_reg(h, r);
+            fold_shift(h, *s, *a);
+        }
+        Operand::Extended(r, e, a) => {
+            h.byte(2);
+            fold_reg(h, r);
+            fold_extend(h, *e, *a);
+        }
+        Operand::Imm(v) => {
+            h.byte(3);
+            h.u64(*v as u64);
+        }
+        Operand::UImm(v) => {
+            h.byte(4);
+            h.u64(*v);
+        }
+        Operand::Count(v) => {
+            h.byte(5);
+            h.u64(*v as u64);
+        }
+        Operand::ShiftOp(s, a) => {
+            h.byte(6);
+            fold_shift(h, *s, *a);
+        }
+        Operand::Name(n) => {
+            h.byte(7);
+            h.slice(n.as_bytes());
+        }
+        Operand::FpImm(v) => {
+            h.byte(8);
+            h.u64(*v);
+        }
+        Operand::Vector(n, l) => {
+            h.byte(9);
+            h.byte(*n);
+            h.slice(l.as_str().as_bytes());
+        }
+        Operand::VectorLane(n, w, i) => {
+            h.byte(10);
+            h.byte(*n);
+            h.byte(*w as u8);
+            h.byte(*i);
+        }
+        Operand::VectorList(n, c, l) => {
+            h.byte(11);
+            h.byte(*n);
+            h.byte(*c);
+            h.slice(l.as_str().as_bytes());
+        }
+        // Excluded on purpose: this is the address the instruction names, and
+        // an insertion earlier in the function is exactly what changes it.
+        Operand::Addr(_) => h.byte(12),
+        Operand::Mem(m) => {
+            h.byte(13);
+            fold_mem(h, m);
+        }
+        Operand::Cond(c) => {
+            h.byte(14);
+            h.byte(c.0);
+        }
+        Operand::Sys(v) => {
+            h.byte(15);
+            h.u64(*v as u64);
+        }
+    }
+}
+
+/// Every absolute address one instruction names, in a fixed order.
+///
+/// The order is a function of the operand kinds and the flow class alone, both
+/// of which [`shape_token`] folds in, so two instructions with the same token
+/// produce lists of the same length and a caller can compare them position by
+/// position.
+pub fn addresses(i: &Insn) -> Vec<Addr> {
+    let mut out = Vec::new();
+    for op in i.operands() {
+        match op {
+            Operand::Addr(a) => out.push(*a),
+            Operand::Mem(m) => {
+                if let Some(a) = m.pc_target(i.end()) {
+                    out.push(a);
+                }
+            }
+            _ => {}
+        }
+    }
+    out.extend(i.flow.target());
+    out
 }
 
 /// A stable identity for one location.

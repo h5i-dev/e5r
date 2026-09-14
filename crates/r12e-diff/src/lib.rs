@@ -18,9 +18,16 @@
 //!
 //! Anything still unmatched is an addition or a removal, which is itself a
 //! finding.
+//!
+//! [`align`] takes it one level down: inside a matched pair, which
+//! instruction changed.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+
+pub mod align;
+
+pub use align::{Edit, EditKind, FunctionDiff, compare_function, detail, mapping};
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 

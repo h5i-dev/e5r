@@ -13,3 +13,11 @@ r12e-core = { workspace = true }
 r12e-arch = { workspace = true }
 r12e-types = { workspace = true }
 serde = { workspace = true }
+
+# The signature gate measures against a real statically linked binary and
+# builds its library out of the distribution's own static archives, so it needs
+# a loader and an analysis. Neither of those depends on this crate, so the edge
+# only exists for the tests.
+[dev-dependencies]
+r12e-format = { workspace = true }
+r12e-analysis = { workspace = true }
