@@ -34,6 +34,9 @@ pub struct Output {
     pub arity: usize,
     /// Which of them are pointers.
     pub pointer_parameters: Vec<bool>,
+    /// How wide each one is declared, in bytes, so a caller passing a constant
+    /// can write it at the width the callee reads.
+    pub parameter_widths: Vec<u8>,
 }
 
 /// What the debug information said about a function, when it said anything.
@@ -62,6 +65,8 @@ pub struct Callee {
     pub arity: usize,
     /// Which of them are pointers, so a call passes something C will take.
     pub pointer_parameters: Vec<bool>,
+    /// How wide each one is declared, in bytes.
+    pub parameter_widths: Vec<u8>,
     /// False when it was declared to return nothing, so its result is not
     /// assigned to anything.
     pub returns_value: bool,
@@ -309,6 +314,10 @@ pub fn decompile_full(
         Some(p) => p.parameters.iter().map(|param| param.pointer).collect(),
         None => vec![false; arity],
     };
+    let parameter_widths: Vec<u8> = match prototype {
+        Some(p) => p.parameters.iter().map(|param| param.size).collect(),
+        None => vec![8; arity],
+    };
     let declared_parameters = if declared.is_empty() {
         "void".to_string()
     } else {
@@ -348,6 +357,7 @@ pub fn decompile_full(
         signature,
         arity,
         pointer_parameters,
+        parameter_widths,
         declarations,
         gotos: s.gotos,
         lost: s.lost.len(),
@@ -1087,6 +1097,16 @@ impl Emitter<'_> {
             let value = match self.value_before(at, index, *offset) {
                 Some(v) => self.r.operand(&Operand::Value(v)),
                 None => Expr::Const(0, 8),
+            };
+            // A constant written into a 64-bit register by a 32-bit move is
+            // held as the whole register, so `-512` arrives as `0xfffffe00`.
+            // The callee reads four bytes of it, so four bytes is what the
+            // call passes, and the reader gets the number back.
+            let value = match (value, callee.parameter_widths.get(slot)) {
+                (Expr::Const(v, size), Some(&w)) if w > 0 && w < size => {
+                    Expr::Const(v & (u64::MAX >> (64 - w as u32 * 8)), w)
+                }
+                (v, _) => v,
             };
             // A parameter declared as a pointer needs the argument cast to it:
             // the machine passes bits and C wants to be told what they are.

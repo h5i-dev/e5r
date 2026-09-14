@@ -58,12 +58,12 @@ fn an_assertion_names_the_parameters_and_narrows_their_types() {
     let Some(p) = open("dt-memory.x64.O2") else {
         return;
     };
-    // Nothing declared this binary: the recovery can only say that three
-    // argument registers arrive with values.
+    // Nothing declared this binary: the recovery can say that three argument
+    // registers arrive with values, and how wide each one is read.
     let before = decompile(&p, "nestedoffset", None);
     assert_eq!(
         before.signature,
-        "uint64_t nestedoffset(uint64_t arg0, uint64_t arg1, uint64_t arg2)"
+        "uint64_t nestedoffset(uint64_t arg0, uint32_t arg1, uint32_t arg2)"
     );
     assert!(before.text.contains("arg0 + ("), "{}", before.text);
 

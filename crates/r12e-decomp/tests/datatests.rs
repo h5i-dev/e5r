@@ -854,7 +854,6 @@ fn floatcast() {
 /// set is more often a small negative number than four billion is still
 /// available and unused.
 #[test]
-#[ignore = "a negative constant prints as an unsigned hexadecimal"]
 fn convert() {
     case(&all("arith"), "convert", |c| {
         c.has("-512").has("-3000");

@@ -173,6 +173,7 @@ pub fn decompile_program_with(
                     name: r12e_decomp::identifier(&name),
                     arity: out.arity,
                     pointer_parameters: out.pointer_parameters.clone(),
+                    parameter_widths: out.parameter_widths.clone(),
                     returns_value: !out.signature.starts_with("void "),
                     signature: out.signature.clone(),
                 },
@@ -493,8 +494,13 @@ fn recovered(p: &Program, f: &Function, ssa: &SsaFunction) -> Option<Prototype> 
         // the same structure to the same argument register and a shared name
         // would claim they did.
         let tag = format!("{}_{name}", r12e_decomp::identifier(&f.display_name()));
+        // The register is eight bytes; the argument is as wide as the body
+        // reads it, which is what stops every parameter being `uint64_t` and
+        // what lets a caller's `-512` print as itself rather than as
+        // `0xfffffe00`.
+        let width = recovered.integer_widths.get(n).copied().unwrap_or(8);
         let (decl, pointer) = if fields.is_empty() {
-            (format!("uint64_t {name}"), false)
+            (format!("{} {name}", r12e_decomp::c_type(width)), false)
         } else {
             definitions.push(structure(&tag, &fields));
             (format!("struct s_{tag} *{name}"), true)
@@ -504,7 +510,7 @@ fn recovered(p: &Program, f: &Function, ssa: &SsaFunction) -> Option<Prototype> 
             name,
             floating: false,
             pointer,
-            size: 8,
+            size: if pointer { 8 } else { width },
             fields,
             stride,
         });

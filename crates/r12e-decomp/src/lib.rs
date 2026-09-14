@@ -17,5 +17,5 @@ pub use emit::{
     Callee, Output, Param, Prototype, decompile, decompile_full, decompile_in, decompile_with,
     identifier,
 };
-pub use expr::{Expr, field_name};
+pub use expr::{Expr, c_type, field_name};
 pub use structure::{Case, Region, Structured, Switches};

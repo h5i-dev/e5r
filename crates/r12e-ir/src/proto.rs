@@ -31,6 +31,14 @@ pub struct Prototype {
     pub integer_arguments: usize,
     /// How many floating point ones.
     pub float_arguments: usize,
+    /// How wide each integer argument is actually read, in bytes.
+    ///
+    /// A register arrives eight bytes wide whatever the source declared, so a
+    /// prototype taken from the register file makes every argument
+    /// `uint64_t`. When a function only ever reads the low four bytes of one,
+    /// four is the width it was written against. Empty when nothing was
+    /// recovered; otherwise one entry per integer argument.
+    pub integer_widths: Vec<u8>,
     /// Offsets from the entry stack pointer of the arguments passed there.
     pub stack_arguments: Vec<i64>,
     /// Where it leaves a value the caller could read, when it leaves one.
@@ -373,6 +381,9 @@ fn apply(machine: Prototype, asserted: &Asserted, abi: &Abi) -> Prototype {
     Prototype {
         integer_arguments,
         float_arguments,
+        // An asserted declaration carries its own types, so the widths the
+        // body reads at are the recovered prototype's business, not this one's.
+        integer_widths: Vec::new(),
         stack_arguments,
         returns,
         returns_float,
@@ -618,9 +629,17 @@ pub fn recover_observed(f: &SsaFunction, abi: &Abi, observed: &Observed) -> Prot
     // A callee-saved register this function writes and does not put back.
     let unsaved = conv::clobbered(f, abi, &facts.written, &definitions);
 
+    let integer_widths = (0..integer_arguments)
+        .map(|n| match abi.integer_arguments.get(n) {
+            Some(offset) => read_width(f, &facts.live_in, *offset),
+            None => 8,
+        })
+        .collect();
+
     Prototype {
         integer_arguments,
         float_arguments,
+        integer_widths,
         stack_arguments,
         returns,
         returns_float,
@@ -629,6 +648,41 @@ pub fn recover_observed(f: &SsaFunction, abi: &Abi, observed: &Observed) -> Prot
         detected,
         ..Prototype::default()
     }
+}
+
+/// How wide an incoming argument register is actually read.
+///
+/// Every read of it has to take the low piece and nothing may read the rest.
+/// One full-width read, one piece taken from anywhere but the start, or a use
+/// as anything other than the value being narrowed, and the register keeps the
+/// width it arrived at -- a prototype that claims a narrower argument than the
+/// body reads would drop bits the machine uses.
+fn read_width(f: &SsaFunction, live_in: &BTreeSet<Location>, offset: u64) -> u8 {
+    let Some(l) = live_in
+        .iter()
+        .find(|l| l.space == Space::Register && l.offset == offset)
+    else {
+        return 8;
+    };
+    let arriving = Operand::Undefined(*l);
+    let mut widest = 0u8;
+    for b in f.blocks.values() {
+        for op in &b.ops {
+            let narrowing = op.kind == SsaKind::Op(Op::SubPiece)
+                && op.size < l.size
+                && matches!(op.inputs.get(1), Some(Operand::Const(0, _)));
+            for (i, input) in op.inputs.iter().enumerate() {
+                if *input != arriving {
+                    continue;
+                }
+                if !(narrowing && i == 0) {
+                    return l.size;
+                }
+                widest = widest.max(op.size);
+            }
+        }
+    }
+    if widest == 0 { l.size } else { widest }
 }
 
 /// One past the last of `candidates` that appears among the live-in set.
