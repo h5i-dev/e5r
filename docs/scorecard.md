@@ -46,6 +46,14 @@ encoding not decoded at all is a separate number with a floor that only rises.
 | AArch64 | `objdump -d` | 1,640,904 | 0 | 99.85% |
 | x86-64 | `llvm-objdump --x86-asm-syntax=intel` | 4,760 | 0 | 100% |
 | ARM32 and Thumb-2 | `llvm-objdump-18 -d` | 3,568 | 0 | 100% |
+| i386 | `llvm-mc` and `llvm-objdump`, swept | 235,357 | 0 | 99.71% |
+
+The i386 number is a sweep rather than a corpus: every one- and two-byte
+opcode crossed with prefix strings and ModRM shapes, both three-byte maps, all
+256 ModRM values of all eight x87 escapes, and 200,000 random byte piles. A
+compiler emits a narrow slice of an instruction set and a sweep covers the
+rest; this one found 467 disagreements no fixture would have. Over the
+compiled fixtures it is 100%.
 
 Adding a static Go binary to the AArch64 corpus raised it from 1.43M to 1.64M
 instructions and found five decoding bugs that the C corpus never reached: a
@@ -72,6 +80,31 @@ x86-64 material is cross-compiled. 4,760 instructions is enough to find
 systematic errors and not enough to claim the breadth the AArch64 number does.
 That is the honest reading of it.
 
+### Decoded from a SLEIGH language definition
+
+The same gate, against a decoder that reads its instruction set from a file at
+run time rather than having it compiled in.
+
+| architecture | oracle | instructions | wrong | decoded |
+| --- | --- | --- | --- | --- |
+| AArch64 | `objdump -d` | 19,710 | 0 | 100% |
+| x86-64 | `llvm-objdump --x86-asm-syntax=intel` | 5,688 | 0 | 100% |
+| RISC-V 64 | `llvm-objdump -M no-aliases` | 2,567 | 0 | 100% |
+
+RISC-V is an architecture this tool could not decode at all before, and no
+RISC-V code was written to make it work: the language definition is data.
+Sixteen further architectures decode noise without panic or hang.
+
+The strongest check available is three ways at once, because two of these
+already have hand-written decoders measured at zero disagreements. Running
+SLEIGH over the same bytes and comparing against both names which of the two
+is wrong when they differ. 19,554 agree three ways on AArch64 with none
+disagreeing, and 5,688 agree on where an x86-64 instruction ends.
+
+Spelling differences are enumerated rather than allowed in bulk: each names
+the `.sinc` lines whose display differs from the oracle and why, and a
+disagreement from any constructor not on that list fails the gate.
+
 ## Lifting
 
 The IR is measured two ways. Coverage is the share of instructions inside
@@ -80,17 +113,29 @@ model emits an explicit `Unimplemented` rather than an approximation.
 
 | architecture | instructions | lifted |
 | --- | --- | --- |
-| AArch64 | 607,913 | 99.52% |
-| x86-64 | 9,242 | 99.83% |
+| AArch64 | 617,824 | 99.64% |
+| x86-64 | 13,842 | 99.95% |
 
 The AArch64 corpus includes libc, bash and ls; the x86-64 one is the fixtures
 only, because this host runs no x86 system binaries, so the two numbers are
 not comparable.
 
-What remains on AArch64 is `mrs` (reading system registers, which needs a
-system model), `svc` and `brk` (which leave the program), the load-acquire and
-store-release forms, the SVE instructions in libc's string routines, and the
-byte and bit reversals.
+What remains on AArch64 is `mrs` at 1,732 of the 2,236 gaps, which reads a
+system register whose value comes from the processor and not from the program,
+then the byte and bit reversals, the load-acquire and store-release forms, and
+the SVE instructions in libc's string routines.
+
+A system call is modelled rather than declared unmodelled. What the
+instruction does to the register file is specified, so it is written down; what
+the kernel does is not knowable from the instruction, so the result and
+everything the convention lets it change is undefined rather than guessed, and
+the flow still stops the interpreter. A trap changes no register on the way, so
+it is complete with no operations at all.
+
+Lifted from a SLEIGH language definition, over the same corpora: RISC-V 100%,
+AArch64 99.8%, x86-64 98.5%. Every gap there is one construct, SLEIGH's
+user-defined operation, which this IR has no opcode for; it is reported rather
+than approximated.
 
 Correctness is measured against a processor. One program is compiled for both
 architectures and executed — natively here, under qemu for the other — and the
@@ -133,26 +178,62 @@ It found that most of the corpus was wrong:
 | the gate was first written | 225 | 130 |
 | extension widths fixed | 225 | 69 |
 | signed arithmetic widths fixed | 225 | 66 |
+| byte registers fixed | 224 | 40 |
+| blocks stopped being dropped | 229 | 39 |
 
 An inverted signed comparison, found separately by the ported Ghidra
 datatests, had made every `<` and `<=` in a source program reach the output
 meaning its complement, on both architectures at every optimization level. It
 compiled cleanly, which is why the first gate never saw it.
 
-The remaining 66 are being worked through and each is named by the gate.
+The gate is now a ratchet: 39 is a ceiling that fails both when the number
+rises and when it falls without being recorded, because a gate that is
+permanently red is a gate everyone learns to skip. Zero is the only acceptable
+end state and each of the 39 is named by the failure message.
 
-Goto density, the share of functions the structuring could not express without
-a label, is the quality signal:
+### Nothing is dropped
 
-| corpus | functions | gotos | per function |
-| --- | --- | --- | --- |
-| driver.a64.O0 / O1 / Os | 37-38 | 0 | 0.00 |
-| driver.x64.O0 / O1 / Os | 36-37 | 0 | 0.00 |
-| driver.a64.O2 / O3 | 37 | 9 | 0.24 |
-| driver.x64.O2 / O3 | 37 | 9 | 0.24 |
+The most serious thing this subsystem can do is lose code, because the reader
+cannot tell. Over every complete function in the corpus, **2,389 basic blocks
+were vanishing from the output**, and whole inner loops with them. That is now
+zero and asserted on every run.
 
-The O2 and O3 figures are one vectorized function each, whose loop has several
-exits.
+### Gotos
+
+A goto is honest, and it is also the thing to improve, so the count is a
+ceiling that only comes down.
+
+| | gotos over the corpus | functions needing a label |
+| --- | --- | --- |
+| before blocks stopped being dropped | 7,081 | |
+| after, which is the honest baseline | 7,286 | 1,153 |
+| after single-place block classification and tail copying | **4,489** | **1,001** |
+
+The rise in the middle row is the price of emitting 2,389 blocks that used to
+disappear: a dropped block costs no gotos. The fall is 38.4%, and it cost 6.2%
+more output text.
+
+The fixture ceiling in `quality.rs`, the share of functions needing at least
+one label, came down from 0.13 to **0.07**.
+
+What remains splits by target shape rather than by cause: 45% target a region
+above 24 blocks, where duplication is the wrong tool; 31% target a region
+containing a loop, where two copies would read as two different loops; 24% are
+acyclic and above the copy cap, and buying those costs about 6 KB of output
+per goto.
+
+### Types
+
+An assertion reaches the output. On a binary with no debug information,
+declaring a pointer-to-struct parameter turns three anonymous 64-bit arguments
+into named typed ones, emits the structure, and narrows the return. The JSON
+carries every variable with its name, type, size, role and storage rather than
+a count, which is why every consumer that tried to score type recovery scored
+zero on nearly every function.
+
+A function decompiles byte-identically whether asked for alone or as part of
+the whole program, gated over 90 functions in three fixtures. It did not
+before: asking for one left every call it makes anonymous and argument-less.
 
 ## Function recovery
 
