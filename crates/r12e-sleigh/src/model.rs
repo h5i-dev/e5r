@@ -1225,9 +1225,11 @@ pub struct Constructor {
     /// Its operands, display order first, then any the pattern alone names.
     ///
     /// This is the numbering [`DisplayPiece::Operand`], [`Offset::base`] and
-    /// every [`SymbolRef::Operand`] use, and it is the numbering the compiled
-    /// `.sla` uses too. It is *not* the order the bits arrive in; see
-    /// [`Constructor::order`].
+    /// every [`SymbolRef::Operand`] use. It is *not* the order the bits arrive
+    /// in; see [`Constructor::order`], and it is *not* the numbering a
+    /// compiled `.sla` uses either: every index in that file is a position in
+    /// the resolution-ordered list, which compiling all 152 definitions and
+    /// diffing against the reference proved twice.
     pub operands: Vec<Operand>,
     /// Every operand index exactly once, in the order a decoder must resolve
     /// them.

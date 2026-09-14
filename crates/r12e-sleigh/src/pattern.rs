@@ -394,9 +394,6 @@ fn conjoin(left: &[Alt], right: &[Alt]) -> Vec<Alt> {
             if !context.merge(&b.context) {
                 continue;
             }
-            // An ellipsis side stretches to whatever it is combined with, so
-            // it does not decide the width; it still contributes the bytes it
-            // covers, so the length is the larger of the two either way.
             // An ellipsis extends its side's token length to whatever the
             // combination turns out to be, so the width of a conjunction is
             // the larger of the two sides whether or not one is elided. The
