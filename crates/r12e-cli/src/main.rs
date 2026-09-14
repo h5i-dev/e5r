@@ -317,12 +317,26 @@ pub enum Command {
 #[derive(Subcommand)]
 pub enum PatchCommand {
     /// Capture an edit from the binary as it is now.
+    #[command(group = clap::ArgGroup::new("replacement").required(true).args(["bytes", "asm"]))]
     Record {
         /// Address or symbol to write at.
         target: String,
         /// The bytes to write, in hex.
         #[arg(long)]
-        bytes: String,
+        bytes: Option<String>,
+        /// The instructions to write, assembled at the target address.
+        ///
+        /// Exclusive with `--bytes`: a patch whose two spellings disagree is
+        /// one nobody can review.
+        #[arg(long)]
+        asm: Option<String>,
+        /// Pad the edit to this many bytes with no-ops.
+        ///
+        /// An instruction that encodes shorter than the one it replaces leaves
+        /// a hole, and the bytes after it are no longer the instructions they
+        /// were.
+        #[arg(long, value_name = "N")]
+        pad_to: Option<usize>,
         /// Why.
         #[arg(long, default_value = "")]
         note: String,
@@ -720,13 +734,22 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
                 PatchCommand::Record {
                     target,
                     bytes,
+                    asm,
+                    pad_to,
                     note,
                     out,
                 } => patch::record(
                     w,
                     &subject,
                     target,
-                    &patch::hex(bytes)?,
+                    patch::Replacement {
+                        source: match (bytes, asm) {
+                            (Some(b), _) => patch::Source::Bytes(patch::hex(b)?),
+                            (_, Some(a)) => patch::Source::Asm(a),
+                            _ => unreachable!("the argument group requires one"),
+                        },
+                        pad_to: *pad_to,
+                    },
                     &whoami(),
                     note,
                     out,

@@ -17,6 +17,7 @@ r12e-core = { workspace = true }
 r12e-format = { workspace = true }
 r12e-arch = { workspace = true }
 r12e-analysis = { workspace = true }
+r12e-asm = { workspace = true }
 r12e-db = { workspace = true }
 r12e-diff = { workspace = true }
 r12e-types = { workspace = true }

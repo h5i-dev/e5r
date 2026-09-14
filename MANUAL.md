@@ -172,12 +172,20 @@ find, so a patch written against one build still lands on the right
 instruction in the next one, and says how it found it.
 
 ```
-r12e patch prog record 0x401234 --bytes 90909090 --note "skip the check" -o fix.r12e-patch
+r12e patch prog record 0x401234 --asm "nop" --note "skip the check" -o fix.r12e-patch
+r12e patch prog record 0x401234 --bytes 90909090 -o fix.r12e-patch
+r12e patch prog record 0x401234 --asm "mov eax, 1" --pad-to 8 -o fix.r12e-patch
 r12e patch prog preview fix.r12e-patch     # where it lands, what it overwrites
 r12e patch prog apply   fix.r12e-patch -o prog.patched
 r12e patch prog.patched revert fix.r12e-patch -o prog
 r12e patch prog merge a.r12e-patch b.r12e-patch -o both.r12e-patch
 ```
+
+`--asm` assembles at the target address, because a branch encodes a
+displacement from where it sits. It accepts what `r12e disas` prints, so a
+line can be copied out, changed, and assembled back. `--pad-to` fills the rest
+with no-ops: an instruction that encodes shorter than the one it replaces
+would otherwise leave the bytes after it meaning something they did not mean.
 
 A set applies as a whole or not at all. Overlapping edits are a conflict
 rather than an order-dependent result, and an edit is always the same length

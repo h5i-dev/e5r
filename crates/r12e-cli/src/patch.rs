@@ -181,17 +181,54 @@ fn report(w: &mut Out, applied: &Applied, dest: &Path) {
 }
 
 /// `record`: capture an edit from the binary as it is now.
+/// How the replacement was written.
+///
+/// Assembly cannot be turned into bytes until the address is known: a branch
+/// or a pc-relative operand encodes a displacement from where it sits, so
+/// assembling at zero and relocating afterwards would be wrong.
+pub enum Source<'a> {
+    /// Bytes, already given as hex.
+    Bytes(Vec<u8>),
+    /// Instructions, to assemble at the target address.
+    Asm(&'a str),
+}
+
+/// What to write, and how long it has to be.
+pub struct Replacement<'a> {
+    /// The replacement as the analyst wrote it.
+    pub source: Source<'a>,
+    /// Pad with no-ops to this length. An instruction that encodes shorter
+    /// than the one it replaces leaves the bytes after it meaning something
+    /// they did not mean before.
+    pub pad_to: Option<usize>,
+}
+
 pub fn record(
     w: &mut Out,
     s: &Subject,
     target: &str,
-    replace: &[u8],
+    replace: Replacement<'_>,
     who: &str,
     note: &str,
     out: &Path,
 ) -> R {
     let (p, file, binary) = (s.program, s.file, s.binary);
     let at = addr::resolve(p, target).ok_or_else(|| format!("{target}: no such address"))?;
+    let mut bytes = match replace.source {
+        Source::Bytes(b) => b,
+        Source::Asm(text) => r12e_asm::assemble_all(&p.object.arch, text, at)
+            .map_err(|e| format!("{target}: {e}"))?,
+    };
+    if let Some(n) = replace.pad_to {
+        if bytes.len() > n {
+            return Err(format!(
+                "the replacement is {} bytes, which does not fit in {n}",
+                bytes.len()
+            ));
+        }
+        bytes.extend(r12e_asm::pad(&p.object.arch, n - bytes.len()).map_err(|e| e.to_string())?);
+    }
+    let replace = &bytes[..];
     let base = file_base(&p.object, at)
         .ok_or_else(|| format!("{at} is not in any section with file bytes"))?;
     let mut set = match std::fs::read_to_string(out) {
@@ -239,6 +276,7 @@ pub fn record(
             .by(who)
             .noted(note),
     );
+
     write(out, &set)?;
     outln!(
         w,
