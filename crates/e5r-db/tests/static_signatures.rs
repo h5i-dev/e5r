@@ -59,7 +59,15 @@ fn open(name: &str) -> Option<Program> {
 /// Where the distribution keeps the static libraries this binary was linked
 /// from. The compiler knows, so it is asked rather than guessed at.
 fn archive(name: &str) -> Option<PathBuf> {
-    let out = Command::new("gcc")
+    // The compiler that built the fixture, not the one that matches the host:
+    // the binary these signatures are matched against is AArch64 wherever it
+    // was built, so an x86-64 `libc.a` yields signatures that cannot match a
+    // single function in it -- which reads as a recovery rate of zero rather
+    // than as a library about the wrong machine.
+    let cc = ["aarch64-linux-gnu-gcc", "gcc"]
+        .into_iter()
+        .find(|c| Command::new(c).arg("--version").output().is_ok())?;
+    let out = Command::new(cc)
         .arg(format!("-print-file-name={name}"))
         .output()
         .ok()?;

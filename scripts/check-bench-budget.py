@@ -35,9 +35,10 @@ both ways, and a ceiling that ratchets itself down on a lucky run becomes a
 ceiling that fails on an ordinary one. Lower them with ``--update`` when a
 change is meant to have made them lower.
 
-Entries measured on system libraries are marked ``portable: false``: this
-machine's libc is not another machine's, so a CI runner checks only the
-fixtures, which are built from sources in this repository.
+Entries whose content this repository does not own are marked
+``portable: false``: this machine's libc is not another machine's, and neither
+is its Go runtime, so a CI runner checks only what is built from sources here
+by a toolchain whose output does not move between releases.
 """
 
 from __future__ import annotations
@@ -197,6 +198,23 @@ def timing_breaches(name: str, entry: dict, got: dict, notes: list[str]) -> list
     return failures
 
 
+# Fixtures whose function inventory belongs to a toolchain rather than to this
+# repository.
+#
+# `hello.go` is nine lines of Go and thirteen hundred functions, and all but
+# three of them are the Go runtime. A patch release of the compiler adds or
+# removes a handful, which is what a CI runner one Go release ahead of the
+# maintainer reported: recall a fifth of a percent higher than the floor and one
+# more entry no symbol names. Neither is a fact about e5r, and a floor that
+# tracks somebody's `apt upgrade` is not a ratchet. Measured everywhere, checked
+# where the toolchain is the recorded one.
+TOOLCHAIN_OWNED = ("hello.go",)
+
+
+def toolchain_owned(name: str) -> bool:
+    return name.split(".stripped")[0] in TOOLCHAIN_OWNED
+
+
 def update(budget: dict, results: dict) -> dict:
     rows = measured_rows(results)
     speeds = ratios(results)
@@ -210,7 +228,9 @@ def update(budget: dict, results: dict) -> dict:
         # A fixture is built from sources in this repository and is the same
         # bytes anywhere; this machine's libc is not another machine's.
         entry = budget["binaries"].setdefault(name, {})
-        entry["portable"] = got["path"].startswith("fixtures/")
+        entry["portable"] = got["path"].startswith("fixtures/") and not toolchain_owned(
+            name
+        )
         entry["measured_seconds"] = got["seconds"]
         entry["measured_peak_mb"] = got["peak_mb"]
         entry["seconds_ceiling"] = round(

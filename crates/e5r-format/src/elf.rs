@@ -1179,7 +1179,16 @@ fn read_plt_relocations(
     obj: &mut Object,
     caps: &e5r_core::Caps,
 ) {
-    let Some(plt) = obj.section(".plt").cloned() else {
+    // `.plt.sec` where there is one. A binary built for indirect-branch
+    // tracking puts the address a call actually goes to there -- one 16-byte
+    // entry per relocation with no resolver header -- and leaves `.plt` as the
+    // lazy-resolution stubs behind it. objdump labels the `.plt.sec` entry
+    // `<name@plt>`, so naming `.plt` on such a file names the wrong addresses,
+    // and every indirect call through the PLT resolves to nothing. Ubuntu
+    // builds x86-64 this way by default; aarch64 has no such section, which is
+    // why the whole form went unnoticed here.
+    let sec = obj.section(".plt.sec").cloned();
+    let Some(plt) = sec.clone().or_else(|| obj.section(".plt").cloned()) else {
         return;
     };
     if dynsym_names.is_empty() || plt.range.is_empty() {
@@ -1236,7 +1245,11 @@ fn read_plt_relocations(
     // followed by entries of another. Dividing the section's length by the
     // relocation count instead gives the wrong answer whenever the section
     // also holds IFUNC entries, which it usually does.
-    let (header, entry_size) = plt_layout(&obj.arch);
+    // `.plt.sec` is entries alone: the resolver stub stays in `.plt`.
+    let (header, entry_size) = match &sec {
+        Some(_) => (0, 16),
+        None => plt_layout(&obj.arch),
+    };
     if plt.range.len() < header + count * entry_size {
         obj.warnings.push(format!(
             ".plt is {:#x} bytes, too small for {count} entries of {entry_size:#x} \

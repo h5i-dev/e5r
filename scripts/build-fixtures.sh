@@ -240,7 +240,12 @@ fn main() {
     assert!(n < 100, "too many arguments");
 }
 EOF
-  (cd "$out" && rustc -O -C panic=abort -o panicky panicky.rs 2>/dev/null) || true
+  # A fixed target, like every other fixture here: the tests that read this
+  # one count what they find in it, and a Rust binary for another architecture
+  # is a different binary with different counts. `$cc` links it, which is the
+  # cross gcc off-host.
+  (cd "$out" && rustc -O -C panic=abort --target aarch64-unknown-linux-gnu \
+    -C "linker=$cc" -o panicky panicky.rs 2>/dev/null) || true
 fi
 
 # An Objective-C object, for the class and method lists. It is relocatable, so

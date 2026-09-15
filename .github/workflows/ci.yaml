@@ -47,7 +47,11 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      # The AArch64 std, for the Rust fixture: `build-fixtures.sh` builds it
+      # for a fixed target so the counts the tests hold do not follow the host.
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
       # Every gate that has no tool skips silently, which is the worst
       # possible outcome: a green run that measured nothing. These are what
@@ -85,7 +89,11 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      # The AArch64 std, for the Rust fixture: `build-fixtures.sh` builds it
+      # for a fixed target so the counts the tests hold do not follow the host.
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
       # The cross gcc because this runner is x86-64 and a `.a64` fixture
       # has to be AArch64; qemu because several of them are executed.
@@ -114,7 +122,11 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      # The AArch64 std, for the Rust fixture: `build-fixtures.sh` builds it
+      # for a fixed target so the counts the tests hold do not follow the host.
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
       # The cross gcc because this runner is x86-64 and a `.a64` fixture
       # has to be AArch64; qemu because several of them are executed.

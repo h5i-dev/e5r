@@ -286,7 +286,15 @@ fn plt_thunks_are_named_where_objdump_names_them() {
     // objdump prints `<name@plt>` at each PLT entry, which is the oracle for
     // whether the layout arithmetic is right. An off-by-one here names every
     // indirect call after the wrong import.
-    for path in ["/bin/bash", "/usr/lib/aarch64-linux-gnu/libc.so.6"] {
+    // Whatever this machine has: the oracle is objdump, not a recorded list,
+    // so any dynamically linked system binary will do and the architecture
+    // does not have to be this one.
+    let mut compared_somewhere = false;
+    for path in [
+        "/bin/bash",
+        "/usr/lib/aarch64-linux-gnu/libc.so.6",
+        "/usr/lib/x86_64-linux-gnu/libc.so.6",
+    ] {
         let p = Path::new(path);
         if !p.is_file() {
             continue;
@@ -295,8 +303,10 @@ fn plt_thunks_are_named_where_objdump_names_them() {
         let Ok(obj) = load(&data, &LoadOptions::default()) else {
             continue;
         };
+        // `.plt.sec` as well: with indirect-branch tracking on, that is where
+        // the entry a call reaches lives, and it is the one objdump labels.
         let Ok(out) = Command::new("objdump")
-            .args(["-d", "--section=.plt"])
+            .args(["-d", "--section=.plt", "--section=.plt.sec"])
             .arg(p)
             .output()
         else {
@@ -334,6 +344,16 @@ fn plt_thunks_are_named_where_objdump_names_them() {
             );
             checked += 1;
         }
-        assert!(checked > 10, "{path}: only {checked} PLT entries compared");
+        // Not per path: a machine need not have all three, and one that names
+        // none of them is a machine where this gate did not run, which is
+        // worth failing over rather than passing quietly.
+        if checked > 10 {
+            compared_somewhere = true;
+        }
     }
+    assert!(
+        compared_somewhere,
+        "no system binary here offered a PLT objdump would name; this gate \
+         compared nothing"
+    );
 }

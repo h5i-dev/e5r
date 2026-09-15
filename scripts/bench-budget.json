@@ -45,7 +45,7 @@
       "recall_floor": 0.9945
     },
     "hello.go": {
-      "portable": true,
+      "portable": false,
       "measured_seconds": 0.06,
       "measured_peak_mb": 14.8,
       "seconds_ceiling": 0.12,
@@ -56,7 +56,7 @@
       "recall_floor": 1.0
     },
     "hello.go.stripped": {
-      "portable": true,
+      "portable": false,
       "measured_seconds": 0.05,
       "measured_peak_mb": 14.2,
       "seconds_ceiling": 0.1,
