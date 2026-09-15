@@ -553,11 +553,39 @@ fn corrupted_relocation_tables_neither_panic_nor_hang() {
         return;
     }
 
+    // The budget stops the sweep; the hang is caught per file.
+    //
+    // How long the whole sweep takes is a fact about the build profile and the
+    // machine -- it is 3s optimized here and ten times that unoptimized on a
+    // shared runner, with nothing hanging in either -- so the sweep spends a
+    // budget and stops, and what is asserted is the worst single load. One
+    // small file taking seconds to refuse is a hang whatever built it.
+    const BUDGET: Duration = Duration::from_secs(20);
+    const ONE_FILE: Duration = Duration::from_secs(10);
+
     let started = Instant::now();
-    for seed in &seeds {
+    let mut worst = Duration::ZERO;
+    let mut slowest = String::new();
+    let mut tried = 0u64;
+    let mut time = |what: String, f: &mut dyn FnMut()| {
+        let at = Instant::now();
+        f();
+        let took = at.elapsed();
+        tried += 1;
+        if took > worst {
+            worst = took;
+            slowest = what;
+        }
+    };
+    'sweep: for (n, seed) in seeds.iter().enumerate() {
         // Every truncation, at a stride that still lands inside every table.
         for cut in (0..seed.len()).step_by(7) {
-            let _ = load(&seed[..cut], &LoadOptions::default());
+            time(format!("seed {n} truncated to {cut}"), &mut || {
+                let _ = load(&seed[..cut], &LoadOptions::default());
+            });
+            if started.elapsed() > BUDGET {
+                break 'sweep;
+            }
         }
         // Every byte of every section header, saturated. That is how a
         // relocation count becomes 7x10^17: `sh_size` is a number from the
@@ -567,15 +595,20 @@ fn corrupted_relocation_tables_neither_panic_nor_hang() {
             for b in v[i..(i + 8).min(seed.len())].iter_mut() {
                 *b = 0xff;
             }
-            let _ = load(&v, &LoadOptions::default());
-            if started.elapsed() > Duration::from_secs(20) {
-                break;
+            time(format!("seed {n} saturated at {i}"), &mut || {
+                let _ = load(&v, &LoadOptions::default());
+            });
+            if started.elapsed() > BUDGET {
+                break 'sweep;
             }
         }
     }
+    // Not a silent pass: a sweep that tried almost nothing proves nothing.
+    assert!(tried > 100, "the sweep only loaded {tried} files");
     assert!(
-        started.elapsed() < Duration::from_secs(30),
-        "the corruption sweep took {:?}, which is a hang, not a test",
+        worst < ONE_FILE,
+        "{slowest} took {worst:?} to load, which is a hang, not slowness \
+         ({tried} files in {:?})",
         started.elapsed()
     );
 }

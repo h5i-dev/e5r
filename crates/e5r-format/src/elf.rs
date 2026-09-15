@@ -1250,16 +1250,21 @@ fn read_plt_relocations(
         Some(_) => (0, 16),
         None => plt_layout(&obj.arch),
     };
-    // `.plt` gives every relocation a slot, an IFUNC's included. `.plt.sec`
-    // gives one only to the relocations that name a symbol: a call to an IFUNC
-    // does not go through the tracking stub, so it has no entry there. Sizing
-    // this section by the relocation count would therefore declare it too
-    // small and name nothing.
-    let slots = match &sec {
-        Some(_) => named_relocations(r, sh, step, wide, count, dynsym_names),
-        None => count,
-    };
-    if plt.range.len() < header + slots * entry_size {
+    // x86-64 `.plt.sec` is read the way i386 reads `.plt`: by decoding each
+    // entry to find the GOT slot it jumps through, and naming it from the
+    // relocation that slot belongs to. Index order does not survive here --
+    // an IFUNC takes a slot in `.plt` and none in `.plt.sec`, so every
+    // IRELATIVE before a symbol shifts the rest by one -- and counting which
+    // relocations have a slot means walking the table twice, which on a
+    // corrupt file with a large declared count is the difference between a
+    // sweep and a hang.
+    if sec.is_some()
+        && obj.arch == Arch::X86_64
+        && name_plt_sec(r, sh.offset, step, is_rela, count, dynsym_names, &plt, obj)
+    {
+        return;
+    }
+    if plt.range.len() < header + count * entry_size {
         obj.warnings.push(format!(
             ".plt is {:#x} bytes, too small for {count} entries of {entry_size:#x} \
              after a {header:#x}-byte header; thunks not named",
@@ -1268,9 +1273,6 @@ fn read_plt_relocations(
         return;
     }
 
-    // The slot this relocation takes, which is its own index only where every
-    // relocation has one.
-    let mut slot = 0;
     for i in 0..count {
         let Ok(mut e) = r.slice_at("relocation", sh.offset + i * step, step) else {
             break;
@@ -1286,18 +1288,13 @@ fn read_plt_relocations(
             (info >> 8) as usize
         };
         let Some(name) = dynsym_names.get(sym_index).filter(|n| !n.is_empty()) else {
-            // It still consumed a `.plt` slot; it consumed no `.plt.sec` one.
-            if sec.is_none() {
-                slot += 1;
-            }
             continue;
         };
         let thunk = plt
             .range
             .start()
-            .checked_add(header + slot * entry_size)
+            .checked_add(header + i * entry_size)
             .filter(|a| plt.range.contains(*a));
-        slot += 1;
         if let Some(imp) = obj.imports.iter_mut().find(|im| im.name == *name) {
             imp.thunk = thunk;
         }
@@ -1312,39 +1309,96 @@ fn read_plt_relocations(
     }
 }
 
-/// How many of these relocations name a symbol, which is how many entries a
-/// `.plt.sec` holds.
-fn named_relocations(
+/// Name the entries of an x86-64 `.plt.sec` by what each one jumps through.
+///
+/// One entry is sixteen bytes: `endbr64`, then a `jmp *disp(%rip)` that may
+/// carry the `bnd` prefix, then padding. The displacement is relative to the
+/// end of the jump, and what it reaches is the GOT slot a `JUMP_SLOT`
+/// relocation names -- so the pairing is by address and survives anything the
+/// linker put in between.
+///
+/// Returns false when nothing was named, leaving the caller to try `.plt`.
+#[allow(clippy::too_many_arguments)]
+fn name_plt_sec(
     r: &Reader<'_>,
-    sh: &SecHdr,
+    table_offset: u64,
     step: u64,
-    wide: bool,
+    is_rela: bool,
     count: u64,
     dynsym_names: &[String],
-) -> u64 {
-    let mut n = 0;
+    plt: &Section,
+    obj: &mut Object,
+) -> bool {
+    const R_X86_64_JUMP_SLOT: u64 = 7;
+    const ENTRY: u64 = 16;
+
+    let mut by_slot: Vec<(u64, String)> = Vec::new();
     for i in 0..count {
-        let Ok(mut e) = r.slice_at("relocation", sh.offset + i * step, step) else {
+        let Some(rel) = read_reloc(r, table_offset + i * step, true, is_rela) else {
             break;
         };
-        if e.uword("r_offset", wide).is_err() {
-            break;
+        if rel.kind != R_X86_64_JUMP_SLOT {
+            continue;
         }
-        let sym_index = if wide {
-            let Ok(info) = e.u64("r_info") else { break };
-            (info >> 32) as usize
-        } else {
-            let Ok(info) = e.u32("r_info") else { break };
-            (info >> 8) as usize
+        let Some(name) = dynsym_names
+            .get(rel.symbol as usize)
+            .filter(|n| !n.is_empty())
+        else {
+            continue;
         };
-        if dynsym_names
-            .get(sym_index)
-            .is_some_and(|name| !name.is_empty())
-        {
-            n += 1;
+        by_slot.push((rel.offset, name.clone()));
+    }
+    if by_slot.is_empty() {
+        return false;
+    }
+    by_slot.sort_by_key(|(slot, _)| *slot);
+
+    let mut found: Vec<(u64, String)> = Vec::new();
+    for i in 0..plt.range.len() / ENTRY {
+        let at = plt.range.start().get().wrapping_add(i * ENTRY);
+        let Some(code) = obj.memory.slice(Addr(at), ENTRY) else {
+            continue;
+        };
+        // `endbr64` is what puts these entries in their own section, but the
+        // form without it is still a `.plt.sec` the linker may emit.
+        let mut off = if code.starts_with(&[0xf3, 0x0f, 0x1e, 0xfa]) {
+            4
+        } else {
+            0
+        };
+        if code.get(off) == Some(&0xf2) {
+            off += 1; // `bnd`
+        }
+        if code.get(off) != Some(&0xff) || code.get(off + 1) != Some(&0x25) {
+            continue;
+        }
+        let Some(rel32) = code.get(off + 2..off + 6) else {
+            continue;
+        };
+        let disp = i32::from_le_bytes([rel32[0], rel32[1], rel32[2], rel32[3]]) as i64;
+        // Relative to the end of the jump, which is where the program counter
+        // stands when it is executed.
+        let after = at.wrapping_add(off as u64 + 6);
+        let slot = after.wrapping_add(disp as u64);
+        if let Ok(k) = by_slot.binary_search_by_key(&slot, |(s, _)| *s) {
+            found.push((at, by_slot[k].1.clone()));
         }
     }
-    n
+    if found.is_empty() {
+        return false;
+    }
+    for (at, name) in found {
+        if let Some(imp) = obj.imports.iter_mut().find(|im| im.name == name) {
+            imp.thunk = Some(Addr(at));
+        }
+        obj.function_hints.push(FunctionHint {
+            addr: Addr(at),
+            size: Some(ENTRY),
+            name: Some(format!("{name}@plt")),
+            provenance: Provenance::new(Evidence::ImportThunk),
+        });
+    }
+    true
 }
 
 /// Where `_GLOBAL_OFFSET_TABLE_` is, for the `%ebx`-relative form of a PLT
