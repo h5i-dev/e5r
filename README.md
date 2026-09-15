@@ -1,34 +1,10 @@
-<p align="center">
-  <a href="https://github.com/h5i-dev/e5r/actions/workflows/ci.yaml"><img alt="ci" src="https://github.com/h5i-dev/e5r/actions/workflows/ci.yaml/badge.svg"></a>
-  <a href="https://github.com/h5i-dev/e5r/blob/main/LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/github/license/h5i-dev/e5r?color=blue"></a>
-  <a href="https://github.com/h5i-dev/e5r/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/h5i-dev/e5r?style=social"></a>
-  <a href="https://github.com/h5i-dev/e5r/releases"><img alt="release" src="https://img.shields.io/github/v/release/h5i-dev/e5r?label=release"></a>
-</p>
-
-<h1 align="center">The Reverse Engineering Toolkit for AI Agents</h1>
+# e5r: The Reverse Engineering Toolkit for AI Agents
 
 **e5r** is a disassembler, decompiler and binary differ with a command line as
 its only front end. Every command speaks JSON, every recovered fact carries the
 evidence for it, and every name, type and comment an agent writes lands in a
 git-mergeable log. One static Rust binary: no JVM, no project server, no
 proprietary database.
-
-<table align="center">
-  <tr>
-    <td align="center">
-      <strong>Agent-native</strong><br>
-      <sub>JSON on every command, and analysis an agent can correct</sub>
-    </td>
-    <td align="center">
-      <strong>Evidence, not assertions</strong><br>
-      <sub>Every gate measured against an outside oracle, including a processor</sub>
-    </td>
-    <td align="center">
-      <strong>21×–3,291× faster than rizin</strong><br>
-      <sub><a href="./docs/benchmarks.md">2.4×–8.6× less memory, in our benchmarks</a></sub>
-    </td>
-  </tr>
-</table>
 
 **Let agents read binaries the way a human does with IDA — and write what they
 learn back into the repository.**
