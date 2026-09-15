@@ -7,7 +7,7 @@
 
 use r12e_core::Addr;
 
-use crate::insn::{AddrMode, Flow, Insn, Mem, Operand};
+use crate::insn::{AddrMode, Flow, Insn, Mem, Operand, Shift};
 
 use super::text::{decimal, index, minus_zero};
 use super::{
@@ -75,8 +75,10 @@ pub fn decode(w: u32, addr: Addr) -> Option<Insn> {
         0b011 => media(w, cond, addr),
         0b100 => block(w, cond, addr),
         0b101 => branch(w, cond, addr),
-        0b110 => vfp::ldst(w, cond, addr, 4),
-        _ => vfp::dp(w, cond, addr, 4),
+        // Coprocessors 10 and 11 are the floating point unit and have their
+        // own decoder; every other coprocessor is the generic space.
+        0b110 => vfp::ldst(w, cond, addr, 4).or_else(|| super::coproc(w, cond, addr, false)),
+        _ => vfp::dp(w, cond, addr, 4).or_else(|| super::coproc(w, cond, addr, false)),
     }
 }
 
@@ -477,9 +479,11 @@ fn ldst(w: u32, cond: u32, addr: Addr, reg_form: bool) -> Option<Insn> {
         bit(w, 21) == 1,
         bit(w, 20) == 1,
     );
-    if !p && wb {
-        return None; // ldrt and its relatives
-    }
+    // `P == 0 && W == 1` is the unprivileged form, which accesses memory with
+    // the permissions of user mode however privileged the caller is. It is a
+    // post-index by construction and an operating system's own instruction:
+    // the one it copies a user pointer with.
+    let unprivileged = !p && wb;
     let (rn, rt) = (bits(w, 19, 16), bits(w, 15, 12));
     let mode = match (p, wb) {
         (false, _) => AddrMode::PostIndex,
@@ -509,11 +513,15 @@ fn ldst(w: u32, cond: u32, addr: Addr, reg_form: bool) -> Option<Insn> {
     if mode == AddrMode::PostIndex {
         m = decimal(m);
     }
-    let mn = match (l, b) {
-        (true, false) => cm(conds!("ldr"), cond),
-        (true, true) => cm(conds!("ldrb"), cond),
-        (false, false) => cm(conds!("str"), cond),
-        (false, true) => cm(conds!("strb"), cond),
+    let mn = match (unprivileged, l, b) {
+        (false, true, false) => cm(conds!("ldr"), cond),
+        (false, true, true) => cm(conds!("ldrb"), cond),
+        (false, false, false) => cm(conds!("str"), cond),
+        (false, false, true) => cm(conds!("strb"), cond),
+        (true, true, false) => cm(conds!("ldrt"), cond),
+        (true, true, true) => cm(conds!("ldrbt"), cond),
+        (true, false, false) => cm(conds!("strt"), cond),
+        (true, false, true) => cm(conds!("strbt"), cond),
     };
     let flow = if l && rt == 15 {
         Flow::IndirectBranch
@@ -598,6 +606,40 @@ fn media(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
             i.push(Operand::Reg(reg(rn)))
                 .push(Operand::Reg(reg(rm)))
                 .push(Operand::Reg(reg(bits(w, 11, 8))));
+            Some(i)
+        }
+        // `ssat` and `usat` clamp a shifted value into a signed or unsigned
+        // field of a chosen width. The saturate-position field is one more
+        // than the encoding holds for the signed form and exactly it for the
+        // unsigned one, which is the architecture's own asymmetry.
+        (0b01010 | 0b01011 | 0b01110 | 0b01111, _) if bits(w, 5, 4) == 0b01 => {
+            let signed = op1 < 0b01110;
+            let sat = if signed { rn + 1 } else { rn };
+            let shift = bits(w, 11, 7);
+            let asr = bit(w, 6) == 1;
+            let mut i = at(
+                addr,
+                cm(
+                    if signed {
+                        conds!("ssat")
+                    } else {
+                        conds!("usat")
+                    },
+                    cond,
+                ),
+                Flow::Next,
+            );
+            i.push(Operand::Reg(reg(rd)))
+                .push(Operand::Count(sat as i64))
+                .push(Operand::Reg(reg(rm)));
+            if shift != 0 || asr {
+                let (kind, n) = if asr {
+                    (Shift::Asr, if shift == 0 { 32 } else { shift as u8 })
+                } else {
+                    (Shift::Lsl, shift as u8)
+                };
+                i.push(Operand::ShiftOp(kind, n));
+            }
             Some(i)
         }
         (0b01011, 0b001) | (0b01011, 0b101) | (0b01111, 0b001) | (0b01111, 0b101)

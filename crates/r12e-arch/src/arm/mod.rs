@@ -16,7 +16,7 @@
 
 use r12e_core::Addr;
 
-use crate::insn::{Insn, Operand, Reg, RegClass, Shift, Width};
+use crate::insn::{AddrMode, Flow, Insn, Mem, Operand, Reg, RegClass, Shift, Width};
 
 /// Bits `hi..=lo` of `w`.
 #[inline]
@@ -154,6 +154,129 @@ pub(crate) fn vreg(n: u32, double: bool) -> Reg {
 #[inline]
 pub(crate) fn core_list(mask: u32) -> Operand {
     Operand::Sys(mask & 0xffff)
+}
+
+/// The sixteen coprocessor numbers and the sixteen coprocessor registers, as
+/// a listing spells them.
+const PN: [&str; 16] = [
+    "p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11", "p12", "p13", "p14",
+    "p15",
+];
+const CN: [&str; 16] = [
+    "c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12", "c13", "c14",
+    "c15",
+];
+
+/// The generic coprocessor instructions, which A32 and T32 encode identically.
+///
+/// `cdp`, `mcr`, `mrc`, `mcrr`, `mrrc`, `ldc` and `stc` move data and commands
+/// between the core and a coprocessor. Coprocessors 10 and 11 are the floating
+/// point unit and have their own decoder; everything else is this, and it is
+/// what a system, a debug unit or a cache controller is driven through. The
+/// `2` forms are the same instructions in the unconditional space, which is a
+/// second instruction space rather than a condition.
+///
+/// `len` is 4 either way: the T32 encodings are the A32 word unchanged, which
+/// is why one decoder serves both.
+pub(crate) fn coproc(w: u32, cond: u32, addr: Addr, two: bool) -> Option<Insn> {
+    fn at(addr: Addr, mn: &'static str, flow: Flow) -> Insn {
+        Insn::new(addr, 4, mn, flow)
+    }
+    let coproc = bits(w, 11, 8);
+    // The floating point unit's own space, decoded elsewhere.
+    if coproc == 10 || coproc == 11 {
+        return None;
+    }
+    let p = PN[coproc as usize];
+    let group = bits(w, 27, 24);
+    let mut i = if group == 0b1110 && bit(w, 4) == 1 {
+        // `mcr` writes a core register to the coprocessor, `mrc` reads one.
+        let load = bit(w, 20) == 1;
+        let mn = match (load, two) {
+            (true, false) => cm(conds!("mrc"), cond),
+            (false, false) => cm(conds!("mcr"), cond),
+            (true, true) => "mrc2",
+            (false, true) => "mcr2",
+        };
+        let mut i = at(addr, mn, Flow::Next);
+        i.push(Operand::Name(p))
+            .push(Operand::Count(bits(w, 23, 21) as i64))
+            .push(Operand::Reg(reg(bits(w, 15, 12))))
+            .push(Operand::Name(CN[bits(w, 19, 16) as usize]))
+            .push(Operand::Name(CN[bits(w, 3, 0) as usize]))
+            .push(Operand::Count(bits(w, 7, 5) as i64));
+        i
+    } else if group == 0b1110 {
+        let mn = if two { "cdp2" } else { cm(conds!("cdp"), cond) };
+        let mut i = at(addr, mn, Flow::Next);
+        i.push(Operand::Name(p))
+            .push(Operand::Count(bits(w, 23, 20) as i64))
+            .push(Operand::Name(CN[bits(w, 15, 12) as usize]))
+            .push(Operand::Name(CN[bits(w, 19, 16) as usize]))
+            .push(Operand::Name(CN[bits(w, 3, 0) as usize]))
+            .push(Operand::Count(bits(w, 7, 5) as i64));
+        i
+    } else if group == 0b1100 && bits(w, 23, 21) == 0b010 {
+        // The two-register forms, which move a 64-bit value in one go.
+        let load = bit(w, 20) == 1;
+        let mn = match (load, two) {
+            (true, false) => cm(conds!("mrrc"), cond),
+            (false, false) => cm(conds!("mcrr"), cond),
+            (true, true) => "mrrc2",
+            (false, true) => "mcrr2",
+        };
+        let mut i = at(addr, mn, Flow::Next);
+        i.push(Operand::Name(p))
+            .push(Operand::Count(bits(w, 7, 4) as i64))
+            .push(Operand::Reg(reg(bits(w, 15, 12))))
+            .push(Operand::Reg(reg(bits(w, 19, 16))))
+            .push(Operand::Name(CN[bits(w, 3, 0) as usize]));
+        i
+    } else if matches!(group, 0b1100 | 0b1101) {
+        // `ldc` and `stc`, which move words to and from memory. The `l` suffix
+        // is the long form, which the D bit selects.
+        let load = bit(w, 20) == 1;
+        let long = bit(w, 22) == 1;
+        let mn = match (load, long, two) {
+            (true, false, false) => cm(conds!("ldc"), cond),
+            (true, true, false) => cm(conds!("ldc", "l"), cond),
+            (false, false, false) => cm(conds!("stc"), cond),
+            (false, true, false) => cm(conds!("stc", "l"), cond),
+            (true, false, true) => "ldc2",
+            (true, true, true) => "ldc2l",
+            (false, false, true) => "stc2",
+            (false, true, true) => "stc2l",
+        };
+        let (p_bit, u, wb) = (bit(w, 24) == 1, bit(w, 23) == 1, bit(w, 21) == 1);
+        if !p_bit && !wb && !u {
+            // Neither indexed nor written back, which is the unindexed form
+            // this does not model rather than a form to invent.
+            return None;
+        }
+        let mode = match (p_bit, wb) {
+            (false, _) => AddrMode::PostIndex,
+            (true, true) => AddrMode::PreIndex,
+            (true, false) => AddrMode::Offset,
+        };
+        let off = bits(w, 7, 0) as i64 * 4;
+        let m = Mem {
+            seg: None,
+            base: Some(reg(bits(w, 19, 16))),
+            index: None,
+            disp: if u { off } else { -off },
+            mode,
+            size: 4,
+        };
+        let mut i = at(addr, mn, Flow::Next);
+        i.push(Operand::Name(p))
+            .push(Operand::Name(CN[bits(w, 15, 12) as usize]))
+            .push(Operand::Mem(m));
+        i
+    } else {
+        return None;
+    };
+    i.len = 4;
+    Some(i)
 }
 
 /// A VFP list is always a run: tag 1 single, tag 2 double, first register in

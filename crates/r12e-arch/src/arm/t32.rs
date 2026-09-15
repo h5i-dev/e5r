@@ -538,8 +538,10 @@ fn wide(w: u32, cond: u32, in_it: bool, addr: Addr) -> Option<Insn> {
     match bits(w, 28, 27) {
         // The coprocessor space, which for VFP is the A32 word unchanged.
         0b01 if op2 & 0b1000000 != 0 => match bits(w, 27, 24) {
-            0b1100 | 0b1101 => vfp::ldst(w, cond, addr, 4),
-            0b1110 => vfp::dp(w, cond, addr, 4),
+            0b1100 | 0b1101 => {
+                vfp::ldst(w, cond, addr, 4).or_else(|| super::coproc(w, cond, addr, false))
+            }
+            0b1110 => vfp::dp(w, cond, addr, 4).or_else(|| super::coproc(w, cond, addr, false)),
             _ => None,
         },
         0b01 if op2 & 0b1100100 == 0b0000000 => block(w, cond, addr),
@@ -933,6 +935,9 @@ fn control(w: u32, cond: u32, in_it: bool, addr: Addr) -> Option<Insn> {
             if let Some(i) = misc_control(w, cond, addr) {
                 return Some(i);
             }
+            if let Some(i) = special_move(w, cond, addr) {
+                return Some(i);
+            }
             let c = bits(w, 25, 22);
             if c >= 0b1110 {
                 return None;
@@ -978,6 +983,77 @@ fn control(w: u32, cond: u32, in_it: bool, addr: Addr) -> Option<Insn> {
             Some(i)
         }
     }
+}
+
+/// The special registers a Thumb `msr` and `mrs` name.
+///
+/// These are the M-profile registers: the encoding does not exist on
+/// A-profile, which is why naming them needs no knowledge of the image. A
+/// number inside the architecture's three groups with no name of its own is
+/// printed as the number, which is what it is; anything outside them is not
+/// decoded, because a register the architecture does not define is not one.
+fn special_register(sysm: u32) -> Option<&'static str> {
+    Some(match sysm {
+        0 => "apsr",
+        1 => "iapsr",
+        2 => "eapsr",
+        3 => "xpsr",
+        5 => "ipsr",
+        6 => "epsr",
+        7 => "iepsr",
+        8 => "msp",
+        9 => "psp",
+        16 => "primask",
+        17 => "basepri",
+        18 => "basepri_max",
+        19 => "faultmask",
+        20 => "control",
+        _ => return None,
+    })
+}
+
+/// The special register as an operand: its name, or its number inside the
+/// space the architecture defines.
+fn special_operand(sysm: u32) -> Option<Operand> {
+    if let Some(name) = special_register(sysm) {
+        return Some(Operand::Name(name));
+    }
+    // `SYSm[7:3]` selects the group: 0 is the program status registers, 1 the
+    // stack pointers, 2 the masks. Above that there is nothing.
+    (sysm >> 3 <= 2).then_some(Operand::Count(sysm as i64))
+}
+
+/// `msr` and `mrs`, which move between a core register and a special one.
+///
+/// They sit in the branch-and-miscellaneous space alongside the barriers, in
+/// the rows where the field a conditional branch reads as its condition is not
+/// one. Firmware is built out of these: masking interrupts, switching stacks
+/// and reading the exception number all go through them.
+fn special_move(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
+    let op = bits(w, 26, 20);
+    let sysm = bits(w, 7, 0);
+    let name = special_operand(sysm)?;
+    if op == 0b0111000 || op == 0b0111001 {
+        // `msr <special>, Rn`.
+        let rn = bits(w, 19, 16);
+        if rn == 15 || rn == 13 {
+            return None;
+        }
+        let mut i = at(addr, 4, cm(conds!("msr"), cond), Flow::Next);
+        i.push(name).push(Operand::Reg(reg(rn)));
+        return Some(i);
+    }
+    if op == 0b0111110 || op == 0b0111111 {
+        // `mrs Rd, <special>`.
+        let rd = bits(w, 11, 8);
+        if rd == 15 || rd == 13 || bits(w, 19, 16) != 0b1111 {
+            return None;
+        }
+        let mut i = at(addr, 4, cm(conds!("mrs"), cond), Flow::Next);
+        i.push(Operand::Reg(reg(rd))).push(name);
+        return Some(i);
+    }
+    None
 }
 
 /// The barriers and hints that live among the branches.
@@ -1140,7 +1216,13 @@ fn group11(w: u32, cond: u32, addr: Addr) -> Option<Insn> {
     if op2 & 0b1000000 == 0 {
         return ldst(w, cond, addr);
     }
-    None
+    // The coprocessor space again, in the second of the two halves it spans.
+    // These are the `2` forms: the same instructions, encoded where A32 puts
+    // its unconditional space, so they carry no condition.
+    match bits(w, 27, 24) {
+        0b1100..=0b1110 => super::coproc(w, cond, addr, true),
+        _ => None,
+    }
 }
 
 /// The single-item loads and stores, whose `.w` marks the twelve-bit and

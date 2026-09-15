@@ -368,7 +368,14 @@ impl Flow {
 }
 
 /// The most operands any supported encoding uses.
-pub const MAX_OPERANDS: usize = 5;
+///
+/// Six, which is what ARM's `mcr` and `mrc` take: a coprocessor, an opcode,
+/// a core register, two coprocessor registers and a second opcode. Everything
+/// else needs fewer. [`Insn::push`] drops anything past this rather than
+/// growing, so a decoder that needs more would silently produce an instruction
+/// missing an operand -- which is why this is the widest encoding and not a
+/// round number.
+pub const MAX_OPERANDS: usize = 6;
 
 /// A decoded instruction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
