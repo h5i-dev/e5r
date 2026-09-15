@@ -221,8 +221,12 @@ pub enum Command {
         #[arg(long, default_value_t = 64)]
         depth: u32,
         /// How many IR operations to allow.
+        ///
+        /// Not `--budget`, which is global and counts seconds. Two options
+        /// with one name and two types is a clap panic at parse time, which is
+        /// what this was: `r12e emulate` could not be run at all.
         #[arg(long, default_value_t = 1 << 22)]
-        budget: u64,
+        steps: u64,
     },
     /// Ask a question about the program.
     ///
@@ -797,8 +801,8 @@ pub fn dispatch(
             target,
             args,
             depth,
-            budget,
-        } => print::emulate(w, program, target, args, *depth, *budget, common.json),
+            steps,
+        } => print::emulate(w, program, target, args, *depth, *steps, common.json),
         Command::Vtables { common } => print::vtables(w, program, common.json),
         Command::Classes { common, members } => print::classes(w, program, *members, common.json),
         Command::Batch {
@@ -1010,4 +1014,64 @@ fn whoami() -> String {
 #[allow(unsafe_code)]
 fn map_file(file: &std::fs::File) -> std::io::Result<memmap2::Mmap> {
     unsafe { memmap2::Mmap::map(file) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every subcommand's parser is well formed.
+    ///
+    /// `clap` builds the parser at run time, so a definition that contradicts
+    /// itself is not a compile error: it is a panic the first time someone
+    /// runs the subcommand that contains it. `emulate` had one for its whole
+    /// life -- a global `--budget` counting seconds and a subcommand
+    /// `--budget` counting IR operations, two types under one name -- and
+    /// `r12e emulate` could not be run at all. Nothing noticed, because
+    /// nothing ever built the parser outside of running the program.
+    ///
+    /// `debug_assert` is clap's own consistency check, and it is the same one
+    /// that panics at parse time. Running it here turns "the first user to try
+    /// this subcommand" into "the test run".
+    #[test]
+    fn the_command_tree_is_consistent() {
+        Cli::command().debug_assert();
+    }
+
+    /// No subcommand names an option the global set already owns.
+    ///
+    /// The check above catches a redefinition with a different type, which is
+    /// the panic that happened. It does not catch one with the *same* type:
+    /// that parses, and quietly gives the subcommand's copy, so the same flag
+    /// before and after the subcommand would mean two things with no error
+    /// anywhere. A name is either global or it is not.
+    #[test]
+    fn no_subcommand_shadows_a_global_option() {
+        let cli = Cli::command();
+        // The global options live on `Common`, which is flattened into every
+        // subcommand rather than declared on the root, so that is where they
+        // are visible.
+        let globals: std::collections::BTreeSet<String> = cli
+            .get_subcommands()
+            .flat_map(|s| s.get_arguments())
+            .filter(|a| a.is_global_set())
+            .map(|a| a.get_id().to_string())
+            .collect();
+        assert!(!globals.is_empty(), "no global options were found at all");
+
+        let mut clashes = Vec::new();
+        for sub in cli.get_subcommands() {
+            for arg in sub.get_arguments() {
+                let id = arg.get_id().to_string();
+                if !arg.is_global_set() && globals.contains(&id) {
+                    clashes.push(format!("{} --{id}", sub.get_name()));
+                }
+            }
+        }
+        assert!(
+            clashes.is_empty(),
+            "these subcommands redefine a global option: {}",
+            clashes.join(", ")
+        );
+    }
 }
