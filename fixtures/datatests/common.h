@@ -5,8 +5,8 @@
    compiler folds an if/else ladder whose arms differ only in a constant into a
    bit test, and the ladder is what several of these cases are about. */
 
-#ifndef R12E_DATATESTS_COMMON_H
-#define R12E_DATATESTS_COMMON_H
+#ifndef E5R_DATATESTS_COMMON_H
+#define E5R_DATATESTS_COMMON_H
 
 #define NI __attribute__((noinline))
 

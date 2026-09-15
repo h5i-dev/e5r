@@ -1,6 +1,6 @@
 # Loading
 
-`crates/r12e-format`
+`crates/e5r-format`
 
 ## What it is for
 

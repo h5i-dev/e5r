@@ -1,0 +1,12 @@
+[package]
+name = "e5r-arch"
+description = "e5r — instruction decoders."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+e5r-core = { workspace = true }

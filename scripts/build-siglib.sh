@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build an r12e signature library out of real distribution packages.
+# Build an e5r signature library out of real distribution packages.
 #
 # A statically linked binary is the case signature matching exists for: the
 # library code is inside the image, the symbol table that named it has been
@@ -9,7 +9,7 @@
 # of, and those are downloadable, versioned and already on most machines.
 #
 # So this takes packages or static libraries, splits each archive into the
-# objects it holds, fingerprints every named function in them with `r12e sig
+# objects it holds, fingerprints every named function in them with `e5r sig
 # <object> create`, and merges the result into one sorted library. The output is the
 # ordinary text format: one signature per line, sorted, so a library reviews in
 # a diff and merges the way the annotation log does.
@@ -36,7 +36,7 @@
 # they need no reverse engineering of anyone's format.
 set -euo pipefail
 
-r12e=${R12E:-./target/release/r12e}
+e5r=${E5R:-./target/release/e5r}
 out=
 inputs=()
 
@@ -54,8 +54,8 @@ if [ ${#inputs[@]} -eq 0 ] || [ -z "$out" ]; then
   exit 2
 fi
 
-if [ ! -x "$r12e" ]; then
-  echo "$r12e not found; build it with: cargo build --release -p r12e-cli" >&2
+if [ ! -x "$e5r" ]; then
+  echo "$e5r not found; build it with: cargo build --release -p e5r-cli" >&2
   exit 2
 fi
 
@@ -146,7 +146,7 @@ while IFS=$'\t' read -r archive label; do
   mkdir -p "$d"
   # `ar x` rather than reading the archive in the tool: a member is an ordinary
   # object file once it is on disk, and this keeps the script working against
-  # any r12e that can open an object at all.
+  # any e5r that can open an object at all.
   (cd "$d" && ar x "$(readlink -f "$archive")" 2>/dev/null) || {
     note "skip $archive: not an archive this ar understands"
     continue
@@ -156,7 +156,7 @@ while IFS=$'\t' read -r archive label; do
   for o in "$d"/*; do
     [ -f "$o" ] || continue
     members=$((members + 1))
-    if ! "$r12e" sig "$o" create > "$work/one.sig" 2>/dev/null; then
+    if ! "$e5r" sig "$o" create > "$work/one.sig" 2>/dev/null; then
       failed=$((failed + 1))
       continue
     fi
@@ -183,7 +183,7 @@ fi
 # Sorted and deduplicated here as well as in the reader, so the file on disk is
 # the same file on every machine and a rebuild shows up as a real diff.
 {
-  echo "# r12e signatures v1"
+  echo "# e5r signatures v1"
   echo "# built by scripts/build-siglib.sh from: ${inputs[*]}"
   LC_ALL=C sort -u < "$work/parts/all"
 } > "$out"

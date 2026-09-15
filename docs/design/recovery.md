@@ -1,6 +1,6 @@
 # Function recovery
 
-`crates/r12e-analysis`
+`crates/e5r-analysis`
 
 ## What it is for
 

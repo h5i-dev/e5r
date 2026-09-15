@@ -1,6 +1,6 @@
 # Resource limits and the one unsafe block
 
-`crates/r12e-core/src/error.rs`, and the exceptions listed at the end.
+`crates/e5r-core/src/error.rs`, and the exceptions listed at the end.
 
 Two of M12's items are policies rather than code: what this tool does with a
 count it read out of a file it does not trust, and where it uses `unsafe`.
@@ -76,16 +76,16 @@ which is how a size or an entry count becomes enormous in practice.
 
 Those are per format and each one proves a point about its own parser. The
 statement M12 asks for is one gate over the whole untrusted surface, and it is
-`crates/r12e-ir/tests/nopanic_gate.rs`. It lives in `r12e-ir` because that is
-the only crate whose dev-dependencies reach both `r12e-format` and
-`r12e-arch`, and a gate split across two test binaries is two gates.
+`crates/e5r-ir/tests/nopanic_gate.rs`. It lives in `e5r-ir` because that is
+the only crate whose dev-dependencies reach both `e5r-format` and
+`e5r-arch`, and a gate split across two test binaries is two gates.
 
 One function, `drive_every_entry_point`, calls every path in this workspace
 that takes bytes somebody else wrote: `load` for each container, the archive
 reader including `load_member`, raw mode, the overlay pass, DWARF through the
 loaded object, PDB from raw bytes and again with a section table, the Swift
 reader, the Go `pclntab` reader, the Objective-C class reader, the Rust panic
-site scan, and then `r12e_arch::decode` over every executable section the
+site scan, and then `e5r_arch::decode` over every executable section the
 object claims. Adding a reader to the crate and not adding it there is a
 visible omission rather than an invisible one.
 
@@ -125,7 +125,7 @@ turns the pin red and the pin comes out with the fix:
    release that is a silent wrong answer; with overflow checks on, which is
    the dev profile CI builds, it is a panic.
 3. `Object::symbol_at` adds a file-chosen `st_size` to a symbol address
-   unchecked, and so does `r12e-api/src/vtables.rs`. One run of `0xff` over a
+   unchecked, and so does `e5r-api/src/vtables.rs`. One run of `0xff` over a
    fixture's symbol table produces a symbol at `0xffff_ffff_0010_08c8` with
    size `0xffff_ffff`; the same overflow, the same profile split.
 
@@ -136,7 +136,7 @@ asking whether the sum exists.
 
 ## `unsafe`
 
-Every crate is `#![forbid(unsafe_code)]` except `r12e-cli`, which is
+Every crate is `#![forbid(unsafe_code)]` except `e5r-cli`, which is
 `#![deny(unsafe_code)]` so that one audited call can opt in with a written
 reason. There is exactly one, and this is it:
 

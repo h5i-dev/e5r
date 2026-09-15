@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure r12e against the other reverse engineering tools on this machine.
+"""Measure e5r against the other reverse engineering tools on this machine.
 
 Driven by ``scripts/compare-tools.sh``, which finds the tools and checks they
 run. This file does the measuring and nothing else.
@@ -90,8 +90,8 @@ class Layout:
 
 
 def readelf(*args: str) -> str:
-    """readelf rather than r12e: the oracle for a comparison r12e takes part
-    in cannot be r12e."""
+    """readelf rather than e5r: the oracle for a comparison e5r takes part
+    in cannot be e5r."""
     return subprocess.run(
         ["readelf", *args], capture_output=True, text=True
     ).stdout
@@ -279,8 +279,8 @@ def probe(argv: list[str]) -> str:
         return "unknown"
 
 
-class R12e:
-    name = "r12e"
+class E5r:
+    name = "e5r"
 
     def __init__(self, exe: str, limit: int = DEFAULT_TIMEOUT):
         self.exe = exe
@@ -296,7 +296,7 @@ class R12e:
     def recover(self, binary: Path, work: Path):
         """Function recovery alone. Analysis is lazy, so listing functions
         forces nothing else."""
-        out = work / "r12e-recover.json"
+        out = work / "e5r-recover.json"
         secs, rss, code = run_timed(
             [self.exe, "funcs", str(binary), "--json"], out, self.limit
         )
@@ -309,7 +309,7 @@ class R12e:
         return secs, rss, {int(f["addr"], 16) for f in data["items"]}
 
     def analyze(self, binary: Path, work: Path):
-        """Time `r12e stats`, count what `r12e funcs` lists.
+        """Time `e5r stats`, count what `e5r funcs` lists.
 
         `stats` is the command that does the whole job -- functions, control
         flow, cross references and strings -- which is what `rizin -A` also
@@ -321,7 +321,7 @@ class R12e:
         secs, rss, code = run_timed([self.exe, "stats", str(binary), "--json"], None, self.limit)
         if code:
             return secs, rss, outcome(code, True)
-        out = work / "r12e.json"
+        out = work / "e5r.json"
         if run_timed([self.exe, "funcs", str(binary), "--json"], out)[2] != 0:
             return secs, rss, None
         try:
@@ -354,7 +354,7 @@ class Rizin:
     def recover(self, binary: Path, work: Path):
         # `aa` is rizin's own "analyze all (fcns + bbs)": function recovery
         # without the passes -A adds on top of it. This is the row that is
-        # like for like against r12e's function recovery, and on this corpus
+        # like for like against e5r's function recovery, and on this corpus
         # it is both much faster and much more accurate than -A.
         out = work / "rizin-aa.json"
         secs, rss, code = run_timed(
@@ -750,10 +750,10 @@ def build_tools(args) -> tuple[list, list[str]]:
     scripts = Path(__file__).resolve().parent / "ghidra"
     tools, absent = [], []
 
-    if "r12e" in skip:
-        absent.append("r12e: skipped by request")
+    if "e5r" in skip:
+        absent.append("e5r: skipped by request")
     else:
-        tools.append(R12e(args.r12e, args.timeout))
+        tools.append(E5r(args.e5r, args.timeout))
 
     if "rizin" in skip:
         absent.append("rizin: skipped by request")
@@ -780,11 +780,11 @@ def build_tools(args) -> tuple[list, list[str]]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("binaries", nargs="*", type=Path)
-    ap.add_argument("--r12e", default=os.environ.get("R12E", "target/release/r12e"))
+    ap.add_argument("--e5r", default=os.environ.get("E5R", "target/release/e5r"))
     ap.add_argument(
-        "--r12e-name",
+        "--e5r-name",
         default="",
-        help="where the r12e binary came from, when --r12e is a snapshot of it",
+        help="where the e5r binary came from, when --e5r is a snapshot of it",
     )
     ap.add_argument("--rizin", default=os.environ.get("RIZIN", "rizin"))
     ap.add_argument("--ghidra", default=os.environ.get("GHIDRA_INSTALL_DIR", ""))
@@ -833,11 +833,11 @@ def main() -> int:
         print(f"not measured -- {line}")
     versions = {t.name: t.version() for t in tools}
     # The exact bytes measured, because this workspace gets rebuilt while a run
-    # is in progress and "r12e 0.1.0" does not distinguish two builds of it.
+    # is in progress and "e5r 0.1.0" does not distinguish two builds of it.
     for tool in tools:
-        if isinstance(tool, R12e):
-            versions["r12e"] += (
-                f" ({args.r12e_name or args.r12e}, sha256 {sha256(Path(tool.exe))[:16]})"
+        if isinstance(tool, E5r):
+            versions["e5r"] += (
+                f" ({args.e5r_name or args.e5r}, sha256 {sha256(Path(tool.exe))[:16]})"
             )
     for name, text in versions.items():
         print(f"{name:<8} {text}")
@@ -869,7 +869,7 @@ def main() -> int:
             "oracle_functions": len(oracle),
             "tools": {},
         }
-        with tempfile.TemporaryDirectory(prefix="r12e-bench-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="e5r-bench-") as tmp:
             work = Path(tmp)
             for tool in tools:
                 runs = args.slow_runs if isinstance(tool, Ghidra) else args.runs
@@ -914,7 +914,7 @@ def main() -> int:
         for row in results:
             row["runs"] = args.runs
         doc = {
-            "schema": "r12e-bench/1",
+            "schema": "e5r-bench/1",
             "when": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "loadavg": os.getloadavg(),
             # The cost half of any budget derived from this run belongs to this

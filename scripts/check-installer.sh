@@ -2,7 +2,7 @@
 # The installer against a real archive, end to end.
 #
 # `install.sh` reaches into the archive by name -- it expects
-# `r12e-<version>-<target>/r12e` inside `r12e-<version>-<target>.tar.gz`, and it
+# `e5r-<version>-<target>/e5r` inside `e5r-<version>-<target>.tar.gz`, and it
 # expects a `SHA256SUMS` beside it that names that archive. Every one of those
 # is decided by `scripts/build-release.sh`, in a different file, and nothing
 # links the two. A change to either that forgot the other is a download that
@@ -38,16 +38,16 @@ case "$(uname -s)-$(uname -m)" in
   *) echo "no installer mapping for this host; nothing to check" >&2; exit 0 ;;
 esac
 
-src="dist/r12e-$version-$host.tar.gz"
+src="dist/e5r-$version-$host.tar.gz"
 [ -f "$src" ] || { echo "build-release.sh produced no $src" >&2; exit 1; }
 
 # Restage under the name the installer will ask for. The directory inside has
 # to be renamed too, which is the half that would otherwise go unchecked.
 tar -xzf "$src" -C "$work"
-mv "$work/r12e-$version-$host" "$work/r12e-$version-$want"
-tar -C "$work" -czf "$work/r12e-$version-$want.tar.gz" "r12e-$version-$want"
-rm -rf "$work/r12e-$version-$want"
-(cd "$work" && sha256sum "r12e-$version-$want.tar.gz" > SHA256SUMS)
+mv "$work/e5r-$version-$host" "$work/e5r-$version-$want"
+tar -C "$work" -czf "$work/e5r-$version-$want.tar.gz" "e5r-$version-$want"
+rm -rf "$work/e5r-$version-$want"
+(cd "$work" && sha256sum "e5r-$version-$want.tar.gz" > SHA256SUMS)
 
 # A high port chosen per run, so two checkouts checking at once do not collide.
 port=$((20000 + RANDOM % 20000))
@@ -59,15 +59,15 @@ for _ in $(seq 40); do
 done
 
 run() {
-  R12E_BASE_URL="http://127.0.0.1:$port" R12E_VERSION="v$version" \
-    R12E_INSTALL_DIR="$1" sh install.sh
+  E5R_BASE_URL="http://127.0.0.1:$port" E5R_VERSION="v$version" \
+    E5R_INSTALL_DIR="$1" sh install.sh
 }
 
 echo "==> a good archive installs"
 mkdir -p "$work/good"
 run "$work/good"
-[ -x "$work/good/r12e" ] || { echo "FAIL: the installer left no binary" >&2; exit 1; }
-"$work/good/r12e" --version | grep -q "$version" ||
+[ -x "$work/good/e5r" ] || { echo "FAIL: the installer left no binary" >&2; exit 1; }
+"$work/good/e5r" --version | grep -q "$version" ||
   { echo "FAIL: the installed binary does not report $version" >&2; exit 1; }
 
 echo "==> a tampered checksum is refused"
@@ -78,7 +78,7 @@ if run "$work/bad" > /dev/null 2>&1; then
   echo "FAIL: the installer accepted a mismatched checksum" >&2
   exit 1
 fi
-[ -e "$work/bad/r12e" ] && { echo "FAIL: it installed anyway" >&2; exit 1; }
+[ -e "$work/bad/e5r" ] && { echo "FAIL: it installed anyway" >&2; exit 1; }
 cp "$work/SHA256SUMS.good" "$work/SHA256SUMS"
 
 echo "==> a missing SHA256SUMS is refused"

@@ -1,9 +1,9 @@
 # The annotation store
 
-`crates/r12e-db`
+`crates/e5r-db`
 
 ROADMAP.md M7 says this subsystem gets designed before it gets coded, because
-it is the feature that distinguishes r12e from the incumbents. This is that
+it is the feature that distinguishes e5r from the incumbents. This is that
 design, kept up to date with what was built.
 
 ## The problem
@@ -57,7 +57,7 @@ and undo is a new assertion rather than an edit, so history is never rewritten.
 
 ### Merging
 
-The file is line-oriented and append-only, which means `*.r12e merge=union` in
+The file is line-oriented and append-only, which means `*.e5r merge=union` in
 `.gitattributes` makes git merge two branches of annotations with no conflict
 markers. Two analysts on separate branches merge like two people editing
 different functions in source, because that is what they are doing.

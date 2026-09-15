@@ -28,7 +28,7 @@ project, so the guards are opt-in and gitignored rather than committed settings:
    ```
 
 Both are on in this checkout. Every cargo invocation takes `--release` and the
-binary is `./target/release/r12e`. Do not work around a "File exists" failure on
+binary is `./target/release/e5r`. Do not work around a "File exists" failure on
 `target/debug`: build release, or turn the guard off deliberately, which is the
 owner's call.
 

@@ -1,0 +1,14 @@
+[package]
+name = "e5r-format"
+description = "e5r — container loaders: ELF, PE, Mach-O, raw."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+e5r-core = { workspace = true }
+e5r-types = { workspace = true }
+serde = { workspace = true }

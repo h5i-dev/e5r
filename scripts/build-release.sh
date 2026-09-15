@@ -59,13 +59,13 @@ for target in "${targets[@]}"; do
   # Only the binary and what it needs: a release job has no use for the test
   # binaries of fourteen crates, and on a small machine that is the difference
   # between a build that fits and one that swaps.
-  if ! RUSTFLAGS="$flags" cargo build --release --target "$target" -p r12e-cli --bin r12e; then
+  if ! RUSTFLAGS="$flags" cargo build --release --target "$target" -p e5r-cli --bin e5r; then
     echo "FAIL $target: did not build here" >&2
     skipped+=("$target")
     continue
   fi
 
-  bin=target/$target/release/r12e
+  bin=target/$target/release/e5r
   [ -x "$bin" ] || { echo "FAIL $target: no binary at $bin" >&2; skipped+=("$target"); continue; }
 
   # A gate rather than a print. A musl archive that picked up a dynamic
@@ -86,11 +86,11 @@ for target in "${targets[@]}"; do
       ;;
   esac
 
-  name=r12e-$version-$target
+  name=e5r-$version-$target
   stage=$out/$name
   rm -rf "$stage"
   mkdir -p "$stage"
-  cp "$bin" "$stage/r12e"
+  cp "$bin" "$stage/e5r"
   cp README.md LICENSE MANUAL.md "$stage/"
   tar -C "$out" "${tarflags[@]}" -czf "$out/$name.tar.gz" "$name"
   rm -rf "$stage"
@@ -109,7 +109,7 @@ done
 # the whole release. An archive of some other version is not listed, because a
 # checksum file that mixes versions is worse than none.
 if command -v sha256sum > /dev/null; then sha=(sha256sum); else sha=(shasum -a 256); fi
-(cd "$out" && "${sha[@]}" r12e-"$version"-* > SHA256SUMS)
+(cd "$out" && "${sha[@]}" e5r-"$version"-* > SHA256SUMS)
 cat "$out/SHA256SUMS"
 
 # A target that was asked for and did not appear is a failure, not a note. The

@@ -1,0 +1,20 @@
+[package]
+name = "e5r-ir"
+description = "e5r — the intermediate representation, its lifters and its interpreter."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+e5r-core = { workspace = true }
+e5r-arch = { workspace = true }
+e5r-types = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+e5r-format = { workspace = true }
+e5r-analysis = { workspace = true }
+e5r-arch = { workspace = true }

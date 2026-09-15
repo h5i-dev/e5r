@@ -45,13 +45,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: cargo install into an empty root
-        run: cargo install --path crates/r12e-cli --root "$RUNNER_TEMP/inst" --locked
+        run: cargo install --path crates/e5r-cli --root "$RUNNER_TEMP/inst" --locked
       - name: The installed binary runs with nothing else around it
         run: |
           cd "$RUNNER_TEMP"
-          ./inst/bin/r12e --version
-          ./inst/bin/r12e info /bin/ls
-          ./inst/bin/r12e funcs --json /bin/ls | head -c 200
+          ./inst/bin/e5r --version
+          ./inst/bin/e5r info /bin/ls
+          ./inst/bin/e5r funcs --json /bin/ls | head -c 200
 
   # Static musl, both architectures, linked with the rust-lld that ships in
   # every toolchain: no musl-gcc, no cross, no container. Verified on the
@@ -71,10 +71,10 @@ jobs:
       - name: Say what came out
         run: |
           file dist/*.tar.gz
-          tar -tzf dist/r12e-*-x86_64-unknown-linux-musl.tar.gz
+          tar -tzf dist/e5r-*-x86_64-unknown-linux-musl.tar.gz
           tmp=$(mktemp -d)
-          tar -xzf dist/r12e-*-x86_64-unknown-linux-musl.tar.gz -C "$tmp"
-          bin=$(find "$tmp" -name r12e -type f)
+          tar -xzf dist/e5r-*-x86_64-unknown-linux-musl.tar.gz -C "$tmp"
+          bin=$(find "$tmp" -name e5r -type f)
           file "$bin"
           # The build script already fails the job if either archive carries a
           # NEEDED or an INTERP. This is the same fact in the form a reader of
@@ -103,8 +103,8 @@ jobs:
       - name: Run the native one
         run: |
           tmp=$(mktemp -d)
-          tar -xzf dist/r12e-*-aarch64-apple-darwin.tar.gz -C "$tmp"
-          bin=$(find "$tmp" -name r12e -type f)
+          tar -xzf dist/e5r-*-aarch64-apple-darwin.tar.gz -C "$tmp"
+          bin=$(find "$tmp" -name e5r -type f)
           otool -L "$bin"
           "$bin" --version
           "$bin" info /bin/ls
@@ -131,17 +131,17 @@ jobs:
         shell: pwsh
         env:
           RUSTFLAGS: -C strip=symbols
-        run: cargo build --release --target x86_64-pc-windows-msvc -p r12e-cli --bin r12e
+        run: cargo build --release --target x86_64-pc-windows-msvc -p e5r-cli --bin e5r
       - name: Archive
         shell: pwsh
         run: |
           $version = (cargo metadata --no-deps --format-version 1 | ConvertFrom-Json).packages |
-            Where-Object { $_.name -eq "r12e-cli" } | ForEach-Object { $_.version }
-          $name = "r12e-$version-x86_64-pc-windows-msvc"
+            Where-Object { $_.name -eq "e5r-cli" } | ForEach-Object { $_.version }
+          $name = "e5r-$version-x86_64-pc-windows-msvc"
           New-Item -ItemType Directory -Force -Path "dist/$name" | Out-Null
-          Copy-Item "target/x86_64-pc-windows-msvc/release/r12e.exe" "dist/$name/"
+          Copy-Item "target/x86_64-pc-windows-msvc/release/e5r.exe" "dist/$name/"
           Copy-Item README.md, LICENSE, MANUAL.md "dist/$name/"
-          & "dist/$name/r12e.exe" --version
+          & "dist/$name/e5r.exe" --version
           Compress-Archive -Path "dist/$name" -DestinationPath "dist/$name.zip"
       - uses: actions/upload-artifact@v4
         with:
@@ -168,7 +168,7 @@ jobs:
         run: |
           cd dist
           rm -f SHA256SUMS
-          sha256sum r12e-* > SHA256SUMS
+          sha256sum e5r-* > SHA256SUMS
           cat SHA256SUMS
 
       # Keyless: the signing identity is this workflow's OIDC token, so there
@@ -229,4 +229,4 @@ jobs:
         run: |
           tag="${{ github.event.inputs.tag || github.ref_name }}"
           gh release create "$tag" --draft --title "$tag" --notes-file notes.md \
-            dist/SHA256SUMS dist/r12e-* $(ls dist/SHA256SUMS.sig dist/SHA256SUMS.pem 2>/dev/null)
+            dist/SHA256SUMS dist/e5r-* $(ls dist/SHA256SUMS.sig dist/SHA256SUMS.pem 2>/dev/null)

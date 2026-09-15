@@ -16,7 +16,7 @@ $ strip ./prog
 ## 1. Ask what it is before asking anything else
 
 ```
-$ r12e info prog
+$ e5r info prog
 ```
 
 Format, architecture, entry point, image base, whether it is position
@@ -29,7 +29,7 @@ after this point rests on it.
 ## 2. Find the functions, and look at the evidence column
 
 ```
-$ r12e funcs prog
+$ e5r funcs prog
 address                 size  blocks   insns  strength  evidence                    name
 0x400144                  24       1       9  inferred  direct call target          sub_400144
 0x400168                  14       1       5  inferred  direct call target          sub_400168
@@ -49,8 +49,8 @@ into one number.
 To see what is fact and what is a scanner's opinion, run it both ways:
 
 ```
-$ r12e funcs prog --no-scan | wc -l
-$ r12e funcs prog | wc -l
+$ e5r funcs prog --no-scan | wc -l
+$ e5r funcs prog | wc -l
 ```
 
 The difference is the scan's contribution, and if it is large on your binary
@@ -61,9 +61,9 @@ that is worth knowing before you trust it.
 Build a signature library from a binary that has symbols:
 
 ```
-$ r12e sig fixtures/build/driver.a64.O2 create -o driver.r12e-sig
+$ e5r sig fixtures/build/driver.a64.O2 create -o driver.e5r-sig
 38 signature(s) written
-$ r12e sig prog apply driver.r12e-sig
+$ e5r sig prog apply driver.e5r-sig
 address              match      name                         was
 0x400144             exact      arith8                       sub_400144
 0x400168             exact      arith16                      sub_400168
@@ -92,8 +92,8 @@ worse than no name, because you will believe it.
 ## 4. Read the code
 
 ```
-$ r12e disas prog 0x400144
-$ r12e decompile prog 0x400144
+$ e5r disas prog 0x400144
+$ e5r decompile prog 0x400144
 ```
 
 The C is a statement of what the machine does, in C's notation. Where the
@@ -105,17 +105,17 @@ an operation has no C, a named helper appears (`__bits`, `__clobbered`,
 To find the function worth reading first:
 
 ```
-$ r12e query prog 'functions where insns > 100 and calls > 5'
-$ r12e strings prog --min 8
-$ r12e xrefs prog 0x410008
+$ e5r query prog 'functions where insns > 100 and calls > 5'
+$ e5r strings prog --min 8
+$ e5r xrefs prog 0x410008
 ```
 
 ## 5. Write down what you worked out
 
 ```
-$ r12e annotate prog name 0x400144 parse_header
-$ r12e annotate prog comment 0x400144 "length is little endian, unlike the rest"
-$ r12e annotate prog type 0x400144 "int parse_header(const uint8_t *p, size_t n)"
+$ e5r annotate prog name 0x400144 parse_header
+$ e5r annotate prog comment 0x400144 "length is little endian, unlike the rest"
+$ e5r annotate prog type 0x400144 "int parse_header(const uint8_t *p, size_t n)"
 ```
 
 Each one prints what it recorded:
@@ -125,15 +125,15 @@ Each one prints what it recorded:
 0x400144 comment = "length is little endian, unlike the rest"
 ```
 
-and writes `prog.r12e`, one assertion per line:
+and writes `prog.e5r`, one assertion per line:
 
 ```
-$ cat prog.r12e
-r12e-annotations 1
+$ cat prog.e5r
+e5r-annotations 1
 # One assertion per line, sorted by content id. Order does not affect the
 # result, so the union of two branches is the correct merge. Put this in
 # .gitattributes so git does that for you:
-#     *.r12e merge=union
+#     *.e5r merge=union
 # Do not sort or reflow by hand.
 name shape=6a0730fc0e7aa36f bytes=893ddaba11934499 insns=9 abs=400144 off=0 \
   seq=0 id=0a30883f9c5dc4a3 by="you" value="parse_header"
@@ -150,8 +150,8 @@ and its address as a tiebreak. The first two survive a rebase and a relink.
 Made a mistake:
 
 ```
-$ r12e annotate prog undo
-$ r12e annotate prog redo
+$ e5r annotate prog undo
+$ e5r annotate prog redo
 ```
 
 Undo is a new assertion, not an edit, so the history is never rewritten.
@@ -159,8 +159,8 @@ Undo is a new assertion, not an edit, so the history is never rewritten.
 ## 6. Commit it
 
 ```
-$ echo '*.r12e merge=union' >> .gitattributes
-$ git add .gitattributes prog.r12e
+$ echo '*.e5r merge=union' >> .gitattributes
+$ git add .gitattributes prog.e5r
 $ git commit -m "Name the header parser and its length field"
 ```
 
@@ -184,7 +184,7 @@ This is the step the incumbents cannot do.
 
 ```
 $ make -B                      # rebuild the program from changed source
-$ r12e annotate ./prog list
+$ e5r annotate ./prog list
 0x400144            name     "parse_header"
 0x400144            comment  "length is little endian, unlike the rest"
 ```
@@ -196,16 +196,16 @@ the same-binary fast path, and `abs=` is the address, used only as a tiebreak.
 
 Where it matters most is the case where an anchor resolves on the address
 alone, because that means the code the annotation was written against is not
-there any more. Nothing hides that. `r12e sig ... apply` prints the resolution
-per function in its `match` column, and `r12e patch ... apply` refuses outright
+there any more. Nothing hides that. `e5r sig ... apply` prints the resolution
+per function in its `match` column, and `e5r patch ... apply` refuses outright
 unless you pass `--allow-address-only`.
 
 ## 8. Save the session
 
 ```
-$ r12e project new prog -o prog.r12e-proj
-$ r12e project add prog.r12e-proj --signatures driver.r12e-sig
-$ git add prog.r12e-proj && git commit -m "Record the session"
+$ e5r project new prog -o prog.e5r-proj
+$ e5r project add prog.e5r-proj --signatures driver.e5r-sig
+$ git add prog.e5r-proj && git commit -m "Record the session"
 ```
 
 A project names its binary by content as well as by path. Opening it against a

@@ -1,6 +1,6 @@
 # Decoding
 
-`crates/r12e-arch`
+`crates/e5r-arch`
 
 ## What it is for
 

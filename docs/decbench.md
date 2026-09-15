@@ -9,7 +9,7 @@ grading our own work, and this is not.
 
 This document records what was measured, how to reproduce it, and the numbers,
 including the ones that go against us. The short version: on the one project
-that could be run here, **r12e scores 23.4 union against angr's 37.0 on the
+that could be run here, **e5r scores 23.4 union against angr's 37.0 on the
 same binaries**: behind on structure, behind on types, level on
 recompilation. It decompiles more of the corpus than angr does and thirteen
 times faster, and neither of those is a DecBench metric.
@@ -29,8 +29,8 @@ zip. We take the first route.
 A backend is one class:
 
 ```python
-@register_decompiler("r12e")
-class R12eDecompiler(Decompiler):
+@register_decompiler("e5r")
+class E5rDecompiler(Decompiler):
     def is_available(self) -> bool: ...
     def get_version(self) -> str | None: ...
     def decompile_binary(self, binary_path, functions=None, output_dir=None,
@@ -50,7 +50,7 @@ optional: variable lists with ABI argument positions and line maps improve
 fidelity, but a backend that fills in only code and address is still scored on
 all three metrics, with type_match parsing types out of the C.
 
-Ours is `scripts/decbench_r12e.py`. It shells out to `r12e decompile <binary>
+Ours is `scripts/decbench_e5r.py`. It shells out to `e5r decompile <binary>
 all --json` once per binary and splits the JSON document into functions, which
 is far cheaper than one call per function: every invocation re-analyzes the
 whole image, so `all` pays the analysis once (5s for 158 functions of zlib's
@@ -105,7 +105,7 @@ makes it the only honest like-for-like comparison in the table below.
   **Our number is not comparable to a published number**, and the table below
   keeps them apart.
 - **What the decompiler saw:** a `strip --strip-all` copy. No symbols, no DWARF.
-- **Versions:** r12e 0.1.0 at `523515a`, angr 9.3.4, DecBench `5818d67`,
+- **Versions:** e5r 0.1.0 at `523515a`, angr 9.3.4, DecBench `5818d67`,
   metrics as that commit defines them (`cache_version` ged 4, byte_match 7,
   type_match 6).
 
@@ -115,7 +115,7 @@ Percent of functions scored perfect on each metric, which is what DecBench
 ranks on. Higher is better. Both columns are the same seven binaries and the
 same 780 function slots on the same machine, 779 of them after the duplicate
 DWARF name merges. The denominators differ, because
-DecBench scores each decompiler over the functions it returned: 779 for r12e,
+DecBench scores each decompiler over the functions it returned: 779 for e5r,
 759 for angr, which returned nothing for twenty of them. Crediting angr with a
 zero on those twenty instead of dropping them gives it 36.1 union rather than
 37.0, so the choice does not change the ordering.
@@ -123,7 +123,7 @@ zero on those twenty instead of dropping them gives it 36.1 union rather than
 | | Union | Structure (GED) | Types | Recompile |
 | --- | --- | --- | --- | --- |
 | angr 9.3.4 | **37.0** | **34.6** | **10.2** | **0.66** |
-| r12e 0.1.0 | 23.4 | 22.9 | 5.6 | 0.64 |
+| e5r 0.1.0 | 23.4 | 22.9 | 5.6 | 0.64 |
 
 The per-metric distributions, because a perfect-count alone hides how far off
 the rest are. GED is a distance, so lower is better; the other two are
@@ -132,11 +132,11 @@ similarities, where 1.0 is perfect.
 | | GED mean | GED median | Types mean | Recompile mean | Functions that recompiled |
 | --- | --- | --- | --- | --- | --- |
 | angr | 9.2 | 3 | 0.50 | 0.175 | 88.5% |
-| r12e | 21.1 | 13 | 0.10 | 0.181 | 96.1% |
+| e5r | 21.1 | 13 | 0.10 | 0.181 | 96.1% |
 
-So: **r12e is beaten on structure and on types, and is level on
+So: **e5r is beaten on structure and on types, and is level on
 recompilation.** Union is 23.4 against angr's 37.0, a third behind. The
-recompile column is the one the roadmap bet on being open, and it is: r12e's
+recompile column is the one the roadmap bet on being open, and it is: e5r's
 mean assembly similarity is marginally the higher of the two and it compiles
 after fixup more often, while both land five perfect functions out of ~780.
 
@@ -145,7 +145,7 @@ function and compares the two assemblies by Jaccard similarity with
 linker-dependent operands normalized away, which measures shape. A function
 that drops every argument at every call, as defect 3 below says ours do,
 still produces call instructions in roughly the right places and still scores.
-This repository's own `cargo test --release -p r12e-decomp --test roundtrip`
+This repository's own `cargo test --release -p e5r-decomp --test roundtrip`
 gate compiles each pure decompiled function and runs it against the
 interpreter, and at the time of this run it reported over a thousand calls
 disagreeing with the machine across dozens of functions. Those two statements
@@ -161,7 +161,7 @@ Two things that DecBench does not score, and which are ours:
 
 | | Functions returned | Wall time for all seven binaries |
 | --- | --- | --- |
-| r12e | 780 / 780 | 21s |
+| e5r | 780 / 780 | 21s |
 | angr | 760 / 780 | 278s |
 
 ### Against what the roadmap asked for
@@ -195,11 +195,11 @@ twice on purpose, as the only thing that bridges them.
 | dewolf v2026.7.11 | published, x86-64 | 4.4 | 4.5 | 0.1 | 0.0 |
 | --- | --- | --- | --- | --- | --- |
 | **angr 9.3.4** | **ours, aarch64, zlib O0, 779 fns** | **37.0** | **34.6** | **10.2** | **0.66** |
-| **r12e 0.1.0** | **ours, aarch64, zlib O0, 779 fns** | **23.4** | **22.9** | **5.6** | **0.64** |
+| **e5r 0.1.0** | **ours, aarch64, zlib O0, 779 fns** | **23.4** | **22.9** | **5.6** | **0.64** |
 
 angr scores 37.0 on our slice against 45.7 on the published corpus, so this
-slice is the harder of the two for reasons that have nothing to do with r12e.
-r12e reaches 63% of angr's union on the binaries where both were run. That
+slice is the harder of the two for reasons that have nothing to do with e5r.
+e5r reaches 63% of angr's union on the binaries where both were run. That
 ratio is the honest statement. It is not a projected leaderboard position, and
 nobody should read one into it: the only way to get a comparable number is to
 run the published corpus on x86-64, which needs a cross toolchain this machine
@@ -216,18 +216,18 @@ number without the other misleads.
 
 ### The three defects that cost the most
 
-**1. Structuring, which is most of the gap on its own.** r12e
+**1. Structuring, which is most of the gap on its own.** e5r
 emits 1,545 gotos across the 780 functions, 1.98 per function, against angr's
 433 and 0.57. Splitting our own functions by their goto count says the rest of
 the decompiler is not the problem:
 
-| r12e functions | count | GED-perfect | mean GED |
+| e5r functions | count | GED-perfect | mean GED |
 | --- | --- | --- | --- |
 | no goto | 475 | 36.2% | 10.6 |
 | 1-2 gotos | 175 | 2.9% | 18.4 |
 | 3 or more gotos | 124 | 0.0% | 65.1 |
 
-A function r12e structures without a goto scores 36.2% perfect, which is
+A function e5r structures without a goto scores 36.2% perfect, which is
 *better* than angr's 34.6% over its whole set. Every function that needs one is
 a near-certain zero. At that rate across all 774 scored functions the GED
 column would read about 36 instead of 22.9, which is thirteen points and most
@@ -239,10 +239,10 @@ number is optimistic.
 **2. Locals reach the metric with no name, no offset and no type.** type_match
 scores parameters and locals together, and 444 of libz's 768 ground-truth
 variables (58%) are locals. DecBench matches locals by stack offset when the
-backend supplies `VariableInfo`, and by name otherwise. `r12e decompile
+backend supplies `VariableInfo`, and by name otherwise. `e5r decompile
 --json` emits only a *count* of locals, so the adapter can supply neither, and
-every local is a guaranteed miss: 596 of r12e's 764 scored functions score
-exactly 0. Parameters are not much better: across libz's 151 functions r12e
+every local is a guaranteed miss: 596 of e5r's 764 scored functions score
+exactly 0. Parameters are not much better: across libz's 151 functions e5r
 emits 410 of them, 308 as a bare `uint64_t`, against angr's spread of
 `unsigned int`, `long long` and pointer types over 317. They are still where
 the 43 perfect functions come from. Exposing
@@ -252,7 +252,7 @@ point of score on this list.
 **3. Calls through the PLT lose their arguments and their return value.** 295
 of the 780 functions contain at least one `name_plt()` call emitted with an
 empty argument list; libz alone has 194 such call sites, and **30 of the 47
-distinct callees are functions r12e decompiled with a full signature in the
+distinct callees are functions e5r decompiled with a full signature in the
 same run**, reached through a PLT stub only because the library is built PIC. The result is then read from `__clobbered()`, so the value the call
 produced is severed from everything downstream. In `all` mode, which is the mode the
 benchmark runs because it is the only affordable one, the assignment
@@ -262,7 +262,7 @@ modes, two different bodies for one function, one of them undefined. Compare,
 on `compress2`:
 
 ```c
-/* r12e */   deflateInit__plt();
+/* e5r */   deflateInit__plt();
              v13 = (uint32_t)v0;          /* v0 is never assigned */
 
 /* angr */   i = deflateInit_(&v4, a4, "1.2.13", 112, &v4);
@@ -274,15 +274,15 @@ Reproduce it in three lines:
 printf '#include <string.h>\nint f(const char*s){return strlen(s)>3;}\n%s\n' \
   'int main(int c,char**v){return f(v[0]);}' > /tmp/p.c
 gcc -g -O0 -fno-builtin /tmp/p.c -o /tmp/p
-./target/release/r12e decompile /tmp/p f     # v0 = (uint64_t)(sub_5f0());
-./target/release/r12e decompile /tmp/p all   # strlen_plt();  and v0 never assigned
+./target/release/e5r decompile /tmp/p f     # v0 = (uint64_t)(sub_5f0());
+./target/release/e5r decompile /tmp/p all   # strlen_plt();  and v0 never assigned
 ```
 
 The argument is gone in both. The assignment is gone only in `all`, which is
 the mode the benchmark runs.
 
 This one does not show up as a GED loss, because a call is a call whatever its
-arguments, but it is the reason a recompiled r12e function computes the wrong
+arguments, but it is the reason a recompiled e5r function computes the wrong
 thing, and it is a `docs/design/decompiling.md` violation: the design says the
 decompiler does not silently drop anything, and this drops every argument at
 the call.
@@ -335,7 +335,7 @@ all.
   project's score is not a leaderboard position.
 - **O0 only.** DecBench's `optimized` (O2 with inlining disabled), `inlined`
   (plain O2) and `large` sets are where the whole field falls over, nobody
-  clearing 2% union on `large`, and r12e has not been near them.
+  clearing 2% union on `large`, and e5r has not been near them.
 - **aarch64 only**, for the reason above.
 - **No Ghidra, IDA or Binary Ninja column**, for the reasons above. The only
   peer measured here is angr.
@@ -354,21 +354,21 @@ cp -a ~/Ref/decbench /tmp/decbench-work
 python3 -m venv /tmp/decbench-venv
 /tmp/decbench-venv/bin/pip install -e /tmp/decbench-work
 
-# 3. Build r12e.
+# 3. Build e5r.
 cargo build --release
 
 # 4. One command. It compiles the corpus project on the first run (network:
 #    the project TOMLs name upstream tarballs and git remotes), then
 #    decompiles and evaluates.
 DECBENCH_REPO=/tmp/decbench-work DECBENCH_VENV=/tmp/decbench-venv \
-  scripts/decbench.sh /tmp/decbench-r12e zlib O0 r12e,angr
+  scripts/decbench.sh /tmp/decbench-e5r zlib O0 e5r,angr
 ```
 
 The first run also downloads Joern (1.8 GB) the first time a metric needs a
 CFG. Budget an hour for a single project at one optimization level on this
 machine: the decompiling is minutes, the Joern parsing and the graph edit
 distances are the rest. Results are cached in the tree, so re-running only
-redoes the evaluation; `DECBENCH_REDO=r12e` forces the decompiling again after
+redoes the evaluation; `DECBENCH_REDO=e5r` forces the decompiling again after
 a rebuild. Joern plants a `workspace/` directory of CPG stores next to
 wherever it runs, so the driver chdirs into the results tree first, to keep it
 out of this repository.
@@ -394,7 +394,7 @@ Three things, in the order they are worth doing:
 2. Submit to the 250-function sample set, which needs no harness at all:
    download the eval kit, decompile the listed functions, mail back the zip.
 3. Upstream the backend. Ours is deliberately out-of-tree; moving it to
-   `decbench/decompilers/raw/r12e_raw.py` is a rename and an import, plus
+   `decbench/decompilers/raw/e5r_raw.py` is a rename and an import, plus
    filling in `VariableInfo` with ABI argument positions so type_match scores
    the recovered types rather than parsing them back out of the C.
 
@@ -424,7 +424,7 @@ scripts/decbench-fixtures.sh --all           # everything that builds here
 ```
 
 Where things go: the sources, the object trees and the binaries live in
-`~/.cache/r12e/decbench` (`DECBENCH_FIXTURES` moves it). The only thing that
+`~/.cache/e5r/decbench` (`DECBENCH_FIXTURES` moves it). The only thing that
 lands under `fixtures/` is `fixtures/build/decbench/manifest.tsv`, a text file
 listing, per binary, the unstripped image, a stripped copy and a TSV of DWARF
 function bounds read by `readelf`. `fixtures/build/` is gitignored, so nothing
@@ -436,7 +436,7 @@ deleting a cache directory removes it by itself.
 
 Recipes that need an autotools bootstrap, a sysroot or a missing dependency are
 reported and skipped; each failure names its build log under
-`~/.cache/r12e/decbench/log/`. The corpus is whatever actually builds here.
+`~/.cache/e5r/decbench/log/`. The corpus is whatever actually builds here.
 
 What consumes it is `scripts/boundary-gate.sh`, which is G4:
 [`docs/boundaries.md`](boundaries.md) has the method and the numbers. The

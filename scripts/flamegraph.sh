@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# A CPU profile of one r12e run, as a flamegraph and as a table.
+# A CPU profile of one e5r run, as a flamegraph and as a table.
 #
 # Not a test: it needs a profiler, it takes as long as the run it measures,
 # and what it produces is a picture and a list a person reads and records. Run
 # it by hand when a change is supposed to have made something faster, or when
 # something is slow and nobody knows which part.
 #
-# Usage: scripts/flamegraph.sh <r12e arguments...>
+# Usage: scripts/flamegraph.sh <e5r arguments...>
 #        scripts/flamegraph.sh funcs /usr/lib/aarch64-linux-gnu/libcrypto.so.3
 #        OUT=/tmp/x.svg TOP=30 scripts/flamegraph.sh stats /bin/bash
 #
@@ -19,7 +19,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-r12e=${R12E:-target/release/r12e}
+e5r=${E5R:-target/release/e5r}
 top=${TOP:-20}
 freq=${FREQ:-997}
 
@@ -27,8 +27,8 @@ freq=${FREQ:-997}
   sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//' >&2
   exit 2
 }
-[ -x "$r12e" ] || {
-  echo "no $r12e; build it first: cargo build --release" >&2
+[ -x "$e5r" ] || {
+  echo "no $e5r; build it first: cargo build --release" >&2
   exit 2
 }
 
@@ -63,7 +63,7 @@ if ! perfbin=$(find_perf); then
   if command -v samply > /dev/null 2>&1; then
     echo "samply is installed. It renders its own view rather than an SVG, so" >&2
     echo "this script does not drive it; run it directly:" >&2
-    echo "  samply record $r12e $*" >&2
+    echo "  samply record $e5r $*" >&2
   fi
   exit 2
 fi
@@ -85,18 +85,18 @@ svg=${OUT:-$outdir/$name.svg}
 data=$outdir/$name.perf
 folded=$outdir/$name.folded
 
-echo "profiling: $r12e $*" >&2
+echo "profiling: $e5r $*" >&2
 # --call-graph dwarf, because a release build has no frame pointers and the
 # default unwinder then reports one frame per sample. Output is thrown away:
 # the profile is of the analysis, not of the terminal.
-"$perfbin" record -F "$freq" --call-graph dwarf,8192 -o "$data" -- "$r12e" "$@" \
+"$perfbin" record -F "$freq" --call-graph dwarf,8192 -o "$data" -- "$e5r" "$@" \
   > /dev/null 2>&1 || {
   echo "perf record failed; rerun without the redirect to see why:" >&2
-  echo "  $perfbin record -F $freq --call-graph dwarf,8192 -o $data -- $r12e $*" >&2
+  echo "  $perfbin record -F $freq --call-graph dwarf,8192 -o $data -- $e5r $*" >&2
   exit 1
 }
 
-# perf prints Rust's v0 names raw, so the profile of r12e is unreadable until
+# perf prints Rust's v0 names raw, so the profile of e5r is unreadable until
 # something demangles it. The workspace has the demangler the tool itself uses;
 # when it is built, use it, and when it is not, say so rather than silently
 # printing mangled names.
@@ -106,7 +106,7 @@ if [ -x "$demangler" ]; then
 else
   filter=cat
   echo "note: names stay mangled; build the demangler for readable ones:" >&2
-  echo "  cargo build --release -p r12e-analysis --example demangle" >&2
+  echo "  cargo build --release -p e5r-analysis --example demangle" >&2
 fi
 
 "$perfbin" script -i "$data" 2> /dev/null | "$filter" | python3 -c '
@@ -223,7 +223,7 @@ open(out, "w").write(
     '<rect width="100%%" height="100%%" fill="#f8f8f4"/>\n'
     '<text x="8" y="18" font-size="14">%s &#8212; %d samples</text>\n'
     '%s\n</svg>\n'
-    % (W, height, html.escape("r12e " + title), root.total, "\n".join(rects))
+    % (W, height, html.escape("e5r " + title), root.total, "\n".join(rects))
 )
 PY
 

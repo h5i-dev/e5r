@@ -30,7 +30,7 @@ The Ghidra source tree at `Ghidra/Processors/*/data/languages/` holds 152
 in. A binary distribution has the built ones.
 
 Three of the compiled experiments are committed as
-`crates/r12e-sla/tests/data/*.sla`, with the `.sinc` sources that produced them,
+`crates/e5r-sla/tests/data/*.sla`, with the `.sinc` sources that produced them,
 so the work is reproducible without a Ghidra install.
 
 ## The container
@@ -57,7 +57,7 @@ should refuse a version it has not been tested against rather than guess.
 
 No, and this was the one thing that could have sunk the work. The stream is
 plain DEFLATE in a zlib wrapper, both of which are published as RFC 1951 and RFC
-1950. `crates/r12e-sla/src/inflate.rs` is about 330 lines including the tests
+1950. `crates/e5r-sla/src/inflate.rs` is about 330 lines including the tests
 and decompresses all 137 files with their checksums matching. No dependency is
 needed and none was added.
 
@@ -506,7 +506,7 @@ of AArch64, x86-64 or RISC-V does.
 
 ## Measured coverage
 
-From `cargo test --release -p r12e-sla`, over the 137 shipped files plus the
+From `cargo test --release -p e5r-sla`, over the 137 shipped files plus the
 committed fixtures. "Interpreted" counts the bytes of every element whose
 meaning is established, where an element's bytes are its own tags, ids and
 attribute values, excluding its children; summing that over the tree gives the
@@ -537,7 +537,7 @@ files pass with zero inconsistencies.
 Reading a format and writing it are different claims, and the second is the
 stronger one: a reader that is careless about which of two encodings a field
 used still produces the right model, while a writer that is careless the same
-way produces a file nothing else will read. `crates/r12e-sla/src/encode.rs`
+way produces a file nothing else will read. `crates/e5r-sla/src/encode.rs`
 writes the tag stream, `src/emit.rs` decides what tree to write, and
 `src/deflate.rs` compresses it. The gates are in `tests/writer.rs`:
 
@@ -595,9 +595,9 @@ format's meaning.
 
 ### Compiling a `.slaspec`
 
-`crates/r12e-sla/tests/sleighc/` turns an `r12e-sleigh` specification into the
+`crates/e5r-sla/tests/sleighc/` turns an `e5r-sleigh` specification into the
 model above and writes it. It lives in the test harness rather than the library
-because `r12e-sleigh` will depend on `r12e-sla` for its decode engine and cargo
+because `e5r-sleigh` will depend on `e5r-sla` for its decode engine and cargo
 refuses a cycle between two normal dependencies; moving it is a file move.
 
 Over all 152 `.slaspec` files in the source and binary trees: 152 parse, 152
@@ -671,8 +671,8 @@ missing 57% is the p-code.
 #### Decoding with what we wrote
 
 The strongest gate, because it does not compare us against ourselves.
-`r12e-sleigh`'s decode engine is measured at zero disagreements with objdump on
-AArch64, x86-64 and RISC-V. `crates/r12e-sla/tests/slaload/` rebuilds a
+`e5r-sleigh`'s decode engine is measured at zero disagreements with objdump on
+AArch64, x86-64 and RISC-V. `crates/e5r-sla/tests/slaload/` rebuilds a
 decodable model out of a compiled file, so the same bytes can be decoded twice:
 once from the specification the front end parsed, once through a `.sla` this
 compiler wrote and this reader read. Over 20,000 pseudo-random encodings each:
@@ -705,6 +705,6 @@ takes a second or two on a small spec. Change one line, recompile, and diff the
 two decoded trees. That loop is the whole method, and it is why this document
 can say which claims are proved: each one names the edit that moved the bytes.
 
-The tests find a Ghidra tree at `$R12E_GHIDRA_DIR`, at
+The tests find a Ghidra tree at `$E5R_GHIDRA_DIR`, at
 `~/.local/share/ghidra-cli/ghidra`, at `~/ghidra`, at `~/Ref/ghidra` or at
 `/opt/ghidra`, and report and return when there is none.

@@ -23,7 +23,7 @@ between two parts of the same program. The oracle here is `readelf
 `readelf` is binutils' DWARF reader, the same relationship `objdump` has to the
 decoder parity gates.
 
-Ground truth is read from the **unstripped** binary. r12e is run on a copy with
+Ground truth is read from the **unstripped** binary. e5r is run on a copy with
 the debug information removed, so nothing it reports came from a symbol table.
 
 ## The two configurations, and why the first one is not enough
@@ -48,10 +48,10 @@ deliberately hardened all arrive in exactly that state.
 A stripped binary contains code the project did not compile: PLT thunks,
 `_init` and `_fini`, and whatever the C runtime linked in. None of it has
 DWARF, because none of it was built with `-g`. Counting all of it as false
-positives would report that r12e invented 47,000 functions where it found
+positives would report that e5r invented 47,000 functions where it found
 47,000 real ones the ground truth does not describe.
 
-So the precision denominator is the functions r12e reported **inside a byte
+So the precision denominator is the functions e5r reported **inside a byte
 range DWARF actually covers**. A reported function that starts in the middle of
 a ground-truth function body is a real false positive, a split, and it counts.
 A reported function in the PLT is out of scope. The wider denominator is
@@ -79,7 +79,7 @@ functions rather than the hundreds.
 
 `scripts/decbench-fixtures.sh` does not copy the corpus into the checkout. It
 reads each project's recipe out of the DecBench TOML, fetches and builds it in
-`~/.cache/r12e/decbench` (552 MB for these 16), and writes one text file into
+`~/.cache/e5r/decbench` (552 MB for these 16), and writes one text file into
 `fixtures/build/decbench/manifest.tsv`, which is gitignored along with the rest
 of `fixtures/build`. The DecBench checkout is read-only: nothing is written
 inside it, not even a `__pycache__`. It also does not use DecBench's Python
@@ -96,13 +96,13 @@ DECBENCH_OPTS=O0,O2 scripts/decbench-fixtures.sh zlib
 
 Sixteen of the 39 build on this machine. The rest want an autotools bootstrap,
 a sysroot, or a dependency that is not here; each failure names its log under
-`~/.cache/r12e/decbench/log/` and is skipped. The manifest is rebuilt from the
+`~/.cache/e5r/decbench/log/` and is skipped. The manifest is rebuilt from the
 cache on every run rather than from that run, so adding a project adds to the
 corpus instead of replacing it.
 
 ## The numbers
 
-Measured 2026-09-14, aarch64, gcc 13.3, r12e at `03d0db8` plus the working
+Measured 2026-09-14, aarch64, gcc 13.3, e5r at `03d0db8` plus the working
 tree. 592 binaries, 95,697 ground-truth functions.
 
 ### stripped: `.eh_frame` present
@@ -164,7 +164,7 @@ Five things this says.
    explanation and this corpus does not support it.
 
 2. **Precision holds up far better than recall.** 0.937 blind against 1.000
-   stripped. Without an unwind table r12e is not inventing functions, it is
+   stripped. Without an unwind table e5r is not inventing functions, it is
    failing to find them, which is the better of the two failure modes and the
    one a user can work around.
 

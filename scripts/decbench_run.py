@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Drive DecBench over already-compiled binaries with r12e as one column.
+"""Drive DecBench over already-compiled binaries with e5r as one column.
 
 DecBench's own `scripts/run_benchmark.py` is the resilient full-corpus driver.
 It is not usable here: it decompiles through its own `decompile_one.py`
@@ -17,7 +17,7 @@ Usage:
 
 Env:
     DECBENCH_REPO   the DecBench checkout (required)
-    R12E            the r12e executable (default: target/release/r12e)
+    E5R            the e5r executable (default: target/release/e5r)
     DECBENCH_MAXBINS / DECBENCH_MAXFUNCS  cap the work for a smoke run
     DECBENCH_TIMEOUT  seconds per (binary, decompiler), default 1800
     DECBENCH_REDO     decompilers to rerun rather than reuse from the tree
@@ -48,7 +48,7 @@ sys.path.insert(0, str(_DECBENCH))
 sys.path.insert(0, str(_REPO / "scripts"))
 
 import decbench.decompilers  # noqa: E402,F401  (registers the in-tree backends)
-import decbench_r12e  # noqa: E402,F401  (registers ours)
+import decbench_e5r  # noqa: E402,F401  (registers ours)
 from decbench.models.decompilation import DecompilationResult  # noqa: E402
 from decbench.models.project import OptimizationLevel, Project  # noqa: E402
 from decbench.pipeline.evaluate import evaluate_project  # noqa: E402
@@ -95,7 +95,7 @@ def relabel_to_dwarf(result: DecompilationResult, addr2name: dict[int, str]) -> 
 def decompile_worker() -> int:
     """`--decompile-one <binary> <dec> <out_dir> <pkl> <addrs.json>` in a child process.
 
-    A separate process per (binary, decompiler) is what keeps angr's and r12e's
+    A separate process per (binary, decompiler) is what keeps angr's and e5r's
     memory out of the driver and lets a hung backend be killed.
     """
     binary, dec_name, out_dir, pkl, addrs_json = sys.argv[2:7]
@@ -188,7 +188,7 @@ def main() -> int:
     os.chdir(tree)
     project_name = sys.argv[2]
     opts = [OptimizationLevel(o) for o in sys.argv[3].split(",")]
-    decs = (sys.argv[4] if len(sys.argv) > 4 else "r12e").split(",")
+    decs = (sys.argv[4] if len(sys.argv) > 4 else "e5r").split(",")
     max_bins = int(os.environ.get("DECBENCH_MAXBINS", "0"))
     max_funcs = int(os.environ.get("DECBENCH_MAXFUNCS", "0"))
 

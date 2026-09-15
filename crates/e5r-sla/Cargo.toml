@@ -1,0 +1,23 @@
+[package]
+name = "e5r-sla"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Reader for Ghidra's compiled SLEIGH language files (.sla)"
+
+# No dependencies on purpose. The payload is a raw zlib stream and the
+# decompressor is in src/inflate.rs; see docs/sla-format.md for why the
+# workspace does not take a crate for it.
+[dependencies]
+
+# A dev-dependency on purpose, and the direction is the reason. The compiler
+# in tests/sleighc turns an `e5r-sleigh` specification into the model this
+# crate writes, but e5r-sleigh's own decode engine will want to read a `.sla`,
+# and cargo refuses a cycle between two normal dependencies. A dev-dependency
+# cycle is allowed, so the compiler lives in the test harness until it moves
+# into e5r-sleigh, which is a file move and no code change.
+[dev-dependencies]
+e5r-sleigh = { workspace = true }

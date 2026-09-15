@@ -131,6 +131,152 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
 
 [[package]]
+name = "e5r-analysis"
+version = "0.1.0"
+dependencies = [
+ "e5r-arch",
+ "e5r-core",
+ "e5r-format",
+ "e5r-types",
+ "rayon",
+ "serde",
+]
+
+[[package]]
+name = "e5r-api"
+version = "0.1.0"
+dependencies = [
+ "e5r-analysis",
+ "e5r-core",
+ "e5r-db",
+ "e5r-decomp",
+ "e5r-format",
+ "e5r-ir",
+ "e5r-types",
+]
+
+[[package]]
+name = "e5r-arch"
+version = "0.1.0"
+dependencies = [
+ "e5r-core",
+]
+
+[[package]]
+name = "e5r-asm"
+version = "0.1.0"
+dependencies = [
+ "e5r-arch",
+ "e5r-core",
+]
+
+[[package]]
+name = "e5r-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "e5r-analysis",
+ "e5r-api",
+ "e5r-arch",
+ "e5r-asm",
+ "e5r-core",
+ "e5r-db",
+ "e5r-decomp",
+ "e5r-diff",
+ "e5r-format",
+ "e5r-ir",
+ "e5r-types",
+ "memmap2",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "e5r-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "e5r-db"
+version = "0.1.0"
+dependencies = [
+ "e5r-analysis",
+ "e5r-arch",
+ "e5r-core",
+ "e5r-format",
+ "e5r-types",
+ "serde",
+]
+
+[[package]]
+name = "e5r-decomp"
+version = "0.1.0"
+dependencies = [
+ "e5r-analysis",
+ "e5r-api",
+ "e5r-arch",
+ "e5r-core",
+ "e5r-decomp",
+ "e5r-format",
+ "e5r-ir",
+ "serde",
+]
+
+[[package]]
+name = "e5r-diff"
+version = "0.1.0"
+dependencies = [
+ "e5r-analysis",
+ "e5r-arch",
+ "e5r-core",
+ "e5r-db",
+ "e5r-format",
+ "serde",
+]
+
+[[package]]
+name = "e5r-format"
+version = "0.1.0"
+dependencies = [
+ "e5r-core",
+ "e5r-types",
+ "serde",
+]
+
+[[package]]
+name = "e5r-ir"
+version = "0.1.0"
+dependencies = [
+ "e5r-analysis",
+ "e5r-arch",
+ "e5r-core",
+ "e5r-format",
+ "e5r-types",
+ "serde",
+]
+
+[[package]]
+name = "e5r-sla"
+version = "0.1.0"
+dependencies = [
+ "e5r-sleigh",
+]
+
+[[package]]
+name = "e5r-sleigh"
+version = "0.1.0"
+dependencies = [
+ "e5r-arch",
+ "e5r-core",
+]
+
+[[package]]
+name = "e5r-types"
+version = "0.1.0"
+
+[[package]]
 name = "either"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -214,152 +360,6 @@ checksum = "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001"
 dependencies = [
  "proc-macro2",
 ]
-
-[[package]]
-name = "r12e-analysis"
-version = "0.1.0"
-dependencies = [
- "r12e-arch",
- "r12e-core",
- "r12e-format",
- "r12e-types",
- "rayon",
- "serde",
-]
-
-[[package]]
-name = "r12e-api"
-version = "0.1.0"
-dependencies = [
- "r12e-analysis",
- "r12e-core",
- "r12e-db",
- "r12e-decomp",
- "r12e-format",
- "r12e-ir",
- "r12e-types",
-]
-
-[[package]]
-name = "r12e-arch"
-version = "0.1.0"
-dependencies = [
- "r12e-core",
-]
-
-[[package]]
-name = "r12e-asm"
-version = "0.1.0"
-dependencies = [
- "r12e-arch",
- "r12e-core",
-]
-
-[[package]]
-name = "r12e-cli"
-version = "0.1.0"
-dependencies = [
- "clap",
- "memmap2",
- "r12e-analysis",
- "r12e-api",
- "r12e-arch",
- "r12e-asm",
- "r12e-core",
- "r12e-db",
- "r12e-decomp",
- "r12e-diff",
- "r12e-format",
- "r12e-ir",
- "r12e-types",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "r12e-core"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "r12e-db"
-version = "0.1.0"
-dependencies = [
- "r12e-analysis",
- "r12e-arch",
- "r12e-core",
- "r12e-format",
- "r12e-types",
- "serde",
-]
-
-[[package]]
-name = "r12e-decomp"
-version = "0.1.0"
-dependencies = [
- "r12e-analysis",
- "r12e-api",
- "r12e-arch",
- "r12e-core",
- "r12e-decomp",
- "r12e-format",
- "r12e-ir",
- "serde",
-]
-
-[[package]]
-name = "r12e-diff"
-version = "0.1.0"
-dependencies = [
- "r12e-analysis",
- "r12e-arch",
- "r12e-core",
- "r12e-db",
- "r12e-format",
- "serde",
-]
-
-[[package]]
-name = "r12e-format"
-version = "0.1.0"
-dependencies = [
- "r12e-core",
- "r12e-types",
- "serde",
-]
-
-[[package]]
-name = "r12e-ir"
-version = "0.1.0"
-dependencies = [
- "r12e-analysis",
- "r12e-arch",
- "r12e-core",
- "r12e-format",
- "r12e-types",
- "serde",
-]
-
-[[package]]
-name = "r12e-sla"
-version = "0.1.0"
-dependencies = [
- "r12e-sleigh",
-]
-
-[[package]]
-name = "r12e-sleigh"
-version = "0.1.0"
-dependencies = [
- "r12e-arch",
- "r12e-core",
-]
-
-[[package]]
-name = "r12e-types"
-version = "0.1.0"
 
 [[package]]
 name = "rayon"

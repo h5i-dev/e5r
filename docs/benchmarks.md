@@ -1,6 +1,6 @@
 # Benchmarks
 
-r12e against another mature reverse engineering tool on the same binaries, with
+e5r against another mature reverse engineering tool on the same binaries, with
 the command that produced every number written down so it can be rerun.
 
 The headline figures are in [`scorecard.md`](scorecard.md). This file is the
@@ -9,15 +9,15 @@ do not support, and what the regression budget holds them to.
 
 ## The rule this file is written under
 
-rizin is a decade and a half of accumulated work and r12e is new. A benchmark
+rizin is a decade and a half of accumulated work and e5r is new. A benchmark
 that flatters the new tool by measuring the wrong thing is worth less than no
 benchmark, so:
 
 - every tool gets the invocation its own documentation recommends for the job;
 - the job is the same job, and where it is not, the table says so in the table
   rather than in a footnote;
-- rows r12e loses stay in the table. There is one, and it is in
-  [What r12e loses](#what-r12e-loses).
+- rows e5r loses stay in the table. There is one, and it is in
+  [What e5r loses](#what-e5r-loses).
 
 ## The run
 
@@ -26,7 +26,7 @@ Machine: Linux 6.6.87.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Thu Jun  
 Fastest of 3 runs per binary.
 Measured once rather than 3: `libstdc++.so.6`, `libcrypto.so.3`.
 
-- `r12e`: r12e 0.1.0 (target/release/r12e, sha256 6525025002f44172)
+- `e5r`: e5r 0.1.0 (target/release/e5r, sha256 6525025002f44172)
 - `rizin`: rizin 0.8.2 @ linux-arm-64, package: 0.8.2 (RizinOrg)
 - Ghidra: not measured, no GHIDRA_INSTALL_DIR. Its headless analyzer works on this architecture; its decompiler ships x86-64 only, so a decompiler comparison is not available on an aarch64 host either way.
 
@@ -35,7 +35,7 @@ installed from the project's own Ubuntu repository at
 `download.opensuse.org/repositories/home:/RizinOrg/xUbuntu_24.04`. `rz-bin` is
 the same package.
 
-The r12e line carries the hash of the exact binary measured, because this
+The e5r line carries the hash of the exact binary measured, because this
 workspace is rebuilt by other agents while a run is in progress. The harness
 measures a copy taken at the start of the run for the same reason: without
 that, half a table can describe one build and half another with nothing saying
@@ -62,11 +62,11 @@ an idle machine would produce smaller numbers for both tools.
 Three jobs are timed, because they are different questions and running them
 together answers none of them.
 
-| job | r12e | rizin |
+| job | e5r | rizin |
 | --- | --- | --- |
-| **load**: parse the container, report what is in it, analyze no code | `r12e info <file> --json` | `rz-bin -I <file>` |
-| **recover**: find the functions and nothing else | `r12e funcs <file> --json` | `rizin -N -q -c 'aa; aflj' <file>` |
-| **analyze**: the tool's own full analysis, then list the functions | `r12e stats <file> --json`, timed; the list from a separate untimed `r12e funcs` | `rizin -N -q -A -c aflj <file>` |
+| **load**: parse the container, report what is in it, analyze no code | `e5r info <file> --json` | `rz-bin -I <file>` |
+| **recover**: find the functions and nothing else | `e5r funcs <file> --json` | `rizin -N -q -c 'aa; aflj' <file>` |
+| **analyze**: the tool's own full analysis, then list the functions | `e5r stats <file> --json`, timed; the list from a separate untimed `e5r funcs` | `rizin -N -q -A -c aflj <file>` |
 
 Why each of those:
 
@@ -78,9 +78,9 @@ Why each of those:
   out of the measurement, `-q` quits after the command, and `aflj` is the
   function list as JSON.
 - **`aa` as well as `-A`, and neither row alone is the honest one.** `aaa` is
-  not the same workload as `r12e stats`: on top of function recovery it
+  not the same workload as `e5r stats`: on top of function recovery it
   autonames functions, recovers variables and signatures per function, and
-  searches the image for values, none of which r12e produces at all. Some of
+  searches the image for values, none of which e5r produces at all. Some of
   its time buys things this table does not score. So rizin's own `aa`,
   "analyze all (fcns + bbs)", is measured beside it, to show how much of the
   cost is function recovery and how much is everything else.
@@ -90,9 +90,9 @@ Why each of those:
   binary here finds two functions and nothing else. Read the `aa` row as the
   floor on rizin's cost, never as a configuration anyone would analyze a
   stripped binary with. The headline comparison stays `rizin -A` against
-  `r12e stats`, which is what the roadmap names and what a user would run.
-- `r12e stats` rather than `r12e funcs` for the analyze row, even though `funcs`
-  is the command that produces the list. r12e's analysis is lazy, so listing
+  `e5r stats`, which is what the roadmap names and what a user would run.
+- `e5r stats` rather than `e5r funcs` for the analyze row, even though `funcs`
+  is the command that produces the list. e5r's analysis is lazy, so listing
   functions does not force cross references or strings, and `aaa` computes
   those. Timing the cheaper command against a tool doing more would be the same
   error in our favour. The function list comes from a separate `funcs` run that
@@ -103,7 +103,7 @@ Why each of those:
 A count of functions on its own is close to meaningless. A tool reporting 4,000
 where another reports 3,500 may be finding five hundred more functions or
 inventing five hundred addresses, and the count cannot tell you which. So every
-count is split against a symbol table read by `readelf`, never by r12e:
+count is split against a symbol table read by `readelf`, never by e5r:
 
 - **recall** is the share of `FUNC` symbols the tool found, at the exact entry
   address.
@@ -157,7 +157,7 @@ setting anyone would analyze a stripped binary with.
 
 ### Wall time and peak memory
 
-| binary | size | r12e load | r12e analyze | r12e peak | rizin load | rizin analyze | rizin peak |
+| binary | size | e5r load | e5r analyze | e5r peak | rizin load | rizin analyze | rizin peak |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `hello.a64.O2` | 71K | 0.00s | 0.00s | 5 MB | 0.02s | 0.05s | 24 MB |
 | `hello.a64.O2.stripped` | 66K | 0.00s | 0.00s | 5 MB | 0.01s | 0.04s | 23 MB |
@@ -178,7 +178,7 @@ setting anyone would analyze a stripped binary with.
 
 ### Function recovery alone, without the rest of a full analysis
 
-| binary | named | r12e time | r12e found | r12e recall | r12e not in code | rizin time | rizin found | rizin recall | rizin not in code |
+| binary | named | e5r time | e5r found | e5r recall | e5r not in code | rizin time | rizin found | rizin recall | rizin not in code |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `hello.a64.O2` | 10 | 0.00s | 11 | 100.0% | 0 | 0.03s | 12 | 80.0% | 0 |
 | `hello.a64.O2.stripped` | 10 | 0.00s | 10 | 100.0% | 0 | 0.03s | 5 | 30.0% | 0 |
@@ -199,7 +199,7 @@ setting anyone would analyze a stripped binary with.
 
 ### Functions found by the full analysis, against the symbol table
 
-| binary | oracle | named | r12e found | r12e recall | r12e missed | r12e unnamed | r12e not in code | rizin found | rizin recall | rizin missed | rizin unnamed | rizin not in code |
+| binary | oracle | named | e5r found | e5r recall | e5r missed | e5r unnamed | e5r not in code | rizin found | rizin recall | rizin missed | rizin unnamed | rizin not in code |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `hello.a64.O2` | symtab | 10 | 11 | 100.0% | 0 | 1 (1 inside a named function) | 0 | 12 | 80.0% | 2 (2 within 16 bytes) | 4 (1 inside a named function) | 0 |
 | `hello.a64.O2.stripped` | symtab of unstripped twin | 10 | 10 | 100.0% | 0 | 0 | 0 | 10 | 60.0% | 4 (3 within 16 bytes) | 4 (1 inside a named function) | 0 |
@@ -218,16 +218,16 @@ setting anyone would analyze a stripped binary with.
 | `libstdc++.so.6` | dynsym only | 3917 | 4676 | 100.0% | 0 | 759 | 0 | 18392 | 71.7% | 1108 (1108 within 16 bytes) | 15583 (1523 inside a named function) | 13260 |
 | `libcrypto.so.3` | dynsym only | 5363 | 10690 | 100.0% | 0 | 5327 | 0 | 11451 | 97.5% | 133 (133 within 16 bytes) | 6221 (428 inside a named function) | 429 |
 
-Across the rows where r12e's own time is above the timer's resolution, full
+Across the rows where e5r's own time is above the timer's resolution, full
 analysis is **21x to 3,291x** faster than `rizin -A`, and peak resident memory
 is **2.4x to 8.6x** smaller. The spread on the time ratio is not measurement
 noise: it is `libstdc++`, which is its own subject below.
 
 The memory result is worth a sentence because it points the other way from the
-rest of the scorecard. Against `objdump`, r12e uses about ten times the memory,
-which that table calls the axis r12e is worse on. Against rizin it uses two to
+rest of the scorecard. Against `objdump`, e5r uses about ten times the memory,
+which that table calls the axis e5r is worse on. Against rizin it uses two to
 nine times less, on every binary here. Both are true: `objdump` streams and
-keeps nothing, and r12e and rizin both keep a program model in memory.
+keeps nothing, and e5r and rizin both keep a program model in memory.
 
 ## What each tool found that the other did not
 
@@ -237,8 +237,8 @@ was right.
 
 ### rizin's exclusive entries are almost never at a symbol
 
-On `hello.static.a64.stripped`, rizin reports 101 entries r12e does not, and
-exactly **one** of them is at an address the symbol table names. r12e reports
+On `hello.static.a64.stripped`, rizin reports 101 entries e5r does not, and
+exactly **one** of them is at an address the symbol table names. e5r reports
 194 that rizin does not, and **189** of those are named functions. The same
 shape holds on every fixture with a complete symbol table.
 
@@ -258,18 +258,18 @@ On `bash` every one of rizin's 291 missed entries is of this kind.
 
 ### Where the gap is real: evidence rizin does not read
 
-`cpp-hierarchy.a64.O2.rtti.stripped` is a stripped C++ binary. r12e finds all
+`cpp-hierarchy.a64.O2.rtti.stripped` is a stripped C++ binary. e5r finds all
 39 functions; `rizin -A` finds 2, and `-AA` finds the same 2. Every one of
-r12e's 39 comes from an `.eh_frame` FDE:
+e5r's 39 comes from an `.eh_frame` FDE:
 
 ```
-$ r12e funcs fixtures/build/cpp-hierarchy.a64.O2.rtti.stripped --json | ...
+$ e5r funcs fixtures/build/cpp-hierarchy.a64.O2.rtti.stripped --json | ...
 38 ('.eh_frame FDE',)
  1 ('.eh_frame FDE', 'entry point')
 ```
 
 The binary keeps its exception tables when it is stripped, and those tables
-name the boundaries. r12e's function discovery reads them; rizin's does not,
+name the boundaries. e5r's function discovery reads them; rizin's does not,
 so it is left with recursive descent from the entry point, and in a program
 whose work is reached through virtual dispatch that gets nowhere. This is a
 design difference rather than a bug, and it is the single largest recall gap in
@@ -278,7 +278,7 @@ the table.
 ### `libstdc++`, which is the outlier in every column
 
 `rizin -A` takes **12 minutes 37 seconds** on `libstdc++.so.6` and reports
-18,392 functions, against r12e's 0.23 seconds and 4,676. The count is the more
+18,392 functions, against e5r's 0.23 seconds and 4,676. The count is the more
 interesting number: **13,260 of rizin's 18,392 entries are at addresses in
 sections that never become executable.** Its executable sections begin at
 `0x9c7c0`; rizin reports functions at `0x3fc8`, `0x4000` and `0x4004`, which
@@ -291,38 +291,38 @@ the whole image rather than over code. This is one measured run of one version
 on one binary, and it should be read as a lead rather than as a verdict on
 rizin; the evidence for it is in the JSON the run wrote.
 
-### Where r12e's extra entries come from
+### Where e5r's extra entries come from
 
-r12e reports more functions than the symbol table names on most system
+e5r reports more functions than the symbol table names on most system
 binaries: 1,250 on `libc`, 5,327 on `libcrypto`. Those rows are `dynsym only`,
 so the oracle names exports and nothing else, and a static function in `libc`
 is not a false positive for not being exported. The column that would catch an
-invention, entries outside executable memory, is **0 for r12e on every binary
-in the corpus**. On the rows where the oracle is complete, r12e's unnamed
+invention, entries outside executable memory, is **0 for e5r on every binary
+in the corpus**. On the rows where the oracle is complete, e5r's unnamed
 entries are 8 or fewer and every one of them falls inside a function the symbol
 table already names, which is a boundary split rather than an invention.
 
-## What r12e loses
+## What e5r loses
 
-One row, and it is the load row on `panicky`: `r12e info` takes 0.08s and
+One row, and it is the load row on `panicky`: `e5r info` takes 0.08s and
 56 MB where `rz-bin -I` takes 0.02s and 19 MB. It reproduces, and the cause is
 not the file size:
 
 ```
-$ /usr/bin/time -f '%e s %M KB' r12e info fixtures/build/panicky
+$ /usr/bin/time -f '%e s %M KB' e5r info fixtures/build/panicky
 0.08 s 51332 KB
 $ objcopy --strip-debug panicky panicky.nodebug
-$ /usr/bin/time -f '%e s %M KB' r12e info panicky.nodebug
+$ /usr/bin/time -f '%e s %M KB' e5r info panicky.nodebug
 0.00 s 5376 KB
 ```
 
 `panicky` is a 4.5 MB Rust binary carrying 1.8 MB of `.debug_str` and 1 MB of
-`.debug_info`. `r12e info`, which prints the container header and nothing that
+`.debug_info`. `e5r info`, which prints the container header and nothing that
 needs types, parses the debug information anyway, and pays 0.08 seconds and
 46 MB for it. A 4.5 MB binary without DWARF, `libcrypto.so.3`, loads in 0.01s.
 `rz-bin -I` does not read DWARF unless asked.
 
-This is a defect in r12e and it is not fixed here: this task's brief is the
+This is a defect in e5r and it is not fixed here: this task's brief is the
 benchmark and its scripts, not the crates. It is the one place in this table
 where the mature tool is doing the more sensible thing.
 
@@ -436,13 +436,13 @@ single `rizin -A` on `libstdc++` takes twelve and a half minutes. Their rows say
   an x86-64 binary only, so the comparison that would matter most cannot be made
   here at all. The earlier function-recovery comparison against Ghidra 12.1.3 is
   in [`scorecard.md`](scorecard.md).
-- **Everything rizin does that r12e does not.** rizin is a debugger, a hex
-  editor, a shell, an assembler and a scriptable session; r12e is none of those.
-  The columns here cover the part of rizin that overlaps r12e, which is a small
+- **Everything rizin does that e5r does not.** rizin is a debugger, a hex
+  editor, a shell, an assembler and a scriptable session; e5r is none of those.
+  The columns here cover the part of rizin that overlaps e5r, which is a small
   part of rizin.
 - **Decompiler output quality**, which is [DecBench](decbench.md)'s job, and
-  where r12e currently loses.
+  where e5r currently loses.
 - **Anything but ELF on aarch64 and x86-64.** The corpus is what this machine
   can build and run.
 - **A cold page cache.** Every run here is warm, which flatters whichever tool
-  reads less of the file, and that is r12e, which memory-maps the image.
+  reads less of the file, and that is e5r, which memory-maps the image.

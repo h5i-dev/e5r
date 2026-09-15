@@ -6,13 +6,13 @@ does not do. They are not API references; the code is the API reference.
 
 | document | crate | what it is about |
 | --- | --- | --- |
-| [loading.md](loading.md) | `r12e-format` | turning a file into an address space, and refusing to guess |
-| [decoding.md](decoding.md) | `r12e-arch` | bytes to instructions, and why the gate is another disassembler |
-| [lifting.md](lifting.md) | `r12e-ir` | instructions to IR, and why a processor is the oracle |
-| [recovery.md](recovery.md) | `r12e-analysis` | finding functions, and the difference between evidence and a scan |
-| [decompiling.md](decompiling.md) | `r12e-decomp` | IR to C, and why running the C is the only real gate |
-| [db.md](db.md) | `r12e-db` | the annotation store, and why it merges |
-| [limits.md](limits.md) | `r12e-core` | what to do with a count read from a file, and the one unsafe block |
+| [loading.md](loading.md) | `e5r-format` | turning a file into an address space, and refusing to guess |
+| [decoding.md](decoding.md) | `e5r-arch` | bytes to instructions, and why the gate is another disassembler |
+| [lifting.md](lifting.md) | `e5r-ir` | instructions to IR, and why a processor is the oracle |
+| [recovery.md](recovery.md) | `e5r-analysis` | finding functions, and the difference between evidence and a scan |
+| [decompiling.md](decompiling.md) | `e5r-decomp` | IR to C, and why running the C is the only real gate |
+| [db.md](db.md) | `e5r-db` | the annotation store, and why it merges |
+| [limits.md](limits.md) | `e5r-core` | what to do with a count read from a file, and the one unsafe block |
 
 ## The rule they all share
 

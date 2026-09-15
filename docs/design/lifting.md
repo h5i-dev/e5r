@@ -1,6 +1,6 @@
 # Lifting
 
-`crates/r12e-ir`
+`crates/e5r-ir`
 
 ## What it is for
 

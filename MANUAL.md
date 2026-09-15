@@ -1,4 +1,4 @@
-# r12e
+# e5r
 
 Reverse engineering from the command line. Load a binary, recover its
 functions, disassemble them, decompile them, and ask questions about what is
@@ -10,7 +10,7 @@ a bad command line, and `3` for input that could not be read.
 
 ```
 cargo build --release
-./target/release/r12e info /bin/ls
+./target/release/e5r info /bin/ls
 ```
 
 ## Installing
@@ -18,11 +18,11 @@ cargo build --release
 ### A release binary
 
 Every release attaches one archive per platform, a `SHA256SUMS` file and a
-signature over it. Unpack and put `r12e` on your path:
+signature over it. Unpack and put `e5r` on your path:
 
 ```
-tar -xzf r12e-0.1.0-x86_64-unknown-linux-musl.tar.gz
-install -m755 r12e-0.1.0-x86_64-unknown-linux-musl/r12e /usr/local/bin/
+tar -xzf e5r-0.1.0-x86_64-unknown-linux-musl.tar.gz
+install -m755 e5r-0.1.0-x86_64-unknown-linux-musl/e5r /usr/local/bin/
 ```
 
 Check what you downloaded first. The checksums cover the archives, and the
@@ -32,18 +32,18 @@ identity is the release workflow itself and there is no key to distribute:
 ```
 sha256sum -c SHA256SUMS
 cosign verify-blob --signature SHA256SUMS.sig --certificate SHA256SUMS.pem \
-  --certificate-identity-regexp '^https://github.com/h5i-dev/r12e/' \
+  --certificate-identity-regexp '^https://github.com/h5i-dev/e5r/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   SHA256SUMS
 ```
 
 | Platform | Archive |
 | --- | --- |
-| Linux x86-64 | `r12e-VERSION-x86_64-unknown-linux-musl.tar.gz` |
-| Linux AArch64 | `r12e-VERSION-aarch64-unknown-linux-musl.tar.gz` |
-| macOS Apple silicon | `r12e-VERSION-aarch64-apple-darwin.tar.gz` |
-| macOS Intel | `r12e-VERSION-x86_64-apple-darwin.tar.gz` |
-| Windows x86-64 | `r12e-VERSION-x86_64-pc-windows-msvc.zip` |
+| Linux x86-64 | `e5r-VERSION-x86_64-unknown-linux-musl.tar.gz` |
+| Linux AArch64 | `e5r-VERSION-aarch64-unknown-linux-musl.tar.gz` |
+| macOS Apple silicon | `e5r-VERSION-aarch64-apple-darwin.tar.gz` |
+| macOS Intel | `e5r-VERSION-x86_64-apple-darwin.tar.gz` |
+| Windows x86-64 | `e5r-VERSION-x86_64-pc-windows-msvc.zip` |
 
 ### What the Linux build guarantees
 
@@ -54,20 +54,20 @@ Alpine, a distroless container, or a rescue initramfs. `ldd` on it says it is
 not a dynamic executable, and that is the whole claim:
 
 ```
-$ file r12e
-r12e: ELF 64-bit LSB pie executable, x86-64, static-pie linked, stripped
+$ file e5r
+e5r: ELF 64-bit LSB pie executable, x86-64, static-pie linked, stripped
 ```
 
 Nothing outside the binary is needed at run time. The fixture corpus under
-`fixtures/` is what the test suite measures against; an installed `r12e` never
+`fixtures/` is what the test suite measures against; an installed `e5r` never
 reads it, and no data file, configuration or cache directory is required to
 start.
 
 ### From source
 
 ```
-cargo install --git https://github.com/h5i-dev/r12e r12e-cli
-cargo install --path crates/r12e-cli          # from a checkout
+cargo install --git https://github.com/h5i-dev/e5r e5r-cli
+cargo install --path crates/e5r-cli          # from a checkout
 ```
 
 The dependency list is deliberately short (`serde` and `serde_json`, `clap`,
@@ -93,7 +93,7 @@ timestamps are zeroed, so the same binary always packs to the same checksum.
 ### install.sh
 
 ```
-curl -fsSL https://raw.githubusercontent.com/h5i-dev/r12e/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/h5i-dev/e5r/main/install.sh | sh
 ```
 
 It works out the platform, asks the releases API for the latest tag, downloads
@@ -106,10 +106,10 @@ Four environment variables, all of them for a case the default does not cover:
 
 | | |
 | --- | --- |
-| `R12E_INSTALL_DIR` | somewhere other than `/usr/local/bin` |
-| `R12E_VERSION` | a tag other than the latest |
-| `R12E_BASE_URL` | a mirror, or a staged release that is not published yet |
-| `R12E_SKIP_CHECKSUM` | install without verifying, said out loud on stderr |
+| `E5R_INSTALL_DIR` | somewhere other than `/usr/local/bin` |
+| `E5R_VERSION` | a tag other than the latest |
+| `E5R_BASE_URL` | a mirror, or a staged release that is not published yet |
+| `E5R_SKIP_CHECKSUM` | install without verifying, said out loud on stderr |
 
 There is no Homebrew formula. There was a draft one, and it was deleted rather
 than published: it had never been run against `brew`, and a tap is a second
@@ -138,13 +138,13 @@ the output rather than being approximated.
 ## Looking at a file
 
 ```
-r12e info FILE           container, architecture, entry, what the loader noticed
-r12e sections FILE       sections and where they are mapped
-r12e symbols FILE        symbols the container names
-r12e imports FILE        what it needs from elsewhere
-r12e exports FILE        what it offers
-r12e strings FILE        strings found in the image, by section
-r12e stats FILE          counts: functions, blocks, instructions, references
+e5r info FILE           container, architecture, entry, what the loader noticed
+e5r sections FILE       sections and where they are mapped
+e5r symbols FILE        symbols the container names
+e5r imports FILE        what it needs from elsewhere
+e5r exports FILE        what it offers
+e5r strings FILE        strings found in the image, by section
+e5r stats FILE          counts: functions, blocks, instructions, references
 ```
 
 `info` and the listings above need only the container, so they are instant
@@ -153,11 +153,11 @@ whatever the size of the file.
 ## Code
 
 ```
-r12e funcs FILE                     every recovered function and its evidence
-r12e disas FILE TARGET              disassemble a function, an address, or `all`
-r12e xrefs FILE TARGET [--from]     references to an address, or from one
-r12e decompile FILE TARGET          pseudo-C for a function, or for `all`
-r12e emulate FILE TARGET [ARGS...]  run a function and report what it did
+e5r funcs FILE                     every recovered function and its evidence
+e5r disas FILE TARGET              disassemble a function, an address, or `all`
+e5r xrefs FILE TARGET [--from]     references to an address, or from one
+e5r decompile FILE TARGET          pseudo-C for a function, or for `all`
+e5r emulate FILE TARGET [ARGS...]  run a function and report what it did
 ```
 
 `TARGET` is an address (`0x401000`, `401000`), a symbol name, or `all`.
@@ -186,21 +186,21 @@ wrong, so the identity the image asks for is checked before anything in the
 database is believed.
 
 ```
-$ r12e funcs prog.exe
+$ e5r funcs prog.exe
 0x140001000  ...  proven  program database  compare_points
 0x140001020  ...  proven  program database  walk
 ```
 
 Without it, the same binary yields only its entry point.
 
-`r12e info` reports `pe.pdb`, `pe.pdb.key` and `pe.pdb.age`, which together
+`e5r info` reports `pe.pdb`, `pe.pdb.key` and `pe.pdb.age`, which together
 are what a symbol server is indexed by.
 
 ## C++
 
 ```
-r12e classes prog                # the hierarchy
-r12e classes prog --members      # and every member function, with its `this`
+e5r classes prog                # the hierarchy
+e5r classes prog --members      # and every member function, with its `this`
 ```
 
 Classes come from the type information where a binary has it, and from the
@@ -223,8 +223,8 @@ default.
 ## Structure and types
 
 ```
-r12e shapes FILE TARGET     what the pointers a function takes point at
-r12e vtables FILE           virtual tables and the classes they belong to
+e5r shapes FILE TARGET     what the pointers a function takes point at
+e5r vtables FILE           virtual tables and the classes they belong to
 ```
 
 `shapes` reports the offsets a function touches through each pointer it is
@@ -235,9 +235,9 @@ two disagreeing strides into one.
 ## Asking questions
 
 ```
-r12e query FILE 'functions where insns > 100 and name ~ "crypt"'
-r12e query FILE 'strings where length >= 20 and text ~ "/etc/"'
-r12e query FILE 'xrefs where kind = call and to = 0x401000 limit 20'
+e5r query FILE 'functions where insns > 100 and name ~ "crypt"'
+e5r query FILE 'strings where length >= 20 and text ~ "/etc/"'
+e5r query FILE 'xrefs where kind = call and to = 0x401000 limit 20'
 ```
 
 Entities: `functions`, `strings`, `symbols`, `imports`, `exports`, `sections`,
@@ -249,7 +249,7 @@ and is reported as one, with the fields there are.
 ## Comparing builds
 
 ```
-r12e diff OLD NEW [--all]
+e5r diff OLD NEW [--all]
 ```
 
 Functions are matched across the two builds by a fingerprint of their
@@ -260,8 +260,8 @@ Given a vulnerable build and a patched one, this points at the change.
 ## Naming a stripped binary
 
 ```
-r12e sig FILE create -o LIBRARY      a signature for every named function
-r12e sig FILE apply LIBRARY          name what the library recognizes
+e5r sig FILE create -o LIBRARY      a signature for every named function
+e5r sig FILE apply LIBRARY          name what the library recognizes
 ```
 
 A signature identifies a function by its content rather than its address, so a
@@ -275,7 +275,7 @@ The file is sorted text, so a signature library reviews in a diff.
 ## An interactive session
 
 ```
-$ r12e repl prog
+$ e5r repl prog
 38 function(s) in prog. `help` lists the commands, `quit` leaves.
 0x400144> f
 0x400144> seek parse_header
@@ -302,17 +302,17 @@ An assertion is not a note on the side: it changes the analysis. Decompile,
 see what the engine could not work out, say what it is, decompile again.
 
 ```
-$ r12e decompile prog nestedoffset
+$ e5r decompile prog nestedoffset
 uint64_t nestedoffset(uint64_t arg0, uint64_t arg1, uint64_t arg2)
 {
     return (uint64_t)((uint64_t)(uint32_t)*(uint32_t *)(arg0 +
         ((int64_t)(int32_t)((uint32_t)arg1 + (uint32_t)arg2) << 2) + 12));
 }
 
-$ r12e annotate prog type nestedoffset \
+$ e5r annotate prog type nestedoffset \
     "int nestedoffset(struct outer { int header; int pad; int array[8]; } *ptr, int a, int b)"
 
-$ r12e decompile prog nestedoffset
+$ e5r decompile prog nestedoffset
 struct outer { int32_t header; int32_t pad; int32_t array[8]; };
 
 int32_t nestedoffset(struct outer *ptr, int32_t a, int32_t b)
@@ -335,7 +335,7 @@ where the machine kept it, so a program driving this can see what there is to
 assert:
 
 ```
-$ r12e decompile prog nestedoffset --json
+$ e5r decompile prog nestedoffset --json
   ...
   "asserted": true,
   "variables": [
@@ -348,10 +348,10 @@ $ r12e decompile prog nestedoffset --json
 ## Annotations
 
 ```
-r12e annotate FILE name TARGET NAME
-r12e annotate FILE comment TARGET TEXT
-r12e annotate FILE list
-r12e annotate FILE undo
+e5r annotate FILE name TARGET NAME
+e5r annotate FILE comment TARGET TEXT
+e5r annotate FILE list
+e5r annotate FILE undo
 ```
 
 Annotations are written to a log beside the binary, keyed to a content anchor
@@ -360,7 +360,7 @@ by that anchor, so two analysts on separate branches merge without conflict
 markers. Add this to `.gitattributes`:
 
 ```
-*.r12e merge=union
+*.e5r merge=union
 ```
 
 ## Containers that are not one program
@@ -370,14 +370,14 @@ than loaded: picking a member silently would make every later answer about
 bytes you did not choose.
 
 ```
-r12e archive libfoo.a              # members, sizes and offsets
-r12e archive libfoo.a --symbols    # and what each one defines
+e5r archive libfoo.a              # members, sizes and offsets
+e5r archive libfoo.a --symbols    # and what each one defines
 ```
 
 GNU and BSD archives, long names, both symbol index forms, and thin archives.
 
 ```
-r12e overlay firmware.exe
+e5r overlay firmware.exe
 ```
 
 reports where the headers stop describing the file, what is appended past that
@@ -395,17 +395,17 @@ find, so a patch written against one build still lands on the right
 instruction in the next one, and says how it found it.
 
 ```
-r12e patch prog record 0x401234 --asm "nop" --note "skip the check" -o fix.r12e-patch
-r12e patch prog record 0x401234 --bytes 90909090 -o fix.r12e-patch
-r12e patch prog record 0x401234 --asm "mov eax, 1" --pad-to 8 -o fix.r12e-patch
-r12e patch prog preview fix.r12e-patch     # where it lands, what it overwrites
-r12e patch prog apply   fix.r12e-patch -o prog.patched
-r12e patch prog.patched revert fix.r12e-patch -o prog
-r12e patch prog merge a.r12e-patch b.r12e-patch -o both.r12e-patch
+e5r patch prog record 0x401234 --asm "nop" --note "skip the check" -o fix.e5r-patch
+e5r patch prog record 0x401234 --bytes 90909090 -o fix.e5r-patch
+e5r patch prog record 0x401234 --asm "mov eax, 1" --pad-to 8 -o fix.e5r-patch
+e5r patch prog preview fix.e5r-patch     # where it lands, what it overwrites
+e5r patch prog apply   fix.e5r-patch -o prog.patched
+e5r patch prog.patched revert fix.e5r-patch -o prog
+e5r patch prog merge a.e5r-patch b.e5r-patch -o both.e5r-patch
 ```
 
 `--asm` assembles at the target address, because a branch encodes a
-displacement from where it sits. It accepts what `r12e disas` prints, so a
+displacement from where it sits. It accepts what `e5r disas` prints, so a
 line can be copied out, changed, and assembled back. `--pad-to` fills the rest
 with no-ops: an instruction that encodes shorter than the one it replaces
 would otherwise leave the bytes after it meaning something they did not mean.
@@ -423,10 +423,10 @@ the bytes the anchor fingerprinted, which is exactly what applying it did.
 ## Saving a session
 
 ```
-r12e project new prog -o prog.r12e-proj --set scan_gaps=true
-r12e project add prog.r12e-proj --signatures libc.r12e-sig --patch fix.r12e-patch
-r12e project verify prog.r12e-proj
-r12e project show prog.r12e-proj
+e5r project new prog -o prog.e5r-proj --set scan_gaps=true
+e5r project add prog.e5r-proj --signatures libc.e5r-sig --patch fix.e5r-patch
+e5r project verify prog.e5r-proj
+e5r project show prog.e5r-proj
 ```
 
 A project names its binary by content as well as by path. Opening it against a
@@ -436,16 +436,16 @@ and a binary that only moved is still the right one.
 ## Driving it from a program
 
 Every command takes `--json`. The schema is named in every document
-(`"schema": "r12e/1"`) and addresses are hex strings so nothing is lost to a
+(`"schema": "e5r/1"`) and addresses are hex strings so nothing is lost to a
 float.
 
 ## Shell integration
 
 ```
-r12e completions bash > /etc/bash_completion.d/r12e
-r12e completions zsh  > ~/.zsh/completions/_r12e
-r12e completions fish > ~/.config/fish/completions/r12e.fish
-r12e manpage          > /usr/local/share/man/man1/r12e.1
+e5r completions bash > /etc/bash_completion.d/e5r
+e5r completions zsh  > ~/.zsh/completions/_e5r
+e5r completions fish > ~/.config/fish/completions/e5r.fish
+e5r manpage          > /usr/local/share/man/man1/e5r.1
 ```
 
 Both are generated from the command tree, so they cannot describe a command
@@ -460,7 +460,7 @@ that does not exist.
 | `--arch NAME` | The architecture of a raw image, which has no header to say. |
 | `--threads N` | How much of the analysis to run in parallel. The output does not depend on this. |
 | `--color WHEN` | `auto` (a terminal only), `always`, or `never`. `NO_COLOR` is honoured. |
-| `--no-pager` | Do not page, even when a terminal is reading. `PAGER` and `R12E_PAGER` choose the pager. |
+| `--no-pager` | Do not page, even when a terminal is reading. `PAGER` and `E5R_PAGER` choose the pager. |
 | `--budget SECONDS` | Stop after this long and report what was finished. |
 | `--limit N` | Stop after this many items and report what was finished. |
 | `--progress` | Show a counter on stderr. Silent when stderr is not a terminal. |
@@ -469,8 +469,8 @@ A job that runs out of budget prints why on stderr and how much is left, and
 the output it already produced is still a valid document:
 
 ```
-$ r12e decompile libstdc++.so.6 all --budget 3 > partial.c
-r12e: out of time after 3.5s and 1024 of 5609 function(s); 4585 not done.
+$ e5r decompile libstdc++.so.6 all --budget 3 > partial.c
+e5r: out of time after 3.5s and 1024 of 5609 function(s); 4585 not done.
 Raise --budget or --limit, or narrow the target.
 ```
 

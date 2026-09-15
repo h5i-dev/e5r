@@ -1,6 +1,6 @@
 # Roadmap
 
-Status: in progress, 2026-09-13. This file is the scope authority for r12e:
+Status: in progress, 2026-09-13. This file is the scope authority for e5r:
 what it is, what gets built in what order, and what will be refused in review
 rather than argued about again.
 
@@ -32,9 +32,9 @@ including the ones that go against us. In short: `libc.so.6` analyzes in 0.10s
 and 58 MB, finding 3,517 functions with 95.3% analyzed completely, where
 `objdump -d` takes 0.26s and only disassembles; both decoders are at zero
 disagreements with their oracle; memory use is about ten times objdump's, which
-is the axis r12e is worse on. 164 tests, clippy clean.
+is the axis e5r is worse on. 164 tests, clippy clean.
 
-r12e is a reverse engineering toolkit with a command line as its only front end.
+e5r is a reverse engineering toolkit with a command line as its only front end.
 It loads a binary, recovers functions, disassembles, lifts to an IR, decompiles
 to C, diffs two builds, and writes an analyst's findings to a text log that git
 can merge. One static Rust binary, no JVM, no project server, no proprietary
@@ -46,13 +46,13 @@ x86-64 and ELF notes in `MEMO.md` survive the rewrite and move under `docs/`.
 
 ## The bets
 
-Ghidra, rizin and IDA are each better than r12e will be for years at breadth of
+Ghidra, rizin and IDA are each better than e5r will be for years at breadth of
 architecture and at accumulated analysis lore. Beating them means picking the
 axes where their design, not their effort, is the limit.
 
 1. **Startup and throughput:** Ghidra pays JVM startup and a project import
    before it shows a function. rizin is single-threaded through most of its
-   analysis. r12e memory-maps the image, analyzes functions in parallel, and
+   analysis. e5r memory-maps the image, analyzes functions in parallel, and
    analyzes a function only when something asks for it. The target is first
    useful output in under 200 ms on a 100 MB binary, and full analysis of
    `/bin/bash` faster than `rizin -A` by a factor we publish and regression-test.
@@ -79,7 +79,7 @@ axes where their design, not their effort, is the limit.
    a headless mode retrofitted onto a GUI.
 
 6. **Breadth through SLEIGH, depth by hand:** Writing 40 instruction decoders is
-   not a good use of the next two years. r12e ships a Rust SLEIGH runtime and
+   not a good use of the next two years. e5r ships a Rust SLEIGH runtime and
    compiler so Ghidra's processor specifications load directly, plus
    hand-written decoders for x86-64 and AArch64 where speed matters. Kuna proved
    the SLEIGH port is tractable.
@@ -90,23 +90,23 @@ The library owns every fact. The CLI and any future UI compute
 nothing of their own.
 
 ```
-r12e-core      addresses, spaces, memory map, ids, error model, provenance
-r12e-format    ELF, PE/COFF, Mach-O, raw, archives, overlays
-r12e-arch      decoder trait, hand-written x86/x86-64 and AArch64/ARM
-r12e-sleigh    .sla runtime plus the SLEIGH compiler (breadth)
-r12e-ir        p-code-style IR, SSA, dataflow framework
-r12e-analysis  partition, function discovery, CFG, jump tables, xrefs, strings
-r12e-types     type model, DWARF, PDB, demanglers, type archives
-r12e-decomp    regions, structuring, expression rebuild, C emission
-r12e-db        content anchors, the annotation log, git merge semantics
-r12e-diff      function matching, build-to-build diff
-r12e-patch     assembler-backed patch sets
-r12e-api       stable library surface and the versioned JSON schema
-r12e-cli       the r12e binary
+e5r-core      addresses, spaces, memory map, ids, error model, provenance
+e5r-format    ELF, PE/COFF, Mach-O, raw, archives, overlays
+e5r-arch      decoder trait, hand-written x86/x86-64 and AArch64/ARM
+e5r-sleigh    .sla runtime plus the SLEIGH compiler (breadth)
+e5r-ir        p-code-style IR, SSA, dataflow framework
+e5r-analysis  partition, function discovery, CFG, jump tables, xrefs, strings
+e5r-types     type model, DWARF, PDB, demanglers, type archives
+e5r-decomp    regions, structuring, expression rebuild, C emission
+e5r-db        content anchors, the annotation log, git merge semantics
+e5r-diff      function matching, build-to-build diff
+e5r-patch     assembler-backed patch sets
+e5r-api       stable library surface and the versioned JSON schema
+e5r-cli       the e5r binary
 ```
 
-Dependency edges run downward only. `r12e-cli` may depend on everything;
-`r12e-core` depends on nothing in the workspace.
+Dependency edges run downward only. `e5r-cli` may depend on everything;
+`e5r-core` depends on nothing in the workspace.
 
 ## Milestones
 
@@ -238,7 +238,7 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       space table and 148 on the constructor count.
 - [x] Assembler for x86-64 and AArch64, needed by M10 patching. Encoding only,
       from public manuals, built around the decoder so it accepts our own
-      disassembly verbatim: a user can copy a line out of `r12e disas`, change
+      disassembly verbatim: a user can copy a line out of `e5r disas`, change
       it, and assemble it back. Round trip over the whole fixture corpus, 0
       wrong on both architectures; byte-identical to `as` and
       `aarch64-linux-gnu-as` on every one of 2,535 and 1,272 comparable forms.
@@ -478,7 +478,7 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       the fixture corpus is decompiled into one translation unit that `clang`
       has to accept. Density is zero at O0, O1 and Os on both architectures and
       0.24 per function at O2 and O3.
-- [ ] M6 does not close until DecBench scores r12e above Ghidra on the
+- [ ] M6 does not close until DecBench scores e5r above Ghidra on the
       unoptimized set: 32.2 union, 29.3 structure. **Measured 2026-09-13: 23.4
       union, 22.9 structure.** Not met. The gap is structuring: 1.98 gotos per
       function against angr's 0.57, and the 124 functions with three or more
@@ -488,7 +488,7 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 
 ### M7. The annotation store
 
-This is the feature that distinguishes r12e from every incumbent, so it gets
+This is the feature that distinguishes e5r from every incumbent, so it gets
 designed before it gets coded, and the design lives in
 [`docs/design/db.md`](../docs/design/db.md).
 
@@ -536,7 +536,7 @@ designed before it gets coded, and the design lives in
 - [x] Paging, color, and a terminal-width-aware listing that stays diffable when
       piped. All three are decided once from whether standard output is a
       terminal, so piped output is byte-identical to what it was before they
-      existed. `NO_COLOR`, `PAGER` and `R12E_PAGER` are honoured; `--color` and
+      existed. `NO_COLOR`, `PAGER` and `E5R_PAGER` are honoured; `--color` and
       `--no-pager` override. JSON is never coloured or paged.
 - [x] Shell completion for bash, zsh and fish, and a generated man page, both
       generated from the command tree so neither can describe a command that
@@ -551,7 +551,7 @@ designed before it gets coded, and the design lives in
 
 ### M9. Automation and agents
 
-- [x] `r12e-api`: the library surface the CLI and the tests share, so a
+- [x] `e5r-api`: the library surface the CLI and the tests share, so a
       difference between what a test checks and what a user gets is a
       difference a user will find. Decompilation, shapes, signatures,
       emulation and queries go through it.
@@ -633,7 +633,7 @@ designed before it gets coded, and the design lives in
       distribution's development packages carry the same code under the same
       names, are what a statically linked binary was built from, and need no
       reading of anyone's format.
-- [x] Emulation, built on the M4 IR interpreter: `r12e emulate` runs a
+- [x] Emulation, built on the M4 IR interpreter: `e5r emulate` runs a
       function with given arguments and reports what came back and what it
       touched. Nothing escapes the process. Gated against the processor by
       running the oracle's case table through it.
@@ -659,7 +659,7 @@ designed before it gets coded, and the design lives in
 - [x] Published benchmark numbers against `rizin -A` on the fixture corpus,
       rerun in CI, with a regression budget. 16 binaries, 21x to 3,291x faster
       and 2.4x to 8.6x less memory, with the three qualifications that ratio
-      needs in the table rather than under it, and the one row r12e loses left
+      needs in the table rather than under it, and the one row e5r loses left
       in. `docs/benchmarks.md`, `scripts/bench-budget.json`. Ghidra's headless
       analyzer is wired and opt-in behind `GHIDRA_INSTALL_DIR`, but its
       decompiler ships x86-64 only, so on this aarch64 host the comparison that
@@ -679,7 +679,7 @@ designed before it gets coded, and the design lives in
       stored blocks were 2.69M distinct ranges, held once per function that
       could reach them. Wall time is unchanged and is not claimed as a win.
 - [x] Profiling as a habit, with `scripts/flamegraph.sh` checked in and run
-      rather than merely written. It found that `r12e funcs` spends 12.3% of
+      rather than merely written. It found that `e5r funcs` spends 12.3% of
       its time computing content anchors for every function before printing
       anything.
 
@@ -696,7 +696,7 @@ designed before it gets coded, and the design lives in
       the file first, then by the cap, check the cursor advanced, and read
       through the reader. Checked by the mutation fuzzer in the ordinary test
       suite rather than by review.
-- [x] `#![forbid(unsafe_code)]` on every crate except `r12e-cli`, which is
+- [x] `#![forbid(unsafe_code)]` on every crate except `e5r-cli`, which is
       `#![deny(unsafe_code)]` so one audited call can opt in. There is exactly
       one exception, the memory map, and its justification is in
       [`docs/design/limits.md`](../docs/design/limits.md).
@@ -752,7 +752,7 @@ Green before every merge to main. Each one is a command, not a judgment call.
 Ghidra has 1,946 test files and 18,999 `@Test` methods. Copying that number is
 the wrong target and it would take a decade. Look at where those tests actually
 are: 615 files cover `Features/Base`, 399 cover the framework, and most of the
-rest are GUI and integration tests for a UI r12e does not have. The decompiler,
+rest are GUI and integration tests for a UI e5r does not have. The decompiler,
 which is the hardest thing in the product, has 15 Java test files, because the
 real decompiler tests are 89 XML datatests driving the C++ engine. Processors
 have 17.
@@ -763,10 +763,10 @@ writing more assertions about our own behavior.
 
 ### Oracle-backed suites
 
-| Suite | What the oracle is | Reference point | r12e target |
+| Suite | What the oracle is | Reference point | e5r target |
 | --- | --- | --- | --- |
 | Decoder parity | `objdump` and `iced-x86` on the same bytes | rizin ships 6,333 named cases and 24,625 lines of assembly vectors | every instruction in the fixture corpus, plus 10^8 randomly generated encodings per architecture, with zero unexplained disagreements |
-| Semantic lift | native execution of the same code | Ghidra's PCodeTest compiles 21 C bodies per target and emulates them | the same C bodies plus our own, executed natively and under the r12e emulator, compared on every observable |
+| Semantic lift | native execution of the same code | Ghidra's PCodeTest compiles 21 C bodies per target and emulates them | the same C bodies plus our own, executed natively and under the e5r emulator, compared on every observable |
 | Function boundaries | DWARF and PE unwind records | none published | precision and recall per fixture, tracked per release |
 | Decompiler behavior | recorded baseline, reviewed on change | Ghidra 89 datatests, kuna 83 files and 675 assertions | 89 ported cases before the M6 gate opens, then one case per fixed bug, permanently |
 | Type recovery | DWARF types in the fixture that has them | none published | agreement rate per type category, tracked per release |
@@ -790,10 +790,10 @@ single workspace number lets a well-tested decoder hide an untested loader.
 
 | Crate | Line | Branch |
 | --- | --- | --- |
-| `r12e-format`, `r12e-arch`, `r12e-sleigh` | 90% | 85% |
-| `r12e-core`, `r12e-ir`, `r12e-db`, `r12e-types` | 85% | 80% |
-| `r12e-analysis`, `r12e-decomp`, `r12e-diff`, `r12e-patch` | 75% | 65% |
-| `r12e-cli` | 60% | 50% |
+| `e5r-format`, `e5r-arch`, `e5r-sleigh` | 90% | 85% |
+| `e5r-core`, `e5r-ir`, `e5r-db`, `e5r-types` | 85% | 80% |
+| `e5r-analysis`, `e5r-decomp`, `e5r-diff`, `e5r-patch` | 75% | 65% |
+| `e5r-cli` | 60% | 50% |
 
 Parsers and decoders get the high floor because their inputs are hostile and
 their failure mode is silent. The decompiler gets a lower one because a
@@ -811,8 +811,8 @@ reports whether the suite failed. The score is the fraction of mutants killed.
 
 | Crate | Floor |
 | --- | --- |
-| `r12e-format`, `r12e-arch`, `r12e-core` | 85% |
-| `r12e-ir`, `r12e-db`, `r12e-types` | 75% |
+| `e5r-format`, `e5r-arch`, `e5r-core` | 85% |
+| `e5r-ir`, `e5r-db`, `e5r-types` | 75% |
 | everything else | 60%, or an exemption with a written reason |
 
 Full mutation runs are slow, so CI mutates only the diff on a pull request and
@@ -845,7 +845,7 @@ Counted by what it finds, not by whether it runs.
 
 ## Scorecard
 
-The claim is that r12e is better than the incumbents, so it needs numbers that
+The claim is that e5r is better than the incumbents, so it needs numbers that
 can prove it wrong. These get recorded in `docs/scorecard.md` from the first
 release and rerun every release.
 
@@ -938,7 +938,7 @@ Tasks:
       with `.eh_frame` removed as well, which is the number that says what the
       analysis can do with nothing but code. See
       [`docs/boundaries.md`](../docs/boundaries.md).
-- [x] A DecBench backend for r12e, as `scripts/decbench_r12e.py`. Out of tree,
+- [x] A DecBench backend for e5r, as `scripts/decbench_e5r.py`. Out of tree,
       which DecBench's own documentation permits, so the benchmark checkout
       stays untouched. Driven by `scripts/decbench.sh`.
 - [ ] Submit to the 250-function sample set as soon as M6 produces output at all.

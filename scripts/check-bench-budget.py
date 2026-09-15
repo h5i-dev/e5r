@@ -73,10 +73,10 @@ def load(path: Path) -> dict:
 
 
 def measured_rows(results: dict) -> dict[str, dict]:
-    """The r12e measurement per binary, keyed by binary name."""
+    """The e5r measurement per binary, keyed by binary name."""
     rows = {}
     for row in results["results"]:
-        tool = row["tools"].get("r12e")
+        tool = row["tools"].get("e5r")
         if tool and tool.get("ran"):
             rows[row["binary"]] = {
                 "seconds": tool["seconds"],
@@ -91,10 +91,10 @@ def measured_rows(results: dict) -> dict[str, dict]:
 
 
 def ratios(results: dict) -> dict[str, dict[str, float]]:
-    """r12e's wall time as a fraction of each other tool's, per binary."""
+    """e5r's wall time as a fraction of each other tool's, per binary."""
     out = {}
     for row in results["results"]:
-        ours = row["tools"].get("r12e")
+        ours = row["tools"].get("e5r")
         # A ratio against a time at the timer's resolution is arithmetic on
         # noise, so the small fixtures contribute no speedup floor.
         if not ours or not ours.get("ran"):
@@ -223,7 +223,7 @@ def update(budget: dict, results: dict) -> dict:
         if got["recall"] is not None:
             entry["recall_floor"] = got["recall"]
     # The speedup floor is deliberately slack, and capped. It exists to catch
-    # r12e losing a standing advantage, not to bet that another tool will never
+    # e5r losing a standing advantage, not to bet that another tool will never
     # get faster: rizin takes twelve minutes on libstdc++ here, and pinning a
     # floor near that ratio would fail the day rizin fixes it, which is not our
     # regression. An order of magnitude is the most this claims.

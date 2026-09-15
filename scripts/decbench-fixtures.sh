@@ -28,8 +28,8 @@
 #   DECBENCH_OPTS=O0,O2 scripts/decbench-fixtures.sh zlib
 #
 # Env: DECBENCH_REPO      the DecBench checkout (default ~/Ref/decbench)
-#      DECBENCH_FIXTURES  where to build (default $XDG_CACHE_HOME/r12e/decbench,
-#                         falling back to ~/.cache/r12e/decbench)
+#      DECBENCH_FIXTURES  where to build (default $XDG_CACHE_HOME/e5r/decbench,
+#                         falling back to ~/.cache/e5r/decbench)
 #      DECBENCH_OPTS      comma-separated optimization levels; default is what
 #                         each project's TOML asks for
 #      DECBENCH_JOBS      make -j level (default 1: four agents share this box)
@@ -41,7 +41,7 @@ set -euo pipefail
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 decbench=${DECBENCH_REPO:-$HOME/Ref/decbench}
-cache=${DECBENCH_FIXTURES:-${XDG_CACHE_HOME:-$HOME/.cache}/r12e/decbench}
+cache=${DECBENCH_FIXTURES:-${XDG_CACHE_HOME:-$HOME/.cache}/e5r/decbench}
 jobs=${DECBENCH_JOBS:-1}
 manifest_dir="$repo/fixtures/build/decbench"
 
@@ -269,7 +269,7 @@ for project in "${projects[@]}"; do
       [ -f "$bin" ] || continue
       case "$bin" in *.stripped | *.dwarf) continue ;; esac
       # The DWARF copy is the ground truth; the stripped copy is what the gate
-      # hands to r12e, so that nothing it measures came from a symbol table.
+      # hands to e5r, so that nothing it measures came from a symbol table.
       [ -f "$bin.dwarf" ] || ground_truth "$bin" > "$bin.dwarf"
       if [ ! -s "$bin.dwarf" ]; then
         rm -f "$bin.dwarf"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Measure r12e against what else is on this machine, and print a table.
+# Measure e5r against what else is on this machine, and print a table.
 #
 # Wall time and peak RSS from /usr/bin/time, best of three runs, over the
 # fixture corpus plus whatever system binaries are present. objdump is the
@@ -9,7 +9,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-bin=target/release/r12e
+bin=target/release/e5r
 [ -x "$bin" ] || { echo "build first: cargo build --release" >&2; exit 2; }
 
 # Best of three, printed as "seconds KB".
@@ -34,7 +34,7 @@ for f in /bin/ls /bin/bash /usr/bin/objdump \
 done
 
 printf '%-26s %8s  %18s  %18s  %s\n' \
-  "binary" "size" "r12e (analyze)" "objdump (disas)" "functions / complete"
+  "binary" "size" "e5r (analyze)" "objdump (disas)" "functions / complete"
 printf '%-26s %8s  %18s  %18s  %s\n' \
   "--------------------------" "--------" "------------------" "------------------" "--------------------"
 
@@ -60,6 +60,6 @@ for f in "${targets[@]}"; do
 done
 
 echo
-echo "r12e recovers functions, control flow, cross references and strings."
+echo "e5r recovers functions, control flow, cross references and strings."
 echo "objdump disassembles linearly and does none of that; it is here because"
 echo "it is the one comparison present on every machine."

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# r12e measured against the other reverse engineering tools on this machine.
+# e5r measured against the other reverse engineering tools on this machine.
 #
 # Not a test: it needs rizin, and Ghidra with a JVM if that is asked for. The
 # numbers it prints are recorded in docs/benchmarks.md and docs/scorecard.md,
@@ -15,7 +15,7 @@
 #   scripts/compare-tools.sh /bin/ls              # one binary
 #   RUNS=1 scripts/compare-tools.sh               # the fast loop
 #
-# Env: R12E                the r12e executable (default target/release/r12e)
+# Env: E5R                the e5r executable (default target/release/e5r)
 #      RIZIN               the rizin executable (default whatever is on PATH)
 #      GHIDRA_INSTALL_DIR  a Ghidra installation; Ghidra is left out without one
 #      OUT                 where the JSON goes (default target/bench-tools.json,
@@ -29,11 +29,11 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-r12e=${R12E:-target/release/r12e}
+e5r=${E5R:-target/release/e5r}
 rizin=${RIZIN:-rizin}
 out=${OUT:-target/bench-tools.json}
 
-[ -x "$r12e" ] || {
+[ -x "$e5r" ] || {
   echo "build first: cargo build --release" >&2
   exit 2
 }
@@ -43,9 +43,9 @@ out=${OUT:-target/bench-tools.json}
 # underneath it, so half the table would describe one build and half another
 # with nothing in the output saying so. The copy is deleted on the way out and
 # its hash is recorded with the numbers.
-snapshot=$(mktemp -t r12e-bench-XXXXXX)
+snapshot=$(mktemp -t e5r-bench-XXXXXX)
 trap 'rm -f "$snapshot"' EXIT
-cp "$r12e" "$snapshot"
+cp "$e5r" "$snapshot"
 chmod +x "$snapshot"
 [ -x "$rizin" ] || command -v "$rizin" > /dev/null || {
   echo "no rizin: install it or set RIZIN. See docs/benchmarks.md." >&2
@@ -85,8 +85,8 @@ fi
 
 # Not exec: the trap has to run and delete the snapshot.
 python3 scripts/compare_tools.py \
-  --r12e "$snapshot" \
-  --r12e-name "$r12e" \
+  --e5r "$snapshot" \
+  --e5r-name "$e5r" \
   --rizin "$rizin" \
   --ghidra "$ghidra" \
   --runs "${RUNS:-3}" \

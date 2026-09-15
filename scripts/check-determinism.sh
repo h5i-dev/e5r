@@ -7,7 +7,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-bin=target/release/r12e
+bin=target/release/e5r
 [ -x "$bin" ] || { echo "build first: cargo build --release" >&2; exit 2; }
 
 shopt -s nullglob

@@ -183,7 +183,7 @@
     "cpus": 10
   },
   "versions": {
-    "r12e": "r12e 0.1.0 (target/release/r12e, sha256 6525025002f44172)",
+    "e5r": "e5r 0.1.0 (target/release/e5r, sha256 6525025002f44172)",
     "rizin": "rizin 0.8.2 @ linux-arm-64, package: 0.8.2 (RizinOrg)"
   },
   "loadavg_when_measured": [
