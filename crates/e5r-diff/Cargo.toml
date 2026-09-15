@@ -1,0 +1,19 @@
+[package]
+name = "e5r-diff"
+description = "e5r — matching functions across two builds."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+e5r-core = { workspace = true }
+e5r-arch = { workspace = true }
+e5r-analysis = { workspace = true }
+e5r-db = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+e5r-format = { workspace = true }

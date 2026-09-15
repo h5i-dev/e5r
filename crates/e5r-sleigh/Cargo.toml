@@ -1,0 +1,22 @@
+[package]
+name = "e5r-sleigh"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "SLEIGH processor specification front end: .slaspec source to an in-memory model"
+
+# No dependencies on purpose. The front end is a lexer, a parser and a bit
+# solver over text; anything it pulled in would be a liability at the same
+# trust boundary as the loaders.
+[dependencies]
+
+# The gates compare the decode engine against the hand-written decoders and
+# against objdump, so the test binaries need them. A dev dependency, so the
+# library itself still pulls in nothing and `e5r-arch` stays free to depend on
+# this crate.
+[dev-dependencies]
+e5r-arch = { workspace = true }
+e5r-core = { workspace = true }

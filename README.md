@@ -1,69 +1,346 @@
-# MyDisassembler
+<p align="center">
+  <a href="https://github.com/h5i-dev/e5r/actions/workflows/ci.yaml"><img alt="ci" src="https://github.com/h5i-dev/e5r/actions/workflows/ci.yaml/badge.svg"></a>
+  <a href="https://github.com/h5i-dev/e5r/blob/main/LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/github/license/h5i-dev/e5r?color=blue"></a>
+  <a href="https://github.com/h5i-dev/e5r/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/h5i-dev/e5r?style=social"></a>
+  <a href="https://github.com/h5i-dev/e5r/releases"><img alt="release" src="https://img.shields.io/github/v/release/h5i-dev/e5r?label=release"></a>
+</p>
 
-Welcome to MyDisassembler, a project designed to help learners understand X86-64 machine codes, assembly language, ELF format, and disassembly strategies. With this tool, we can explore the intricacies of low-level programming and gain insights into how binaries are structured and executed.
+<h1 align="center">The Reverse Engineering Toolkit for AI Agents</h1>
 
-You might find [our memo](MEMO.md) helpful if you're new to X86-64 and assembly (like us).
+**e5r** is a disassembler, decompiler and binary differ with a command line as
+its only front end. Every command speaks JSON, every recovered fact carries the
+evidence for it, and every name, type and comment an agent writes lands in a
+git-mergeable log. One static Rust binary: no JVM, no project server, no
+proprietary database.
 
-## Install
+<table align="center">
+  <tr>
+    <td align="center">
+      <strong>Agent-native</strong><br>
+      <sub>JSON on every command, and analysis an agent can correct</sub>
+    </td>
+    <td align="center">
+      <strong>Evidence, not assertions</strong><br>
+      <sub>Every gate measured against an outside oracle, including a processor</sub>
+    </td>
+    <td align="center">
+      <strong>21×–3,291× faster than rizin</strong><br>
+      <sub><a href="./docs/benchmarks.md">2.4×–8.6× less memory, in our benchmarks</a></sub>
+    </td>
+  </tr>
+</table>
 
-To get started with MyDisassembler, follow these simple steps:
-
-- Clone the Repository:
+**Let agents read binaries the way a human does with IDA — and write what they
+learn back into the repository.**
 
 ```bash
-git clone https://github.com:Koukyosyumei/MyDisassembler.git
+# Look at a binary.
+e5r info ./a.out                              # container, architecture, entry, what the loader noticed
+e5r funcs ./a.out                             # every function, with the evidence for each boundary
+e5r disas ./a.out main                        # one function, or a range, or everything
+e5r decompile ./a.out main                    # pseudo-C, with a goto where the shape is not there
+
+# Ask questions instead of reading output.
+e5r xrefs ./a.out 0x4006e8                    # who reaches this, and how
+e5r strings ./a.out                           # ASCII, UTF-8 and UTF-16LE, by section
+e5r classes ./a.out                           # C++ hierarchy from the vtables and the RTTI
+e5r query ./a.out 'functions where insns > 100 and name ~ "crypt"'
+
+# Write what you worked out, and merge it like code.
+e5r annotate ./a.out name 0x4006e8 parse_header
+e5r annotate ./a.out type 0x4006e8 "int parse_header(struct hdr *h, size_t n)"
+e5r decompile ./a.out parse_header            # the assertion reaches the output
+
+# Drive it from an agent.
+e5r batch ./a.out --command funcs --command strings   # several commands, one document
+e5r funcs ./a.out --json                      # every command takes it
 ```
 
-- Build the Project:
+---
+
+## 1. Install
 
 ```bash
-cd MyDisassembler
-./script/build.sh
+curl -fsSL https://raw.githubusercontent.com/h5i-dev/e5r/main/install.sh | sh
+# cargo install --path crates/e5r-cli   # build from source
 ```
 
-## Usage
-
-Once installed, you can use MyDisassembler to disassemble binary files and delve into their assembly code. Here's how you can use it:
+One binary, no runtime dependency. The script works out the platform, verifies
+the download against the release's `SHA256SUMS`, and refuses to install if it
+does not match. [`MANUAL.md`](MANUAL.md) has the environment variables.
 
 ```bash
-./build/script/mydisas example/jmp.o
+e5r completions bash > /etc/bash_completion.d/e5r   # or zsh, fish, elvish
+e5r manpage > ~/.local/share/man/man1/e5r.1
 ```
 
-```yaml
-section: .text ----
+---
 
-40 <_start>:
- 40: mov  eax 0x00000000                      ( b8 0 0 0 0 )
- 45: cmp  eax 0x00                            ( 83 f8 0 )
- 48: jz 4e <zero_label> ; relative offset = 4 ( 74 4 )
- 4a: jmp 52 <end_label> ; relative offset = 6 ( eb 6 )
- 4c: jmp 40 <_start> ; relative offset = -14  ( eb f2 )
+## 2. Use it
 
-4e <zero_label>:
- 4e: push  rsp                                ( 54 )
- 4f: xor  eax eax                             ( 31 c0 )
- 51: ret                                      ( c3 )
+### 2.1. Read a binary
 
-52 <end_label>:
- 52: push  rdi                                ( 57 )
- 53: xor  ecx ecx                             ( 31 c9 )
- 55: ret                                      ( c3 )
--------------------
-Done!
+Everything e5r recovers carries the evidence for it, and the strength of that
+evidence is printed next to it, so a boundary from an `.eh_frame` record and one
+from a prologue pattern are never the same claim:
+
+```bash
+e5r info ./a.out                    # container, architecture, entry, warnings
+e5r sections ./a.out                # and how each maps into memory
+e5r funcs ./a.out                   # address, size, blocks, strength, evidence, name
+e5r disas ./a.out main              # a function, an address, a range, or `all`
+e5r stats ./a.out --json            # counts, for a script rather than a reader
 ```
 
-## Features
+| Strength | Meaning |
+| --- | --- |
+| `asserted` | A person or an agent wrote it in the annotation log. |
+| `proven` | The file says so: a symbol table, debug information, an unwind record. |
+| `inferred` | The code implies it: a call target, a jump table, an import thunk. |
+| `heuristic` | A pattern suggests it: a prologue, a sweep, a pointer in data. |
 
-- Implemented entirely from scratch in C++
-- Supports both linear sweeping and recursive descent disassembly strategies
-- Handles most basic operations with precision
-- Capable of parsing ELF headers for deeper analysis
+Where a thing cannot be worked out it is reported as unknown, never guessed.
 
-## Future Improvements
+### 2.2. Decompile
 
-- Expand test coverage for enhanced reliability
-- Add support for VEX Prefix
-- Incorporate additional instructions, including floating-point operations
-- Introduce support for AT&T syntax
+```bash
+e5r decompile ./a.out main          # pseudo-C
+e5r decompile ./a.out all --json    # every complete function, with a position map
+e5r shapes ./a.out parse_header     # what the pointers it takes appear to point at
+e5r emulate ./a.out checksum 1 2 3  # run it in the interpreter and see what comes back
+```
 
-Feel free to contribute to MyDisassembler and make it even better!
+The output says what the machine does in C's notation; it does not claim to be
+the source. Where the control flow does not fit a loop or a branch, a labelled
+`goto` appears rather than a shape that is not there, and the count is printed.
+
+**Every function that can be compiled and run is compiled and run, on every
+argument vector, and agrees with the interpreter.** That gate started at 130
+disagreeing functions and is at zero.
+
+### 2.3. Write analysis back, and merge it
+
+Names, types and comments are lines in an append-only log keyed to **content
+anchors** — a shape hash and a body hash — rather than to addresses, so they
+survive a rebuild that moves everything:
+
+```bash
+e5r annotate ./a.out name 0x4006e8 parse_header
+e5r annotate ./a.out comment 0x400710 "length is attacker-controlled"
+e5r annotate ./a.out list
+```
+
+Two analysts merge with `git merge`. Reviewing reverse engineering work becomes
+a pull request. Add `*.e5r merge=union` to `.gitattributes`: the fold ignores
+line order, so the union of two branches is the correct merge and git already
+knows how to compute it.
+
+### 2.4. Compare two builds
+
+```bash
+e5r diff ./old ./new                # which functions changed, moved, appeared, vanished
+e5r diff ./old ./new --json         # and what changed inside each one
+```
+
+Matching is by content, not by address, so a rebuild that shifts every function
+is not reported as a rewrite of the program.
+
+### 2.5. Patch, and say why
+
+```bash
+e5r patch ./a.out record 0x4006f0 --asm "nop" --out fix.e5rpatch
+e5r patch ./a.out preview fix.e5rpatch         # what it would change
+e5r patch ./a.out apply fix.e5rpatch --out ./patched   # a new file, never in place
+```
+
+### 2.6. Drive it from an agent
+
+```bash
+e5r funcs ./a.out --json                      # every command takes it
+e5r batch ./a.out --command funcs --command strings
+e5r project new ./a.out --out a.e5rproj      # reopen it later without reanalysing
+```
+
+Every command takes `--json`, and the exit codes are documented: `0` ok, `1`
+nothing found, `2` bad usage, `3` bad input. That is the whole agent interface,
+deliberately: the CLI is a thin client of the library, so anything it can do is
+a function call away, and a second protocol on top would be a second surface to
+keep in step with the first.
+
+---
+
+## 3. What works
+
+| | |
+| --- | --- |
+| Containers | ELF, PE and COFF, Mach-O (thin and fat), PDB, `ar` archives, raw images |
+| Decoders | AArch64, x86-64, i386, ARM32 and Thumb-2 — each at zero disagreements with its oracle |
+| Also | any architecture a Ghidra SLEIGH specification covers, through our own runtime |
+| Lifting | p-code-style IR and SSA for AArch64, x86-64, i386 and ARM32/Thumb |
+| Analysis | functions with provenance, control flow, jump tables, no-return propagation, cross references, strings, data regions |
+| Decompiler | expressions, types, structuring, variable naming, C++ classes from vtables and RTTI |
+| Names | Itanium C++, Rust (both schemes), MSVC |
+| Storage | git-mergeable annotation log keyed to content anchors |
+| Surfaces | CLI with JSON on every command, REPL, binary diff, patching |
+
+Scope, and what is deliberately **not** built, is in
+[`ROADMAP.md`](ROADMAP.md), which is the authority on both.
+
+---
+
+## 4. How it is tested
+
+Every correctness gate is measured against something outside this repository,
+so no number here can be produced by writing more assertions about our own
+behaviour. The ones that go against us stay in
+[`docs/scorecard.md`](docs/scorecard.md).
+
+| gate | oracle | result |
+| --- | --- | --- |
+| AArch64 decoding | `objdump -d` | 1,640,904 instructions, 0 wrong |
+| x86-64 decoding | `llvm-objdump --x86-asm-syntax=intel` | 0 wrong |
+| ARM32 and Thumb-2 | `llvm-objdump-18 -d` | 0 wrong |
+| i386 decoding | `llvm-mc`, over a swept encoding space | 235,357 encodings, 0 wrong |
+| SLEIGH decoding | `objdump` and `llvm-objdump` | 0 wrong on AArch64, x86-64 and RISC-V |
+| Lifting | **a processor**, natively and under `qemu` | every case agrees |
+| Decompiled C | **a processor**, again: compile it and run it | 0 functions disagree |
+| Function boundaries | DWARF, via `readelf` | 95,697 functions; 0.766 recall blind, 0.937 precision |
+| ELF, Mach-O, PDB loading | `readelf`, `llvm-objdump -t`, `llvm-pdbutil` | every section, symbol and record |
+| Demangling | `c++filt` | 5,953 libstdc++ names |
+| Annotation merge | `git merge` itself | two branches, clean |
+| Determinism | itself, at 1, 4 and 10 threads | 153 fixtures, identical output |
+
+A processor is the oracle wherever one can be: the lifters are checked by
+assembling a case, running it, and comparing against our own interpreter, so
+"the manual says this instruction sets the carry flag" is never the last word.
+
+Plus mutation fuzzing of every loader and decoder in the ordinary test run,
+which found the one place in the loaders that bypassed the bounds-checked
+reader, and a no-panic gate over 1.26 million inputs across every entry point
+that takes foreign bytes.
+
+---
+
+## 5. Where it stands against the others
+
+Ghidra, rizin and IDA are each better than e5r at breadth of architecture and
+at accumulated analysis lore. Two measurements, both with every command written
+down in [`docs/benchmarks.md`](docs/benchmarks.md) and
+[`docs/decbench.md`](docs/decbench.md):
+
+- **Against rizin**, on the same 16 binaries on the same machine: 21× to 3,291×
+  faster and 2.4× to 8.6× less memory. Three qualifications belong with that
+  ratio and are in the table rather than under it — including the one row e5r
+  loses.
+- **Against angr, on DecBench**, a third-party decompiler benchmark: 23.4 union
+  against angr's 37.0. That is a third behind, and the milestone this project
+  set itself is Ghidra's published 32.2, which is **not met**.
+
+The bets are on the axes where the others' design, not their effort, is the
+limit: speed, annotations in git, determinism, provenance, and an interface
+built for a program rather than for a person.
+
+---
+
+## 6. Build
+
+The checkout is release-only; see [`CLAUDE.md`](CLAUDE.md).
+
+```bash
+cargo build --release
+./scripts/build-fixtures.sh       # the corpus the gates measure against
+cargo test --release --workspace
+./scripts/bench.sh
+```
+
+---
+
+## 7. Documentation
+
+- [MANUAL.md](MANUAL.md) / `man e5r`: the full command reference
+- [docs/tutorial.md](docs/tutorial.md): a stripped binary to a committed annotation log
+- [docs/design/](docs/design/): one document per subsystem, and why it is shaped that way
+- [docs/scorecard.md](docs/scorecard.md): every measured number, including the bad ones
+- [CONTRIBUTING.md](CONTRIBUTING.md): what a change has to measure, and the clean-room rule
+
+---
+
+## 8. FAQ
+
+<details>
+<summary>What is e5r?</summary>
+
+A reverse engineering toolkit: it loads a binary, recovers its functions,
+disassembles and decompiles them, and lets you write names, types and comments
+back into a log you can commit. It runs locally, is written in Rust, and ships
+as one static binary.
+
+</details>
+
+<details>
+<summary>Why another one, when Ghidra and rizin exist?</summary>
+
+Not because they are bad. Because a few things are hard to retrofit: an
+annotation store that merges with `git merge` rather than with a project-file
+lock, output that is deterministic across thread counts, a provenance record on
+every recovered fact, and an interface designed for a program to call rather
+than for a person to click. Those are design choices rather than effort, and
+they are what e5r is betting on.
+
+</details>
+
+<details>
+<summary>Is the decompiler as good as Hex-Rays?</summary>
+
+No, and the gap is measured rather than estimated: 23.4 union on DecBench
+against IDA's published 47.9 — on a different corpus, which
+[`docs/decbench.md`](docs/decbench.md) is careful about. What e5r does claim is
+narrower and checked: every function it decompiles, that can be compiled and
+run, computes what the machine computes.
+
+</details>
+
+<details>
+<summary>What does "agent-native" actually mean here?</summary>
+
+Two things that are properties of the tool rather than a wrapper around it.
+Every command emits JSON with a schema and a documented exit code, so an agent
+drives it the same way it drives `git`. And an agent's conclusions are
+first-class input: an asserted name or type reaches the decompiled output and
+the recovered prototype, so read, conclude, correct, re-read is the normal way
+to use it rather than a feature bolted on.
+
+</details>
+
+<details>
+<summary>Can I trust what it tells me?</summary>
+
+Look at the evidence column, and at [`docs/scorecard.md`](docs/scorecard.md).
+"Wrong" is treated as a bug with no allowance; "not recovered" is a gap with a
+number and a floor that only rises. Where the two could be confused, the
+scorecard says so — it has a section for what is *not* measured.
+
+</details>
+
+<details>
+<summary>What is not built?</summary>
+
+WASM, .NET, DEX and Java class files; scripting beyond the batch language; and
+the decompiler quality needed to clear the DecBench milestone. All of it is in
+[`ROADMAP.md`](ROADMAP.md) with the reason, and none of it is claimed here.
+
+</details>
+
+---
+
+## 9. History
+
+e5r began as a C++ teaching disassembler for x86-64. That code is in the git
+history, and its x86-64 and ELF notes are kept at
+[`docs/x86-64-notes.md`](docs/x86-64-notes.md).
+
+---
+
+## 10. License
+
+Apache-2.0. See [LICENSE](LICENSE).

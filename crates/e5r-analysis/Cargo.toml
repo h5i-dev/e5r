@@ -1,0 +1,17 @@
+[package]
+name = "e5r-analysis"
+description = "e5r — function discovery, control flow, cross references, strings."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+e5r-core = { workspace = true }
+e5r-format = { workspace = true }
+e5r-arch = { workspace = true }
+e5r-types = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }

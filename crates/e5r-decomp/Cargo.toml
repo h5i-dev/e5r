@@ -1,0 +1,25 @@
+[package]
+name = "e5r-decomp"
+description = "e5r — expression rebuilding, structuring and C emission."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+e5r-core = { workspace = true }
+e5r-arch = { workspace = true }
+e5r-ir = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+e5r-analysis = { workspace = true }
+e5r-format = { workspace = true }
+# Path only, with no version. A dev-dependency that carries a version is
+# resolved against the registry when the crate is packaged, and these two
+# point back at this crate and at one that depends on it, which is a cycle
+# nothing can publish. Stripped from the published manifest without one.
+e5r-decomp = { path = "." }
+e5r-api = { path = "../e5r-api" }

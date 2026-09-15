@@ -1,0 +1,12 @@
+# cargo-mutants configuration.
+#
+# The per-crate floors live in ROADMAP.md under "Test coverage targets"; this
+# file only says what not to mutate. Mutating a formatter produces mutants a
+# human would call equivalent, and mutating an opcode table produces one mutant
+# per entry, which drowns the signal from the decode logic that matters.
+exclude_globs = [
+    "crates/*/src/*/text.rs",
+    "crates/e5r-arch/src/x86/table.rs",
+    "crates/e5r-cli/src/print.rs",
+    "crates/e5r-cli/src/json.rs",
+]

@@ -1,0 +1,60 @@
+# e5r — a CLI reverse engineering toolkit.
+#
+# The library owns every fact; the CLI is a thin client of it.
+# Crate boundaries and the dependency direction are documented in ROADMAP.md
+# under "Architecture": edges run downward only, and e5r-core depends on
+# nothing else in the workspace.
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+repository = "https://github.com/h5i-dev/e5r"
+authors = ["e5r contributors"]
+# Publishing metadata. Here rather than in each crate so a crate that becomes
+# publishable only has to opt in; e5r-cli is the one that is published today.
+homepage = "https://github.com/h5i-dev/e5r"
+documentation = "https://docs.rs/e5r-cli"
+readme = "README.md"
+keywords = ["reverse-engineering", "disassembler", "decompiler", "binary", "elf"]
+categories = ["command-line-utilities", "development-tools::debugging"]
+
+[workspace.dependencies]
+e5r-core = { path = "crates/e5r-core", version = "0.1.0" }
+e5r-format = { path = "crates/e5r-format", version = "0.1.0" }
+e5r-arch = { path = "crates/e5r-arch", version = "0.1.0" }
+e5r-asm = { path = "crates/e5r-asm", version = "0.1.0" }
+e5r-sla = { path = "crates/e5r-sla", version = "0.1.0" }
+e5r-sleigh = { path = "crates/e5r-sleigh", version = "0.1.0" }
+e5r-analysis = { path = "crates/e5r-analysis", version = "0.1.0" }
+e5r-db = { path = "crates/e5r-db", version = "0.1.0" }
+e5r-types = { path = "crates/e5r-types", version = "0.1.0" }
+e5r-diff = { path = "crates/e5r-diff", version = "0.1.0" }
+e5r-ir = { path = "crates/e5r-ir", version = "0.1.0" }
+e5r-decomp = { path = "crates/e5r-decomp", version = "0.1.0" }
+e5r-api = { path = "crates/e5r-api", version = "0.1.0" }
+
+# Kept deliberately short. Loaders and decoders are written here rather than
+# pulled in, because provenance tagging and hostile-input behaviour are the
+# product, not an implementation detail we can delegate.
+memmap2 = "0.9"
+rayon = "1.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+clap = { version = "4.5", features = ["derive", "wrap_help"] }
+
+# A dev-profile build lands in target/debug, which this checkout forbids
+# (see CLAUDE.md). Release is the only profile used here.
+[profile.release]
+opt-level = 3
+# Off on purpose: this machine has 7.5 GB of RAM and debug info in a workspace
+# this size makes linking the peak-memory step. Profile with a temporary
+# override when a flamegraph is actually needed.
+debug = false
+lto = "thin"
+codegen-units = 16
+panic = "unwind"

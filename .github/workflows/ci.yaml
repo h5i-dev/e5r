@@ -1,0 +1,165 @@
+name: ci
+
+# `main` and pull requests, and nothing else.
+#
+# A branch name in this list is a name that will be wrong later: it was
+# `full-rewrite-to-rs`, which is one branch of one period of this repository's
+# life, and every other branch went unchecked while that one burned a runner on
+# every push. Work in progress is checked when it is proposed, which is what a
+# pull request is; a push to a branch nobody has proposed is not yet a claim
+# that anything works.
+on:
+  push:
+    branches: [main]
+  # Any base branch, so a feature branch proposed against anything is checked.
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+# One in-flight run per ref. Pushing a fix ten seconds after a typo should not
+# leave the first run holding a runner; `main` is exempt so a merge is never
+# cancelled by the merge behind it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  # Runners are disposable, so these build the dev profile on purpose. The
+  # release-only rule in CLAUDE.md is about the maintainer's machine.
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  # G2, G3, G4, G6, G7, G9: the whole suite, with the corpus built so the
+  # oracle-backed gates actually run. Without fixtures they skip silently.
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      # The AArch64 std, for the Rust fixture: `build-fixtures.sh` builds it
+      # for a fixed target so the counts the tests hold do not follow the host.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v2
+      # Every gate that has no tool skips silently, which is the worst
+      # possible outcome: a green run that measured nothing. These are what
+      # the oracle-backed gates need, named so a missing one is visible.
+      #   clang, llvm, binutils  the fixture corpus and objdump parity
+      #   llvm-objdump           the ARM32 and x86-64 parity oracles
+      #   gcc-aarch64-linux-gnu  the `.a64` corpus. This runner is x86-64, so
+      #                          without it plain `gcc` writes an x86-64 binary
+      #                          into a name claiming AArch64, and the tests
+      #                          that read one measure the wrong file
+      #   qemu-user-static       both halves of the lifter's hardware oracle,
+      #                          and the recorded output of every executed
+      #                          AArch64 fixture
+      #   golang-go              the Go fixture, which found five decoder bugs
+      - name: Install the oracles
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm binutils qemu-user-static golang-go \
+            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+      - name: Build the fixture corpus
+        run: ./scripts/build-fixtures.sh
+      - name: Say which oracles are present
+        run: |
+          for t in clang llvm-objdump objdump readelf c++filt qemu-x86_64 go rustc; do
+            printf '%-16s %s\n' "$t" "$(command -v $t || echo MISSING)"
+          done
+      # `--no-fail-fast`: without it cargo stops at the first failing test
+      # binary, so a runner that differs from the maintainer's machine in
+      # several ways reports them one push at a time.
+      - run: cargo test --workspace --no-fail-fast -- --nocapture
+
+  # G5: the same bytes must produce the same output at any thread count.
+  determinism:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # The AArch64 std, for the Rust fixture: `build-fixtures.sh` builds it
+      # for a fixed target so the counts the tests hold do not follow the host.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v2
+      # The cross gcc because this runner is x86-64 and a `.a64` fixture
+      # has to be AArch64; qemu because several of them are executed.
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y clang \
+            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user-static
+      - run: ./scripts/build-fixtures.sh
+      - run: cargo build --release
+      - run: ./scripts/check-determinism.sh
+
+  # G8: what the analysis FOUND, against the floors in scripts/bench-budget.json.
+  #
+  # Not a benchmark, and deliberately not run as one. Recall against the symbol
+  # table and the count of entries no symbol names are the same bytes in, same
+  # numbers out, on any machine at any thread count, so they gate. Wall time
+  # and peak memory are facts about a machine, and a shared runner with a noisy
+  # neighbour is not the machine the ceilings were recorded on -- so timing is
+  # not measured here, not gated here, and not published from here. It is
+  # measured by hand on a known machine and written down in docs/benchmarks.md.
+  #
+  # One run per binary for the same reason: the fastest of three exists to beat
+  # down timing noise, and there is no timing to beat down.
+  recall:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # The AArch64 std, for the Rust fixture: `build-fixtures.sh` builds it
+      # for a fixed target so the counts the tests hold do not follow the host.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v2
+      # The cross gcc because this runner is x86-64 and a `.a64` fixture
+      # has to be AArch64; qemu because several of them are executed.
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y clang binutils \
+            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user-static
+      - run: ./scripts/build-fixtures.sh
+      # Release, like determinism above: the recall numbers have to come from
+      # the code path a user runs.
+      - run: cargo build --release
+      - run: RUNS=1 SKIP=rizin OUT=target/recall.json ./scripts/compare-tools.sh
+      - run: ./scripts/check-bench-budget.py target/recall.json --portable-only --no-timing
+
+  # `install.sh` is what people pipe into a shell, and nothing else in this
+  # workflow would notice it rotting: it is not built, not linked and not
+  # imported. Two checks, both cheap.
+  #
+  # `sh -n` is the syntax gate. `shellcheck` is the rest of it -- an unquoted
+  # expansion in an installer run as root is not a style note -- and it is
+  # pinned to POSIX `sh` because the shebang is `sh`, not bash.
+  installer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: sh -n install.sh
+      - run: sudo apt-get update -q && sudo apt-get install -y shellcheck
+      - run: shellcheck --shell=sh install.sh
+      # The one thing syntax cannot see: that the script still knows where the
+      # release puts things. `build-release.sh` names the archive and the
+      # directory inside it, and the installer reaches into that directory by
+      # name -- so a change to either that forgot the other is a download that
+      # unpacks into a path nobody looks at.
+      - name: The installer agrees with the release layout
+        run: ./scripts/check-installer.sh

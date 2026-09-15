@@ -1,0 +1,2 @@
+*.e5r-patch merge=union
+*.e5r-proj  merge=union

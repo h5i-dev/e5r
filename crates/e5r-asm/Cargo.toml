@@ -1,0 +1,13 @@
+[package]
+name = "e5r-asm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Instruction encoders for x86-64 and AArch64, the inverse of the decoders in e5r-arch."
+
+[dependencies]
+e5r-core.workspace = true
+e5r-arch.workspace = true

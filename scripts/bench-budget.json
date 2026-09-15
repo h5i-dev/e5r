@@ -1,0 +1,229 @@
+{
+  "binaries": {
+    "hello.a64.O2": {
+      "portable": true,
+      "measured_seconds": 0.0,
+      "measured_peak_mb": 5.1,
+      "seconds_ceiling": 0.02,
+      "peak_mb_ceiling": 5.9,
+      "functions": 11,
+      "extra_ceiling": 1,
+      "oracle": "symtab",
+      "recall_floor": 1.0
+    },
+    "hello.a64.O2.stripped": {
+      "portable": true,
+      "measured_seconds": 0.0,
+      "measured_peak_mb": 5.0,
+      "seconds_ceiling": 0.02,
+      "peak_mb_ceiling": 5.8,
+      "functions": 10,
+      "extra_ceiling": 0,
+      "oracle": "symtab of unstripped twin",
+      "recall_floor": 1.0
+    },
+    "hello.static.a64": {
+      "portable": true,
+      "measured_seconds": 0.05,
+      "measured_peak_mb": 17.0,
+      "seconds_ceiling": 0.1,
+      "peak_mb_ceiling": 19.5,
+      "functions": 917,
+      "extra_ceiling": 8,
+      "oracle": "symtab",
+      "recall_floor": 0.9956
+    },
+    "hello.static.a64.stripped": {
+      "portable": true,
+      "measured_seconds": 0.06,
+      "measured_peak_mb": 16.1,
+      "seconds_ceiling": 0.12,
+      "peak_mb_ceiling": 18.5,
+      "functions": 915,
+      "extra_ceiling": 7,
+      "oracle": "symtab of unstripped twin",
+      "recall_floor": 0.9945
+    },
+    "hello.go": {
+      "portable": false,
+      "measured_seconds": 0.06,
+      "measured_peak_mb": 14.8,
+      "seconds_ceiling": 0.12,
+      "peak_mb_ceiling": 17.0,
+      "functions": 1312,
+      "extra_ceiling": 12,
+      "oracle": "symtab",
+      "recall_floor": 1.0
+    },
+    "hello.go.stripped": {
+      "portable": false,
+      "measured_seconds": 0.05,
+      "measured_peak_mb": 14.2,
+      "seconds_ceiling": 0.1,
+      "peak_mb_ceiling": 16.3,
+      "functions": 1311,
+      "extra_ceiling": 12,
+      "oracle": "symtab of unstripped twin",
+      "recall_floor": 0.9992
+    },
+    "cpp-hierarchy.a64.O2.rtti": {
+      "portable": true,
+      "measured_seconds": 0.0,
+      "measured_peak_mb": 5.0,
+      "seconds_ceiling": 0.02,
+      "peak_mb_ceiling": 5.8,
+      "functions": 39,
+      "extra_ceiling": 0,
+      "oracle": "symtab",
+      "recall_floor": 1.0
+    },
+    "cpp-hierarchy.a64.O2.rtti.stripped": {
+      "portable": true,
+      "measured_seconds": 0.0,
+      "measured_peak_mb": 4.9,
+      "seconds_ceiling": 0.02,
+      "peak_mb_ceiling": 5.6,
+      "functions": 39,
+      "extra_ceiling": 0,
+      "oracle": "symtab of unstripped twin",
+      "recall_floor": 1.0
+    },
+    "panicky": {
+      "portable": true,
+      "measured_seconds": 0.14,
+      "measured_peak_mb": 55.8,
+      "seconds_ceiling": 0.28,
+      "peak_mb_ceiling": 64.2,
+      "functions": 645,
+      "extra_ceiling": 0,
+      "oracle": "symtab",
+      "recall_floor": 1.0
+    },
+    "driver.x64.O2": {
+      "portable": true,
+      "measured_seconds": 0.0,
+      "measured_peak_mb": 5.1,
+      "seconds_ceiling": 0.02,
+      "peak_mb_ceiling": 5.9,
+      "functions": 40,
+      "extra_ceiling": 0,
+      "oracle": "symtab",
+      "recall_floor": 1.0
+    },
+    "ls": {
+      "portable": false,
+      "measured_seconds": 0.02,
+      "measured_peak_mb": 11.5,
+      "seconds_ceiling": 0.04,
+      "peak_mb_ceiling": 13.2,
+      "functions": 195,
+      "extra_ceiling": 189,
+      "oracle": "dynsym only",
+      "recall_floor": 1.0
+    },
+    "objdump": {
+      "portable": false,
+      "measured_seconds": 0.03,
+      "measured_peak_mb": 15.9,
+      "seconds_ceiling": 0.06,
+      "peak_mb_ceiling": 18.3,
+      "functions": 317,
+      "extra_ceiling": 315,
+      "oracle": "dynsym only",
+      "recall_floor": 1.0
+    },
+    "bash": {
+      "portable": false,
+      "measured_seconds": 0.11,
+      "measured_peak_mb": 33.0,
+      "seconds_ceiling": 0.22,
+      "peak_mb_ceiling": 37.9,
+      "functions": 2299,
+      "extra_ceiling": 628,
+      "oracle": "dynsym only",
+      "recall_floor": 1.0
+    },
+    "libc.so.6": {
+      "portable": false,
+      "measured_seconds": 0.14,
+      "measured_peak_mb": 42.6,
+      "seconds_ceiling": 0.28,
+      "peak_mb_ceiling": 49.0,
+      "functions": 3497,
+      "extra_ceiling": 1250,
+      "oracle": "dynsym only",
+      "recall_floor": 0.9991
+    },
+    "libstdc++.so.6": {
+      "portable": false,
+      "measured_seconds": 0.23,
+      "measured_peak_mb": 48.1,
+      "seconds_ceiling": 0.46,
+      "peak_mb_ceiling": 55.3,
+      "functions": 4676,
+      "extra_ceiling": 759,
+      "oracle": "dynsym only",
+      "recall_floor": 1.0
+    },
+    "libcrypto.so.3": {
+      "portable": false,
+      "measured_seconds": 0.24,
+      "measured_peak_mb": 52.6,
+      "seconds_ceiling": 0.48,
+      "peak_mb_ceiling": 60.5,
+      "functions": 10690,
+      "extra_ceiling": 5327,
+      "oracle": "dynsym only",
+      "recall_floor": 1.0
+    }
+  },
+  "measured_on": "2026-09-14T10:22:38",
+  "machine": {
+    "uname": "Linux 6.6.87.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:31:42 UTC 2025 aarch64",
+    "cpus": 10
+  },
+  "versions": {
+    "e5r": "e5r 0.1.0 (target/release/e5r, sha256 6525025002f44172)",
+    "rizin": "rizin 0.8.2 @ linux-arm-64, package: 0.8.2 (RizinOrg)"
+  },
+  "loadavg_when_measured": [
+    5.39990234375,
+    5.69091796875,
+    5.658203125
+  ],
+  "speedup_floor": {
+    "hello.static.a64": {
+      "rizin": 10.0
+    },
+    "hello.static.a64.stripped": {
+      "rizin": 10.0
+    },
+    "hello.go": {
+      "rizin": 10.0
+    },
+    "hello.go.stripped": {
+      "rizin": 10.0
+    },
+    "panicky": {
+      "rizin": 10.0
+    },
+    "ls": {
+      "rizin": 10.0
+    },
+    "objdump": {
+      "rizin": 10.0
+    },
+    "bash": {
+      "rizin": 10.0
+    },
+    "libc.so.6": {
+      "rizin": 10.0
+    },
+    "libstdc++.so.6": {
+      "rizin": 10.0
+    },
+    "libcrypto.so.3": {
+      "rizin": 10.0
+    }
+  }
+}

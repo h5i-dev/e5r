@@ -1,0 +1,70 @@
+# Case table for the lifter oracle: one call per line, function then arguments.
+# A `&name` argument is the address of a global defined in the driver. Numbers
+# may be decimal or hex and may be negative. Every function named here must
+# return an integer, because the driver compares eight bytes per case.
+arith8:u8 3 5
+arith8:u8 200 100
+arith8:u8 255 255
+arith16:u16 1234 5678
+arith16:u16 65535 3
+arith32:u32 123456789 987654
+arith32:u32 0xffffffff 0
+arith64:u64 1234567890123 98765
+arith64:u64 0xffffffffffffffff 7
+sarith32:i32 -12345 678
+sarith32:i32 -2147483647 -1
+sarith64:i64 -1234567890123 -9876
+sarith64:i64 -9223372036854775807 3
+widen:u64 200 40000 4000000000
+sign_widen:i64 -100 -30000 -2000000000
+rotate:u64 0x123456789abcdef 13
+rotate:u64 0xdeadbeefcafebabe 0
+rotate:u64 1 63
+bits:u32 0xdeadbeef
+bits:u32 0
+compares:i32 -5 7
+compares:i32 7 7
+compares:i32 9 -3
+select_chain:i32 1 2 3
+select_chain:i32 9 2 3
+select_chain:i32 0 0 0
+dense:i64 0
+dense:i64 3
+dense:i64 7
+dense:i64 11
+nested:i32 6
+nested:i32 1
+collatz:u64 27
+collatz:u64 1
+many_args:u64 1 2 3 4 5 6 7 8
+deep_recursion:i64 10
+deep_recursion:i64 1
+indexed:u64 5
+indexed:u64 0xdeadbeef
+strlen_like:u64 &text
+strcmp_like:i32 &text &text2
+strcmp_like:i32 &text &text
+sum_array:u64 &nums 8
+dot:i32 &ints &other 8
+use_struct:i64 &points 3
+# Floating point. A token with a dot is a floating argument, and a trailing `f`
+# makes it single precision; the return kind says how the driver records it.
+fmath:f64 1.5 2.5
+fmath:f64 -0.25 3.75
+fmath:f64 1e10 0.5
+fmath32:f32 1.5f 2.5f
+fmath32:f32 -7.5f 0.25f
+f2i:i64 3.9
+f2i:i64 -3.9
+f2i:i64 1e18
+i2f:f64 42
+i2f:f64 -7
+i2f:f64 1234567890123456789
+d2f:f32 1.0e10
+d2f:f32 0.1
+f2d:f64 0.1f
+swap64:u64 0x0123456789abcdef
+swap64:u64 0xffffffffffffffff
+swap64:u64 0
+swap32:u32 0x12345678
+swap32:u32 0xdeadbeef

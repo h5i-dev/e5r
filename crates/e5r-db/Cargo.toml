@@ -1,0 +1,23 @@
+[package]
+name = "e5r-db"
+description = "e5r — content anchors and the git-mergeable annotation log."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+e5r-core = { workspace = true }
+e5r-arch = { workspace = true }
+e5r-types = { workspace = true }
+serde = { workspace = true }
+
+# The signature gate measures against a real statically linked binary and
+# builds its library out of the distribution's own static archives, so it needs
+# a loader and an analysis. Neither of those depends on this crate, so the edge
+# only exists for the tests.
+[dev-dependencies]
+e5r-format = { workspace = true }
+e5r-analysis = { workspace = true }

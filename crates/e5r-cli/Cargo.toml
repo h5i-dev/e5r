@@ -1,0 +1,44 @@
+[package]
+name = "e5r-cli"
+description = "e5r — the command line. Load a binary, recover functions, disassemble, decompile, diff."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+# Inherited, so the path is the workspace README rather than a second copy.
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+# No `include` list on purpose: everything under the crate directory is the
+# package, so a file added later cannot be left out of it silently. Nothing in
+# the build reads a file outside the package either (no build script, no
+# include_str! of a fixture), which is what makes the published copy build
+# where fixtures/ and scripts/ do not exist.
+
+[[bin]]
+name = "e5r"
+path = "src/main.rs"
+
+[dependencies]
+e5r-core = { workspace = true }
+e5r-format = { workspace = true }
+e5r-arch = { workspace = true }
+e5r-analysis = { workspace = true }
+e5r-asm = { workspace = true }
+e5r-db = { workspace = true }
+e5r-diff = { workspace = true }
+e5r-types = { workspace = true }
+e5r-ir = { workspace = true }
+e5r-decomp = { workspace = true }
+e5r-api = { workspace = true }
+clap = { workspace = true }
+memmap2 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
