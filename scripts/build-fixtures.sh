@@ -1,17 +1,56 @@
 #!/usr/bin/env bash
 # Build the fixture corpus into fixtures/build/ (gitignored).
 #
-# This machine is aarch64, so native builds are AArch64 ELF executables with
-# DWARF kept (ground truth for the G4 boundary gate) plus a stripped copy. x86
-# fixtures are cross-compiled object files: clang needs no sysroot for -c, and
-# llvm-objdump disassembles the result, which is enough for decoder parity.
+# `.a64` in a fixture's name is a claim about the file's architecture, so an
+# AArch64 compiler makes one whatever the host is: `gcc` on this machine, the
+# cross gcc on an x86-64 runner. DWARF is kept (ground truth for the G4
+# boundary gate) with a stripped copy beside it. x86 fixtures are
+# cross-compiled object files: clang needs no sysroot for -c, and llvm-objdump
+# disassembles the result, which is enough for decoder parity.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 out=fixtures/build
 mkdir -p "$out"
-cc=${CC:-gcc}
+# An x86-64 binary named `.a64` is a fixture that lies, and a test reading one
+# does not fail -- it measures a different file and reports whatever that file
+# happens to say. So the toolchain is chosen by target, not by host, and a host
+# with no AArch64 compiler stops here rather than building a corpus whose names
+# are wrong.
+case "$(uname -m)" in
+  aarch64 | arm64) triple= ;;
+  *)
+    triple=aarch64-linux-gnu-
+    if [ -z "${CC:-}" ] && ! command -v "${triple}gcc" > /dev/null; then
+      echo "build-fixtures.sh: this host is $(uname -m) and has no AArch64 compiler." >&2
+      echo "  apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu" >&2
+      echo "  (or set CC/CXX/STRIP to one, if it is called something else)" >&2
+      exit 1
+    fi
+    ;;
+esac
+cc=${CC:-${triple}gcc}
+cxx_default=${triple}g++
+# The cross binutils `strip`, because the host one is built for the host's
+# target and need not know this format at all.
+strip=${STRIP:-${triple}strip}
 xcc=${XCC:-clang}
+
+# Several fixtures are executed and their output recorded, so that a test
+# compares a lift or an emulation against what a processor produced rather than
+# against another model of one. On an x86-64 host that takes an emulator; a
+# host with neither records nothing, which leaves the recording absent rather
+# than wrong.
+if [ -z "$triple" ]; then
+  run_a64() { "$@"; }
+elif command -v qemu-aarch64 > /dev/null; then
+  run_a64() { qemu-aarch64 -L /usr/aarch64-linux-gnu "$@"; }
+elif command -v qemu-aarch64-static > /dev/null; then
+  run_a64() { qemu-aarch64-static -L /usr/aarch64-linux-gnu "$@"; }
+else
+  echo "warning: no qemu-aarch64; AArch64 fixtures are built but not run" >&2
+  run_a64() { return 1; }
+fi
 
 for src in fixtures/src/*.c; do
   [ -e "$src" ] || continue
@@ -19,7 +58,7 @@ for src in fixtures/src/*.c; do
   for opt in O0 O2; do
     "$cc" -g -"$opt" -fno-pie -no-pie -o "$out/${base}.a64.${opt}" "$src"
     cp "$out/${base}.a64.${opt}" "$out/${base}.a64.${opt}.stripped"
-    strip "$out/${base}.a64.${opt}.stripped"
+    "$strip" "$out/${base}.a64.${opt}.stripped"
   done
 done
 
@@ -84,7 +123,7 @@ if [ -n "$lld" ]; then
     "$xcc" -"$opt" -fno-inline -ffreestanding -fno-stack-protector -fno-builtin \
       -nostdlib -static -o "$out/driver.a64.$opt" "$out/driver.c" 2>/dev/null || true
     if [ -x "$out/driver.a64.$opt" ]; then
-      "$out/driver.a64.$opt" > "$out/driver.a64.$opt.out" || true
+      run_a64 "$out/driver.a64.$opt" > "$out/driver.a64.$opt.out" || true
     fi
     if [ -x "$out/driver.x64.$opt" ] && command -v qemu-x86_64 > /dev/null; then
       qemu-x86_64 "$out/driver.x64.$opt" > "$out/driver.x64.$opt.out" || true
@@ -102,7 +141,7 @@ fi
 
 # C++ fixtures: virtual dispatch, inheritance and RTTI, which is what vtable
 # recovery has to find. Freestanding, so no C++ runtime is needed to build them.
-cxx=${CXX:-g++}
+cxx=${CXX:-$cxx_default}
 for src in fixtures/cpp/*.cpp; do
   [ -e "$src" ] || continue
   base=$(basename "$src" .cpp)
@@ -119,7 +158,7 @@ for src in fixtures/cpp/*.cpp; do
       -nostdlib -static \
       -o "$out/${base}.a64.${opt}.cpp" "$src" fixtures/cpp/start.cpp 2>/dev/null || true
     if [ -x "$out/${base}.a64.${opt}.cpp" ]; then
-      "$out/${base}.a64.${opt}.cpp" > "$out/${base}.a64.${opt}.cpp.out" || true
+      run_a64 "$out/${base}.a64.${opt}.cpp" > "$out/${base}.a64.${opt}.cpp.out" || true
     fi
   done
 done
@@ -581,8 +620,8 @@ if [ -e fixtures/cpp/hierarchy.cpp ]; then
       if [ -e "$out/cpp-hierarchy.a64.${opt}.${rtti}" ]; then
         cp "$out/cpp-hierarchy.a64.${opt}.${rtti}" \
            "$out/cpp-hierarchy.a64.${opt}.${rtti}.stripped"
-        strip "$out/cpp-hierarchy.a64.${opt}.${rtti}.stripped"
-        "$out/cpp-hierarchy.a64.${opt}.${rtti}" \
+        "$strip" "$out/cpp-hierarchy.a64.${opt}.${rtti}.stripped"
+        run_a64 "$out/cpp-hierarchy.a64.${opt}.${rtti}" \
           > "$out/cpp-hierarchy.a64.${opt}.${rtti}.out" || true
       fi
     done
@@ -749,7 +788,7 @@ if [ -e fixtures/src/hello.c ]; then
     2>/dev/null || true
   if [ -e "$out/hello.static.a64" ]; then
     cp "$out/hello.static.a64" "$out/hello.static.a64.stripped"
-    strip "$out/hello.static.a64.stripped"
+    "$strip" "$out/hello.static.a64.stripped"
   fi
 fi
 
@@ -775,7 +814,7 @@ if [ -e fixtures/emulate/paths.c ]; then
         -o "$out/em-paths.x64.$opt" fixtures/emulate/paths.c 2>/dev/null || true
     fi
     if [ -x "$out/em-paths.a64.$opt" ]; then
-      "$out/em-paths.a64.$opt" > "$out/em-paths.a64.$opt.out" || true
+      run_a64 "$out/em-paths.a64.$opt" > "$out/em-paths.a64.$opt.out" || true
     fi
     if [ -x "$out/em-paths.x64.$opt" ] && command -v qemu-x86_64 > /dev/null; then
       qemu-x86_64 "$out/em-paths.x64.$opt" > "$out/em-paths.x64.$opt.out" || true

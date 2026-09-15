@@ -135,10 +135,15 @@ Dependency edges run downward only. `e5r-cli` may depend on everything;
       Ground truth comes from DWARF where the fixture has it.
 - [x] Bench harness that records wall time, peak RSS and output hash per fixture,
       so a regression shows up as a number and not a feeling.
-- [x] Coverage and mutation tooling in CI: `cargo llvm-cov` reports per-crate
-      line coverage, and `cargo mutants` runs on the diff of a pull request
-      with `mutants.toml` saying what not to mutate. Both report rather than
-      gate for now; a floor nobody can pass is a floor everyone learns to skip.
+- [x] Coverage and mutation tooling, run on demand rather than in CI:
+      `cargo llvm-cov --workspace` for per-crate line coverage and
+      `cargo mutants` for the mutation score, with `mutants.toml` saying what
+      not to mutate. Neither gates yet — the floors below are not met, and a
+      floor nobody can pass is a floor everyone learns to skip — and a CI job
+      that reports a number without gating on it buys nothing: the coverage
+      run re-ran the whole suite under instrumentation for a summary line, and
+      the mutation run ended in `|| true`, so it could not fail. They belong in
+      CI on the day the floors become gates.
 
 ### M1. Containers
 

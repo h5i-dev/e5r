@@ -34,7 +34,7 @@
 use std::path::{Path, PathBuf};
 
 use e5r_analysis::{Options, Program, TableKind, analyze};
-use e5r_core::Addr;
+use e5r_core::{Addr, Arch};
 use e5r_format::LoadOptions;
 
 /// One switch, as an outside disassembler and `od` report it.
@@ -112,10 +112,68 @@ fn corpus() -> Option<PathBuf> {
     d.is_dir().then(|| d.canonicalize().unwrap())
 }
 
-fn open(name: &str) -> Option<Program> {
+fn open(name: &str) -> Option<(Program, Vec<u8>)> {
     let data = std::fs::read(corpus()?.join(name)).ok()?;
     let obj = e5r_format::load(&data, &LoadOptions::default()).ok()?;
-    Some(analyze(obj, &Options::default()))
+    Some((analyze(obj, &Options::default()), data))
+}
+
+/// The bytes a mapped address names, straight out of the file.
+fn at(p: &Program, data: &[u8], addr: u64, len: usize) -> Option<Vec<u8>> {
+    let sec = p.object.section_at(Addr(addr))?;
+    let off = (sec.file_offset + (addr - sec.range.start().0)) as usize;
+    (off + len <= data.len() && addr - sec.range.start().0 + len as u64 <= sec.file_size)
+        .then(|| data[off..off + len].to_vec())
+}
+
+/// Every expectation here is transcribed from a listing of one build, so a
+/// fixture compiled by a different toolchain is a different program sitting at
+/// the same path -- and the assertions below would measure it and report a
+/// recovery bug that is really a corpus that moved. That is not hypothetical:
+/// `build-fixtures.sh` chose its compiler by host, so on an x86-64 machine
+/// every `.a64` fixture was an x86-64 binary, and this test failed for a
+/// reason its message did not mention.
+///
+/// So the file is checked against the transcription before anything is
+/// concluded from it. The table entries are read out of the fixture and turned
+/// into targets here, by the arithmetic the listing's `add` spells out, which
+/// makes this an independent derivation of `targets` rather than a second
+/// reading of the same recovery.
+fn is_the_transcribed_build(p: &Program, data: &[u8], s: &Switch) -> Result<(), String> {
+    if p.object.arch != Arch::AArch64 {
+        return Err(format!(
+            "{} is {}, not AArch64: build-fixtures.sh built the corpus with a \
+             host compiler, so this file is not the program these expectations \
+             describe",
+            s.fixture, p.object.arch
+        ));
+    }
+    let n = s.targets.len();
+    let raw = at(p, data, s.table, n * s.entry_size as usize)
+        .ok_or_else(|| format!("{}: nothing mapped at {:#x}", s.fixture, s.table))?;
+    let derived: Vec<u64> = raw
+        .chunks(s.entry_size as usize)
+        .map(|e| {
+            // Sign extended from the entry's own width, then scaled: the
+            // listing's `sxtb #2` and `sxth #2`.
+            let v = match e {
+                [b] => *b as i8 as i64,
+                [lo, hi] => i16::from_le_bytes([*lo, *hi]) as i64,
+                _ => unreachable!("entry widths are one and two bytes"),
+            };
+            (s.anchor as i64 + (v << s.shift)) as u64
+        })
+        .collect();
+    if derived != s.targets {
+        return Err(format!(
+            "{}: the table at {:#x} does not hold the entries this listing was \
+             transcribed from -- the fixture is a different build, and these \
+             expectations have to be re-transcribed from it\n  file: {:#x?}\n  \
+             transcribed: {:#x?}",
+            s.fixture, s.table, derived, s.targets
+        ));
+    }
+    Ok(())
 }
 
 #[test]
@@ -123,8 +181,13 @@ fn an_anchored_compact_table_recovers_what_objdump_shows() {
     let mut checked = 0;
     let mut present = 0;
     for s in SWITCHES {
-        let Some(p) = open(s.fixture) else { continue };
+        let Some((p, data)) = open(s.fixture) else {
+            continue;
+        };
         present += 1;
+        if let Err(why) = is_the_transcribed_build(&p, &data, s) {
+            panic!("{why}");
+        }
         let f = p
             .functions_by_address()
             .find(|f| f.name.as_deref() == Some(s.func))
@@ -191,7 +254,15 @@ fn the_functions_holding_them_analyze_completely() {
         ("em-paths.a64.O2", "pick"),
         ("hello.static.a64", "__gettextparse"),
     ] {
-        let Some(p) = open(fixture) else { continue };
+        let Some((p, _)) = open(fixture) else {
+            continue;
+        };
+        assert_eq!(
+            p.object.arch,
+            Arch::AArch64,
+            "{fixture} is {}, not AArch64: the corpus was built with a host compiler",
+            p.object.arch
+        );
         let f = p
             .functions_by_address()
             .find(|f| f.name.as_deref() == Some(func))
