@@ -28,6 +28,12 @@ use e5r_ir::{func, opt, ssa, stack};
 /// written out. It is here rather than called into the crate on purpose: a test
 /// that generated its inputs with the code under test would only say the code
 /// agrees with itself.
+///
+/// Spelled with `wrapping_*` throughout. The figure is written in C, where
+/// unsigned arithmetic is modular by definition and the algorithm leans on
+/// that -- `2 * q1 + 1` is meant to carry out of the word. Rust's `*` wraps
+/// only in release, so the plain operators made this a transcription that was
+/// right on one profile and a panic on the other.
 fn magicu(d: u32) -> (u32, bool, u32) {
     assert!(d >= 3);
     let nc = u32::MAX - (0u32.wrapping_sub(d) % d);
@@ -36,28 +42,28 @@ fn magicu(d: u32) -> (u32, bool, u32) {
     let (mut q2, mut r2) = (0x7fff_ffffu32 / d, 0x7fff_ffffu32 % d);
     loop {
         p += 1;
-        if r1 >= nc - r1 {
-            q1 = 2 * q1 + 1;
-            r1 = 2 * r1 - nc;
+        if r1 >= nc.wrapping_sub(r1) {
+            q1 = q1.wrapping_mul(2).wrapping_add(1);
+            r1 = r1.wrapping_mul(2).wrapping_sub(nc);
         } else {
-            q1 *= 2;
-            r1 *= 2;
+            q1 = q1.wrapping_mul(2);
+            r1 = r1.wrapping_mul(2);
         }
-        if r2 + 1 >= d - r2 {
+        if r2.wrapping_add(1) >= d.wrapping_sub(r2) {
             add |= q2 >= 0x7fff_ffff;
-            q2 = 2 * q2 + 1;
-            r2 = 2 * r2 + 1 - d;
+            q2 = q2.wrapping_mul(2).wrapping_add(1);
+            r2 = r2.wrapping_mul(2).wrapping_add(1).wrapping_sub(d);
         } else {
             add |= q2 >= 0x8000_0000;
-            q2 *= 2;
-            r2 = 2 * r2 + 1;
+            q2 = q2.wrapping_mul(2);
+            r2 = r2.wrapping_mul(2).wrapping_add(1);
         }
-        let delta = d - 1 - r2;
+        let delta = d.wrapping_sub(1).wrapping_sub(r2);
         if p >= 64 || !(q1 < delta || (q1 == delta && r1 == 0)) {
             break;
         }
     }
-    (q2 + 1, add, p - 32)
+    (q2.wrapping_add(1), add, p - 32)
 }
 
 /// The signed magic number and its shift, for a 32-bit divisor.
@@ -76,14 +82,14 @@ fn magics(d: u32) -> (u32, u32) {
     let (mut q2, mut r2) = (two31 / ad, two31 % ad);
     loop {
         p += 1;
-        q1 *= 2;
-        r1 *= 2;
+        q1 = q1.wrapping_mul(2);
+        r1 = r1.wrapping_mul(2);
         if r1 >= anc {
-            q1 += 1;
+            q1 = q1.wrapping_add(1);
             r1 -= anc;
         }
-        q2 *= 2;
-        r2 *= 2;
+        q2 = q2.wrapping_mul(2);
+        r2 = r2.wrapping_mul(2);
         if r2 >= ad {
             q2 += 1;
             r2 -= ad;

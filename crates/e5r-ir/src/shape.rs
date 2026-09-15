@@ -56,7 +56,11 @@ impl Shape {
             return Some(*stride);
         }
         let (offset, size) = self.fields().into_iter().next_back()?;
-        (offset >= 0).then_some(offset as u64 + size as u64)
+        // Checked: the offset is an i64 read out of an address computation, so
+        // one near the top of the range plus a field width leaves the type.
+        (offset >= 0)
+            .then_some(offset as u64)?
+            .checked_add(size as u64)
     }
 }
 

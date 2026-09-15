@@ -22,7 +22,16 @@ pub fn corpus() -> Option<PathBuf> {
 pub fn objdump(arch: &Arch) -> Option<&'static str> {
     let candidates: &[&str] = match arch {
         Arch::X86_64 => &["llvm-objdump-18", "llvm-objdump-15", "llvm-objdump"],
-        _ => &["objdump", "llvm-objdump-18", "llvm-objdump"],
+        // The prefixed binutils first: a plain `objdump` built for another
+        // host reads an AArch64 file and prints no instructions, which reads
+        // here as an oracle that had nothing to say rather than one that
+        // cannot answer.
+        _ => &[
+            "aarch64-linux-gnu-objdump",
+            "objdump",
+            "llvm-objdump-18",
+            "llvm-objdump",
+        ],
     };
     candidates
         .iter()

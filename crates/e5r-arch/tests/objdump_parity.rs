@@ -43,9 +43,25 @@ struct Line {
     text: String,
 }
 
+/// The binutils that knows AArch64.
+///
+/// Prefixed name first: `objdump` is built for its own host's targets, so on
+/// an x86-64 machine the plain one reads an AArch64 file and prints nothing.
+/// That is not a missing oracle, it is an oracle that answers "no
+/// instructions" to every question -- which this file then reported as an
+/// empty corpus.
+fn binutils(name: &str) -> String {
+    let prefixed = format!("aarch64-linux-gnu-{name}");
+    if Command::new(&prefixed).arg("--version").output().is_ok() {
+        prefixed
+    } else {
+        name.to_string()
+    }
+}
+
 /// Parse `objdump -d` output, keeping only fully decoded 4-byte instructions.
 fn objdump(path: &Path) -> Vec<Line> {
-    let out = Command::new("objdump")
+    let out = Command::new(binutils("objdump"))
         .args(["-d", "--show-raw-insn"])
         .arg(path)
         .output()
@@ -385,7 +401,11 @@ fn sysreg_names_match_binutils() {
     if std::fs::write(&src, &asm).is_err() {
         return;
     }
-    let assembled = Command::new("as").arg("-o").arg(&obj).arg(&src).status();
+    let assembled = Command::new(binutils("as"))
+        .arg("-o")
+        .arg(&obj)
+        .arg(&src)
+        .status();
     if !matches!(assembled, Ok(s) if s.success()) {
         return; // no aarch64 assembler here
     }

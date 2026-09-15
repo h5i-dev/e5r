@@ -697,14 +697,20 @@ fn aarch64_agrees_with_objdump() {
     else {
         return;
     };
-    if !have("objdump") {
+    // The prefixed binutils where the host's own does not know AArch64: it
+    // does not fail on such a file, it prints no instructions, and a parity
+    // run against no instructions passes by measuring nothing.
+    let od = ["aarch64-linux-gnu-objdump", "objdump"]
+        .into_iter()
+        .find(|t| have(t));
+    let Some(od) = od else {
         return;
-    }
+    };
     let mut t = Tally::default();
     for path in files(&dir, |n| n.contains(".a64.") && !n.ends_with(".out")) {
-        let lines = disassemble("objdump", &["-d", "--show-raw-insn"], &path);
+        let lines = disassemble(od, &["-d", "--show-raw-insn"], &path);
         let mut d = Decoder::new(&spec);
-        compare(&spec, &mut d, "objdump", &path, &lines, &mut t);
+        compare(&spec, &mut d, od, &path, &lines, &mut t);
     }
     t.report("AArch64 via SLEIGH against objdump");
     assert!(t.total() > 10_000, "the corpus must be worth measuring");

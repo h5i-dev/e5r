@@ -1052,7 +1052,10 @@ fn argument_index(word: &str) -> Option<usize> {
     let n: usize = word.strip_prefix("arg")?.parse().ok()?;
     // `arg0` is nobody's first argument, and a number past what any
     // convention passes in registers is a typo rather than a question.
-    (1..=64).contains(&n).then_some(n - 1)
+    // `then`, not `then_some`: the latter takes a value, so `n - 1` is
+    // computed whatever the range says and `arg0` underflows before the
+    // `None` that was supposed to reject it.
+    (1..=64).contains(&n).then(|| n - 1)
 }
 
 /// One piece of a query.

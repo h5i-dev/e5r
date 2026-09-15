@@ -1263,8 +1263,12 @@ fn static_address(value: Option<&Value>, unit: &Unit<'_>) -> Option<Addr> {
 
 fn address_from_table(unit: &Unit<'_>, index: u64) -> Option<Addr> {
     let size = unit.address_size.max(1) as usize;
-    let at = unit.addr_base + index as usize * size;
-    let bytes = unit.sections.addr.get(at..at + size)?;
+    // Checked: `index` comes out of the file, so a corrupt one multiplies
+    // past `usize` and lands the read somewhere it was never meant to be.
+    let at = (index as usize)
+        .checked_mul(size)
+        .and_then(|off| unit.addr_base.checked_add(off))?;
+    let bytes = unit.sections.addr.get(at..at.checked_add(size)?)?;
     let mut reader = Cur::new(bytes, unit.endian);
     Some(Addr(if size == 4 {
         reader.u32()? as u64
@@ -1527,7 +1531,11 @@ fn line_program(
                     emit(&mut state, &files, out);
                     state = LineState::new(default_is_stmt);
                 }
-                DW_LNE_SET_ADDRESS => {
+                // `size` counts the sub-opcode byte, so it cannot be zero in a
+                // well-formed program; `reader.seek` below resynchronises
+                // whatever this arm does, so a corrupt one is skipped rather
+                // than ending the program.
+                DW_LNE_SET_ADDRESS if size >= 1 => {
                     let remaining = size - 1;
                     state.address = if remaining == 4 {
                         reader.u32()? as u64
@@ -1543,7 +1551,9 @@ fn line_program(
                 DW_LNS_COPY => emit(&mut state, &files, out),
                 DW_LNS_ADVANCE_PC => {
                     let n = reader.uleb128()?;
-                    state.address += n * minimum_instruction_length.max(1) as u64;
+                    state.address = state
+                        .address
+                        .saturating_add(n.saturating_mul(minimum_instruction_length.max(1) as u64));
                 }
                 DW_LNS_ADVANCE_LINE => {
                     let n = reader.sleb128()?;
@@ -1554,10 +1564,13 @@ fn line_program(
                 DW_LNS_NEGATE_STMT => state.statement = !state.statement,
                 DW_LNS_CONST_ADD_PC => {
                     let adjusted = (255 - opcode_base) as i64;
-                    state.address +=
-                        (adjusted / line_range) as u64 * minimum_instruction_length.max(1) as u64;
+                    state.address = state.address.saturating_add(
+                        (adjusted / line_range) as u64 * minimum_instruction_length.max(1) as u64,
+                    );
                 }
-                DW_LNS_FIXED_ADVANCE_PC => state.address += reader.u16()? as u64,
+                DW_LNS_FIXED_ADVANCE_PC => {
+                    state.address = state.address.saturating_add(reader.u16()? as u64)
+                }
                 _ => {
                     // An opcode this does not model still declares how many
                     // arguments it takes.
@@ -1572,8 +1585,9 @@ fn line_program(
             }
         } else {
             let adjusted = (opcode - opcode_base) as i64;
-            state.address +=
-                (adjusted / line_range) as u64 * minimum_instruction_length.max(1) as u64;
+            state.address = state.address.saturating_add(
+                (adjusted / line_range) as u64 * minimum_instruction_length.max(1) as u64,
+            );
             state.line = state
                 .line
                 .saturating_add_signed((line_base + adjusted % line_range) as i32);

@@ -813,7 +813,12 @@ fn map_relocatable(
         if sh.flags & SHF_ALLOC == 0 || sh.size == 0 {
             continue;
         }
-        let align = sh.addralign.max(1).next_power_of_two();
+        // Checked: `addralign` is whatever the file says, and
+        // `next_power_of_two` panics rather than saturates above 2^63.
+        let Some(align) = sh.addralign.max(1).checked_next_power_of_two() else {
+            warnings.push(format!("section {}: implausible alignment", sec.name));
+            continue;
+        };
         let Some(at) = next.align_up(align) else {
             warnings.push(format!(
                 "section {} does not fit the address space",

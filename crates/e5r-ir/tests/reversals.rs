@@ -32,13 +32,25 @@ const INPUTS: [u64; 10] = [
 ];
 
 /// Assemble one instruction and hand back its four bytes.
+/// The binutils built for AArch64, which on another host is the prefixed one.
+/// A plain `objdump` from an x86-64 binutils prints nothing for these bytes,
+/// and nothing compares equal to nothing.
+fn binutils(name: &str) -> String {
+    let prefixed = format!("aarch64-linux-gnu-{name}");
+    if Command::new(&prefixed).arg("--version").output().is_ok() {
+        prefixed
+    } else {
+        name.to_string()
+    }
+}
+
 fn assemble(text: &str) -> Option<[u8; 4]> {
     let dir = std::env::temp_dir().join(format!("e5r-rev-{}", std::process::id()));
     std::fs::create_dir_all(&dir).ok()?;
     let src = dir.join("a.s");
     let obj = dir.join("a.o");
     std::fs::write(&src, format!("{text}\n")).ok()?;
-    let ok = Command::new("as")
+    let ok = Command::new(binutils("as"))
         .arg("-o")
         .arg(&obj)
         .arg(&src)
@@ -47,7 +59,7 @@ fn assemble(text: &str) -> Option<[u8; 4]> {
     if !ok.success() {
         return None;
     }
-    let out = Command::new("objdump")
+    let out = Command::new(binutils("objdump"))
         .args(["-d", "--show-raw-insn"])
         .arg(&obj)
         .output()

@@ -562,6 +562,13 @@ fn bitfield(w: u32, addr: Addr) -> Option<Insn> {
     }
     let immr = bits(w, 21, 16);
     let imms = bits(w, 15, 10);
+    // The 32-bit forms hold five bits in each field. A sixth one set is an
+    // undefined encoding, which llvm and binutils both refuse -- and which
+    // this decoder turned into a shift amount by subtracting `immr` from a
+    // width smaller than it.
+    if !sf && (immr & 0x20 != 0 || imms & 0x20 != 0) {
+        return None;
+    }
     let rd = bits(w, 4, 0);
     let rn = bits(w, 9, 5);
     let width = if sf { 64 } else { 32 };
