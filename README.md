@@ -77,8 +77,7 @@ e5r emulate ./a.out checksum 1 2 3  # run it in the interpreter and see what com
 ### 2.3. Write analysis back, and merge it
 
 Names, types and comments are lines in an append-only log keyed to **content
-anchors** — a shape hash and a body hash — rather than to addresses, so they
-survive a rebuild that moves everything:
+anchors**.
 
 ```bash
 e5r annotate ./a.out name 0x4006e8 parse_header
@@ -108,25 +107,6 @@ e5r funcs ./a.out --json                      # every command takes it
 e5r batch ./a.out --command funcs --command strings
 e5r project new ./a.out --out a.e5rproj      # reopen it later without reanalysing
 ```
-
----
-
-## 3. What works
-
-| | |
-| --- | --- |
-| Containers | ELF, PE and COFF, Mach-O (thin and fat), PDB, `ar` archives, raw images |
-| Decoders | AArch64, x86-64, i386, ARM32 and Thumb-2 — each at zero disagreements with its oracle |
-| Also | any architecture a Ghidra SLEIGH specification covers, through our own runtime |
-| Lifting | p-code-style IR and SSA for AArch64, x86-64, i386 and ARM32/Thumb |
-| Analysis | functions with provenance, control flow, jump tables, no-return propagation, cross references, strings, data regions |
-| Decompiler | expressions, types, structuring, variable naming, C++ classes from vtables and RTTI |
-| Names | Itanium C++, Rust (both schemes), MSVC |
-| Storage | git-mergeable annotation log keyed to content anchors |
-| Surfaces | CLI with JSON on every command, REPL, binary diff, patching |
-
-Scope, and what is deliberately **not** built, is in
-[`ROADMAP.md`](ROADMAP.md), which is the authority on both.
 
 ---
 
