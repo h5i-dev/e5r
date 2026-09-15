@@ -428,13 +428,23 @@ fn move_wide_preferred(sf: bool, n: u32, imms: u32, immr: u32) -> bool {
     if !sf && (n != 0 || imms & 0x20 != 0) {
         return false;
     }
+    // The immediate is a run of `imms + 1` ones rotated right by `immr`. A
+    // MOVZ can spell it when that run fits inside one aligned halfword; a MOVN
+    // when the complementary run of zeros does. Both are the same question
+    // asked of a cyclic run: where it starts within its halfword, plus how
+    // long it is, must not pass sixteen.
     if imms < 16 {
-        // A MOVZ needs the ones to stay inside one halfword once rotated.
+        // The ones. `(16 - immr % 16) % 16` is where they begin.
         return (16 - immr % 16) % 16 <= 15 - imms;
     }
-    if imms >= width - 15 {
-        // A MOVN needs the same of the zeros.
-        return immr % 16 <= imms - width + 15;
+    // The zeros, which begin `imms + 1` past the ones and are as many as the
+    // register has left. Written as the mirror of the branch above rather than
+    // as the ARM ARM's closed form, which is a subtraction that underflows in
+    // `u32` for every `imms` below `width` -- the whole of this branch.
+    let zeros = width - imms - 1;
+    if zeros <= 16 {
+        let start = (16 - (zeros + immr) % 16) % 16;
+        return start + zeros <= 16;
     }
     false
 }

@@ -47,10 +47,18 @@ snapshot=$(mktemp -t e5r-bench-XXXXXX)
 trap 'rm -f "$snapshot"' EXIT
 cp "$e5r" "$snapshot"
 chmod +x "$snapshot"
-[ -x "$rizin" ] || command -v "$rizin" > /dev/null || {
-  echo "no rizin: install it or set RIZIN. See docs/benchmarks.md." >&2
-  exit 2
-}
+# Not checked when SKIP names it: a run that was told to leave rizin out and
+# then refuses to start without it is a gate nobody can run anywhere rizin is
+# not installed, which is every CI runner.
+case ",${SKIP:-}," in
+  *,rizin,*) ;;
+  *)
+    [ -x "$rizin" ] || command -v "$rizin" > /dev/null || {
+      echo "no rizin: install it, set RIZIN, or SKIP=rizin. See docs/benchmarks.md." >&2
+      exit 2
+    }
+    ;;
+esac
 command -v readelf > /dev/null || {
   echo "no readelf: the symbol-table oracle needs binutils" >&2
   exit 2

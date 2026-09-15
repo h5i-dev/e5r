@@ -34,3 +34,10 @@ owner's call.
 
 CI runs on disposable runners, so the workflow builds dev profile on purpose. Do
 not add `--release` there.
+
+That difference matters for more than space. Dev profile panics on an
+overflowing `-`; release wraps it and returns a wrong answer quietly. So an
+arithmetic bug in a decoder is invisible to every run on this machine and shows
+up only on CI -- `move_wide_preferred` underflowed on every 32-bit
+`orr Rd, ZR, #imm`, and the local suite was green throughout. A red CI is worth
+reading before assuming it is about the runner.
