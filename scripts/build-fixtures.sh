@@ -52,6 +52,17 @@ else
   run_a64() { return 1; }
 fi
 
+# Several `.a64` fixtures are built by clang rather than gcc, because gcc's
+# freestanding entry needs a runtime they do not link. Natively that takes no
+# flags. Cross it takes the target and a linker that knows it, which is the
+# same rust-lld the x86-64 fixtures are linked with -- so `$a64` is empty on
+# this machine and carries both on a runner. Unquoted at every use, because it
+# is several words or none.
+a64=""
+if [ -n "$triple" ]; then
+  a64="--target=aarch64-unknown-linux-gnu"
+fi
+
 for src in fixtures/src/*.c; do
   [ -e "$src" ] || continue
   base=$(basename "$src" .c)
@@ -113,6 +124,7 @@ lld=$(ls -d "$HOME"/.rustup/toolchains/*/lib/rustlib/*/bin/rust-lld 2>/dev/null 
 if [ -n "$lld" ]; then
   mkdir -p "$out/ld"
   ln -sf "$lld" "$out/ld/ld.lld"
+  [ -n "$a64" ] && a64="$a64 -B$out/ld -fuse-ld=lld"
   python3 scripts/gen-driver.py fixtures/portable/cases.txt "$out/driver.c"
   cp fixtures/portable/wide.c "$out/wide.c"
   for opt in O0 O1 O2 O3 Os; do
@@ -120,7 +132,7 @@ if [ -n "$lld" ]; then
       -fno-inline -ffreestanding -fno-stack-protector -fno-builtin -nostdlib \
       -static -o "$out/driver.x64.$opt" "$out/driver.c" 2>/dev/null || true
     # clang for both: gcc's freestanding entry needs a runtime this has not.
-    "$xcc" -"$opt" -fno-inline -ffreestanding -fno-stack-protector -fno-builtin \
+    "$xcc" $a64 -"$opt" -fno-inline -ffreestanding -fno-stack-protector -fno-builtin \
       -nostdlib -static -o "$out/driver.a64.$opt" "$out/driver.c" 2>/dev/null || true
     if [ -x "$out/driver.a64.$opt" ]; then
       run_a64 "$out/driver.a64.$opt" > "$out/driver.a64.$opt.out" || true
@@ -199,10 +211,16 @@ func main() {
 	}
 }
 EOF
-  (cd "$out/gosrc" && GOFLAGS=-trimpath go build -o ../hello.go . 2>/dev/null) || true
-  if [ -x "$out/hello.go" ]; then
+  # `GOARCH=arm64` rather than the host's, for the same reason the C fixtures
+  # take a cross compiler: the recall floors in `scripts/bench-budget.json`
+  # count functions in a particular binary, and a Go runtime compiled for
+  # another architecture is a different binary with a different count. Go
+  # cross-compiles without a toolchain, and nothing here needs cgo.
+  (cd "$out/gosrc" && GOOS=linux GOARCH=arm64 CGO_ENABLED=0 GOFLAGS=-trimpath \
+    go build -o ../hello.go . 2>/dev/null) || true
+  if [ -e "$out/hello.go" ]; then
     cp "$out/hello.go" "$out/hello.go.stripped"
-    strip "$out/hello.go.stripped"
+    "$strip" "$out/hello.go.stripped"
   fi
   rm -rf "$out/gosrc"
 fi
@@ -274,7 +292,7 @@ if [ -d fixtures/datatests ]; then
     base=$(basename "$src" .c)
     case "$base" in support) continue ;; esac
     for opt in O1 O2; do
-      "$xcc" -"$opt" -ffreestanding -fno-stack-protector -fno-builtin -fno-pie \
+      "$xcc" $a64 -"$opt" -ffreestanding -fno-stack-protector -fno-builtin -fno-pie \
         -nostdlib -static -Ifixtures/datatests \
         -o "$out/dt-${base}.a64.${opt}" "$src" fixtures/datatests/support.c \
         2>/dev/null || true
@@ -534,7 +552,7 @@ for src in fixtures/dataflow/*.c; do
   [ -e "$src" ] || continue
   base=$(basename "$src" .c)
   for opt in O0 O2; do
-    "$xcc" -"$opt" -ffreestanding -fno-stack-protector -fno-builtin -fno-pie \
+    "$xcc" $a64 -"$opt" -ffreestanding -fno-stack-protector -fno-builtin -fno-pie \
       -nostdlib -static -o "$out/df-${base}.a64.${opt}" "$src" 2>/dev/null || true
     if [ -n "${lld:-}" ]; then
       "$xcc" --target=x86_64-unknown-linux-gnu -B"$out/ld" -fuse-ld=lld -"$opt" \

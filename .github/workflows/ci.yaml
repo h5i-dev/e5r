@@ -74,7 +74,10 @@ jobs:
           for t in clang llvm-objdump objdump readelf c++filt qemu-x86_64 go rustc; do
             printf '%-16s %s\n' "$t" "$(command -v $t || echo MISSING)"
           done
-      - run: cargo test --workspace -- --nocapture
+      # `--no-fail-fast`: without it cargo stops at the first failing test
+      # binary, so a runner that differs from the maintainer's machine in
+      # several ways reports them one push at a time.
+      - run: cargo test --workspace --no-fail-fast -- --nocapture
 
   # G5: the same bytes must produce the same output at any thread count.
   determinism:

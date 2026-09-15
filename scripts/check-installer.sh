@@ -72,7 +72,14 @@ run "$work/good"
 
 echo "==> a tampered checksum is refused"
 cp "$work/SHA256SUMS" "$work/SHA256SUMS.good"
-sed 's/^./0/' "$work/SHA256SUMS.good" > "$work/SHA256SUMS"
+# The whole digest, not its first character: `s/^./0/` leaves the file
+# untouched one time in sixteen, whenever the digest already starts with a
+# zero, and then this step asks the installer to reject a checksum that is
+# correct. It passed here and accused the installer on CI.
+sed 's/^[0-9a-f]\{64\}/0000000000000000000000000000000000000000000000000000000000000000/' \
+  "$work/SHA256SUMS.good" > "$work/SHA256SUMS"
+cmp -s "$work/SHA256SUMS" "$work/SHA256SUMS.good" &&
+  { echo "FAIL: the tampering step changed nothing, so it tests nothing" >&2; exit 1; }
 mkdir -p "$work/bad"
 if run "$work/bad" > /dev/null 2>&1; then
   echo "FAIL: the installer accepted a mismatched checksum" >&2

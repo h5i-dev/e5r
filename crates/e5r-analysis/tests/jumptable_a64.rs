@@ -53,6 +53,14 @@ struct Switch {
     shift: u8,
     /// Every entry, in table order, turned into an address by hand.
     targets: &'static [u64],
+    /// True when the fixture statically links whatever libc built it.
+    ///
+    /// Then these addresses are a fact about that libc and not about the
+    /// program, so on a machine whose libc differs they are not a weaker
+    /// expectation -- they are a false one. The halfword form still has to be
+    /// recovered and bounded there; only the transcribed addresses are held
+    /// back, and the run says so rather than passing quietly.
+    from_system_libc: bool,
 }
 
 const SWITCHES: &[Switch] = &[
@@ -71,6 +79,7 @@ const SWITCHES: &[Switch] = &[
             0x400390, 0x40039c, 0x4003a4, 0x4003ac, 0x4003b4, 0x4003bc, 0x4003c4, 0x4003cc,
             0x4003d4, 0x4003dc, 0x4003e4,
         ],
+        from_system_libc: false,
     },
     // The same source at -O2, where the compare names the index register
     // directly. It recovered before this form was modelled, so it is the
@@ -88,6 +97,7 @@ const SWITCHES: &[Switch] = &[
             0x4003b0, 0x4003b4, 0x4003b8, 0x4003bc, 0x4003c0, 0x4003c4, 0x4003c8, 0x4003cc,
             0x4003d0, 0x4003a8, 0x4003ac,
         ],
+        from_system_libc: false,
     },
     // cmp w10, #0xb ; b.hi ; adrp x4, 0x45a000 ; add x4, x4, #0xf50
     // ldrh w4, [x4, w10, uxtw #1] ; adr x10, 0x433dbc ; add x4, x10, w4, sxth #2
@@ -104,6 +114,7 @@ const SWITCHES: &[Switch] = &[
             0x433fe0, 0x433ff4, 0x43404c, 0x43409c, 0x433f98, 0x433e5c, 0x433e5c, 0x433e5c,
             0x4340f4, 0x4341f8, 0x434220, 0x4340ec,
         ],
+        from_system_libc: true,
     },
 ];
 
@@ -180,14 +191,25 @@ fn is_the_transcribed_build(p: &Program, data: &[u8], s: &Switch) -> Result<(), 
 fn an_anchored_compact_table_recovers_what_objdump_shows() {
     let mut checked = 0;
     let mut present = 0;
+    // Cases whose fixture is a different build of a system library, where the
+    // transcribed addresses are checked on the machine they came from.
+    let mut elsewhere = 0;
     for s in SWITCHES {
         let Some((p, data)) = open(s.fixture) else {
             continue;
         };
         present += 1;
-        if let Err(why) = is_the_transcribed_build(&p, &data, s) {
-            panic!("{why}");
-        }
+        let transcribed = match is_the_transcribed_build(&p, &data, s) {
+            Ok(()) => true,
+            // A different libc is a different program, so the addresses below
+            // do not describe it. The shape still does, and is checked.
+            Err(why) if s.from_system_libc => {
+                println!("note: {why}");
+                elsewhere += 1;
+                false
+            }
+            Err(why) => panic!("{why}"),
+        };
         let f = p
             .functions_by_address()
             .find(|f| f.name.as_deref() == Some(s.func))
@@ -195,32 +217,39 @@ fn an_anchored_compact_table_recovers_what_objdump_shows() {
 
         let where_ = format!("{}/{}", s.fixture, s.func);
         // By branch address rather than by position: a function can hold more
-        // than one switch, and `__gettextparse` holds two.
-        let t = f
-            .cfg
-            .tables
-            .iter()
-            .find(|t| t.at == Addr(s.branch))
-            .unwrap_or_else(|| {
-                panic!(
-                    "{where_}: no table for the branch at {:#x}, {} recovered in this function",
-                    s.branch,
-                    f.cfg.tables.len()
-                )
-            });
+        // than one switch, and `__gettextparse` holds two. Where the addresses
+        // belong to another libc, by entry width instead -- which is the thing
+        // this case is here for, the halfword form a byte-wide table cannot
+        // reach.
+        let t = if transcribed {
+            f.cfg.tables.iter().find(|t| t.at == Addr(s.branch))
+        } else {
+            f.cfg.tables.iter().find(|t| t.entry_size == s.entry_size)
+        }
+        .unwrap_or_else(|| {
+            panic!(
+                "{where_}: no table for the branch at {:#x}, {} recovered in this function",
+                s.branch,
+                f.cfg.tables.len()
+            )
+        });
 
-        assert_eq!(t.table, Addr(s.table), "{where_}: wrong table address");
+        if transcribed {
+            assert_eq!(t.table, Addr(s.table), "{where_}: wrong table address");
+        }
         assert_eq!(t.entry_size, s.entry_size, "{where_}: wrong entry width");
         assert_eq!(
             t.kind,
             TableKind::RelativeToBase,
             "{where_}: wrong entry encoding"
         );
-        assert_eq!(
-            t.base,
-            Addr(s.anchor),
-            "{where_}: offsets measured from the wrong place"
-        );
+        if transcribed {
+            assert_eq!(
+                t.base,
+                Addr(s.anchor),
+                "{where_}: offsets measured from the wrong place"
+            );
+        }
         assert_eq!(t.shift, s.shift, "{where_}: wrong scale");
         assert!(
             !t.bounded_by_scan,
@@ -228,19 +257,36 @@ fn an_anchored_compact_table_recovers_what_objdump_shows() {
         );
 
         let got: Vec<u64> = t.targets.iter().map(|a| a.get()).collect();
-        assert_eq!(
-            got.len(),
-            s.targets.len(),
-            "{where_}: {} cases recovered, the guard allows {}",
-            got.len(),
-            s.targets.len()
-        );
-        assert_eq!(got, s.targets, "{where_}: targets differ from the table");
+        if transcribed {
+            assert_eq!(
+                got.len(),
+                s.targets.len(),
+                "{where_}: {} cases recovered, the guard allows {}",
+                got.len(),
+                s.targets.len()
+            );
+            assert_eq!(got, s.targets, "{where_}: targets differ from the table");
+        } else {
+            // Every target inside the function that branched, which is what a
+            // bounded table means and what a guess would break.
+            assert!(!got.is_empty(), "{where_}: a table with no cases");
+            for a in &got {
+                assert!(
+                    f.range.contains(Addr(*a)),
+                    "{where_}: case {a:#x} is outside the function"
+                );
+            }
+        }
         checked += 1;
     }
     assert!(
         checked == present,
         "only {checked} of {present} present fixtures recovered their table"
+    );
+    assert!(
+        present - elsewhere >= 2,
+        "{elsewhere} of {present} cases were system-library builds: the \
+         transcribed addresses went unchecked here"
     );
 }
 
