@@ -6,9 +6,6 @@ evidence for it, and every name, type and comment an agent writes lands in a
 git-mergeable log. One static Rust binary: no JVM, no project server, no
 proprietary database.
 
-**Let agents read binaries the way a human does with IDA — and write what they
-learn back into the repository.**
-
 ```bash
 # Look at a binary.
 e5r info ./a.out                              # container, architecture, entry, what the loader noticed
@@ -68,15 +65,6 @@ e5r disas ./a.out main              # a function, an address, a range, or `all`
 e5r stats ./a.out --json            # counts, for a script rather than a reader
 ```
 
-| Strength | Meaning |
-| --- | --- |
-| `asserted` | A person or an agent wrote it in the annotation log. |
-| `proven` | The file says so: a symbol table, debug information, an unwind record. |
-| `inferred` | The code implies it: a call target, a jump table, an import thunk. |
-| `heuristic` | A pattern suggests it: a prologue, a sweep, a pointer in data. |
-
-Where a thing cannot be worked out it is reported as unknown, never guessed.
-
 ### 2.2. Decompile
 
 ```bash
@@ -85,14 +73,6 @@ e5r decompile ./a.out all --json    # every complete function, with a position m
 e5r shapes ./a.out parse_header     # what the pointers it takes appear to point at
 e5r emulate ./a.out checksum 1 2 3  # run it in the interpreter and see what comes back
 ```
-
-The output says what the machine does in C's notation; it does not claim to be
-the source. Where the control flow does not fit a loop or a branch, a labelled
-`goto` appears rather than a shape that is not there, and the count is printed.
-
-**Every function that can be compiled and run is compiled and run, on every
-argument vector, and agrees with the interpreter.** That gate started at 130
-disagreeing functions and is at zero.
 
 ### 2.3. Write analysis back, and merge it
 
@@ -106,20 +86,12 @@ e5r annotate ./a.out comment 0x400710 "length is attacker-controlled"
 e5r annotate ./a.out list
 ```
 
-Two analysts merge with `git merge`. Reviewing reverse engineering work becomes
-a pull request. Add `*.e5r merge=union` to `.gitattributes`: the fold ignores
-line order, so the union of two branches is the correct merge and git already
-knows how to compute it.
-
 ### 2.4. Compare two builds
 
 ```bash
 e5r diff ./old ./new                # which functions changed, moved, appeared, vanished
 e5r diff ./old ./new --json         # and what changed inside each one
 ```
-
-Matching is by content, not by address, so a rebuild that shifts every function
-is not reported as a rewrite of the program.
 
 ### 2.5. Patch, and say why
 
@@ -136,12 +108,6 @@ e5r funcs ./a.out --json                      # every command takes it
 e5r batch ./a.out --command funcs --command strings
 e5r project new ./a.out --out a.e5rproj      # reopen it later without reanalysing
 ```
-
-Every command takes `--json`, and the exit codes are documented: `0` ok, `1`
-nothing found, `2` bad usage, `3` bad input. That is the whole agent interface,
-deliberately: the CLI is a thin client of the library, so anything it can do is
-a function call away, and a second protocol on top would be a second surface to
-keep in step with the first.
 
 ---
 
@@ -161,60 +127,6 @@ keep in step with the first.
 
 Scope, and what is deliberately **not** built, is in
 [`ROADMAP.md`](ROADMAP.md), which is the authority on both.
-
----
-
-## 4. How it is tested
-
-Every correctness gate is measured against something outside this repository,
-so no number here can be produced by writing more assertions about our own
-behaviour. The ones that go against us stay in
-[`docs/scorecard.md`](docs/scorecard.md).
-
-| gate | oracle | result |
-| --- | --- | --- |
-| AArch64 decoding | `objdump -d` | 1,640,904 instructions, 0 wrong |
-| x86-64 decoding | `llvm-objdump --x86-asm-syntax=intel` | 0 wrong |
-| ARM32 and Thumb-2 | `llvm-objdump-18 -d` | 0 wrong |
-| i386 decoding | `llvm-mc`, over a swept encoding space | 235,357 encodings, 0 wrong |
-| SLEIGH decoding | `objdump` and `llvm-objdump` | 0 wrong on AArch64, x86-64 and RISC-V |
-| Lifting | **a processor**, natively and under `qemu` | every case agrees |
-| Decompiled C | **a processor**, again: compile it and run it | 0 functions disagree |
-| Function boundaries | DWARF, via `readelf` | 95,697 functions; 0.766 recall blind, 0.937 precision |
-| ELF, Mach-O, PDB loading | `readelf`, `llvm-objdump -t`, `llvm-pdbutil` | every section, symbol and record |
-| Demangling | `c++filt` | 5,953 libstdc++ names |
-| Annotation merge | `git merge` itself | two branches, clean |
-| Determinism | itself, at 1, 4 and 10 threads | 153 fixtures, identical output |
-
-A processor is the oracle wherever one can be: the lifters are checked by
-assembling a case, running it, and comparing against our own interpreter, so
-"the manual says this instruction sets the carry flag" is never the last word.
-
-Plus mutation fuzzing of every loader and decoder in the ordinary test run,
-which found the one place in the loaders that bypassed the bounds-checked
-reader, and a no-panic gate over 1.26 million inputs across every entry point
-that takes foreign bytes.
-
----
-
-## 5. Where it stands against the others
-
-Ghidra, rizin and IDA are each better than e5r at breadth of architecture and
-at accumulated analysis lore. Two measurements, both with every command written
-down in [`docs/benchmarks.md`](docs/benchmarks.md) and
-[`docs/decbench.md`](docs/decbench.md):
-
-- **Against rizin**, on the same 16 binaries on the same machine: 21× to 3,291×
-  faster and 2.4× to 8.6× less memory. Three qualifications belong with that
-  ratio and are in the table rather than under it — including the one row e5r
-  loses.
-- **Against angr, on DecBench**, a third-party decompiler benchmark: 23.4 union
-  against angr's 37.0. That is a third behind, and the milestone this project
-  set itself is Ghidra's published 32.2, which is **not met**.
-
-The bets are on the axes where the others' design, not their effort, is the
-limit: speed, annotations in git, determinism, provenance, and an interface
-built for a program rather than for a person.
 
 ---
 
