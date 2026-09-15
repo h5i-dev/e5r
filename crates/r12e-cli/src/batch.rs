@@ -91,7 +91,7 @@ fn one(cli: &Cli, common: &Common, line: &str) -> (u8, String) {
     };
     // A batch of batches would analyze the file again for each one, which is
     // the cost this exists to avoid.
-    if matches!(parsed.command, Command::Batch { .. } | Command::Mcp) {
+    if matches!(parsed.command, Command::Batch { .. }) {
         return (exit::USAGE, quote("a batch cannot run a batch or a server"));
     }
     let _ = cli;

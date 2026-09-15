@@ -159,7 +159,7 @@ fn step(
     match &parsed.command {
         // Both of these would analyze the file again, which is the cost this
         // exists to avoid, and nesting a session inside one answers nothing.
-        Command::Repl { .. } | Command::Batch { .. } | Command::Mcp => {
+        Command::Repl { .. } | Command::Batch { .. } => {
             eprintln!("r12e: not from a session");
             return Step::Continue;
         }

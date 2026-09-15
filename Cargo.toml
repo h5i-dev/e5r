@@ -1,6 +1,6 @@
 # r12e — a CLI reverse engineering toolkit.
 #
-# The library owns every fact; the CLI and the MCP server are thin clients.
+# The library owns every fact; the CLI is a thin client of it.
 # Crate boundaries and the dependency direction are documented in ROADMAP.md
 # under "Architecture": edges run downward only, and r12e-core depends on
 # nothing else in the workspace.

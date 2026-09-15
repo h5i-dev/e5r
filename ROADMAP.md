@@ -22,7 +22,6 @@ rather than argued about again.
 | demanglers | Itanium, Rust both schemes, MSVC names (M5) |
 | annotation log, content anchors, git merge | built (M7) |
 | CLI with JSON on every command | built (M8) |
-| MCP server | built (M9) |
 | binary diff | built (M10) |
 | patch, signatures, emulation, queries | not started (M10) |
 | benchmarks and scorecard | built (M11) |
@@ -76,7 +75,7 @@ axes where their design, not their effort, is the limit.
    output says so. The incumbents flatten both into the same listing.
 
 5. **Built for automation first:** Structured JSON on every command, stable exit
-   codes, an MCP server, and a library API that the CLI is a thin client of. Not
+   codes, and a library API that the CLI is a thin client of. Not
    a headless mode retrofitted onto a GUI.
 
 6. **Breadth through SLEIGH, depth by hand:** Writing 40 instruction decoders is
@@ -87,7 +86,7 @@ axes where their design, not their effort, is the limit.
 
 ## Architecture
 
-The library owns every fact. The CLI, the MCP server and any future UI compute
+The library owns every fact. The CLI and any future UI compute
 nothing of their own.
 
 ```
@@ -103,7 +102,6 @@ r12e-db        content anchors, the annotation log, git merge semantics
 r12e-diff      function matching, build-to-build diff
 r12e-patch     assembler-backed patch sets
 r12e-api       stable library surface and the versioned JSON schema
-r12e-mcp       agent server over r12e-api
 r12e-cli       the r12e binary
 ```
 
@@ -558,11 +556,12 @@ designed before it gets coded, and the design lives in
       difference a user will find. Decompilation, shapes, signatures,
       emulation and queries go through it.
       Semver from 1.0, with a compatibility test suite.
-- [x] MCP server, as `r12e mcp`: open, stats, list_functions, disassemble,
-      xrefs, strings, annotate and read_annotations. Written directly rather
-      than through an SDK; the protocol is newline-delimited JSON-RPC and a
-      dependency would be larger than the code. decompile, diff and patch
-      preview follow their features.
+- [x] ~~MCP server~~. Built in M9 and **removed**: it exposed eight of the
+      twenty-nine commands, so it was never the complete agent interface it
+      was advertised as, and everything it did was already reachable through
+      `--json` and a documented exit code. A second protocol over the same
+      library is a second surface to keep in step with the first, and the
+      first one is the one that is complete.
 - [x] Cancellable jobs with a budget, so an agent that asks for the decompilation
       of a 40,000-function binary gets partial results and a reason. `--budget`
       in seconds and `--limit` in items, on `decompile` and `disas`. The clock
@@ -794,7 +793,7 @@ single workspace number lets a well-tested decoder hide an untested loader.
 | `r12e-format`, `r12e-arch`, `r12e-sleigh` | 90% | 85% |
 | `r12e-core`, `r12e-ir`, `r12e-db`, `r12e-types` | 85% | 80% |
 | `r12e-analysis`, `r12e-decomp`, `r12e-diff`, `r12e-patch` | 75% | 65% |
-| `r12e-cli`, `r12e-mcp` | 60% | 50% |
+| `r12e-cli` | 60% | 50% |
 
 Parsers and decoders get the high floor because their inputs are hostile and
 their failure mode is silent. The decompiler gets a lower one because a

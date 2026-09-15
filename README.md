@@ -17,7 +17,7 @@ proprietary database.
   <tr>
     <td align="center">
       <strong>Agent-native</strong><br>
-      <sub>JSON everywhere, an MCP server, and analysis an agent can correct</sub>
+      <sub>JSON on every command, and analysis an agent can correct</sub>
     </td>
     <td align="center">
       <strong>Evidence, not assertions</strong><br>
@@ -52,8 +52,8 @@ r12e annotate ./a.out type 0x4006e8 "int parse_header(struct hdr *h, size_t n)"
 r12e decompile ./a.out parse_header            # the assertion reaches the output
 
 # Drive it from an agent.
-r12e mcp                                       # Model Context Protocol on stdin and stdout
 r12e batch ./a.out --command funcs --command strings   # several commands, one document
+r12e funcs ./a.out --json                      # every command takes it
 ```
 
 ---
@@ -156,14 +156,16 @@ r12e patch ./a.out apply fix.r12epatch --out ./patched   # a new file, never in 
 ### 2.6. Drive it from an agent
 
 ```bash
-r12e mcp                                       # JSON-RPC over stdin and stdout
+r12e funcs ./a.out --json                      # every command takes it
 r12e batch ./a.out --command funcs --command strings
 r12e project new ./a.out --out a.r12eproj      # reopen it later without reanalysing
 ```
 
 Every command takes `--json`, and the exit codes are documented: `0` ok, `1`
-nothing found, `2` bad usage, `3` bad input. The CLI is a thin client of the
-library, so anything it can do is a function call away.
+nothing found, `2` bad usage, `3` bad input. That is the whole agent interface,
+deliberately: the CLI is a thin client of the library, so anything it can do is
+a function call away, and a second protocol on top would be a second surface to
+keep in step with the first.
 
 ---
 
@@ -179,7 +181,7 @@ library, so anything it can do is a function call away.
 | Decompiler | expressions, types, structuring, variable naming, C++ classes from vtables and RTTI |
 | Names | Itanium C++, Rust (both schemes), MSVC |
 | Storage | git-mergeable annotation log keyed to content anchors |
-| Surfaces | CLI with JSON on every command, MCP server, REPL, binary diff, patching |
+| Surfaces | CLI with JSON on every command, REPL, binary diff, patching |
 
 Scope, and what is deliberately **not** built, is in
 [`ROADMAP.md`](ROADMAP.md), which is the authority on both.
@@ -301,9 +303,9 @@ run, computes what the machine computes.
 <details>
 <summary>What does "agent-native" actually mean here?</summary>
 
-Three things that are properties of the tool rather than a wrapper around it.
-Every command emits JSON with a schema and a documented exit code. An MCP server
-exposes the analysis to a model directly. And an agent's conclusions are
+Two things that are properties of the tool rather than a wrapper around it.
+Every command emits JSON with a schema and a documented exit code, so an agent
+drives it the same way it drives `git`. And an agent's conclusions are
 first-class input: an asserted name or type reaches the decompiled output and
 the recovered prototype, so read, conclude, correct, re-read is the normal way
 to use it rather than a feature bolted on.

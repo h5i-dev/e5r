@@ -439,13 +439,6 @@ Every command takes `--json`. The schema is named in every document
 (`"schema": "r12e/1"`) and addresses are hex strings so nothing is lost to a
 float.
 
-```
-r12e mcp
-```
-
-speaks the Model Context Protocol on stdin and stdout, so an agent can open a
-file, look at it, and write annotations without a shell.
-
 ## Shell integration
 
 ```

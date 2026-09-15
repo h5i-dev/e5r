@@ -4,8 +4,8 @@
 //! immediately. A query it does not understand has to say which part it did
 //! not understand, because "no results" for a misspelling is worse than an
 //! error. And nothing typed at it may panic or take an unbounded time, since
-//! the same parser is behind the MCP server, where the text comes from an
-//! agent rather than from a person.
+//! the same parser is behind `r12e query`, where an agent can put anything it
+//! likes in front of it.
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};

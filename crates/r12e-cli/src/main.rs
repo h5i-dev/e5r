@@ -13,7 +13,6 @@ mod annotate;
 mod batch;
 mod budget;
 mod json;
-mod mcp;
 mod out;
 mod patch;
 mod print;
@@ -317,9 +316,6 @@ pub enum Command {
     },
     /// Write the manual page, in roff.
     Manpage,
-    /// Speak the Model Context Protocol on stdin and stdout, so an agent can
-    /// drive the analysis.
-    Mcp,
     /// Open an interactive session.
     ///
     /// One analysis, many questions. The commands are the ones below, spelled
@@ -534,9 +530,9 @@ impl Command {
     /// for a program rather than for a person.
     fn terminal_options(&self) -> Option<(out::When, bool)> {
         match self {
-            // The server speaks a protocol, and the two writers below are
-            // redirected into a file the first time and never read on screen.
-            Command::Mcp | Command::Completions { .. } | Command::Manpage => None,
+            // Both writers are redirected into a file the first time and
+            // never read on screen.
+            Command::Completions { .. } | Command::Manpage => None,
             Command::Project { .. } => Some((out::When::Auto, false)),
             _ => {
                 let c = self.common();
@@ -560,11 +556,7 @@ impl Command {
             Command::Annotate { common, .. }
             | Command::Batch { common, .. }
             | Command::Diff { common, .. } => common,
-            // The server takes its paths per call rather than up front.
-            Command::Mcp
-            | Command::Project { .. }
-            | Command::Completions { .. }
-            | Command::Manpage => {
+            Command::Project { .. } | Command::Completions { .. } | Command::Manpage => {
                 unreachable!("handled before a file is opened")
             }
             Command::Vtables { common, .. }
@@ -610,10 +602,8 @@ fn main() -> ExitCode {
 }
 
 pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
-    // The server opens files itself, one per tool call, and the two writers
-    // below have no input at all.
+    // The two writers below have no input at all.
     match &cli.command {
-        Command::Mcp => return mcp::serve(),
         // A project names its own files; none of them is the binary the other
         // commands open up front.
         Command::Project { what } => return project(w, what),
