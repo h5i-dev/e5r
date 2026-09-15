@@ -1036,3 +1036,37 @@ mod synth {
         build(1, 0, &secs, &shstr, &body, body_offset, None)
     }
 }
+
+/// A section that claims more than the image holds must not become a loop.
+///
+/// Found by the sweep above, which named the file it choked on: eight bytes
+/// saturated at 4488 of a 4,642-byte dynamic object lands in a section header,
+/// and `.plt` then claimed a size the file could not hold. The PLT readers
+/// divided that size by an entry width and walked a quarter of a billion
+/// slots, every one of them outside the image -- 309ms optimized here, and the
+/// eighteen seconds a dev build took on a runner.
+///
+/// Pinned by name rather than left to the sweep, which spends a budget and may
+/// stop before reaching this input again. The bound is loose on purpose: the
+/// gap between a bounded read and an unbounded one here is four orders of
+/// magnitude, so nothing turns on where inside that gap the line sits.
+#[test]
+fn a_section_larger_than_the_image_is_not_a_loop() {
+    let mut v = synth::dynamic_plt(true);
+    let end = (4488 + 8).min(v.len());
+    assert!(
+        end > 4488,
+        "the synthetic object is too short to corrupt there"
+    );
+    for b in v[4488..end].iter_mut() {
+        *b = 0xff;
+    }
+    let started = Instant::now();
+    let _ = load(&v, &LoadOptions::default());
+    let took = started.elapsed();
+    assert!(
+        took < Duration::from_secs(2),
+        "loading {} bytes took {took:?}: a size from the file became a walk",
+        v.len()
+    );
+}

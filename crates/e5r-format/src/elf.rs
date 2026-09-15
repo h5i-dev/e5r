@@ -1309,6 +1309,25 @@ fn read_plt_relocations(
     }
 }
 
+/// How many entries of `size` bytes a section can really hold.
+///
+/// `sh_size` is a number from the file, and a corrupt one makes a PLT that
+/// claims four gigabytes inside a four-kilobyte image. Dividing that by an
+/// entry width gives a loop of a quarter of a billion iterations, each one a
+/// bounds check that fails -- eighteen seconds on a dev build, which is how
+/// this was found. The image is what the file actually provided, so it is the
+/// bound.
+fn entries_within(obj: &Object, sec: &Section, size: u64) -> u64 {
+    let Some(image) = obj.memory.bounds() else {
+        return 0;
+    };
+    if sec.range.start() >= image.end() {
+        return 0;
+    }
+    let reach = image.end().get() - sec.range.start().get();
+    sec.range.len().min(reach) / size
+}
+
 /// Name the entries of an x86-64 `.plt.sec` by what each one jumps through.
 ///
 /// One entry is sixteen bytes: `endbr64`, then a `jmp *disp(%rip)` that may
@@ -1354,7 +1373,7 @@ fn name_plt_sec(
     by_slot.sort_by_key(|(slot, _)| *slot);
 
     let mut found: Vec<(u64, String)> = Vec::new();
-    for i in 0..plt.range.len() / ENTRY {
+    for i in 0..entries_within(obj, plt, ENTRY) {
         let at = plt.range.start().get().wrapping_add(i * ENTRY);
         let Some(code) = obj.memory.slice(Addr(at), ENTRY) else {
             continue;
@@ -1470,7 +1489,7 @@ fn name_i386_plt(
     let got = i386_got_base(obj);
 
     const ENTRY: u64 = 16;
-    let entries = plt.range.len() / ENTRY;
+    let entries = entries_within(obj, plt, ENTRY);
     let mut found = Vec::new();
     for i in 0..entries {
         let at = plt.range.start().get().wrapping_add(i * ENTRY);
