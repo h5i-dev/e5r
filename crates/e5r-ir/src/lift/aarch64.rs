@@ -765,6 +765,41 @@ pub fn lift(i: &Insn) -> Lifted {
         // A prefetch has no architectural effect beyond timing.
         "prfm" | "prfum" => b.finish(true),
 
+        // The two that write the whole register rather than one halfword.
+        // `movz` places the immediate and zeroes the rest; `movn` places its
+        // complement and ones the rest. Both are constants at lift time, so
+        // neither needs the shift as an operation.
+        "movz" | "movn" => {
+            let Some(d) = dest else {
+                return b.unimplemented();
+            };
+            let v = match ops.get(1) {
+                Some(Operand::UImm(v)) => *v,
+                Some(Operand::Imm(v)) if *v >= 0 => *v as u64,
+                _ => return b.unimplemented(),
+            };
+            let shift = match ops.get(2) {
+                Some(Operand::ShiftOp(_, n)) => *n as u64,
+                _ => 0,
+            };
+            let placed = v << shift;
+            // Narrowed to the destination: a 32-bit `movn` complements within
+            // the word, and the upper half of the slot is written by
+            // `write_reg` rather than carried over from the complement.
+            let mask = if size >= 8 {
+                u64::MAX
+            } else {
+                (1u64 << (size * 8)) - 1
+            };
+            let value = if i.mnemonic == "movz" {
+                placed
+            } else {
+                !placed
+            } & mask;
+            write_reg(&mut b, d, Varnode::constant(value, size));
+            b.finish(true)
+        }
+
         "movk" => {
             let Some(d) = dest else {
                 return b.unimplemented();

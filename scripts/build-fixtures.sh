@@ -52,6 +52,27 @@ else
   run_a64() { return 1; }
 fi
 
+# And the same for the x86-64 side. Not symmetric with the above by accident:
+# `qemu-x86_64` is in `qemu-user`, while `qemu-user-static` -- which is what a
+# CI runner usually installs -- spells it `qemu-x86_64-static`. And on an
+# x86-64 host there is nothing to emulate. Guarding on the one name meant a
+# runner recorded no x86-64 output at all, which does not fail anything: the
+# tests that read those recordings skip the fixture, and a jump-table gate
+# confirmed two tables instead of four.
+case "$(uname -m)" in
+  x86_64 | amd64) run_x64() { "$@"; } ;;
+  *)
+    if command -v qemu-x86_64 > /dev/null; then
+      run_x64() { qemu-x86_64 "$@"; }
+    elif command -v qemu-x86_64-static > /dev/null; then
+      run_x64() { qemu-x86_64-static "$@"; }
+    else
+      echo "warning: no qemu-x86_64; x86-64 fixtures are built but not run" >&2
+      run_x64() { return 1; }
+    fi
+    ;;
+esac
+
 # Several `.a64` fixtures are built by clang rather than gcc, because gcc's
 # freestanding entry needs a runtime they do not link. Natively that takes no
 # flags. Cross it takes the target and a linker that knows it, which is the
@@ -137,8 +158,8 @@ if [ -n "$lld" ]; then
     if [ -x "$out/driver.a64.$opt" ]; then
       run_a64 "$out/driver.a64.$opt" > "$out/driver.a64.$opt.out" || true
     fi
-    if [ -x "$out/driver.x64.$opt" ] && command -v qemu-x86_64 > /dev/null; then
-      qemu-x86_64 "$out/driver.x64.$opt" > "$out/driver.x64.$opt.out" || true
+    if [ -x "$out/driver.x64.$opt" ]; then
+      run_x64 "$out/driver.x64.$opt" > "$out/driver.x64.$opt.out" || true
     fi
   done
   # The two architectures computing the same answers is the harness checking
@@ -839,8 +860,8 @@ if [ -e fixtures/emulate/paths.c ]; then
     if [ -x "$out/em-paths.a64.$opt" ]; then
       run_a64 "$out/em-paths.a64.$opt" > "$out/em-paths.a64.$opt.out" || true
     fi
-    if [ -x "$out/em-paths.x64.$opt" ] && command -v qemu-x86_64 > /dev/null; then
-      qemu-x86_64 "$out/em-paths.x64.$opt" > "$out/em-paths.x64.$opt.out" || true
+    if [ -x "$out/em-paths.x64.$opt" ]; then
+      run_x64 "$out/em-paths.x64.$opt" > "$out/em-paths.x64.$opt.out" || true
     fi
     # The two architectures computing the same answers is the oracle checking
     # itself before anything is measured against it.

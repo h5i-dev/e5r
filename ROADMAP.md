@@ -10,7 +10,7 @@ rather than argued about again.
 | --- | --- |
 | workspace, guards, fixtures, CI | built (M0) |
 | ELF, PE and COFF, Mach-O, raw | built (M1) |
-| AArch64 decoder | built, objdump parity over 1.43M instructions, 99.87% decoded |
+| AArch64 decoder | built, objdump parity over 395K fixture instructions, 99.67% decoded |
 | x86-64 decoder | built, llvm-objdump parity over 4,760 instructions, 100% decoded |
 | SLEIGH runtime and compiler | not started (M2) |
 | i386, ARM32 and Thumb-2 decoders | not started (M2) |

@@ -1250,7 +1250,16 @@ fn read_plt_relocations(
         Some(_) => (0, 16),
         None => plt_layout(&obj.arch),
     };
-    if plt.range.len() < header + count * entry_size {
+    // `.plt` gives every relocation a slot, an IFUNC's included. `.plt.sec`
+    // gives one only to the relocations that name a symbol: a call to an IFUNC
+    // does not go through the tracking stub, so it has no entry there. Sizing
+    // this section by the relocation count would therefore declare it too
+    // small and name nothing.
+    let slots = match &sec {
+        Some(_) => named_relocations(r, sh, step, wide, count, dynsym_names),
+        None => count,
+    };
+    if plt.range.len() < header + slots * entry_size {
         obj.warnings.push(format!(
             ".plt is {:#x} bytes, too small for {count} entries of {entry_size:#x} \
              after a {header:#x}-byte header; thunks not named",
@@ -1259,6 +1268,9 @@ fn read_plt_relocations(
         return;
     }
 
+    // The slot this relocation takes, which is its own index only where every
+    // relocation has one.
+    let mut slot = 0;
     for i in 0..count {
         let Ok(mut e) = r.slice_at("relocation", sh.offset + i * step, step) else {
             break;
@@ -1274,13 +1286,18 @@ fn read_plt_relocations(
             (info >> 8) as usize
         };
         let Some(name) = dynsym_names.get(sym_index).filter(|n| !n.is_empty()) else {
+            // It still consumed a `.plt` slot; it consumed no `.plt.sec` one.
+            if sec.is_none() {
+                slot += 1;
+            }
             continue;
         };
         let thunk = plt
             .range
             .start()
-            .checked_add(header + i * entry_size)
+            .checked_add(header + slot * entry_size)
             .filter(|a| plt.range.contains(*a));
+        slot += 1;
         if let Some(imp) = obj.imports.iter_mut().find(|im| im.name == *name) {
             imp.thunk = thunk;
         }
@@ -1293,6 +1310,41 @@ fn read_plt_relocations(
             });
         }
     }
+}
+
+/// How many of these relocations name a symbol, which is how many entries a
+/// `.plt.sec` holds.
+fn named_relocations(
+    r: &Reader<'_>,
+    sh: &SecHdr,
+    step: u64,
+    wide: bool,
+    count: u64,
+    dynsym_names: &[String],
+) -> u64 {
+    let mut n = 0;
+    for i in 0..count {
+        let Ok(mut e) = r.slice_at("relocation", sh.offset + i * step, step) else {
+            break;
+        };
+        if e.uword("r_offset", wide).is_err() {
+            break;
+        }
+        let sym_index = if wide {
+            let Ok(info) = e.u64("r_info") else { break };
+            (info >> 32) as usize
+        } else {
+            let Ok(info) = e.u32("r_info") else { break };
+            (info >> 8) as usize
+        };
+        if dynsym_names
+            .get(sym_index)
+            .is_some_and(|name| !name.is_empty())
+        {
+            n += 1;
+        }
+    }
+    n
 }
 
 /// Where `_GLOBAL_OFFSET_TABLE_` is, for the `%ebx`-relative form of a PLT

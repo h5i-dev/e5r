@@ -120,10 +120,20 @@ encoding not decoded at all is a separate number with a floor that only rises.
 
 | architecture | oracle | instructions | wrong | decoded |
 | --- | --- | --- | --- | --- |
-| AArch64 | `objdump -d` | 1,640,904 | 0 | 99.85% |
+| AArch64 | `objdump -d` | 395,142 | 0 | 99.67% |
 | x86-64 | `llvm-objdump --x86-asm-syntax=intel` | 4,760 | 0 | 100% |
 | ARM32 and Thumb-2 | `llvm-objdump-18 -d` | 3,568 | 0 | 100% |
 | i386 | `llvm-mc` and `llvm-objdump`, swept | 235,357 | 0 | 99.71% |
+
+The AArch64 row counts the fixtures, which are built from sources in this
+repository and hold the same instructions on any machine. Adding the
+libraries installed here -- libc, libstdc++, libcrypto -- takes it to
+1,820,572 instructions and 99.83%, which is the number this table used to
+carry. That is a better-looking figure about a worse-defined corpus: those
+libraries are hundreds of thousands of ordinary instructions that dilute every
+gap, and a machine without them measures 99.67% with nothing different about
+the decoder. They are still compared, because a wrong answer in libc is a wrong
+answer; they are not counted in the floor.
 
 The i386 number is a sweep rather than a corpus: every one- and two-byte
 opcode crossed with prefix strings and ModRM shapes, both three-byte maps, all

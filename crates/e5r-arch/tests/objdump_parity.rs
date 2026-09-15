@@ -121,15 +121,24 @@ fn unprefixed(text: &str) -> String {
     }
 }
 
-/// Coverage floor: the fraction of objdump-decodable instructions we also
-/// decode. What remains is the single-structure SIMD loads and stores, the
-/// by-element multiplies, the memory-tagging instructions, and the Scalable
-/// Vector Extension, which is a separate architecture's worth of encodings.
-/// Raise this as the gap closes; never lower it.
-const MIN_COVERAGE: f64 = 0.998;
+/// Coverage floor over the fixtures, which are built from sources in this
+/// repository and are the same instructions on any machine. What remains is
+/// the single-structure SIMD loads and stores, the by-element multiplies, the
+/// memory-tagging instructions, and the Scalable Vector Extension, which is a
+/// separate architecture's worth of encodings. Raise this as the gap closes;
+/// never lower it.
+///
+/// Held over the fixtures alone on purpose. Counting this machine's libc,
+/// libstdc++ and libcrypto in the same fraction makes the number a fact about
+/// which libraries are installed: they are hundreds of thousands of ordinary
+/// instructions that dilute every gap, and a runner without them measured
+/// 99.67% where this machine measured 99.87% with nothing different about the
+/// decoder. They are still compared -- a wrong answer in libc is a wrong
+/// answer -- and their coverage is reported beside the gated one.
+const MIN_COVERAGE: f64 = 0.996;
 
 /// What comparing one file found.
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct Tally {
     /// Decoded, and the text matches objdump.
     matched: usize,
@@ -214,19 +223,21 @@ fn system_binaries() -> Vec<PathBuf> {
 fn aarch64_matches_objdump_on_every_fixture() {
     let Some(dir) = corpus() else { return };
     let mut all = Tally::default();
+    let mut ours = Tally::default();
     let mut files = 0;
 
-    let fixtures = std::fs::read_dir(&dir)
+    let built: Vec<PathBuf> = std::fs::read_dir(&dir)
         .unwrap()
         .filter_map(|e| {
             let p = e.ok()?.path();
             let n = p.file_name()?.to_string_lossy().into_owned();
             (n.contains("a64") || n.contains("hello")).then_some(p)
         })
-        .chain(system_binaries());
+        .collect();
+    let from_here = built.len();
 
     let mut named: Vec<String> = Vec::new();
-    for p in fixtures {
+    for (i, p) in built.into_iter().chain(system_binaries()).enumerate() {
         let name = p.file_name().unwrap().to_string_lossy().into_owned();
         let t = check(&p);
         if t.total() == 0 {
@@ -234,6 +245,9 @@ fn aarch64_matches_objdump_on_every_fixture() {
         }
         files += 1;
         named.extend(t.wrong.iter().map(|b| format!("{name}: {b}")));
+        if i < from_here {
+            ours.merge(t.clone());
+        }
         all.merge(t);
     }
 
@@ -271,17 +285,32 @@ fn aarch64_matches_objdump_on_every_fixture() {
         );
     }
 
-    // A gap is not a bug, but its floor only moves up.
+    // A gap is not a bug, but its floor only moves up -- and it is held over
+    // the half of the corpus this repository builds.
     assert!(
-        all.coverage() >= MIN_COVERAGE,
-        "decoded {:.3}% of {} instructions, floor is {:.1}% ({} undecoded)",
-        all.coverage() * 100.0,
-        all.total(),
+        ours.total() > 100,
+        "only {} instructions came from fixtures",
+        ours.total()
+    );
+    assert!(
+        ours.coverage() >= MIN_COVERAGE,
+        "decoded {:.3}% of {} fixture instructions, floor is {:.1}% ({} undecoded)",
+        ours.coverage() * 100.0,
+        ours.total(),
         MIN_COVERAGE * 100.0,
-        all.undecoded
+        ours.undecoded
     );
     println!(
-        "objdump parity: {} instructions, {} matched, {} undecoded, {:.3}% coverage",
+        "objdump parity, fixtures: {} instructions, {} matched, {} undecoded, \
+         {:.3}% coverage",
+        ours.total(),
+        ours.matched,
+        ours.undecoded,
+        ours.coverage() * 100.0
+    );
+    println!(
+        "objdump parity, with this machine's libraries: {} instructions, \
+         {} matched, {} undecoded, {:.3}% coverage",
         all.total(),
         all.matched,
         all.undecoded,

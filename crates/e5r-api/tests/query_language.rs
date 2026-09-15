@@ -523,10 +523,16 @@ fn asking_about_one_callee_does_not_lift_the_whole_image() {
         narrow.rows.len(),
         wide.matched
     );
-    // Neither may take longer than a person will wait at a prompt, on a
-    // binary of this size.
+    // The comparison, not the reading. A wall-clock bound is a fact about the
+    // machine and its load -- a shared runner took 25s and 90s here for two
+    // queries that are milliseconds on an idle one -- and a gate that fails on
+    // a busy afternoon is a gate people learn to ignore. What holds anywhere
+    // is that the question with a handle costs no more than the question
+    // without one, because both were asked of the same image on the same
+    // machine a moment apart.
     assert!(
-        narrow_took < Duration::from_secs(60) && wide_took < Duration::from_secs(60),
-        "{narrow_took:?} and {wide_took:?}"
+        narrow_took <= wide_took,
+        "asking about one callee took {narrow_took:?}, asking about every call \
+         took {wide_took:?}: the handle bought nothing"
     );
 }
