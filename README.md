@@ -76,6 +76,17 @@ Plus mutation fuzzing of every loader and decoder in the ordinary test run,
 which found the one place in the loaders that bypassed the bounds-checked
 reader.
 
+## Install
+
+```console
+$ curl -fsSL https://raw.githubusercontent.com/h5i-dev/r12e/main/install.sh | sh
+```
+
+One binary, no runtime dependency. The script verifies the download against the
+release's `SHA256SUMS` and refuses to install if it does not match. See
+[`MANUAL.md`](MANUAL.md) for the environment variables and for building the
+archives yourself.
+
 ## Build
 
 The checkout is release-only; see [`CLAUDE.md`](CLAUDE.md).

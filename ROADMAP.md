@@ -720,9 +720,11 @@ designed before it gets coded, and the design lives in
       checkout, where the absent fixtures break nothing. `cargo package
       --workspace` succeeds for all 14 crates. Signing is Sigstore keyless
       through the workflow's own identity, so no secret is stored, and it
-      degrades to unsigned checksums rather than failing the release. The
-      Homebrew formula is a draft and its first line says so, because there is
-      no brew here to run it.
+      degrades to unsigned checksums rather than failing the release.
+      `install.sh` is the install path, and it has been run: against a real
+      archive served locally, and against a tampered checksum, a missing
+      `SHA256SUMS` and a missing archive, each of which it refuses. The draft
+      Homebrew formula it replaced had never been run at all.
 - [x] `MANUAL.md`, a design document per subsystem under `docs/design/`, and a
       tutorial that takes a reader from a stripped binary to a named, typed,
       committed annotation log (`docs/tutorial.md`).

@@ -90,10 +90,32 @@ cross-building the other architecture's static binary needs no musl gcc, no
 The tarball adds no variation of its own: entries are sorted and ownership and
 timestamps are zeroed, so the same binary always packs to the same checksum.
 
-### Homebrew
+### install.sh
 
-`packaging/homebrew/r12e.rb` is a draft formula, not yet published in a tap and
-not yet run against `brew`.
+```
+curl -fsSL https://raw.githubusercontent.com/h5i-dev/r12e/main/install.sh | sh
+```
+
+It works out the platform, asks the releases API for the latest tag, downloads
+that archive, **verifies it against the release's `SHA256SUMS` and refuses to
+install if it does not match**, and puts the binary in `/usr/local/bin` with
+`install` rather than `mv`, so a `sudo` install does not leave a user-writable
+binary in a root-owned directory.
+
+Four environment variables, all of them for a case the default does not cover:
+
+| | |
+| --- | --- |
+| `R12E_INSTALL_DIR` | somewhere other than `/usr/local/bin` |
+| `R12E_VERSION` | a tag other than the latest |
+| `R12E_BASE_URL` | a mirror, or a staged release that is not published yet |
+| `R12E_SKIP_CHECKSUM` | install without verifying, said out loud on stderr |
+
+There is no Homebrew formula. There was a draft one, and it was deleted rather
+than published: it had never been run against `brew`, and a tap is a second
+place a version number has to be right. A script that has been run against a
+real archive, and refuses a tampered one, is the smaller promise and the kept
+one.
 
 ## What it will and will not tell you
 
