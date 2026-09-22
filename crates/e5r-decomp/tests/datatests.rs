@@ -867,15 +867,47 @@ fn convert() {
     });
 }
 
-/// deindirect.xml and indproto.xml, the argument half: an indirect call comes
-/// out as `__callind(target)` with no arguments at all, so `f(b + 3)` loses the
-/// `b + 3`. The two calls here also share a target that is a single global
-/// holding one function, which Ghidra collapses to a direct call to it.
+/// deindirect.xml and indproto.xml, the argument half: an indirect call keeps
+/// the registers prepared for it, so `f(b + 3)` does not lose the `b + 3`.
 #[test]
-#[ignore = "an indirect call is emitted without its arguments and is never devirtualized"]
+fn indirect_call_keeps_arguments() {
+    case(&all("calls"), "deindirect", |c| {
+        let calls: Vec<&str> = c
+            .text
+            .lines()
+            .filter(|line| line.contains("= (uint64_t)(__callind("))
+            .collect();
+        if calls.len() != 2 {
+            c.fail(&format!(
+                "expected two indirect call statements, found {calls:?}"
+            ));
+        }
+        if !calls[0].contains("+ 3") || !calls[1].contains("+ 5") {
+            c.fail(&format!(
+                "indirect call arguments were not preserved: {calls:?}"
+            ));
+        }
+        // Each call has one target and one argument. A clobber marker from
+        // the first call must not look like preparation for the second.
+        for call in calls {
+            if call.matches(',').count() != 1 {
+                c.fail(&format!(
+                    "indirect call acquired spurious arguments: {call}"
+                ));
+            }
+        }
+    });
+}
+
+/// deindirect.xml, the target half: both calls load one writable global that
+/// initially points at `realfunc`. Ghidra collapses them to direct calls. Doing
+/// that here needs proof the global cannot change between load and call; its
+/// initial contents alone are not enough.
+#[test]
+#[ignore = "a writable function pointer is not devirtualized without mutation analysis"]
 fn deindirect() {
     case(&all("calls"), "deindirect", |c| {
-        c.has("realfunc").has("+ 3").has("+ 5");
+        c.has("realfunc");
     });
 }
 

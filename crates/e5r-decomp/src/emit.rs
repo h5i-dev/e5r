@@ -465,7 +465,11 @@ fn helper_for(o: Op) -> Option<&'static str> {
         Op::FloatConvert | Op::IntToFloat | Op::UIntToFloat | Op::FloatToInt | Op::FloatToUInt => {
             REINTERPRET
         }
-        Op::CallInd => "uint64_t __callind(uint64_t);",
+        // The first argument is the target. The rest are the argument
+        // registers we can prove were prepared for this call. An unspecified
+        // tail would make calls with arguments fail the recompilability gate;
+        // a variadic tail says only that the target's prototype is unknown.
+        Op::CallInd => "uint64_t __callind(uint64_t, ...);",
         Op::BranchInd => "void __indirect_branch(uint64_t);",
         Op::IntDiv128 => "uint64_t __udiv128(uint64_t, uint64_t, uint64_t);",
         Op::IntSDiv128 => "uint64_t __sdiv128(uint64_t, uint64_t, uint64_t);",
@@ -991,6 +995,16 @@ impl Emitter<'_> {
                                 .unwrap_or_else(|| crate::expr::default_call_name(target));
                             Expr::Call(name, self.arguments(at, index, callee))
                         }
+                        (Op::CallInd, _) => {
+                            let mut args = op
+                                .inputs
+                                .first()
+                                .map(|i| self.r.integer(self.r.operand(i), i))
+                                .into_iter()
+                                .collect::<Vec<_>>();
+                            args.extend(self.unknown_arguments(at, index));
+                            Expr::Named("__callind", args)
+                        }
                         _ => self.r.expr(op),
                     };
                     match op.out.and_then(|v| self.r.locals.get(&v)).filter(|_| !void) {
@@ -1126,6 +1140,68 @@ impl Emitter<'_> {
             out.push(Expr::Const(0, 8));
         }
         out
+    }
+
+    /// Arguments prepared for a call whose prototype and target are unknown.
+    ///
+    /// There is no honest arity to copy from, so take only the contiguous
+    /// argument registers this block wrote since the preceding call. This
+    /// preserves ordinary callback arguments without inventing stale values
+    /// left in caller-saved registers. An unchanged incoming argument cannot
+    /// be proved at an untyped indirect site and is deliberately omitted.
+    fn unknown_arguments(&self, at: Addr, index: usize) -> Vec<Expr> {
+        let Some(block) = self.f.blocks.get(&at) else {
+            return Vec::new();
+        };
+        let since = block.ops[..index]
+            .iter()
+            .rposition(|op| matches!(op.kind, SsaKind::Op(Op::Call | Op::CallInd)))
+            .map_or(0, |n| n + 1);
+
+        self.r
+            .abi
+            .integer_arguments
+            .iter()
+            .map_while(|offset| {
+                let value = block.ops[since..index]
+                    .iter()
+                    .rev()
+                    // `Undefine` records registers the preceding call
+                    // clobbered. It is not a write that prepared an argument
+                    // for the next call, even though it has an SSA output.
+                    .filter(|op| op.kind != SsaKind::Op(Op::Undefine))
+                    .filter_map(|op| op.out)
+                    .find(|v| {
+                        v.location.space == Space::Register && v.location.offset == *offset
+                    })?;
+                if self.value_is_clobbered(value, 0) {
+                    return None;
+                }
+                Some(self.r.operand(&Operand::Value(value)))
+            })
+            .collect()
+    }
+
+    /// Whether a value is only a call-clobber marker, possibly through the
+    /// copies and width-normalizing operations SSA put above it.
+    fn value_is_clobbered(&self, value: Value, depth: u8) -> bool {
+        if depth >= 16 {
+            return false;
+        }
+        let Some((at, index)) = self.r.definition_site(value) else {
+            return false;
+        };
+        let Some(op) = self.f.blocks.get(&at).and_then(|b| b.ops.get(index)) else {
+            return false;
+        };
+        if op.kind == SsaKind::Op(Op::Undefine) {
+            return true;
+        }
+        op.inputs.iter().any(|input| {
+            input
+                .as_value()
+                .is_some_and(|v| self.value_is_clobbered(v, depth + 1))
+        })
     }
 
     /// The value a register held just before an operation.
