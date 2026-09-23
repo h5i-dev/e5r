@@ -21,6 +21,7 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use e5r_analysis::{Options, Program, analyze};
@@ -560,6 +561,24 @@ fn stackstring() {
     });
 }
 
+/// SSA gives every definition a version, but several versions of one promoted
+/// stack slot are one C local rather than a row of invented temporaries.
+#[test]
+fn promoted_stack_slot_has_one_name() {
+    case(&["driver.x64.O0".to_string()], "compares", |c| {
+        let declarations: Vec<&str> = c
+            .text
+            .lines()
+            .filter(|line| line.trim_start().starts_with("uint32_t v"))
+            .collect();
+        if declarations.len() != 1 {
+            c.fail(&format!(
+                "one promoted stack slot should have one declaration: {declarations:?}"
+            ));
+        }
+    });
+}
+
 /// heapstring.xml: the same store pattern, to memory the function does not own.
 ///
 /// x86-64 only: the AArch64 build ends the run with a `strb` of a register,
@@ -897,6 +916,82 @@ fn indirect_call_keeps_arguments() {
             }
         }
     });
+}
+
+/// An import thunk has an unknown prototype, not a zero-argument prototype.
+/// Prepared argument registers therefore stay attached to PLT calls.
+#[test]
+fn plt_calls_keep_prepared_arguments() {
+    case(&["hello.a64.O0".to_string()], "main", |c| {
+        // The prototype is unknown, so the call is cast to the arguments this
+        // site prepared. An empty call is the bug.
+        c.has("strlen_plt)")
+            .has("*(uint64_t *)")
+            .has("printf_plt)")
+            .lacks("strlen_plt()");
+    });
+}
+
+/// A wrapper's `ret` reads `x0`. The call that produced it also clobbers `x1`,
+/// which the convention lists as a second result register. That clobber is not
+/// the return value, and a phi of the real result still has to be named: the
+/// return operation itself does not mention it.
+#[test]
+fn a_returned_call_is_the_call_result() {
+    let Some(cc) = ["clang", "cc", "gcc"]
+        .into_iter()
+        .find(|name| Command::new(name).arg("--version").output().is_ok())
+    else {
+        return;
+    };
+    let dir = std::env::temp_dir().join("e5r-returned-call");
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("w.c");
+    std::fs::write(
+        &src,
+        "int callee(int x){return x+1;}
+         int wrapper(int x){return callee(x);}
+         int branchy(int x){if(x)return callee(x);return callee(x+1);}\n",
+    )
+    .unwrap();
+    let bin = dir.join("w.o");
+    let compiled = Command::new(cc)
+        .args(["-c", "-O0", "-fno-builtin", "-o"])
+        .arg(&bin)
+        .arg(&src)
+        .output();
+    let Ok(output) = compiled else { return };
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let data = std::fs::read(&bin).unwrap();
+    let obj = e5r_format::load(&data, &LoadOptions::default()).expect("load wrapper");
+    let program = analyze(obj, &Options::default());
+    let targets: Vec<&e5r_analysis::Function> = program
+        .functions_by_address()
+        .filter(|f| {
+            f.name
+                .as_deref()
+                .is_some_and(|n| n == "wrapper" || n == "branchy")
+        })
+        .collect();
+    assert_eq!(targets.len(), 2, "compiled functions were not recovered");
+    let text = e5r_api::decompile_program(&program, &targets).text();
+    assert!(!text.contains("__phi"), "{text}");
+    assert!(text.contains("callee"), "{text}");
+    // The returned expression is the call's result. A clobber of the high
+    // half may still be named; it must not be what the function returns.
+    for body in text.split("uint64_t ").skip(1) {
+        let Some(ret) = body.lines().rev().find(|line| line.contains("return")) else {
+            continue;
+        };
+        assert!(
+            !ret.contains("__clobbered") && !ret.contains("__phi"),
+            "{text}"
+        );
+    }
 }
 
 /// deindirect.xml, the target half: both calls load one writable global that

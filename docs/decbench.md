@@ -249,6 +249,12 @@ the 43 perfect functions come from. Exposing
 per-variable name, type and stack offset in the JSON is the single cheapest
 point of score on this list.
 
+**Status after the recorded run:** the JSON surface now carries each
+variable's name, type, size, role and machine home, and the adapter translates
+parameters to ABI-positioned `VariableInfo` records and locals to their native
+stack offsets where known. This closes the integration defect; the score above
+predates it and must be re-measured before claiming an improvement.
+
 **3. Calls through the PLT lose their arguments and their return value.** 295
 of the 780 functions contain at least one `name_plt()` call emitted with an
 empty argument list; libz alone has 194 such call sites, and **30 of the 47
@@ -280,6 +286,13 @@ gcc -g -O0 -fno-builtin /tmp/p.c -o /tmp/p
 
 The argument is gone in both. The assignment is gone only in `all`, which is
 the mode the benchmark runs.
+
+**Status after the recorded run:** a stub whose real function is in the same
+image borrows that function's signature. `deflateInit_` is the eight-argument
+call it actually is, and the value comes back in the `return`. A stub with no
+local function is called with the argument registers the call site prepared,
+through a cast. The numbers above were measured before this and have not
+been re-run.
 
 This one does not show up as a GED loss, because a call is a call whatever its
 arguments, but it is the reason a recompiled e5r function computes the wrong

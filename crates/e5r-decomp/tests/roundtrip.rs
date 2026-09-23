@@ -77,6 +77,36 @@ fn vectors(arity: usize) -> Vec<Vec<u64>> {
 /// test covers them all and a helper added later cannot slip past.
 const DISQUALIFYING: &[&str] = &["sub_", "__", "*(", "goto"];
 
+/// A call by its real name. `sub_` and `__` miss it, and the harness has no
+/// definition for the callee, so the function is not one this gate can run.
+fn calls_out(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'(' && text[..i].contains('{') {
+            let mut j = i;
+            while j > 0 && bytes[j - 1].is_ascii_whitespace() {
+                j -= 1;
+            }
+            let end = j;
+            while j > 0 && (bytes[j - 1].is_ascii_alphanumeric() || bytes[j - 1] == b'_') {
+                j -= 1;
+            }
+            let name = &text[j..end];
+            if !name.is_empty()
+                && !matches!(
+                    name,
+                    "if" | "while" | "for" | "switch" | "sizeof" | "return"
+                )
+            {
+                return true;
+            }
+        }
+        i += 1;
+    }
+    false
+}
+
 fn build_dir() -> Option<PathBuf> {
     let d = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/build");
     d.is_dir().then(|| d.canonicalize().unwrap())
@@ -140,7 +170,10 @@ struct Candidate {
 /// Decompile one function and run it, if it is eligible.
 fn candidate(p: &Program, f: &Function) -> Option<Candidate> {
     let d = e5r_api::decompile_function(p, f);
-    if d.text.is_empty() || DISQUALIFYING.iter().any(|bad| d.text.contains(bad)) {
+    if d.text.is_empty()
+        || DISQUALIFYING.iter().any(|bad| d.text.contains(bad))
+        || calls_out(&d.text)
+    {
         return None;
     }
     // A function whose C returns nothing has no answer to compare, and one

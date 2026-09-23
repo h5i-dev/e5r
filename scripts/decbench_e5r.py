@@ -32,9 +32,85 @@ from decbench.models.decompilation import (
     DecompilationResult,
     DecompilerMetadata,
     FunctionDecompilation,
+    VariableInfo,
 )
 
 _REPO = Path(__file__).resolve().parent.parent
+
+
+def requested_addresses(
+    functions: list[tuple[str, int]] | None, function_names: set[int] | None
+) -> set[int]:
+    """Every address either spelling of DecBench's target API requested."""
+    out = set(common.addr_targets_of(function_names))
+    for _, address in functions or []:
+        out.add(int(address))
+    return out
+
+
+def variable_info(item: dict[str, Any]) -> list[VariableInfo]:
+    """Translate e5r's stable JSON variable records to DecBench's model.
+
+    Parameter indices are ABI positions, not enumeration positions among all
+    variables. Inherited registers are deliberately absent: they are neither
+    source parameters nor locals, and presenting them as either would create
+    false type claims. Stack homes use e5r's entry-SP-relative offset; DecBench
+    calibrates each backend's native offset space before matching it to DWARF.
+    """
+    out: list[VariableInfo] = []
+    arg_index = 0
+    for raw in item.get("variables") or []:
+        if not isinstance(raw, dict):
+            continue
+        role = str(raw.get("role") or "")
+        if role == "inherited":
+            continue
+        if role not in {"parameter", "local"}:
+            continue
+
+        stack_offset = raw.get("stack_offset")
+        try:
+            stack_offset = int(stack_offset) if stack_offset is not None else None
+        except (TypeError, ValueError):
+            stack_offset = None
+        storage = str(raw.get("storage") or "")
+        if stack_offset is None and storage.startswith("stack"):
+            try:
+                stack_offset = int(storage.removeprefix("stack"), 10)
+            except ValueError:
+                pass
+
+        size = raw.get("size")
+        try:
+            size = int(size)
+        except (TypeError, ValueError):
+            size = None
+        if size is not None and size <= 0:
+            size = None
+
+        is_arg = role == "parameter"
+        explicit_index = raw.get("argument")
+        try:
+            explicit_index = int(explicit_index) if explicit_index is not None else None
+        except (TypeError, ValueError):
+            explicit_index = None
+        if explicit_index is not None and explicit_index < 0:
+            explicit_index = None
+        out.append(
+            VariableInfo(
+                name=str(raw.get("name") or ""),
+                type=str(raw.get("type") or ""),
+                stack_offset=stack_offset,
+                size=size,
+                kind="arg" if is_arg else "stack",
+                arg_index=(explicit_index if explicit_index is not None else arg_index)
+                if is_arg
+                else None,
+            )
+        )
+        if is_arg:
+            arg_index += 1
+    return out
 
 
 def e5r_binary() -> Path | None:
@@ -103,7 +179,8 @@ class E5rDecompiler(Decompiler):
         # e5r reports a function's virtual address, which for an ELF is already
         # the file-space address DecBench keys DWARF on, so no rebasing is needed.
         text_range = common.elf_text_ranges(binary_path)
-        addr_targets = common.addr_targets_of(function_names)
+        addr_targets = requested_addresses(functions, function_names)
+        explicit_names = {int(address): str(name) for name, address in functions or []}
 
         decompiled: dict[str, FunctionDecompilation] = {}
         failed: list[str] = []
@@ -132,16 +209,19 @@ class E5rDecompiler(Decompiler):
             )
 
         targets_mode = os.environ.get("E5R_MODE") == "targets" and addr_targets
-        try:
-            if targets_mode:
-                items = []
-                for addr in sorted(addr_targets):
+        if targets_mode:
+            items = []
+            for addr in sorted(addr_targets):
+                try:
                     items.extend(self._run(binary_path, hex(addr)))
-            else:
+                except Exception:  # noqa: BLE001
+                    failed.append(explicit_names.get(addr, hex(addr)))
+        else:
+            try:
                 items = self._run(binary_path, "all")
-        except Exception as e:  # noqa: BLE001
-            failed.append("all")
-            return _result(partial=False, error=str(e))
+            except Exception as e:  # noqa: BLE001
+                failed.append("all")
+                return _result(partial=False, error=str(e))
 
         candidates: list[tuple[str, int, dict]] = []
         for item in items:
@@ -158,7 +238,7 @@ class E5rDecompiler(Decompiler):
         by_addr = {addr: (name, item) for name, addr, item in candidates}
         narrowed = common.narrow_to_source(
             [(name, addr) for name, addr, _ in candidates],
-            function_names,
+            addr_targets or None,
             backend=self.name,
             binary_name=binary_path.name,
         )
@@ -166,8 +246,9 @@ class E5rDecompiler(Decompiler):
         for name, addr in narrowed:
             entry = by_addr.get(addr)
             code = (entry[1].get("code") or "") if entry else ""
+            output_name = explicit_names.get(addr, name)
             if not code.strip():
-                failed.append(name)
+                failed.append(output_name)
                 continue
             item = entry[1]
             metadata = common.extract_metrics(code)
@@ -176,12 +257,12 @@ class E5rDecompiler(Decompiler):
             metadata["e5r_gotos"] = item.get("gotos")
             metadata["e5r_unmodelled"] = item.get("unmodelled")
             metadata["e5r_complete"] = (item.get("function") or {}).get("complete")
-            decompiled[name] = FunctionDecompilation(
-                name=name,
+            decompiled[output_name] = FunctionDecompilation(
+                name=output_name,
                 address=addr,
                 decompiled_code=code,
                 line_count=code.count("\n") + 1,
-                variables=[],
+                variables=variable_info(item),
                 metadata=metadata,
             )
             if progress_path is not None:

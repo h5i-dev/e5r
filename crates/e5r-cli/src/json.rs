@@ -316,7 +316,14 @@ pub struct VariableOut {
     ty: String,
     size: u8,
     role: &'static str,
+    /// ABI parameter position. Absent for locals and inherited values.
+    argument: Option<usize>,
+    /// Human-readable storage, retained for command-line consumers.
     storage: String,
+    /// Entry-SP-relative offset, when this is a promoted stack slot.
+    stack_offset: Option<i64>,
+    /// Byte offset in the architecture's register file, when register-backed.
+    register: Option<String>,
 }
 
 /// One decompiled function, with the numbers that say how well it went.
@@ -346,13 +353,26 @@ pub fn decompiled(items: Vec<(&Function, &e5r_api::Decompiled)>) -> Listing<Deco
                 unmodelled: d.unmodelled,
                 asserted: d.asserted,
                 conflicts: d.conflicts.clone(),
-                variables: d.variables.iter().map(variable_out).collect(),
+                variables: {
+                    let mut argument = 0usize;
+                    d.variables
+                        .iter()
+                        .map(|v| {
+                            let index = (v.role == e5r_decomp::expr::Role::Parameter).then(|| {
+                                let index = argument;
+                                argument += 1;
+                                index
+                            });
+                            variable_out(v, index)
+                        })
+                        .collect()
+                },
             })
             .collect(),
     )
 }
 
-fn variable_out(v: &e5r_decomp::expr::Variable) -> VariableOut {
+fn variable_out(v: &e5r_decomp::expr::Variable, argument: Option<usize>) -> VariableOut {
     use e5r_decomp::expr::{Home, Role};
     VariableOut {
         name: v.name.clone(),
@@ -363,10 +383,19 @@ fn variable_out(v: &e5r_decomp::expr::Variable) -> VariableOut {
             Role::Local => "local",
             Role::Inherited => "inherited",
         },
+        argument,
         storage: match v.home {
             Home::Register(o) => format!("register+{o}"),
             Home::Stack(o) => format!("stack{o:+}"),
             Home::Anywhere => "anywhere".to_string(),
+        },
+        stack_offset: match v.home {
+            Home::Stack(o) => Some(o),
+            _ => None,
+        },
+        register: match v.home {
+            Home::Register(o) => Some(format!("{o:#x}")),
+            _ => None,
         },
     }
 }

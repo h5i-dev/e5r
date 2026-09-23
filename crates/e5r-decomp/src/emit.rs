@@ -32,6 +32,8 @@ pub struct Output {
     pub signature: String,
     /// How many parameters it declares, so a call to it passes that many.
     pub arity: usize,
+    /// Whether an empty parameter list proves there are no parameters.
+    pub parameters_known: bool,
     /// Which of them are pointers.
     pub pointer_parameters: Vec<bool>,
     /// How wide each one is declared, in bytes, so a caller passing a constant
@@ -48,6 +50,8 @@ pub struct Output {
 pub struct Prototype {
     /// The parameters, in order.
     pub parameters: Vec<Param>,
+    /// False for an import whose body cannot reveal what callers pass.
+    pub parameters_known: bool,
     /// The return type as C spells it.
     pub returns: Option<String>,
     /// Local variables by their offset from the frame base.
@@ -63,6 +67,8 @@ pub struct Callee {
     pub name: String,
     /// How many parameters it declares.
     pub arity: usize,
+    /// False when callers must recover prepared arguments at the call site.
+    pub parameters_known: bool,
     /// Which of them are pointers, so a call passes something C will take.
     pub pointer_parameters: Vec<bool>,
     /// How wide each one is declared, in bytes.
@@ -276,7 +282,15 @@ pub fn decompile_full(
 
     let mut declarations: Vec<String> =
         prototype.map(|p| p.definitions.clone()).unwrap_or_default();
-    declarations.extend(helpers.iter().map(|h| h.to_string()));
+    // A clobber or an unmodelled condition that structuring never printed is
+    // not a call, and declaring the helper for it makes the unit look like it
+    // uses a value it does not.
+    declarations.extend(
+        helpers
+            .iter()
+            .filter(|h| helper_used(&body, h))
+            .map(|h| h.to_string()),
+    );
     declarations.extend(
         called
             .iter()
@@ -322,8 +336,11 @@ pub fn decompile_full(
         Some(p) => p.parameters.iter().map(|param| param.size).collect(),
         None => vec![8; arity],
     };
-    let declared_parameters = if declared.is_empty() {
+    let parameters_known = prototype.is_none_or(|p| p.parameters_known);
+    let declared_parameters = if declared.is_empty() && parameters_known {
         "void".to_string()
+    } else if declared.is_empty() {
+        String::new()
     } else {
         declared.join(", ")
     };
@@ -342,7 +359,11 @@ pub fn decompile_full(
     for (name, ty) in &inherited {
         let _ = writeln!(text, "    {ty} {name};  // inherited");
     }
+    let mut declared_locals: BTreeSet<&str> = BTreeSet::new();
     for (value, local) in &rebuilder.locals {
+        if !declared_locals.insert(local) {
+            continue;
+        }
         let ty = if rebuilder.floats.contains(&value.location) {
             crate::expr::float_type(value.location.size)
         } else {
@@ -360,12 +381,13 @@ pub fn decompile_full(
         text,
         signature,
         arity,
+        parameters_known,
         pointer_parameters,
         parameter_widths,
         declarations,
         gotos: s.gotos,
         lost: s.lost.len(),
-        locals: rebuilder.locals.len(),
+        locals: declared_locals.len(),
         unmodelled: e.unmodelled,
     }
 }
@@ -441,6 +463,13 @@ fn mentions(text: &str, name: &str) -> bool {
 }
 
 /// The declaration an operation's helper needs, when it has one.
+/// Whether the emitted body calls the helper a declaration would introduce.
+fn helper_used(body: &str, declaration: &str) -> bool {
+    let head = declaration.split('(').next().unwrap_or(declaration);
+    let name = head.rsplit(' ').next().unwrap_or(head);
+    !name.is_empty() && body.contains(name)
+}
+
 fn helper_for(o: Op) -> Option<&'static str> {
     Some(match o {
         Op::FloatAdd
@@ -491,40 +520,68 @@ fn helper_for(o: Op) -> Option<&'static str> {
 
 /// Which register the function leaves its result in, if any.
 ///
-/// The convention lists the candidates; which one this function writes says
-/// whether it returns an integer, a floating point value, or nothing.
+/// The convention lists the candidates. A call then marks every other
+/// caller-saved register undefined, and on AArch64 that includes `x1`, which
+/// is also where a two-register result would come back. That clobber is not a
+/// value the function computed. Counting it made every wrapper `return
+/// __clobbered()` and dropped the call result on the floor.
 fn result_register(f: &SsaFunction, r: &Rebuilder) -> Option<u64> {
-    // The one written latest before the return. A function that computes into
-    // a general register and then converts into a vector one writes both, and
-    // only the order says which the caller reads.
-    let mut best: Option<(usize, u64)> = None;
+    let mut found: Vec<u64> = Vec::new();
     for b in f.blocks.values() {
-        let returns = b.ops.iter().any(|op| op.kind == SsaKind::Op(Op::Return));
-        if !returns {
+        if !b.ops.iter().any(|op| op.kind == SsaKind::Op(Op::Return)) {
             continue;
         }
-        for (n, op) in b.ops.iter().enumerate() {
-            let Some(v) = op.out else { continue };
-            if v.location.space != Space::Register || !r.abi.results.contains(&v.location.offset) {
-                continue;
-            }
-            if best.map(|(at, _)| n > at).unwrap_or(true) {
-                best = Some((n, v.location.offset));
-            }
+        if let Some(offset) = result_in_block(b, r) {
+            found.push(offset);
         }
     }
-    if let Some((_, offset)) = best {
+    // Several blocks can return. The earliest result register any of them
+    // actually writes is the one the convention reads first: `x0` before the
+    // high half, and either before a vector result nobody computed.
+    if let Some(offset) = r.abi.results.iter().copied().find(|o| found.contains(o)) {
         return Some(offset);
     }
     // Nothing was written in the returning block, so whichever the function
-    // writes at all is the answer.
+    // writes at all is the answer. A clobber still is not a write.
     r.abi.results.iter().copied().find(|offset| {
         f.blocks.values().any(|b| {
-            b.ops
-                .iter()
-                .any(|op| op.out.is_some_and(|v| v.location.offset == *offset))
+            b.ops.iter().any(|op| {
+                op.kind != SsaKind::Op(Op::Undefine)
+                    && op.out.is_some_and(|v| {
+                        v.location.space == Space::Register && v.location.offset == *offset
+                    })
+            })
         })
     })
+}
+
+/// The result register one returning block leaves behind.
+///
+/// A real operation beats a phi: phis for every live register sit at the top
+/// of the block in location order, and the last of them would otherwise be
+/// `x1`'s merge rather than the value the block computed. With only phis, the
+/// earliest result register is the one the caller reads.
+fn result_in_block(b: &e5r_ir::ssa::SsaBlock, r: &Rebuilder) -> Option<u64> {
+    let mut latest_real: Option<(usize, u64)> = None;
+    let mut phis: Vec<u64> = Vec::new();
+    for (n, op) in b.ops.iter().enumerate() {
+        if op.kind == SsaKind::Op(Op::Undefine) {
+            continue;
+        }
+        let Some(v) = op.out else { continue };
+        if v.location.space != Space::Register || !r.abi.results.contains(&v.location.offset) {
+            continue;
+        }
+        if op.kind == SsaKind::Phi {
+            phis.push(v.location.offset);
+        } else {
+            latest_real = Some((n, v.location.offset));
+        }
+    }
+    if let Some((_, offset)) = latest_real {
+        return Some(offset);
+    }
+    r.abi.results.iter().copied().find(|o| phis.contains(o))
 }
 
 /// The declared return type, from where the result was left.
@@ -993,7 +1050,13 @@ impl Emitter<'_> {
                             let name = callee
                                 .map(|c| c.name.clone())
                                 .unwrap_or_else(|| crate::expr::default_call_name(target));
-                            Expr::Call(name, self.arguments(at, index, callee))
+                            let known = callee.is_some_and(|c| c.parameters_known);
+                            let args = if known {
+                                self.arguments(at, index, callee)
+                            } else {
+                                self.unknown_arguments(at, index)
+                            };
+                            self.direct_call(name, args, known)
                         }
                         (Op::CallInd, _) => {
                             let mut args = op
@@ -1031,7 +1094,13 @@ impl Emitter<'_> {
                     let name = callee
                         .map(|c| c.name.clone())
                         .unwrap_or_else(|| crate::expr::default_call_name(target));
-                    let e = Expr::Call(name, self.arguments(at, index, callee));
+                    let known = callee.is_some_and(|c| c.parameters_known);
+                    let args = if known {
+                        self.arguments(at, index, callee)
+                    } else {
+                        self.unknown_arguments(at, index)
+                    };
+                    let e = self.direct_call(name, args, known);
                     let _ = writeln!(out, "{pad}{e};");
                     let _ = writeln!(out, "{pad}{}", self.return_statement(at));
                 }
@@ -1097,6 +1166,19 @@ impl Emitter<'_> {
             (None, false) => format!("return {value};"),
             (None, true) => "return;".to_string(),
         }
+    }
+
+    /// A direct call. An unknown prototype is invoked through a cast so the
+    /// arguments this site prepared are visible, and so a declaration that
+    /// could not learn an arity still compiles beside them.
+    fn direct_call(&self, name: String, args: Vec<Expr>, parameters_known: bool) -> Expr {
+        if parameters_known || args.is_empty() {
+            return Expr::Call(name, args);
+        }
+        let formals = std::iter::repeat_n("uint64_t", args.len())
+            .collect::<Vec<_>>()
+            .join(", ");
+        Expr::Call(format!("((uint64_t (*)({formals})){name})"), args)
     }
 
     /// The arguments a call passes, read out of the convention's registers.
@@ -1232,22 +1314,30 @@ impl Emitter<'_> {
         let Some(offset) = self.result else {
             return String::new();
         };
+        let defined = |op: &SsaOp| {
+            op.kind != SsaKind::Op(Op::Undefine)
+                && op.out.is_some_and(|v| {
+                    v.location.space == Space::Register && v.location.offset == offset
+                })
+        };
         let in_block = self.f.blocks.get(&at).and_then(|b| {
             b.ops
                 .iter()
                 .rev()
+                .filter(|op| defined(op))
                 .filter_map(|op| op.out)
-                .find(|v| v.location.space == Space::Register && v.location.offset == offset)
+                .next()
         });
         // Nothing in this block wrote it, so the value came from wherever it
         // was last written: the newest version is the one that reaches here.
+        // A clobber is not a version of the result.
         let value = in_block.or_else(|| {
             self.f
                 .blocks
                 .values()
                 .flat_map(|b| b.ops.iter())
+                .filter(|op| defined(op))
                 .filter_map(|op| op.out)
-                .filter(|v| v.location.space == Space::Register && v.location.offset == offset)
                 .max_by_key(|v| v.version)
         });
         match value {
