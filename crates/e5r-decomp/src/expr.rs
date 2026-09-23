@@ -10,6 +10,7 @@
 //! load or a call would change what the code does, and duplicating arithmetic
 //! makes the output longer rather than clearer.
 
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
@@ -522,6 +523,9 @@ pub struct Rebuilder<'a> {
     pub abi: Abi,
     defs: BTreeMap<Value, (e5r_core::Addr, usize)>,
     uses: BTreeMap<Value, usize>,
+    /// Values currently being expanded. A definition that reads one of them
+    /// is a cycle, and inlining it does not terminate.
+    expanding: RefCell<BTreeSet<Value>>,
     /// Values that became named locals because they are read more than once.
     pub locals: BTreeMap<Value, String>,
     /// Locations that hold floating point values, which is what decides how a
@@ -605,6 +609,7 @@ impl<'a> Rebuilder<'a> {
             defs,
             uses,
             locals,
+            expanding: RefCell::new(BTreeSet::new()),
         }
     }
 
@@ -737,6 +742,13 @@ impl<'a> Rebuilder<'a> {
 
     /// An index multiplied by a constant, however it was written.
     fn scaled(&self, o: &Operand) -> Option<(Expr, u64)> {
+        self.scaled_at(o, 0)
+    }
+
+    fn scaled_at(&self, o: &Operand, depth: u32) -> Option<(Expr, u64)> {
+        if depth > 8 {
+            return None;
+        }
         let Operand::Value(v) = o else { return None };
         let op = self.definition(*v)?;
         let SsaKind::Op(kind) = op.kind else {
@@ -754,7 +766,7 @@ impl<'a> Rebuilder<'a> {
                 let n = op.inputs.get(1)?.as_const()?;
                 Some((self.operand(op.inputs.first()?), n))
             }
-            Op::Copy | Op::IntSExt | Op::IntZExt => self.scaled(op.inputs.first()?),
+            Op::Copy | Op::IntSExt | Op::IntZExt => self.scaled_at(op.inputs.first()?, depth + 1),
             _ => None,
         }
     }
@@ -790,10 +802,24 @@ impl<'a> Rebuilder<'a> {
                 if let Some(name) = self.locals.get(v) {
                     return Expr::Local(name.clone());
                 }
-                match self.definition(*v) {
+                // Drop the borrow before expanding. The set stays marked so a
+                // nested read of this same value stops instead of looping.
+                let cycle = {
+                    let mut expanding = self.expanding.borrow_mut();
+                    !expanding.insert(*v)
+                };
+                if cycle {
+                    // The definition reads itself. Expanding it again does not
+                    // terminate. The location's own name is what gets declared
+                    // when the body still mentions it.
+                    return Expr::Local(self.name_of(v.location));
+                }
+                let expr = match self.definition(*v) {
                     Some(op) => self.expr(op),
                     None => Expr::Input(v.location, self.name_of(v.location)),
-                }
+                };
+                self.expanding.borrow_mut().remove(v);
+                expr
             }
         }
     }

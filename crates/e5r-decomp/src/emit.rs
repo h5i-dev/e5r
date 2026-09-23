@@ -447,6 +447,11 @@ pub fn identifier(name: &str) -> String {
 
 /// True when a name appears in the text as a whole word.
 fn mentions(text: &str, name: &str) -> bool {
+    // An empty name is a substring of every string, and the search would
+    // never advance.
+    if name.is_empty() {
+        return false;
+    }
     let mut at = 0;
     while let Some(found) = text[at..].find(name) {
         let start = at + found;
@@ -1279,11 +1284,17 @@ impl Emitter<'_> {
         if op.kind == SsaKind::Op(Op::Undefine) {
             return true;
         }
-        op.inputs.iter().any(|input| {
-            input
-                .as_value()
-                .is_some_and(|v| self.value_is_clobbered(v, depth + 1))
-        })
+        // Only the chain of copies and width casts SSA inserts above a
+        // clobber. Following every input of every operation is exponential in
+        // the depth, and a call argument whose tree is a few dozen operations
+        // deep does not come back.
+        let SsaKind::Op(Op::Copy | Op::IntZExt | Op::IntSExt | Op::SubPiece) = op.kind else {
+            return false;
+        };
+        op.inputs
+            .first()
+            .and_then(|input| input.as_value())
+            .is_some_and(|v| self.value_is_clobbered(v, depth + 1))
     }
 
     /// The value a register held just before an operation.
