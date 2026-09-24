@@ -8,7 +8,7 @@ use e5r_ir::op::{Op, Space};
 use e5r_ir::ssa::{Operand, SsaFunction, SsaKind, SsaOp, Value};
 
 use crate::expr::{Expr, Rebuilder, c_type, input_name, negate};
-use crate::structure::{Graph, Region, Switches, Taken, structure_with};
+use crate::structure::{Graph, Region, Switches, Taken, lift_exit_guards, structure_with};
 
 /// A decompiled function.
 #[derive(Debug, Clone)]
@@ -161,7 +161,10 @@ pub fn decompile_full(
             Some((*a, Addr(target)))
         })
         .collect();
-    let s = structure_with(f.entry, &graph, &taken, switches);
+    let mut s = structure_with(f.entry, &graph, &taken, switches);
+    // Done here, where a block's real work can be weighed. `structure_with`
+    // only has the graph, and a diamond of empty blocks must stay an if/else.
+    lift_exit_guards(&mut s.root, &graph, &s.labels, &block_weights(f));
     let mut rebuilder = Rebuilder::new(f);
     // A declared parameter arrives in a register the convention chooses, so
     // the body can use the name the source gave it rather than `arg0`.
@@ -640,6 +643,54 @@ fn parameter_list(f: &SsaFunction, r: &Rebuilder) -> Vec<String> {
 ///
 /// Their indirect branch is the switch itself, so writing it out as well would
 /// say the control transfer twice.
+/// How much each block does, ignoring the branch that structuring already
+/// accounted for. The return itself is the shared tail, so it does not count
+/// as work that would make a guard look heavy. A phi is written as an
+/// assignment on the incoming edge, so that assignment belongs to the
+/// predecessor: a guard's only work is often just that copy.
+fn block_weights(f: &SsaFunction) -> BTreeMap<Addr, u32> {
+    let mut weights: BTreeMap<Addr, u32> = f
+        .blocks
+        .iter()
+        .map(|(at, block)| {
+            let weight = block
+                .ops
+                .iter()
+                .filter(|op| {
+                    !matches!(
+                        op.kind,
+                        SsaKind::Phi
+                            | SsaKind::Op(Op::Branch | Op::CBranch | Op::BranchInd | Op::Return)
+                    )
+                })
+                .count() as u32;
+            (*at, weight)
+        })
+        .collect();
+    for block in f.blocks.values() {
+        for (slot, pred) in block.predecessors.iter().enumerate() {
+            let copies = block
+                .ops
+                .iter()
+                .filter(|op| {
+                    op.kind == SsaKind::Phi && op.out.is_some() && op.inputs.get(slot).is_some()
+                })
+                .count() as u32;
+            *weights.entry(*pred).or_default() += copies;
+        }
+    }
+    weights
+}
+
+/// True when a loop body is only the edge back to its header.
+fn falls_straight_back(region: &Region) -> bool {
+    match region {
+        Region::Empty | Region::Continue => true,
+        Region::Seq(parts) => parts.iter().all(falls_straight_back),
+        _ => false,
+    }
+}
+
 fn switch_heads(r: &Region) -> BTreeSet<Addr> {
     let mut out = BTreeSet::new();
     collect_switch_heads(r, &mut out);
@@ -759,10 +810,16 @@ impl Emitter<'_> {
                 }
                 // The head's own statements compute the condition, so they run
                 // on every iteration: a `for (; cond; )` with them hoisted
-                // would be wrong. Write the loop as `while (1)` with the test
-                // at the top when the head does more than test.
+                // would be wrong. A header that is itself the whole iteration
+                // tests at the bottom, which is a `do`/`while`. A `while (1)`
+                // with a break there has an edge from the entry straight to
+                // the exit, and this block has no such edge.
                 let cond = self.condition(*head, *invert);
-                if self.head_is_only_a_test(*head) {
+                if !self.head_is_only_a_test(*head) && falls_straight_back(body) {
+                    let _ = writeln!(out, "{pad}do {{");
+                    self.statements(out, *head, depth + 1);
+                    let _ = writeln!(out, "{pad}}} while ({cond});");
+                } else if self.head_is_only_a_test(*head) {
                     let _ = writeln!(out, "{pad}while ({cond}) {{");
                     self.region(out, body, depth + 1);
                     let _ = writeln!(out, "{pad}}}");

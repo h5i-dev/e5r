@@ -270,6 +270,179 @@ pub fn structure_with(
     }
 }
 
+/// A branch whose arms rejoin only by leaving the function, with one arm much
+/// smaller than the other, is the early return a guard is.
+///
+/// The compiler still builds one epilogue, so the recovered tree has an
+/// `if`/`else` and a shared tail. Writing that tail into the light arm and
+/// letting the heavy arm fall into the original copy is the same run, and it
+/// is the shape of a check that returns on failure. A balanced diamond is left
+/// alone: both arms are the choice, and an early return would invent one.
+/// `weight` is how much each block does, so "light" is about the arm and not
+/// about how the compiler bundled its instructions.
+pub fn lift_exit_guards(
+    root: &mut Region,
+    graph: &Graph,
+    labels: &BTreeSet<Addr>,
+    weight: &BTreeMap<Addr, u32>,
+) {
+    lift_exit_guards_rec(root, graph, labels, weight);
+    tidy(root);
+}
+
+/// Heavier than this, an arm is the body of the function and not a guard.
+const GUARD_MAX: u32 = 8;
+
+/// Heavier than this, the block both arms fall into is shared work, not an
+/// epilogue. Copying it would write that work on both arms.
+const EXIT_MAX: u32 = 3;
+
+fn lift_exit_guards_rec(
+    region: &mut Region,
+    graph: &Graph,
+    labels: &BTreeSet<Addr>,
+    weight: &BTreeMap<Addr, u32>,
+) {
+    match region {
+        Region::Seq(parts) => {
+            for part in parts.iter_mut() {
+                lift_exit_guards_rec(part, graph, labels, weight);
+            }
+            lift_seq(parts, graph, labels, weight);
+        }
+        Region::If {
+            then, otherwise, ..
+        } => {
+            lift_exit_guards_rec(then, graph, labels, weight);
+            if let Some(arm) = otherwise {
+                lift_exit_guards_rec(arm, graph, labels, weight);
+            }
+        }
+        Region::While { body, .. } | Region::Infinite { body, .. } => {
+            lift_exit_guards_rec(body, graph, labels, weight);
+        }
+        Region::Switch { cases, default, .. } => {
+            for case in cases {
+                lift_exit_guards_rec(&mut case.body, graph, labels, weight);
+            }
+            if let Some(arm) = default {
+                lift_exit_guards_rec(arm, graph, labels, weight);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn lift_seq(
+    parts: &mut Vec<Region>,
+    graph: &Graph,
+    labels: &BTreeSet<Addr>,
+    weight: &BTreeMap<Addr, u32>,
+) {
+    let old = std::mem::take(parts);
+    let mut index = 0;
+    while index < old.len() {
+        let exit_follows = index + 2 == old.len();
+        if exit_follows
+            && let Some(rewritten) = lift_one(&old[index], &old[index + 1], graph, labels, weight)
+        {
+            parts.extend(rewritten);
+            index += 2;
+            continue;
+        }
+        parts.push(old[index].clone());
+        index += 1;
+    }
+}
+
+/// `Some(true)` when the then-arm is the guard, `Some(false)` when the else is.
+fn guard_side(then_w: Option<u32>, else_w: Option<u32>) -> Option<bool> {
+    match (then_w, else_w) {
+        (Some(then), Some(otherwise))
+            if then > 0 && otherwise >= then.saturating_mul(3) && then <= GUARD_MAX =>
+        {
+            Some(true)
+        }
+        (Some(then), Some(otherwise))
+            if otherwise > 0 && then >= otherwise.saturating_mul(3) && otherwise <= GUARD_MAX =>
+        {
+            Some(false)
+        }
+        // The heavy arm has structure of its own. The light arm is still a guard.
+        (Some(then), None) if then > 0 && then <= GUARD_MAX => Some(true),
+        (None, Some(otherwise)) if otherwise > 0 && otherwise <= GUARD_MAX => Some(false),
+        _ => None,
+    }
+}
+
+fn lift_one(
+    branch: &Region,
+    tail: &Region,
+    graph: &Graph,
+    labels: &BTreeSet<Addr>,
+    weight: &BTreeMap<Addr, u32>,
+) -> Option<Vec<Region>> {
+    let Region::If {
+        head,
+        invert,
+        then,
+        otherwise: Some(otherwise),
+    } = branch
+    else {
+        return None;
+    };
+    let Region::Block(exit) = tail else {
+        return None;
+    };
+    if labels.contains(exit)
+        || graph.get(exit).is_none_or(|succs| !succs.is_empty())
+        || weight.get(exit).copied().unwrap_or(0) > EXIT_MAX
+    {
+        return None;
+    }
+    let then_is_guard = guard_side(
+        straight_weight(then, weight),
+        straight_weight(otherwise, weight),
+    )?;
+    let (guard, rest, invert) = if then_is_guard {
+        (then.as_ref().clone(), otherwise.as_ref().clone(), *invert)
+    } else {
+        (otherwise.as_ref().clone(), then.as_ref().clone(), !*invert)
+    };
+    let mut rest = match rest {
+        Region::Seq(parts) => parts,
+        other => vec![other],
+    };
+    let guard = Region::Seq(vec![guard, Region::Block(*exit)]);
+    rest.insert(
+        0,
+        Region::If {
+            head: *head,
+            invert,
+            then: Box::new(guard),
+            otherwise: None,
+        },
+    );
+    rest.push(Region::Block(*exit));
+    Some(rest)
+}
+
+/// Statement-weight of a straight-line arm, or `None` when it has structure.
+fn straight_weight(region: &Region, weight: &BTreeMap<Addr, u32>) -> Option<u32> {
+    match region {
+        Region::Empty => Some(0),
+        Region::Block(at) => Some(weight.get(at).copied().unwrap_or(0)),
+        Region::Seq(parts) => {
+            let mut total = 0;
+            for part in parts {
+                total += straight_weight(part, weight)?;
+            }
+            Some(total)
+        }
+        _ => None,
+    }
+}
+
 /// Blocks a region tree both writes out more than once and labels.
 fn labelled_twice(root: &Region, labels: &BTreeSet<Addr>) -> BTreeSet<Addr> {
     let mut counts: BTreeMap<Addr, usize> = BTreeMap::new();
@@ -1962,6 +2135,62 @@ mod tests {
             )
         });
         assert!(found, "no plain if in {:?}", s.root);
+    }
+
+    #[test]
+    fn a_light_arm_that_rejoins_only_at_the_exit_returns_there() {
+        // 1 is a few statements, 2 and 3 are the rest, and both reach the
+        // epilogue at 4. The light arm should return, and the rest should
+        // follow the if rather than sit in an else.
+        let graph = g(&[(0, &[1, 2]), (1, &[4]), (2, &[3]), (3, &[4]), (4, &[])]);
+        let mut s = structure(Addr(0), &graph);
+        let weight = BTreeMap::from([(Addr(1), 1), (Addr(2), 6), (Addr(3), 6), (Addr(4), 1)]);
+        lift_exit_guards(&mut s.root, &graph, &s.labels, &weight);
+        let mut counts = BTreeMap::new();
+        occurrences(&s.root, &mut counts);
+        assert_eq!(counts.get(&Addr(4)).copied(), Some(2), "{:?}", s.root);
+        assert!(
+            !collect(&s.root).iter().any(|r| matches!(
+                r,
+                Region::If {
+                    otherwise: Some(_),
+                    ..
+                }
+            )),
+            "guard still has an else: {:?}",
+            s.root
+        );
+        assert!(s.lost.is_empty(), "lost {:?}", s.lost);
+    }
+
+    #[test]
+    fn a_heavy_epilogue_stays_shared() {
+        let graph = g(&[(0, &[1, 2]), (1, &[4]), (2, &[3]), (3, &[4]), (4, &[])]);
+        let mut s = structure(Addr(0), &graph);
+        let weight = BTreeMap::from([(Addr(1), 1), (Addr(2), 6), (Addr(3), 6), (Addr(4), 10)]);
+        lift_exit_guards(&mut s.root, &graph, &s.labels, &weight);
+        let mut counts = BTreeMap::new();
+        occurrences(&s.root, &mut counts);
+        assert_eq!(counts.get(&Addr(4)).copied(), Some(1), "{:?}", s.root);
+    }
+
+    #[test]
+    fn a_balanced_diamond_is_not_rewritten_as_a_return() {
+        let graph = g(&[(0, &[1, 2]), (1, &[3]), (2, &[3]), (3, &[])]);
+        let mut s = structure(Addr(0), &graph);
+        let weight = BTreeMap::from([(Addr(1), 2), (Addr(2), 2), (Addr(3), 1)]);
+        lift_exit_guards(&mut s.root, &graph, &s.labels, &weight);
+        assert!(
+            collect(&s.root).iter().any(|r| matches!(
+                r,
+                Region::If {
+                    otherwise: Some(_),
+                    ..
+                }
+            )),
+            "balanced diamond lost its else: {:?}",
+            s.root
+        );
     }
 
     #[test]
