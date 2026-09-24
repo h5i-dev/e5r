@@ -375,7 +375,7 @@ fn one(
         .map(|(a, b)| (*a, (b.range.end(), b.successors.clone())))
         .collect();
     let mut ir = e5r_ir::func::build(&p.object.memory, &p.object.arch, f.entry, &blocks);
-    e5r_ir::stack::promote(&mut ir);
+    let promoted = e5r_ir::stack::promote(&mut ir);
     let mut ssa = e5r_ir::ssa::build(&ir);
     e5r_ir::opt::optimize(&mut ssa);
     // The SSA the emitter runs on is the SSA prototype recovery reads, rather
@@ -390,8 +390,38 @@ fn one(
     let name = f.display_name();
     let output =
         e5r_decomp::decompile_full(&name, &ssa, shape.prototype.as_ref(), callees, &switches);
+    let mut variables = e5r_decomp::expr::variables(&ssa, shape.prototype.as_ref(), &output.text);
+    // Stack promotion deliberately gives up when any stack address escapes:
+    // rewriting in that case could hide writes through the pointer. Direct
+    // loads and stores still prove that a slot of this width exists, though,
+    // and are useful variable-recovery evidence in their own right. Keep the
+    // stronger promoted variable when one exists and add only facts the SSA
+    // surface otherwise lost.
+    let mut homes: BTreeSet<(i64, u8)> = variables
+        .iter()
+        .filter_map(|v| match v.home {
+            e5r_decomp::expr::Home::Stack(offset) => Some((offset, v.size)),
+            _ => None,
+        })
+        .collect();
+    for (offset, size) in promoted.candidates {
+        // Positive entry-SP offsets are caller-owned stack arguments. Their
+        // ABI position is not recoverable from the offset alone, so claiming
+        // one as a local would be less honest than leaving it unclassified.
+        if offset >= 0 || !homes.insert((offset, size)) {
+            continue;
+        }
+        let width = u16::from(size) * 8;
+        variables.push(Variable {
+            name: format!("stack_m{:x}_{size}", -offset),
+            ty: format!("uint{width}_t"),
+            size,
+            role: Role::Local,
+            home: Home::Stack(offset),
+        });
+    }
     Some(One {
-        variables: e5r_decomp::expr::variables(&ssa, shape.prototype.as_ref(), &output.text),
+        variables,
         output,
         prototype: shape.prototype,
         unlifted: ir.unlifted.len(),

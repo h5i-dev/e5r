@@ -221,13 +221,32 @@ pub fn decompile_full(
         callees,
         returns,
         unmodelled: 0,
+        dead: BTreeSet::new(),
     };
 
-    let body = {
+    let mut body = {
         let mut out = String::new();
         e.region(&mut out, &s.root, 1);
         out
     };
+    // SSA carries every live machine register through a join, including
+    // clobbers and bookkeeping no emitted statement ever reads. Remove only
+    // names used exclusively as assignment destinations. Re-emit so phi
+    // diamonds exposed by that removal can become conditional expressions.
+    for _ in 0..4 {
+        let dead = dead_locals(&body, rebuilder.locals.values());
+        if dead == e.dead {
+            break;
+        }
+        e.dead = dead;
+        e.unmodelled = 0;
+        body.clear();
+        e.region(&mut body, &s.root, 1);
+    }
+    body = inline_condition_assignments(&body);
+    body = inline_return_assignments(&body);
+    body = e.inline_terminal_if_returns(&body);
+    body = remove_return_after_loop_control(&body);
 
     // Values that arrive from outside and are not arguments: registers the
     // function inherited. Declaring them says where they came from without
@@ -364,7 +383,7 @@ pub fn decompile_full(
     }
     let mut declared_locals: BTreeSet<&str> = BTreeSet::new();
     for (value, local) in &rebuilder.locals {
-        if !declared_locals.insert(local) {
+        if !mentions(&body, local) || !declared_locals.insert(local) {
             continue;
         }
         let ty = if rebuilder.floats.contains(&value.location) {
@@ -811,17 +830,350 @@ struct Emitter<'a> {
     /// they mean.
     returns: Option<String>,
     unmodelled: usize,
+    /// Pure locals whose emitted assignments have no reader.
+    dead: BTreeSet<String>,
+}
+
+/// Names that occur only on the left of assignments in the emitted body.
+fn dead_locals<'a>(body: &str, locals: impl Iterator<Item = &'a String>) -> BTreeSet<String> {
+    let mut dead = BTreeSet::new();
+    for name in locals {
+        let mut read = false;
+        for line in body.lines().filter(|line| mentions(line, name)) {
+            let line = line.trim();
+            let prefix = format!("{name} = ");
+            let Some(rhs) = line.strip_prefix(&prefix) else {
+                read = true;
+                break;
+            };
+            if mentions(rhs, name) {
+                read = true;
+                break;
+            }
+        }
+        if !read {
+            dead.insert(name.clone());
+        }
+    }
+    dead
+}
+
+/// Fold an assignment immediately consumed by a return into that return.
+///
+/// This runs after dead-local discovery: marking the assigned SSA value dead
+/// would suppress its defining operation on the next emission pass. Keeping
+/// the fold textual also makes the restriction obvious -- no intervening
+/// statement, label, or control edge can be crossed.
+fn inline_return_assignments(body: &str) -> String {
+    let lines: Vec<&str> = body.lines().collect();
+    let mut out = String::with_capacity(body.len());
+    let mut at = 0;
+    while at < lines.len() {
+        if let Some(next) = lines.get(at + 1)
+            && let Some((indent, name, value)) = assignment_line(lines[at])
+            && !value.contains("__callind(")
+            && let Some((prefix, suffix)) = returned_local(next, indent, name)
+        {
+            let _ = writeln!(out, "{indent}return {prefix}{value}{suffix}");
+            at += 2;
+            continue;
+        }
+        let _ = writeln!(out, "{}", lines[at]);
+        at += 1;
+    }
+    out
+}
+
+/// Fold a temporary used once by the immediately following condition.
+///
+/// The right-hand side stays at the same sequence point and is substituted
+/// exactly once, so calls are neither duplicated nor reordered.
+fn inline_condition_assignments(body: &str) -> String {
+    let lines: Vec<&str> = body.lines().collect();
+    let mut out = String::with_capacity(body.len());
+    let mut at = 0;
+    while at < lines.len() {
+        if let Some(next) = lines.get(at + 1)
+            && let Some((indent, name, value)) = assignment_line(lines[at])
+            && next.starts_with(indent)
+            && next[indent.len()..].starts_with("if (")
+            && token_occurrences(next, name) == 1
+            && lines[at + 1..]
+                .iter()
+                .map(|line| token_occurrences(line, name))
+                .sum::<usize>()
+                == 1
+        {
+            let replaced = replace_token(next, name, &format!("({value})"));
+            let _ = writeln!(out, "{replaced}");
+            at += 2;
+            continue;
+        }
+        let _ = writeln!(out, "{}", lines[at]);
+        at += 1;
+    }
+    out
+}
+
+fn token_occurrences(text: &str, name: &str) -> usize {
+    text.match_indices(name)
+        .filter(|(at, _)| {
+            let end = at + name.len();
+            let boundary =
+                |c: Option<char>| c.is_none_or(|c| !(c == '_' || c.is_ascii_alphanumeric()));
+            boundary(text[..*at].chars().next_back()) && boundary(text[end..].chars().next())
+        })
+        .count()
+}
+
+fn replace_token(text: &str, name: &str, value: &str) -> String {
+    let Some((at, _)) = text.match_indices(name).find(|(at, _)| {
+        let end = at + name.len();
+        let boundary = |c: Option<char>| c.is_none_or(|c| !(c == '_' || c.is_ascii_alphanumeric()));
+        boundary(text[..*at].chars().next_back()) && boundary(text[end..].chars().next())
+    }) else {
+        return text.to_string();
+    };
+    format!("{}{}{}", &text[..at], value, &text[at + name.len()..])
+}
+
+/// A copied exit after an unconditional loop edge is unreachable. Restrict
+/// this cleanup to the adjacent return shape so labels and other entry points
+/// remain untouched.
+fn remove_return_after_loop_control(body: &str) -> String {
+    let lines: Vec<&str> = body.lines().collect();
+    let mut out = String::with_capacity(body.len());
+    let mut at = 0;
+    while at < lines.len() {
+        let line = lines[at];
+        let control = matches!(line.trim(), "break;" | "continue;");
+        let same_indent_return = lines.get(at + 1).is_some_and(|next| {
+            let indent = line.len() - line.trim_start().len();
+            next.len() >= indent
+                && next[..indent] == line[..indent]
+                && next[indent..].starts_with("return ")
+        });
+        let _ = writeln!(out, "{line}");
+        at += if control && same_indent_return { 2 } else { 1 };
+    }
+    out
+}
+
+fn assignment_line(line: &str) -> Option<(&str, &str, &str)> {
+    let indent_len = line.len() - line.trim_start().len();
+    let (indent, statement) = line.split_at(indent_len);
+    let statement = statement.strip_suffix(';')?;
+    let (name, value) = statement.split_once(" = ")?;
+    if name.is_empty()
+        || !name.chars().all(|c| c == '_' || c.is_ascii_alphanumeric())
+        || !name
+            .chars()
+            .next()
+            .is_some_and(|c| c == '_' || c.is_ascii_alphabetic())
+    {
+        return None;
+    }
+    Some((indent, name, value))
+}
+
+fn returned_local<'a>(line: &'a str, indent: &str, name: &str) -> Option<(&'a str, &'a str)> {
+    let statement = line.strip_prefix(indent)?.strip_prefix("return ")?;
+    let occurrence = statement.find(name)?;
+    let after = occurrence + name.len();
+    let boundary = |c: Option<char>| c.is_none_or(|c| !(c == '_' || c.is_ascii_alphanumeric()));
+    if !boundary(statement[..occurrence].chars().next_back())
+        || !boundary(statement[after..].chars().next())
+        || statement[after..].contains(name)
+        || statement[..occurrence].contains(name)
+    {
+        return None;
+    }
+    Some((&statement[..occurrence], &statement[after..]))
+}
+
+/// A `Block(head), If(head)` pair whose true arm is the whole guard body.
+fn plain_guard(parts: &[Region], at: usize) -> Option<(Addr, bool, &Region)> {
+    let [
+        Region::Block(block),
+        Region::If {
+            head,
+            invert,
+            then,
+            otherwise,
+        },
+    ] = parts.get(at..at + 2)?
+    else {
+        return None;
+    };
+    (*block == *head && otherwise.is_none() && **then != Region::Empty).then_some((
+        *head,
+        *invert,
+        then.as_ref(),
+    ))
+}
+
+/// Remove the longest sequence duplicated at the end of an arm and directly
+/// after its `if`.
+fn without_following_suffix(region: &Region, following: &[Region]) -> Option<Region> {
+    let Region::Seq(parts) = region else {
+        return None;
+    };
+    let most = parts.len().min(following.len());
+    let copied = (1..=most)
+        .rev()
+        .find(|count| parts[parts.len() - count..] == following[..*count])?;
+    let prefix = &parts[..parts.len() - copied];
+    if prefix.is_empty() {
+        return None;
+    }
+    Some(match prefix {
+        [only] => only.clone(),
+        prefix => Region::Seq(prefix.to_vec()),
+    })
+}
+
+/// `if (a) { prep; if (b) unique else shared } else shared` can write the
+/// shared region once after the outer conditional even when `prep` prevents
+/// combining the two tests with `&&`.
+fn nested_shared_tail<'a>(
+    then: &'a Region,
+    shared: &'a Region,
+) -> Option<(Region, Addr, bool, &'a Region)> {
+    let Region::Seq(parts) = then else {
+        return None;
+    };
+    let [
+        prefix @ ..,
+        Region::Block(block),
+        Region::If {
+            head,
+            invert,
+            then: inner_then,
+            otherwise: Some(inner_else),
+        },
+    ] = parts.as_slice()
+    else {
+        return None;
+    };
+    if block != head {
+        return None;
+    }
+    let (inner_invert, unique) = if inner_else.as_ref() == shared {
+        (*invert, inner_then.as_ref())
+    } else if inner_then.as_ref() == shared {
+        (!*invert, inner_else.as_ref())
+    } else {
+        return None;
+    };
+    let mut before = prefix.to_vec();
+    before.push(Region::Block(*block));
+    Some((Region::Seq(before), *head, inner_invert, unique))
+}
+
+fn contains_conditional(region: &Region) -> bool {
+    match region {
+        Region::If { .. } | Region::Switch { .. } | Region::While { .. } => true,
+        Region::Seq(parts) => parts.iter().any(contains_conditional),
+        Region::Infinite { body, .. } => contains_conditional(body),
+        _ => false,
+    }
 }
 
 impl Emitter<'_> {
+    /// Turn a terminal assignment diamond followed by `return result` into
+    /// early returns in its arms. This also catches diamonds separated from
+    /// their exit block in the region tree by a condition-producing block.
+    fn inline_terminal_if_returns(&self, body: &str) -> String {
+        let lines: Vec<&str> = body.lines().collect();
+        let mut out = String::with_capacity(body.len());
+        let mut at = 0;
+        while at < lines.len() {
+            let line = lines[at];
+            let indent_len = line.len() - line.trim_start().len();
+            let indent = &line[..indent_len];
+            let is_if = line[indent_len..].starts_with("if (") && line.ends_with('{');
+            let else_at = is_if.then(|| {
+                (at + 1..lines.len()).find(|i| lines[*i] == format!("{indent}}} else {{"))
+            });
+            let close_at = else_at.flatten().and_then(|middle| {
+                (middle + 1..lines.len()).find(|i| lines[*i] == format!("{indent}}}"))
+            });
+            let Some((middle, close)) = else_at.flatten().zip(close_at) else {
+                let _ = writeln!(out, "{line}");
+                at += 1;
+                continue;
+            };
+            let Some(return_line) = lines.get(close + 1) else {
+                let _ = writeln!(out, "{line}");
+                at += 1;
+                continue;
+            };
+            let Some((_, then_name, then_value)) = lines
+                .get(middle.wrapping_sub(1))
+                .and_then(|line| assignment_line(line))
+            else {
+                let _ = writeln!(out, "{line}");
+                at += 1;
+                continue;
+            };
+            let Some((_, else_name, else_value)) = lines
+                .get(close.wrapping_sub(1))
+                .and_then(|line| assignment_line(line))
+            else {
+                let _ = writeln!(out, "{line}");
+                at += 1;
+                continue;
+            };
+            if then_name != else_name
+                || !return_line.starts_with(indent)
+                || !return_line[indent_len..].starts_with("return ")
+                || token_occurrences(return_line, then_name) != 1
+            {
+                let _ = writeln!(out, "{line}");
+                at += 1;
+                continue;
+            }
+            let then_prefix = lines[at + 1..middle - 1].join("\n");
+            let else_prefix = lines[middle + 1..close - 1].join("\n");
+            let reaches_from_before = |value: &str, prefix: &str| {
+                self.r
+                    .locals
+                    .values()
+                    .filter(|local| local.as_str() != then_name && mentions(value, local))
+                    .any(|local| !mentions(prefix, local))
+            };
+            if reaches_from_before(then_value, &then_prefix)
+                || reaches_from_before(else_value, &else_prefix)
+            {
+                let _ = writeln!(out, "{line}");
+                at += 1;
+                continue;
+            }
+
+            let _ = writeln!(out, "{line}");
+            for arm_line in &lines[at + 1..middle - 1] {
+                let _ = writeln!(out, "{arm_line}");
+            }
+            let then_indent = "    ".repeat(indent_len / 4 + 1);
+            let _ = writeln!(out, "{then_indent}{}", self.return_value(then_value));
+            let _ = writeln!(out, "{indent}}}");
+            let nested_indent = format!("{indent}    ");
+            for arm_line in &lines[middle + 1..close - 1] {
+                let arm_line = arm_line.strip_prefix(&nested_indent).unwrap_or(arm_line);
+                let _ = writeln!(out, "{indent}{arm_line}");
+            }
+            let _ = writeln!(out, "{indent}{}", self.return_value(else_value));
+            at = close + 2;
+        }
+        out
+    }
+
     fn region(&mut self, out: &mut String, region: &Region, depth: usize) {
         let pad = "    ".repeat(depth);
         match region {
             Region::Empty => {}
             Region::Seq(parts) => {
-                for p in parts {
-                    self.region(out, p, depth);
-                }
+                self.sequence(out, parts, depth);
             }
             Region::Block(at) => {
                 if self.labels.contains(at) {
@@ -849,11 +1201,39 @@ impl Emitter<'_> {
                 then,
                 otherwise,
             } => {
+                if let Some((name, value)) =
+                    self.conditional_assignment(*head, *invert, then, otherwise.as_deref())
+                {
+                    let _ = writeln!(out, "{pad}{name} = {value};");
+                // Nested guards with no else are the short-circuit spelling
+                // of a conjunction. The nested head may contain SSA-only dead
+                // copies, so judge the statements that actually survive
+                // emission rather than the raw operation list.
+                } else if let Some((terms, body)) =
+                    self.no_else_conjunction(*head, *invert, then, otherwise.as_deref())
+                {
+                    let _ = writeln!(out, "{pad}if ({}) {{", terms.join(" && "));
+                    self.region(out, body, depth + 1);
+                    let _ = writeln!(out, "{pad}}}");
+                } else if let Some(shared) = otherwise
+                    && let Some((prefix, inner, inner_invert, unique)) =
+                        nested_shared_tail(then, shared)
+                    && !self.head_emits_only_test(inner)
+                {
+                    let outer = self.condition(*head, *invert);
+                    let _ = writeln!(out, "{pad}if ({outer}) {{");
+                    self.region(out, &prefix, depth + 1);
+                    let inner = self.condition(inner, inner_invert);
+                    let _ = writeln!(out, "{pad}    if ({inner}) {{");
+                    self.region(out, unique, depth + 2);
+                    let _ = writeln!(out, "{pad}    }}");
+                    let _ = writeln!(out, "{pad}}}");
+                    self.region(out, shared, depth);
                 // `if (a) { if (b) t else e } else e` is `if (a && b)`, and so
                 // is the same shape where the shared arm is reached by a goto.
                 // The inner test has to be only a test: a statement there runs
                 // on one path and `&&` would drop it.
-                if let Some(o) = otherwise
+                } else if let Some(o) = otherwise
                     && let Some((rest, unique, shared)) = self.conjunction(then, o)
                 {
                     let mut terms = vec![format!("({})", self.condition(*head, *invert))];
@@ -867,9 +1247,30 @@ impl Emitter<'_> {
                     }
                     let _ = writeln!(out, "{pad}if ({}) {{", terms.join(" && "));
                     self.region(out, unique, depth + 1);
-                    let _ = writeln!(out, "{pad}}} else {{");
-                    self.region(out, shared, depth + 1);
+                    if self.region_ends_control(unique) {
+                        let _ = writeln!(out, "{pad}}}");
+                        self.region(out, shared, depth);
+                    } else {
+                        let _ = writeln!(out, "{pad}}} else {{");
+                        self.region(out, shared, depth + 1);
+                        let _ = writeln!(out, "{pad}}}");
+                    }
+                } else if let Some(o) = otherwise
+                    && self.region_ends_control(then)
+                {
+                    let cond = self.condition(*head, *invert);
+                    let _ = writeln!(out, "{pad}if ({cond}) {{");
+                    self.region(out, then, depth + 1);
                     let _ = writeln!(out, "{pad}}}");
+                    self.region(out, o, depth);
+                } else if let Some(o) = otherwise
+                    && self.region_ends_control(o)
+                {
+                    let cond = negate(self.condition(*head, *invert));
+                    let _ = writeln!(out, "{pad}if ({cond}) {{");
+                    self.region(out, o, depth + 1);
+                    let _ = writeln!(out, "{pad}}}");
+                    self.region(out, then, depth);
                 } else {
                     let cond = self.condition(*head, *invert);
                     let _ = writeln!(out, "{pad}if ({cond}) {{");
@@ -957,6 +1358,361 @@ impl Emitter<'_> {
                 self.region(out, body, depth + 1);
                 let _ = writeln!(out, "{pad}}}");
             }
+        }
+    }
+
+    /// Emit a sequence, folding adjacent guards with the same destination.
+    ///
+    /// Compilers lower `if (a || b) return x` to two tests that enter the same
+    /// return block. Tail duplication makes the region tree honest but leaves
+    /// two identical `if` statements in C. When the later test has no work of
+    /// its own, short-circuit `||` is exactly the original control flow and
+    /// writes the shared body once.
+    fn sequence(&mut self, out: &mut String, parts: &[Region], depth: usize) {
+        let pad = "    ".repeat(depth);
+        let mut i = 0;
+        while i < parts.len() {
+            if let [
+                Region::Block(block),
+                Region::If {
+                    head,
+                    invert,
+                    then,
+                    otherwise: None,
+                },
+                ..,
+            ] = &parts[i..]
+                && block == head
+                && !self.labels.contains(head)
+                && let Some(prefix) = without_following_suffix(then, &parts[i + 2..])
+            {
+                self.region(out, &parts[i], depth);
+                let condition = self.condition(*head, *invert);
+                let _ = writeln!(out, "{pad}if ({condition}) {{");
+                self.region(out, &prefix, depth + 1);
+                let _ = writeln!(out, "{pad}}}");
+                // Leave the shared suffix for the next iteration.
+                i += 2;
+                continue;
+            }
+            if let [
+                Region::If {
+                    head,
+                    invert,
+                    then,
+                    otherwise: Some(otherwise),
+                },
+                Region::Block(exit),
+                ..,
+            ] = &parts[i..]
+                && !self.labels.contains(exit)
+                && let Some(name) = self.return_only(*exit)
+                && let Some((then, otherwise)) = self.returning_arms(then, otherwise, depth, &name)
+            {
+                let condition = self.condition(*head, *invert);
+                let _ = writeln!(out, "{pad}if ({condition}) {{");
+                out.push_str(&then);
+                let _ = writeln!(out, "{pad}}}");
+                out.push_str(&otherwise);
+                i += 2;
+                continue;
+            }
+            let Some((first, first_invert, body)) = plain_guard(parts, i) else {
+                self.region(out, &parts[i], depth);
+                i += 1;
+                continue;
+            };
+            let mut terms = vec![format!("({})", self.condition(first, first_invert))];
+            let mut end = i + 2;
+            while let Some((head, invert, next_body)) = plain_guard(parts, end) {
+                if next_body != body || self.labels.contains(&head) {
+                    break;
+                }
+                let Some(term) = self.short_circuit_condition(head, invert) else {
+                    break;
+                };
+                terms.push(term);
+                end += 2;
+            }
+            if terms.len() == 1 {
+                self.region(out, &parts[i], depth);
+                i += 1;
+                continue;
+            }
+
+            // The first head may prepare a call result used by its condition;
+            // later heads were proven to contain only their tests.
+            self.region(out, &parts[i], depth);
+            let _ = writeln!(out, "{pad}if ({}) {{", terms.join(" || "));
+            self.region(out, body, depth + 1);
+            let _ = writeln!(out, "{pad}}}");
+            i = end;
+        }
+    }
+
+    /// Two arms whose final assignment feeds the immediately following return.
+    fn returning_arms(
+        &mut self,
+        then: &Region,
+        otherwise: &Region,
+        depth: usize,
+        name: &str,
+    ) -> Option<(String, String)> {
+        if contains_conditional(then) || contains_conditional(otherwise) {
+            return None;
+        }
+        let before = self.unmodelled;
+        let mut then_text = String::new();
+        self.region(&mut then_text, then, depth + 1);
+        let mut otherwise_text = String::new();
+        self.region(&mut otherwise_text, otherwise, depth);
+        let out = self
+            .return_last_assignment(&then_text, name)
+            .zip(self.return_last_assignment(&otherwise_text, name));
+        if out.is_none() {
+            self.unmodelled = before;
+        }
+        out
+    }
+
+    fn no_else_conjunction<'a>(
+        &mut self,
+        head: Addr,
+        invert: bool,
+        then: &'a Region,
+        otherwise: Option<&Region>,
+    ) -> Option<(Vec<String>, &'a Region)> {
+        if otherwise.is_some() {
+            return None;
+        }
+        let before = self.unmodelled;
+        let mut terms = vec![format!("({})", self.condition(head, invert))];
+        let mut body = then;
+        while let Some((inner, inner_invert, inner_then, None)) = nested_if(body) {
+            if !self.head_emits_only_test(inner) {
+                break;
+            }
+            terms.push(format!("({})", self.condition(inner, inner_invert)));
+            body = inner_then;
+        }
+        if terms.len() > 1 {
+            Some((terms, body))
+        } else {
+            self.unmodelled = before;
+            None
+        }
+    }
+
+    fn return_last_assignment(&self, text: &str, name: &str) -> Option<String> {
+        let mut lines: Vec<&str> = text.lines().collect();
+        let last = lines.pop()?;
+        let (indent, assigned, value) = assignment_line(last)?;
+        if assigned != name {
+            return None;
+        }
+        let mut out = lines.join("\n");
+        // A value defined before the diamond must stay merged after it. Early
+        // returning such an arm destroys that merge and often obscures a
+        // source-level conditional expression. Values produced inside this
+        // arm are safe to return here.
+        if self
+            .r
+            .locals
+            .values()
+            .filter(|local| local.as_str() != name && mentions(value, local))
+            .any(|local| !mentions(&out, local))
+        {
+            return None;
+        }
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        let _ = writeln!(out, "{indent}{}", self.return_value(value));
+        Some(out)
+    }
+
+    fn return_only(&mut self, at: Addr) -> Option<String> {
+        let before = self.unmodelled;
+        let mut text = String::new();
+        self.statements(&mut text, at, 0);
+        self.unmodelled = before;
+        let mut lines = text.lines().filter(|line| !line.trim().is_empty());
+        let line = lines.next()?.trim();
+        if lines.next().is_some() || !line.starts_with("return ") {
+            return None;
+        }
+        let name = self.result(at);
+        (!name.is_empty() && mentions(line, &name)).then_some(name)
+    }
+
+    /// A later short-circuit test as an expression, including work its block
+    /// must do only when earlier terms were false.
+    fn short_circuit_condition(&mut self, head: Addr, invert: bool) -> Option<String> {
+        let before = self.unmodelled;
+        let mut prep = String::new();
+        self.statements(&mut prep, head, 0);
+        let mut expressions = Vec::new();
+        for line in prep.lines().map(str::trim).filter(|line| !line.is_empty()) {
+            let Some(expression) = line.strip_suffix(';') else {
+                self.unmodelled = before;
+                return None;
+            };
+            if (expression.contains('{') || expression.contains('}'))
+                || expression.starts_with("return ")
+                || expression.starts_with("goto ")
+                || expression == "break"
+                || expression == "continue"
+            {
+                self.unmodelled = before;
+                return None;
+            }
+            expressions.push(format!("({expression})"));
+        }
+        expressions.push(format!("({})", self.condition(head, invert)));
+        Some(if expressions.len() == 1 {
+            expressions.pop().unwrap()
+        } else {
+            format!("({})", expressions.join(", "))
+        })
+    }
+
+    /// Turn a diamond that only chooses one assignment into `?:`.
+    ///
+    /// SSA makes a phi explicit as one assignment in each predecessor. C's
+    /// conditional expression is the source-level spelling of that same
+    /// choice and, unlike an `if`/`else` plus assignments, preserves the CFG
+    /// shape of a ternary in tools that model expression control flow.
+    fn conditional_assignment(
+        &mut self,
+        head: Addr,
+        invert: bool,
+        then: &Region,
+        otherwise: Option<&Region>,
+    ) -> Option<(String, String)> {
+        let before = self.unmodelled;
+        let out = self.conditional_assignment_inner(head, invert, then, otherwise);
+        if out.is_none() {
+            self.unmodelled = before;
+        }
+        out
+    }
+
+    fn conditional_assignment_inner(
+        &mut self,
+        head: Addr,
+        invert: bool,
+        then: &Region,
+        otherwise: Option<&Region>,
+    ) -> Option<(String, String)> {
+        let otherwise = otherwise?;
+        if !self.head_emits_only_test(head) {
+            return None;
+        }
+        let (then_name, then_value) = self.assigned_value(then)?;
+        let (else_name, else_value) = self.assigned_value(otherwise)?;
+        if then_name != else_name {
+            return None;
+        }
+        let condition = self.condition(head, invert);
+        Some((
+            then_name,
+            format!("({condition}) ? ({then_value}) : ({else_value})"),
+        ))
+    }
+
+    fn assigned_value(&mut self, region: &Region) -> Option<(String, String)> {
+        match region {
+            Region::Block(at) if !self.labels.contains(at) => self.single_assignment(*at),
+            Region::If {
+                head,
+                invert,
+                then,
+                otherwise,
+            } => self.conditional_assignment_inner(*head, *invert, then, otherwise.as_deref()),
+            Region::Seq(parts) => match parts.as_slice() {
+                [
+                    Region::Block(block),
+                    Region::If {
+                        head,
+                        invert,
+                        then,
+                        otherwise,
+                    },
+                ] if block == head && !self.labels.contains(head) => {
+                    self.conditional_assignment_inner(*head, *invert, then, otherwise.as_deref())
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn single_assignment(&mut self, at: Addr) -> Option<(String, String)> {
+        let before = self.unmodelled;
+        let mut text = String::new();
+        self.statements(&mut text, at, 0);
+        let mut lines = text.lines().map(str::trim).filter(|line| !line.is_empty());
+        let Some(line) = lines.next() else {
+            self.unmodelled = before;
+            return None;
+        };
+        if lines.next().is_some() {
+            self.unmodelled = before;
+            return None;
+        }
+        let Some(line) = line.strip_suffix(';') else {
+            self.unmodelled = before;
+            return None;
+        };
+        let Some((name, value)) = line.split_once(" = ") else {
+            self.unmodelled = before;
+            return None;
+        };
+        if name.is_empty()
+            || !name.chars().all(|c| c == '_' || c.is_ascii_alphanumeric())
+            || !name
+                .chars()
+                .next()
+                .is_some_and(|c| c == '_' || c.is_ascii_alphabetic())
+        {
+            self.unmodelled = before;
+            return None;
+        }
+        Some((name.to_string(), value.to_string()))
+    }
+
+    /// True when this region cannot fall through to the statement after it.
+    fn region_ends_control(&self, region: &Region) -> bool {
+        match region {
+            Region::Block(at) => self.f.blocks.get(at).is_none_or(|block| {
+                block.ops.iter().any(|op| {
+                    matches!(op.kind, SsaKind::Op(Op::Return | Op::BranchInd))
+                        || tail_call(self.f, op).is_some()
+                }) || !block
+                    .successors
+                    .iter()
+                    .any(|successor| self.f.blocks.contains_key(successor))
+            }),
+            Region::Break | Region::Continue | Region::Goto(_) => true,
+            Region::Seq(parts) => parts
+                .last()
+                .is_some_and(|part| self.region_ends_control(part)),
+            Region::If {
+                then,
+                otherwise: Some(otherwise),
+                ..
+            } => self.region_ends_control(then) && self.region_ends_control(otherwise),
+            Region::Switch {
+                cases,
+                default: Some(default),
+                ..
+            } => {
+                cases
+                    .iter()
+                    .all(|case| self.region_ends_control(&case.body))
+                    && self.region_ends_control(default)
+            }
+            _ => false,
         }
     }
 
@@ -1129,6 +1885,15 @@ impl Emitter<'_> {
         !b.ops.iter().any(|op| self.is_statement(op))
     }
 
+    /// True when dead-value cleanup leaves no statement in a branch head.
+    fn head_emits_only_test(&mut self, at: Addr) -> bool {
+        let before = self.unmodelled;
+        let mut statements = String::new();
+        self.statements(&mut statements, at, 0);
+        self.unmodelled = before;
+        statements.trim().is_empty()
+    }
+
     /// The branch condition of a block, inverted if asked.
     fn condition(&mut self, at: Addr, invert: bool) -> Expr {
         let cond = self
@@ -1189,6 +1954,9 @@ impl Emitter<'_> {
                 let Some(name) = self.r.locals.get(&v) else {
                     continue;
                 };
+                if self.dead.contains(name) {
+                    continue;
+                }
                 // An assignment from itself says nothing.
                 let value = self.r.integer(self.r.operand(input), input);
                 let text = format!("{value}");
@@ -1279,7 +2047,11 @@ impl Emitter<'_> {
                         }
                         _ => self.r.expr(op),
                     };
-                    match op.out.and_then(|v| self.r.locals.get(&v)).filter(|_| !void) {
+                    match op
+                        .out
+                        .and_then(|v| self.r.locals.get(&v))
+                        .filter(|name| !void && !self.dead.contains(*name))
+                    {
                         // The local is an integer and the callee may be
                         // declared to return a pointer, which C will not
                         // assign without being told.
@@ -1330,6 +2102,9 @@ impl Emitter<'_> {
                 _ => {
                     // Anything else that reaches here has a named output.
                     if let Some(name) = op.out.and_then(|v| self.r.locals.get(&v)) {
+                        if self.dead.contains(name) {
+                            continue;
+                        }
                         let _ = writeln!(out, "{pad}{name} = {};", self.r.expr(op));
                     }
                 }
@@ -1374,6 +2149,14 @@ impl Emitter<'_> {
             (Some(ty), true) => format!("return ({ty})__clobbered();"),
             (None, false) => format!("return {value};"),
             (None, true) => "return;".to_string(),
+        }
+    }
+
+    fn return_value(&self, value: &str) -> String {
+        match &self.returns {
+            Some(ty) if ty == "void" => "return;".to_string(),
+            Some(ty) => format!("return ({ty})({value});"),
+            None => format!("return {value};"),
         }
     }
 
@@ -1599,6 +2382,53 @@ mod tests {
                 negate(Expr::Unary("!", Box::new(Expr::Local("c".into()))))
             ),
             "c"
+        );
+    }
+
+    #[test]
+    fn an_assignment_immediately_returned_is_inlined() {
+        assert_eq!(
+            inline_return_assignments(
+                "    v0 = call(arg);\n    return (uint64_t)(v0);\n    v1 = 3;\n    use(v1);\n"
+            ),
+            "    return (uint64_t)(call(arg));\n    v1 = 3;\n    use(v1);\n"
+        );
+    }
+
+    #[test]
+    fn a_single_use_condition_temporary_is_inlined() {
+        assert_eq!(
+            inline_condition_assignments(
+                "    v1 = seek(fd);\n    if ((uint64_t)v1 + 1 == 0) {\n        return 1;\n    }\n"
+            ),
+            "    if ((uint64_t)(seek(fd)) + 1 == 0) {\n        return 1;\n    }\n"
+        );
+        assert_eq!(
+            inline_condition_assignments(
+                "    v1 = seek(fd);\n    if (v1 < 0) {\n        fail(v1);\n    }\n"
+            ),
+            "    v1 = seek(fd);\n    if (v1 < 0) {\n        fail(v1);\n    }\n"
+        );
+    }
+
+    #[test]
+    fn a_copied_return_after_continue_is_removed() {
+        assert_eq!(
+            remove_return_after_loop_control(
+                "    while (x) {\n        continue;\n        return lost;\n    }\n    return kept;\n"
+            ),
+            "    while (x) {\n        continue;\n    }\n    return kept;\n"
+        );
+    }
+
+    #[test]
+    fn a_duplicated_sequence_suffix_is_factored() {
+        let a = Region::Block(Addr(1));
+        let b = Region::Block(Addr(2));
+        let c = Region::Block(Addr(3));
+        assert_eq!(
+            without_following_suffix(&Region::Seq(vec![a.clone(), b.clone(), c.clone()]), &[b, c]),
+            Some(a)
         );
     }
 }

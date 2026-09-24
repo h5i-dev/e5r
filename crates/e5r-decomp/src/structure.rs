@@ -29,7 +29,7 @@ use e5r_core::Addr;
 /// starts reading as a second piece of code, which is worse than the goto it
 /// replaces. Measured over the corpus: four is where the curve flattens, and
 /// every block past it costs more output than it saves gotos.
-const MAX_COPIED_TAIL: usize = 4;
+const MAX_COPIED_TAIL: usize = 12;
 
 /// How many blocks in total a function may write out a second time.
 ///
@@ -2521,20 +2521,16 @@ mod tests {
     #[test]
     fn a_tail_too_large_to_copy_is_written_after_the_branch() {
         // 0 branches to 1 or 2. Both reach 3, which no join places because 2
-        // can also return at 20. The tail 3..8 is six blocks, past
+        // can also return at 20. The tail is one block past
         // MAX_COPIED_TAIL, so duplication will not take it.
-        let graph = g(&[
-            (0, &[1, 2]),
-            (1, &[3]),
-            (2, &[3, 20]),
-            (20, &[]),
-            (3, &[4]),
-            (4, &[5]),
-            (5, &[6]),
-            (6, &[7]),
-            (7, &[8]),
-            (8, &[]),
-        ]);
+        let mut graph = g(&[(0, &[1, 2]), (1, &[3]), (2, &[3, 20]), (20, &[])]);
+        for n in 0..=MAX_COPIED_TAIL + 1 {
+            let at = Addr(3 + n as u64);
+            let successors = (n < MAX_COPIED_TAIL + 1)
+                .then_some(vec![Addr(at.0 + 1)])
+                .unwrap_or_default();
+            graph.insert(at, successors);
+        }
         let s = structure(Addr(0), &graph);
         assert_eq!(s.gotos, 0, "{:?}", s.root);
         assert!(s.labels.is_empty(), "{:?}", s.labels);

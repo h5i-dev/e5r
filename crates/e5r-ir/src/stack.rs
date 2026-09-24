@@ -26,12 +26,18 @@ use crate::func::Function;
 use crate::op::{IrOp, Op, Space, Varnode};
 
 /// What a pass changed.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Promoted {
     /// Accesses rewritten into slot reads and writes.
     pub accesses: usize,
     /// Distinct slots created.
     pub slots: usize,
+    /// Direct stack accesses observed, whether or not promotion was safe.
+    ///
+    /// An address escaping prevents replacing its loads and stores with SSA
+    /// variables, but it does not erase the evidence that a fixed-width slot
+    /// exists at that offset. Consumers can still report that weaker fact.
+    pub candidates: Vec<(i64, u8)>,
 }
 
 /// A value's offset from the stack pointer on entry, when it has one.
@@ -84,8 +90,12 @@ pub fn promote(f: &mut Function) -> Promoted {
         }
     }
 
+    let candidates = slots.keys().copied().collect();
     if escaped || slots.is_empty() {
-        return Promoted::default();
+        return Promoted {
+            candidates,
+            ..Promoted::default()
+        };
     }
     // Overlapping slots of different widths alias, and this pass has no way to
     // say that, so none of them are promoted.
@@ -100,7 +110,10 @@ pub fn promote(f: &mut Function) -> Promoted {
         .collect();
 
     // Rewrite.
-    let mut changed = Promoted::default();
+    let mut changed = Promoted {
+        candidates,
+        ..Promoted::default()
+    };
     let mut used: BTreeSet<(i64, u8)> = BTreeSet::new();
     for at in &order {
         let mut state = entry_state.get(at).cloned().unwrap_or_default();
@@ -240,5 +253,46 @@ fn step(
                 state.remove(&out);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::func::{Block, Function};
+    use e5r_core::{Addr, Arch};
+
+    #[test]
+    fn an_escaped_frame_still_reports_direct_slot_candidates() {
+        let arch = Arch::X86_64;
+        let sp = Varnode::register(abi::of(&arch).stack_pointer, 8);
+        let address = Varnode::temp(0, 8);
+        let value = Varnode::temp(1, 4);
+        let at = Addr(0x1000);
+        let block = Block {
+            addr: at,
+            ops: vec![
+                IrOp::new(at, Op::IntSub, Some(address))
+                    .with(sp)
+                    .with(Varnode::constant(16, 8)),
+                IrOp::new(at, Op::Load, Some(value)).with(address),
+                // Returning the address makes promotion unsafe, but does not
+                // invalidate the direct four-byte access just observed.
+                IrOp::new(at, Op::Return, None).with(address),
+            ],
+            successors: Vec::new(),
+            predecessors: Vec::new(),
+        };
+        let mut function = Function {
+            arch,
+            entry: at,
+            blocks: [(at, block)].into_iter().collect(),
+            unlifted: Vec::new(),
+        };
+
+        let result = promote(&mut function);
+        assert_eq!(result.slots, 0, "an escaped slot must not be promoted");
+        assert_eq!(result.candidates, vec![(-16, 4)]);
+        assert_eq!(function.blocks[&at].ops[1].op, Op::Load);
     }
 }
