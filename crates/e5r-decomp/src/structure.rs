@@ -435,8 +435,23 @@ fn lift_one(
             otherwise: None,
         },
     );
-    rest.push(Region::Block(*exit));
+    // The arm already fell into the epilogue. Appending it again writes a
+    // second return on that path, which nothing reaches.
+    if !rest
+        .last()
+        .is_some_and(|region| ends_with_block(region, *exit))
+    {
+        rest.push(Region::Block(*exit));
+    }
     Some(rest)
+}
+
+fn ends_with_block(region: &Region, at: Addr) -> bool {
+    match region {
+        Region::Block(block) => *block == at,
+        Region::Seq(parts) => parts.last().is_some_and(|part| ends_with_block(part, at)),
+        _ => false,
+    }
 }
 
 /// A compound test `if (a && b) { light } else { rest }` in front of the
@@ -2345,6 +2360,28 @@ mod tests {
         );
         assert!(counts.get(&Addr(4)).copied().unwrap_or(0) >= 1, "{root:?}");
         assert!(counts.get(&Addr(5)).copied().unwrap_or(0) >= 2, "{root:?}");
+    }
+
+    #[test]
+    fn an_arm_that_already_reaches_the_exit_does_not_gain_a_second_return() {
+        let mut root = Region::Seq(vec![
+            Region::If {
+                head: Addr(0),
+                invert: false,
+                then: Box::new(Region::Block(Addr(1))),
+                otherwise: Some(Box::new(Region::Seq(vec![
+                    Region::Block(Addr(2)),
+                    Region::Block(Addr(3)),
+                ]))),
+            },
+            Region::Block(Addr(3)),
+        ]);
+        let graph = g(&[(0, &[1, 2]), (1, &[3]), (2, &[3]), (3, &[])]);
+        let weight = BTreeMap::from([(Addr(1), 1), (Addr(2), 6), (Addr(3), 1)]);
+        lift_exit_guards(&mut root, &graph, &BTreeSet::new(), &weight);
+        let mut counts = BTreeMap::new();
+        occurrences(&root, &mut counts);
+        assert_eq!(counts.get(&Addr(3)).copied(), Some(2), "{root:?}");
     }
 
     #[test]
