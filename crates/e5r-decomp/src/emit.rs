@@ -639,16 +639,27 @@ fn parameter_list(f: &SsaFunction, r: &Rebuilder) -> Vec<String> {
     seen.into_values().collect()
 }
 
-/// The blocks a region tree turned into a `switch`.
-///
-/// Their indirect branch is the switch itself, so writing it out as well would
-/// say the control transfer twice.
 /// How much each block does, ignoring the branch that structuring already
 /// accounted for. The return itself is the shared tail, so it does not count
 /// as work that would make a guard look heavy. A phi is written as an
 /// assignment on the incoming edge, so that assignment belongs to the
-/// predecessor: a guard's only work is often just that copy.
+/// predecessor: a guard's only work is often just that copy. A phi of a
+/// clobber is not work. Counting it made every call's guard look as heavy
+/// as the call.
 fn block_weights(f: &SsaFunction) -> BTreeMap<Addr, u32> {
+    let defs = f.definitions();
+    let real = |input: &Operand| -> bool {
+        match input {
+            Operand::Undefined(_) => false,
+            Operand::Const(_, _) => true,
+            Operand::Value(v) => defs.get(v).is_none_or(|(at, index)| {
+                f.blocks
+                    .get(at)
+                    .and_then(|b| b.ops.get(*index))
+                    .is_none_or(|op| op.kind != SsaKind::Op(Op::Undefine))
+            }),
+        }
+    };
     let mut weights: BTreeMap<Addr, u32> = f
         .blocks
         .iter()
@@ -673,13 +684,62 @@ fn block_weights(f: &SsaFunction) -> BTreeMap<Addr, u32> {
                 .ops
                 .iter()
                 .filter(|op| {
-                    op.kind == SsaKind::Phi && op.out.is_some() && op.inputs.get(slot).is_some()
+                    op.kind == SsaKind::Phi
+                        && op.out.is_some()
+                        && op.inputs.get(slot).is_some_and(real)
                 })
                 .count() as u32;
             *weights.entry(*pred).or_default() += copies;
         }
     }
     weights
+}
+
+/// The `if` nested as the then-arm, when the block in front of it is only its
+/// own head. Anything else between the two tests is a statement `&&` would skip.
+fn nested_if(then: &Region) -> Option<(Addr, bool, &Region, Option<&Region>)> {
+    match then {
+        Region::If {
+            head,
+            invert,
+            then,
+            otherwise,
+        } => Some((*head, *invert, then, otherwise.as_deref())),
+        Region::Seq(parts) => {
+            let [
+                Region::Block(block),
+                Region::If {
+                    head,
+                    invert,
+                    then,
+                    otherwise,
+                },
+            ] = parts.as_slice()
+            else {
+                return None;
+            };
+            (*block == *head).then_some((*head, *invert, then.as_ref(), otherwise.as_deref()))
+        }
+        _ => None,
+    }
+}
+
+/// True when `region` is, or begins with, the block a goto names.
+fn starts_at(region: &Region, at: Addr) -> bool {
+    match region {
+        Region::Block(block) => *block == at,
+        Region::Seq(parts) => parts.first().is_some_and(|part| starts_at(part, at)),
+        Region::If { head, .. } => *head == at,
+        _ => false,
+    }
+}
+
+/// One test in a chain that shares an arm.
+struct AndTerm {
+    at: Addr,
+    invert: bool,
+    /// The then-arm of this test is the one that continues toward the unique arm.
+    unique_when_held: bool,
 }
 
 /// True when a loop body is only the edge back to its header.
@@ -691,6 +751,10 @@ fn falls_straight_back(region: &Region) -> bool {
     }
 }
 
+/// The blocks a region tree turned into a `switch`.
+///
+/// Their indirect branch is the switch itself, so writing it out as well would
+/// say the control transfer twice.
 fn switch_heads(r: &Region) -> BTreeSet<Addr> {
     let mut out = BTreeSet::new();
     collect_switch_heads(r, &mut out);
@@ -785,17 +849,40 @@ impl Emitter<'_> {
                 then,
                 otherwise,
             } => {
-                let cond = self.condition(*head, *invert);
-                let _ = writeln!(out, "{pad}if ({cond}) {{");
-                self.region(out, then, depth + 1);
-                match otherwise {
-                    Some(o) if **o != Region::Empty => {
-                        let _ = writeln!(out, "{pad}}} else {{");
-                        self.region(out, o, depth + 1);
-                        let _ = writeln!(out, "{pad}}}");
+                // `if (a) { if (b) t else e } else e` is `if (a && b)`, and so
+                // is the same shape where the shared arm is reached by a goto.
+                // The inner test has to be only a test: a statement there runs
+                // on one path and `&&` would drop it.
+                if let Some(o) = otherwise
+                    && let Some((rest, unique, shared)) = self.conjunction(then, o)
+                {
+                    let mut terms = vec![format!("({})", self.condition(*head, *invert))];
+                    for term in rest {
+                        let term_expr = self.condition(term.at, term.invert);
+                        terms.push(if term.unique_when_held {
+                            format!("({term_expr})")
+                        } else {
+                            format!("({})", negate(term_expr))
+                        });
                     }
-                    _ => {
-                        let _ = writeln!(out, "{pad}}}");
+                    let _ = writeln!(out, "{pad}if ({}) {{", terms.join(" && "));
+                    self.region(out, unique, depth + 1);
+                    let _ = writeln!(out, "{pad}}} else {{");
+                    self.region(out, shared, depth + 1);
+                    let _ = writeln!(out, "{pad}}}");
+                } else {
+                    let cond = self.condition(*head, *invert);
+                    let _ = writeln!(out, "{pad}if ({cond}) {{");
+                    self.region(out, then, depth + 1);
+                    match otherwise {
+                        Some(o) if **o != Region::Empty => {
+                            let _ = writeln!(out, "{pad}}} else {{");
+                            self.region(out, o, depth + 1);
+                            let _ = writeln!(out, "{pad}}}");
+                        }
+                        _ => {
+                            let _ = writeln!(out, "{pad}}}");
+                        }
                     }
                 }
             }
@@ -971,6 +1058,66 @@ impl Emitter<'_> {
             Op::SubPiece => Some(self.r.operand(operand)),
             _ => None,
         }
+    }
+
+    /// Tests and-ed in front of one arm, when each nested `if` shares the other.
+    ///
+    /// A chain `if (a) { if (b) { if (c) u else s } else s } else s` is one
+    /// condition. Each term says whether its then-arm continues toward `unique`.
+    fn conjunction<'a>(
+        &self,
+        then: &'a Region,
+        otherwise: &'a Region,
+    ) -> Option<(Vec<AndTerm>, &'a Region, &'a Region)> {
+        let mut terms = Vec::new();
+        let mut cursor = then;
+        let mut shared = otherwise;
+        while let Some((head, invert, inner_then, inner_else)) = nested_if(cursor) {
+            if !self.head_is_only_a_test(head) {
+                break;
+            }
+            let Some(inner_else) = inner_else else {
+                break;
+            };
+            if inner_else == shared {
+                terms.push(AndTerm {
+                    at: head,
+                    invert,
+                    unique_when_held: true,
+                });
+                cursor = inner_then;
+            } else if inner_then == shared {
+                terms.push(AndTerm {
+                    at: head,
+                    invert,
+                    unique_when_held: false,
+                });
+                cursor = inner_else;
+            } else if let Region::Goto(target) = shared {
+                if starts_at(inner_then, *target) {
+                    terms.push(AndTerm {
+                        at: head,
+                        invert,
+                        unique_when_held: false,
+                    });
+                    shared = inner_then;
+                    cursor = inner_else;
+                } else if starts_at(inner_else, *target) {
+                    terms.push(AndTerm {
+                        at: head,
+                        invert,
+                        unique_when_held: true,
+                    });
+                    shared = inner_else;
+                    cursor = inner_then;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        (!terms.is_empty()).then_some((terms, cursor, shared))
     }
 
     /// True when a block's only job is to compute the branch condition, so the

@@ -261,39 +261,47 @@ fn elseif() {
 
 /// orcompare.xml: two comparisons joined by a short-circuit or.
 ///
-/// Ghidra fuses the pair into `if (a == 10 || b == 20)`. We do not fuse, so the
-/// property is what fusing is derived from: both comparisons are there, and the
-/// arm they share is reached from each of them.
+/// The pair comes out as one `&&` of the negated tests, which is the same
+/// branch as `a == 10 || b == 20`. Each sink is reached once.
 #[test]
 fn orcompare() {
     case(&all("control"), "orcompare", |c| {
-        c.has("10").has("20").times("sink1(", 2).times("sink2(", 1);
+        c.has("10")
+            .has("20")
+            .has("&&")
+            .times("sink1(", 1)
+            .times("sink2(", 1);
     });
 }
 
-/// orcompare.xml, the three-way case: a chain of three ors.
+/// orcompare.xml, the three-way case: a chain of three ors, one condition.
 #[test]
 fn orcompare_three_terms() {
     case(&all("control"), "orcompare3", |c| {
-        c.at_least("if (", 3).times("sink3(", 3).times("sink4(", 1);
+        c.has("100")
+            .has("200")
+            .has("300")
+            .has("&&")
+            .times("if (", 1)
+            .times("sink3(", 1)
+            .times("sink4(", 1);
     });
 }
 
 /// ccmp.xml: two comparisons joined by a short-circuit and, which AArch64
 /// compiles into one `ccmp` against the flags the first left behind.
 ///
-/// Ghidra's assertion is that the pair reads as `ptr[1] == 0x3c && val < 10`
-/// with no `SBORROW` left over. Ours keeps them as nested tests, and the
-/// property is that both comparisons survive with their operands intact: the
-/// load of the second element compared against 60, and the bound on the
-/// argument.
+/// The pair reads as one `&&`: the load of the second element compared against
+/// 60, and the bound on the argument. Each sink is reached once, and no
+/// `__borrow` is left over.
 #[test]
 fn ccmp() {
     case(&all("control"), "andcompare", |c| {
         c.has("+ 4")
             .has("== 60")
+            .has("&&")
             .times("sink5(", 1)
-            .times("sink6(", 2)
+            .times("sink6(", 1)
             .lacks("__borrow");
     });
 }
