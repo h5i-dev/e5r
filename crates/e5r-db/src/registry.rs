@@ -219,6 +219,12 @@ impl Registry {
             Some(root) => Store::new(root).list()?,
             None => Vec::new(),
         };
+        let mut records = Vec::new();
+        if let Some(root) = source_work {
+            for kind in ["finding", "note", "report"] {
+                records.push((kind, Store::new(root.join(kind)).list()?));
+            }
+        }
         fs::create_dir_all(&self.root).map_err(|e| e.to_string())?;
         let dir = path.parent().ok_or("invalid project path")?;
         fs::create_dir(dir)
@@ -233,6 +239,20 @@ impl Registry {
                         .map_err(|e| e.to_string())?;
                 }
             }
+            for (kind, items) in &records {
+                if items.is_empty() {
+                    continue;
+                }
+                let dest = work::beside(&path).join(kind);
+                fs::create_dir_all(&dest).map_err(|e| e.to_string())?;
+                for item in items {
+                    fs::write(
+                        dest.join(format!("{}.json", item.id)),
+                        serde_json::to_vec_pretty(item).map_err(|e| e.to_string())?,
+                    )
+                    .map_err(|e| e.to_string())?;
+                }
+            }
             let temporary = dir.join("project.tmp");
             fs::write(&temporary, project.to_text()).map_err(|e| e.to_string())?;
             fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
@@ -244,6 +264,13 @@ impl Registry {
             let work = work::beside(&path);
             for task in &tasks {
                 let _ = fs::remove_file(work.join(format!("{}.json", task.id)));
+            }
+            for (kind, items) in &records {
+                let dest = work.join(kind);
+                for item in items {
+                    let _ = fs::remove_file(dest.join(format!("{}.json", item.id)));
+                }
+                let _ = fs::remove_dir(dest);
             }
             let _ = fs::remove_dir(work);
             let _ = fs::remove_file(dir.join("project.tmp"));

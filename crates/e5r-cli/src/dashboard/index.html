@@ -41,7 +41,7 @@
           <div class="top-actions">
             <span id="sync" class="muted" aria-live="polite">Connecting…</span
             ><button id="refresh" class="button subtle">Refresh tasks</button
-            ><button id="new-task" class="button primary">+ New task</button>
+            >
           </div>
         </header>
         <div id="error" role="alert" hidden></div>
@@ -109,6 +109,7 @@
             </div>
             <div id="task-empty" class="empty" hidden></div>
           </section>
+          <section class="panel"><div class="panel-head"><h2>Findings, notes & reports</h2><span class="muted">Written by agents · read-only</span></div><div id="records"></div></section>
           <section class="agent-strip">
             <div>
               <div class="eyebrow">AGENT HANDOFF</div>
@@ -157,9 +158,7 @@
                   ← Back</button
                 ><button id="copy-code" class="button subtle" disabled>
                   Copy code</button
-                ><button id="task-function" class="button primary" disabled>
-                  + Task here
-                </button>
+                >
               </div>
             </div>
             <div class="code-tabs" role="tablist" aria-label="Function view">
@@ -184,7 +183,7 @@
                 data-pane="xrefs"
               >
                 References</button
-              ><label class="code-wrap"
+              ><button role="tab" aria-selected="false" data-pane="callgraph">Call graph</button><label class="code-wrap"
                 ><input id="wrap-code" type="checkbox" checked />Wrap</label
               >
             </div>
@@ -202,8 +201,7 @@
                 <span class="code-mark">{ }</span>
                 <h3>Follow the code. Keep the context.</h3>
                 <p>
-                  Select a function to see its pseudocode and evidence.<br />Create
-                  a task here to capture the next investigation.
+                  Select a function to see its pseudocode and evidence.<br />Ask an agent to record the next investigation.
                 </p>
               </div>
             </div>
@@ -236,100 +234,11 @@
         </main>
       </div>
     </div>
-    <dialog id="task-dialog">
-      <form id="task-form">
-        <div class="dialog-head">
-          <div>
-            <div id="edit-id" class="eyebrow">NEW TASK</div>
-            <h2 id="edit-heading">Define the next outcome</h2>
-          </div>
-          <button
-            type="button"
-            id="close-dialog"
-            class="button subtle"
-            aria-label="Close task editor"
-          >
-            ×
-          </button>
-        </div>
-        <label
-          >Outcome<input
-            name="title"
-            required
-            maxlength="240"
-            placeholder="Trace the input length through parse_header" /></label
-        ><label
-          >Context & acceptance criteria<textarea
-            name="description"
-            rows="3"
-            placeholder="What needs to be understood or demonstrated?"
-          ></textarea>
-        </label>
-        <div class="form-grid">
-          <label
-            >State<select name="state">
-              <option value="planned">Planned</option>
-              <option value="active">Active</option>
-              <option value="blocked">Blocked</option>
-              <option value="review">Review</option>
-              <option value="done">Done</option>
-            </select></label
-          ><label
-            >Priority<select name="priority">
-              <option value="normal">Normal</option>
-              <option value="high">High</option>
-              <option value="low">Low</option>
-            </select></label
-          ><label
-            >Owner<input name="owner" placeholder="Person or agent" /></label
-          ><label
-            >Written by<input
-              name="author"
-              required
-              placeholder="Your name or agent id"
-          /></label>
-        </div>
-        <label
-          >Next action / handoff<textarea
-            name="next"
-            rows="2"
-            placeholder="A concrete step the next person or agent can take"
-          ></textarea></label
-        ><label id="blocker-label" hidden
-          >Blocker reason<textarea
-            name="blocker"
-            rows="2"
-            placeholder="What is needed to proceed?"
-          ></textarea>
-        </label>
-        <div class="form-grid">
-          <label
-            >Evidence <span class="muted">one per line</span
-            ><textarea
-              name="evidence"
-              rows="3"
-              placeholder="function:0x401000&#10;docs/notes.md&#10;e5r decompile ./binary main"
-            ></textarea></label
-          ><label
-            >Prerequisites <span class="muted">task ids, comma separated</span
-            ><input name="depends_on" placeholder="T-0001, T-0002"
-          /></label>
-        </div>
-        <details id="history">
-          <summary>Revision history</summary>
-          <div id="history-items"></div>
-        </details>
-        <div id="form-error" role="alert" hidden></div>
-        <div class="dialog-foot">
-          <span id="revision-note" class="muted"
-            >Saved beside the project; shared with agents.</span
-          ><button type="button" id="reload-task" class="button subtle" hidden>
-            Reload latest task</button
-          ><button type="submit" id="save-task" class="button primary">
-            Save task
-          </button>
-        </div>
-      </form>
+    <dialog id="task-dialog" aria-labelledby="edit-heading">
+      <div class="dialog-head"><div><div id="edit-id" class="eyebrow"></div><h2 id="edit-heading"></h2></div>
+      <div><button id="expand-task" class="button subtle">Full view</button> <button id="close-dialog" class="button subtle" aria-label="Close task">×</button></div></div>
+      <p class="muted">Read-only. Ask an agent to update this task through the CLI.</p>
+      <div id="task-detail"></div><details id="history"><summary>Revision history</summary><div id="history-items"></div></details>
     </dialog>
   </body>
 </html>

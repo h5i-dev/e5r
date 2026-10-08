@@ -34,9 +34,7 @@
           <div class="top-actions">
             <span id="sync" class="muted" aria-live="polite">Connecting…</span
             ><button id="refresh" class="button subtle">Refresh</button
-            ><button id="new-project" class="button primary">
-              + New project
-            </button>
+            >
           </div>
         </header>
         <div id="error" role="alert" hidden></div>
@@ -64,7 +62,7 @@
               <div>
                 <h2>Projects</h2>
                 <span class="muted"
-                  >Open a project to manage tasks or explore its code</span
+                  >Open a project to read tasks or explore its code</span
                 >
               </div>
               <div class="filters">
@@ -112,48 +110,5 @@
         </main>
       </div>
     </div>
-    <dialog id="project-dialog">
-      <form id="project-form">
-        <div class="dialog-head">
-          <div>
-            <div class="eyebrow">NEW PROJECT</div>
-            <h2>Add a binary to your library</h2>
-          </div>
-          <button
-            id="close-dialog"
-            type="button"
-            class="button subtle"
-            aria-label="Close project editor"
-          >
-            ×
-          </button>
-        </div>
-        <label
-          >Project name<input
-            name="name"
-            required
-            maxlength="64"
-            pattern="[A-Za-z0-9_\-][A-Za-z0-9_.\-]*"
-            placeholder="parser-investigation" /></label
-        ><label
-          >Binary path<input
-            name="binary"
-            required
-            placeholder="/absolute/path/to/binary"
-        /></label>
-        <p class="muted">
-          Use a file on the machine running e5r. The project and tasks live in
-          your global library; the binary stays where it is.
-        </p>
-        <div id="form-error" role="alert" hidden></div>
-        <div class="dialog-foot">
-          <span class="muted"
-            >Existing project names are never overwritten.</span
-          ><button id="save-project" class="button primary" type="submit">
-            Create project
-          </button>
-        </div>
-      </form>
-    </dialog>
   </body>
 </html>

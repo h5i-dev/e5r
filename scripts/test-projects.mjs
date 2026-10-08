@@ -39,7 +39,13 @@ try {
       "Read main",
     ),
   );
+  for (const kind of ["finding", "note", "report"]) {
+    cli("project", "record", local, kind, "add", `${kind} title`, "--description", "Body retained on import");
+  }
   cli("project", "import", local, "--name", "beta");
+  for (const kind of ["finding", "note", "report"]) {
+    assert.deepEqual(JSON.parse(cli("project", "record", "beta", kind, "list", "--json")), JSON.parse(cli("project", "record", local, kind, "list", "--json")));
+  }
   assert.deepEqual(
     JSON.parse(cli("project", "task", "beta", "list", "--json")),
     JSON.parse(cli("project", "task", local, "list", "--json")),
@@ -93,17 +99,15 @@ try {
   await page.locator("#project-rows .project-link").first().waitFor();
   assert.equal(await page.locator("#project-rows .project-link").count(), 2);
   await page.screenshot({ path: "/tmp/e5r-projects.png", fullPage: true });
-  await page.locator("#new-project").click();
-  await page.locator("[name=name]").fill("gamma");
-  await page.locator("[name=binary]").fill(binary);
-  await page.locator("#save-project").click();
-  await page.waitForFunction(
-    () => document.querySelectorAll("#project-rows .project-link").length === 3,
-  );
+  assert.equal(await page.locator("#new-project").count(), 0);
+  assert.equal((await fetch(url + "/api/projects", {method:"POST", headers:{"X-E5R-Client":"dashboard","Content-Type":"application/json"}, body:JSON.stringify({name:"gamma", binary})})).status, 405);
+  cli("project", "new", binary, "--name", "gamma");
+  await page.locator("#refresh").click();
+  await page.waitForFunction(() => document.querySelectorAll("#project-rows .project-link").length === 3);
   await page.goto(url + `/p/beta/#task/${task.id}`);
   await page.locator("dialog[open]").waitFor();
   assert.equal(
-    await page.locator("dialog[open] [name=title]").inputValue(),
+    await page.locator("#edit-heading").textContent(),
     "Inspect entry point",
   );
   const functions = await (await fetch(url + "/p/beta/api/functions")).json();
@@ -150,7 +154,7 @@ try {
   );
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
-    "Global projects: registration, import, cwd independence, isolated tasks, browser creation, decompiler and relocation passed.",
+    "Global projects: registration, import, cwd independence, isolated tasks, read-only collection and CLI creation, decompiler and relocation passed.",
   );
 } finally {
   if (browser) await browser.close();

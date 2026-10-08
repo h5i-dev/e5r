@@ -493,6 +493,14 @@ pub enum ProjectCommand {
         #[command(subcommand)]
         what: work::Command,
     },
+    /// Write or read findings, notes and reports using the revisioned content store.
+    Record {
+        project: PathBuf,
+        #[arg(value_parser = ["finding", "note", "report"])]
+        kind: String,
+        #[command(subcommand)]
+        what: work::Command,
+    },
     /// Open a local project dashboard and decompiler workspace.
     Dashboard {
         /// Global project name or project file.
@@ -1057,6 +1065,19 @@ fn project(w: &mut out::Out, what: &ProjectCommand) -> Result<u8, String> {
             let project = projects::resolve(project)?;
             patch::project_read(&project)?;
             work::run(w, &project, what)
+        }
+        ProjectCommand::Record {
+            project,
+            kind,
+            what,
+        } => {
+            let project = projects::resolve(project)?;
+            patch::project_read(&project)?;
+            work::run_store(
+                w,
+                e5r_db::work::Store::new(e5r_db::work::beside(&project).join(kind)),
+                what,
+            )
         }
         ProjectCommand::Dashboard {
             project,

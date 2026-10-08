@@ -1067,3 +1067,15 @@ summary {
     font-size: 11px;
   }
 }
+
+/* Reading long evidence should not compete with prerequisites. */
+.task-detail dt { color: var(--muted); margin-top: 20px; font-size: 12px; }
+.task-detail dd { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.task-evidence { min-height: 150px; padding: 16px; background: var(--surface); }
+dialog.full-view { width: calc(100vw - 32px); height: calc(100vh - 32px); max-height: calc(100vh - 32px); }
+.record { padding: 16px; border-bottom: 1px solid #404b59; }
+.record-body { white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; line-height: 1.7; }
+.call-graph { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 14px; padding: 24px; align-items: center; }
+.call-node { background: var(--surface); color: var(--ink); font-family: inherit; cursor: pointer; padding: 16px; border: 1px solid #404b59; border-radius: 8px; overflow-wrap: anywhere; }
+
+.call-node:hover { border-color: #d5b56b; }

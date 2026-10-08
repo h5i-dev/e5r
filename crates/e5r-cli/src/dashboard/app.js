@@ -9,7 +9,8 @@ const state = {
   functions: [],
   selected: null,
   pane: "decompile",
-  editing: null,
+  currentTask: null,
+  recordStamp: "",
   request: 0,
   history: [],
   code: "",
@@ -23,17 +24,6 @@ const labels = {
   review: "Review",
   done: "Done",
 };
-const blank = () => ({
-  title: "",
-  description: "",
-  state: "planned",
-  priority: "normal",
-  owner: "",
-  next: "",
-  blocker: "",
-  evidence: [],
-  depends_on: [],
-});
 function el(tag, text, className) {
   const e = document.createElement(tag);
   if (text !== undefined) e.textContent = text;
@@ -56,20 +46,8 @@ function message(node, title, detail) {
 function shellQuote(text) {
   return "'" + text.replaceAll("'", "'\\''") + "'";
 }
-async function api(path, body) {
-  const response = await fetch(
-    base + path,
-    body === undefined
-      ? {}
-      : {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-E5R-Client": "dashboard",
-          },
-          body: JSON.stringify(body),
-        },
-  );
+async function api(path) {
+  const response = await fetch(base + path);
   const data = await response.json();
   if (!response.ok) {
     const error = new Error(
@@ -192,7 +170,7 @@ function renderBoard() {
       open.length ? "No task ready to claim." : "Start the first task.",
       open.length
         ? "Active work, blockers and prerequisites are listed below."
-        : "Use “New task” to capture the next investigation.",
+        : "Ask an agent to capture the next investigation.",
     );
   if (attention.length > 6)
     $("attention").append(
@@ -265,6 +243,10 @@ async function refreshTasks() {
     const board = await api("/api/tasks"),
       stamp = JSON.stringify(board);
     state.board = board;
+    if ($("task-dialog").open && state.currentTask) {
+      const latest = board.tasks.find(r => r.task.id === state.currentTask.id)?.task;
+      if (latest && latest.revision !== state.currentTask.revision) openTask(latest);
+    }
     if (stamp !== state.boardStamp) {
       state.boardStamp = stamp;
       renderBoard();
@@ -276,96 +258,52 @@ async function refreshTasks() {
     error(`Could not refresh tasks: ${e.message}`);
   }
 }
-function openTask(task = null, content = null) {
-  state.editing = task;
-  const d = content || task?.content || blank(),
-    form = $("task-form");
-  for (const key of [
-    "title",
-    "description",
-    "state",
-    "priority",
-    "owner",
-    "next",
-    "blocker",
-  ])
-    form.elements[key].value = d[key];
-  form.elements.evidence.value = d.evidence.join("\n");
-  form.elements.depends_on.value = d.depends_on.join(", ");
-  form.elements.author.value =
-    localStorage.getItem("e5r.writer") || state.project?.author || "human";
-  $("edit-id").textContent = task
-    ? `${task.id} · REVISION ${task.revision}`
-    : "NEW TASK";
-  $("edit-heading").textContent = task
-    ? "Keep the next step clear"
-    : "Define the next outcome";
-  $("revision-note").textContent = task
-    ? "Stale edits are refused. Task history is retained."
-    : "Saved beside the project; shared with agents.";
-  $("form-error").hidden = true;
-  $("reload-task").hidden = true;
-  $("history").hidden = !task?.history.length;
+function openTask(task) {
+  state.currentTask = task;
+  $("edit-id").textContent = `${task.id} · REVISION ${task.revision}`;
+  $("edit-heading").textContent = task.content.title;
+  clear($("task-detail"));
+  const dl = el("dl", undefined, "task-detail");
+  for (const [label, value] of [
+    ["State", labels[task.content.state]], ["Priority", task.content.priority],
+    ["Owner", task.content.owner], ["Context & acceptance criteria", task.content.description],
+    ["Next action / handoff", task.content.next], ["Blocker", task.content.blocker],
+    ["Evidence", task.content.evidence.join("\n")], ["Prerequisites", task.content.depends_on.join(", ")],
+  ]) {
+    dl.append(el("dt", label));
+    const dd = el("dd", value || "None recorded");
+    if (label === "Evidence") dd.className = "task-evidence";
+    dl.append(dd);
+  }
+  $("task-detail").append(dl);
+  $("history").hidden = !task.history.length;
   clear($("history-items"));
-  for (const h of [...(task?.history || [])].reverse()) {
-    const div = el("div", undefined, "history-row");
-    div.append(
-      el("strong", `${h.author} · ${new Date(h.at * 1000).toLocaleString()}`),
-      el("div", `${labels[h.previous.state]} · ${h.previous.title}`),
-      el("div", h.previous.next || "No next action"),
-    );
-    $("history-items").append(div);
+  for (const h of [...task.history].reverse()) {
+    const row = el("div", undefined, "history-row");
+    row.append(el("strong", `${h.author} · ${new Date(h.at * 1000).toLocaleString()}`), el("pre", JSON.stringify(h.previous, null, 2)));
+    $("history-items").append(row);
   }
-  blockerToggle();
   if (!$("task-dialog").open) $("task-dialog").showModal();
-  form.elements.title.focus();
 }
-function blockerToggle() {
-  const blocked = $("task-form").elements.state.value === "blocked";
-  $("blocker-label").hidden = !blocked;
-  $("task-form").elements.blocker.required = blocked;
-}
-async function saveTask(event) {
-  event.preventDefault();
-  const form = $("task-form"),
-    content = blank();
-  for (const key of [
-    "title",
-    "description",
-    "state",
-    "priority",
-    "owner",
-    "next",
-    "blocker",
-  ])
-    content[key] = form.elements[key].value.trim();
-  if (content.state !== "blocked") content.blocker = "";
-  content.evidence = form.elements.evidence.value
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  content.depends_on = form.elements.depends_on.value
-    .split(/[\s,]+/)
-    .filter(Boolean);
-  const author = form.elements.author.value.trim();
-  $("save-task").disabled = true;
-  $("form-error").hidden = true;
+async function refreshRecords() {
   try {
-    await api(state.editing ? `/api/tasks/${state.editing.id}` : "/api/tasks", {
-      content,
-      author,
-      revision: state.editing?.revision ?? null,
-    });
-    localStorage.setItem("e5r.writer", author);
-    $("task-dialog").close();
-    await refreshTasks();
-  } catch (e) {
-    $("form-error").textContent = e.message;
-    $("form-error").hidden = false;
-    $("reload-task").hidden = e.status !== 409;
-  } finally {
-    $("save-task").disabled = false;
-  }
+    const data = await api("/api/records");
+    const stamp = JSON.stringify(data);
+    if (stamp === state.recordStamp) return;
+    const opened = new Set([...$("records").querySelectorAll("details[open]")].map(d => d.dataset.key));
+    state.recordStamp = stamp;
+    clear($("records"));
+    for (const {kind, record} of data.records) {
+      const details = el("details", undefined, "record");
+      details.dataset.key = `${kind}/${record.id}`;
+      details.open = opened.has(details.dataset.key);
+      details.append(el("summary", `${kind} · ${record.id} · ${record.content.title}`),
+        el("p", `Revision ${record.revision} · ${record.author || record.content.owner || "Unassigned"}`, "muted"),
+        el("pre", record.content.description, "record-body"), el("pre", record.content.evidence.join("\n"), "record-body"));
+      $("records").append(details);
+    }
+    if (!data.records.length) $("records").textContent = "No records yet. Ask an agent to write a finding, note or report with e5r project record.";
+  } catch (e) { $("records").textContent = `Records unavailable: ${e.message}`; }
 }
 async function loadFunctions() {
   $("function-count").textContent = "Loading…";
@@ -431,7 +369,6 @@ function selectFunction(f, push = true) {
   $("back").disabled = !state.history.length;
   $("function-name").textContent = f.name;
   $("function-address").textContent = f.addr;
-  $("task-function").disabled = false;
   $("copy-code").disabled = true;
   history.replaceState(null, "", `#workspace/${f.addr}`);
   view("workspace");
@@ -467,7 +404,7 @@ function renderRelated() {
   );
   if (!tasks.length)
     $("related-work").textContent =
-      "No task linked yet. “Task here” preserves this function as evidence.";
+      "No task linked yet. Ask an agent to link this function as evidence.";
 }
 function syntaxLine(line, known) {
   const container = el("span", undefined, "line-source");
@@ -573,6 +510,23 @@ function renderReferences(data) {
   state.code = JSON.stringify(data, null, 2);
   $("copy-code").disabled = false;
 }
+function renderCallGraph(data) {
+  clear($("code"));
+  const graph = el("div", undefined, "call-graph");
+  for (const edge of data.edges) {
+    for (const [i, addr] of [edge.from, edge.to].entries()) {
+      if (i) graph.append(el("span", "→", "call-arrow"));
+      const f = state.functions.find(f => f.addr === addr);
+      const node = el(f ? "button" : "span", f ? `${f.name}\n${addr}` : addr, "call-node");
+      if (f) node.onclick = () => selectFunction(f);
+      graph.append(node);
+    }
+  }
+  $("code").append(graph);
+  if (!data.edges.length) message($("code"), "No recovered direct calls.", "Indirect targets are not resolved by this graph.");
+  state.code = JSON.stringify(data, null, 2);
+  $("copy-code").disabled = false;
+}
 async function loadPane() {
   if (!state.selected) return;
   const serial = ++state.request,
@@ -605,7 +559,8 @@ async function loadPane() {
     .join(" ");
   $("analysis-command").textContent =
     `e5r ${command} ${shellQuote(state.project.binary)} ${f.addr}${options ? " " + options : ""}${pane === "disas" ? " --bytes" : ""}`;
-  $("copy-analysis").disabled = false;
+  $("copy-analysis").disabled = pane === "callgraph";
+  if (pane === "callgraph") $("analysis-command").textContent = "Call graph from recovered CFG direct-call edges.";
   try {
     const data = await api(`/api/${pane}/${f.addr}`);
     if (serial !== state.request) return;
@@ -635,6 +590,9 @@ async function loadPane() {
       else renderCode(lines.join("\n"));
       $("quality").textContent =
         `${f.insns} instructions · ${f.strength} boundary · ${f.complete ? "Complete" : "Incomplete: " + f.halt}`;
+    } else if (pane === "callgraph") {
+      renderCallGraph(data);
+      $("quality").textContent = "Incoming → outgoing direct calls around this function. Click a node to navigate. Indirect targets are not resolved.";
     } else {
       renderReferences(data);
       $("quality").textContent =
@@ -656,17 +614,16 @@ for (const b of document.querySelectorAll("[data-pane]"))
     state.pane = b.dataset.pane;
     loadPane();
   };
-$("new-task").onclick = () => openTask();
-$("refresh").onclick = refreshTasks;
+$("refresh").onclick = () => { refreshTasks(); refreshRecords(); };
 $("close-dialog").onclick = () => $("task-dialog").close();
-$("task-form").onsubmit = saveTask;
-$("task-form").elements.state.onchange = blockerToggle;
-$("reload-task").onclick = async () => {
-  const id = state.editing?.id;
-  await refreshTasks();
-  const task = state.board.tasks.find((r) => r.task.id === id)?.task;
-  if (task) openTask(task);
+$("expand-task").onclick = () => {
+  const expanded = $("task-dialog").classList.toggle("full-view");
+  $("expand-task").textContent = expanded ? "← Back to popup" : "Full view";
 };
+$("task-dialog").addEventListener("close", () => {
+  $("task-dialog").classList.remove("full-view");
+  $("expand-task").textContent = "Full view";
+});
 $("task-search").oninput = renderTasks;
 $("task-filter").onchange = renderTasks;
 $("function-search").oninput = () => {
@@ -684,15 +641,6 @@ $("wrap-code").onchange = () => {
 $("wrap-code").checked = localStorage.getItem("e5r.wrap") !== "false";
 $("code").classList.toggle("wrap", $("wrap-code").checked);
 $("copy-code").onclick = () => copy(state.code, $("copy-code"));
-$("task-function").onclick = () => {
-  const d = blank();
-  d.title = `Investigate ${state.selected.name}`;
-  d.evidence = [
-    `function:${state.selected.addr}`,
-    $("analysis-command").textContent,
-  ];
-  openTask(null, d);
-};
 $("back").onclick = () => {
   const addr = state.history.pop(),
     f = state.functions.find((f) => f.addr === addr);
@@ -722,12 +670,13 @@ async function boot() {
       `e5r project task ${shellQuote(state.project.project)} list --json`;
     renderBoard();
     await refreshTasks();
+    await refreshRecords();
     if (state.project.binary_error)
       error(
         `Binary unavailable: ${state.project.binary_error}. Project tasks remain available.`,
       );
     route();
-    setInterval(refreshTasks, 5000);
+    setInterval(() => { refreshTasks(); refreshRecords(); }, 5000);
   } catch (e) {
     error(`Could not open project: ${e.message}`);
     $("sync").textContent = "Unavailable";

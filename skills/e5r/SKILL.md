@@ -37,3 +37,24 @@ codes: 0 success, 1 no match, 2 usage, 3 bad input.
 For details, read [the manual](../../docs/MANUAL.md) and
 [project/task formats](../../docs/dashboard.md). For repository development,
 read [the roadmap](../../docs/ROADMAP.md) first.
+
+## Names and investigation records
+
+The UI is read-only. Make requested edits through the CLI, including tasks and
+project registration. When a function's purpose is supported by evidence, give
+it a descriptive name with `e5r annotate BINARY name ADDRESS NAME --db LOG`.
+Use the project's recorded annotation log, then check `funcs` and `decompile`
+with the same `--db LOG`. Record the rationale and uncertainty in a comment.
+Restart the UI server to reload annotations. Do not invent meanings from a
+single call site. Per-variable name annotations are not currently supported;
+record proposed variable names and their storage in a note instead.
+
+Save investigation output with `e5r project record PROJECT KIND add TITLE
+--description BODY --evidence function:0xADDRESS --author AGENT`, where KIND is
+`finding`, `note` or `report`. Findings describe a claim and its supporting
+evidence; notes retain observations and open questions; reports explain the
+investigation and conclusions. These records reuse task content, revision,
+history and update semantics in separate stores per kind; record IDs are local
+to each kind. Use `record PROJECT KIND list --json` and `update ID --revision N
+--input FILE` to read and revise them. Put the full text in `description` (or a
+complete JSON input document); evidence is one reference per array entry.

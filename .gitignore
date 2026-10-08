@@ -257,3 +257,6 @@ __marimo__/
 # Local task-store write locks and atomic-write scratch files. Task JSON is durable.
 *.work/.lock
 *.work/*.tmp
+
+*.work/*/.lock
+*.work/*/*.tmp

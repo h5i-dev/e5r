@@ -31,7 +31,7 @@ function render() {
         : "Start your first investigation.";
   $("headline-sub").textContent = projects.length
     ? `${projects.length} projects · task updates appear here automatically. Open a project to keep its next step clear.`
-    : "Add a binary here, or run e5r project new PATH --name NAME. Existing manifests can be imported with e5r project import.";
+    : "Ask an agent to run e5r project new PATH --name NAME. Existing manifests can be imported with e5r project import.";
   $("counts").replaceChildren();
   for (const [n, label, tone] of [
     [projects.length, "projects", ""],
@@ -133,7 +133,7 @@ function renderProjects() {
   $("empty").hidden = !!visible.length;
   $("empty").textContent = projects.length
     ? "No projects match this view."
-    : "No projects registered. Add a binary with New project, or import an existing manifest from the CLI.";
+    : "No projects registered. Ask an agent to register or import a project through the CLI.";
 }
 async function refresh() {
   try {
@@ -158,41 +158,6 @@ async function refresh() {
 $("refresh").onclick = refresh;
 $("search").oninput = renderProjects;
 $("filter").onchange = renderProjects;
-$("new-project").onclick = () => {
-  $("project-form").reset();
-  $("form-error").hidden = true;
-  $("project-dialog").showModal();
-  $("project-form").elements.name.focus();
-};
-$("close-dialog").onclick = () => $("project-dialog").close();
-$("project-form").onsubmit = async (event) => {
-  event.preventDefault();
-  const form = $("project-form");
-  $("save-project").disabled = true;
-  $("form-error").hidden = true;
-  try {
-    const response = await fetch("/api/projects", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-E5R-Client": "dashboard",
-        },
-        body: JSON.stringify({
-          name: form.elements.name.value.trim(),
-          binary: form.elements.binary.value.trim(),
-        }),
-      }),
-      data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-    $("project-dialog").close();
-    await refresh();
-  } catch (e) {
-    $("form-error").textContent = e.message;
-    $("form-error").hidden = false;
-  } finally {
-    $("save-project").disabled = false;
-  }
-};
 $("copy-command").onclick = async () => {
   try {
     await navigator.clipboard.writeText("e5r project list --json");

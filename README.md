@@ -114,7 +114,8 @@ e5r project new ./a.out --out a.e5rproj      # reopen it later without reanalysi
 
 A local dashboard puts blockers, review requests and next actions first. Its
 decompiler pane provides searchable functions, pseudocode, disassembly and
-references, with tasks and evidence shared by humans and agents.
+references and direct call graphs. The UI is read-only; agents edit tasks,
+findings, notes and reports through the CLI, and humans read the live results.
 
 ```bash
 e5r project new ./a.out --name investigation

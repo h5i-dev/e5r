@@ -3,21 +3,11 @@ use crate::{annotate, out::Out, patch};
 use e5r_db::{
     project::Project,
     registry::{self, Registry},
-    work::{Draft, Store},
+    work::Store,
 };
-use serde::Deserialize;
 use serde_json::{Value, json};
-use std::io::Read;
 use std::path::{Path, PathBuf};
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Edit {
-    content: Draft,
-    author: String,
-    revision: Option<u64>,
-}
 
 fn header(name: &str, value: &str) -> Header {
     Header::from_bytes(name.as_bytes(), value.as_bytes()).expect("constant HTTP header")
@@ -43,37 +33,6 @@ fn field<'a>(request: &'a Request, name: &'static str) -> Option<&'a str> {
 fn trusted(request: &Request, host: &str) -> bool {
     field(request, "Host") == Some(host)
         && field(request, "Origin").is_none_or(|origin| origin == format!("http://{host}"))
-}
-
-fn body<T: serde::de::DeserializeOwned>(request: &mut Request) -> Result<T, String> {
-    if field(request, "X-E5R-Client") != Some("dashboard") {
-        return Err("missing dashboard client header".into());
-    }
-    if field(request, "Content-Type") != Some("application/json") {
-        return Err("expected application/json".into());
-    }
-    const CAP: usize = 128 * 1024;
-    if request.body_length().is_some_and(|n| n > CAP) {
-        return Err("request exceeds 128 KiB".into());
-    }
-    let mut data = Vec::new();
-    request
-        .as_reader()
-        .take((CAP + 1) as u64)
-        .read_to_end(&mut data)
-        .map_err(|e| e.to_string())?;
-    if data.len() > CAP {
-        return Err("request exceeds 128 KiB".into());
-    }
-    serde_json::from_slice(&data).map_err(|e| e.to_string())
-}
-
-fn edit(request: &mut Request) -> Result<Edit, String> {
-    let change: Edit = body(request)?;
-    if change.author.trim().is_empty() {
-        return Err("a writer name is required".into());
-    }
-    Ok(change)
 }
 
 #[derive(Clone)]
@@ -216,6 +175,21 @@ impl Analysis {
         if self.program.function(at).is_none() {
             return Err("function not found".into());
         }
+        if kind == "callgraph" {
+            let edges: Vec<_> = self
+                .program
+                .functions
+                .iter()
+                .flat_map(|(from, f)| {
+                    f.cfg
+                        .calls
+                        .iter()
+                        .filter(move |to| *from == at || **to == at)
+                        .map(move |to| json!({"from":from.to_string(),"to":to.to_string()}))
+                })
+                .collect();
+            return Ok(json!({"schema":"e5r.callgraph.v1","edges":edges}));
+        }
         let mut output = Out::buffer();
         let limits = crate::print::Limits {
             budget: crate::budget::Budget::new(Some(10.0), Some(1)),
@@ -296,28 +270,6 @@ fn worker() -> std::sync::mpsc::SyncSender<Job> {
     sender
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct NewProject {
-    name: String,
-    binary: PathBuf,
-}
-
-fn register(request: &mut Request, registry: &Registry) -> Result<Value, String> {
-    let create: NewProject = body(request)?;
-    registry::validate_name(&create.name)?;
-    if !create.binary.is_absolute() {
-        return Err("enter an absolute binary path".into());
-    }
-    let file = std::fs::File::open(&create.binary).map_err(|e| e.to_string())?;
-    let data = crate::map_file(&file).map_err(|e| e.to_string())?;
-    let object =
-        e5r_format::load(&data, &e5r_format::LoadOptions::default()).map_err(|e| e.to_string())?;
-    let project = patch::make_project(&create.binary, &object, &data, &[], None)?;
-    let path = registry.create(&create.name, &project, None)?;
-    Ok(json!({"name":create.name,"project":path.display().to_string()}))
-}
-
 pub fn serve(project_path: &Path, port: u16, binary: Option<&Path>) -> Result<u8, String> {
     let workspace = Workspace::new(project_path, binary, None)?;
     // Single-project mode keeps its existing early refusal of a wrong binary.
@@ -345,13 +297,22 @@ fn serve_inner(
             "Project collection"
         }
     );
-    for mut request in server.incoming_requests() {
+    for request in server.incoming_requests() {
         if !trusted(&request, &host) {
             respond(
                 request,
                 403,
                 "application/json",
                 json!({"error":"untrusted host or origin"}).to_string(),
+            );
+            continue;
+        }
+        if request.method() != &Method::Get {
+            respond(
+                request,
+                405,
+                "application/json",
+                json!({"error":"read-only UI; ask an agent to edit through the CLI"}).to_string(),
             );
             continue;
         }
@@ -400,7 +361,7 @@ fn serve_inner(
             if path == "/api/projects" {
                 let result = match *request.method() {
                     Method::Get => registry.list().map(|projects| json!({"schema":"e5r.projects.v1","root":registry.root().display().to_string(),"projects":projects})),
-                    Method::Post => register(&mut request,registry),
+
                     _ => Err("route not found".into()),
                 };
                 answer(request, result);
@@ -433,9 +394,12 @@ fn serve_inner(
                 .and_then(|s| s.split_once('/'))
                 .map(|(kind, target)| (kind, Some(target)))
                 .or_else(|| (route == "/api/functions").then_some(("functions", None)));
-            if let Some((kind, target)) = analysis_route
-                .filter(|(kind, _)| matches!(*kind, "functions" | "decompile" | "disas" | "xrefs"))
-            {
+            if let Some((kind, target)) = analysis_route.filter(|(kind, _)| {
+                matches!(
+                    *kind,
+                    "functions" | "decompile" | "disas" | "xrefs" | "callgraph"
+                )
+            }) {
                 if target.is_some_and(|target| crate::addr::parse_number(target).is_none()) {
                     answer(request, Err("expected a function address".into()));
                     continue;
@@ -466,23 +430,16 @@ fn serve_inner(
             (&Method::Get, "/api/tasks") => {
                 serde_json::to_value(workspace.store().board()?).map_err(|e| e.to_string())
             }
-            (&Method::Post, "/api/tasks") => {
-                let change = edit(&mut request)?;
-                if change.revision.is_some() {
-                    return Err("new tasks do not take a revision".into());
+            (&Method::Get, "/api/records") => {
+                let mut records = Vec::new();
+                for kind in ["finding", "note", "report"] {
+                    for record in
+                        Store::new(e5r_db::work::beside(&workspace.path).join(kind)).list()?
+                    {
+                        records.push(json!({"kind":kind,"record":record}));
+                    }
                 }
-                serde_json::to_value(workspace.store().create(change.content, &change.author)?)
-                    .map_err(|e| e.to_string())
-            }
-            _ if request.method() == &Method::Post && route.starts_with("/api/tasks/") => {
-                let change = edit(&mut request)?;
-                serde_json::to_value(workspace.store().update(
-                    &route[11..],
-                    change.revision.ok_or("revision is required")?,
-                    change.content,
-                    &change.author,
-                )?)
-                .map_err(|e| e.to_string())
+                Ok(json!({"schema":"e5r.records.v1","records":records}))
             }
             _ => Err("route not found".into()),
         })();

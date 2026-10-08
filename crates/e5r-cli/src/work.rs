@@ -67,7 +67,10 @@ fn read(path: &Path) -> Result<Draft, String> {
 }
 
 pub fn run(w: &mut Out, project: &Path, command: &Command) -> Result<u8, String> {
-    let store = Store::new(e5r_db::work::beside(project));
+    run_store(w, Store::new(e5r_db::work::beside(project)), command)
+}
+
+pub fn run_store(w: &mut Out, store: Store, command: &Command) -> Result<u8, String> {
     match command {
         Command::List { json: true } => json::emit(w, &store.board()?),
         Command::List { json: false } => {

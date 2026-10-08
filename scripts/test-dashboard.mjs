@@ -81,7 +81,7 @@ try {
         body: "{}",
       })
     ).status,
-    400,
+    405,
   );
   assert.equal(
     (
@@ -116,7 +116,7 @@ try {
         body: "x".repeat(128 * 1024 + 1),
       })
     ).status,
-    400,
+    405,
   );
   browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
   const page = await browser.newPage({
@@ -132,49 +132,33 @@ try {
   await page
     .getByRole("button", { name: "Trace input validation", exact: true })
     .click();
-  await page.locator("[name=next]").fill("Human draft that must survive");
-  const draft = { ...task.content, next: "Agent update" };
+  assert.equal(await page.locator("#task-dialog input, #task-dialog textarea, #task-dialog select").count(), 0);
+  await page.locator("#expand-task").click();
+  assert(await page.locator("#task-dialog").evaluate(e => e.classList.contains("full-view")));
+  await page.screenshot({path:"/tmp/e5r-dashboard-task-full.png", fullPage:true});
+  await page.locator("#expand-task").click();
+  assert(!(await page.locator("#task-dialog").evaluate(e => e.classList.contains("full-view"))));
+  const draft = { ...task.content, next: "Agent update", evidence: ["Evidence line\n".repeat(100)] };
   const input = join(root, "edit.json");
   writeFileSync(input, JSON.stringify(draft));
-  cli(
-    "project",
-    "task",
-    project,
-    "update",
-    task.id,
-    "--revision",
-    "1",
-    "--input",
-    input,
-    "--author",
-    "agent-b",
-  );
-  await page.getByRole("button", { name: "Save task", exact: true }).click();
-  await page
-    .locator("#form-error")
-    .filter({ hasText: "revision conflict" })
-    .waitFor();
-  assert.equal(
-    await page.locator("[name=next]").inputValue(),
-    "Human draft that must survive",
-  );
-  await page.getByRole("button", { name: "Reload latest task" }).click();
-  await page.waitForFunction(
-    () => document.querySelector("[name=next]").value === "Agent update",
-  );
-  assert.equal(await page.locator("[name=next]").inputValue(), "Agent update");
-  await page.locator("[name=state]").selectOption("blocked");
-  await page
-    .locator("[name=blocker]")
-    .fill("Need a sample input from the owner");
-  await page.getByRole("button", { name: "Save task", exact: true }).click();
-  await page.locator("#task-dialog").waitFor({ state: "hidden" });
-  await page
-    .locator("#headline")
-    .filter({ hasText: "1 item needs attention." })
-    .waitFor();
-  const board = JSON.parse(cli("project", "task", project, "list", "--json"));
-  assert.equal(board.tasks[0].attention, "Need a sample input from the owner");
+  cli("project", "task", project, "update", task.id, "--revision", "1", "--input", input, "--author", "agent-b");
+  await page.locator("#task-detail").filter({hasText: "Agent update"}).waitFor();
+  assert(await page.locator(".task-evidence").evaluate(e => e.getBoundingClientRect().height >= 150));
+  await page.locator("#close-dialog").click();
+  for (const kind of ["finding", "note", "report"]) {
+    cli("project", "record", project, kind, "add", `${kind} title`, "--description", '<img src=x onerror="window.taskXss=true">', "--evidence", `function:${main.addr}`, "--author", "agent-b");
+  }
+  const record = JSON.parse(cli("project", "record", project, "finding", "list", "--json")).tasks[0].task;
+  writeFileSync(input, JSON.stringify({...record.content, description:"Updated finding"}));
+  cli("project", "record", project, "finding", "update", record.id, "--revision", "1", "--input", input);
+  assert.throws(() => cli("project", "record", project, "finding", "update", record.id, "--revision", "1", "--input", input), /revision conflict/);
+  assert.equal(JSON.parse(cli("project", "record", project, "finding", "list", "--json")).tasks[0].task.history.length, 1);
+  await page.locator("#refresh").click();
+  await page.locator("#records summary").filter({hasText:"report title"}).waitFor();
+  assert.equal(await page.locator("#records img").count(), 0);
+  await page.locator("#records summary").filter({hasText:"report title"}).click();
+  await page.locator("#refresh").click();
+  assert(await page.locator("#records details").filter({hasText:"report title"}).evaluate(e => e.open));
   await page.screenshot({
     path: "/tmp/e5r-dashboard-overview.png",
     fullPage: true,
@@ -208,23 +192,13 @@ try {
     .locator("#quality")
     .filter({ hasText: "Incoming references" })
     .waitFor();
-  await page.getByRole("button", { name: "+ Task here" }).click();
-  assert(
-    (await page.locator("[name=evidence]").inputValue()).includes(
-      `function:${main.addr}`,
-    ),
-  );
-  await page
-    .locator("[name=title]")
-    .fill('<img src=x onerror="window.taskXss=true">');
-  await page.getByRole("button", { name: "Save task", exact: true }).click();
-  await page.locator("#task-dialog").waitFor({ state: "hidden" });
-  await page
-    .locator("#related-work")
-    .getByText('<img src=x onerror="window.taskXss=true">', { exact: false })
-    .waitFor();
+  await page.getByRole("tab", { name: "Call graph" }).click();
+  await page.locator(".call-node").filter({hasText:"parse_header"}).first().waitFor();
+  await page.screenshot({path:"/tmp/e5r-dashboard-callgraph.png", fullPage:true});
+  await page.locator(".call-node").filter({hasText:"parse_header"}).first().click();
+  await page.locator("#function-name").filter({hasText:"parse_header"}).waitFor();
+  await page.locator(".call-node").filter({hasText:"main"}).first().waitFor();
   assert.equal(await page.evaluate(() => window.taskXss), undefined);
-  assert.equal(await page.locator("#related-work img").count(), 0);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: "/tmp/e5r-dashboard-mobile.png",
@@ -242,10 +216,10 @@ try {
   const saved = JSON.parse(
     readFileSync(join(project + ".work", task.id + ".json"), "utf8"),
   );
-  assert.equal(saved.revision, 3);
-  assert.equal(saved.history.length, 2);
+  assert.equal(saved.revision, 2);
+  assert.equal(saved.history.length, 1);
   console.log(
-    "Dashboard integration passed: CLI parity, browser edits, stale conflicts, attention, function navigation, evidence, XSS, mobile layout, HTTP boundaries.",
+    "Dashboard integration passed: CLI parity, read-only UI, live agent updates, full task view, records, call graph, function navigation, evidence, XSS, mobile layout, HTTP boundaries.",
   );
 } finally {
   if (browser) await browser.close();
