@@ -12,6 +12,21 @@ pub fn registry() -> Result<Registry, String> {
 }
 
 pub fn resolve(reference: &Path) -> Result<PathBuf, String> {
+    // Default project names often equal the binary filename in the current
+    // directory. Prefer a registered name; ./FILE explicitly selects a file.
+    if !reference.is_absolute() && reference.components().count() == 1 {
+        if let Some(name) = reference
+            .to_str()
+            .filter(|name| registry::validate_name(name).is_ok())
+        {
+            if let Ok(registry) = registry() {
+                let path = registry.path(name)?;
+                if path.is_file() {
+                    return Ok(path);
+                }
+            }
+        }
+    }
     if reference.is_file() {
         return std::fs::canonicalize(reference).map_err(|e| e.to_string());
     }

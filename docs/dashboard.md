@@ -24,7 +24,8 @@ Each name owns `<root>/<name>/project.e5rproj` and
 `project.e5rproj.work/`. Binaries and existing annotation logs remain at their
 recorded absolute paths. Creation refuses existing names. Omitting `--name`
 uses the binary filename; `--out FILE` keeps the explicit local-file workflow.
-Named project commands work from any directory:
+Named project commands work from any directory. A registered name takes
+precedence over a same-named local file; use `./FILE` to select a local manifest:
 
 ```sh
 e5r project list --json

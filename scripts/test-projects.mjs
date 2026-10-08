@@ -116,6 +116,19 @@ try {
     pane,
     JSON.parse(cli("decompile", binary, main.addr, "--json")),
   );
+  cli("project", "new", binary);
+  const collision = JSON.parse(
+    execFileSync(executable, ["project", "task", "sample", "list", "--json"], {
+      env,
+      cwd: root,
+      encoding: "utf8",
+    }),
+  );
+  assert.equal(
+    collision.tasks.length,
+    0,
+    "registered name must beat a same-named binary",
+  );
   const moved = join(root, "moved");
   renameSync(binary, moved);
   assert.equal(
