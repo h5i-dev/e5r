@@ -12,6 +12,7 @@ pub mod anchor;
 pub mod log;
 pub mod patch;
 pub mod project;
+pub mod registry;
 pub mod signature;
 pub mod work;
 

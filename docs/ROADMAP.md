@@ -27,7 +27,7 @@ rather than argued about again.
 | benchmarks and scorecard | built (M11) |
 | fuzzing, coverage and mutation tooling | built (M12); packaging not started |
 
-The measured numbers live in [`docs/scorecard.md`](docs/scorecard.md),
+The measured numbers live in [`docs/scorecard.md`](scorecard.md),
 including the ones that go against us. In short: `libc.so.6` analyzes in 0.10s
 and 58 MB, finding 3,517 functions with 95.3% analyzed completely, where
 `objdump -d` takes 0.26s and only disassembles; both decoders are at zero
@@ -225,7 +225,7 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       declines because it faults on hardware, and what it decodes where llvm
       declines is listed with the reason.
 - [x] SLEIGH runtime. The `.sla` format is worked out in
-      [`docs/sla-format.md`](../docs/sla-format.md) and its reader consumes all
+      [`docs/sla-format.md`](sla-format.md) and its reader consumes all
       137 files Ghidra ships. The decode engine measures 0 wrong against
       objdump on AArch64 (19,710), x86-64 (5,688) and RISC-V 64 (2,567), the
       last being an architecture this tool could not decode at all and for
@@ -501,7 +501,7 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 
 This is the feature that distinguishes e5r from every incumbent, so it gets
 designed before it gets coded, and the design lives in
-[`docs/design/db.md`](../docs/design/db.md).
+[`docs/design/db.md`](design/db.md).
 
 - [x] Content anchors. A function is identified by a fingerprint of its
       instruction-shape stream with branch targets excluded, so the identity
@@ -703,14 +703,14 @@ designed before it gets coded, and the design lives in
       read by indexing the slice instead of through the reader. A `cargo-fuzz`
       setup for longer runs is still to do.
 - [x] Resource caps on every attacker-controlled count, with a documented
-      policy in [`docs/design/limits.md`](../docs/design/limits.md): bound by
+      policy in [`docs/design/limits.md`](design/limits.md): bound by
       the file first, then by the cap, check the cursor advanced, and read
       through the reader. Checked by the mutation fuzzer in the ordinary test
       suite rather than by review.
 - [x] `#![forbid(unsafe_code)]` on every crate except `e5r-cli`, which is
       `#![deny(unsafe_code)]` so one audited call can opt in. There is exactly
       one exception, the memory map, and its justification is in
-      [`docs/design/limits.md`](../docs/design/limits.md).
+      [`docs/design/limits.md`](design/limits.md).
 - [x] A no-panic gate on every path that reads foreign bytes, 1.26 million cases
       inside a 12-second budget so it runs every time rather than nightly. It
       asserts three things and not one: no panic, a per-case ceiling, and that
@@ -948,7 +948,7 @@ Tasks:
       ground-truth functions: 1.000 and 1.000 stripped, and 0.766 and 0.937
       with `.eh_frame` removed as well, which is the number that says what the
       analysis can do with nothing but code. See
-      [`docs/boundaries.md`](../docs/boundaries.md).
+      [`docs/boundaries.md`](boundaries.md).
 - [x] A DecBench backend for e5r, as `scripts/decbench_e5r.py`. Out of tree,
       which DecBench's own documentation permits, so the benchmark checkout
       stays untouched. Driven by `scripts/decbench.sh`.
@@ -958,7 +958,7 @@ Tasks:
 - [x] Record the DecBench numbers in `docs/scorecard.md` per release, including
       the runs where we lose. The first run is one we lose: 23.4 union against
       angr's 37.0 on the same slice, with the method and the defect analysis in
-      [`docs/decbench.md`](../docs/decbench.md).
+      [`docs/decbench.md`](decbench.md).
 
 ## Not building
 
@@ -969,7 +969,7 @@ it was closed.
   for a local dashboard, durable project tasks and a decompiler pane. This
   workspace uses existing library analysis and keeps the CLI complete; it does
   not add a mandatory project service or desktop framework. See
-  [`docs/dashboard.md`](docs/dashboard.md).
+  [`docs/dashboard.md`](dashboard.md).
 - **A debugger:** rizin and gdb do this well and it is a different product. The
   emulator in M10 runs code paths for analysis; it does not attach to a process.
 - **Ghidra script compatibility:** Running Java is the thing this project exists

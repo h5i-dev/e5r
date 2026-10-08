@@ -1,4 +1,7 @@
 "use strict";
+const base = location.pathname.startsWith("/p/")
+  ? location.pathname.replace(/\/$/, "")
+  : "";
 const $ = (id) => document.getElementById(id);
 const state = {
   project: null,
@@ -55,7 +58,7 @@ function shellQuote(text) {
 }
 async function api(path, body) {
   const response = await fetch(
-    path,
+    base + path,
     body === undefined
       ? {}
       : {
@@ -104,6 +107,12 @@ function view(name) {
 function route() {
   const parts = location.hash.slice(1).split("/");
   view(parts[0] === "workspace" ? "workspace" : "overview");
+  if (parts[0] === "task" && parts[1]) {
+    const task = state.board.tasks.find(
+      (row) => row.task.id === parts[1],
+    )?.task;
+    if (task && !$("task-dialog").open) openTask(task);
+  }
   if (
     parts[0] === "workspace" &&
     parts[1] &&
@@ -261,7 +270,7 @@ async function refreshTasks() {
       renderBoard();
     }
     $("sync").textContent = "Tasks up to date";
-    error("");
+    if (!state.project?.binary_error) error("");
   } catch (e) {
     $("sync").textContent = "Tasks unavailable";
     error(`Could not refresh tasks: ${e.message}`);
@@ -529,7 +538,7 @@ function renderReferences(data) {
     message(
       $("code"),
       "No incoming references reported.",
-      "This is the analysis result for this startup snapshot.",
+      "This is the analysis result for this analysis snapshot.",
     );
     return;
   }
@@ -704,7 +713,8 @@ window.addEventListener("keydown", (e) => {
 async function boot() {
   try {
     state.project = await api("/api/project");
-    const name = state.project.project.split("/").pop();
+    const name = state.project.name || state.project.project.split("/").pop();
+    $("all-projects").hidden = !state.project.collection;
     $("project-name").textContent = name;
     document.title = `${name} · e5r`;
     $("binary-name").textContent = state.project.binary;
@@ -712,6 +722,10 @@ async function boot() {
       `e5r project task ${shellQuote(state.project.project)} list --json`;
     renderBoard();
     await refreshTasks();
+    if (state.project.binary_error)
+      error(
+        `Binary unavailable: ${state.project.binary_error}. Project tasks remain available.`,
+      );
     route();
     setInterval(refreshTasks, 5000);
   } catch (e) {

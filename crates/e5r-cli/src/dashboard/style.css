@@ -1029,3 +1029,41 @@ summary {
     padding: 8px 0;
   }
 }
+
+.collection-row {
+  color: var(--ink);
+  text-decoration: none;
+}
+.project-link {
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--ink);
+}
+.project-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.project-error {
+  color: var(--amber);
+  font-size: 11px;
+  display: block;
+  overflow-wrap: anywhere;
+}
+.all-projects {
+  margin-top: 24px;
+  font-size: 12px;
+  text-decoration: none;
+  color: var(--muted);
+}
+.all-projects:hover {
+  color: var(--ink);
+}
+.rail a.nav {
+  text-decoration: none;
+}
+@media (max-width: 900px) {
+  .all-projects {
+    margin: 0;
+    font-size: 11px;
+  }
+}

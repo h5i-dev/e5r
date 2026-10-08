@@ -1,16 +1,51 @@
 # A workspace for people and agents
 
-Create a binary project, then serve its workspace locally:
+Start the global collection from any directory:
 
 ```sh
-./target/release/e5r project new ./a.out --out investigation.e5rproj
-./target/release/e5r project dashboard investigation.e5rproj
+e5r project new ./a.out --name parser
+e5r ui
 ```
 
-Open the printed `http://127.0.0.1:7879` address. `--port 0` selects a free
-port; `--binary PATH` opens a moved binary only if its content still matches the
-project. Ctrl-C stops the workspace. Assets ship inside the Rust executable;
-there is no frontend build step, CDN, font download, or Node runtime requirement.
+In this checkout, use `./target/release/e5r` if e5r is not installed. Open the
+printed `http://127.0.0.1:7879` address. The collection shows every project's
+live tasks, blockers, review requests and binary availability. Select a project
+to open its task dashboard and decompiler; **All projects** returns to the
+collection. **New project** registers a local binary from an absolute path.
+An unavailable binary does not prevent editing that project's tasks.
+
+Project storage follows h5i's convention, in this order:
+
+1. `E5R_PROJECT_HOME`
+2. `$XDG_DATA_HOME/e5r/projects` (absolute XDG paths only)
+3. `~/.local/share/e5r/projects`
+
+Each name owns `<root>/<name>/project.e5rproj` and
+`project.e5rproj.work/`. Binaries and existing annotation logs remain at their
+recorded absolute paths. Creation refuses existing names. Omitting `--name`
+uses the binary filename; `--out FILE` keeps the explicit local-file workflow.
+Named project commands work from any directory:
+
+```sh
+e5r project list --json
+e5r project task parser list --json
+e5r project task parser add 'Trace input validation' --owner agent-a
+e5r project import ./old.e5rproj --name older-investigation
+e5r project relocate parser /new/path/to/a.out
+e5r project dashboard parser           # optional single-project mode
+```
+
+Import copies the manifest and task history, preserving the original files.
+Legacy relative references resolve against the original manifest's directory;
+use `--base-dir ORIGINAL_CWD` if they were recorded relative to a different
+working directory. New manifests always use absolute references. Relocate
+checks content before changing a path. The collection checks existence and
+size only; the content digest is verified before loading a binary.
+
+Both UI modes support `--port 0` for a free port. Single-project mode also
+accepts `--binary PATH` as a temporary path override. Ctrl-C stops the server.
+Assets ship inside the Rust executable; no frontend build step, CDN, font
+download, or Node runtime is required.
 
 The overview answers “what needs me?” before showing the rest of the work.
 Blocked work always carries a reason, review requests carry their handoff, and
@@ -34,8 +69,9 @@ The library owns all analysis facts and all task readiness rules. The pane
 shows boundary strength, source evidence, incomplete control flow, unmodelled
 operations and signature conflicts. It does not imply that pseudocode is
 verified source or fabricate a source-to-instruction mapping. Binary analysis
-and annotations are a **startup snapshot**; restart the server after changing
-them. Task data stays live. Signature-library references and patch-set references
+and annotations are a snapshot taken when the decompiler first loads. Restart
+the server after changing binary bytes or annotations. Manifest changes and
+relocated paths invalidate the cached analysis. Task data stays live. Signature-library references and patch-set references
 remain in the project file; they are not automatically applied to the loaded
 binary. Unknown analysis settings and custom readers are refused. Supported
 analysis settings are `scan_gaps`, `follow_calls`, `strings`, `xrefs`, `noreturn`,
@@ -110,11 +146,13 @@ is no longer running. Corrupt JSON is an error, never an invisible missing task.
 The workspace binds IPv4 loopback only. Host and Origin checks reject cross-site
 and rebound-host requests. Writes require JSON and the custom
 `X-E5R-Client: dashboard` header; there is no CORS permission. Task request bodies
-are capped at 128 KiB. Binary paths and arbitrary commands cannot be supplied by
-HTTP. Analysis endpoints accept only a recovered function's address.
+are capped at 128 KiB. Project creation accepts an absolute local binary path; no arbitrary commands
+are accepted. Analysis endpoints accept only a recovered function's address.
 
 | Route | Meaning |
 | --- | --- |
+| `GET /api/projects` | all registered projects and live task signals |
+| `POST /api/projects` | create a project from `{name, binary}` |
 | `GET /api/project` | project identity and container information |
 | `GET /api/tasks` | shared task snapshot |
 | `POST /api/tasks` | create `{content, author, revision: null}` |
@@ -124,9 +162,13 @@ HTTP. Analysis endpoints accept only a recovered function's address.
 | `GET /api/disas/0xADDRESS` | one function's instructions |
 | `GET /api/xrefs/0xADDRESS` | incoming references |
 
+In collection mode, workspace routes are prefixed with `/p/NAME` (for example,
+`/p/parser/api/tasks`); `/api/projects` remains global.
+
 Responses are JSON; task conflicts return 409, missing routes/functions return
-404, invalid content returns 400. The server handles requests serially, and
-single-function decompilation can delay task requests. The existing budget is
+404, invalid content returns 400. Analysis runs on a separate worker with a bounded queue, so project monitoring
+and task editing remain responsive during decompilation. Only one analyzed
+program is resident at a time; switching projects evicts it. The existing budget is
 checked between functions, so it is not a hard preemptive timeout for one very
 large function. The CLI remains available independently during analysis.
 
@@ -138,6 +180,7 @@ install Playwright and its Chromium browser outside the checkout, then run:
 ```sh
 cargo build --release -p e5r-cli
 E5R_PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node scripts/test-dashboard.mjs
+E5R_PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node scripts/test-projects.mjs
 ```
 
 The integration check compiles a small C binary with `cc`, starts an isolated
@@ -145,3 +188,7 @@ workspace on a free port, compares decompiler output with the CLI, tests browser
 editing and stale revisions, checks function navigation and linked evidence,
 and verifies cross-origin rejection and mobile layout. It removes its temporary
 project and stops the server when finished. Screenshots are written under `/tmp`.
+
+The collection check verifies global registration/import, working-directory
+independence, project isolation, browser creation, decompiler access and binary
+relocation with a temporary `E5R_PROJECT_HOME`.

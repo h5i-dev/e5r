@@ -91,7 +91,9 @@ for target in "${targets[@]}"; do
   rm -rf "$stage"
   mkdir -p "$stage"
   cp "$bin" "$stage/e5r"
-  cp README.md LICENSE MANUAL.md "$stage/"
+  cp README.md LICENSE "$stage/"
+  mkdir -p "$stage/docs"
+  cp docs/MANUAL.md docs/ROADMAP.md docs/dashboard.md "$stage/docs/"
   tar -C "$out" "${tarflags[@]}" -czf "$out/$name.tar.gz" "$name"
   rm -rf "$stage"
   built+=("$name.tar.gz")
