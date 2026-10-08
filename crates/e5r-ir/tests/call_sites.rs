@@ -38,16 +38,8 @@ use e5r_ir::ssa::SsaFunction;
 /// Floor on the share of recorded call-site arguments the detection also finds.
 /// Only raised.
 ///
-/// Measured at 33 of 37 over the fixtures below. The four it misses are one
-/// function, `pick` in `em-paths.{a64,x64}.{O1,O2}`, and they are one defect
-/// rather than four: `pick` copies its second argument into the first argument
-/// register and then tail calls, a tail call lifts to `Op::Branch` and not to
-/// `Op::Return`, and `opt`'s liveness treats the convention's registers as live
-/// only at a `Return`. So the copy is dead by the optimizer's rules, dead code
-/// elimination deletes it, and the only read of that register is gone before
-/// detection sees the function. The fix belongs in `opt`, which must treat a
-/// branch leaving the function as a call and hold the argument registers live
-/// across it; the floor comes back up when it lands.
+/// Tail-call argument setup is live even when the exit is a branch, so
+/// optimizing it away cannot hide a recorded incoming argument.
 const MIN_AGREEMENT: f64 = 0.89;
 
 fn corpus() -> Option<PathBuf> {

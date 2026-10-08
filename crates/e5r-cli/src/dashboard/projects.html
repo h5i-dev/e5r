@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Projects · e5r</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/projects.js" defer></script>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="rail">
+        <a class="brand" href="/">e5r<span>ANALYSIS WORKSPACE</span></a>
+        <div class="rail-label">GLOBAL LIBRARY</div>
+        <div class="project-name">All projects</div>
+        <nav aria-label="Collection">
+          <a class="nav selected" href="/">Projects</a>
+        </nav>
+        <div class="rail-foot">
+          <span class="local-dot"></span> LOCAL COLLECTION
+          <p>Live tasks across your projects.</p>
+          <small
+            >Binaries stay in their original locations.<br />Analysis loads when
+            you open a decompiler.</small
+          >
+        </div>
+      </aside>
+      <div class="body">
+        <header class="topbar">
+          <div class="crumb">
+            <span>Project collection</span
+            ><span id="storage" class="muted">Reading the library…</span>
+          </div>
+          <div class="top-actions">
+            <span id="sync" class="muted" aria-live="polite">Connecting…</span
+            ><button id="refresh" class="button subtle">Refresh</button
+            >
+          </div>
+        </header>
+        <div id="error" role="alert" hidden></div>
+        <main class="overview">
+          <section class="hero">
+            <div>
+              <div class="eyebrow">ACROSS ALL PROJECTS</div>
+              <h1 id="headline">Your investigations, together.</h1>
+              <p id="headline-sub" class="muted">
+                One place for the work that needs you and the projects behind
+                it.
+              </p>
+            </div>
+            <div id="counts" class="counts"></div>
+          </section>
+          <section class="panel attention-panel">
+            <div class="panel-head">
+              <h2>Needs attention</h2>
+              <span id="attention-count" class="badge"></span>
+            </div>
+            <div id="attention"></div>
+          </section>
+          <section class="panel tasks-panel">
+            <div class="panel-head">
+              <div>
+                <h2>Projects</h2>
+                <span class="muted"
+                  >Open a project to read tasks or explore its code</span
+                >
+              </div>
+              <div class="filters">
+                <input
+                  id="search"
+                  type="search"
+                  aria-label="Search projects"
+                  placeholder="Project name or binary…"
+                /><select id="filter" aria-label="Filter projects">
+                  <option value="all">All projects</option>
+                  <option value="attention">Needs attention</option>
+                  <option value="active">Active work</option>
+                  <option value="unavailable">Binary unavailable</option>
+                </select>
+              </div>
+            </div>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Project / binary</th>
+                    <th>Open work</th>
+                    <th>Active</th>
+                    <th>Needs attention</th>
+                    <th>Binary</th>
+                  </tr>
+                </thead>
+                <tbody id="project-rows"></tbody>
+              </table>
+            </div>
+            <div id="empty" class="empty" hidden></div>
+          </section>
+          <section class="agent-strip">
+            <div>
+              <div class="eyebrow">SHARED WITH AGENTS</div>
+              <p>
+                Create projects once. Read their live state from any directory.
+              </p>
+              <code>e5r project list --json</code>
+            </div>
+            <button id="copy-command" class="button subtle">
+              Copy command
+            </button>
+          </section>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

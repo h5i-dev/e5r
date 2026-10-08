@@ -29,7 +29,7 @@ and under what licence, in the file that uses it.
 ## What a change has to come with
 
 Every claim this tool makes is measured, and a change that makes a claim has to
-bring its measurement. `ROADMAP.md` says what each milestone is gated on; the
+bring its measurement. `docs/ROADMAP.md` says what each milestone is gated on; the
 short version:
 
 - **An external oracle wherever one exists.** A decoder is compared against

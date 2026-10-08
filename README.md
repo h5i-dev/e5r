@@ -1,9 +1,9 @@
 # e5r: The Reverse Engineering Toolkit for AI Agents
 
 **e5r** is a disassembler, decompiler and binary differ with a command line as
-its only front end. Every command speaks JSON, every recovered fact carries the
-evidence for it, and every name, type and comment an agent writes lands in a
-git-mergeable log. One static Rust binary: no JVM, no project server, no
+its primary interface and an optional local project workspace. Every command
+speaks JSON, every recovered fact carries the evidence for it, and every name,
+type and comment an agent writes lands in a git-mergeable log. One static Rust binary: no JVM, no required project server, no
 proprietary database.
 
 ```bash
@@ -40,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/h5i-dev/e5r/main/install.sh | sh
 
 One binary, no runtime dependency. The script works out the platform, verifies
 the download against the release's `SHA256SUMS`, and refuses to install if it
-does not match. [`MANUAL.md`](MANUAL.md) has the environment variables.
+does not match. [`MANUAL.md`](docs/MANUAL.md) has the environment variables.
 
 ```bash
 e5r completions bash > /etc/bash_completion.d/e5r   # or zsh, fish, elvish
@@ -110,6 +110,25 @@ e5r project new ./a.out --out a.e5rproj      # reopen it later without reanalysi
 
 ---
 
+## 3. Project workspace
+
+A local dashboard puts blockers, review requests and next actions first. Its
+decompiler pane provides searchable functions, pseudocode, disassembly and
+references and direct call graphs. The UI is read-only; agents edit tasks,
+findings, notes and reports through the CLI, and humans read the live results.
+
+```bash
+e5r project new ./a.out --name investigation
+e5r ui
+e5r project task investigation list --json
+```
+
+Projects default to `~/.local/share/e5r/projects`; `e5r ui` lists them all.
+Open the printed loopback URL. See [the workspace guide](docs/dashboard.md) for
+task creation, handoffs and conflict handling.
+
+---
+
 ## 6. Build
 
 The checkout is release-only; see [`CLAUDE.md`](CLAUDE.md).
@@ -125,7 +144,7 @@ cargo test --release --workspace
 
 ## 7. Documentation
 
-- [MANUAL.md](MANUAL.md) / `man e5r`: the full command reference
+- [MANUAL.md](docs/MANUAL.md) / `man e5r`: the full command reference
 - [docs/tutorial.md](docs/tutorial.md): a stripped binary to a committed annotation log
 - [docs/design/](docs/design/): one document per subsystem, and why it is shaped that way
 - [docs/scorecard.md](docs/scorecard.md): every measured number, including the bad ones
@@ -195,7 +214,7 @@ scorecard says so — it has a section for what is *not* measured.
 
 WASM, .NET, DEX and Java class files; scripting beyond the batch language; and
 the decompiler quality needed to clear the DecBench milestone. All of it is in
-[`ROADMAP.md`](ROADMAP.md) with the reason, and none of it is claimed here.
+[`ROADMAP.md`](docs/ROADMAP.md) with the reason, and none of it is claimed here.
 
 </details>
 

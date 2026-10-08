@@ -12,13 +12,16 @@ mod addr;
 mod annotate;
 mod batch;
 mod budget;
+mod dashboard;
 mod json;
 mod out;
 mod patch;
 mod print;
 mod progress;
+mod projects;
 mod repl;
 mod shell;
+mod work;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -99,6 +102,12 @@ pub struct Common {
 
 #[derive(Subcommand)]
 pub enum Command {
+    /// Manage and monitor every registered project from one local UI.
+    Ui {
+        /// Loopback port; zero chooses a free port.
+        #[arg(long, default_value_t = 7879)]
+        port: u16,
+    },
     /// Container, architecture, entry point, and what the loader noticed.
     Info(Common),
     /// Sections and their mapping.
@@ -306,6 +315,25 @@ pub enum Command {
         #[arg(long)]
         symbols: bool,
     },
+    /// List the modules embedded in a Bun standalone executable.
+    ///
+    /// `bun build --compile` stores its scripts in a graph after the native
+    /// image. The graph is source and bytecode, so it is listed rather than
+    /// loaded, for the same reason an archive is.
+    Bun {
+        #[command(flatten)]
+        common: Common,
+        /// Write this module's bytes to standard output.
+        ///
+        /// A path as the graph spells it, a decimal index, or a unique
+        /// suffix that starts on a `/`.
+        #[arg(long, value_name = "MODULE")]
+        extract: Option<String>,
+        /// Which graph, when the file has more than one. 0 is the last,
+        /// which is the one Bun reads.
+        #[arg(long, value_name = "N", default_value_t = 0)]
+        which: usize,
+    },
     /// Write a completion script for a shell.
     ///
     /// Generated from the command tree, so it cannot describe a command that
@@ -434,13 +462,66 @@ pub enum PatchCommand {
 /// What to do with a project file.
 #[derive(Subcommand)]
 pub enum ProjectCommand {
+    /// List all globally registered projects and their live task state.
+    List {
+        /// Emit versioned JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Copy an existing project and task history into the global directory.
+    Import {
+        /// Existing project file.
+        project: PathBuf,
+        /// Global project name.
+        #[arg(long)]
+        name: String,
+        /// Base for legacy relative file references (default: manifest directory).
+        #[arg(long)]
+        base_dir: Option<PathBuf>,
+    },
+    /// Update the path of a moved binary, refusing different content.
+    Relocate {
+        /// Global name or project file.
+        project: PathBuf,
+        /// New binary path.
+        binary: PathBuf,
+    },
+    /// Manage durable tasks shared by people and agents.
+    Task {
+        /// Global project name or project file.
+        project: PathBuf,
+        #[command(subcommand)]
+        what: work::Command,
+    },
+    /// Write or read findings, notes and reports using the revisioned content store.
+    Record {
+        project: PathBuf,
+        #[arg(value_parser = ["finding", "note", "report"])]
+        kind: String,
+        #[command(subcommand)]
+        what: work::Command,
+    },
+    /// Open a local project dashboard and decompiler workspace.
+    Dashboard {
+        /// Global project name or project file.
+        project: PathBuf,
+        /// Loopback port; zero chooses a free port.
+        #[arg(long, default_value_t = 7879)]
+        port: u16,
+        /// Override a moved binary path; content must still match.
+        #[arg(long)]
+        binary: Option<PathBuf>,
+    },
     /// Record what it takes to reopen this session.
     New {
         /// The binary.
         binary: PathBuf,
-        /// Where to write the project.
-        #[arg(short, long)]
-        out: PathBuf,
+        /// Explicit local file; omitted projects go into the global directory.
+        #[arg(short, long, conflicts_with = "name")]
+        out: Option<PathBuf>,
+        /// Global name (defaults to the binary filename).
+        #[arg(long)]
+        name: Option<String>,
         /// An analysis option, as `key=value`. Repeatable.
         #[arg(long = "set")]
         settings: Vec<String>,
@@ -533,7 +614,7 @@ impl Command {
             // Both writers are redirected into a file the first time and
             // never read on screen.
             Command::Completions { .. } | Command::Manpage => None,
-            Command::Project { .. } => Some((out::When::Auto, false)),
+            Command::Project { .. } | Command::Ui { .. } => Some((out::When::Auto, false)),
             _ => {
                 let c = self.common();
                 if c.json {
@@ -556,13 +637,17 @@ impl Command {
             Command::Annotate { common, .. }
             | Command::Batch { common, .. }
             | Command::Diff { common, .. } => common,
-            Command::Project { .. } | Command::Completions { .. } | Command::Manpage => {
+            Command::Project { .. }
+            | Command::Ui { .. }
+            | Command::Completions { .. }
+            | Command::Manpage => {
                 unreachable!("handled before a file is opened")
             }
             Command::Vtables { common, .. }
             | Command::Classes { common, .. }
             | Command::Overlay { common, .. }
             | Command::Archive { common, .. }
+            | Command::Bun { common, .. }
             | Command::Repl { common }
             | Command::Patch { common, .. }
             | Command::Emulate { common, .. }
@@ -607,6 +692,7 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
         // A project names its own files; none of them is the binary the other
         // commands open up front.
         Command::Project { what } => return project(w, what),
+        Command::Ui { port } => return dashboard::serve_all(*port),
         Command::Completions { shell } => {
             let script = shell::completions(&Cli::command(), *shell);
             for line in script.lines() {
@@ -632,6 +718,17 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
 
     if let Command::Archive { common, symbols } = &cli.command {
         return print::archive(w, &data, *symbols, common.json);
+    }
+    // Same reason as an archive: the answer is about bytes the loader does
+    // not map as code, and analyzing the native image first would spend
+    // seconds to ignore them.
+    if let Command::Bun {
+        common,
+        extract,
+        which,
+    } = &cli.command
+    {
+        return print::bun(w, &data, extract.as_deref(), *which, common.json);
     }
 
     let arch = match &common.arch {
@@ -749,6 +846,11 @@ pub fn dispatch(
         Command::Overlay { common } => {
             return print::overlay(w, &program.object, data, common.json);
         }
+        Command::Bun {
+            common,
+            extract,
+            which,
+        } => return print::bun(w, data, extract.as_deref(), *which, common.json),
         _ => {}
     }
 
@@ -950,9 +1052,42 @@ pub fn dispatch(
 /// The project commands, which open the files they name and nothing else.
 fn project(w: &mut out::Out, what: &ProjectCommand) -> Result<u8, String> {
     match what {
+        ProjectCommand::List { json } => projects::list(w, *json),
+        ProjectCommand::Import {
+            project,
+            name,
+            base_dir,
+        } => projects::import(w, project, name, base_dir.as_deref()),
+        ProjectCommand::Relocate { project, binary } => {
+            projects::relocate(w, &projects::resolve(project)?, binary)
+        }
+        ProjectCommand::Task { project, what } => {
+            let project = projects::resolve(project)?;
+            patch::project_read(&project)?;
+            work::run(w, &project, what)
+        }
+        ProjectCommand::Record {
+            project,
+            kind,
+            what,
+        } => {
+            let project = projects::resolve(project)?;
+            patch::project_read(&project)?;
+            work::run_store(
+                w,
+                e5r_db::work::Store::new(e5r_db::work::beside(&project).join(kind)),
+                what,
+            )
+        }
+        ProjectCommand::Dashboard {
+            project,
+            port,
+            binary,
+        } => dashboard::serve(&projects::resolve(project)?, *port, binary.as_deref()),
         ProjectCommand::New {
             binary,
             out,
+            name,
             settings,
             log,
         } => {
@@ -961,11 +1096,22 @@ fn project(w: &mut out::Out, what: &ProjectCommand) -> Result<u8, String> {
             let data = map_file(&file).map_err(|e| format!("{}: {e}", binary.display()))?;
             let object = e5r_format::load(&data, &LoadOptions::default())
                 .map_err(|e| format!("{}: {e}", binary.display()))?;
-            patch::project_new(w, binary, &object, &data, settings, log.as_deref(), out)
+            if let Some(out) = out {
+                patch::project_new(w, binary, &object, &data, settings, log.as_deref(), out)
+            } else {
+                let project =
+                    patch::make_project(binary, &object, &data, settings, log.as_deref())?;
+                let name = name
+                    .clone()
+                    .unwrap_or_else(|| e5r_db::registry::default_name(binary));
+                projects::create(w, &name, &project)
+            }
         }
-        ProjectCommand::Show { project } => patch::project_show(w, &patch::project_read(project)?),
+        ProjectCommand::Show { project } => {
+            patch::project_show(w, &patch::project_read(&projects::resolve(project)?)?)
+        }
         ProjectCommand::Verify { project, binary } => {
-            let proj = patch::project_read(project)?;
+            let proj = patch::project_read(&projects::resolve(project)?)?;
             let path = binary
                 .clone()
                 .unwrap_or_else(|| PathBuf::from(&proj.binary.path));
@@ -979,7 +1125,13 @@ fn project(w: &mut out::Out, what: &ProjectCommand) -> Result<u8, String> {
             signatures,
             patches,
             log,
-        } => patch::project_add(w, project, signatures, patches, log.as_deref()),
+        } => patch::project_add(
+            w,
+            &projects::resolve(project)?,
+            signatures,
+            patches,
+            log.as_deref(),
+        ),
     }
 }
 

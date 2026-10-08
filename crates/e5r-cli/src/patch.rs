@@ -390,6 +390,20 @@ pub fn project_new(
     log: Option<&Path>,
     out: &Path,
 ) -> R {
+    let proj = make_project(binary, o, data, settings, log)?;
+    std::fs::write(out, proj.to_text()).map_err(|e| format!("{}: {e}", out.display()))?;
+    outln!(w, "{} written", out.display());
+    Ok(exit::OK)
+}
+
+/// Build a manifest with absolute references so opening it never depends on cwd.
+pub fn make_project(
+    binary: &Path,
+    o: &Object,
+    data: &[u8],
+    settings: &[String],
+    log: Option<&Path>,
+) -> Result<Project, String> {
     let mut proj = Project::for_binary(&binary.display().to_string(), data);
     proj.load.base = Some(o.image_base);
     proj.load.arch = Some(o.arch.clone());
@@ -403,9 +417,11 @@ pub fn project_new(
     proj.log = log
         .map(|p| p.display().to_string())
         .or_else(|| Some(annotate::default_path(binary).display().to_string()));
-    std::fs::write(out, proj.to_text()).map_err(|e| format!("{}: {e}", out.display()))?;
-    outln!(w, "{} written", out.display());
-    Ok(exit::OK)
+    e5r_db::registry::normalize(
+        &mut proj,
+        &std::env::current_dir().map_err(|e| e.to_string())?,
+    )?;
+    Ok(proj)
 }
 
 /// Read a project file.
@@ -457,6 +473,10 @@ pub fn project_add(
     if let Some(l) = log {
         proj.log = Some(l.display().to_string());
     }
+    e5r_db::registry::normalize(
+        &mut proj,
+        &std::env::current_dir().map_err(|e| e.to_string())?,
+    )?;
     std::fs::write(path, proj.to_text()).map_err(|e| format!("{}: {e}", path.display()))?;
     outln!(
         w,

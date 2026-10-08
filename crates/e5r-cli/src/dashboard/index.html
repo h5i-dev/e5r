@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>e5r · Project workspace</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="rail">
+        <a class="brand" href="#overview">e5r<span>ANALYSIS WORKSPACE</span></a>
+        <a id="all-projects" class="all-projects" href="/" hidden
+          >← All projects</a
+        >
+        <div class="rail-label">PROJECT</div>
+        <div id="project-name" class="project-name">Loading project…</div>
+        <nav aria-label="Workspace">
+          <button id="nav-overview" class="nav selected" data-view="overview">
+            Overview</button
+          ><button id="nav-workspace" class="nav" data-view="workspace">
+            Decompiler
+          </button>
+        </nav>
+        <div class="rail-foot">
+          <span class="local-dot"></span> LOCAL WORKSPACE
+          <p>Human and agent, same state.</p>
+          <small
+            >Binary & annotations: analysis snapshot.<br />Restart the server to
+            reload analysis.</small
+          >
+        </div>
+      </aside>
+      <div class="body">
+        <header class="topbar">
+          <div class="crumb">
+            <span id="view-title">Project overview</span
+            ><span id="binary-name" class="muted"></span>
+          </div>
+          <div class="top-actions">
+            <span id="sync" class="muted" aria-live="polite">Connecting…</span
+            ><button id="refresh" class="button subtle">Refresh tasks</button
+            >
+          </div>
+        </header>
+        <div id="error" role="alert" hidden></div>
+        <main id="overview" class="overview">
+          <section class="hero">
+            <div>
+              <div class="eyebrow">WHERE TO FOCUS</div>
+              <h1 id="headline">Reading the project.</h1>
+              <p id="headline-sub" class="muted">
+                Your work, its evidence, and the next step.
+              </p>
+            </div>
+            <div id="counts" class="counts"></div>
+          </section>
+          <div class="overview-grid">
+            <section class="panel attention-panel">
+              <div class="panel-head">
+                <h2>Needs attention</h2>
+                <span id="attention-count" class="badge"></span>
+              </div>
+              <div id="attention"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Ready to pick up</h2>
+                <span id="ready-count" class="muted"></span>
+              </div>
+              <div id="ready"></div>
+            </section>
+          </div>
+          <section class="panel tasks-panel">
+            <div class="panel-head">
+              <div>
+                <h2>Project work</h2>
+                <span class="muted">Outcomes, owners, and the next action</span>
+              </div>
+              <div class="filters">
+                <input
+                  id="task-search"
+                  type="search"
+                  placeholder="Find a task or owner…"
+                  aria-label="Search tasks"
+                /><select id="task-filter" aria-label="Filter tasks">
+                  <option value="open">Open work</option>
+                  <option value="all">All work</option>
+                  <option value="active">Active</option>
+                  <option value="blocked">Blocked</option>
+                  <option value="review">Review</option>
+                  <option value="done">Done</option>
+                </select>
+              </div>
+            </div>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Task / outcome</th>
+                    <th>State</th>
+                    <th>Owner</th>
+                    <th>Next action</th>
+                  </tr>
+                </thead>
+                <tbody id="task-rows"></tbody>
+              </table>
+            </div>
+            <div id="task-empty" class="empty" hidden></div>
+          </section>
+          <section class="panel"><div class="panel-head"><h2>Findings, notes & reports</h2><span class="muted">Written by agents · read-only</span></div><div id="records"></div></section>
+          <section class="panel binary-panel">
+            <div class="panel-head"><h2>Binary information</h2><span class="muted">Container and loader results</span></div>
+            <div id="binary-info" class="binary-info"></div>
+            <div id="loader-warnings" class="loader-warnings" hidden></div>
+          </section>
+          <section class="agent-strip">
+            <div>
+              <div class="eyebrow">AGENT HANDOFF</div>
+              <p>Read the same tasks, claim work, leave evidence.</p>
+              <code id="agent-command"></code>
+            </div>
+            <button id="copy-agent" class="button subtle">Copy command</button>
+          </section>
+        </main>
+        <main id="workspace" class="workspace" hidden>
+          <div class="workspace-tools" aria-label="Workspace layout">
+            <div class="layout-controls">
+              <button id="toggle-functions" class="button subtle" aria-expanded="true" aria-controls="function-pane">Functions</button>
+              <button id="toggle-context" class="button subtle" aria-expanded="false" aria-controls="inspector">Evidence &amp; tasks</button>
+            </div>
+            <span class="workspace-hint">Follow a function name to navigate · <kbd>/</kbd> search · <kbd>Alt ← / →</kbd> history</span>
+            <div class="reading-controls" aria-label="Code text size">
+              <button id="font-smaller" class="button subtle" aria-label="Smaller code text">A−</button>
+              <output id="font-size">14px</output>
+              <button id="font-larger" class="button subtle" aria-label="Larger code text">A+</button>
+            </div>
+          </div>
+          <section id="function-pane" class="function-pane">
+            <div class="pane-head">
+              <h2>Functions</h2>
+              <span id="function-count" class="muted"></span>
+            </div>
+            <div class="function-search">
+              <input
+                id="function-search"
+                type="search"
+                placeholder="Name or address  /"
+                aria-label="Search functions"
+              />
+            </div>
+            <div
+              id="functions"
+              class="function-list"
+              role="navigation"
+              aria-label="Functions"
+            ></div>
+          </section>
+          <section class="code-pane">
+            <div class="code-header">
+              <div>
+                <div class="eyebrow" id="function-address">
+                  SELECT A FUNCTION
+                </div>
+                <h2 id="function-name">Explore the binary</h2>
+              </div>
+              <div class="code-actions">
+                <button
+                  id="back"
+                  class="button subtle"
+                  disabled
+                  aria-label="Previous function"
+                >
+                  ← Back</button
+                ><button id="forward" class="button subtle" disabled aria-label="Next function">Forward →</button
+                ><button id="copy-code" class="button subtle" disabled>
+                  Copy code</button
+                >
+              </div>
+            </div>
+            <div class="code-tabs" role="tablist" aria-label="Function view">
+              <button
+                id="tab-decompile"
+                role="tab"
+                aria-selected="true"
+                data-pane="decompile"
+              >
+                Pseudocode</button
+              ><button
+                id="tab-disas"
+                role="tab"
+                aria-selected="false"
+                data-pane="disas"
+              >
+                Disassembly</button
+              ><button
+                id="tab-xrefs"
+                role="tab"
+                aria-selected="false"
+                data-pane="xrefs"
+              >
+                References</button
+              ><button role="tab" aria-selected="false" data-pane="callgraph">Call graph</button><button id="tab-cfg" role="tab" aria-selected="false" data-pane="cfg">Control flow</button><button id="tab-notes" role="tab" aria-selected="false" data-pane="notes">Records</button><button id="tab-annotations" role="tab" aria-selected="false" data-pane="annotations">Annotations</button><label class="code-wrap"
+                ><input id="wrap-code" type="checkbox" checked />Wrap</label
+              >
+            </div>
+            <div id="reference-controls" class="reference-controls" hidden>
+              <label>Show <select id="reference-direction" aria-label="Reference direction"><option value="incoming">Incoming to entry</option><option value="outgoing">All outgoing references</option><option value="data">Strings &amp; data</option></select></label>
+            </div>
+            <div id="quality" class="quality" aria-live="polite">
+              Choose a function on the left. Click a known function name in code
+              to follow it.
+            </div>
+            <div
+              id="code"
+              class="code"
+              role="tabpanel"
+              aria-label="Function output"
+            >
+              <div class="code-empty">
+                <span class="code-mark">{ }</span>
+                <h3>Select a function to begin.</h3>
+                <p>
+                  Search by name or address on the left.<br />Follow calls in the code; use Back to retrace your steps.
+                </p>
+              </div>
+            </div>
+          </section>
+          <aside id="inspector" class="inspector" aria-label="Function evidence and related work">
+            <section>
+              <div class="eyebrow">FUNCTION CONTEXT</div>
+              <div id="function-context" class="context">
+                No function selected.
+              </div>
+            </section>
+            <section>
+              <div class="pane-head"><h2>Function records</h2><span id="function-note-count" class="muted"></span></div>
+              <div id="function-notes" class="function-notes muted">Select a function to read its notes, findings and reports.</div>
+            </section>
+            <section>
+              <div class="pane-head"><h2>Annotations</h2></div>
+              <div id="function-annotations" class="context">Select a function to see saved comments and assertions.</div>
+            </section>
+            <section id="variables-section" hidden>
+              <div class="eyebrow">VARIABLES & STORAGE</div>
+              <div id="variables" class="context"></div>
+            </section>
+            <section>
+              <div class="pane-head"><h2>Related work</h2></div>
+              <div id="related-work" class="muted">
+                Tasks linked by this function's address appear here.
+              </div>
+            </section>
+            <section>
+              <div class="eyebrow">CLI COMMAND</div>
+              <code id="analysis-command"></code
+              ><button id="copy-analysis" class="button subtle" disabled>
+                Copy command
+              </button>
+            </section>
+          </aside>
+        </main>
+      </div>
+    </div>
+    <dialog id="task-dialog" aria-labelledby="edit-heading">
+      <div class="dialog-head"><div><div id="edit-id" class="eyebrow"></div><h2 id="edit-heading"></h2></div>
+      <div><button id="expand-task" class="button subtle">Full view</button> <button id="close-dialog" class="button subtle" aria-label="Close task">×</button></div></div>
+      <p class="muted">Read-only. Ask an agent to update this task through the CLI.</p>
+      <div id="task-detail"></div><details id="history"><summary>Revision history</summary><div id="history-items"></div></details>
+    </dialog>
+  </body>
+</html>

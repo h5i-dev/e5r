@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 Scope, milestones and the list of things this project will not build live in
-[`ROADMAP.md`](ROADMAP.md). Read that first.
+[`ROADMAP.md`](docs/ROADMAP.md). Read that first.
 
 ## This checkout is release-only
 

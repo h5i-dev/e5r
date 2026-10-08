@@ -1,7 +1,7 @@
 # e5r — a CLI reverse engineering toolkit.
 #
 # The library owns every fact; the CLI is a thin client of it.
-# Crate boundaries and the dependency direction are documented in ROADMAP.md
+# Crate boundaries and the dependency direction are documented in docs/ROADMAP.md
 # under "Architecture": edges run downward only, and e5r-core depends on
 # nothing else in the workspace.
 [workspace]
