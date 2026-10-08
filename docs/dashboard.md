@@ -109,7 +109,11 @@ Unavailable binaries leave the project records and tasks readable.
 The visual hierarchy follows a repeatable reading path: project and mode at the
 top, function selection at the left, function identity and output in the center,
 then supporting evidence at the right. Body and code text carry the findings;
-metadata is quieter but readable. Blue marks selection, focus and navigation;
+metadata is quieter but readable. Blue marks selection and navigation; keyboard
+focus uses a bright neutral outline.
+Clickable code names have persistent underlines; plain addresses and encodings
+use quieter neutral text. Comments share one color across code views, and CFG
+edges use a neutral tone rather than the navigation color;
 amber marks attention and incomplete analysis. Status and provenance always
 remain words, so color alone never carries an analysis claim. Project work and
 records use the same surfaces and type hierarchy.
