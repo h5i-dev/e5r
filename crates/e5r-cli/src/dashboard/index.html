@@ -18,9 +18,9 @@
         <div id="project-name" class="project-name">Loading project…</div>
         <nav aria-label="Workspace">
           <button id="nav-overview" class="nav selected" data-view="overview">
-            <span>01</span> Overview</button
+            Overview</button
           ><button id="nav-workspace" class="nav" data-view="workspace">
-            <span>02</span> Decompiler
+            Decompiler
           </button>
         </nav>
         <div class="rail-foot">
@@ -120,7 +120,19 @@
           </section>
         </main>
         <main id="workspace" class="workspace" hidden>
-          <section class="function-pane">
+          <div class="workspace-tools" aria-label="Workspace layout">
+            <div class="layout-controls">
+              <button id="toggle-functions" class="button subtle" aria-expanded="true" aria-controls="function-pane">Functions</button>
+              <button id="toggle-context" class="button subtle" aria-expanded="false" aria-controls="inspector">Evidence &amp; tasks</button>
+            </div>
+            <span class="workspace-hint">Follow a function name to navigate · <kbd>/</kbd> search · <kbd>Alt ← / →</kbd> history</span>
+            <div class="reading-controls" aria-label="Code text size">
+              <button id="font-smaller" class="button subtle" aria-label="Smaller code text">A−</button>
+              <output id="font-size">14px</output>
+              <button id="font-larger" class="button subtle" aria-label="Larger code text">A+</button>
+            </div>
+          </div>
+          <section id="function-pane" class="function-pane">
             <div class="pane-head">
               <h2>Functions</h2>
               <span id="function-count" class="muted"></span>
@@ -156,6 +168,7 @@
                   aria-label="Previous function"
                 >
                   ← Back</button
+                ><button id="forward" class="button subtle" disabled aria-label="Next function">Forward →</button
                 ><button id="copy-code" class="button subtle" disabled>
                   Copy code</button
                 >
@@ -199,14 +212,14 @@
             >
               <div class="code-empty">
                 <span class="code-mark">{ }</span>
-                <h3>Follow the code. Keep the context.</h3>
+                <h3>Select a function to begin.</h3>
                 <p>
-                  Select a function to see its pseudocode and evidence.<br />Ask an agent to record the next investigation.
+                  Search by name or address on the left.<br />Follow calls in the code; use Back to retrace your steps.
                 </p>
               </div>
             </div>
           </section>
-          <aside class="inspector">
+          <aside id="inspector" class="inspector" aria-label="Function evidence and related work">
             <section>
               <div class="eyebrow">FUNCTION CONTEXT</div>
               <div id="function-context" class="context">

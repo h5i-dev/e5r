@@ -57,17 +57,43 @@ initial view. Tasks refresh every five seconds, including changes from agents.
 Open task details follow agent updates. **Full view** expands the popup;
 **Back to popup** restores it. Evidence occupies its own full-width section.
 
-The decompiler uses a familiar three-column workspace: searchable functions on
-the left, code in the center, and evidence, variables and related tasks on the
-right. Use `/` to focus function search. Pseudocode, disassembly and incoming
-references are tabs over the same recovered function. Click a known function
-name or address to navigate; Back returns to the previous function. Toggle **Wrap** for long expressions. Copy code
-or its CLI command, ask an agent to retain the function address as
-evidence in a task. **Call graph** shows incoming and outgoing direct calls
-around the selected function; click a node to navigate. Unresolved indirect
-call targets are not included. Large function lists are loaded in display batches;
-search always searches the complete list. Narrow screens collapse the context
-column so code keeps space.
+The decompiler gives code the center of attention: project navigation occupies a
+compact top strip, the searchable function browser sits on the left, and the
+**Evidence & tasks** panel sits on the right on wide screens. Layout buttons
+let you hide either side to give long expressions more space. On narrow screens,
+functions and evidence open as dismissible overlays; selecting a function closes
+the function browser. Evidence remains accessible at every width.
+
+Use `/` to focus function search, and **Back** / **Forward** or `Alt+Left` /
+`Alt+Right` to retrace function navigation. Following a known function name or
+address keeps the browser selection visible, clearing a filter that excludes it.
+Pseudocode, disassembly, references and call graph share the same selected
+function. Arrow keys move between focused view tabs. **A− / A+** adjust code
+text from 12 to 22 pixels (14 by default), with the preference retained in this
+browser; **Wrap** also persists. Copy code or its CLI command, and ask an agent
+to retain the function address as evidence in a task.
+
+**Call graph** groups unique callers on the left, the selected function in the
+center, and unique callees on the right. Click a caller or callee to navigate.
+Unresolved indirect call targets are not included. Large function lists are
+loaded in display batches; search always searches the complete list. Variables
+are shown for pseudocode only.
+
+The visual hierarchy follows a repeatable reading path: project and mode at the
+top, function selection at the left, function identity and output in the center,
+then supporting evidence at the right. Body and code text carry the findings;
+metadata is quieter but readable. Blue marks selection, focus and navigation;
+amber marks attention and incomplete analysis. Status and provenance always
+remain words, so color alone never carries an analysis claim. Project work and
+records use the same surfaces and type hierarchy.
+
+Design references: h5i's local console uses restrained surface steps and reserves
+color for meaningful signals. [IDA's subviews](https://docs.hex-rays.com/ida-9.2/user-guide/user-interface/subviews)
+keep function selection synchronized with the active view and retain navigation
+history. [Ghidra's CodeBrowser](https://ghidra.re/ghidra_docs/GhidraClass/Beginner/Introduction_to_Ghidra_Student_Guide.html)
+provides a stable function/listing/decompiler context. e5r uses these navigation
+principles at function granularity; its analysis does not supply instruction to
+pseudocode correspondence.
 
 The library owns all analysis facts and all task readiness rules. The pane
 shows boundary strength, source evidence, incomplete control flow, unmodelled

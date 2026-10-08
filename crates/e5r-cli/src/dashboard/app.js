@@ -13,6 +13,7 @@ const state = {
   recordStamp: "",
   request: 0,
   history: [],
+  future: [],
   code: "",
   boardStamp: "",
   functionLimit: 400,
@@ -146,11 +147,12 @@ function renderBoard() {
     [active.length, "active", ""],
     [ready.length, "ready", ""],
   ]) {
-    const e = el("div", undefined, `count ${tone}`);
+    const e = el("div", undefined, `count ${n ? tone : ""}`);
     e.append(el("b", String(n)), el("span", label));
     $("counts").append(e);
   }
   $("attention-count").textContent = String(attention.length);
+  $("attention").closest(".attention-panel").classList.toggle("quiet", !attention.length);
   $("ready-count").textContent = String(ready.length);
   clear($("attention"));
   clear($("ready"));
@@ -362,17 +364,31 @@ function renderFunctions() {
     );
 }
 function selectFunction(f, push = true) {
-  if (push && state.selected && state.selected.addr !== f.addr)
+  if (push && state.selected && state.selected.addr !== f.addr) {
     state.history.push(state.selected.addr);
+    state.future = [];
+  }
+  // A call followed from a filtered list must still have a visible selection.
+  const query = $("function-search").value.toLowerCase();
+  if (!`${f.name} ${f.addr}`.toLowerCase().includes(query))
+    $("function-search").value = "";
+  const index = state.functions.filter(item =>
+    `${item.name} ${item.addr}`.toLowerCase().includes($("function-search").value.toLowerCase()),
+  ).findIndex(item => item.addr === f.addr);
+  state.functionLimit = Math.max(state.functionLimit, index + 1);
+  $("workspace").classList.remove("mobile-functions");
+  syncLayout();
   state.selected = f;
   state.code = "";
   $("back").disabled = !state.history.length;
+  $("forward").disabled = !state.future.length;
   $("function-name").textContent = f.name;
   $("function-address").textContent = f.addr;
   $("copy-code").disabled = true;
   history.replaceState(null, "", `#workspace/${f.addr}`);
   view("workspace");
   renderFunctions();
+  $("functions").querySelector(".selected")?.scrollIntoView({ block: "nearest" });
   renderContext();
   $("variables-section").hidden = true;
   renderRelated();
@@ -444,6 +460,8 @@ function syntaxLine(line, known) {
 function renderCode(code) {
   state.code = code;
   clear($("code"));
+  $("code").scrollTop = 0;
+  $("code").scrollLeft = 0;
   const known = new Map(
     state.functions.flatMap((f) => [
       [f.name, f],
@@ -513,22 +531,30 @@ function renderReferences(data) {
 function renderCallGraph(data) {
   clear($("code"));
   const graph = el("div", undefined, "call-graph");
-  for (const edge of data.edges) {
-    for (const [i, addr] of [edge.from, edge.to].entries()) {
-      if (i) graph.append(el("span", "→", "call-arrow"));
-      const f = state.functions.find(f => f.addr === addr);
-      const node = el(f ? "button" : "span", f ? `${f.name}\n${addr}` : addr, "call-node");
-      if (f) node.onclick = () => selectFunction(f);
-      graph.append(node);
+  const addr = state.selected.addr;
+  const callers = [...new Set(data.edges.filter(edge => edge.to === addr).map(edge => edge.from))];
+  const callees = [...new Set(data.edges.filter(edge => edge.from === addr).map(edge => edge.to))];
+  for (const [label, addresses] of [["Callers →", callers], ["Selected function", [addr]], ["→ Callees", callees]]) {
+    const column = el("section", undefined, "call-column");
+    column.append(el("h3", `${label} (${addresses.length})`));
+    for (const target of addresses) {
+      const f = state.functions.find(f => f.addr === target);
+      const current = label === "Selected function";
+      const node = el(f && !current ? "button" : "div", f ? `${f.name}\n${target}` : target, `call-node${current ? " current" : ""}`);
+      if (f && !current) node.onclick = () => selectFunction(f);
+      column.append(node);
     }
+    if (!addresses.length) column.append(el("p", "None recovered", "muted"));
+    graph.append(column);
   }
   $("code").append(graph);
-  if (!data.edges.length) message($("code"), "No recovered direct calls.", "Indirect targets are not resolved by this graph.");
   state.code = JSON.stringify(data, null, 2);
   $("copy-code").disabled = false;
 }
+
 async function loadPane() {
   if (!state.selected) return;
+  $("variables-section").hidden = true;
   const serial = ++state.request,
     f = state.selected,
     pane = state.pane;
@@ -539,7 +565,7 @@ async function loadPane() {
     );
   $("quality").className = "quality";
   $("quality").textContent =
-    `Loading ${pane === "decompile" ? "pseudocode" : pane === "disas" ? "disassembly" : "references"}…`;
+    `Loading ${pane === "decompile" ? "pseudocode" : pane === "disas" ? "disassembly" : pane === "callgraph" ? "call graph" : "references"}…`;
   message(
     $("code"),
     "Reading the function…",
@@ -641,23 +667,95 @@ $("wrap-code").onchange = () => {
 $("wrap-code").checked = localStorage.getItem("e5r.wrap") !== "false";
 $("code").classList.toggle("wrap", $("wrap-code").checked);
 $("copy-code").onclick = () => copy(state.code, $("copy-code"));
-$("back").onclick = () => {
-  const addr = state.history.pop(),
-    f = state.functions.find((f) => f.addr === addr);
-  if (f) selectFunction(f, false);
+function navigateHistory(forward = false) {
+  const source = forward ? state.future : state.history;
+  const destination = forward ? state.history : state.future;
+  const addr = source.pop();
+  const f = state.functions.find(f => f.addr === addr);
+  if (!f) return;
+  if (state.selected) destination.push(state.selected.addr);
+  selectFunction(f, false);
+}
+$("back").onclick = () => navigateHistory();
+$("forward").onclick = () => navigateHistory(true);
+
+const mobileLayout = matchMedia("(max-width: 700px)");
+const wideLayout = matchMedia("(min-width: 1101px)");
+function syncLayout() {
+  const workspace = $("workspace");
+  $("toggle-functions").setAttribute("aria-expanded", String(mobileLayout.matches
+    ? workspace.classList.contains("mobile-functions")
+    : !workspace.classList.contains("functions-hidden")));
+  $("toggle-context").setAttribute("aria-expanded", String(workspace.classList.contains("context-open")));
+}
+$("workspace").classList.toggle("context-open", wideLayout.matches);
+$("toggle-functions").onclick = () => {
+  $("workspace").classList.toggle(mobileLayout.matches ? "mobile-functions" : "functions-hidden");
+  if (mobileLayout.matches) $("workspace").classList.remove("context-open");
+  syncLayout();
 };
+$("toggle-context").onclick = () => {
+  $("workspace").classList.toggle("context-open");
+  $("workspace").classList.remove("mobile-functions");
+  syncLayout();
+};
+mobileLayout.addEventListener("change", () => {
+  $("workspace").classList.remove("mobile-functions", "functions-hidden");
+  syncLayout();
+});
+syncLayout();
+let codeSize = Number(localStorage.getItem("e5r.code-size") || 14);
+if (!Number.isFinite(codeSize)) codeSize = 14;
+function resizeCode(delta = 0) {
+  codeSize = Math.max(12, Math.min(22, codeSize + delta));
+  document.documentElement.style.setProperty("--code-size", `${codeSize}px`);
+  $("font-size").textContent = `${codeSize}px`;
+  $("font-smaller").disabled = codeSize <= 12;
+  $("font-larger").disabled = codeSize >= 22;
+  localStorage.setItem("e5r.code-size", String(codeSize));
+}
+$("font-smaller").onclick = () => resizeCode(-1);
+$("font-larger").onclick = () => resizeCode(1);
+resizeCode();
 window.addEventListener("hashchange", route);
 window.addEventListener("keydown", (e) => {
-  if (
-    e.key === "/" &&
-    !$("workspace").hidden &&
-    !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName) &&
-    !$("task-dialog").open
-  ) {
+  if ($("workspace").hidden || $("task-dialog").open ||
+    ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
+  if (e.key === "/") {
     e.preventDefault();
+    $("workspace").classList.remove("functions-hidden");
+    if (mobileLayout.matches) {
+      $("workspace").classList.add("mobile-functions");
+      $("workspace").classList.remove("context-open");
+    }
+    syncLayout();
     $("function-search").focus();
+  } else if (e.altKey && ["ArrowLeft", "ArrowRight"].includes(e.key)) {
+    e.preventDefault();
+    navigateHistory(e.key === "ArrowRight");
+  } else if (e.key === "Escape") {
+    $("workspace").classList.remove("mobile-functions");
+    if (!wideLayout.matches) $("workspace").classList.remove("context-open");
+    syncLayout();
   }
 });
+const tabs = [...document.querySelectorAll("[data-pane]")];
+function syncTabs() {
+  tabs.forEach(tab => tab.tabIndex = tab.dataset.pane === state.pane ? 0 : -1);
+}
+for (const tab of tabs) {
+  tab.addEventListener("click", syncTabs);
+  tab.addEventListener("keydown", e => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+    e.preventDefault();
+    const index = e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1
+      : (tabs.indexOf(tab) + (e.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+    tabs[index].click();
+    tabs[index].focus();
+  });
+}
+syncTabs();
+
 async function boot() {
   try {
     state.project = await api("/api/project");

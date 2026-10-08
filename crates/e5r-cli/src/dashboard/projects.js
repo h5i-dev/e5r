@@ -38,12 +38,13 @@ function render() {
     [projects.reduce((n, p) => n + p.counts.active, 0), "active tasks", ""],
     [attention.length + errors.length, "need attention", "attention"],
   ]) {
-    const c = el("div", undefined, `count ${tone}`);
+    const c = el("div", undefined, `count ${n ? tone : ""}`);
     c.append(el("b", String(n)), el("span", label));
     $("counts").append(c);
   }
   $("attention").replaceChildren();
   $("attention-count").textContent = String(attention.length + errors.length);
+  $("attention").closest(".attention-panel").classList.toggle("quiet", !attention.length && !errors.length);
   for (const t of attention.slice(0, 10)) {
     const a = el("a", undefined, "work-row collection-row");
     a.href = link(t.project, `task/${t.id}`);

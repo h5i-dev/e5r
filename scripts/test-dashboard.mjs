@@ -182,12 +182,30 @@ try {
     .locator("#function-name")
     .filter({ hasText: "parse_header" })
     .waitFor();
+  // Following a call keeps the function browser synchronized, even after filtering.
+  assert.equal(await page.locator("#function-search").inputValue(), "");
+  assert.equal(await page.locator(".function-row.selected strong").textContent(), "parse_header");
   await page.locator("#back").click();
   await page.locator("#function-name").filter({ hasText: "main" }).waitFor();
+  await page.locator("#forward").click();
+  await page.locator("#function-name").filter({ hasText: "parse_header" }).waitFor();
+  await page.keyboard.press("Alt+ArrowLeft");
+  await page.locator("#function-name").filter({ hasText: "main" }).waitFor();
+  await page.locator("#font-larger").click();
+  assert.equal(await page.locator(".code-line").first().evaluate(e => getComputedStyle(e).fontSize), "15px");
+  assert.equal(await page.evaluate(() => localStorage.getItem("e5r.code-size")), "15");
+  await page.locator("#toggle-context").click();
+  assert.equal(await page.locator("#inspector").isVisible(), false);
+  await page.locator("#toggle-functions").click();
+  assert.equal(await page.locator("#function-pane").isVisible(), false);
+  await page.locator("#toggle-functions").click();
+  await page.locator("#toggle-context").click();
   await page.getByRole("tab", { name: "Disassembly" }).click();
   await page.locator("#quality").filter({ hasText: "instructions" }).waitFor();
   assert((await page.locator("#code").textContent()).includes(main.addr));
-  await page.getByRole("tab", { name: "References" }).click();
+  await page.getByRole("tab", { name: "Disassembly" }).focus();
+  await page.keyboard.press("ArrowRight");
+  assert.equal(await page.getByRole("tab", { name: "References" }).getAttribute("aria-selected"), "true");
   await page
     .locator("#quality")
     .filter({ hasText: "Incoming references" })
@@ -200,6 +218,18 @@ try {
   await page.locator(".call-node").filter({hasText:"main"}).first().waitFor();
   assert.equal(await page.evaluate(() => window.taskXss), undefined);
   await page.setViewportSize({ width: 390, height: 844 });
+  if (await page.locator("#inspector").isVisible()) await page.locator("#toggle-context").click();
+  assert.equal(await page.locator("#function-pane").isVisible(), false);
+  await page.locator("#toggle-context").click();
+  assert.equal(await page.locator("#inspector").isVisible(), true, "evidence stays reachable on mobile");
+  await page.locator("#toggle-context").click();
+  await page.keyboard.press("/");
+  assert.equal(await page.locator("#function-pane").isVisible(), true);
+  await page.locator("#function-search").fill("main");
+  await page.locator('.function-row[title="main"]').click();
+  assert.equal(await page.locator("#function-pane").isVisible(), false);
+  await page.getByRole("tab", { name: "Pseudocode" }).click();
+  await page.locator(".line-source").first().waitFor();
   await page.screenshot({
     path: "/tmp/e5r-dashboard-mobile.png",
     fullPage: true,
@@ -219,7 +249,7 @@ try {
   assert.equal(saved.revision, 2);
   assert.equal(saved.history.length, 1);
   console.log(
-    "Dashboard integration passed: CLI parity, read-only UI, live agent updates, full task view, records, call graph, function navigation, evidence, XSS, mobile layout, HTTP boundaries.",
+    "Dashboard integration passed: CLI parity, read-only UI, live agent updates, full task view, records, call graph, synchronized function navigation, back/forward history, reading controls, keyboard tabs, mobile evidence, XSS, mobile layout, HTTP boundaries.",
   );
 } finally {
   if (browser) await browser.close();
