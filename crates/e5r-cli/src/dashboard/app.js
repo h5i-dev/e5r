@@ -11,6 +11,8 @@ const state = {
   pane: "decompile",
   currentTask: null,
   recordStamp: "",
+  records: null,
+  recordsError: "",
   request: 0,
   history: [],
   future: [],
@@ -291,7 +293,9 @@ async function refreshRecords() {
   try {
     const data = await api("/api/records");
     const stamp = JSON.stringify(data);
-    if (stamp === state.recordStamp) return;
+    if (stamp === state.recordStamp && !state.recordsError) return;
+    state.records = data.records;
+    state.recordsError = "";
     const opened = new Set([...$("records").querySelectorAll("details[open]")].map(d => d.dataset.key));
     state.recordStamp = stamp;
     clear($("records"));
@@ -304,8 +308,14 @@ async function refreshRecords() {
         el("pre", record.content.description, "record-body"), el("pre", record.content.evidence.join("\n"), "record-body"));
       $("records").append(details);
     }
-    if (!data.records.length) $("records").textContent = "No records yet. Ask an agent to write a finding, note or report with e5r project record.";
-  } catch (e) { $("records").textContent = `Records unavailable: ${e.message}`; }
+    if (!data.records.length)
+      message($("records"), "No records yet.", "Ask an agent to write a finding, note or report with e5r project record.");
+    renderFunctionNotes();
+  } catch (e) {
+    state.recordsError = e.message;
+    message($("records"), "Records unavailable", e.message);
+    renderFunctionNotes();
+  }
 }
 async function loadFunctions() {
   $("function-count").textContent = "Loading…";
@@ -390,6 +400,7 @@ function selectFunction(f, push = true) {
   renderFunctions();
   $("functions").querySelector(".selected")?.scrollIntoView({ block: "nearest" });
   renderContext();
+  renderFunctionNotes();
   $("variables-section").hidden = true;
   renderRelated();
   loadPane();
@@ -421,6 +432,67 @@ function renderRelated() {
   if (!tasks.length)
     $("related-work").textContent =
       "No task linked yet. Ask an agent to link this function as evidence.";
+}
+function functionNotes() {
+  const addr = state.selected?.addr;
+  return (state.records || []).filter(({kind, record}) => kind === "note" &&
+    record.content.evidence.some(e => e === `function:${addr}` || e === addr));
+}
+function noteMetadata(record) {
+  return `${record.id} · ${record.author || record.content.owner || "Unassigned"} · revision ${record.revision}`;
+}
+function openNotes() {
+  state.pane = "notes";
+  if (mobileLayout.matches || !wideLayout.matches) {
+    $("workspace").classList.remove("context-open");
+    syncLayout();
+  }
+  loadPane();
+  syncTabs();
+}
+function renderFunctionNotes() {
+  if (!state.selected) return;
+  const notes = functionNotes();
+  clear($("function-notes"));
+  $("function-note-count").textContent = state.recordsError ? "Unavailable" : state.records === null ? "Loading…" : String(notes.length);
+  if (state.recordsError) $("function-notes").textContent = `Notes unavailable: ${state.recordsError}`;
+  else if (state.records === null) $("function-notes").textContent = "Loading notes…";
+  else if (!notes.length) $("function-notes").textContent = `No notes linked to ${state.selected.addr}. Link a note with function:${state.selected.addr} as evidence.`;
+  else {
+    for (const {record} of notes) {
+      const button = el("button", undefined, "function-note-preview");
+      button.append(el("strong", record.content.title),
+        el("span", record.content.description || "No note text recorded.", "note-excerpt"),
+        el("small", noteMetadata(record), "muted"));
+      button.onclick = openNotes;
+      $("function-notes").append(button);
+    }
+  }
+  if (state.pane === "notes") renderNotesPane();
+}
+function renderNotesPane() {
+  const notes = functionNotes();
+  $("quality").className = "quality";
+  $("quality").textContent = `Function notes · ${state.selected.addr} · Live project records, written by people or agents.`;
+  $("analysis-command").textContent = `e5r project record ${shellQuote(state.project.project)} note add 'Note title' --description 'Note text' --evidence function:${state.selected.addr}`;
+  $("copy-analysis").disabled = false;
+  clear($("code"));
+  state.code = "";
+  $("copy-code").disabled = true;
+  if (state.recordsError) message($("code"), "Notes unavailable", state.recordsError);
+  else if (state.records === null) message($("code"), "Loading notes…");
+  else if (!notes.length) message($("code"), "No notes for this function yet.", `Ask an agent to save a note with function:${state.selected.addr} as evidence. The command is available in Evidence & tasks.`);
+  else {
+    for (const {record} of notes) {
+      const article = el("article", undefined, "function-note");
+      article.append(el("h3", record.content.title),
+        el("p", noteMetadata(record), "muted"),
+        el("pre", record.content.description || "No note text recorded.", "record-body"));
+      $("code").append(article);
+    }
+    state.code = notes.map(({record}) => `${record.content.title}\n${record.content.description}`).join("\n\n");
+    $("copy-code").disabled = false;
+  }
 }
 function syntaxLine(line, known) {
   const container = el("span", undefined, "line-source");
@@ -563,6 +635,10 @@ async function loadPane() {
     .forEach((b) =>
       b.setAttribute("aria-selected", String(b.dataset.pane === pane)),
     );
+  if (pane === "notes") {
+    renderNotesPane();
+    return;
+  }
   $("quality").className = "quality";
   $("quality").textContent =
     `Loading ${pane === "decompile" ? "pseudocode" : pane === "disas" ? "disassembly" : pane === "callgraph" ? "call graph" : "references"}…`;

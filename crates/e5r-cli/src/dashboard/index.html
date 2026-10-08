@@ -196,7 +196,7 @@
                 data-pane="xrefs"
               >
                 References</button
-              ><button role="tab" aria-selected="false" data-pane="callgraph">Call graph</button><label class="code-wrap"
+              ><button role="tab" aria-selected="false" data-pane="callgraph">Call graph</button><button id="tab-notes" role="tab" aria-selected="false" data-pane="notes">Notes</button><label class="code-wrap"
                 ><input id="wrap-code" type="checkbox" checked />Wrap</label
               >
             </div>
@@ -225,6 +225,10 @@
               <div id="function-context" class="context">
                 No function selected.
               </div>
+            </section>
+            <section>
+              <div class="pane-head"><h2>Function notes</h2><span id="function-note-count" class="muted"></span></div>
+              <div id="function-notes" class="function-notes muted">Select a function to read its notes.</div>
             </section>
             <section id="variables-section" hidden>
               <div class="eyebrow">VARIABLES & STORAGE</div>

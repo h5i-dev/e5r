@@ -218,7 +218,7 @@ relocation with a temporary `E5R_PROJECT_HOME`.
 
 ## Findings, notes and reports
 
-Agents write records; humans read them in the overview. Each kind has a separate
+Agents write records; humans read them in the overview and function workspace. Each kind has a separate
 revisioned store under `<project>.work/{finding,note,report}/`, using the same
 content and history format as tasks. IDs and prerequisites are local to a kind.
 Records do not contribute to task readiness or task counts. Imports preserve
@@ -233,6 +233,24 @@ e5r project record parser report add 'Parser investigation' --description 'Inves
 e5r project record parser finding list --json
 e5r project record parser finding update T-0001 --revision 1 --input finding.json
 ```
+
+Attach a note to a recovered function using its exact address as evidence:
+
+```sh
+e5r project record parser note add 'Input length checks' \
+  --description 'The parser rejects lengths above 32 before the copy.' \
+  --evidence function:0x401000 --author agent-a
+```
+
+The decompiler's **Function notes** section shows notes linked to the selected
+function. Click a note or open the **Notes** tab to read full text beside the
+function browser. Writer and revision are displayed; updates refresh every five
+seconds without restarting analysis. Notes linked to other functions and notes
+without a function link stay in the project overview. Selecting another function
+changes the displayed notes. The Notes tab is also accessible on narrow screens.
+The CLI command panel supplies a note creation command for the selected function.
+Existing `annotate comment` entries remain analysis annotations, separate from
+these live project notes.
 
 Full record text lives in `description`; use `--input FILE` for large content.
 The UI renders text literally, including Markdown, without executing HTML.

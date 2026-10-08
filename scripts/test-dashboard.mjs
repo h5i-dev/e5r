@@ -66,6 +66,8 @@ try {
   const functions = await (await fetch(url + "/api/functions")).json();
   const main = functions.items.find((f) => f.name === "main");
   assert(main);
+  const parser = functions.items.find(f => f.name === "parse_header");
+  assert(parser);
   const decompiled = await (
     await fetch(url + `/api/decompile/${main.addr}`)
   ).json();
@@ -148,6 +150,8 @@ try {
   for (const kind of ["finding", "note", "report"]) {
     cli("project", "record", project, kind, "add", `${kind} title`, "--description", '<img src=x onerror="window.taskXss=true">', "--evidence", `function:${main.addr}`, "--author", "agent-b");
   }
+  cli("project", "record", project, "note", "add", "Parser-only note", "--description", "Parser investigation", "--evidence", `function:${parser.addr}`);
+  cli("project", "record", project, "note", "add", "Unlinked project note", "--description", "General project context");
   const record = JSON.parse(cli("project", "record", project, "finding", "list", "--json")).tasks[0].task;
   writeFileSync(input, JSON.stringify({...record.content, description:"Updated finding"}));
   cli("project", "record", project, "finding", "update", record.id, "--revision", "1", "--input", input);
@@ -169,6 +173,29 @@ try {
   await page.locator(".line-source").first().waitFor();
   assert.equal(await page.locator("#function-name").textContent(), "main");
   assert(await page.locator("#code").textContent());
+  assert.equal(await page.locator("#function-note-count").textContent(), "1");
+  assert.equal(await page.locator("#function-notes strong").textContent(), "note title");
+  await page.locator("#function-notes button").click();
+  assert.equal(await page.getByRole("tab", {name:"Notes", exact:true}).getAttribute("aria-selected"), "true");
+  assert.equal(await page.locator("#code .function-note").count(), 1);
+  assert((await page.locator("#code").textContent()).includes('<img src=x onerror="window.taskXss=true">'));
+  assert.equal(await page.locator("#code img").count(), 0);
+  const note = JSON.parse(cli("project", "record", project, "note", "list", "--json")).tasks.find(r => r.task.content.title === "note title").task;
+  writeFileSync(input, JSON.stringify({...note.content, description:"Updated function note\nSecond line"}));
+  cli("project", "record", project, "note", "update", note.id, "--revision", "1", "--input", input, "--author", "agent-c");
+  await page.locator("#refresh").click();
+  await page.locator("#code .record-body").filter({hasText:"Updated function note"}).waitFor();
+  assert((await page.locator("#function-notes").textContent()).includes("Updated function note"));
+  assert((await page.locator("#code").textContent()).includes("agent-c"));
+  await page.screenshot({path:"/tmp/e5r-dashboard-function-notes.png", fullPage:true});
+  await page.locator("#function-search").fill("parse_header");
+  await page.locator('.function-row[title="parse_header"]').click();
+  assert.equal(await page.locator("#code .function-note h3").textContent(), "Parser-only note");
+  assert(!(await page.locator("#code").textContent()).includes("Updated function note"));
+  await page.locator("#back").click();
+  await page.locator("#code .record-body").filter({hasText:"Updated function note"}).waitFor();
+  await page.getByRole("tab", {name:"Pseudocode"}).click();
+  await page.locator(".line-source").first().waitFor();
   await page.screenshot({
     path: "/tmp/e5r-dashboard-decompiler.png",
     fullPage: true,
@@ -249,7 +276,7 @@ try {
   assert.equal(saved.revision, 2);
   assert.equal(saved.history.length, 1);
   console.log(
-    "Dashboard integration passed: CLI parity, read-only UI, live agent updates, full task view, records, call graph, synchronized function navigation, back/forward history, reading controls, keyboard tabs, mobile evidence, XSS, mobile layout, HTTP boundaries.",
+    "Dashboard integration passed: CLI parity, read-only UI, live agent updates, full task view, records, call graph, synchronized function navigation, back/forward history, reading controls, keyboard tabs, mobile evidence, function notes and live updates, XSS, mobile layout, HTTP boundaries.",
   );
 } finally {
   if (browser) await browser.close();

@@ -912,3 +912,13 @@ kbd { font: inherit; color: var(--ink); }
   .dialog-head { align-items: flex-start; gap: 12px; }
   .dialog-foot { flex-wrap: wrap; }
 }
+
+.function-notes { font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.function-note-preview { display: block; width: 100%; text-align: left; background: transparent; border: 0; border-top: 1px solid var(--line); padding: 12px 0; line-height: 1.7; }
+.function-note-preview strong { display: block; font-size: 13px; }
+.function-note-preview:hover strong { color: var(--accent); }
+.note-excerpt { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; white-space: pre-wrap; color: var(--muted); margin: 6px 0; }
+.function-note-preview small { display: block; font-size: 12px; }
+.function-note { padding: 20px 24px; border-bottom: 1px solid var(--line); }
+.function-note h3 { margin: 0; font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
+.function-note .record-body { font-size: 14px; }
