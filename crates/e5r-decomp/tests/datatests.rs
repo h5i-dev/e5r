@@ -21,6 +21,7 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use e5r_analysis::{Options, Program, analyze};
@@ -260,39 +261,47 @@ fn elseif() {
 
 /// orcompare.xml: two comparisons joined by a short-circuit or.
 ///
-/// Ghidra fuses the pair into `if (a == 10 || b == 20)`. We do not fuse, so the
-/// property is what fusing is derived from: both comparisons are there, and the
-/// arm they share is reached from each of them.
+/// The pair comes out as one `&&` of the negated tests, which is the same
+/// branch as `a == 10 || b == 20`. Each sink is reached once.
 #[test]
 fn orcompare() {
     case(&all("control"), "orcompare", |c| {
-        c.has("10").has("20").times("sink1(", 2).times("sink2(", 1);
+        c.has("10")
+            .has("20")
+            .has("&&")
+            .times("sink1(", 1)
+            .times("sink2(", 1);
     });
 }
 
-/// orcompare.xml, the three-way case: a chain of three ors.
+/// orcompare.xml, the three-way case: a chain of three ors, one condition.
 #[test]
 fn orcompare_three_terms() {
     case(&all("control"), "orcompare3", |c| {
-        c.at_least("if (", 3).times("sink3(", 3).times("sink4(", 1);
+        c.has("100")
+            .has("200")
+            .has("300")
+            .has("&&")
+            .times("if (", 1)
+            .times("sink3(", 1)
+            .times("sink4(", 1);
     });
 }
 
 /// ccmp.xml: two comparisons joined by a short-circuit and, which AArch64
 /// compiles into one `ccmp` against the flags the first left behind.
 ///
-/// Ghidra's assertion is that the pair reads as `ptr[1] == 0x3c && val < 10`
-/// with no `SBORROW` left over. Ours keeps them as nested tests, and the
-/// property is that both comparisons survive with their operands intact: the
-/// load of the second element compared against 60, and the bound on the
-/// argument.
+/// The pair reads as one `&&`: the load of the second element compared against
+/// 60, and the bound on the argument. Each sink is reached once, and no
+/// `__borrow` is left over.
 #[test]
 fn ccmp() {
     case(&all("control"), "andcompare", |c| {
         c.has("+ 4")
             .has("== 60")
+            .has("&&")
             .times("sink5(", 1)
-            .times("sink6(", 2)
+            .times("sink6(", 1)
             .lacks("__borrow");
     });
 }
@@ -557,6 +566,24 @@ fn stackstring() {
     builds.push("dt-memory.x64.O2".to_string());
     case(&builds, "stackstring", |c| {
         c.has("0x6f77206f6c6c6568");
+    });
+}
+
+/// SSA gives every definition a version, but several versions of one promoted
+/// stack slot are one C local rather than a row of invented temporaries.
+#[test]
+fn promoted_stack_slot_has_one_name() {
+    case(&["driver.x64.O0".to_string()], "compares", |c| {
+        let declarations: Vec<&str> = c
+            .text
+            .lines()
+            .filter(|line| line.trim_start().starts_with("uint32_t v"))
+            .collect();
+        if declarations.len() != 1 {
+            c.fail(&format!(
+                "one promoted stack slot should have one declaration: {declarations:?}"
+            ));
+        }
     });
 }
 
@@ -867,15 +894,123 @@ fn convert() {
     });
 }
 
-/// deindirect.xml and indproto.xml, the argument half: an indirect call comes
-/// out as `__callind(target)` with no arguments at all, so `f(b + 3)` loses the
-/// `b + 3`. The two calls here also share a target that is a single global
-/// holding one function, which Ghidra collapses to a direct call to it.
+/// deindirect.xml and indproto.xml, the argument half: an indirect call keeps
+/// the registers prepared for it, so `f(b + 3)` does not lose the `b + 3`.
 #[test]
-#[ignore = "an indirect call is emitted without its arguments and is never devirtualized"]
+fn indirect_call_keeps_arguments() {
+    case(&all("calls"), "deindirect", |c| {
+        let calls: Vec<&str> = c
+            .text
+            .lines()
+            .filter(|line| line.contains("= (uint64_t)(__callind("))
+            .collect();
+        if calls.len() != 2 {
+            c.fail(&format!(
+                "expected two indirect call statements, found {calls:?}"
+            ));
+        }
+        if !calls[0].contains("+ 3") || !calls[1].contains("+ 5") {
+            c.fail(&format!(
+                "indirect call arguments were not preserved: {calls:?}"
+            ));
+        }
+        // Each call has one target and one argument. A clobber marker from
+        // the first call must not look like preparation for the second.
+        for call in calls {
+            if call.matches(',').count() != 1 {
+                c.fail(&format!(
+                    "indirect call acquired spurious arguments: {call}"
+                ));
+            }
+        }
+    });
+}
+
+/// An import thunk has an unknown prototype, not a zero-argument prototype.
+/// Prepared argument registers therefore stay attached to PLT calls.
+#[test]
+fn plt_calls_keep_prepared_arguments() {
+    case(&["hello.a64.O0".to_string()], "main", |c| {
+        // The prototype is unknown, so the call is cast to the arguments this
+        // site prepared. An empty call is the bug.
+        c.has("strlen_plt)")
+            .has("*(uint64_t *)")
+            .has("printf_plt)")
+            .lacks("strlen_plt()");
+    });
+}
+
+/// A wrapper's `ret` reads `x0`. The call that produced it also clobbers `x1`,
+/// which the convention lists as a second result register. That clobber is not
+/// the return value, and a phi of the real result still has to be named: the
+/// return operation itself does not mention it.
+#[test]
+fn a_returned_call_is_the_call_result() {
+    let Some(cc) = ["clang", "cc", "gcc"]
+        .into_iter()
+        .find(|name| Command::new(name).arg("--version").output().is_ok())
+    else {
+        return;
+    };
+    let dir = std::env::temp_dir().join("e5r-returned-call");
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("w.c");
+    std::fs::write(
+        &src,
+        "int callee(int x){return x+1;}
+         int wrapper(int x){return callee(x);}
+         int branchy(int x){if(x)return callee(x);return callee(x+1);}\n",
+    )
+    .unwrap();
+    let bin = dir.join("w.o");
+    let compiled = Command::new(cc)
+        .args(["-c", "-O0", "-fno-builtin", "-o"])
+        .arg(&bin)
+        .arg(&src)
+        .output();
+    let Ok(output) = compiled else { return };
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let data = std::fs::read(&bin).unwrap();
+    let obj = e5r_format::load(&data, &LoadOptions::default()).expect("load wrapper");
+    let program = analyze(obj, &Options::default());
+    let targets: Vec<&e5r_analysis::Function> = program
+        .functions_by_address()
+        .filter(|f| {
+            f.name
+                .as_deref()
+                .is_some_and(|n| n == "wrapper" || n == "branchy")
+        })
+        .collect();
+    assert_eq!(targets.len(), 2, "compiled functions were not recovered");
+    let text = e5r_api::decompile_program(&program, &targets).text();
+    assert!(!text.contains("__phi"), "{text}");
+    assert!(text.contains("callee"), "{text}");
+    // The returned expression is the call's result. A clobber of the high
+    // half may still be named; it must not be what the function returns.
+    for body in text.split("uint64_t ").skip(1) {
+        let Some(ret) = body.lines().rev().find(|line| line.contains("return")) else {
+            continue;
+        };
+        assert!(
+            !ret.contains("__clobbered") && !ret.contains("__phi"),
+            "{text}"
+        );
+    }
+}
+
+/// deindirect.xml, the target half: both calls load one writable global that
+/// initially points at `realfunc`. Ghidra collapses them to direct calls. Doing
+/// that here needs proof the global cannot change between load and call; its
+/// initial contents alone are not enough.
+#[test]
+#[ignore = "a writable function pointer is not devirtualized without mutation analysis"]
 fn deindirect() {
     case(&all("calls"), "deindirect", |c| {
-        c.has("realfunc").has("+ 3").has("+ 5");
+        c.has("realfunc");
     });
 }
 

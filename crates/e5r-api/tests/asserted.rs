@@ -260,9 +260,12 @@ fn the_variables_come_back_with_their_names_and_types() {
     };
     assert_eq!(named("arg0").role, Role::Parameter);
     assert_eq!(named("arg0").ty, "struct s_dupptr_arg0 *");
-    assert_eq!(named("v2").role, Role::Local);
-    assert_eq!(named("v2").ty, "uint32_t");
-    assert_eq!(named("v2").size, 4);
+    let masked = d
+        .variables
+        .iter()
+        .find(|v| v.role == Role::Local && v.ty == "uint32_t" && v.size == 4)
+        .unwrap_or_else(|| panic!("no uint32 local in {:?}", d.variables));
+    assert!(word(&d.text, &masked.name), "{}", d.text);
     // Every variable the text declares is a variable the text mentions.
     for v in &d.variables {
         assert!(word(&d.text, &v.name), "{} is not in the body", v.name);
@@ -292,7 +295,11 @@ fn an_access_through_a_pointer_reads_as_a_field() {
     // offset then reads as the field it is rather than as arithmetic.
     let text = unit(&p, "dupptr", None);
     assert!(text.contains("struct s_dupptr_arg0 {"), "{text}");
-    assert!(text.contains("arg0[v0].field_c"), "{text}");
+    // The index is the argument itself once it is not forced into a temporary.
+    assert!(
+        text.contains("arg0[") && text.contains(".field_c"),
+        "{text}"
+    );
     // The name says the offset, which is the honest thing for a field nobody
     // declared: `field_c` is this crate's name for what is at twelve, not a
     // name anyone wrote down.
@@ -332,6 +339,7 @@ fn a_declared_field_name_beats_the_one_the_offset_implies() {
             stride: Some(4),
             stack: None,
         }],
+        parameters_known: true,
         returns: Some("uint64_t".to_string()),
         definitions: Vec::new(),
         locals: BTreeMap::new(),

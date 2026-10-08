@@ -8,7 +8,7 @@ use e5r_ir::op::{Op, Space};
 use e5r_ir::ssa::{Operand, SsaFunction, SsaKind, SsaOp, Value};
 
 use crate::expr::{Expr, Rebuilder, c_type, input_name, negate};
-use crate::structure::{Graph, Region, Switches, Taken, structure_with};
+use crate::structure::{Graph, Region, Switches, Taken, lift_exit_guards, structure_with};
 
 /// A decompiled function.
 #[derive(Debug, Clone)]
@@ -32,6 +32,8 @@ pub struct Output {
     pub signature: String,
     /// How many parameters it declares, so a call to it passes that many.
     pub arity: usize,
+    /// Whether an empty parameter list proves there are no parameters.
+    pub parameters_known: bool,
     /// Which of them are pointers.
     pub pointer_parameters: Vec<bool>,
     /// How wide each one is declared, in bytes, so a caller passing a constant
@@ -48,6 +50,8 @@ pub struct Output {
 pub struct Prototype {
     /// The parameters, in order.
     pub parameters: Vec<Param>,
+    /// False for an import whose body cannot reveal what callers pass.
+    pub parameters_known: bool,
     /// The return type as C spells it.
     pub returns: Option<String>,
     /// Local variables by their offset from the frame base.
@@ -63,6 +67,8 @@ pub struct Callee {
     pub name: String,
     /// How many parameters it declares.
     pub arity: usize,
+    /// False when callers must recover prepared arguments at the call site.
+    pub parameters_known: bool,
     /// Which of them are pointers, so a call passes something C will take.
     pub pointer_parameters: Vec<bool>,
     /// How wide each one is declared, in bytes.
@@ -155,7 +161,10 @@ pub fn decompile_full(
             Some((*a, Addr(target)))
         })
         .collect();
-    let s = structure_with(f.entry, &graph, &taken, switches);
+    let mut s = structure_with(f.entry, &graph, &taken, switches);
+    // Done here, where a block's real work can be weighed. `structure_with`
+    // only has the graph, and a diamond of empty blocks must stay an if/else.
+    lift_exit_guards(&mut s.root, &graph, &s.labels, &block_weights(f));
     let mut rebuilder = Rebuilder::new(f);
     // A declared parameter arrives in a register the convention chooses, so
     // the body can use the name the source gave it rather than `arg0`.
@@ -212,13 +221,32 @@ pub fn decompile_full(
         callees,
         returns,
         unmodelled: 0,
+        dead: BTreeSet::new(),
     };
 
-    let body = {
+    let mut body = {
         let mut out = String::new();
         e.region(&mut out, &s.root, 1);
         out
     };
+    // SSA carries every live machine register through a join, including
+    // clobbers and bookkeeping no emitted statement ever reads. Remove only
+    // names used exclusively as assignment destinations. Re-emit so phi
+    // diamonds exposed by that removal can become conditional expressions.
+    for _ in 0..4 {
+        let dead = dead_locals(&body, rebuilder.locals.values());
+        if dead == e.dead {
+            break;
+        }
+        e.dead = dead;
+        e.unmodelled = 0;
+        body.clear();
+        e.region(&mut body, &s.root, 1);
+    }
+    body = inline_condition_assignments(&body);
+    body = inline_return_assignments(&body);
+    body = e.inline_terminal_if_returns(&body);
+    body = remove_return_after_loop_control(&body);
 
     // Values that arrive from outside and are not arguments: registers the
     // function inherited. Declaring them says where they came from without
@@ -276,7 +304,15 @@ pub fn decompile_full(
 
     let mut declarations: Vec<String> =
         prototype.map(|p| p.definitions.clone()).unwrap_or_default();
-    declarations.extend(helpers.iter().map(|h| h.to_string()));
+    // A clobber or an unmodelled condition that structuring never printed is
+    // not a call, and declaring the helper for it makes the unit look like it
+    // uses a value it does not.
+    declarations.extend(
+        helpers
+            .iter()
+            .filter(|h| helper_used(&body, h))
+            .map(|h| h.to_string()),
+    );
     declarations.extend(
         called
             .iter()
@@ -322,8 +358,11 @@ pub fn decompile_full(
         Some(p) => p.parameters.iter().map(|param| param.size).collect(),
         None => vec![8; arity],
     };
-    let declared_parameters = if declared.is_empty() {
+    let parameters_known = prototype.is_none_or(|p| p.parameters_known);
+    let declared_parameters = if declared.is_empty() && parameters_known {
         "void".to_string()
+    } else if declared.is_empty() {
+        String::new()
     } else {
         declared.join(", ")
     };
@@ -342,7 +381,11 @@ pub fn decompile_full(
     for (name, ty) in &inherited {
         let _ = writeln!(text, "    {ty} {name};  // inherited");
     }
+    let mut declared_locals: BTreeSet<&str> = BTreeSet::new();
     for (value, local) in &rebuilder.locals {
+        if !mentions(&body, local) || !declared_locals.insert(local) {
+            continue;
+        }
         let ty = if rebuilder.floats.contains(&value.location) {
             crate::expr::float_type(value.location.size)
         } else {
@@ -360,12 +403,13 @@ pub fn decompile_full(
         text,
         signature,
         arity,
+        parameters_known,
         pointer_parameters,
         parameter_widths,
         declarations,
         gotos: s.gotos,
         lost: s.lost.len(),
-        locals: rebuilder.locals.len(),
+        locals: declared_locals.len(),
         unmodelled: e.unmodelled,
     }
 }
@@ -425,6 +469,11 @@ pub fn identifier(name: &str) -> String {
 
 /// True when a name appears in the text as a whole word.
 fn mentions(text: &str, name: &str) -> bool {
+    // An empty name is a substring of every string, and the search would
+    // never advance.
+    if name.is_empty() {
+        return false;
+    }
     let mut at = 0;
     while let Some(found) = text[at..].find(name) {
         let start = at + found;
@@ -441,6 +490,13 @@ fn mentions(text: &str, name: &str) -> bool {
 }
 
 /// The declaration an operation's helper needs, when it has one.
+/// Whether the emitted body calls the helper a declaration would introduce.
+fn helper_used(body: &str, declaration: &str) -> bool {
+    let head = declaration.split('(').next().unwrap_or(declaration);
+    let name = head.rsplit(' ').next().unwrap_or(head);
+    !name.is_empty() && body.contains(name)
+}
+
 fn helper_for(o: Op) -> Option<&'static str> {
     Some(match o {
         Op::FloatAdd
@@ -465,7 +521,11 @@ fn helper_for(o: Op) -> Option<&'static str> {
         Op::FloatConvert | Op::IntToFloat | Op::UIntToFloat | Op::FloatToInt | Op::FloatToUInt => {
             REINTERPRET
         }
-        Op::CallInd => "uint64_t __callind(uint64_t);",
+        // The first argument is the target. The rest are the argument
+        // registers we can prove were prepared for this call. An unspecified
+        // tail would make calls with arguments fail the recompilability gate;
+        // a variadic tail says only that the target's prototype is unknown.
+        Op::CallInd => "uint64_t __callind(uint64_t, ...);",
         Op::BranchInd => "void __indirect_branch(uint64_t);",
         Op::IntDiv128 => "uint64_t __udiv128(uint64_t, uint64_t, uint64_t);",
         Op::IntSDiv128 => "uint64_t __sdiv128(uint64_t, uint64_t, uint64_t);",
@@ -487,40 +547,68 @@ fn helper_for(o: Op) -> Option<&'static str> {
 
 /// Which register the function leaves its result in, if any.
 ///
-/// The convention lists the candidates; which one this function writes says
-/// whether it returns an integer, a floating point value, or nothing.
+/// The convention lists the candidates. A call then marks every other
+/// caller-saved register undefined, and on AArch64 that includes `x1`, which
+/// is also where a two-register result would come back. That clobber is not a
+/// value the function computed. Counting it made every wrapper `return
+/// __clobbered()` and dropped the call result on the floor.
 fn result_register(f: &SsaFunction, r: &Rebuilder) -> Option<u64> {
-    // The one written latest before the return. A function that computes into
-    // a general register and then converts into a vector one writes both, and
-    // only the order says which the caller reads.
-    let mut best: Option<(usize, u64)> = None;
+    let mut found: Vec<u64> = Vec::new();
     for b in f.blocks.values() {
-        let returns = b.ops.iter().any(|op| op.kind == SsaKind::Op(Op::Return));
-        if !returns {
+        if !b.ops.iter().any(|op| op.kind == SsaKind::Op(Op::Return)) {
             continue;
         }
-        for (n, op) in b.ops.iter().enumerate() {
-            let Some(v) = op.out else { continue };
-            if v.location.space != Space::Register || !r.abi.results.contains(&v.location.offset) {
-                continue;
-            }
-            if best.map(|(at, _)| n > at).unwrap_or(true) {
-                best = Some((n, v.location.offset));
-            }
+        if let Some(offset) = result_in_block(b, r) {
+            found.push(offset);
         }
     }
-    if let Some((_, offset)) = best {
+    // Several blocks can return. The earliest result register any of them
+    // actually writes is the one the convention reads first: `x0` before the
+    // high half, and either before a vector result nobody computed.
+    if let Some(offset) = r.abi.results.iter().copied().find(|o| found.contains(o)) {
         return Some(offset);
     }
     // Nothing was written in the returning block, so whichever the function
-    // writes at all is the answer.
+    // writes at all is the answer. A clobber still is not a write.
     r.abi.results.iter().copied().find(|offset| {
         f.blocks.values().any(|b| {
-            b.ops
-                .iter()
-                .any(|op| op.out.is_some_and(|v| v.location.offset == *offset))
+            b.ops.iter().any(|op| {
+                op.kind != SsaKind::Op(Op::Undefine)
+                    && op.out.is_some_and(|v| {
+                        v.location.space == Space::Register && v.location.offset == *offset
+                    })
+            })
         })
     })
+}
+
+/// The result register one returning block leaves behind.
+///
+/// A real operation beats a phi: phis for every live register sit at the top
+/// of the block in location order, and the last of them would otherwise be
+/// `x1`'s merge rather than the value the block computed. With only phis, the
+/// earliest result register is the one the caller reads.
+fn result_in_block(b: &e5r_ir::ssa::SsaBlock, r: &Rebuilder) -> Option<u64> {
+    let mut latest_real: Option<(usize, u64)> = None;
+    let mut phis: Vec<u64> = Vec::new();
+    for (n, op) in b.ops.iter().enumerate() {
+        if op.kind == SsaKind::Op(Op::Undefine) {
+            continue;
+        }
+        let Some(v) = op.out else { continue };
+        if v.location.space != Space::Register || !r.abi.results.contains(&v.location.offset) {
+            continue;
+        }
+        if op.kind == SsaKind::Phi {
+            phis.push(v.location.offset);
+        } else {
+            latest_real = Some((n, v.location.offset));
+        }
+    }
+    if let Some((_, offset)) = latest_real {
+        return Some(offset);
+    }
+    r.abi.results.iter().copied().find(|o| phis.contains(o))
 }
 
 /// The declared return type, from where the result was left.
@@ -568,6 +656,118 @@ fn parameter_list(f: &SsaFunction, r: &Rebuilder) -> Vec<String> {
         }
     }
     seen.into_values().collect()
+}
+
+/// How much each block does, ignoring the branch that structuring already
+/// accounted for. The return itself is the shared tail, so it does not count
+/// as work that would make a guard look heavy. A phi is written as an
+/// assignment on the incoming edge, so that assignment belongs to the
+/// predecessor: a guard's only work is often just that copy. A phi of a
+/// clobber is not work. Counting it made every call's guard look as heavy
+/// as the call.
+fn block_weights(f: &SsaFunction) -> BTreeMap<Addr, u32> {
+    let defs = f.definitions();
+    let real = |input: &Operand| -> bool {
+        match input {
+            Operand::Undefined(_) => false,
+            Operand::Const(_, _) => true,
+            Operand::Value(v) => defs.get(v).is_none_or(|(at, index)| {
+                f.blocks
+                    .get(at)
+                    .and_then(|b| b.ops.get(*index))
+                    .is_none_or(|op| op.kind != SsaKind::Op(Op::Undefine))
+            }),
+        }
+    };
+    let mut weights: BTreeMap<Addr, u32> = f
+        .blocks
+        .iter()
+        .map(|(at, block)| {
+            let weight = block
+                .ops
+                .iter()
+                .filter(|op| {
+                    !matches!(
+                        op.kind,
+                        SsaKind::Phi
+                            | SsaKind::Op(Op::Branch | Op::CBranch | Op::BranchInd | Op::Return)
+                    )
+                })
+                .count() as u32;
+            (*at, weight)
+        })
+        .collect();
+    for block in f.blocks.values() {
+        for (slot, pred) in block.predecessors.iter().enumerate() {
+            let copies = block
+                .ops
+                .iter()
+                .filter(|op| {
+                    op.kind == SsaKind::Phi
+                        && op.out.is_some()
+                        && op.inputs.get(slot).is_some_and(real)
+                })
+                .count() as u32;
+            *weights.entry(*pred).or_default() += copies;
+        }
+    }
+    weights
+}
+
+/// The `if` nested as the then-arm, when the block in front of it is only its
+/// own head. Anything else between the two tests is a statement `&&` would skip.
+fn nested_if(then: &Region) -> Option<(Addr, bool, &Region, Option<&Region>)> {
+    match then {
+        Region::If {
+            head,
+            invert,
+            then,
+            otherwise,
+        } => Some((*head, *invert, then, otherwise.as_deref())),
+        Region::Seq(parts) => {
+            let [
+                Region::Block(block),
+                Region::If {
+                    head,
+                    invert,
+                    then,
+                    otherwise,
+                },
+            ] = parts.as_slice()
+            else {
+                return None;
+            };
+            (*block == *head).then_some((*head, *invert, then.as_ref(), otherwise.as_deref()))
+        }
+        _ => None,
+    }
+}
+
+/// True when `region` is, or begins with, the block a goto names.
+fn starts_at(region: &Region, at: Addr) -> bool {
+    match region {
+        Region::Block(block) => *block == at,
+        Region::Seq(parts) => parts.first().is_some_and(|part| starts_at(part, at)),
+        Region::If { head, .. } => *head == at,
+        _ => false,
+    }
+}
+
+/// One test in a chain that shares an arm.
+struct AndTerm {
+    at: Addr,
+    invert: bool,
+    /// The then-arm of this test is the one that continues toward the unique arm.
+    unique_when_held: bool,
+}
+
+/// True when a loop body is only the edge back to its header.
+fn falls_straight_back(region: &Region) -> bool {
+    match region {
+        Region::Empty | Region::Continue => true,
+        Region::Seq(parts) => parts.iter().all(falls_straight_back),
+        _ => false,
+    }
 }
 
 /// The blocks a region tree turned into a `switch`.
@@ -630,17 +830,350 @@ struct Emitter<'a> {
     /// they mean.
     returns: Option<String>,
     unmodelled: usize,
+    /// Pure locals whose emitted assignments have no reader.
+    dead: BTreeSet<String>,
+}
+
+/// Names that occur only on the left of assignments in the emitted body.
+fn dead_locals<'a>(body: &str, locals: impl Iterator<Item = &'a String>) -> BTreeSet<String> {
+    let mut dead = BTreeSet::new();
+    for name in locals {
+        let mut read = false;
+        for line in body.lines().filter(|line| mentions(line, name)) {
+            let line = line.trim();
+            let prefix = format!("{name} = ");
+            let Some(rhs) = line.strip_prefix(&prefix) else {
+                read = true;
+                break;
+            };
+            if mentions(rhs, name) {
+                read = true;
+                break;
+            }
+        }
+        if !read {
+            dead.insert(name.clone());
+        }
+    }
+    dead
+}
+
+/// Fold an assignment immediately consumed by a return into that return.
+///
+/// This runs after dead-local discovery: marking the assigned SSA value dead
+/// would suppress its defining operation on the next emission pass. Keeping
+/// the fold textual also makes the restriction obvious -- no intervening
+/// statement, label, or control edge can be crossed.
+fn inline_return_assignments(body: &str) -> String {
+    let lines: Vec<&str> = body.lines().collect();
+    let mut out = String::with_capacity(body.len());
+    let mut at = 0;
+    while at < lines.len() {
+        if let Some(next) = lines.get(at + 1)
+            && let Some((indent, name, value)) = assignment_line(lines[at])
+            && !value.contains("__callind(")
+            && let Some((prefix, suffix)) = returned_local(next, indent, name)
+        {
+            let _ = writeln!(out, "{indent}return {prefix}{value}{suffix}");
+            at += 2;
+            continue;
+        }
+        let _ = writeln!(out, "{}", lines[at]);
+        at += 1;
+    }
+    out
+}
+
+/// Fold a temporary used once by the immediately following condition.
+///
+/// The right-hand side stays at the same sequence point and is substituted
+/// exactly once, so calls are neither duplicated nor reordered.
+fn inline_condition_assignments(body: &str) -> String {
+    let lines: Vec<&str> = body.lines().collect();
+    let mut out = String::with_capacity(body.len());
+    let mut at = 0;
+    while at < lines.len() {
+        if let Some(next) = lines.get(at + 1)
+            && let Some((indent, name, value)) = assignment_line(lines[at])
+            && next.starts_with(indent)
+            && next[indent.len()..].starts_with("if (")
+            && token_occurrences(next, name) == 1
+            && lines[at + 1..]
+                .iter()
+                .map(|line| token_occurrences(line, name))
+                .sum::<usize>()
+                == 1
+        {
+            let replaced = replace_token(next, name, &format!("({value})"));
+            let _ = writeln!(out, "{replaced}");
+            at += 2;
+            continue;
+        }
+        let _ = writeln!(out, "{}", lines[at]);
+        at += 1;
+    }
+    out
+}
+
+fn token_occurrences(text: &str, name: &str) -> usize {
+    text.match_indices(name)
+        .filter(|(at, _)| {
+            let end = at + name.len();
+            let boundary =
+                |c: Option<char>| c.is_none_or(|c| !(c == '_' || c.is_ascii_alphanumeric()));
+            boundary(text[..*at].chars().next_back()) && boundary(text[end..].chars().next())
+        })
+        .count()
+}
+
+fn replace_token(text: &str, name: &str, value: &str) -> String {
+    let Some((at, _)) = text.match_indices(name).find(|(at, _)| {
+        let end = at + name.len();
+        let boundary = |c: Option<char>| c.is_none_or(|c| !(c == '_' || c.is_ascii_alphanumeric()));
+        boundary(text[..*at].chars().next_back()) && boundary(text[end..].chars().next())
+    }) else {
+        return text.to_string();
+    };
+    format!("{}{}{}", &text[..at], value, &text[at + name.len()..])
+}
+
+/// A copied exit after an unconditional loop edge is unreachable. Restrict
+/// this cleanup to the adjacent return shape so labels and other entry points
+/// remain untouched.
+fn remove_return_after_loop_control(body: &str) -> String {
+    let lines: Vec<&str> = body.lines().collect();
+    let mut out = String::with_capacity(body.len());
+    let mut at = 0;
+    while at < lines.len() {
+        let line = lines[at];
+        let control = matches!(line.trim(), "break;" | "continue;");
+        let same_indent_return = lines.get(at + 1).is_some_and(|next| {
+            let indent = line.len() - line.trim_start().len();
+            next.len() >= indent
+                && next[..indent] == line[..indent]
+                && next[indent..].starts_with("return ")
+        });
+        let _ = writeln!(out, "{line}");
+        at += if control && same_indent_return { 2 } else { 1 };
+    }
+    out
+}
+
+fn assignment_line(line: &str) -> Option<(&str, &str, &str)> {
+    let indent_len = line.len() - line.trim_start().len();
+    let (indent, statement) = line.split_at(indent_len);
+    let statement = statement.strip_suffix(';')?;
+    let (name, value) = statement.split_once(" = ")?;
+    if name.is_empty()
+        || !name.chars().all(|c| c == '_' || c.is_ascii_alphanumeric())
+        || !name
+            .chars()
+            .next()
+            .is_some_and(|c| c == '_' || c.is_ascii_alphabetic())
+    {
+        return None;
+    }
+    Some((indent, name, value))
+}
+
+fn returned_local<'a>(line: &'a str, indent: &str, name: &str) -> Option<(&'a str, &'a str)> {
+    let statement = line.strip_prefix(indent)?.strip_prefix("return ")?;
+    let occurrence = statement.find(name)?;
+    let after = occurrence + name.len();
+    let boundary = |c: Option<char>| c.is_none_or(|c| !(c == '_' || c.is_ascii_alphanumeric()));
+    if !boundary(statement[..occurrence].chars().next_back())
+        || !boundary(statement[after..].chars().next())
+        || statement[after..].contains(name)
+        || statement[..occurrence].contains(name)
+    {
+        return None;
+    }
+    Some((&statement[..occurrence], &statement[after..]))
+}
+
+/// A `Block(head), If(head)` pair whose true arm is the whole guard body.
+fn plain_guard(parts: &[Region], at: usize) -> Option<(Addr, bool, &Region)> {
+    let [
+        Region::Block(block),
+        Region::If {
+            head,
+            invert,
+            then,
+            otherwise,
+        },
+    ] = parts.get(at..at + 2)?
+    else {
+        return None;
+    };
+    (*block == *head && otherwise.is_none() && **then != Region::Empty).then_some((
+        *head,
+        *invert,
+        then.as_ref(),
+    ))
+}
+
+/// Remove the longest sequence duplicated at the end of an arm and directly
+/// after its `if`.
+fn without_following_suffix(region: &Region, following: &[Region]) -> Option<Region> {
+    let Region::Seq(parts) = region else {
+        return None;
+    };
+    let most = parts.len().min(following.len());
+    let copied = (1..=most)
+        .rev()
+        .find(|count| parts[parts.len() - count..] == following[..*count])?;
+    let prefix = &parts[..parts.len() - copied];
+    if prefix.is_empty() {
+        return None;
+    }
+    Some(match prefix {
+        [only] => only.clone(),
+        prefix => Region::Seq(prefix.to_vec()),
+    })
+}
+
+/// `if (a) { prep; if (b) unique else shared } else shared` can write the
+/// shared region once after the outer conditional even when `prep` prevents
+/// combining the two tests with `&&`.
+fn nested_shared_tail<'a>(
+    then: &'a Region,
+    shared: &'a Region,
+) -> Option<(Region, Addr, bool, &'a Region)> {
+    let Region::Seq(parts) = then else {
+        return None;
+    };
+    let [
+        prefix @ ..,
+        Region::Block(block),
+        Region::If {
+            head,
+            invert,
+            then: inner_then,
+            otherwise: Some(inner_else),
+        },
+    ] = parts.as_slice()
+    else {
+        return None;
+    };
+    if block != head {
+        return None;
+    }
+    let (inner_invert, unique) = if inner_else.as_ref() == shared {
+        (*invert, inner_then.as_ref())
+    } else if inner_then.as_ref() == shared {
+        (!*invert, inner_else.as_ref())
+    } else {
+        return None;
+    };
+    let mut before = prefix.to_vec();
+    before.push(Region::Block(*block));
+    Some((Region::Seq(before), *head, inner_invert, unique))
+}
+
+fn contains_conditional(region: &Region) -> bool {
+    match region {
+        Region::If { .. } | Region::Switch { .. } | Region::While { .. } => true,
+        Region::Seq(parts) => parts.iter().any(contains_conditional),
+        Region::Infinite { body, .. } => contains_conditional(body),
+        _ => false,
+    }
 }
 
 impl Emitter<'_> {
+    /// Turn a terminal assignment diamond followed by `return result` into
+    /// early returns in its arms. This also catches diamonds separated from
+    /// their exit block in the region tree by a condition-producing block.
+    fn inline_terminal_if_returns(&self, body: &str) -> String {
+        let lines: Vec<&str> = body.lines().collect();
+        let mut out = String::with_capacity(body.len());
+        let mut at = 0;
+        while at < lines.len() {
+            let line = lines[at];
+            let indent_len = line.len() - line.trim_start().len();
+            let indent = &line[..indent_len];
+            let is_if = line[indent_len..].starts_with("if (") && line.ends_with('{');
+            let else_at = is_if.then(|| {
+                (at + 1..lines.len()).find(|i| lines[*i] == format!("{indent}}} else {{"))
+            });
+            let close_at = else_at.flatten().and_then(|middle| {
+                (middle + 1..lines.len()).find(|i| lines[*i] == format!("{indent}}}"))
+            });
+            let Some((middle, close)) = else_at.flatten().zip(close_at) else {
+                let _ = writeln!(out, "{line}");
+                at += 1;
+                continue;
+            };
+            let Some(return_line) = lines.get(close + 1) else {
+                let _ = writeln!(out, "{line}");
+                at += 1;
+                continue;
+            };
+            let Some((_, then_name, then_value)) = lines
+                .get(middle.wrapping_sub(1))
+                .and_then(|line| assignment_line(line))
+            else {
+                let _ = writeln!(out, "{line}");
+                at += 1;
+                continue;
+            };
+            let Some((_, else_name, else_value)) = lines
+                .get(close.wrapping_sub(1))
+                .and_then(|line| assignment_line(line))
+            else {
+                let _ = writeln!(out, "{line}");
+                at += 1;
+                continue;
+            };
+            if then_name != else_name
+                || !return_line.starts_with(indent)
+                || !return_line[indent_len..].starts_with("return ")
+                || token_occurrences(return_line, then_name) != 1
+            {
+                let _ = writeln!(out, "{line}");
+                at += 1;
+                continue;
+            }
+            let then_prefix = lines[at + 1..middle - 1].join("\n");
+            let else_prefix = lines[middle + 1..close - 1].join("\n");
+            let reaches_from_before = |value: &str, prefix: &str| {
+                self.r
+                    .locals
+                    .values()
+                    .filter(|local| local.as_str() != then_name && mentions(value, local))
+                    .any(|local| !mentions(prefix, local))
+            };
+            if reaches_from_before(then_value, &then_prefix)
+                || reaches_from_before(else_value, &else_prefix)
+            {
+                let _ = writeln!(out, "{line}");
+                at += 1;
+                continue;
+            }
+
+            let _ = writeln!(out, "{line}");
+            for arm_line in &lines[at + 1..middle - 1] {
+                let _ = writeln!(out, "{arm_line}");
+            }
+            let then_indent = "    ".repeat(indent_len / 4 + 1);
+            let _ = writeln!(out, "{then_indent}{}", self.return_value(then_value));
+            let _ = writeln!(out, "{indent}}}");
+            let nested_indent = format!("{indent}    ");
+            for arm_line in &lines[middle + 1..close - 1] {
+                let arm_line = arm_line.strip_prefix(&nested_indent).unwrap_or(arm_line);
+                let _ = writeln!(out, "{indent}{arm_line}");
+            }
+            let _ = writeln!(out, "{indent}{}", self.return_value(else_value));
+            at = close + 2;
+        }
+        out
+    }
+
     fn region(&mut self, out: &mut String, region: &Region, depth: usize) {
         let pad = "    ".repeat(depth);
         match region {
             Region::Empty => {}
             Region::Seq(parts) => {
-                for p in parts {
-                    self.region(out, p, depth);
-                }
+                self.sequence(out, parts, depth);
             }
             Region::Block(at) => {
                 if self.labels.contains(at) {
@@ -668,17 +1201,89 @@ impl Emitter<'_> {
                 then,
                 otherwise,
             } => {
-                let cond = self.condition(*head, *invert);
-                let _ = writeln!(out, "{pad}if ({cond}) {{");
-                self.region(out, then, depth + 1);
-                match otherwise {
-                    Some(o) if **o != Region::Empty => {
+                if let Some((name, value)) =
+                    self.conditional_assignment(*head, *invert, then, otherwise.as_deref())
+                {
+                    let _ = writeln!(out, "{pad}{name} = {value};");
+                // Nested guards with no else are the short-circuit spelling
+                // of a conjunction. The nested head may contain SSA-only dead
+                // copies, so judge the statements that actually survive
+                // emission rather than the raw operation list.
+                } else if let Some((terms, body)) =
+                    self.no_else_conjunction(*head, *invert, then, otherwise.as_deref())
+                {
+                    let _ = writeln!(out, "{pad}if ({}) {{", terms.join(" && "));
+                    self.region(out, body, depth + 1);
+                    let _ = writeln!(out, "{pad}}}");
+                } else if let Some(shared) = otherwise
+                    && let Some((prefix, inner, inner_invert, unique)) =
+                        nested_shared_tail(then, shared)
+                    && !self.head_emits_only_test(inner)
+                {
+                    let outer = self.condition(*head, *invert);
+                    let _ = writeln!(out, "{pad}if ({outer}) {{");
+                    self.region(out, &prefix, depth + 1);
+                    let inner = self.condition(inner, inner_invert);
+                    let _ = writeln!(out, "{pad}    if ({inner}) {{");
+                    self.region(out, unique, depth + 2);
+                    let _ = writeln!(out, "{pad}    }}");
+                    let _ = writeln!(out, "{pad}}}");
+                    self.region(out, shared, depth);
+                // `if (a) { if (b) t else e } else e` is `if (a && b)`, and so
+                // is the same shape where the shared arm is reached by a goto.
+                // The inner test has to be only a test: a statement there runs
+                // on one path and `&&` would drop it.
+                } else if let Some(o) = otherwise
+                    && let Some((rest, unique, shared)) = self.conjunction(then, o)
+                {
+                    let mut terms = vec![format!("({})", self.condition(*head, *invert))];
+                    for term in rest {
+                        let term_expr = self.condition(term.at, term.invert);
+                        terms.push(if term.unique_when_held {
+                            format!("({term_expr})")
+                        } else {
+                            format!("({})", negate(term_expr))
+                        });
+                    }
+                    let _ = writeln!(out, "{pad}if ({}) {{", terms.join(" && "));
+                    self.region(out, unique, depth + 1);
+                    if self.region_ends_control(unique) {
+                        let _ = writeln!(out, "{pad}}}");
+                        self.region(out, shared, depth);
+                    } else {
                         let _ = writeln!(out, "{pad}}} else {{");
-                        self.region(out, o, depth + 1);
+                        self.region(out, shared, depth + 1);
                         let _ = writeln!(out, "{pad}}}");
                     }
-                    _ => {
-                        let _ = writeln!(out, "{pad}}}");
+                } else if let Some(o) = otherwise
+                    && self.region_ends_control(then)
+                {
+                    let cond = self.condition(*head, *invert);
+                    let _ = writeln!(out, "{pad}if ({cond}) {{");
+                    self.region(out, then, depth + 1);
+                    let _ = writeln!(out, "{pad}}}");
+                    self.region(out, o, depth);
+                } else if let Some(o) = otherwise
+                    && self.region_ends_control(o)
+                {
+                    let cond = negate(self.condition(*head, *invert));
+                    let _ = writeln!(out, "{pad}if ({cond}) {{");
+                    self.region(out, o, depth + 1);
+                    let _ = writeln!(out, "{pad}}}");
+                    self.region(out, then, depth);
+                } else {
+                    let cond = self.condition(*head, *invert);
+                    let _ = writeln!(out, "{pad}if ({cond}) {{");
+                    self.region(out, then, depth + 1);
+                    match otherwise {
+                        Some(o) if **o != Region::Empty => {
+                            let _ = writeln!(out, "{pad}}} else {{");
+                            self.region(out, o, depth + 1);
+                            let _ = writeln!(out, "{pad}}}");
+                        }
+                        _ => {
+                            let _ = writeln!(out, "{pad}}}");
+                        }
                     }
                 }
             }
@@ -693,10 +1298,16 @@ impl Emitter<'_> {
                 }
                 // The head's own statements compute the condition, so they run
                 // on every iteration: a `for (; cond; )` with them hoisted
-                // would be wrong. Write the loop as `while (1)` with the test
-                // at the top when the head does more than test.
+                // would be wrong. A header that is itself the whole iteration
+                // tests at the bottom, which is a `do`/`while`. A `while (1)`
+                // with a break there has an edge from the entry straight to
+                // the exit, and this block has no such edge.
                 let cond = self.condition(*head, *invert);
-                if self.head_is_only_a_test(*head) {
+                if !self.head_is_only_a_test(*head) && falls_straight_back(body) {
+                    let _ = writeln!(out, "{pad}do {{");
+                    self.statements(out, *head, depth + 1);
+                    let _ = writeln!(out, "{pad}}} while ({cond});");
+                } else if self.head_is_only_a_test(*head) {
                     let _ = writeln!(out, "{pad}while ({cond}) {{");
                     self.region(out, body, depth + 1);
                     let _ = writeln!(out, "{pad}}}");
@@ -747,6 +1358,361 @@ impl Emitter<'_> {
                 self.region(out, body, depth + 1);
                 let _ = writeln!(out, "{pad}}}");
             }
+        }
+    }
+
+    /// Emit a sequence, folding adjacent guards with the same destination.
+    ///
+    /// Compilers lower `if (a || b) return x` to two tests that enter the same
+    /// return block. Tail duplication makes the region tree honest but leaves
+    /// two identical `if` statements in C. When the later test has no work of
+    /// its own, short-circuit `||` is exactly the original control flow and
+    /// writes the shared body once.
+    fn sequence(&mut self, out: &mut String, parts: &[Region], depth: usize) {
+        let pad = "    ".repeat(depth);
+        let mut i = 0;
+        while i < parts.len() {
+            if let [
+                Region::Block(block),
+                Region::If {
+                    head,
+                    invert,
+                    then,
+                    otherwise: None,
+                },
+                ..,
+            ] = &parts[i..]
+                && block == head
+                && !self.labels.contains(head)
+                && let Some(prefix) = without_following_suffix(then, &parts[i + 2..])
+            {
+                self.region(out, &parts[i], depth);
+                let condition = self.condition(*head, *invert);
+                let _ = writeln!(out, "{pad}if ({condition}) {{");
+                self.region(out, &prefix, depth + 1);
+                let _ = writeln!(out, "{pad}}}");
+                // Leave the shared suffix for the next iteration.
+                i += 2;
+                continue;
+            }
+            if let [
+                Region::If {
+                    head,
+                    invert,
+                    then,
+                    otherwise: Some(otherwise),
+                },
+                Region::Block(exit),
+                ..,
+            ] = &parts[i..]
+                && !self.labels.contains(exit)
+                && let Some(name) = self.return_only(*exit)
+                && let Some((then, otherwise)) = self.returning_arms(then, otherwise, depth, &name)
+            {
+                let condition = self.condition(*head, *invert);
+                let _ = writeln!(out, "{pad}if ({condition}) {{");
+                out.push_str(&then);
+                let _ = writeln!(out, "{pad}}}");
+                out.push_str(&otherwise);
+                i += 2;
+                continue;
+            }
+            let Some((first, first_invert, body)) = plain_guard(parts, i) else {
+                self.region(out, &parts[i], depth);
+                i += 1;
+                continue;
+            };
+            let mut terms = vec![format!("({})", self.condition(first, first_invert))];
+            let mut end = i + 2;
+            while let Some((head, invert, next_body)) = plain_guard(parts, end) {
+                if next_body != body || self.labels.contains(&head) {
+                    break;
+                }
+                let Some(term) = self.short_circuit_condition(head, invert) else {
+                    break;
+                };
+                terms.push(term);
+                end += 2;
+            }
+            if terms.len() == 1 {
+                self.region(out, &parts[i], depth);
+                i += 1;
+                continue;
+            }
+
+            // The first head may prepare a call result used by its condition;
+            // later heads were proven to contain only their tests.
+            self.region(out, &parts[i], depth);
+            let _ = writeln!(out, "{pad}if ({}) {{", terms.join(" || "));
+            self.region(out, body, depth + 1);
+            let _ = writeln!(out, "{pad}}}");
+            i = end;
+        }
+    }
+
+    /// Two arms whose final assignment feeds the immediately following return.
+    fn returning_arms(
+        &mut self,
+        then: &Region,
+        otherwise: &Region,
+        depth: usize,
+        name: &str,
+    ) -> Option<(String, String)> {
+        if contains_conditional(then) || contains_conditional(otherwise) {
+            return None;
+        }
+        let before = self.unmodelled;
+        let mut then_text = String::new();
+        self.region(&mut then_text, then, depth + 1);
+        let mut otherwise_text = String::new();
+        self.region(&mut otherwise_text, otherwise, depth);
+        let out = self
+            .return_last_assignment(&then_text, name)
+            .zip(self.return_last_assignment(&otherwise_text, name));
+        if out.is_none() {
+            self.unmodelled = before;
+        }
+        out
+    }
+
+    fn no_else_conjunction<'a>(
+        &mut self,
+        head: Addr,
+        invert: bool,
+        then: &'a Region,
+        otherwise: Option<&Region>,
+    ) -> Option<(Vec<String>, &'a Region)> {
+        if otherwise.is_some() {
+            return None;
+        }
+        let before = self.unmodelled;
+        let mut terms = vec![format!("({})", self.condition(head, invert))];
+        let mut body = then;
+        while let Some((inner, inner_invert, inner_then, None)) = nested_if(body) {
+            if !self.head_emits_only_test(inner) {
+                break;
+            }
+            terms.push(format!("({})", self.condition(inner, inner_invert)));
+            body = inner_then;
+        }
+        if terms.len() > 1 {
+            Some((terms, body))
+        } else {
+            self.unmodelled = before;
+            None
+        }
+    }
+
+    fn return_last_assignment(&self, text: &str, name: &str) -> Option<String> {
+        let mut lines: Vec<&str> = text.lines().collect();
+        let last = lines.pop()?;
+        let (indent, assigned, value) = assignment_line(last)?;
+        if assigned != name {
+            return None;
+        }
+        let mut out = lines.join("\n");
+        // A value defined before the diamond must stay merged after it. Early
+        // returning such an arm destroys that merge and often obscures a
+        // source-level conditional expression. Values produced inside this
+        // arm are safe to return here.
+        if self
+            .r
+            .locals
+            .values()
+            .filter(|local| local.as_str() != name && mentions(value, local))
+            .any(|local| !mentions(&out, local))
+        {
+            return None;
+        }
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        let _ = writeln!(out, "{indent}{}", self.return_value(value));
+        Some(out)
+    }
+
+    fn return_only(&mut self, at: Addr) -> Option<String> {
+        let before = self.unmodelled;
+        let mut text = String::new();
+        self.statements(&mut text, at, 0);
+        self.unmodelled = before;
+        let mut lines = text.lines().filter(|line| !line.trim().is_empty());
+        let line = lines.next()?.trim();
+        if lines.next().is_some() || !line.starts_with("return ") {
+            return None;
+        }
+        let name = self.result(at);
+        (!name.is_empty() && mentions(line, &name)).then_some(name)
+    }
+
+    /// A later short-circuit test as an expression, including work its block
+    /// must do only when earlier terms were false.
+    fn short_circuit_condition(&mut self, head: Addr, invert: bool) -> Option<String> {
+        let before = self.unmodelled;
+        let mut prep = String::new();
+        self.statements(&mut prep, head, 0);
+        let mut expressions = Vec::new();
+        for line in prep.lines().map(str::trim).filter(|line| !line.is_empty()) {
+            let Some(expression) = line.strip_suffix(';') else {
+                self.unmodelled = before;
+                return None;
+            };
+            if (expression.contains('{') || expression.contains('}'))
+                || expression.starts_with("return ")
+                || expression.starts_with("goto ")
+                || expression == "break"
+                || expression == "continue"
+            {
+                self.unmodelled = before;
+                return None;
+            }
+            expressions.push(format!("({expression})"));
+        }
+        expressions.push(format!("({})", self.condition(head, invert)));
+        Some(if expressions.len() == 1 {
+            expressions.pop().unwrap()
+        } else {
+            format!("({})", expressions.join(", "))
+        })
+    }
+
+    /// Turn a diamond that only chooses one assignment into `?:`.
+    ///
+    /// SSA makes a phi explicit as one assignment in each predecessor. C's
+    /// conditional expression is the source-level spelling of that same
+    /// choice and, unlike an `if`/`else` plus assignments, preserves the CFG
+    /// shape of a ternary in tools that model expression control flow.
+    fn conditional_assignment(
+        &mut self,
+        head: Addr,
+        invert: bool,
+        then: &Region,
+        otherwise: Option<&Region>,
+    ) -> Option<(String, String)> {
+        let before = self.unmodelled;
+        let out = self.conditional_assignment_inner(head, invert, then, otherwise);
+        if out.is_none() {
+            self.unmodelled = before;
+        }
+        out
+    }
+
+    fn conditional_assignment_inner(
+        &mut self,
+        head: Addr,
+        invert: bool,
+        then: &Region,
+        otherwise: Option<&Region>,
+    ) -> Option<(String, String)> {
+        let otherwise = otherwise?;
+        if !self.head_emits_only_test(head) {
+            return None;
+        }
+        let (then_name, then_value) = self.assigned_value(then)?;
+        let (else_name, else_value) = self.assigned_value(otherwise)?;
+        if then_name != else_name {
+            return None;
+        }
+        let condition = self.condition(head, invert);
+        Some((
+            then_name,
+            format!("({condition}) ? ({then_value}) : ({else_value})"),
+        ))
+    }
+
+    fn assigned_value(&mut self, region: &Region) -> Option<(String, String)> {
+        match region {
+            Region::Block(at) if !self.labels.contains(at) => self.single_assignment(*at),
+            Region::If {
+                head,
+                invert,
+                then,
+                otherwise,
+            } => self.conditional_assignment_inner(*head, *invert, then, otherwise.as_deref()),
+            Region::Seq(parts) => match parts.as_slice() {
+                [
+                    Region::Block(block),
+                    Region::If {
+                        head,
+                        invert,
+                        then,
+                        otherwise,
+                    },
+                ] if block == head && !self.labels.contains(head) => {
+                    self.conditional_assignment_inner(*head, *invert, then, otherwise.as_deref())
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn single_assignment(&mut self, at: Addr) -> Option<(String, String)> {
+        let before = self.unmodelled;
+        let mut text = String::new();
+        self.statements(&mut text, at, 0);
+        let mut lines = text.lines().map(str::trim).filter(|line| !line.is_empty());
+        let Some(line) = lines.next() else {
+            self.unmodelled = before;
+            return None;
+        };
+        if lines.next().is_some() {
+            self.unmodelled = before;
+            return None;
+        }
+        let Some(line) = line.strip_suffix(';') else {
+            self.unmodelled = before;
+            return None;
+        };
+        let Some((name, value)) = line.split_once(" = ") else {
+            self.unmodelled = before;
+            return None;
+        };
+        if name.is_empty()
+            || !name.chars().all(|c| c == '_' || c.is_ascii_alphanumeric())
+            || !name
+                .chars()
+                .next()
+                .is_some_and(|c| c == '_' || c.is_ascii_alphabetic())
+        {
+            self.unmodelled = before;
+            return None;
+        }
+        Some((name.to_string(), value.to_string()))
+    }
+
+    /// True when this region cannot fall through to the statement after it.
+    fn region_ends_control(&self, region: &Region) -> bool {
+        match region {
+            Region::Block(at) => self.f.blocks.get(at).is_none_or(|block| {
+                block.ops.iter().any(|op| {
+                    matches!(op.kind, SsaKind::Op(Op::Return | Op::BranchInd))
+                        || tail_call(self.f, op).is_some()
+                }) || !block
+                    .successors
+                    .iter()
+                    .any(|successor| self.f.blocks.contains_key(successor))
+            }),
+            Region::Break | Region::Continue | Region::Goto(_) => true,
+            Region::Seq(parts) => parts
+                .last()
+                .is_some_and(|part| self.region_ends_control(part)),
+            Region::If {
+                then,
+                otherwise: Some(otherwise),
+                ..
+            } => self.region_ends_control(then) && self.region_ends_control(otherwise),
+            Region::Switch {
+                cases,
+                default: Some(default),
+                ..
+            } => {
+                cases
+                    .iter()
+                    .all(|case| self.region_ends_control(&case.body))
+                    && self.region_ends_control(default)
+            }
+            _ => false,
         }
     }
 
@@ -850,6 +1816,66 @@ impl Emitter<'_> {
         }
     }
 
+    /// Tests and-ed in front of one arm, when each nested `if` shares the other.
+    ///
+    /// A chain `if (a) { if (b) { if (c) u else s } else s } else s` is one
+    /// condition. Each term says whether its then-arm continues toward `unique`.
+    fn conjunction<'a>(
+        &self,
+        then: &'a Region,
+        otherwise: &'a Region,
+    ) -> Option<(Vec<AndTerm>, &'a Region, &'a Region)> {
+        let mut terms = Vec::new();
+        let mut cursor = then;
+        let mut shared = otherwise;
+        while let Some((head, invert, inner_then, inner_else)) = nested_if(cursor) {
+            if !self.head_is_only_a_test(head) {
+                break;
+            }
+            let Some(inner_else) = inner_else else {
+                break;
+            };
+            if inner_else == shared {
+                terms.push(AndTerm {
+                    at: head,
+                    invert,
+                    unique_when_held: true,
+                });
+                cursor = inner_then;
+            } else if inner_then == shared {
+                terms.push(AndTerm {
+                    at: head,
+                    invert,
+                    unique_when_held: false,
+                });
+                cursor = inner_else;
+            } else if let Region::Goto(target) = shared {
+                if starts_at(inner_then, *target) {
+                    terms.push(AndTerm {
+                        at: head,
+                        invert,
+                        unique_when_held: false,
+                    });
+                    shared = inner_then;
+                    cursor = inner_else;
+                } else if starts_at(inner_else, *target) {
+                    terms.push(AndTerm {
+                        at: head,
+                        invert,
+                        unique_when_held: true,
+                    });
+                    shared = inner_else;
+                    cursor = inner_then;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        (!terms.is_empty()).then_some((terms, cursor, shared))
+    }
+
     /// True when a block's only job is to compute the branch condition, so the
     /// condition can move into a `while` header.
     fn head_is_only_a_test(&self, at: Addr) -> bool {
@@ -857,6 +1883,15 @@ impl Emitter<'_> {
             return true;
         };
         !b.ops.iter().any(|op| self.is_statement(op))
+    }
+
+    /// True when dead-value cleanup leaves no statement in a branch head.
+    fn head_emits_only_test(&mut self, at: Addr) -> bool {
+        let before = self.unmodelled;
+        let mut statements = String::new();
+        self.statements(&mut statements, at, 0);
+        self.unmodelled = before;
+        statements.trim().is_empty()
     }
 
     /// The branch condition of a block, inverted if asked.
@@ -919,6 +1954,9 @@ impl Emitter<'_> {
                 let Some(name) = self.r.locals.get(&v) else {
                     continue;
                 };
+                if self.dead.contains(name) {
+                    continue;
+                }
                 // An assignment from itself says nothing.
                 let value = self.r.integer(self.r.operand(input), input);
                 let text = format!("{value}");
@@ -989,11 +2027,31 @@ impl Emitter<'_> {
                             let name = callee
                                 .map(|c| c.name.clone())
                                 .unwrap_or_else(|| crate::expr::default_call_name(target));
-                            Expr::Call(name, self.arguments(at, index, callee))
+                            let known = callee.is_some_and(|c| c.parameters_known);
+                            let args = if known {
+                                self.arguments(at, index, callee)
+                            } else {
+                                self.unknown_arguments(at, index)
+                            };
+                            self.direct_call(name, args, known)
+                        }
+                        (Op::CallInd, _) => {
+                            let mut args = op
+                                .inputs
+                                .first()
+                                .map(|i| self.r.integer(self.r.operand(i), i))
+                                .into_iter()
+                                .collect::<Vec<_>>();
+                            args.extend(self.unknown_arguments(at, index));
+                            Expr::Named("__callind", args)
                         }
                         _ => self.r.expr(op),
                     };
-                    match op.out.and_then(|v| self.r.locals.get(&v)).filter(|_| !void) {
+                    match op
+                        .out
+                        .and_then(|v| self.r.locals.get(&v))
+                        .filter(|name| !void && !self.dead.contains(*name))
+                    {
                         // The local is an integer and the callee may be
                         // declared to return a pointer, which C will not
                         // assign without being told.
@@ -1017,7 +2075,13 @@ impl Emitter<'_> {
                     let name = callee
                         .map(|c| c.name.clone())
                         .unwrap_or_else(|| crate::expr::default_call_name(target));
-                    let e = Expr::Call(name, self.arguments(at, index, callee));
+                    let known = callee.is_some_and(|c| c.parameters_known);
+                    let args = if known {
+                        self.arguments(at, index, callee)
+                    } else {
+                        self.unknown_arguments(at, index)
+                    };
+                    let e = self.direct_call(name, args, known);
                     let _ = writeln!(out, "{pad}{e};");
                     let _ = writeln!(out, "{pad}{}", self.return_statement(at));
                 }
@@ -1038,6 +2102,9 @@ impl Emitter<'_> {
                 _ => {
                     // Anything else that reaches here has a named output.
                     if let Some(name) = op.out.and_then(|v| self.r.locals.get(&v)) {
+                        if self.dead.contains(name) {
+                            continue;
+                        }
                         let _ = writeln!(out, "{pad}{name} = {};", self.r.expr(op));
                     }
                 }
@@ -1085,6 +2152,27 @@ impl Emitter<'_> {
         }
     }
 
+    fn return_value(&self, value: &str) -> String {
+        match &self.returns {
+            Some(ty) if ty == "void" => "return;".to_string(),
+            Some(ty) => format!("return ({ty})({value});"),
+            None => format!("return {value};"),
+        }
+    }
+
+    /// A direct call. An unknown prototype is invoked through a cast so the
+    /// arguments this site prepared are visible, and so a declaration that
+    /// could not learn an arity still compiles beside them.
+    fn direct_call(&self, name: String, args: Vec<Expr>, parameters_known: bool) -> Expr {
+        if parameters_known || args.is_empty() {
+            return Expr::Call(name, args);
+        }
+        let formals = std::iter::repeat_n("uint64_t", args.len())
+            .collect::<Vec<_>>()
+            .join(", ");
+        Expr::Call(format!("((uint64_t (*)({formals})){name})"), args)
+    }
+
     /// The arguments a call passes, read out of the convention's registers.
     ///
     /// The value each one holds is whatever last wrote it before the call. A
@@ -1128,6 +2216,74 @@ impl Emitter<'_> {
         out
     }
 
+    /// Arguments prepared for a call whose prototype and target are unknown.
+    ///
+    /// There is no honest arity to copy from, so take only the contiguous
+    /// argument registers this block wrote since the preceding call. This
+    /// preserves ordinary callback arguments without inventing stale values
+    /// left in caller-saved registers. An unchanged incoming argument cannot
+    /// be proved at an untyped indirect site and is deliberately omitted.
+    fn unknown_arguments(&self, at: Addr, index: usize) -> Vec<Expr> {
+        let Some(block) = self.f.blocks.get(&at) else {
+            return Vec::new();
+        };
+        let since = block.ops[..index]
+            .iter()
+            .rposition(|op| matches!(op.kind, SsaKind::Op(Op::Call | Op::CallInd)))
+            .map_or(0, |n| n + 1);
+
+        self.r
+            .abi
+            .integer_arguments
+            .iter()
+            .map_while(|offset| {
+                let value = block.ops[since..index]
+                    .iter()
+                    .rev()
+                    // `Undefine` records registers the preceding call
+                    // clobbered. It is not a write that prepared an argument
+                    // for the next call, even though it has an SSA output.
+                    .filter(|op| op.kind != SsaKind::Op(Op::Undefine))
+                    .filter_map(|op| op.out)
+                    .find(|v| {
+                        v.location.space == Space::Register && v.location.offset == *offset
+                    })?;
+                if self.value_is_clobbered(value, 0) {
+                    return None;
+                }
+                Some(self.r.operand(&Operand::Value(value)))
+            })
+            .collect()
+    }
+
+    /// Whether a value is only a call-clobber marker, possibly through the
+    /// copies and width-normalizing operations SSA put above it.
+    fn value_is_clobbered(&self, value: Value, depth: u8) -> bool {
+        if depth >= 16 {
+            return false;
+        }
+        let Some((at, index)) = self.r.definition_site(value) else {
+            return false;
+        };
+        let Some(op) = self.f.blocks.get(&at).and_then(|b| b.ops.get(index)) else {
+            return false;
+        };
+        if op.kind == SsaKind::Op(Op::Undefine) {
+            return true;
+        }
+        // Only the chain of copies and width casts SSA inserts above a
+        // clobber. Following every input of every operation is exponential in
+        // the depth, and a call argument whose tree is a few dozen operations
+        // deep does not come back.
+        let SsaKind::Op(Op::Copy | Op::IntZExt | Op::IntSExt | Op::SubPiece) = op.kind else {
+            return false;
+        };
+        op.inputs
+            .first()
+            .and_then(|input| input.as_value())
+            .is_some_and(|v| self.value_is_clobbered(v, depth + 1))
+    }
+
     /// The value a register held just before an operation.
     fn value_before(&self, at: Addr, index: usize, offset: u64) -> Option<Value> {
         let b = self.f.blocks.get(&at)?;
@@ -1156,22 +2312,30 @@ impl Emitter<'_> {
         let Some(offset) = self.result else {
             return String::new();
         };
+        let defined = |op: &SsaOp| {
+            op.kind != SsaKind::Op(Op::Undefine)
+                && op.out.is_some_and(|v| {
+                    v.location.space == Space::Register && v.location.offset == offset
+                })
+        };
         let in_block = self.f.blocks.get(&at).and_then(|b| {
             b.ops
                 .iter()
                 .rev()
+                .filter(|op| defined(op))
                 .filter_map(|op| op.out)
-                .find(|v| v.location.space == Space::Register && v.location.offset == offset)
+                .next()
         });
         // Nothing in this block wrote it, so the value came from wherever it
         // was last written: the newest version is the one that reaches here.
+        // A clobber is not a version of the result.
         let value = in_block.or_else(|| {
             self.f
                 .blocks
                 .values()
                 .flat_map(|b| b.ops.iter())
+                .filter(|op| defined(op))
                 .filter_map(|op| op.out)
-                .filter(|v| v.location.space == Space::Register && v.location.offset == offset)
                 .max_by_key(|v| v.version)
         });
         match value {
@@ -1218,6 +2382,53 @@ mod tests {
                 negate(Expr::Unary("!", Box::new(Expr::Local("c".into()))))
             ),
             "c"
+        );
+    }
+
+    #[test]
+    fn an_assignment_immediately_returned_is_inlined() {
+        assert_eq!(
+            inline_return_assignments(
+                "    v0 = call(arg);\n    return (uint64_t)(v0);\n    v1 = 3;\n    use(v1);\n"
+            ),
+            "    return (uint64_t)(call(arg));\n    v1 = 3;\n    use(v1);\n"
+        );
+    }
+
+    #[test]
+    fn a_single_use_condition_temporary_is_inlined() {
+        assert_eq!(
+            inline_condition_assignments(
+                "    v1 = seek(fd);\n    if ((uint64_t)v1 + 1 == 0) {\n        return 1;\n    }\n"
+            ),
+            "    if ((uint64_t)(seek(fd)) + 1 == 0) {\n        return 1;\n    }\n"
+        );
+        assert_eq!(
+            inline_condition_assignments(
+                "    v1 = seek(fd);\n    if (v1 < 0) {\n        fail(v1);\n    }\n"
+            ),
+            "    v1 = seek(fd);\n    if (v1 < 0) {\n        fail(v1);\n    }\n"
+        );
+    }
+
+    #[test]
+    fn a_copied_return_after_continue_is_removed() {
+        assert_eq!(
+            remove_return_after_loop_control(
+                "    while (x) {\n        continue;\n        return lost;\n    }\n    return kept;\n"
+            ),
+            "    while (x) {\n        continue;\n    }\n    return kept;\n"
+        );
+    }
+
+    #[test]
+    fn a_duplicated_sequence_suffix_is_factored() {
+        let a = Region::Block(Addr(1));
+        let b = Region::Block(Addr(2));
+        let c = Region::Block(Addr(3));
+        assert_eq!(
+            without_following_suffix(&Region::Seq(vec![a.clone(), b.clone(), c.clone()]), &[b, c]),
+            Some(a)
         );
     }
 }

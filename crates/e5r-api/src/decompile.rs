@@ -155,14 +155,49 @@ pub fn decompile_program_with(
             }
         }
     }
+    // A same-image call through the PLT names the stub, not the function.
+    // The stub is what the caller asks for; the function is what knows the
+    // signature. Pull the function in so the stub can borrow it.
+    let stubs: Vec<Addr> = around.iter().map(|f| f.entry).collect();
+    for entry in stubs {
+        let Some(stub) = p.function(entry) else {
+            continue;
+        };
+        let name = e5r_decomp::identifier(&stub.display_name());
+        let Some(bare) = name.strip_suffix("_plt") else {
+            continue;
+        };
+        let Some(real) = p
+            .functions_by_address()
+            .find(|g| g.entry != entry && e5r_decomp::identifier(&g.display_name()) == bare)
+        else {
+            continue;
+        };
+        if !wanted.contains(&real.entry) && !around.iter().any(|c| c.entry == real.entry) {
+            around.push(real);
+        }
+    }
 
+    // Prototypes from the previous pass, so a PLT thunk can borrow the
+    // signature of the function it stands for. The thunk's own body is one
+    // jump and cannot say what the call passes.
+    let mut known: BTreeMap<String, Prototype> = BTreeMap::new();
     for pass in 0..2 {
         outputs.clear();
+        let resolved = resolved_thunks(&callees, &known);
+        // Callers are decompiled before the thunks, so the table has to say
+        // the borrowed signature before this pass starts.
+        for (addr, proto) in &resolved {
+            if let Some(callee) = callees.get_mut(addr) {
+                apply_prototype(callee, proto);
+            }
+        }
         // The neighbours are prototyped but never emitted: they are here to
         // fill the table, and on the last pass their bodies would be thrown
         // away anyway.
         for (n, f) in targets.iter().chain(around.iter()).enumerate() {
-            let Some(one) = one(p, f, &callees, declarations) else {
+            let borrowed = resolved.get(&f.entry.get());
+            let Some(one) = one(p, f, &callees, declarations, borrowed) else {
                 continue;
             };
             let out = &one.output;
@@ -172,12 +207,16 @@ pub fn decompile_program_with(
                 Callee {
                     name: e5r_decomp::identifier(&name),
                     arity: out.arity,
+                    parameters_known: out.parameters_known,
                     pointer_parameters: out.pointer_parameters.clone(),
                     parameter_widths: out.parameter_widths.clone(),
                     returns_value: !out.signature.starts_with("void "),
                     signature: out.signature.clone(),
                 },
             );
+            if let Some(proto) = one.prototype.clone() {
+                known.insert(e5r_decomp::identifier(&name), proto);
+            }
             if n < targets.len() {
                 outputs.push((f.entry, name, one));
             }
@@ -239,11 +278,63 @@ pub fn decompile_program_with(
 /// One function's way through the pipeline, and what was learned on the way.
 struct One {
     output: Output,
+    /// The prototype the body was emitted with, so a later pass can lend it
+    /// to the thunk that jumps to this function.
+    prototype: Option<Prototype>,
     /// Instructions the lifter did not model, which the emitter never saw.
     unlifted: usize,
     variables: Vec<Variable>,
     conflicts: Vec<String>,
     asserted: bool,
+}
+
+/// PLT thunks whose real function was prototyped in this unit.
+///
+/// Keyed by the thunk's address. The borrowed prototype keeps the thunk's
+/// name: callers wrote the stub's address, and the declaration has to be the
+/// one the stub is emitted with.
+/// Put a recovered signature onto a callee entry, keeping the callee's name.
+fn apply_prototype(callee: &mut Callee, proto: &Prototype) {
+    callee.arity = proto.parameters.len();
+    callee.parameters_known = proto.parameters_known;
+    callee.pointer_parameters = proto.parameters.iter().map(|p| p.pointer).collect();
+    callee.parameter_widths = proto.parameters.iter().map(|p| p.size).collect();
+    let ret = proto
+        .returns
+        .clone()
+        .unwrap_or_else(|| "uint64_t".to_string());
+    callee.returns_value = ret != "void";
+    let params = if proto.parameters.is_empty() {
+        "void".to_string()
+    } else {
+        proto
+            .parameters
+            .iter()
+            .map(|p| p.decl.clone())
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    callee.signature = format!("{ret} {}({params})", callee.name);
+}
+
+fn resolved_thunks(
+    callees: &BTreeMap<u64, Callee>,
+    known: &BTreeMap<String, Prototype>,
+) -> BTreeMap<u64, Prototype> {
+    let mut out = BTreeMap::new();
+    for (addr, callee) in callees {
+        if callee.parameters_known {
+            continue;
+        }
+        let Some(bare) = callee.name.strip_suffix("_plt") else {
+            continue;
+        };
+        let Some(real) = known.get(bare).filter(|p| p.parameters_known) else {
+            continue;
+        };
+        out.insert(*addr, real.clone());
+    }
+    out
 }
 
 /// One function through the whole pipeline.
@@ -252,6 +343,7 @@ fn one(
     f: &Function,
     callees: &BTreeMap<u64, Callee>,
     declarations: &BTreeMap<Addr, String>,
+    borrowed: Option<&Prototype>,
 ) -> Option<One> {
     // What each jump table means: the index the branch used and where that
     // index goes, which is what turns a many-successor block into a switch.
@@ -283,19 +375,55 @@ fn one(
         .map(|(a, b)| (*a, (b.range.end(), b.successors.clone())))
         .collect();
     let mut ir = e5r_ir::func::build(&p.object.memory, &p.object.arch, f.entry, &blocks);
-    e5r_ir::stack::promote(&mut ir);
+    let promoted = e5r_ir::stack::promote(&mut ir);
     let mut ssa = e5r_ir::ssa::build(&ir);
     e5r_ir::opt::optimize(&mut ssa);
     // The SSA the emitter runs on is the SSA prototype recovery reads, rather
     // than a second build of the same thing: lifting a function twice is not
     // free and the two could drift apart.
-    let shape = prototype(p, f, &ssa, declarations);
+    let mut shape = prototype(p, f, &ssa, declarations);
+    // A thunk borrows the signature of the function it reaches. Its own body
+    // still does not read the arguments; the signature is for the callers.
+    if borrowed.is_some() && !shape.asserted {
+        shape.prototype = borrowed.cloned();
+    }
     let name = f.display_name();
     let output =
         e5r_decomp::decompile_full(&name, &ssa, shape.prototype.as_ref(), callees, &switches);
+    let mut variables = e5r_decomp::expr::variables(&ssa, shape.prototype.as_ref(), &output.text);
+    // Stack promotion deliberately gives up when any stack address escapes:
+    // rewriting in that case could hide writes through the pointer. Direct
+    // loads and stores still prove that a slot of this width exists, though,
+    // and are useful variable-recovery evidence in their own right. Keep the
+    // stronger promoted variable when one exists and add only facts the SSA
+    // surface otherwise lost.
+    let mut homes: BTreeSet<(i64, u8)> = variables
+        .iter()
+        .filter_map(|v| match v.home {
+            e5r_decomp::expr::Home::Stack(offset) => Some((offset, v.size)),
+            _ => None,
+        })
+        .collect();
+    for (offset, size) in promoted.candidates {
+        // Positive entry-SP offsets are caller-owned stack arguments. Their
+        // ABI position is not recoverable from the offset alone, so claiming
+        // one as a local would be less honest than leaving it unclassified.
+        if offset >= 0 || !homes.insert((offset, size)) {
+            continue;
+        }
+        let width = u16::from(size) * 8;
+        variables.push(Variable {
+            name: format!("stack_m{:x}_{size}", -offset),
+            ty: format!("uint{width}_t"),
+            size,
+            role: Role::Local,
+            home: Home::Stack(offset),
+        });
+    }
     Some(One {
-        variables: e5r_decomp::expr::variables(&ssa, shape.prototype.as_ref(), &output.text),
+        variables,
         output,
+        prototype: shape.prototype,
         unlifted: ir.unlifted.len(),
         conflicts: shape.conflicts,
         asserted: shape.asserted,
@@ -434,6 +562,7 @@ fn asserted_prototype(a: &Asserted, recovered: &e5r_ir::proto::Prototype) -> Pro
 
     Prototype {
         parameters,
+        parameters_known: true,
         returns: Some(returns),
         definitions,
         locals: BTreeMap::new(),
@@ -458,6 +587,7 @@ fn import_thunk(f: &Function) -> Option<Prototype> {
         || f.provenance.corroborating.contains(&Evidence::ImportThunk);
     thunk.then(|| Prototype {
         parameters: Vec::new(),
+        parameters_known: false,
         returns: Some("uint64_t".to_string()),
         definitions: Vec::new(),
         locals: BTreeMap::new(),
@@ -567,6 +697,7 @@ fn recovered(p: &Program, f: &Function, ssa: &SsaFunction) -> Option<Prototype> 
 
     Some(Prototype {
         parameters,
+        parameters_known: true,
         // A function that leaves nothing behind returns nothing, and saying
         // `void` is what makes the output read like the source.
         returns: Some(match recovered.returns {
@@ -639,6 +770,7 @@ fn declared(p: &Program, f: &Function) -> Option<Prototype> {
         .collect();
     Some(Prototype {
         parameters,
+        parameters_known: true,
         returns: df.signature.returns.map(|t| d.types.name_of(t)),
         // The named types the signature mentions, defined before they are used
         // so the output is a translation unit and not a fragment.

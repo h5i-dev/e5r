@@ -29,7 +29,7 @@ use e5r_core::Addr;
 /// starts reading as a second piece of code, which is worse than the goto it
 /// replaces. Measured over the corpus: four is where the curve flattens, and
 /// every block past it costs more output than it saves gotos.
-const MAX_COPIED_TAIL: usize = 4;
+const MAX_COPIED_TAIL: usize = 12;
 
 /// How many blocks in total a function may write out a second time.
 ///
@@ -267,6 +267,332 @@ pub fn structure_with(
         labels: ctx.labels,
         gotos: ctx.gotos,
         lost,
+    }
+}
+
+/// A branch whose arms rejoin only by leaving the function, with one arm much
+/// smaller than the other, is the early return a guard is.
+///
+/// The compiler still builds one epilogue, so the recovered tree has an
+/// `if`/`else` and a shared tail. Writing that tail into the light arm and
+/// letting the heavy arm fall into the original copy is the same run, and it
+/// is the shape of a check that returns on failure. A balanced diamond is left
+/// alone: both arms are the choice, and an early return would invent one.
+/// `weight` is how much each block does, so "light" is about the arm and not
+/// about how the compiler bundled its instructions.
+pub fn lift_exit_guards(
+    root: &mut Region,
+    graph: &Graph,
+    labels: &BTreeSet<Addr>,
+    weight: &BTreeMap<Addr, u32>,
+) {
+    lift_exit_guards_rec(root, graph, labels, weight);
+    tidy(root);
+}
+
+/// Heavier than this, an arm is the body of the function and not a guard.
+const GUARD_MAX: u32 = 8;
+
+/// Heavier than this, the block both arms fall into is shared work, not an
+/// epilogue. Copying it would write that work on both arms.
+const EXIT_MAX: u32 = 3;
+
+fn lift_exit_guards_rec(
+    region: &mut Region,
+    graph: &Graph,
+    labels: &BTreeSet<Addr>,
+    weight: &BTreeMap<Addr, u32>,
+) {
+    match region {
+        Region::Seq(parts) => {
+            for part in parts.iter_mut() {
+                lift_exit_guards_rec(part, graph, labels, weight);
+            }
+            lift_seq(parts, graph, labels, weight);
+        }
+        Region::If {
+            then, otherwise, ..
+        } => {
+            lift_exit_guards_rec(then, graph, labels, weight);
+            if let Some(arm) = otherwise {
+                lift_exit_guards_rec(arm, graph, labels, weight);
+            }
+        }
+        Region::While { body, .. } | Region::Infinite { body, .. } => {
+            lift_exit_guards_rec(body, graph, labels, weight);
+        }
+        Region::Switch { cases, default, .. } => {
+            for case in cases {
+                lift_exit_guards_rec(&mut case.body, graph, labels, weight);
+            }
+            if let Some(arm) = default {
+                lift_exit_guards_rec(arm, graph, labels, weight);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn lift_seq(
+    parts: &mut Vec<Region>,
+    graph: &Graph,
+    labels: &BTreeSet<Addr>,
+    weight: &BTreeMap<Addr, u32>,
+) {
+    // A lifted guard splices the arm it was hiding in front of the epilogue.
+    // That arm may itself be a guard, so scan until nothing new moves.
+    for _ in 0..8 {
+        let old = std::mem::take(parts);
+        let mut changed = false;
+        let mut index = 0;
+        while index < old.len() {
+            let exit_follows = index + 2 == old.len();
+            if exit_follows
+                && let Some(rewritten) =
+                    lift_one(&old[index], &old[index + 1], graph, labels, weight)
+            {
+                parts.extend(rewritten);
+                index += 2;
+                changed = true;
+                continue;
+            }
+            parts.push(old[index].clone());
+            index += 1;
+        }
+        if !changed {
+            break;
+        }
+    }
+}
+
+/// `Some(true)` when the then-arm is the guard, `Some(false)` when the else is.
+fn guard_side(then_w: Option<u32>, else_w: Option<u32>) -> Option<bool> {
+    match (then_w, else_w) {
+        (Some(then), Some(otherwise))
+            if then > 0 && otherwise >= then.saturating_mul(3) && then <= GUARD_MAX =>
+        {
+            Some(true)
+        }
+        (Some(then), Some(otherwise))
+            if otherwise > 0 && then >= otherwise.saturating_mul(3) && otherwise <= GUARD_MAX =>
+        {
+            Some(false)
+        }
+        // The heavy arm has structure of its own. The light arm is still a guard.
+        (Some(then), None) if then > 0 && then <= GUARD_MAX => Some(true),
+        (None, Some(otherwise)) if otherwise > 0 && otherwise <= GUARD_MAX => Some(false),
+        _ => None,
+    }
+}
+
+fn lift_one(
+    branch: &Region,
+    tail: &Region,
+    graph: &Graph,
+    labels: &BTreeSet<Addr>,
+    weight: &BTreeMap<Addr, u32>,
+) -> Option<Vec<Region>> {
+    let Region::If {
+        head,
+        invert,
+        then,
+        otherwise: Some(otherwise),
+    } = branch
+    else {
+        return None;
+    };
+    let Region::Block(exit) = tail else {
+        return None;
+    };
+    let exit_w = weight.get(exit).copied().unwrap_or(0);
+    let succ_empty = graph.get(exit).is_some_and(|succs| succs.is_empty());
+    if labels.contains(exit) || !succ_empty || exit_w > EXIT_MAX {
+        return None;
+    }
+    if let Some(planted) = plant_conjunction_exit(branch, *exit, weight) {
+        return Some(vec![planted, Region::Block(*exit)]);
+    }
+    let then_is_guard = guard_side(
+        straight_weight(then, weight),
+        straight_weight(otherwise, weight),
+    )?;
+    let (guard, rest, invert) = if then_is_guard {
+        (then.as_ref().clone(), otherwise.as_ref().clone(), *invert)
+    } else {
+        (otherwise.as_ref().clone(), then.as_ref().clone(), !*invert)
+    };
+    let mut rest = match rest {
+        Region::Seq(parts) => parts,
+        other => vec![other],
+    };
+    let guard = Region::Seq(vec![guard, Region::Block(*exit)]);
+    rest.insert(
+        0,
+        Region::If {
+            head: *head,
+            invert,
+            then: Box::new(guard),
+            otherwise: None,
+        },
+    );
+    // The arm already fell into the epilogue. Appending it again writes a
+    // second return on that path, which nothing reaches.
+    if !rest
+        .last()
+        .is_some_and(|region| ends_with_block(region, *exit))
+    {
+        rest.push(Region::Block(*exit));
+    }
+    Some(rest)
+}
+
+fn ends_with_block(region: &Region, at: Addr) -> bool {
+    match region {
+        Region::Block(block) => *block == at,
+        Region::Seq(parts) => parts.last().is_some_and(|part| ends_with_block(part, at)),
+        _ => false,
+    }
+}
+
+/// A compound test `if (a && b) { light } else { rest }` in front of the
+/// epilogue is the same guard as a single test. The light arm is what
+/// returns; the shared arm stays where the emitter folds the `&&`.
+fn plant_conjunction_exit(
+    branch: &Region,
+    exit: Addr,
+    weight: &BTreeMap<Addr, u32>,
+) -> Option<Region> {
+    let Region::If {
+        head,
+        invert,
+        then,
+        otherwise: Some(shared),
+    } = branch
+    else {
+        return None;
+    };
+    let nested = nested_test(then)?;
+    let inner_else = nested.otherwise?;
+    let (light, on_then) = if inner_else == shared.as_ref() {
+        (nested.then, true)
+    } else if nested.then == shared.as_ref() {
+        (inner_else, false)
+    } else {
+        return None;
+    };
+    let light_w = straight_weight(light, weight)?;
+    if light_w == 0 || light_w > GUARD_MAX || contains_block(light, exit) {
+        return None;
+    }
+    let light = Region::Seq(vec![light.clone(), Region::Block(exit)]);
+    let (taken, other) = if on_then {
+        (light, shared.as_ref().clone())
+    } else {
+        (shared.as_ref().clone(), light)
+    };
+    let inner = Region::If {
+        head: nested.head,
+        invert: nested.invert,
+        then: Box::new(taken),
+        otherwise: Some(Box::new(other)),
+    };
+    let outer_then = match nested.leading {
+        Some(at) => Region::Seq(vec![Region::Block(at), inner]),
+        None => inner,
+    };
+    Some(Region::If {
+        head: *head,
+        invert: *invert,
+        then: Box::new(outer_then),
+        otherwise: Some(shared.clone()),
+    })
+}
+
+struct NestedTest<'a> {
+    leading: Option<Addr>,
+    head: Addr,
+    invert: bool,
+    then: &'a Region,
+    otherwise: Option<&'a Region>,
+}
+
+/// The `if` nested as this arm, and the head block in front of it when the
+/// arm is that block plus the `if`.
+fn nested_test(then: &Region) -> Option<NestedTest<'_>> {
+    match then {
+        Region::If {
+            head,
+            invert,
+            then,
+            otherwise,
+        } => Some(NestedTest {
+            leading: None,
+            head: *head,
+            invert: *invert,
+            then,
+            otherwise: otherwise.as_deref(),
+        }),
+        Region::Seq(parts) => {
+            let [
+                Region::Block(block),
+                Region::If {
+                    head,
+                    invert,
+                    then,
+                    otherwise,
+                },
+            ] = parts.as_slice()
+            else {
+                return None;
+            };
+            (*block == *head).then_some(NestedTest {
+                leading: Some(*head),
+                head: *head,
+                invert: *invert,
+                then: then.as_ref(),
+                otherwise: otherwise.as_deref(),
+            })
+        }
+        _ => None,
+    }
+}
+
+fn contains_block(region: &Region, at: Addr) -> bool {
+    match region {
+        Region::Block(block) => *block == at,
+        Region::Seq(parts) => parts.iter().any(|part| contains_block(part, at)),
+        Region::If {
+            then, otherwise, ..
+        } => {
+            contains_block(then, at)
+                || otherwise
+                    .as_deref()
+                    .is_some_and(|arm| contains_block(arm, at))
+        }
+        Region::While { body, .. } | Region::Infinite { body, .. } => contains_block(body, at),
+        Region::Switch { cases, default, .. } => {
+            cases.iter().any(|case| contains_block(&case.body, at))
+                || default
+                    .as_deref()
+                    .is_some_and(|arm| contains_block(arm, at))
+        }
+        _ => false,
+    }
+}
+
+/// Statement-weight of a straight-line arm, or `None` when it has structure.
+fn straight_weight(region: &Region, weight: &BTreeMap<Addr, u32>) -> Option<u32> {
+    match region {
+        Region::Empty => Some(0),
+        Region::Block(at) => Some(weight.get(at).copied().unwrap_or(0)),
+        Region::Seq(parts) => {
+            let mut total = 0;
+            for part in parts {
+                total += straight_weight(part, weight)?;
+            }
+            Some(total)
+        }
+        _ => None,
     }
 }
 
@@ -1965,6 +2291,119 @@ mod tests {
     }
 
     #[test]
+    fn a_light_arm_that_rejoins_only_at_the_exit_returns_there() {
+        // 1 is a few statements, 2 and 3 are the rest, and both reach the
+        // epilogue at 4. The light arm should return, and the rest should
+        // follow the if rather than sit in an else.
+        let graph = g(&[(0, &[1, 2]), (1, &[4]), (2, &[3]), (3, &[4]), (4, &[])]);
+        let mut s = structure(Addr(0), &graph);
+        let weight = BTreeMap::from([(Addr(1), 1), (Addr(2), 6), (Addr(3), 6), (Addr(4), 1)]);
+        lift_exit_guards(&mut s.root, &graph, &s.labels, &weight);
+        let mut counts = BTreeMap::new();
+        occurrences(&s.root, &mut counts);
+        assert_eq!(counts.get(&Addr(4)).copied(), Some(2), "{:?}", s.root);
+        assert!(
+            !collect(&s.root).iter().any(|r| matches!(
+                r,
+                Region::If {
+                    otherwise: Some(_),
+                    ..
+                }
+            )),
+            "guard still has an else: {:?}",
+            s.root
+        );
+        assert!(s.lost.is_empty(), "lost {:?}", s.lost);
+    }
+
+    #[test]
+    fn a_heavy_epilogue_stays_shared() {
+        let graph = g(&[(0, &[1, 2]), (1, &[4]), (2, &[3]), (3, &[4]), (4, &[])]);
+        let mut s = structure(Addr(0), &graph);
+        let weight = BTreeMap::from([(Addr(1), 1), (Addr(2), 6), (Addr(3), 6), (Addr(4), 10)]);
+        lift_exit_guards(&mut s.root, &graph, &s.labels, &weight);
+        let mut counts = BTreeMap::new();
+        occurrences(&s.root, &mut counts);
+        assert_eq!(counts.get(&Addr(4)).copied(), Some(1), "{:?}", s.root);
+    }
+
+    #[test]
+    fn a_compound_guard_returns_from_its_light_arm() {
+        // if (a && b) { block 3 } else { block 4 }, then the epilogue at 5.
+        // Block 3 is a few statements. It should return, and block 4 stay shared.
+        let mut root = Region::Seq(vec![
+            Region::If {
+                head: Addr(1),
+                invert: false,
+                then: Box::new(Region::Seq(vec![
+                    Region::Block(Addr(2)),
+                    Region::If {
+                        head: Addr(2),
+                        invert: false,
+                        then: Box::new(Region::Block(Addr(3))),
+                        otherwise: Some(Box::new(Region::Block(Addr(4)))),
+                    },
+                ])),
+                otherwise: Some(Box::new(Region::Block(Addr(4)))),
+            },
+            Region::Block(Addr(5)),
+        ]);
+        let graph = g(&[(1, &[2, 4]), (2, &[3, 4]), (3, &[5]), (4, &[5]), (5, &[])]);
+        let weight = BTreeMap::from([(Addr(3), 1), (Addr(4), 6), (Addr(5), 1)]);
+        lift_exit_guards(&mut root, &graph, &BTreeSet::new(), &weight);
+        let mut counts = BTreeMap::new();
+        occurrences(&root, &mut counts);
+        let text = format!("{root:?}");
+        assert!(
+            text.contains("Block(0x3), Block(0x5)"),
+            "light arm does not return: {root:?}"
+        );
+        assert!(counts.get(&Addr(4)).copied().unwrap_or(0) >= 1, "{root:?}");
+        assert!(counts.get(&Addr(5)).copied().unwrap_or(0) >= 2, "{root:?}");
+    }
+
+    #[test]
+    fn an_arm_that_already_reaches_the_exit_does_not_gain_a_second_return() {
+        let mut root = Region::Seq(vec![
+            Region::If {
+                head: Addr(0),
+                invert: false,
+                then: Box::new(Region::Block(Addr(1))),
+                otherwise: Some(Box::new(Region::Seq(vec![
+                    Region::Block(Addr(2)),
+                    Region::Block(Addr(3)),
+                ]))),
+            },
+            Region::Block(Addr(3)),
+        ]);
+        let graph = g(&[(0, &[1, 2]), (1, &[3]), (2, &[3]), (3, &[])]);
+        let weight = BTreeMap::from([(Addr(1), 1), (Addr(2), 6), (Addr(3), 1)]);
+        lift_exit_guards(&mut root, &graph, &BTreeSet::new(), &weight);
+        let mut counts = BTreeMap::new();
+        occurrences(&root, &mut counts);
+        assert_eq!(counts.get(&Addr(3)).copied(), Some(2), "{root:?}");
+    }
+
+    #[test]
+    fn a_balanced_diamond_is_not_rewritten_as_a_return() {
+        let graph = g(&[(0, &[1, 2]), (1, &[3]), (2, &[3]), (3, &[])]);
+        let mut s = structure(Addr(0), &graph);
+        let weight = BTreeMap::from([(Addr(1), 2), (Addr(2), 2), (Addr(3), 1)]);
+        lift_exit_guards(&mut s.root, &graph, &s.labels, &weight);
+        assert!(
+            collect(&s.root).iter().any(|r| matches!(
+                r,
+                Region::If {
+                    otherwise: Some(_),
+                    ..
+                }
+            )),
+            "balanced diamond lost its else: {:?}",
+            s.root
+        );
+    }
+
+    #[test]
     fn a_back_edge_becomes_a_loop() {
         // 0 enters 1; 1 branches back to itself or out to 2.
         let graph = g(&[(0, &[1]), (1, &[1, 2]), (2, &[])]);
@@ -2082,20 +2521,16 @@ mod tests {
     #[test]
     fn a_tail_too_large_to_copy_is_written_after_the_branch() {
         // 0 branches to 1 or 2. Both reach 3, which no join places because 2
-        // can also return at 20. The tail 3..8 is six blocks, past
+        // can also return at 20. The tail is one block past
         // MAX_COPIED_TAIL, so duplication will not take it.
-        let graph = g(&[
-            (0, &[1, 2]),
-            (1, &[3]),
-            (2, &[3, 20]),
-            (20, &[]),
-            (3, &[4]),
-            (4, &[5]),
-            (5, &[6]),
-            (6, &[7]),
-            (7, &[8]),
-            (8, &[]),
-        ]);
+        let mut graph = g(&[(0, &[1, 2]), (1, &[3]), (2, &[3, 20]), (20, &[])]);
+        for n in 0..=MAX_COPIED_TAIL + 1 {
+            let at = Addr(3 + n as u64);
+            let successors = (n < MAX_COPIED_TAIL + 1)
+                .then_some(vec![Addr(at.0 + 1)])
+                .unwrap_or_default();
+            graph.insert(at, successors);
+        }
         let s = structure(Addr(0), &graph);
         assert_eq!(s.gotos, 0, "{:?}", s.root);
         assert!(s.labels.is_empty(), "{:?}", s.labels);

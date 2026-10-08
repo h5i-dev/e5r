@@ -10,6 +10,7 @@
 //! load or a call would change what the code does, and duplicating arithmetic
 //! makes the output longer rather than clearer.
 
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
@@ -291,15 +292,99 @@ pub fn input_name(l: Location, abi: &Abi) -> String {
 
 /// How many times each value is read.
 pub fn use_counts(f: &SsaFunction) -> BTreeMap<Value, usize> {
-    let mut out: BTreeMap<Value, usize> = BTreeMap::new();
-    for b in f.blocks.values() {
-        for op in &b.ops {
-            for i in &op.inputs {
-                if let Operand::Value(v) = i {
-                    *out.entry(*v).or_default() += 1;
+    let defs = f.definitions();
+    let mut live_ops: BTreeSet<(e5r_core::Addr, usize)> = BTreeSet::new();
+    let mut work: Vec<Value> = Vec::new();
+
+    // Side effects and control flow are roots. Everything else is live only
+    // when a root (transitively) reads its result.
+    for (at, block) in &f.blocks {
+        for (index, op) in block.ops.iter().enumerate() {
+            let root = match op.kind {
+                SsaKind::Op(o) => matches!(o, Op::Store | Op::Unimplemented) || o.is_branch(),
+                SsaKind::Phi => false,
+            };
+            if !root {
+                continue;
+            }
+            live_ops.insert((*at, index));
+            work.extend(op.inputs.iter().filter_map(|input| input.as_value()));
+        }
+    }
+
+    // A return reads the result registers. The operation lists the link
+    // register, not the value the caller gets, so without this a promoted
+    // local that exists only to be returned is dead and the body that
+    // computed it disappears.
+    let abi = e5r_ir::abi::of(&f.arch);
+    let mut returned: Vec<Value> = Vec::new();
+    for block in f.blocks.values() {
+        for (index, op) in block.ops.iter().enumerate() {
+            if op.kind != SsaKind::Op(Op::Return) {
+                continue;
+            }
+            // One value, not every result register. A call clobbers `x1`,
+            // which is also a second result register; treating that clobber
+            // as returned kept `__clobbered()` alive beside the real result.
+            let mut latest_real: Option<Value> = None;
+            let mut phis: Vec<(u64, Value)> = Vec::new();
+            for earlier in &block.ops[..index] {
+                if earlier.kind == SsaKind::Op(Op::Undefine) {
+                    continue;
+                }
+                let Some(value) = earlier.out else {
+                    continue;
+                };
+                if value.location.space != e5r_ir::op::Space::Register
+                    || !abi.results.contains(&value.location.offset)
+                {
+                    continue;
+                }
+                if earlier.kind == SsaKind::Phi {
+                    phis.push((value.location.offset, value));
+                } else {
+                    latest_real = Some(value);
                 }
             }
+            let value = latest_real.or_else(|| {
+                abi.results.iter().find_map(|offset| {
+                    phis.iter()
+                        .find(|(at, _)| at == offset)
+                        .map(|(_, value)| *value)
+                })
+            });
+            if let Some(value) = value {
+                returned.push(value);
+                work.push(value);
+            }
         }
+    }
+
+    while let Some(value) = work.pop() {
+        let Some(site) = defs.get(&value).copied() else {
+            continue;
+        };
+        if !live_ops.insert(site) {
+            continue;
+        }
+        if let Some(op) = f.blocks.get(&site.0).and_then(|b| b.ops.get(site.1)) {
+            work.extend(op.inputs.iter().filter_map(|input| input.as_value()));
+        }
+    }
+
+    let mut out: BTreeMap<Value, usize> = BTreeMap::new();
+    for (at, index) in live_ops {
+        let Some(op) = f.blocks.get(&at).and_then(|b| b.ops.get(index)) else {
+            continue;
+        };
+        for input in &op.inputs {
+            if let Operand::Value(value) = input {
+                *out.entry(*value).or_default() += 1;
+            }
+        }
+    }
+    for value in returned {
+        *out.entry(value).or_default() += 1;
     }
     out
 }
@@ -438,6 +523,9 @@ pub struct Rebuilder<'a> {
     pub abi: Abi,
     defs: BTreeMap<Value, (e5r_core::Addr, usize)>,
     uses: BTreeMap<Value, usize>,
+    /// Values currently being expanded. A definition that reads one of them
+    /// is a cycle, and inlining it does not terminate.
+    expanding: RefCell<BTreeSet<Value>>,
     /// Values that became named locals because they are read more than once.
     pub locals: BTreeMap<Value, String>,
     /// Locations that hold floating point values, which is what decides how a
@@ -475,10 +563,11 @@ impl<'a> Rebuilder<'a> {
         let defs = f.definitions();
         let uses = use_counts(f);
         let mut locals = BTreeMap::new();
+        let mut stack_locals: BTreeMap<Location, String> = BTreeMap::new();
         let mut n = 0;
         // Values read more than once, and every phi, get a name. A phi is a
-        // merge of paths and inlining it would mean writing the merge out at
-        // each use.
+        // merge of paths. Inlining it prints `__phi`, which is not C, and a
+        // call reads argument registers the call operation does not list.
         for (value, (block, index)) in &defs {
             let Some(op) = f.blocks.get(block).and_then(|b| b.ops.get(*index)) else {
                 continue;
@@ -488,9 +577,23 @@ impl<'a> Rebuilder<'a> {
             // call is a statement, and inlining its result would write the
             // call out again and make it happen twice.
             let call = matches!(op.kind, SsaKind::Op(Op::Call) | SsaKind::Op(Op::CallInd));
-            if multiple || call || op.kind == SsaKind::Phi {
-                locals.insert(*value, format!("v{n}"));
-                n += 1;
+            let phi = op.kind == SsaKind::Phi;
+            if multiple || call || phi {
+                let name = if value.location.space == e5r_ir::op::Space::Stack {
+                    stack_locals
+                        .entry(value.location)
+                        .or_insert_with(|| {
+                            let name = format!("v{n}");
+                            n += 1;
+                            name
+                        })
+                        .clone()
+                } else {
+                    let name = format!("v{n}");
+                    n += 1;
+                    name
+                };
+                locals.insert(*value, name);
             }
         }
         Rebuilder {
@@ -506,6 +609,7 @@ impl<'a> Rebuilder<'a> {
             defs,
             uses,
             locals,
+            expanding: RefCell::new(BTreeSet::new()),
         }
     }
 
@@ -638,6 +742,13 @@ impl<'a> Rebuilder<'a> {
 
     /// An index multiplied by a constant, however it was written.
     fn scaled(&self, o: &Operand) -> Option<(Expr, u64)> {
+        self.scaled_at(o, 0)
+    }
+
+    fn scaled_at(&self, o: &Operand, depth: u32) -> Option<(Expr, u64)> {
+        if depth > 8 {
+            return None;
+        }
         let Operand::Value(v) = o else { return None };
         let op = self.definition(*v)?;
         let SsaKind::Op(kind) = op.kind else {
@@ -655,7 +766,7 @@ impl<'a> Rebuilder<'a> {
                 let n = op.inputs.get(1)?.as_const()?;
                 Some((self.operand(op.inputs.first()?), n))
             }
-            Op::Copy | Op::IntSExt | Op::IntZExt => self.scaled(op.inputs.first()?),
+            Op::Copy | Op::IntSExt | Op::IntZExt => self.scaled_at(op.inputs.first()?, depth + 1),
             _ => None,
         }
     }
@@ -691,10 +802,24 @@ impl<'a> Rebuilder<'a> {
                 if let Some(name) = self.locals.get(v) {
                     return Expr::Local(name.clone());
                 }
-                match self.definition(*v) {
+                // Drop the borrow before expanding. The set stays marked so a
+                // nested read of this same value stops instead of looping.
+                let cycle = {
+                    let mut expanding = self.expanding.borrow_mut();
+                    !expanding.insert(*v)
+                };
+                if cycle {
+                    // The definition reads itself. Expanding it again does not
+                    // terminate. The location's own name is what gets declared
+                    // when the body still mentions it.
+                    return Expr::Local(self.name_of(v.location));
+                }
+                let expr = match self.definition(*v) {
                     Some(op) => self.expr(op),
                     None => Expr::Input(v.location, self.name_of(v.location)),
-                }
+                };
+                self.expanding.borrow_mut().remove(v);
+                expr
             }
         }
     }
