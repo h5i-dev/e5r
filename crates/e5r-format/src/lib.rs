@@ -12,6 +12,7 @@
 #![warn(missing_docs)]
 
 pub mod archive;
+pub mod bun;
 pub mod dwarf;
 pub mod ehframe;
 pub mod elf;

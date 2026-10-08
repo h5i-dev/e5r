@@ -376,6 +376,21 @@ e5r archive libfoo.a --symbols    # and what each one defines
 
 GNU and BSD archives, long names, both symbol index forms, and thin archives.
 
+A Bun standalone executable (`bun build --compile`) carries its scripts in a
+module graph after the native image. The graph is source and bytecode, so it
+is listed rather than disassembled. Bun's own layout is what is read: the
+last `\n---- Bun! ----\n` marker, the offsets just before it, and either
+record size that layout has shipped.
+
+```
+e5r bun prog                      # modules, loaders, sizes
+e5r bun prog --extract a.js       # that module's bytes on stdout
+```
+
+`--extract` takes the path the graph stores, a decimal index, or a unique
+suffix that begins at a `/`. It writes the bytes and nothing else, so it is
+not combined with `--json`.
+
 ```
 e5r overlay firmware.exe
 ```

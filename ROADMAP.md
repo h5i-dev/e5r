@@ -179,6 +179,11 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       `nm -s`. An archive is opened rather than loaded: it has no architecture,
       entry point or memory map, so making one an `Object` would mean picking a
       member and making every later answer about bytes the caller never chose.
+- [x] Bun standalone module graphs. `bun build --compile` appends source and
+      bytecode the native image does not describe. Listed rather than loaded,
+      from the layout Bun's own source writes: the last trailer, the offsets
+      before it, and both record sizes that layout has shipped. `module_info`
+      and bytecode are reported by size and not interpreted.
 - [x] Overlay detection, section entropy map, and a packer heuristic that reports
       a suspicion with its evidence rather than a verdict. Nine finding kinds,
       each with a strength; a packer is named only where a section carries that

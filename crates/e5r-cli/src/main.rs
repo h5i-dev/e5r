@@ -306,6 +306,25 @@ pub enum Command {
         #[arg(long)]
         symbols: bool,
     },
+    /// List the modules embedded in a Bun standalone executable.
+    ///
+    /// `bun build --compile` stores its scripts in a graph after the native
+    /// image. The graph is source and bytecode, so it is listed rather than
+    /// loaded, for the same reason an archive is.
+    Bun {
+        #[command(flatten)]
+        common: Common,
+        /// Write this module's bytes to standard output.
+        ///
+        /// A path as the graph spells it, a decimal index, or a unique
+        /// suffix that starts on a `/`.
+        #[arg(long, value_name = "MODULE")]
+        extract: Option<String>,
+        /// Which graph, when the file has more than one. 0 is the last,
+        /// which is the one Bun reads.
+        #[arg(long, value_name = "N", default_value_t = 0)]
+        which: usize,
+    },
     /// Write a completion script for a shell.
     ///
     /// Generated from the command tree, so it cannot describe a command that
@@ -563,6 +582,7 @@ impl Command {
             | Command::Classes { common, .. }
             | Command::Overlay { common, .. }
             | Command::Archive { common, .. }
+            | Command::Bun { common, .. }
             | Command::Repl { common }
             | Command::Patch { common, .. }
             | Command::Emulate { common, .. }
@@ -632,6 +652,17 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
 
     if let Command::Archive { common, symbols } = &cli.command {
         return print::archive(w, &data, *symbols, common.json);
+    }
+    // Same reason as an archive: the answer is about bytes the loader does
+    // not map as code, and analyzing the native image first would spend
+    // seconds to ignore them.
+    if let Command::Bun {
+        common,
+        extract,
+        which,
+    } = &cli.command
+    {
+        return print::bun(w, &data, extract.as_deref(), *which, common.json);
     }
 
     let arch = match &common.arch {
@@ -749,6 +780,11 @@ pub fn dispatch(
         Command::Overlay { common } => {
             return print::overlay(w, &program.object, data, common.json);
         }
+        Command::Bun {
+            common,
+            extract,
+            which,
+        } => return print::bun(w, data, extract.as_deref(), *which, common.json),
         _ => {}
     }
 

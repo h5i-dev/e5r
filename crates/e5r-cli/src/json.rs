@@ -769,6 +769,70 @@ pub fn archive(a: &e5r_format::archive::Archive) -> ArchiveOut {
 }
 
 #[derive(Serialize)]
+pub struct BunModuleOut {
+    index: u32,
+    name: String,
+    loader: u8,
+    loader_name: String,
+    encoding: String,
+    format: String,
+    side: String,
+    contents_offset: String,
+    contents_size: u64,
+    sourcemap_size: u32,
+    bytecode_size: u32,
+    entry: bool,
+}
+
+#[derive(Serialize)]
+pub struct BunOut {
+    schema: &'static str,
+    offset: String,
+    byte_count: u64,
+    trailer_offset: String,
+    record_size: u64,
+    entry_point: u32,
+    flags: u32,
+    argv: Option<String>,
+    argv_size: u64,
+    modules: Vec<BunModuleOut>,
+    warnings: Vec<String>,
+}
+
+pub fn bun(graph: &e5r_format::bun::Graph) -> BunOut {
+    BunOut {
+        schema: SCHEMA,
+        offset: format!("{:#x}", graph.offset),
+        byte_count: graph.byte_count,
+        trailer_offset: format!("{:#x}", graph.trailer_offset),
+        record_size: graph.record_size,
+        entry_point: graph.entry_point_id,
+        flags: graph.flags,
+        argv: std::str::from_utf8(graph.argv).ok().map(str::to_string),
+        argv_size: graph.argv.len() as u64,
+        modules: graph
+            .modules
+            .iter()
+            .map(|m| BunModuleOut {
+                index: m.index,
+                name: m.name.clone(),
+                loader: m.loader,
+                loader_name: m.loader_name(),
+                encoding: m.encoding_name(),
+                format: m.format_name(),
+                side: m.side_name(),
+                contents_offset: format!("{:#x}", m.contents_offset),
+                contents_size: m.contents.len() as u64,
+                sourcemap_size: m.sourcemap_len,
+                bytecode_size: m.bytecode_len,
+                entry: m.entry,
+            })
+            .collect(),
+        warnings: graph.warnings.clone(),
+    }
+}
+
+#[derive(Serialize)]
 pub struct BaseOut {
     name: String,
     offset: i64,
