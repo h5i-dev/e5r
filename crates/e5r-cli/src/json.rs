@@ -272,9 +272,11 @@ pub fn stats(p: &Program) -> Stats {
 pub struct InsnOut {
     addr: String,
     len: u8,
+    bytes: Option<String>,
     text: String,
     flow: String,
     target: Option<String>,
+    target_name: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -287,6 +289,11 @@ fn insn_out(p: &Program, i: &Insn) -> InsnOut {
     InsnOut {
         addr: hex(i.addr),
         len: i.len,
+        bytes: p
+            .object
+            .memory
+            .slice(i.addr, u64::from(i.len))
+            .map(|bytes| bytes.iter().map(|b| format!("{b:02x}")).collect()),
         text: e5r_arch::format(&p.object.arch, i, false).replace('\t', " "),
         flow: match i.flow {
             e5r_arch::Flow::Next => "next",
@@ -301,6 +308,7 @@ fn insn_out(p: &Program, i: &Insn) -> InsnOut {
         }
         .to_string(),
         target: i.flow.target().map(hex),
+        target_name: i.flow.target().and_then(|at| p.name_of(at)),
     }
 }
 

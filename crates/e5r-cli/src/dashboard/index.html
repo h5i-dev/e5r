@@ -110,6 +110,11 @@
             <div id="task-empty" class="empty" hidden></div>
           </section>
           <section class="panel"><div class="panel-head"><h2>Findings, notes & reports</h2><span class="muted">Written by agents · read-only</span></div><div id="records"></div></section>
+          <section class="panel binary-panel">
+            <div class="panel-head"><h2>Binary information</h2><span class="muted">Container and loader results</span></div>
+            <div id="binary-info" class="binary-info"></div>
+            <div id="loader-warnings" class="loader-warnings" hidden></div>
+          </section>
           <section class="agent-strip">
             <div>
               <div class="eyebrow">AGENT HANDOFF</div>
@@ -196,9 +201,12 @@
                 data-pane="xrefs"
               >
                 References</button
-              ><button role="tab" aria-selected="false" data-pane="callgraph">Call graph</button><button id="tab-notes" role="tab" aria-selected="false" data-pane="notes">Notes</button><label class="code-wrap"
+              ><button role="tab" aria-selected="false" data-pane="callgraph">Call graph</button><button id="tab-cfg" role="tab" aria-selected="false" data-pane="cfg">Control flow</button><button id="tab-notes" role="tab" aria-selected="false" data-pane="notes">Records</button><button id="tab-annotations" role="tab" aria-selected="false" data-pane="annotations">Annotations</button><label class="code-wrap"
                 ><input id="wrap-code" type="checkbox" checked />Wrap</label
               >
+            </div>
+            <div id="reference-controls" class="reference-controls" hidden>
+              <label>Show <select id="reference-direction" aria-label="Reference direction"><option value="incoming">Incoming to entry</option><option value="outgoing">All outgoing references</option><option value="data">Strings &amp; data</option></select></label>
             </div>
             <div id="quality" class="quality" aria-live="polite">
               Choose a function on the left. Click a known function name in code
@@ -227,8 +235,12 @@
               </div>
             </section>
             <section>
-              <div class="pane-head"><h2>Function notes</h2><span id="function-note-count" class="muted"></span></div>
-              <div id="function-notes" class="function-notes muted">Select a function to read its notes.</div>
+              <div class="pane-head"><h2>Function records</h2><span id="function-note-count" class="muted"></span></div>
+              <div id="function-notes" class="function-notes muted">Select a function to read its notes, findings and reports.</div>
+            </section>
+            <section>
+              <div class="pane-head"><h2>Annotations</h2></div>
+              <div id="function-annotations" class="context">Select a function to see saved comments and assertions.</div>
             </section>
             <section id="variables-section" hidden>
               <div class="eyebrow">VARIABLES & STORAGE</div>

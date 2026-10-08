@@ -113,6 +113,9 @@ try {
   const functions = await (await fetch(url + "/p/beta/api/functions")).json();
   const main = functions.items.find((f) => f.name === "main");
   assert(main);
+  const context = await (await fetch(url + `/p/beta/api/context/${main.addr}`)).json();
+  assert.equal(context.function, main.addr);
+  assert(context.blocks.length > 0);
   const pane = await (
     await fetch(url + `/p/beta/api/decompile/${main.addr}`)
   ).json();

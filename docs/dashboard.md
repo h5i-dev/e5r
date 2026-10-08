@@ -67,8 +67,8 @@ the function browser. Evidence remains accessible at every width.
 Use `/` to focus function search, and **Back** / **Forward** or `Alt+Left` /
 `Alt+Right` to retrace function navigation. Following a known function name or
 address keeps the browser selection visible, clearing a filter that excludes it.
-Pseudocode, disassembly, references and call graph share the same selected
-function. Arrow keys move between focused view tabs. **A− / A+** adjust code
+Pseudocode, disassembly, references, call graph, control flow, records and
+annotations share the same selected function. Arrow keys move between focused view tabs. **A− / A+** adjust code
 text from 12 to 22 pixels (14 by default), with the preference retained in this
 browser; **Wrap** also persists. Copy code or its CLI command, and ask an agent
 to retain the function address as evidence in a task.
@@ -78,6 +78,33 @@ center, and unique callees on the right. Click a caller or callee to navigate.
 Unresolved indirect call targets are not included. Large function lists are
 loaded in display batches; search always searches the complete list. Variables
 are shown for pseudocode only.
+
+**Disassembly** shows each instruction's address, raw encoding, length, control
+flow kind and known target name. Saved comments appear at their instruction
+address, with author and anchor match. **Annotations** shows saved names, types
+and comments together; low-confidence anchor matches are marked explicitly.
+Comments are also readable in the context panel while viewing pseudocode; e5r
+keeps their instruction addresses rather than inventing source-line positions.
+
+**References** defaults to incoming references to the selected entry address.
+Its selector also offers **All outgoing references**, covering every recovered
+block, and **Strings & data**, showing data/read/write references with section,
+symbol, extracted string and encoding, or up to 32 mapped bytes. References into
+a string retain its start address and byte offset. Click an instruction address
+to open it in disassembly, or a known function target to navigate to that function.
+A split function's unanalysed gaps do not contribute references.
+
+**Control flow** draws the function's basic blocks and recovered successor edges,
+with instruction counts, block endings and unresolved states. **View instructions**
+opens the block's disassembly. A table retains every block, successor and target
+outside the recovered blocks. Graphs with more than 160 blocks use the table to
+keep the browser responsive; the table loads 200 blocks at a time with a button
+to reveal the next batch. This graph describes control inside one function;
+**Call graph** describes calls between functions.
+
+The overview's **Binary information** section shows format, architecture, bitness,
+endianness, entry point, image base, counts, container metadata and loader warnings.
+Unavailable binaries leave the project records and tasks readable.
 
 The visual hierarchy follows a repeatable reading path: project and mode at the
 top, function selection at the left, function identity and output in the center,
@@ -184,6 +211,7 @@ and rebound-host requests. All non-GET requests are refused with 405. Edits use 
 | `GET /api/disas/0xADDRESS` | one function's instructions |
 | `GET /api/xrefs/0xADDRESS` | incoming references |
 | `GET /api/callgraph/0xADDRESS` | incoming and outgoing direct-call edges |
+| `GET /api/context/0xADDRESS` | function-local annotations, outgoing references with target context, and CFG blocks (`e5r.context.v1`) |
 | `GET /api/records` | findings, notes and reports |
 
 In collection mode, workspace routes are prefixed with `/p/NAME` (for example,
@@ -208,7 +236,7 @@ E5R_PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node scripts/test-projects.m
 ```
 
 The integration check compiles a small C binary with `cc`, starts an isolated
-workspace on a free port, compares decompiler output with the CLI, tests live agent updates, read-only HTTP routes, records, call graphs and task full view, checks function navigation and linked evidence,
+workspace on a free port, compares decompiler output with the CLI, tests live agent updates, read-only HTTP routes, records, call graphs and task full view, checks function navigation, comments, encodings, function-local outgoing/data references, CFG edges and linked evidence,
 and verifies cross-origin rejection and mobile layout. It removes its temporary
 project and stops the server when finished. Screenshots are written under `/tmp`.
 
@@ -242,15 +270,21 @@ e5r project record parser note add 'Input length checks' \
   --evidence function:0x401000 --author agent-a
 ```
 
-The decompiler's **Function notes** section shows notes linked to the selected
-function. Click a note or open the **Notes** tab to read full text beside the
-function browser. Writer and revision are displayed; updates refresh every five
-seconds without restarting analysis. Notes linked to other functions and notes
+The decompiler's **Function records** section shows notes, findings and reports
+linked to the selected function. Click a record or open the **Records** tab to
+read full text beside the function browser. Writer and revision are displayed; updates refresh every five
+seconds without restarting analysis. Records linked to other functions and records
 without a function link stay in the project overview. Selecting another function
-changes the displayed notes. The Notes tab is also accessible on narrow screens.
+changes the displayed records. The Records tab is also accessible on narrow screens.
 The CLI command panel supplies a note creation command for the selected function.
 Existing `annotate comment` entries remain analysis annotations, separate from
-these live project notes.
+these live project records; comments are shown in disassembly and Annotations.
 
 Full record text lives in `description`; use `--input FILE` for large content.
 The UI renders text literally, including Markdown, without executing HTML.
+
+Disassembly JSON (`e5r/1`) includes additive `bytes` and `target_name` fields for
+each instruction. `bytes` is the mapped encoding in hex, or null if unavailable;
+`target_name` is a known name for a direct flow target, or null. The JSON includes
+encodings regardless of the CLI's text-only `--bytes` switch. Other CLI consumers
+continue to receive the same fields as before.

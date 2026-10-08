@@ -14,6 +14,12 @@ const state = {
   records: null,
   recordsError: "",
   request: 0,
+  contextRequest: 0,
+  context: null,
+  contextError: "",
+  contextPromise: null,
+  referenceDirection: "incoming",
+  instructionTarget: null,
   history: [],
   future: [],
   code: "",
@@ -389,6 +395,10 @@ function selectFunction(f, push = true) {
   $("workspace").classList.remove("mobile-functions");
   syncLayout();
   state.selected = f;
+  state.context = null;
+  state.contextError = "";
+  state.instructionTarget = null;
+  state.contextPromise = loadContext(f);
   state.code = "";
   $("back").disabled = !state.history.length;
   $("forward").disabled = !state.future.length;
@@ -400,6 +410,7 @@ function selectFunction(f, push = true) {
   renderFunctions();
   $("functions").querySelector(".selected")?.scrollIntoView({ block: "nearest" });
   renderContext();
+  renderAnnotations();
   renderFunctionNotes();
   $("variables-section").hidden = true;
   renderRelated();
@@ -413,7 +424,7 @@ function renderContext() {
     ["Boundary strength", f.strength],
     ["Evidence", f.evidence.join(", ") || "None reported"],
     ["Coverage", f.complete ? "Complete" : "Incomplete — " + f.halt],
-    ["Shape", `${f.blocks} blocks · ${f.insns} instructions`],
+    ["Shape", `${f.blocks} blocks · ${f.insns} instructions · ${f.size} bytes`],
     ["Indirect control flow", f.indirect ? "Present" : "None reported"],
   ])
     dl.append(el("dt", name), el("dd", value));
@@ -435,7 +446,7 @@ function renderRelated() {
 }
 function functionNotes() {
   const addr = state.selected?.addr;
-  return (state.records || []).filter(({kind, record}) => kind === "note" &&
+  return (state.records || []).filter(({kind, record}) => ["note", "finding", "report"].includes(kind) &&
     record.content.evidence.some(e => e === `function:${addr}` || e === addr));
 }
 function noteMetadata(record) {
@@ -455,14 +466,14 @@ function renderFunctionNotes() {
   const notes = functionNotes();
   clear($("function-notes"));
   $("function-note-count").textContent = state.recordsError ? "Unavailable" : state.records === null ? "Loading…" : String(notes.length);
-  if (state.recordsError) $("function-notes").textContent = `Notes unavailable: ${state.recordsError}`;
-  else if (state.records === null) $("function-notes").textContent = "Loading notes…";
-  else if (!notes.length) $("function-notes").textContent = `No notes linked to ${state.selected.addr}. Link a note with function:${state.selected.addr} as evidence.`;
+  if (state.recordsError) $("function-notes").textContent = `Records unavailable: ${state.recordsError}`;
+  else if (state.records === null) $("function-notes").textContent = "Loading records…";
+  else if (!notes.length) $("function-notes").textContent = `No records linked to ${state.selected.addr}. Link a note with function:${state.selected.addr} as evidence.`;
   else {
-    for (const {record} of notes) {
+    for (const {kind, record} of notes) {
       const button = el("button", undefined, "function-note-preview");
-      button.append(el("strong", record.content.title),
-        el("span", record.content.description || "No note text recorded.", "note-excerpt"),
+      button.append(el("strong", `${kind} · ${record.content.title}`),
+        el("span", record.content.description || "No record text recorded.", "note-excerpt"),
         el("small", noteMetadata(record), "muted"));
       button.onclick = openNotes;
       $("function-notes").append(button);
@@ -473,26 +484,243 @@ function renderFunctionNotes() {
 function renderNotesPane() {
   const notes = functionNotes();
   $("quality").className = "quality";
-  $("quality").textContent = `Function notes · ${state.selected.addr} · Live project records, written by people or agents.`;
+  $("quality").textContent = `Function records · ${state.selected.addr} · Live project records, written by people or agents.`;
   $("analysis-command").textContent = `e5r project record ${shellQuote(state.project.project)} note add 'Note title' --description 'Note text' --evidence function:${state.selected.addr}`;
   $("copy-analysis").disabled = false;
   clear($("code"));
   state.code = "";
   $("copy-code").disabled = true;
-  if (state.recordsError) message($("code"), "Notes unavailable", state.recordsError);
-  else if (state.records === null) message($("code"), "Loading notes…");
-  else if (!notes.length) message($("code"), "No notes for this function yet.", `Ask an agent to save a note with function:${state.selected.addr} as evidence. The command is available in Evidence & tasks.`);
+  if (state.recordsError) message($("code"), "Records unavailable", state.recordsError);
+  else if (state.records === null) message($("code"), "Loading records…");
+  else if (!notes.length) message($("code"), "No records for this function yet.", `Ask an agent to save a note with function:${state.selected.addr} as evidence. The command is available in Evidence & tasks.`);
   else {
-    for (const {record} of notes) {
+    for (const {kind, record} of notes) {
       const article = el("article", undefined, "function-note");
-      article.append(el("h3", record.content.title),
+      article.append(el("h3", `${kind} · ${record.content.title}`),
         el("p", noteMetadata(record), "muted"),
-        el("pre", record.content.description || "No note text recorded.", "record-body"));
+        el("pre", record.content.description || "No record text recorded.", "record-body"),
+        el("p", "Evidence", "muted"), el("pre", record.content.evidence.join("\n") || "None recorded", "record-body"));
       $("code").append(article);
     }
-    state.code = notes.map(({record}) => `${record.content.title}\n${record.content.description}`).join("\n\n");
+    state.code = notes.map(({kind, record}) => `${kind} · ${record.content.title}\n${record.content.description}`).join("\n\n");
     $("copy-code").disabled = false;
   }
+}
+function renderBinaryInfo() {
+  clear($("binary-info"));
+  const info = state.project.info;
+  if (!info) {
+    message($("binary-info"), "Binary information unavailable", state.project.binary_error);
+    return;
+  }
+  const dl = el("dl");
+  for (const [name, value] of [
+    ["Format / architecture", `${info.format} · ${info.arch} · ${info.bits}-bit · ${info.endian} endian`],
+    ["Entry point", info.entry || "None reported"], ["Image base", info.image_base],
+    ["Position independent", info.pic ? "Yes" : "No"],
+    ["Contents", `${info.segments} segments · ${info.symbols} symbols · ${info.imports} imports · ${info.exports} exports`],
+    ["Function hints", info.function_hints], ["Project content hash", state.project.hash],
+    ...Object.entries(info.metadata || {}),
+  ]) dl.append(el("dt", name), el("dd", String(value)));
+  $("binary-info").append(dl);
+  clear($("loader-warnings"));
+  $("loader-warnings").hidden = !info.warnings?.length;
+  if (info.warnings?.length) $("loader-warnings").append(el("h3", "Loader warnings"));
+  for (const warning of info.warnings || []) $("loader-warnings").append(el("p", warning));
+}
+async function loadContext(f) {
+  const serial = ++state.contextRequest;
+  try {
+    const data = await api(`/api/context/${f.addr}`);
+    if (serial !== state.contextRequest) return;
+    state.context = data;
+    renderAnnotations();
+  } catch (e) {
+    if (serial !== state.contextRequest) return;
+    state.contextError = e.message;
+    renderAnnotations();
+  }
+}
+function showPane(pane) {
+  if (!wideLayout.matches) {
+    $("workspace").classList.remove("context-open", "mobile-functions");
+    syncLayout();
+  }
+  state.pane = pane;
+  loadPane();
+}
+function annotationRow(annotation) {
+  const article = el("article", undefined, "annotation-row");
+  article.append(el("strong", `${annotation.field} · ${annotation.addr}`),
+    el("p", annotation.value, "annotation-text"),
+    el("small", `${annotation.author} · asserted · ${annotation.resolution} match${annotation.confident ? "" : " · low confidence"}`, "muted"));
+  if (!annotation.confident) article.classList.add("warning");
+  return article;
+}
+function renderAnnotations() {
+  clear($("function-annotations"));
+  if (state.contextError) $("function-annotations").textContent = `Annotations unavailable: ${state.contextError}`;
+  else if (!state.context) $("function-annotations").textContent = "Loading annotations…";
+  else if (!state.context.annotations.length) $("function-annotations").textContent = "No saved annotations for this function.";
+  else {
+    const button = el("button", `Read ${state.context.annotations.length} ${state.context.annotations.length === 1 ? "annotation" : "annotations"}`, "button subtle");
+    button.onclick = () => showPane("annotations");
+    $("function-annotations").append(button);
+    for (const annotation of state.context.annotations.filter(a => a.field === "comment"))
+      $("function-annotations").append(annotationRow(annotation));
+  }
+}
+function renderAnnotationPane() {
+  clear($("code"));
+  for (const annotation of state.context.annotations) $("code").append(annotationRow(annotation));
+  if (!state.context.annotations.length) message($("code"), "No saved annotations for this function.");
+  $("quality").textContent = "Saved names, types and comments · author and anchor match shown · analysis snapshot";
+  state.code = state.context.annotations.map(a => `${a.addr} ${a.field}: ${a.value}\n${a.author} · ${a.resolution}`).join("\n\n");
+  $("copy-code").disabled = !state.code;
+}
+function goInstruction(addr) {
+  state.instructionTarget = addr;
+  showPane("disas");
+}
+function addressLink(addr, functionAddr = null) {
+  const functionTarget = state.functions.find(f => f.addr === (functionAddr || addr));
+  const local = state.context?.blocks.some(b => BigInt(addr) >= BigInt(b.addr) && BigInt(addr) < BigInt(b.end));
+  if (!local && !functionTarget) return el("code", addr);
+  const button = el("button", addr, "address-link");
+  button.onclick = () => local ? goInstruction(addr) : selectFunction(functionTarget);
+  return button;
+}
+function renderDisassembly(data) {
+  clear($("code"));
+  const known = new Map(state.functions.flatMap(f => [[f.name, f], [f.addr, f]]));
+  const lines = [];
+  for (const group of data.items || []) for (const insn of group.insns || []) {
+    const row = el("div", undefined, "instruction");
+    row.dataset.addr = insn.addr;
+    const content = el("div", undefined, "instruction-content");
+    content.append(syntaxLine(insn.text, known));
+    const detail = el("div", undefined, "instruction-detail");
+    detail.append(el("span", `${insn.flow} · ${insn.len} bytes`));
+    if (insn.target) {
+      detail.append(document.createTextNode(" → "), addressLink(insn.target));
+      if (insn.target_name) detail.append(document.createTextNode(` <${insn.target_name}>`));
+    }
+    content.append(detail);
+    for (const reference of state.context?.references.filter(r => r.from === insn.addr && ["data", "read", "write"].includes(r.kind)) || [])
+      content.append(el("div", `${reference.kind} → ${reference.to} · ${reference.string ? JSON.stringify(reference.string.text) : reference.name || reference.section || "mapped data"}`, "instruction-detail"));
+    for (const annotation of state.context?.annotations.filter(a => a.addr === insn.addr && a.field === "comment") || [])
+      content.append(el("div", `; ${annotation.value} — ${annotation.author} · ${annotation.resolution} match`, "instruction-comment"));
+    row.append(el("code", insn.addr, "instruction-address"), el("code", insn.bytes ?? "Unavailable", "instruction-bytes"), content);
+    $("code").append(row);
+    const comments = state.context?.annotations.filter(a => a.addr === insn.addr && a.field === "comment") || [];
+    lines.push(`${insn.addr}  ${insn.bytes || ""}  ${insn.text}  [${insn.flow}${insn.target ? " → " + insn.target : ""}]${comments.map(a => `\n; ${a.value} — ${a.author} · ${a.resolution} match`).join("")}`);
+  }
+  if (state.contextError) $("code").prepend(el("p", `Annotations and reference context unavailable: ${state.contextError}`, "context-warning"));
+  if (!lines.length) message($("code"), "No decoded instructions for this function.");
+  state.code = lines.join("\n");
+  $("copy-code").disabled = !state.code;
+  if (state.instructionTarget) {
+    const selected = [...$("code").querySelectorAll(".instruction")].find(row => row.dataset.addr === state.instructionTarget);
+    selected?.classList.add("selected");
+    selected?.scrollIntoView({block:"center"});
+  } else $("code").scrollTop = 0;
+}
+function renderOutgoing() {
+  clear($("code"));
+  const rows = state.context.references.filter(r => state.referenceDirection !== "data" || ["data", "read", "write"].includes(r.kind));
+  const table = el("table", undefined, "references outgoing-references");
+  const head = el("tr");
+  for (const label of ["Instruction", "Kind", "Target", "Target context"]) head.append(el("th", label));
+  const thead = el("thead"); thead.append(head); table.append(thead);
+  const body = el("tbody");
+  for (const r of rows) {
+    const row = el("tr"), from = el("td"), target = el("td"), context = el("td");
+    from.append(addressLink(r.from)); target.append(addressLink(r.to, r.function));
+    if (r.name) context.append(el("strong", r.name));
+    if (r.section) context.append(el("div", r.section, "muted"));
+    if (r.string) context.append(el("pre", r.string.text, "record-body"), el("small", `${r.string.encoding} string at ${r.string.addr} +${r.string.offset} bytes`, "muted"));
+    else context.append(el("code", r.bytes || "No mapped bytes", "data-bytes"));
+    row.append(from, el("td", r.kind), target, context); body.append(row);
+  }
+  table.append(body); $("code").append(table);
+  if (!rows.length) message($("code"), "No outgoing references reported in this view.", "References come from every recovered block; unresolved targets are not guessed.");
+  $("quality").textContent = `${rows.length} outgoing references · all recovered blocks · ${state.referenceDirection === "data" ? "strings and data" : "code and data"} · analysis snapshot`;
+  state.code = JSON.stringify(rows, null, 2); $("copy-code").disabled = !rows.length;
+}
+$("reference-direction").onchange = () => {
+  state.referenceDirection = $("reference-direction").value;
+  loadPane();
+};
+function renderCfg() {
+  clear($("code"));
+  const blocks = state.context.blocks;
+  $("quality").textContent = `${blocks.length} recovered basic blocks · ${state.context.complete ? "Complete" : "Incomplete: " + state.context.halt} · arrows are recovered successors`;
+  if (!blocks.length) { message($("code"), "No recovered basic blocks."); return; }
+  const byAddr = new Map(blocks.map(b => [b.addr, b]));
+  if (blocks.length <= 160) {
+    const levels = new Map(), queue = [];
+    if (byAddr.has(state.selected.addr)) { levels.set(state.selected.addr, 0); queue.push(state.selected.addr); }
+    for (let i = 0; i < queue.length; i++) for (const next of byAddr.get(queue[i])?.successors || []) {
+      if (byAddr.has(next) && !levels.has(next)) { levels.set(next, levels.get(queue[i]) + 1); queue.push(next); }
+    }
+    for (const b of blocks) if (!levels.has(b.addr)) levels.set(b.addr, Math.max(-1, ...levels.values()) + 1);
+    const layers = [];
+    for (const b of blocks) (layers[levels.get(b.addr)] ||= []).push(b);
+    const width = Math.max(1, ...layers.map(row => row?.length || 0)) * 330 + 80;
+    const height = layers.length * 190 + 50;
+    const canvas = el("div", undefined, "cfg-canvas");
+    canvas.style.width = `${width}px`; canvas.style.height = `${height}px`;
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("width", String(width)); svg.setAttribute("height", String(height));
+    svg.setAttribute("aria-label", "Recovered control flow edges"); svg.setAttribute("role", "img");
+    const defs = document.createElementNS(ns, "defs"), marker = document.createElementNS(ns, "marker");
+    for (const [key,value] of Object.entries({id:"cfg-arrow", viewBox:"0 0 10 10", refX:"9", refY:"5", markerWidth:"7", markerHeight:"7", orient:"auto-start-reverse"})) marker.setAttribute(key,value);
+    const tip = document.createElementNS(ns,"path"); tip.setAttribute("d","M 0 0 L 10 5 L 0 10 z"); tip.setAttribute("fill","#8cbcff"); marker.append(tip); defs.append(marker); svg.append(defs); canvas.append(svg);
+    const positions = new Map();
+    layers.forEach((row, level) => row.forEach((block, column) => {
+      const left = 40 + (width - 80 - row.length * 330) / 2 + column * 330, top = 20 + level * 190;
+      positions.set(block.addr, {x:left + 145, y:top});
+      const node = el("article", undefined, `cfg-node${block.unresolved ? " unresolved" : ""}`);
+      node.dataset.addr = block.addr; node.style.left = `${left}px`; node.style.top = `${top}px`;
+      node.append(el("strong", `${block.addr}${block.addr === state.selected.addr ? " · entry" : ""}`),
+        el("p", `${block.insns} instructions · ${block.terminator}${block.unresolved ? " · unresolved" : ""}`));
+      const button = el("button", "View instructions", "button subtle"); button.onclick = () => goInstruction(block.addr); node.append(button); canvas.append(node);
+    }));
+    for (const block of blocks) for (const successor of block.successors) {
+      const from = positions.get(block.addr), to = positions.get(successor);
+      if (!to) continue; // External successors remain explicit in the table below.
+      const path = document.createElementNS(ns, "path"), y = from.y + 130;
+      const bend = Math.max(from.x, to.x) + 165;
+      path.setAttribute("d", to.y > from.y
+        ? `M ${from.x} ${y} C ${from.x} ${y+28}, ${to.x} ${to.y-28}, ${to.x} ${to.y}`
+        : `M ${from.x+145} ${from.y+65} C ${bend} ${from.y+65}, ${bend} ${to.y-25}, ${to.x} ${to.y}`);
+      path.setAttribute("marker-end", "url(#cfg-arrow)");
+      const title = document.createElementNS(ns,"title"); title.textContent = `${block.addr} → ${successor}`; path.append(title); svg.append(path);
+    }
+    $("code").append(canvas);
+  } else $("code").append(el("p", "Large control flow graph: all recovered blocks and successors are listed below.", "context-warning"));
+  const table = el("table", undefined, "references cfg-table"), head = el("tr"), thead = el("thead");
+  for (const label of ["Block", "End (exclusive)", "Ending", "Successors"]) head.append(el("th", label));
+  thead.append(head); table.append(thead); const body = el("tbody");
+  table.append(body); $("code").append(table);
+  let shown = 0;
+  const more = el("button", "", "button subtle cfg-more");
+  const appendBlocks = () => {
+    const batch = blocks.slice(shown, shown + 200);
+    for (const block of batch) {
+      const row = el("tr"), address = el("td"), successors = el("td"); address.append(addressLink(block.addr));
+      for (const addr of block.successors) successors.append(addressLink(addr), document.createTextNode(byAddr.has(addr) ? " " : " (outside recovered blocks) "));
+      if (!block.successors.length) successors.textContent = block.unresolved ? "Unresolved" : "None";
+      row.append(address, el("td", block.end), el("td", `${block.terminator}${block.unresolved ? " · unresolved" : ""}`), successors); body.append(row);
+    }
+    shown += batch.length;
+    more.hidden = shown >= blocks.length;
+    more.textContent = `Show next ${Math.min(200, blocks.length - shown)} blocks (${shown} / ${blocks.length} shown)`;
+  };
+  more.onclick = appendBlocks;
+  appendBlocks(); $("code").append(more);
+  state.code = JSON.stringify(blocks, null, 2); $("copy-code").disabled = false;
 }
 function syntaxLine(line, known) {
   const container = el("span", undefined, "line-source");
@@ -515,7 +743,7 @@ function syntaxLine(line, known) {
     )
       style = "keyword";
     const target = known.get(word);
-    if (target) {
+    if (target && !["comment", "string"].includes(style)) {
       const link = el("a", word, "call");
       link.href = `#workspace/${target.addr}`;
       link.onclick = (e) => {
@@ -560,6 +788,8 @@ function renderVariables(variables) {
 }
 function renderReferences(data) {
   clear($("code"));
+  state.code = "";
+  $("copy-code").disabled = true;
   const rows = data.items || [];
   if (!rows.length) {
     message(
@@ -635,8 +865,29 @@ async function loadPane() {
     .forEach((b) =>
       b.setAttribute("aria-selected", String(b.dataset.pane === pane)),
     );
+  $("reference-controls").hidden = pane !== "xrefs";
+  syncTabs();
   if (pane === "notes") {
     renderNotesPane();
+    return;
+  }
+  $("quality").className = "quality";
+  if (["cfg", "annotations"].includes(pane) || (pane === "xrefs" && state.referenceDirection !== "incoming")) {
+    message($("code"), "Loading function context…");
+    $("quality").textContent = "Loading function context…";
+    state.code = "";
+    $("copy-code").disabled = true;
+    $("copy-analysis").disabled = true;
+    await state.contextPromise;
+    if (serial !== state.request) return;
+    if (state.contextError) { message($("code"), "Function context unavailable", state.contextError); $("quality").textContent = "Context unavailable"; return; }
+    if (pane === "cfg") renderCfg();
+    else if (pane === "annotations") renderAnnotationPane();
+    else renderOutgoing();
+    $("analysis-command").textContent = pane === "annotations"
+      ? `e5r annotate ${shellQuote(state.project.binary)} list${state.project.log ? " --db " + shellQuote(state.project.log) : ""}`
+      : `Function ${pane === "cfg" ? "control flow" : "outgoing references"} from the analysis snapshot.`;
+    $("copy-analysis").disabled = pane !== "annotations";
     return;
   }
   $("quality").className = "quality";
@@ -680,16 +931,9 @@ async function loadPane() {
       renderCode(d.code);
       renderVariables(d.variables);
     } else if (pane === "disas") {
-      // CLI disassembly JSON groups instructions under functions.
-      const groups = data.items || [];
-      const lines = [];
-      for (const group of groups) {
-        for (const insn of group.insns || []) {
-          lines.push(`${insn.addr}  ${insn.text}`);
-        }
-      }
-      if (!lines.length) renderCode(JSON.stringify(data, null, 2));
-      else renderCode(lines.join("\n"));
+      await state.contextPromise;
+      if (serial !== state.request) return;
+      renderDisassembly(data);
       $("quality").textContent =
         `${f.insns} instructions · ${f.strength} boundary · ${f.complete ? "Complete" : "Incomplete: " + f.halt}`;
     } else if (pane === "callgraph") {
@@ -817,7 +1061,10 @@ window.addEventListener("keydown", (e) => {
 });
 const tabs = [...document.querySelectorAll("[data-pane]")];
 function syncTabs() {
-  tabs.forEach(tab => tab.tabIndex = tab.dataset.pane === state.pane ? 0 : -1);
+  tabs.forEach(tab => {
+    tab.tabIndex = tab.dataset.pane === state.pane ? 0 : -1;
+    tab.setAttribute("aria-selected", String(tab.dataset.pane === state.pane));
+  });
 }
 for (const tab of tabs) {
   tab.addEventListener("click", syncTabs);
@@ -840,6 +1087,7 @@ async function boot() {
     $("project-name").textContent = name;
     document.title = `${name} · e5r`;
     $("binary-name").textContent = state.project.binary;
+    renderBinaryInfo();
     $("agent-command").textContent =
       `e5r project task ${shellQuote(state.project.project)} list --json`;
     renderBoard();

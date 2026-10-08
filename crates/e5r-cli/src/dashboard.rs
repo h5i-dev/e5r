@@ -132,6 +132,7 @@ struct Analysis {
     program: e5r_analysis::Program,
     declared: std::collections::BTreeMap<e5r_core::Addr, String>,
     comments: std::collections::BTreeMap<e5r_core::Addr, String>,
+    annotations: Vec<e5r_db::log::Applied>,
 }
 
 impl Analysis {
@@ -156,11 +157,13 @@ impl Analysis {
         }
         let declared = annotate::declarations(&program, &db);
         let comments = annotate::comments(&program, &db);
+        let annotations = annotate::load(&db)?.apply(&annotate::index(&program));
         Ok(Self {
             key,
             program,
             declared,
             comments,
+            annotations,
         })
     }
     fn answer(&self, kind: &str, target: Option<&str>) -> Result<Value, String> {
@@ -172,8 +175,32 @@ impl Analysis {
         let at = crate::addr::parse_number(target)
             .map(e5r_core::Addr)
             .ok_or("expected a function address")?;
-        if self.program.function(at).is_none() {
-            return Err("function not found".into());
+        let function = self.program.function(at).ok_or("function not found")?;
+        if kind == "context" {
+            let annotations: Vec<_> = self
+                .annotations
+                .iter()
+                .filter(|a| a.addr == at || e5r_api::inspect::contains(function, a.addr))
+                .map(|a| {
+                    json!({"addr":a.addr.to_string(), "field":a.field.to_string(),
+                    "value":a.value, "author":a.who, "resolution":a.resolution.to_string(),
+                    "confident":a.resolution.is_confident()})
+                })
+                .collect();
+            let references: Vec<_> = e5r_api::inspect::outgoing(&self.program, function).into_iter()
+                .map(|r| json!({"from":r.xref.from.to_string(), "to":r.xref.to.to_string(),
+                    "kind":r.xref.kind, "name":r.name, "function":r.function.map(|a|a.to_string()),
+                    "section":r.section, "bytes":r.bytes.iter().map(|b|format!("{b:02x}")).collect::<String>(),
+                    "string":r.string.map(|s|json!({"addr":s.addr.to_string(), "text":s.text,
+                        "encoding":s.encoding, "offset":r.xref.to.get()-s.addr.get()}))})).collect();
+            let blocks: Vec<_> = function.cfg.blocks.iter().map(|(addr, block)| json!({
+                "addr":addr.to_string(), "end":block.range.end().to_string(), "insns":block.insns,
+                "successors":block.successors.iter().map(|a|a.to_string()).collect::<Vec<_>>(),
+                "terminator":format!("{:?}", block.terminator), "unresolved":block.unresolved
+            })).collect();
+            return Ok(json!({"schema":"e5r.context.v1", "function":at.to_string(),
+                "annotations":annotations, "references":references, "blocks":blocks,
+                "complete":function.is_complete(), "halt":function.cfg.halt.as_str()}));
         }
         if kind == "callgraph" {
             let edges: Vec<_> = self
@@ -397,7 +424,7 @@ fn serve_inner(
             if let Some((kind, target)) = analysis_route.filter(|(kind, _)| {
                 matches!(
                     *kind,
-                    "functions" | "decompile" | "disas" | "xrefs" | "callgraph"
+                    "functions" | "decompile" | "disas" | "xrefs" | "callgraph" | "context"
                 )
             }) {
                 if target.is_some_and(|target| crate::addr::parse_number(target).is_none()) {

@@ -922,3 +922,52 @@ kbd { font: inherit; color: var(--ink); }
 .function-note { padding: 20px 24px; border-bottom: 1px solid var(--line); }
 .function-note h3 { margin: 0; font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
 .function-note .record-body { font-size: 14px; }
+
+/* Analysis views use the same readable surfaces as project records. */
+.code-tabs { flex-wrap: wrap; gap: 0 20px; }
+.binary-panel { margin-top: 20px; }
+.binary-info { padding: 0 24px 20px; }
+.binary-info dl { display: grid; grid-template-columns: minmax(130px, 200px) minmax(0, 1fr); gap: 12px 20px; margin: 0; }
+.binary-info dt { color: var(--muted); font-size: 13px; }
+.binary-info dd { margin: 0; overflow-wrap: anywhere; line-height: 1.6; }
+.loader-warnings, .context-warning { padding: 12px 24px; color: var(--amber); background: #302719; border-left: 3px solid var(--amber); }
+.loader-warnings p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.reference-controls { padding: 10px 20px; background: var(--surface); }
+.reference-controls label { display: flex; flex-direction: row; align-items: center; margin: 0; }
+.reference-controls select { width: auto; padding: 6px 10px; }
+.annotation-row { padding: 16px 20px; border-bottom: 1px solid var(--line); font-size: 13px; line-height: 1.7; }
+.annotation-row strong { font-size: 13px; }
+.annotation-text { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+.annotation-row.warning { border-left: 3px solid var(--amber); }
+.inspector .annotation-row { padding: 12px 0; }
+.instruction { display: grid; grid-template-columns: 100px 150px minmax(0, 1fr); padding: 8px 16px; gap: 14px; border-left: 3px solid transparent; }
+.instruction:hover { background: var(--surface); }
+.instruction.selected { background: #253b55; border-left-color: var(--accent); }
+.instruction code, .instruction .line-source { font-size: var(--code-size); }
+.instruction-address { color: var(--blue); }
+.instruction-bytes { color: var(--muted); overflow-wrap: anywhere; }
+.instruction-content { min-width: 0; }
+.instruction .line-source { display: block; white-space: pre; padding: 0; }
+.code.wrap .instruction .line-source { white-space: pre-wrap; overflow-wrap: anywhere; }
+.instruction-detail { color: var(--muted); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.instruction-comment { color: var(--green); font-size: 13px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.address-link { font: 13px ui-monospace, monospace; color: var(--blue); border: 0; padding: 0; background: transparent; text-decoration: underline; text-underline-offset: 3px; }
+.data-bytes { display: block; overflow-wrap: anywhere; }
+.outgoing-references td:first-child, .cfg-table td:first-child { width: auto; }
+.outgoing-references td:last-child, .cfg-table td:last-child { width: auto; }
+.cfg-canvas { position: relative; margin: 20px; }
+.cfg-canvas svg { position: absolute; inset: 0; }
+.cfg-canvas svg > path { fill: none; stroke: var(--blue); stroke-width: 2; }
+.cfg-node { position: absolute; width: 290px; height: 130px; padding: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+.cfg-node strong { color: var(--blue); font-family: ui-monospace, monospace; }
+.cfg-node p { font-size: 12px; color: var(--muted); margin: 8px 0; }
+.cfg-node.unresolved { border-color: var(--amber); }
+@media (max-width: 700px) {
+  .binary-info { padding: 0 18px 18px; }
+  .binary-info dl { grid-template-columns: 1fr; gap: 4px; }
+  .binary-info dd { margin-bottom: 12px; }
+  .instruction { grid-template-columns: 80px minmax(0, 1fr); gap: 8px; padding: 10px; }
+  .instruction-bytes { grid-column: 2; grid-row: 1; }
+  .instruction-content { grid-column: 1 / -1; }
+  .code-tabs { gap: 0 15px; }
+}
