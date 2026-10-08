@@ -45,6 +45,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      # Whole-corpus decompilation takes tens of minutes without optimization.
+      # Keep test-profile debug assertions and overflow checks enabled.
+      CARGO_PROFILE_TEST_OPT_LEVEL: 2
     steps:
       - uses: actions/checkout@v4
       # The AArch64 std, for the Rust fixture: `build-fixtures.sh` builds it
