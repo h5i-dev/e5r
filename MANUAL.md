@@ -448,6 +448,21 @@ A project names its binary by content as well as by path. Opening it against a
 rebuilt binary says so rather than answering about bytes that are not there,
 and a binary that only moved is still the right one.
 
+## Project dashboard and tasks
+
+```bash
+e5r project dashboard prog.e5r-proj             # local overview + decompiler pane
+e5r project dashboard prog.e5r-proj --port 0    # choose a free loopback port
+e5r project task prog.e5r-proj add "Trace parser" --owner agent-a --next "Inspect main"
+e5r project task prog.e5r-proj list --json
+e5r project task prog.e5r-proj update T-0001 --revision 1 --input task.json
+```
+
+The browser and CLI share durable tasks with revision checks, owners, blockers,
+prerequisites, next actions and evidence. Binary analysis and annotations are
+a startup snapshot; tasks refresh live. See [docs/dashboard.md](docs/dashboard.md)
+for the content format and supported project options.
+
 ## Driving it from a program
 
 Every command takes `--json`. The schema is named in every document

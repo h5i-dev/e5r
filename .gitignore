@@ -253,3 +253,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local task-store write locks and atomic-write scratch files. Task JSON is durable.
+*.work/.lock
+*.work/*.tmp

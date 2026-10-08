@@ -34,11 +34,12 @@ and 58 MB, finding 3,517 functions with 95.3% analyzed completely, where
 disagreements with their oracle; memory use is about ten times objdump's, which
 is the axis e5r is worse on. 164 tests, clippy clean.
 
-e5r is a reverse engineering toolkit with a command line as its only front end.
+e5r is a reverse engineering toolkit with a command line and an optional local
+project workspace.
 It loads a binary, recovers functions, disassembles, lifts to an IR, decompiles
 to C, diffs two builds, and writes an analyst's findings to a text log that git
-can merge. One static Rust binary, no JVM, no project server, no proprietary
-database.
+can merge. One static Rust binary, no JVM, no required project server, no
+proprietary database.
 
 The previous contents of this repository were a C++ teaching disassembler for
 x86-64. It is gone from the tree as of M0 and stays readable in git history. The
@@ -964,8 +965,11 @@ Tasks:
 Each of these is a decision. Reopening one needs a reason that did not exist when
 it was closed.
 
-- **A GUI:** Not in the first year, possibly not ever from this repository. The
-  library API and the JSON schema are designed so someone else can build one.
+- **A full desktop GUI:** The 2026-10-08 request reopens the earlier UI exclusion
+  for a local dashboard, durable project tasks and a decompiler pane. This
+  workspace uses existing library analysis and keeps the CLI complete; it does
+  not add a mandatory project service or desktop framework. See
+  [`docs/dashboard.md`](docs/dashboard.md).
 - **A debugger:** rizin and gdb do this well and it is a different product. The
   emulator in M10 runs code paths for analysis; it does not attach to a process.
 - **Ghidra script compatibility:** Running Java is the thing this project exists

@@ -1,9 +1,9 @@
 # e5r: The Reverse Engineering Toolkit for AI Agents
 
 **e5r** is a disassembler, decompiler and binary differ with a command line as
-its only front end. Every command speaks JSON, every recovered fact carries the
-evidence for it, and every name, type and comment an agent writes lands in a
-git-mergeable log. One static Rust binary: no JVM, no project server, no
+its primary interface and an optional local project workspace. Every command
+speaks JSON, every recovered fact carries the evidence for it, and every name,
+type and comment an agent writes lands in a git-mergeable log. One static Rust binary: no JVM, no required project server, no
 proprietary database.
 
 ```bash
@@ -107,6 +107,23 @@ e5r funcs ./a.out --json                      # every command takes it
 e5r batch ./a.out --command funcs --command strings
 e5r project new ./a.out --out a.e5rproj      # reopen it later without reanalysing
 ```
+
+---
+
+## 3. Project workspace
+
+A local dashboard puts blockers, review requests and next actions first. Its
+decompiler pane provides searchable functions, pseudocode, disassembly and
+references, with tasks and evidence shared by humans and agents.
+
+```bash
+e5r project new ./a.out --out investigation.e5rproj
+e5r project dashboard investigation.e5rproj
+e5r project task investigation.e5rproj list --json
+```
+
+Open the printed loopback URL. See [the workspace guide](docs/dashboard.md) for
+task creation, handoffs and conflict handling.
 
 ---
 

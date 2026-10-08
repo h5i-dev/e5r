@@ -12,6 +12,7 @@ mod addr;
 mod annotate;
 mod batch;
 mod budget;
+mod dashboard;
 mod json;
 mod out;
 mod patch;
@@ -19,6 +20,7 @@ mod print;
 mod progress;
 mod repl;
 mod shell;
+mod work;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -453,6 +455,24 @@ pub enum PatchCommand {
 /// What to do with a project file.
 #[derive(Subcommand)]
 pub enum ProjectCommand {
+    /// Manage durable tasks shared by people and agents.
+    Task {
+        /// The project file.
+        project: PathBuf,
+        #[command(subcommand)]
+        what: work::Command,
+    },
+    /// Open a local project dashboard and decompiler workspace.
+    Dashboard {
+        /// The project file.
+        project: PathBuf,
+        /// Loopback port; zero chooses a free port.
+        #[arg(long, default_value_t = 7879)]
+        port: u16,
+        /// Override a moved binary path; content must still match.
+        #[arg(long)]
+        binary: Option<PathBuf>,
+    },
     /// Record what it takes to reopen this session.
     New {
         /// The binary.
@@ -986,6 +1006,15 @@ pub fn dispatch(
 /// The project commands, which open the files they name and nothing else.
 fn project(w: &mut out::Out, what: &ProjectCommand) -> Result<u8, String> {
     match what {
+        ProjectCommand::Task { project, what } => {
+            patch::project_read(project)?;
+            work::run(w, project, what)
+        }
+        ProjectCommand::Dashboard {
+            project,
+            port,
+            binary,
+        } => dashboard::serve(project, *port, binary.as_deref()),
         ProjectCommand::New {
             binary,
             out,
