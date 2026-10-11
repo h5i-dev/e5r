@@ -317,6 +317,7 @@ pub fn remove_dead(f: &mut SsaFunction) -> Changes {
     // A call reads its arguments out of registers the IR does not name as its
     // inputs, so without this every instruction that sets one up looks dead.
     // Deleting them does not just lose readability: it loses the argument.
+    // A branch leaving the function passes arguments to its tail callee too.
     let argument_locations: Vec<Location> = abi
         .integer_arguments
         .iter()
@@ -329,10 +330,20 @@ pub fn remove_dead(f: &mut SsaFunction) -> Changes {
         .collect();
     for b in f.blocks.values() {
         for (n, op) in b.ops.iter().enumerate() {
+            let tail_call = match op.kind {
+                SsaKind::Op(crate::op::Op::Branch) => op
+                    .inputs
+                    .first()
+                    .and_then(|input| input.as_const())
+                    .is_some_and(|target| !f.blocks.contains_key(&e5r_core::Addr(target))),
+                SsaKind::Op(crate::op::Op::BranchInd) => true,
+                _ => false,
+            };
             if !matches!(
                 op.kind,
                 SsaKind::Op(crate::op::Op::Call) | SsaKind::Op(crate::op::Op::CallInd)
-            ) {
+            ) && !tail_call
+            {
                 continue;
             }
             for location in &argument_locations {
@@ -409,6 +420,118 @@ fn has_effect(op: &crate::ssa::SsaOp) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn independent_clobbers_are_not_common_expressions() {
+        use crate::ssa::{SsaBlock, SsaOp};
+        let entry = e5r_core::Addr(0x1000);
+        let ops = [0, 8]
+            .into_iter()
+            .map(|offset| SsaOp {
+                addr: entry,
+                kind: SsaKind::Op(Op::Undefine),
+                out: Some(Value {
+                    location: Location {
+                        space: Space::Register,
+                        offset,
+                        size: 8,
+                    },
+                    version: 0,
+                }),
+                inputs: vec![],
+                size: 8,
+            })
+            .collect();
+        let mut f = SsaFunction {
+            arch: e5r_core::Arch::X86_64,
+            entry,
+            blocks: BTreeMap::from([(
+                entry,
+                SsaBlock {
+                    ops,
+                    ..Default::default()
+                },
+            )]),
+        };
+        assert_eq!(cse(&mut f).folded, 0);
+        assert!(
+            f.blocks[&entry]
+                .ops
+                .iter()
+                .all(|op| op.kind == SsaKind::Op(Op::Undefine))
+        );
+    }
+
+    #[test]
+    fn tail_calls_keep_argument_setup_live() {
+        use crate::ssa::{SsaBlock, SsaOp};
+        let entry = e5r_core::Addr(0x1000);
+        let abi = crate::abi::of(&e5r_core::Arch::AArch64);
+        let argument = Value {
+            location: Location {
+                space: Space::Register,
+                offset: abi.integer_arguments[0],
+                size: 8,
+            },
+            version: 0,
+        };
+        let ops = vec![
+            SsaOp {
+                addr: entry,
+                kind: SsaKind::Op(Op::IntAdd),
+                out: Some(argument),
+                inputs: vec![
+                    Operand::Undefined(Location {
+                        space: Space::Register,
+                        offset: abi.integer_arguments[1],
+                        size: 8,
+                    }),
+                    Operand::Const(1, 8),
+                ],
+                size: 8,
+            },
+            SsaOp {
+                addr: entry,
+                kind: SsaKind::Op(Op::Branch),
+                out: None,
+                inputs: vec![Operand::Const(0x2000, 8)],
+                size: 8,
+            },
+        ];
+        let mut f = SsaFunction {
+            arch: e5r_core::Arch::AArch64,
+            entry,
+            blocks: BTreeMap::from([(
+                entry,
+                SsaBlock {
+                    ops,
+                    ..Default::default()
+                },
+            )]),
+        };
+        remove_dead(&mut f);
+        assert!(
+            f.blocks[&entry]
+                .ops
+                .iter()
+                .any(|op| op.out == Some(argument))
+        );
+        // An internal branch does not implicitly consume call arguments.
+        f.blocks
+            .get_mut(&entry)
+            .unwrap()
+            .ops
+            .last_mut()
+            .unwrap()
+            .inputs = vec![Operand::Const(entry.get(), 8)];
+        remove_dead(&mut f);
+        assert!(
+            !f.blocks[&entry]
+                .ops
+                .iter()
+                .any(|op| op.out == Some(argument))
+        );
+    }
 
     #[test]
     fn constant_arithmetic_folds() {
@@ -522,8 +645,8 @@ fn mask_of_op(
         }
     };
     let _ = (f, defs);
-    let a = op.inputs.first().map(&get).unwrap_or(u64::MAX);
-    let b = op.inputs.get(1).map(&get).unwrap_or(u64::MAX);
+    let a = op.inputs.first().map(get).unwrap_or(u64::MAX);
+    let b = op.inputs.get(1).map(get).unwrap_or(u64::MAX);
     match op.kind {
         SsaKind::Phi => op.inputs.iter().map(&get).fold(0, |acc, m| acc | m),
         SsaKind::Op(o) => match o {
@@ -1910,6 +2033,7 @@ fn pure(o: Op) -> bool {
             | Op::BranchInd
             | Op::Return
             | Op::Unimplemented
+            | Op::Undefine
             | Op::Copy
     )
 }

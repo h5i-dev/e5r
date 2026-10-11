@@ -1041,6 +1041,117 @@ pub fn archive(w: &mut Out, data: &[u8], symbols: bool, as_json: bool) -> R {
     Ok(exit::OK)
 }
 
+/// Modules embedded by `bun build --compile`.
+pub fn bun(w: &mut Out, data: &[u8], extract: Option<&str>, which: usize, as_json: bool) -> R {
+    if extract.is_some() && as_json {
+        return Err(
+            "--extract writes the module's bytes, so it cannot be combined with --json".into(),
+        );
+    }
+    let opts = e5r_format::bun::Options {
+        which,
+        ..e5r_format::bun::Options::default()
+    };
+    let graph = e5r_format::bun::open_with(data, &opts).map_err(|e| e.to_string())?;
+    if let Some(query) = extract {
+        let index = match graph.find(query) {
+            Ok(index) => index,
+            Err(e5r_core::Error::NotRecognized { .. }) => {
+                eprintln!("no module {query}");
+                return Ok(exit::NOT_FOUND);
+            }
+            Err(e) => return Err(e.to_string()),
+        };
+        let module = &graph.modules[index];
+        eprintln!(
+            "module {} ({} bytes, {})",
+            module.name,
+            module.contents.len(),
+            module.loader_name()
+        );
+        std::io::Write::write_all(&mut std::io::stdout(), module.contents)
+            .map_err(|e| e.to_string())?;
+        return Ok(exit::OK);
+    }
+    if as_json {
+        return json::emit(w, &json::bun(&graph));
+    }
+    outln!(
+        w,
+        "bun standalone, {} module(s), entry {}, record {} bytes, at {:#x}",
+        graph.modules.len(),
+        graph.entry_point_id,
+        graph.record_size,
+        graph.offset
+    );
+    outln!(
+        w,
+        "flags          {:#x}{}",
+        graph.flags,
+        flag_suffix(graph.flags)
+    );
+    if !graph.argv.is_empty() {
+        match std::str::from_utf8(graph.argv) {
+            Ok(text) => outln!(w, "argv           {text}"),
+            Err(_) => outln!(w, "argv           {} bytes, not utf-8", graph.argv.len()),
+        }
+    }
+    if !graph.modules.is_empty() {
+        outln!(w, "");
+        outln!(
+            w,
+            "{:>4}  {:>10}  {:<16}  {}",
+            "#",
+            "size",
+            "loader",
+            "name"
+        );
+        for module in &graph.modules {
+            outln!(
+                w,
+                "{:>4}  {:>10}  {:<16}  {}{}",
+                module.index,
+                module.contents.len(),
+                module.loader_name(),
+                module.name,
+                if module.entry { "  entry" } else { "" }
+            );
+        }
+    }
+    for warn in &graph.warnings {
+        eprintln!("note: {warn}");
+    }
+    if graph.modules.is_empty() {
+        return Ok(exit::NOT_FOUND);
+    }
+    Ok(exit::OK)
+}
+
+fn flag_suffix(flags: u32) -> String {
+    let named = [
+        (0u32, "disable_default_env_files"),
+        (1, "disable_autoload_bunfig"),
+        (2, "disable_autoload_tsconfig"),
+        (3, "disable_autoload_package_json"),
+    ];
+    let mut set: Vec<&str> = named
+        .iter()
+        .filter(|(bit, _)| flags & (1 << bit) != 0)
+        .map(|(_, name)| *name)
+        .collect();
+    // Bits above the four Bun named first are real on current executables.
+    // The hex in the listing is the whole word; this only avoids reading
+    // the parenthetical as a complete decoding.
+    if flags & !0b1111 != 0 {
+        set.push("other bits set");
+    }
+    if set.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", set.join(", "))
+    }
+}
+
 /// Recovered C++ classes, their hierarchy and their member functions.
 pub fn classes(w: &mut Out, p: &Program, members: bool, as_json: bool) -> R {
     let opts = e5r_api::classes::Options {

@@ -186,7 +186,10 @@ fn help(w: &mut Out) {
         w,
         "  xrefs [where]      strings             query <question>"
     );
-    outln!(w, "  classes  vtables  sig  annotate  overlay  archive");
+    outln!(
+        w,
+        "  classes  vtables  sig  annotate  overlay  archive  bun"
+    );
     outln!(w, "");
     outln!(
         w,

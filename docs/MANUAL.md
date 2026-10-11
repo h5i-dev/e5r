@@ -376,6 +376,21 @@ e5r archive libfoo.a --symbols    # and what each one defines
 
 GNU and BSD archives, long names, both symbol index forms, and thin archives.
 
+A Bun standalone executable (`bun build --compile`) carries its scripts in a
+module graph after the native image. The graph is source and bytecode, so it
+is listed rather than disassembled. Bun's own layout is what is read: the
+last `\n---- Bun! ----\n` marker, the offsets just before it, and either
+record size that layout has shipped.
+
+```
+e5r bun prog                      # modules, loaders, sizes
+e5r bun prog --extract a.js       # that module's bytes on stdout
+```
+
+`--extract` takes the path the graph stores, a decimal index, or a unique
+suffix that begins at a `/`. It writes the bytes and nothing else, so it is
+not combined with `--json`.
+
 ```
 e5r overlay firmware.exe
 ```
@@ -432,6 +447,27 @@ e5r project show prog.e5r-proj
 A project names its binary by content as well as by path. Opening it against a
 rebuilt binary says so rather than answering about bytes that are not there,
 and a binary that only moved is still the right one.
+
+## Project dashboard and tasks
+
+```bash
+e5r project new prog --name investigation     # global project, absolute references
+e5r project list --json
+e5r ui                                      # every registered project
+e5r project import prog.e5r-proj --name imported
+e5r project task investigation list --json
+e5r project dashboard prog.e5r-proj             # local overview + decompiler pane
+e5r project dashboard prog.e5r-proj --port 0    # choose a free loopback port
+e5r project task prog.e5r-proj add "Trace parser" --owner agent-a --next "Inspect main"
+e5r project task prog.e5r-proj list --json
+e5r project task prog.e5r-proj update T-0001 --revision 1 --input task.json
+```
+
+The browser and CLI share durable tasks with revision checks, owners, blockers,
+prerequisites, next actions and evidence. Analysis loads on demand; tasks refresh live across all projects. Global
+projects live under `E5R_PROJECT_HOME`, `$XDG_DATA_HOME/e5r/projects`, or
+`~/.local/share/e5r/projects`. See [docs/dashboard.md](dashboard.md)
+for the content format and supported project options.
 
 ## Driving it from a program
 

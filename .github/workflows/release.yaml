@@ -140,7 +140,9 @@ jobs:
           $name = "e5r-$version-x86_64-pc-windows-msvc"
           New-Item -ItemType Directory -Force -Path "dist/$name" | Out-Null
           Copy-Item "target/x86_64-pc-windows-msvc/release/e5r.exe" "dist/$name/"
-          Copy-Item README.md, LICENSE, MANUAL.md "dist/$name/"
+          Copy-Item README.md, LICENSE "dist/$name/"
+          New-Item -ItemType Directory -Force -Path "dist/$name/docs" | Out-Null
+          Copy-Item docs/MANUAL.md, docs/ROADMAP.md, docs/dashboard.md "dist/$name/docs/"
           & "dist/$name/e5r.exe" --version
           Compress-Archive -Path "dist/$name" -DestinationPath "dist/$name.zip"
       - uses: actions/upload-artifact@v4

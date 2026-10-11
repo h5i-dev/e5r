@@ -946,13 +946,29 @@ fn plt_calls_keep_prepared_arguments() {
 /// return operation itself does not mention it.
 #[test]
 fn a_returned_call_is_the_call_result() {
-    let Some(cc) = ["clang", "cc", "gcc"]
-        .into_iter()
+    returned_call(None);
+}
+
+#[test]
+fn a_returned_x86_call_is_the_call_result() {
+    returned_call(Some("x86_64-linux-gnu"));
+}
+
+fn returned_call(target: Option<&str>) {
+    let compilers: &[&str] = if target.is_some() {
+        &["clang"]
+    } else {
+        &["clang", "cc", "gcc"]
+    };
+    let Some(cc) = compilers
+        .iter()
+        .copied()
         .find(|name| Command::new(name).arg("--version").output().is_ok())
     else {
         return;
     };
-    let dir = std::env::temp_dir().join("e5r-returned-call");
+    let dir =
+        std::env::temp_dir().join(format!("e5r-returned-call-{}", target.unwrap_or("native")));
     std::fs::create_dir_all(&dir).unwrap();
     let src = dir.join("w.c");
     std::fs::write(
@@ -963,7 +979,11 @@ fn a_returned_call_is_the_call_result() {
     )
     .unwrap();
     let bin = dir.join("w.o");
-    let compiled = Command::new(cc)
+    let mut command = Command::new(cc);
+    if let Some(target) = target {
+        command.args(["-target", target]);
+    }
+    let compiled = command
         .args(["-c", "-O0", "-fno-builtin", "-o"])
         .arg(&bin)
         .arg(&src)

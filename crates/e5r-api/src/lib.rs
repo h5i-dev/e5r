@@ -13,6 +13,7 @@ pub mod classes;
 pub mod dataflow;
 pub mod decompile;
 pub mod emulate;
+pub mod inspect;
 pub mod kernel;
 mod msvc;
 pub mod prototypes;

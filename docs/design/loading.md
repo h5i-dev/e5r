@@ -41,6 +41,8 @@ table, and a relocation count of `sh.size / 24` where `sh.size` was 7x10^17.
 - Language runtime metadata: Go's `pclntab`, Rust's symbol conventions,
   Objective-C's class and method lists.
 - `ar` archives, which are listed rather than loaded, for the reason below.
+- Bun standalone module graphs, listed the same way: the bytes are source
+  and bytecode, read from the layout Bun publishes, and not mapped as code.
 - Overlays and entropy, which are measured rather than judged.
 
 ## What it deliberately does not do
@@ -50,6 +52,10 @@ no entry point and no memory map, so it cannot be an `Object` without choosing
 one member and making every later answer about bytes the caller did not
 choose. `archive::open` is separate, and `load` refuses an archive with a
 message saying what to do instead.
+
+**It does not load a Bun standalone graph as code.** `bun::open` lists the
+modules and, when asked, returns one module's bytes. It does not decode the
+bytecode cache and it does not make the graph an `Object`.
 
 **It does not render a verdict about packing.** `overlay::analyze` reports
 that a section is writable and executable, that its file bytes are far fewer
