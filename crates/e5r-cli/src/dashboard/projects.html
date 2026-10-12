@@ -9,34 +9,24 @@
   </head>
   <body>
     <div class="shell">
-      <aside class="rail">
-        <a class="brand" href="/">e5r<span>ANALYSIS WORKSPACE</span></a>
-        <div class="rail-label">GLOBAL LIBRARY</div>
-        <div class="project-name">All projects</div>
-        <nav aria-label="Collection">
-          <a class="nav selected" href="/">Projects</a>
-        </nav>
-        <div class="rail-foot">
-          <span class="local-dot"></span> LOCAL COLLECTION
-          <p>Live tasks across your projects.</p>
-          <small
-            >Binaries stay in their original locations.<br />Analysis loads when
-            you open a decompiler.</small
-          >
+      <header class="bar">
+        <div class="bar-left">
+          <a class="brand" href="/">e5r</a>
+          <nav aria-label="Collection">
+            <a class="nav selected" href="/">projects</a>
+          </nav>
         </div>
-      </aside>
+        <div class="crumb">
+          <span>Project collection</span
+          ><span id="storage" class="muted">Reading the library…</span>
+        </div>
+        <div class="top-actions">
+          <span class="local-dot" aria-hidden="true"></span><span class="seg">local</span
+          ><span id="sync" class="seg muted" aria-live="polite">Connecting…</span
+          ><button id="refresh" class="seg seg-button">refresh</button>
+        </div>
+      </header>
       <div class="body">
-        <header class="topbar">
-          <div class="crumb">
-            <span>Project collection</span
-            ><span id="storage" class="muted">Reading the library…</span>
-          </div>
-          <div class="top-actions">
-            <span id="sync" class="muted" aria-live="polite">Connecting…</span
-            ><button id="refresh" class="button subtle">Refresh</button
-            >
-          </div>
-        </header>
         <div id="error" role="alert" hidden></div>
         <main class="overview">
           <section class="hero">

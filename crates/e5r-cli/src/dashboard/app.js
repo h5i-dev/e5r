@@ -1039,6 +1039,11 @@ $("font-larger").onclick = () => resizeCode(1);
 resizeCode();
 window.addEventListener("hashchange", route);
 window.addEventListener("keydown", (e) => {
+  const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName);
+  if (!typing && !$("task-dialog").open && !e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "1" || e.key === "2")) {
+    document.querySelector(`[data-view="${e.key === "1" ? "overview" : "workspace"}"]`).click();
+    return;
+  }
   if ($("workspace").hidden || $("task-dialog").open ||
     ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
   if (e.key === "/") {
