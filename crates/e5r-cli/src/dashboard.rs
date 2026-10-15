@@ -383,6 +383,22 @@ fn serve_inner(
                 respond(request, 200, kind, body.into());
                 continue;
             }
+            // Fonts ship inside the binary: the workspace stays offline and the CSP stays 'self'.
+            let font: Option<&'static [u8]> = match path.as_str() {
+                "/fonts/archivo.woff2" => Some(include_bytes!("dashboard/fonts/archivo.woff2")),
+                "/fonts/plex-mono-400.woff2" => Some(include_bytes!("dashboard/fonts/plex-mono-400.woff2")),
+                "/fonts/plex-mono-500.woff2" => Some(include_bytes!("dashboard/fonts/plex-mono-500.woff2")),
+                "/fonts/plex-mono-600.woff2" => Some(include_bytes!("dashboard/fonts/plex-mono-600.woff2")),
+                _ => None,
+            };
+            if let Some(body) = font {
+                let response = Response::from_data(body)
+                    .with_header(header("Content-Type", "font/woff2"))
+                    .with_header(header("Cache-Control", "max-age=86400, immutable"))
+                    .with_header(header("X-Content-Type-Options", "nosniff"));
+                let _ = request.respond(response);
+                continue;
+            }
         }
         if let Some(registry) = &registry {
             if path == "/api/projects" {

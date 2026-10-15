@@ -9,41 +9,27 @@
   </head>
   <body>
     <div class="shell">
-      <aside class="rail">
-        <a class="brand" href="#overview">e5r<span>ANALYSIS WORKSPACE</span></a>
-        <a id="all-projects" class="all-projects" href="/" hidden
-          >← All projects</a
-        >
-        <div class="rail-label">PROJECT</div>
-        <div id="project-name" class="project-name">Loading project…</div>
-        <nav aria-label="Workspace">
-          <button id="nav-overview" class="nav selected" data-view="overview">
-            Overview</button
-          ><button id="nav-workspace" class="nav" data-view="workspace">
-            Decompiler
-          </button>
-        </nav>
-        <div class="rail-foot">
-          <span class="local-dot"></span> LOCAL WORKSPACE
-          <p>Human and agent, same state.</p>
-          <small
-            >Binary & annotations: analysis snapshot.<br />Restart the server to
-            reload analysis.</small
-          >
+      <header class="bar">
+        <div class="bar-left">
+          <a class="brand" href="#overview">e5r</a>
+          <a id="all-projects" class="all-projects" href="/" hidden>← all projects</a>
+          <span id="project-name" class="project-name">Loading project…</span>
+          <nav aria-label="Workspace">
+            <button id="nav-overview" class="nav selected" data-view="overview"><kbd>1</kbd>overview</button
+            ><button id="nav-workspace" class="nav" data-view="workspace"><kbd>2</kbd>decompiler</button>
+          </nav>
         </div>
-      </aside>
+        <div class="crumb">
+          <span id="view-title">Project overview</span
+          ><span id="binary-name" class="muted"></span>
+        </div>
+        <div class="top-actions">
+          <span class="local-dot" aria-hidden="true"></span><span class="seg">local</span
+          ><span id="sync" class="seg muted" aria-live="polite">Connecting…</span
+          ><button id="refresh" class="seg seg-button">refresh tasks</button>
+        </div>
+      </header>
       <div class="body">
-        <header class="topbar">
-          <div class="crumb">
-            <span id="view-title">Project overview</span
-            ><span id="binary-name" class="muted"></span>
-          </div>
-          <div class="top-actions">
-            <span id="sync" class="muted" aria-live="polite">Connecting…</span
-            ><button id="refresh" class="button subtle">Refresh tasks</button
-            >
-          </div>
-        </header>
         <div id="error" role="alert" hidden></div>
         <main id="overview" class="overview">
           <section class="hero">
@@ -125,23 +111,9 @@
           </section>
         </main>
         <main id="workspace" class="workspace" hidden>
-          <div class="workspace-tools" aria-label="Workspace layout">
-            <div class="layout-controls">
-              <button id="toggle-functions" class="button subtle" aria-expanded="true" aria-controls="function-pane">Functions</button>
-              <button id="toggle-context" class="button subtle" aria-expanded="false" aria-controls="inspector">Evidence &amp; tasks</button>
-            </div>
-            <span class="workspace-hint">Follow a function name to navigate · <kbd>/</kbd> search · <kbd>Alt ← / →</kbd> history</span>
-            <div class="reading-controls" aria-label="Code text size">
-              <button id="font-smaller" class="button subtle" aria-label="Smaller code text">A−</button>
-              <output id="font-size">14px</output>
-              <button id="font-larger" class="button subtle" aria-label="Larger code text">A+</button>
-            </div>
-          </div>
           <section id="function-pane" class="function-pane">
-            <div class="pane-head">
-              <h2>Functions</h2>
-              <span id="function-count" class="muted"></span>
-            </div>
+            <h2 class="tile-title">functions</h2>
+            <span id="function-count" class="tile-meta"></span>
             <div class="function-search">
               <input
                 id="function-search"
@@ -158,6 +130,7 @@
             ></div>
           </section>
           <section class="code-pane">
+            <h2 class="tile-title">function</h2>
             <div class="code-header">
               <div>
                 <div class="eyebrow" id="function-address">
@@ -228,6 +201,8 @@
             </div>
           </section>
           <aside id="inspector" class="inspector" aria-label="Function evidence and related work">
+            <h2 class="tile-title">context</h2>
+            <div class="tile-body">
             <section>
               <div class="eyebrow">FUNCTION CONTEXT</div>
               <div id="function-context" class="context">
@@ -259,7 +234,20 @@
                 Copy command
               </button>
             </section>
+            </div>
           </aside>
+          <footer class="workspace-tools" aria-label="Workspace layout">
+            <span class="workspace-hint"><kbd>/</kbd> search <kbd>alt ←</kbd><kbd>→</kbd> history <kbd>1</kbd><kbd>2</kbd> views <span class="muted">· click a call to follow it</span></span>
+            <div class="layout-controls">
+              <button id="toggle-functions" class="toggle" aria-expanded="true" aria-controls="function-pane">functions</button
+              ><button id="toggle-context" class="toggle" aria-expanded="false" aria-controls="inspector">evidence &amp; tasks</button>
+            </div>
+            <div class="reading-controls" aria-label="Code text size">
+              <button id="font-smaller" class="toggle" aria-label="Smaller code text">a−</button>
+              <output id="font-size">14px</output>
+              <button id="font-larger" class="toggle" aria-label="Larger code text">a+</button>
+            </div>
+          </footer>
         </main>
       </div>
     </div>
