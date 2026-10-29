@@ -5,7 +5,9 @@
   STATUS: SPECIFICATION ONLY. Nothing here is proved; every definition below is a proof
   obligation, and the constants marked CANDIDATE are read from the disassembly of the pinned ELF
   (f39d833f..., review/rmk/deframer-contracts.md on the review branch) and must be confirmed by
-  the proof that uses them. No theorem in this file claims safety.
+  the proof that uses them. No theorem in this file claims safety. Proved elsewhere so far:
+  `Deframer/TailNoCopy.lean` (`tail` with consumed = 0 meets `TailPost`); `CallEnv.selfAl/spAl`
+  and `CopyEnv.spAl` were added for it (ABI alignment; the model faults misaligned word access).
 
   The property (R2), in words: whatever bytes a host sends on the UART, the deframer's state
   invariant `consumed ≤ filled ≤ len` holds whenever its methods return, and no method reaches
@@ -94,6 +96,11 @@ structure CallEnv (entry frame : Nat) (m : Machine) : Prop where
   stackSep : (m.core.get 10).toNat + 12 ≤ (m.core.get 2).toNat - frame ∧
     (m.core.get 11).toNat + (m.core.get 12).toNat ≤ (m.core.get 2).toNat - frame
   ra : (m.core.get 1).getLsbD 0 = false
+  /-- The deframer (three `usize` fields) and the stack pointer are word-aligned (Rust layout and
+      the RISC-V psABI; added when the first proof step needed it: the model faults a misaligned
+      word access). -/
+  selfAl : (m.core.get 10).toNat % 4 = 0
+  spAl : (m.core.get 2).toNat % 4 = 0
 
 abbrev TailEnv (frame : Nat) (m : Machine) : Prop := CallEnv tailPc frame m
 
@@ -241,6 +248,8 @@ structure CopyEnv (m : Machine) : Prop where
   dstSep : (m.core.get 10).toNat + (m.core.get 12).toNat ≤ (m.core.get 2).toNat - memmoveFrame
   srcSep : (m.core.get 11).toNat + (m.core.get 12).toNat ≤ (m.core.get 2).toNat - memmoveFrame
   ra : (m.core.get 1).getLsbD 0 = false
+  /-- As `Memmove.Slots` needs (memmove's save slots are word stores). -/
+  spAl : (m.core.get 2).toNat % 4 = 0
 
 /-- memmove's effect, as Memmove.PostB states it, with the frame widened to 48 bytes. -/
 structure CopyPost (m₀ m : Machine) : Prop where

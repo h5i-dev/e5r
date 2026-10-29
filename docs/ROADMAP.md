@@ -910,13 +910,17 @@ optional; direct and hybrid proofs are equally valid routes.
       axioms audited.
       *Status (partial, not accepted):* `jobs/rmk/rmk-memmove-small.json`
       is proved on `f39d833f` (memmove n < 16, both directions; 7 negative
-      controls). Integrated and compiling on support-lean4, without a runner
-      job yet: `E5R.Rmk.Memmove.contractB` (n < 16 either direction, or
-      n ≥ 16 forward with src ≡ dst mod 4). Not covered: n ≥ 16 backward and
+      controls). `jobs/rmk/rmk-memmove-contractB.json` is proved on
+      `f39d833f` (`E5R.Rmk.Memmove.contractB`: n < 16 either direction, or
+      n ≥ 16 forward with src ≡ dst mod 4; 7 mutation controls; re-run on
+      the integrated tree: 430 s, 6.3 GB). Not covered: n ≥ 16 backward and
       the misaligned forward path, both reachable from the 488-byte deframer
-      buffer, and the deframer methods themselves
-      (`Projects/rmk/Deframer/Spec.lean` states their contracts against an
-      explicit `CopyContract` hypothesis; none is proved).
+      buffer. Deframer (`Projects/rmk/Deframer/Spec.lean` states the
+      contracts against an explicit `CopyContract` hypothesis): only `tail`
+      with consumed = 0 is proved (`Deframer/TailNoCopy.lean`, `nocopy`: that
+      path makes no call, so it does not depend on `CopyContract`). The
+      consumed ≠ 0 path, `park_pending`, `unpark_pending`, `next` and the
+      panic controls are not proved, and there is no runner job for them.
 - [ ] **R4. Toward the session.** Compose R3 with the surrounding session
       loop and interrupts (checker, direct regions or summaries). *Accepted:*
       a kernel-checked theorem about the whole `run_session` path for the
