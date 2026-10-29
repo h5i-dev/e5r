@@ -1711,4 +1711,87 @@ theorem leq_state_sound {ρ : Nat → Word} {a b : AState} {m : Machine} (h : a.
     hmpp _ hs.mpp, leq_sound hmr hs.mieReg, leq_sound htv hs.mtvec, leq_sound hepc hs.mepc,
     leq_sound hca hs.mcause, leq_sound hsc hs.mscratch⟩
 
+/-! ## One instruction -/
+
+/-- The CSR part of `StateHolds` carries over to a core with the same CSRs. -/
+theorem sameCsr_fields {c d : Core} (h : c.sameCsr d) :
+    c.mie_ = d.mie_ ∧ c.mpie = d.mpie ∧ c.mpp = d.mpp ∧ c.mieReg = d.mieReg ∧ c.mtvec = d.mtvec ∧
+    c.mepc = d.mepc ∧ c.mcause = d.mcause ∧ c.mscratch = d.mscratch := by
+  unfold Core.sameCsr Core.ctl at h
+  simp only [Prod.mk.injEq] at h
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, _⟩ := h
+  exact ⟨h1, h2, h3, h4, h5, h6, h7, h8⟩
+
+/-- Build the description of a successor that changed only registers and
+    the pc (and possibly RAM), from the old description. -/
+theorem holds_succ {ρ : Nat → Word} {s t : AState} {m : Machine} {c : Core} {ram : Word → BitVec 8}
+    (hs : StateHolds ρ s m) (hc : c.sameCsr m.core) (hpc : c.pc = w t.pc)
+    (hregs : ∀ r : Reg, (t.get r).gam ρ (c.get r)) (hmem : MemHolds ρ ram t.mem)
+    (hcsr : t.mie = s.mie ∧ t.mpie = s.mpie ∧ t.mpp = s.mpp ∧ t.mieReg = s.mieReg ∧ t.mtvec = s.mtvec ∧
+      t.mepc = s.mepc ∧ t.mcause = s.mcause ∧ t.mscratch = s.mscratch) :
+    StateHolds ρ t ⟨c, ram⟩ := by
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8⟩ := sameCsr_fields hc
+  obtain ⟨f1, f2, f3, f4, f5, f6, f7, f8⟩ := hcsr
+  exact ⟨hpc, hregs, hmem, by rw [f1, e1]; exact hs.mie, by rw [f2, e2]; exact hs.mpie,
+    by rw [f3, e3]; exact hs.mpp, by rw [f4, e4]; exact hs.mieReg, by rw [f5, e5]; exact hs.mtvec,
+    by rw [f6, e6]; exact hs.mepc, by rw [f7, e7]; exact hs.mcause, by rw [f8, e8]; exact hs.mscratch⟩
+
+theorem next_pc {pc len : Nat} (hl : len < M32) : w ((pc + len) % M32) = w pc + w len := by
+  apply BitVec.eq_of_toNat_eq
+  simp only [w, BitVec.toNat_ofNat, BitVec.toNat_add, M32]
+  omega
+
+/-- A length the decoder produces: 2 or 4. -/
+def LenOk (len : Word) : Prop := len = 2 ∨ len = 4
+
+theorem lenOk_lt {len : Word} (h : LenOk len) : len.toNat < M32 := toNat_lt len
+
+theorem w_len {len : Word} : w len.toNat = len := w_toNat len
+
+/-- The pc after a non-jump: what `absExec`'s `adv` puts in the successor. -/
+theorem pc_adv {s : AState} {m : Machine} {len : Word} (hpc : m.core.pc = w s.pc) :
+    m.core.pc + len = w ((s.pc + len.toNat) % M32) := by
+  rw [next_pc (toNat_lt len), hpc, w_len]
+
+/-- What one instruction step must establish: it does not fault, its
+    events are allowed, and the machine after it is described by one of the
+    abstract successors. -/
+def StepOk (cfg : Config) (ρ : Nat → Word) (ts : List AState) (o : Oracle) (e : Eff)
+    (ram : Word → BitVec 8) : Prop :=
+  ∃ c ram' evs, interp cfg.board cfg.img o e ram 0 [] = .ok c ram' evs ∧ (∀ ev ∈ evs, EvOk cfg ev) ∧
+    ∃ t ∈ ts, StateHolds ρ t ⟨c, ram'⟩
+
+theorem AState.set_other (s : AState) (r : Reg) (v : AV) :
+    (s.set r v).mem = s.mem ∧ (s.set r v).mie = s.mie ∧ (s.set r v).mpie = s.mpie ∧
+    (s.set r v).mpp = s.mpp ∧ (s.set r v).mieReg = s.mieReg ∧ (s.set r v).mtvec = s.mtvec ∧
+    (s.set r v).mepc = s.mepc ∧ (s.set r v).mcause = s.mcause ∧ (s.set r v).mscratch = s.mscratch ∧
+    (s.set r v).pc = s.pc ∧ (s.set r v).hnd = s.hnd := by
+  unfold AState.set; split <;> simp
+
+theorem withPc_get (s : AState) (p : Nat) (r : Reg) : ({ s with pc := p } : AState).get r = s.get r := rfl
+
+/-- An instruction that writes `x` (described by `v`) to `rd` and falls
+    through. -/
+theorem regwrite_sound {cfg : Config} {ρ : Nat → Word} {s : AState} {m : Machine} {len : Word} {rd : Reg}
+    {v : AV} {x : Word} (hs : StateHolds ρ s m) (hl : s.regs.length = 31) (hv : v.gam ρ x) (o : Oracle) :
+    StepOk cfg ρ [{ s.set rd v with pc := (s.pc + len.toNat) % M32 }] o
+      (.done (m.core.wr rd x (m.core.pc + len))) m.ram := by
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, _, _⟩ := AState.set_other s rd v
+  refine ⟨_, _, _, interp_done o _ _ _ _, by simp, _, List.mem_singleton_self _, ?_⟩
+  refine holds_succ hs (Core.sameCsr_wr _ _ _ _) (by simp only [Core.wr_pc]; exact pc_adv hs.pc) ?_
+    (by simp only; rw [e1]; exact hs.mem) ⟨e2, e3, e4, e5, e6, e7, e8, e9⟩
+  intro q
+  rw [withPc_get]
+  simp only [Core.wr]
+  exact regs_set hl hs.regs rd hv q
+
+/-- An instruction that only falls through. -/
+theorem nop_sound {cfg : Config} {ρ : Nat → Word} {s : AState} {m : Machine} {len : Word}
+    (hs : StateHolds ρ s m) (o : Oracle) :
+    StepOk cfg ρ [{ s with pc := (s.pc + len.toNat) % M32 }] o
+      (.done { m.core with pc := m.core.pc + len }) m.ram := by
+  refine ⟨_, _, _, interp_done o _ _ _ _, by simp, _, List.mem_singleton_self _, ?_⟩
+  exact holds_succ hs (Core.sameCsr_goto _ _) (pc_adv hs.pc) (fun r => hs.regs r) hs.mem
+    ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+
 end E5R.AI
