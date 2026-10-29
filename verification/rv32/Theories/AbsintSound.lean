@@ -1180,4 +1180,122 @@ theorem absLoad_vals_sound {cfg : Config} {s : AState} {as : List Nat} {wd : Wid
       subst hw; simp only [Fits, Width.bytes]; exact BitVec.isLt _
   · simp at hc
 
+/-! ## Stores -/
+
+theorem inRam_nat {B : Board} {a : Nat} {n : Nat} (ha : a < M32) (h : B.inRam (w a) n = true) :
+    B.ramBase ≤ a ∧ a + n ≤ B.ramBase + B.ramSize := by
+  simp only [Board.inRam, Bool.and_eq_true, decide_eq_true_eq] at h
+  rw [toNat_w_of_lt ha] at h; exact h
+
+/-- The checker's well-formedness and overlap tests give the separation an
+    absolute strong store needs for the cells it keeps, provided relative
+    cells (handler frames) are apart from it. -/
+theorem storeSep_abs {cfg : Config} {ρ : Nat → Word} {mem : List Cell} {a : Nat} {wd : Width} {V : AV}
+    (hram : cfg.board.ramBase + cfg.board.ramSize ≤ M32)
+    (hwf : ∀ c ∈ mem, c.wf cfg = true) (ha : a < M32) (hin : cfg.board.inRam (w a) wd.bytes = true)
+    (hrel : ∀ c ∈ mem, c.base = .rel → Disj (c.at ρ) c.w (w a) wd) :
+    StoreSep ρ mem .abs a wd V := by
+  have hA := inRam_nat ha hin
+  intro c hc hns
+  have hw := hwf c hc
+  simp only [Cell.wf, Bool.and_eq_true] at hw
+  obtain ⟨hcell, hguard⟩ := hw
+  simp only [Cell.staleAfter, Bool.or_eq_false_iff] at hns
+  obtain ⟨hhit, hg⟩ := hns
+  constructor
+  · cases hb : c.base with
+    | rel => exact hrel c hc hb
+    | abs =>
+      simp only [hb, Bool.and_eq_true, decide_eq_true_eq] at hcell
+      have hC := inRam_nat hcell.1 hcell.2
+      simp only [Cell.hits, hb, beq_self_eq_true, Bool.true_and] at hhit
+      have : c.at ρ = w c.addr := by simp [Cell.at, hb]
+      rw [this]
+      exact disj_abs (by omega) (by omega) hhit
+  · intro g hgc
+    rw [hgc] at hguard hg
+    simp only [Bool.and_eq_true, decide_eq_true_eq] at hguard
+    have hG := inRam_nat hguard.1 hguard.2
+    simp only [beq_self_eq_true, Bool.true_and, Bool.and_eq_false_iff, Bool.not_eq_false',
+      Bool.and_eq_true, beq_iff_eq] at hg
+    rcases hg with hov | ⟨⟨⟨h1, h2⟩, h3⟩⟩
+    · exact .inl (disj_abs (by omega) (by omega) hov)
+    · exact .inr ⟨rfl, h1, h2, h3⟩
+
+/-- The device-write property: the first `allow` entry for the written
+    register, if any, bounds the written value. -/
+def EvOk (cfg : Config) (e : Event) : Prop :=
+  match cfg.allow.find? (·.addr == e.addr.toNat) with
+  | none => True
+  | some al => al.lo ≤ e.val.toNat ∧ e.val.toNat ≤ al.hi
+
+theorem writeOk_sound {cfg : Config} {a : Nat} {V : AV} {ρ : Nat → Word} {x A : Word}
+    (h : cfg.writeOk a V = true) (hV : V.gam ρ x) (hA : A.toNat = a) : EvOk cfg ⟨A, x⟩ := by
+  unfold Config.writeOk at h
+  unfold EvOk
+  simp only [hA]
+  split
+  · trivial
+  · next al hal =>
+    rw [hal] at h
+    simp only at h
+    cases hb : V.bounds with
+    | none => rw [hb] at h; simp at h
+    | some p =>
+      obtain ⟨l, hh⟩ := p
+      rw [hb] at h
+      simp only [Bool.and_eq_true, decide_eq_true_eq] at h
+      have := bounds_sound hV hb
+      exact ⟨by omega, by omega⟩
+
+/-- What one store did to the machine: wrote RAM, or emitted an allowed
+    device event. -/
+inductive StoreEffect (cfg : Config) (ram : Word → BitVec 8) (A x : Word) (wd : Width) :
+    (Word → BitVec 8) → List Event → Prop
+  | ram : StoreEffect cfg ram A x wd (ramWrite ram A x wd) []
+  | dev : EvOk cfg ⟨A, x⟩ → StoreEffect cfg ram A x wd ram [⟨A, x⟩]
+
+/-- One candidate address of a store, at the address actually written. -/
+theorem storeAt_written {cfg : Config} {s : AState} {mem mem' : List Cell} {a : Nat} {wd : Width}
+    {V : AV} {atomic strong : Bool} (h : storeAt cfg s mem a wd V atomic strong = some mem')
+    {ρ : Nat → Word} {ram : Word → BitVec 8} {A x : Word} (hAa : A.toNat = a)
+    (hV : V.gam ρ (stored wd x)) (hVw : V.gam ρ x ∨ wd ≠ .w) (hm : MemHolds ρ ram mem)
+    (hsep : cfg.board.inRam (w a) wd.bytes = true → StoreSep ρ mem .abs a wd V)
+    (o : Oracle) (i : Nat) (evs : List Event) (k : Eff) :
+    ∃ ram' evs', interp cfg.board cfg.img o (.store wd A x atomic k) ram i evs =
+        interp cfg.board cfg.img o k ram' i (evs ++ evs') ∧ StoreEffect cfg ram A x wd ram' evs' ∧
+      MemHolds ρ ram' mem' := by
+  have hAw : w a = A := by rw [← hAa]; exact w_toNat A
+  unfold storeAt at h
+  split at h
+  · next hcl =>
+    obtain ⟨hal, hin⟩ := classify_ram hcl
+    split at h
+    · simp at h
+    · simp only [Option.some.injEq] at h; subst h
+      refine ⟨ramWrite ram A x wd, [], ?_, .ram, ?_⟩
+      · rw [List.append_nil]; rw [hAw] at hin; exact interp_store_ram o (by rw [hAa]; exact hal) hin
+      · have hs := hsep hin
+        rw [← hAw]
+        cases strong
+        · exact storeWeak_write hm hV hs
+        · exact storeStrong_sound hm hV hs
+  · next d hcl =>
+    obtain ⟨hal, hin, _, hd, hw⟩ := classify_dev hcl
+    split at h
+    · simp at h
+    · next hok =>
+      simp only [Bool.or_eq_true, not_or, Bool.not_eq_true', Bool.not_eq_false'] at hok
+      obtain ⟨⟨hat, hdw⟩, hwo⟩ := hok
+      simp only [Option.some.injEq] at h; subst h
+      subst hw
+      have hVx : V.gam ρ x := by
+        rcases hVw with h | h
+        · exact h
+        · exact absurd rfl h
+      refine ⟨ram, [⟨A, x⟩], ?_, .dev (writeOk_sound (by simpa using hwo) hVx hAa), hm⟩
+      rw [hAw] at hin hd
+      exact interp_store_dev o (by rw [hAa]; exact hal) hin (by simpa using hat) hd (by simpa using hdw) rfl
+  · simp at h
+
 end E5R.AI
