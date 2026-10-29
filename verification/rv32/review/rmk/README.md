@@ -106,3 +106,15 @@ RAM (0x80000000..), so:
 
 Neither is a bug in the FE310 work; they are obligations a `virt` board/loader must add before any
 RMK claim. Main owns Platform/boards; this is reported, not changed.
+
+## Blocker: e5r-verify cannot export this ELF yet (checked)
+
+- `e5r-verify IMAGE.elf` (plain image export): `ELF must be between 52 and 65536 bytes` (file is 454 024 B;
+  crates/e5r-verify/src/lib.rs:17 also caps mapped bytes at 65 536, and `.text`+`.rodata` alone are ~168 KB).
+- `e5r-verify flash --board boards/hifive1-revb.json IMAGE.elf`: `PT_LOAD 0: physical address 0x80000000 is not
+  in flash` (the loader only knows flash-resident images).
+- So the first RMK step on the e5r side is a loader/exporter mode for RAM-resident images (segments into the
+  initial `ram`, with the size limits raised or the image restricted to the functions under proof) plus a
+  `virt` board; both are in main-owned crates/boards. Per-function proofs of the Deframer could use a
+  review-owned image restricted to `.text` of those functions, but only once the RAM-fetch question (ALERT
+  above) is settled, otherwise the theorem would not describe QEMU.
