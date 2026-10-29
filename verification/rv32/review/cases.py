@@ -216,14 +216,17 @@ def atomics():
                     expect='trap:2'))
     # Misaligned SC with no reservation: the spec (Zalrsc) requires an
     # address-misaligned or access-fault exception regardless of success.
-    # FINDING F1: both QEMU and the model complete these; the spec requires an
-    # exception for a misaligned SC whether or not it would succeed.
+    # FINDING F1: the spec requires an exception for a misaligned (or
+    # non-memory) SC whether or not it would succeed. QEMU 8.2 completes these
+    # with rd = 1; on 593ed31 the model did too. With the fix the model faults,
+    # so QEMU is the wrong oracle here.
+    f1 = 'spec: misaligned SC always raises; QEMU completes it (F1)'
     out.append(Case('sc misaligned no resv', 'lrsc', [E.sc(13, 11, 12)], regs={11: a + 2},
-                    note='spec: misaligned SC always raises; QEMU and model do not'))
+                    model='oracle-divergence', note=f1))
     out.append(Case('sc unmapped no resv', 'lrsc', [E.sc(13, 11, 12)], regs={11: 0x40000000},
-                    note='an SC to an unmapped address completes in QEMU and the model'))
+                    model='decline', note='the model declines an SC outside RAM (F1 fix)'))
     out.append(Case('lr;sc misaligned', 'lrsc', [E.lr(10, 11), E.sc(13, 14, 12)],
-                    regs={11: a, 14: a + 2}, note='spec: misaligned SC always raises'))
+                    regs={11: a, 14: a + 2}, model='oracle-divergence', note=f1))
     out.append(Case('amo f3=3 (RV64 .d)', 'illegal', [E.amo('amoadd.w', 10, 11, 12) ^ (1 << 12)],
                     regs={11: a}, expect='trap:2'))
     out.append(Case('amo funct5=0x1f', 'illegal', [(0x1f << 27) | 12 << 20 | 11 << 15 | 2 << 12 |

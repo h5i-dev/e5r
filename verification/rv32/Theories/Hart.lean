@@ -451,7 +451,13 @@ def exec (c : Core) (len : Word) (i : Instr) : Eff :=
   | .sc rd rs1 rs2 =>
     -- With a reservation the SC may still fail (the spec permits spurious
     -- failure); without one it must fail. Either way the reservation ends.
-    let fail := adv ({ c with resv := false }.set rd 1)
+    -- A failing SC still raises on a misaligned or non-memory address
+    -- (Zalrsc: "If the address is not naturally aligned, an address-misaligned
+    -- exception or an access-fault exception will be generated."), so it
+    -- probes the address with an atomic load: the platform then applies the
+    -- same alignment and RAM checks as to a successful SC, and a RAM read
+    -- changes nothing.
+    let fail := .load .w (c.get rs1) true fun _ => adv ({ c with resv := false }.set rd 1)
     if ¬ c.resv then fail else
     .choose fun ok =>
       if ok then .store .w (c.get rs1) (c.get rs2) true (adv ({ c with resv := false }.set rd 0))
