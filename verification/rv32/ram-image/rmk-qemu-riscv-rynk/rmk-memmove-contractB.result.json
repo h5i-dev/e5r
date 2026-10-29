@@ -1,0 +1,351 @@
+{
+ "inputs": {
+  "allowed_axioms": [
+   "propext",
+   "Classical.choice",
+   "Quot.sound"
+  ],
+  "board_sha256": "6fe2d0db63ed5756db3ca2845b00931154c84359002daf47cff906b0df64287b",
+  "e5r_verify": "0.1.0",
+  "e5r_verify_sha256": "51c3bea108faafa695f5388401228151212ce468c9016fd47de229023dc4a255",
+  "elf": {
+   "bytes": 454024,
+   "path": "build/rmk-qemu-riscv-rynk.elf",
+   "sha256": "f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30"
+  },
+  "image": {
+   "fidelity": {
+    "path": "Projects/rmk/ElfFidelity.lean",
+    "sha256": "f9a53a204d90b5fbe0541a911f3f385569420be00010a237abf38613fa770c71"
+   },
+   "kind": "ram",
+   "manifest": {
+    "path": "build/jobs/rmk-memmove-contractB/ram-image.json",
+    "sha256": "b369d7ceacfb0577b9fcd5fadd94e82623d31857c59bad66835e56007f4980e2"
+   },
+   "module": {
+    "path": "Projects/rmk/Elf.lean",
+    "sha256": "dec6babff7b3451871fc3cdcc77a040308f8c1859fd01acfa3b37ffce9c526a9"
+   }
+  },
+  "job_sha256": "4d637be7ce029f1d1bc30d6f45cfeca7a28fef4e6a9a941c51263d8945a9f844",
+  "lean": "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release)",
+  "sources": {
+   "Projects/ramimage/Memmove.lean": "87bfdc38e20ad6d14ca98581149003e6d602f20c9f740b31e7bdea3bcb7a69e1",
+   "Projects/ramimage/MemmoveB.lean": "9abe1e662977f5cb952cee2d83096ab6a5dc18661ccee02fe066e1cf79d8cb0b",
+   "Projects/rmk/Copy.lean": "4765ef1c0b82aafd9ae8b3ff515b126e4f175dd04990e5906cba9c399f3a6631",
+   "Projects/rmk/Fetch.lean": "d1a3378e024b89090305e3f5d81a9670b328348f68c85933bdf05c243b29307f",
+   "Projects/rmk/MemmoveAligned.lean": "b0a12e6ca24eedec7da6d9536197ac27757a3635dba422d19100383fd64745bc",
+   "Projects/rmk/MemmoveBigLoops.lean": "40fbedbff20cdfdc9555132c79d274f6e83c8ded9b64a5fbe44f0ecc0d5f6627",
+   "Projects/rmk/MemmoveContract.lean": "056ec89c1ff16b762ea02d7d60709b9bae433e99f343287a1379c6843ae4dc4d",
+   "Projects/rmk/MemmoveFetch.lean": "e60c8ae676396eb3d07225fc1acaf8e0803d60b64126fb7a99ade4a3eee84faa",
+   "Projects/rmk/MemmoveLoops.lean": "230f0e1f9228fde5a37ba87a6e828d181e12c83c61b62e22e3c89804426d3bc9",
+   "Projects/rmk/MemmoveSmall.lean": "47b7e4cf8fd0a37db65fd0ca1ed8d4f2fe2884dc1da6a4c127f5b812a40a8663",
+   "Projects/rmk/Run.lean": "908851c1f949ef1340ec6c49e2cb283be6d4a3b26861f92c2e2cf901acfefff8",
+   "Theories/Absint.lean": "9cfc50adaf8612d4154dfca20bf77e7fe2573056c74e53cf947e3c58443db4f4",
+   "Theories/AbsintSound.lean": "60d5622c822f7aad29a38f48d821892bd243414f1a03db6678a910b91d43a718",
+   "Theories/Board/QemuVirtRv32.lean": "d902dbaad9129b352fc736c62313615608ec2cabeb0667805653db9b9aff2a0f",
+   "Theories/FlashElf.lean": "b3a5dd6e56e6e9444b88f05de6f020e326377f55af777b380249fc53cc0111a6",
+   "Theories/Hart.lean": "dde4a86db936c9ad60f58866c3ebb333fbc556ec0f94299da212d0ca08cfb82a",
+   "Theories/Logic.lean": "bed5eee4c9a12c2eee16a3e3b9523cca51c91f17380b97d81673151ff3cc4f48",
+   "Theories/Platform.lean": "37939dcb4318bcea8b8a45c25a36d9f3ae59b78656fedd7dcc60c66442d11528",
+   "Theories/RamElf.lean": "9a8cb07ac5d869fe5297d1934eaefef94b535e1c91d9e144a9daf74fc7ce832f",
+   "tools/gen_board.py": "fd69bd893835b7e4738c119b9a496c26c22fbe40894abb339579e19dbf1eeefb"
+  }
+ },
+ "job": "rmk-memmove-contractB",
+ "job_file": "jobs/rmk/rmk-memmove-contractB.json",
+ "modules": [
+  "Theories/Hart.lean",
+  "Theories/Platform.lean",
+  "Theories/Logic.lean",
+  "Theories/FlashElf.lean",
+  "Theories/RamElf.lean",
+  "Theories/Board/QemuVirtRv32.lean",
+  "Projects/rmk/Elf.lean",
+  "Projects/rmk/ElfFidelity.lean",
+  "Theories/Absint.lean",
+  "Theories/AbsintSound.lean",
+  "Projects/rmk/Copy.lean",
+  "Projects/rmk/Run.lean",
+  "Projects/rmk/Fetch.lean",
+  "Projects/rmk/MemmoveFetch.lean",
+  "Projects/rmk/MemmoveLoops.lean",
+  "Projects/rmk/MemmoveSmall.lean",
+  "Projects/rmk/MemmoveBigLoops.lean",
+  "Projects/rmk/MemmoveAligned.lean",
+  "Projects/rmk/MemmoveContract.lean",
+  "Projects/ramimage/Memmove.lean",
+  "Projects/ramimage/MemmoveB.lean"
+ ],
+ "resumed": [],
+ "schema": "e5r.verify.result.v1",
+ "seconds": 376.8,
+ "stages": [
+  {
+   "name": "lean Theories/Hart.lean",
+   "peak_rss_mib": 487,
+   "seconds": 3.7
+  },
+  {
+   "name": "lean Theories/Platform.lean",
+   "peak_rss_mib": 471,
+   "seconds": 1.9
+  },
+  {
+   "name": "lean Theories/Logic.lean",
+   "peak_rss_mib": 500,
+   "seconds": 2.2
+  },
+  {
+   "name": "lean Theories/FlashElf.lean",
+   "peak_rss_mib": 465,
+   "seconds": 1.5
+  },
+  {
+   "name": "lean Theories/RamElf.lean",
+   "peak_rss_mib": 467,
+   "seconds": 1.5
+  },
+  {
+   "name": "lean Theories/Board/QemuVirtRv32.lean",
+   "peak_rss_mib": 441,
+   "seconds": 1.3
+  },
+  {
+   "name": "lean Projects/rmk/Elf.lean",
+   "peak_rss_mib": 701,
+   "seconds": 9.1
+  },
+  {
+   "name": "lean Projects/rmk/ElfFidelity.lean",
+   "peak_rss_mib": 547,
+   "seconds": 2.9
+  },
+  {
+   "name": "lean Theories/Absint.lean",
+   "peak_rss_mib": 521,
+   "seconds": 3.7
+  },
+  {
+   "name": "lean Theories/AbsintSound.lean",
+   "peak_rss_mib": 800,
+   "seconds": 28.9
+  },
+  {
+   "name": "lean Projects/rmk/Copy.lean",
+   "peak_rss_mib": 613,
+   "seconds": 7.3
+  },
+  {
+   "name": "lean Projects/rmk/Run.lean",
+   "peak_rss_mib": 457,
+   "seconds": 1.3
+  },
+  {
+   "name": "lean Projects/rmk/Fetch.lean",
+   "peak_rss_mib": 6508,
+   "seconds": 57.0
+  },
+  {
+   "name": "lean Projects/rmk/MemmoveFetch.lean",
+   "peak_rss_mib": 917,
+   "seconds": 59.8
+  },
+  {
+   "name": "lean Projects/rmk/MemmoveLoops.lean",
+   "peak_rss_mib": 529,
+   "seconds": 3.8
+  },
+  {
+   "name": "lean Projects/rmk/MemmoveSmall.lean",
+   "peak_rss_mib": 611,
+   "seconds": 7.3
+  },
+  {
+   "name": "lean Projects/rmk/MemmoveBigLoops.lean",
+   "peak_rss_mib": 523,
+   "seconds": 3.9
+  },
+  {
+   "name": "lean Projects/rmk/MemmoveAligned.lean",
+   "peak_rss_mib": 870,
+   "seconds": 17.4
+  },
+  {
+   "name": "lean Projects/rmk/MemmoveContract.lean",
+   "peak_rss_mib": 591,
+   "seconds": 4.8
+  },
+  {
+   "name": "lean Projects/ramimage/Memmove.lean",
+   "peak_rss_mib": 551,
+   "seconds": 1.7
+  },
+  {
+   "name": "lean Projects/ramimage/MemmoveB.lean",
+   "peak_rss_mib": 448,
+   "seconds": 1.3
+  },
+  {
+   "name": "leanchecker Theories/Hart.lean",
+   "peak_rss_mib": 431,
+   "seconds": 4.6
+  },
+  {
+   "name": "leanchecker Theories/Platform.lean",
+   "peak_rss_mib": 270,
+   "seconds": 1.8
+  },
+  {
+   "name": "leanchecker Theories/Logic.lean",
+   "peak_rss_mib": 442,
+   "seconds": 1.9
+  },
+  {
+   "name": "leanchecker Theories/FlashElf.lean",
+   "peak_rss_mib": 365,
+   "seconds": 1.6
+  },
+  {
+   "name": "leanchecker Theories/RamElf.lean",
+   "peak_rss_mib": 275,
+   "seconds": 1.8
+  },
+  {
+   "name": "leanchecker Theories/Board/QemuVirtRv32.lean",
+   "peak_rss_mib": 297,
+   "seconds": 1.7
+  },
+  {
+   "name": "leanchecker Projects/rmk/Elf.lean",
+   "peak_rss_mib": 290,
+   "seconds": 1.8
+  },
+  {
+   "name": "leanchecker Projects/rmk/ElfFidelity.lean",
+   "peak_rss_mib": 506,
+   "seconds": 3.2
+  },
+  {
+   "name": "leanchecker Theories/Absint.lean",
+   "peak_rss_mib": 432,
+   "seconds": 1.8
+  },
+  {
+   "name": "leanchecker Theories/AbsintSound.lean",
+   "peak_rss_mib": 464,
+   "seconds": 5.2
+  },
+  {
+   "name": "leanchecker Projects/rmk/Copy.lean",
+   "peak_rss_mib": 455,
+   "seconds": 4.0
+  },
+  {
+   "name": "leanchecker Projects/rmk/Run.lean",
+   "peak_rss_mib": 280,
+   "seconds": 2.3
+  },
+  {
+   "name": "leanchecker Projects/rmk/Fetch.lean",
+   "peak_rss_mib": 6462,
+   "seconds": 55.6
+  },
+  {
+   "name": "leanchecker Projects/rmk/MemmoveFetch.lean",
+   "peak_rss_mib": 485,
+   "seconds": 40.7
+  },
+  {
+   "name": "leanchecker Projects/rmk/MemmoveLoops.lean",
+   "peak_rss_mib": 462,
+   "seconds": 2.8
+  },
+  {
+   "name": "leanchecker Projects/rmk/MemmoveSmall.lean",
+   "peak_rss_mib": 474,
+   "seconds": 4.0
+  },
+  {
+   "name": "leanchecker Projects/rmk/MemmoveBigLoops.lean",
+   "peak_rss_mib": 458,
+   "seconds": 2.5
+  },
+  {
+   "name": "leanchecker Projects/rmk/MemmoveAligned.lean",
+   "peak_rss_mib": 490,
+   "seconds": 6.2
+  },
+  {
+   "name": "leanchecker Projects/rmk/MemmoveContract.lean",
+   "peak_rss_mib": 480,
+   "seconds": 2.8
+  },
+  {
+   "name": "leanchecker Projects/ramimage/Memmove.lean",
+   "peak_rss_mib": 530,
+   "seconds": 2.2
+  },
+  {
+   "name": "leanchecker Projects/ramimage/MemmoveB.lean",
+   "peak_rss_mib": 321,
+   "seconds": 3.9
+  }
+ ],
+ "status": "proved",
+ "theorems": [
+  {
+   "axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+   ],
+   "name": "E5R.Rmk.Memmove.contractB"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.RmkMemmove.img_eq"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.RmkMemmove.board_eq"
+  },
+  {
+   "axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+   ],
+   "name": "E5R.RmkMemmoveB.contractB"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.Rmk.Image.image_accepted"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.Rmk.Image.image_agrees"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.Rmk.Image.image_entry"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.Rmk.Image.image_rwBase"
+  }
+ ]
+}

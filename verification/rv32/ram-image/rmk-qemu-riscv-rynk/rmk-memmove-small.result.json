@@ -32,9 +32,9 @@
   "lean": "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release)",
   "sources": {
    "Projects/ramimage/Memmove.lean": "87bfdc38e20ad6d14ca98581149003e6d602f20c9f740b31e7bdea3bcb7a69e1",
-   "Projects/rmk/Copy.lean": "8f92e896a5441415e4dcfcad7c99d0617b8da567ccb0091c618c9c1e253edb3a",
+   "Projects/rmk/Copy.lean": "4765ef1c0b82aafd9ae8b3ff515b126e4f175dd04990e5906cba9c399f3a6631",
    "Projects/rmk/Fetch.lean": "d1a3378e024b89090305e3f5d81a9670b328348f68c85933bdf05c243b29307f",
-   "Projects/rmk/MemmoveFetch.lean": "23f8b3ef28a5d1d6e080d5587ba9f2553b23041258e1d20bd6899579cf0668cc",
+   "Projects/rmk/MemmoveFetch.lean": "e60c8ae676396eb3d07225fc1acaf8e0803d60b64126fb7a99ade4a3eee84faa",
    "Projects/rmk/MemmoveLoops.lean": "230f0e1f9228fde5a37ba87a6e828d181e12c83c61b62e22e3c89804426d3bc9",
    "Projects/rmk/MemmoveSmall.lean": "47b7e4cf8fd0a37db65fd0ca1ed8d4f2fe2884dc1da6a4c127f5b812a40a8663",
    "Projects/rmk/Run.lean": "908851c1f949ef1340ec6c49e2cb283be6d4a3b26861f92c2e2cf901acfefff8",
@@ -70,179 +70,140 @@
   "Projects/rmk/MemmoveSmall.lean",
   "Projects/ramimage/Memmove.lean"
  ],
- "resumed": [],
+ "resumed": [
+  "Theories/Hart.lean",
+  "Theories/Platform.lean",
+  "Theories/Logic.lean",
+  "Theories/FlashElf.lean",
+  "Theories/RamElf.lean",
+  "Theories/Board/QemuVirtRv32.lean",
+  "Projects/rmk/Elf.lean",
+  "Projects/rmk/ElfFidelity.lean",
+  "Theories/Absint.lean",
+  "Theories/AbsintSound.lean"
+ ],
  "schema": "e5r.verify.result.v1",
- "seconds": 237.2,
+ "seconds": 273.3,
  "stages": [
   {
-   "name": "lean Theories/Hart.lean",
-   "peak_rss_mib": 498,
-   "seconds": 3.0
-  },
-  {
-   "name": "lean Theories/Platform.lean",
-   "peak_rss_mib": 470,
-   "seconds": 1.8
-  },
-  {
-   "name": "lean Theories/Logic.lean",
-   "peak_rss_mib": 490,
-   "seconds": 2.2
-  },
-  {
-   "name": "lean Theories/FlashElf.lean",
-   "peak_rss_mib": 463,
-   "seconds": 1.5
-  },
-  {
-   "name": "lean Theories/RamElf.lean",
-   "peak_rss_mib": 466,
-   "seconds": 1.6
-  },
-  {
-   "name": "lean Theories/Board/QemuVirtRv32.lean",
-   "peak_rss_mib": 442,
-   "seconds": 1.3
-  },
-  {
-   "name": "lean Projects/rmk/Elf.lean",
-   "peak_rss_mib": 698,
-   "seconds": 8.7
-  },
-  {
-   "name": "lean Projects/rmk/ElfFidelity.lean",
-   "peak_rss_mib": 546,
-   "seconds": 2.8
-  },
-  {
-   "name": "lean Theories/Absint.lean",
-   "peak_rss_mib": 528,
-   "seconds": 3.8
-  },
-  {
-   "name": "lean Theories/AbsintSound.lean",
-   "peak_rss_mib": 800,
-   "seconds": 29.0
-  },
-  {
    "name": "lean Projects/rmk/Copy.lean",
-   "peak_rss_mib": 581,
-   "seconds": 4.8
+   "peak_rss_mib": 613,
+   "seconds": 7.4
   },
   {
    "name": "lean Projects/rmk/Run.lean",
-   "peak_rss_mib": 455,
-   "seconds": 1.1
+   "peak_rss_mib": 447,
+   "seconds": 2.4
   },
   {
    "name": "lean Projects/rmk/Fetch.lean",
-   "peak_rss_mib": 6506,
-   "seconds": 50.3
+   "peak_rss_mib": 6507,
+   "seconds": 55.3
   },
   {
    "name": "lean Projects/rmk/MemmoveFetch.lean",
-   "peak_rss_mib": 567,
-   "seconds": 8.9
+   "peak_rss_mib": 917,
+   "seconds": 59.9
   },
   {
    "name": "lean Projects/rmk/MemmoveLoops.lean",
-   "peak_rss_mib": 528,
+   "peak_rss_mib": 533,
    "seconds": 3.8
   },
   {
    "name": "lean Projects/rmk/MemmoveSmall.lean",
-   "peak_rss_mib": 614,
-   "seconds": 7.3
+   "peak_rss_mib": 627,
+   "seconds": 7.2
   },
   {
    "name": "lean Projects/ramimage/Memmove.lean",
-   "peak_rss_mib": 546,
+   "peak_rss_mib": 551,
    "seconds": 1.8
   },
   {
    "name": "leanchecker Theories/Hart.lean",
-   "peak_rss_mib": 428,
-   "seconds": 4.7
+   "peak_rss_mib": 430,
+   "seconds": 4.1
   },
   {
    "name": "leanchecker Theories/Platform.lean",
-   "peak_rss_mib": 303,
-   "seconds": 2.4
-  },
-  {
-   "name": "leanchecker Theories/Logic.lean",
-   "peak_rss_mib": 441,
-   "seconds": 2.5
-  },
-  {
-   "name": "leanchecker Theories/FlashElf.lean",
-   "peak_rss_mib": 252,
+   "peak_rss_mib": 336,
    "seconds": 1.8
   },
   {
+   "name": "leanchecker Theories/Logic.lean",
+   "peak_rss_mib": 442,
+   "seconds": 1.9
+  },
+  {
+   "name": "leanchecker Theories/FlashElf.lean",
+   "peak_rss_mib": 324,
+   "seconds": 1.9
+  },
+  {
    "name": "leanchecker Theories/RamElf.lean",
-   "peak_rss_mib": 383,
+   "peak_rss_mib": 212,
    "seconds": 1.8
   },
   {
    "name": "leanchecker Theories/Board/QemuVirtRv32.lean",
-   "peak_rss_mib": 430,
-   "seconds": 1.9
+   "peak_rss_mib": 399,
+   "seconds": 1.7
   },
   {
    "name": "leanchecker Projects/rmk/Elf.lean",
-   "peak_rss_mib": 390,
+   "peak_rss_mib": 442,
    "seconds": 1.8
   },
   {
    "name": "leanchecker Projects/rmk/ElfFidelity.lean",
-   "peak_rss_mib": 504,
-   "seconds": 3.5
+   "peak_rss_mib": 505,
+   "seconds": 3.1
   },
   {
    "name": "leanchecker Theories/Absint.lean",
-   "peak_rss_mib": 432,
-   "seconds": 1.8
+   "peak_rss_mib": 433,
+   "seconds": 1.9
   },
   {
    "name": "leanchecker Theories/AbsintSound.lean",
-   "peak_rss_mib": 463,
+   "peak_rss_mib": 465,
    "seconds": 5.4
   },
   {
    "name": "leanchecker Projects/rmk/Copy.lean",
    "peak_rss_mib": 455,
-   "seconds": 3.1
+   "seconds": 4.0
   },
   {
    "name": "leanchecker Projects/rmk/Run.lean",
-   "peak_rss_mib": 239,
-   "seconds": 1.8
+   "peak_rss_mib": 411,
+   "seconds": 1.7
   },
   {
    "name": "leanchecker Projects/rmk/Fetch.lean",
-   "peak_rss_mib": 6462,
-   "seconds": 51.0
+   "peak_rss_mib": 6464,
+   "seconds": 53.0
   },
   {
    "name": "leanchecker Projects/rmk/MemmoveFetch.lean",
-   "peak_rss_mib": 472,
-   "seconds": 9.7
+   "peak_rss_mib": 486,
+   "seconds": 40.7
   },
   {
    "name": "leanchecker Projects/rmk/MemmoveLoops.lean",
-   "peak_rss_mib": 459,
-   "seconds": 2.5
+   "peak_rss_mib": 461,
+   "seconds": 2.6
   },
   {
    "name": "leanchecker Projects/rmk/MemmoveSmall.lean",
-   "peak_rss_mib": 471,
+   "peak_rss_mib": 474,
    "seconds": 3.7
   },
   {
    "name": "leanchecker Projects/ramimage/Memmove.lean",
-   "peak_rss_mib": 526,
-   "seconds": 2.1
+   "peak_rss_mib": 529,
+   "seconds": 2.3
   }
  ],
  "status": "proved",

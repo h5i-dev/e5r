@@ -291,3 +291,46 @@ transcript `memmove-job-controls.txt`):
 - A claim that model RAM starts 4 bytes later is `failed`.
 - In a bundle, one changed word of the packed file fails at the checksums. With
   the checksum forged as well, it fails at `check-packing.py`.
+
+## The RMK memmove contractB job (`jobs/rmk/rmk-memmove-contractB.json`)
+
+This job checks the peer's `E5R.Rmk.Memmove.contractB`
+(`Projects/rmk/MemmoveContract.lean`, peer commit `60d2f96`) on the runner's
+image. It is **bounded, not full memmove**. `PreB` admits n < 16 in either
+direction, or n ≥ 16 copied forward ((dst − src) ≥ n, unsigned) with
+src ≡ dst (mod 4). The n ≥ 16 backward path and the misaligned forward path are
+not covered. The other conditions are as the peer states them:
+- pc at the trampoline 0x80020c1e and a quiet core;
+- dst and src in model RAM;
+- aligned save slots in RAM, with the stack separated from dst and src;
+- an even return address.
+
+`PostB` is the ABI frame (all registers but t0–t6 and a1–a7 preserved), with
+CSRs unchanged and RAM outside the save slots equal to the memmove of the entry
+RAM.
+
+`Projects/ramimage/MemmoveB.lean` restates it over the runner's image and board
+(`E5R.RmkMemmoveB.contractB`), reusing `img_eq` and `board_eq`. The job audits
+both contracts, the two equalities and the four image bindings: `proved` in
+377 s, peak 6.5 GB RSS (in `Fetch.lean`), standard axioms only. Its bundle
+rechecks offline in 220 s, including the packing check. After merging the
+peer's larger `MemmoveFetch.lean` (259 instruction facts), the n < 16 job still
+proves (`rmk-memmove-small.result.json`).
+
+Mutations (`python3 -I scripts/test-rmk-memmoveB-job.py E5R_VERIFY`, transcript
+`memmoveB-mutations.txt`). Each proof mutation edits a copy of the peer's
+module, never the module itself. "Rejected" means status `failed`, with the
+first Lean error in the named theorem:
+
+| Mutation | Result |
+| --- | --- |
+| unmodified copy (control) | `proved` |
+| `PreB` without src ≡ dst (mod 4) | rejected in `contractB` |
+| `PreB` without "forward" | rejected in `contractB` |
+| `PreB.dstSep` weakened to `True` | rejected in `contractB` |
+| `PostB` claiming a1 preserved | rejected in `finishB` |
+| word-loop `sw a2,0(t5)` → `sw a3,0(t5)` in the ELF, unpinned | rejected at instruction fact `f80020ec4` |
+| a job module that does not exist | `error` (a tool or job problem, not a rejection) |
+
+A rejected mutation shows that the proof needs that condition. It does not show
+that the weakened statement is false.
