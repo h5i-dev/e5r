@@ -6,8 +6,10 @@
   obligation, and the constants marked CANDIDATE are read from the disassembly of the pinned ELF
   (f39d833f..., review/rmk/deframer-contracts.md on the review branch) and must be confirmed by
   the proof that uses them. No theorem in this file claims safety. Proved elsewhere so far:
-  `Deframer/TailNoCopy.lean` (`tail` with consumed = 0 meets `TailPost`); `CallEnv.selfAl/spAl`
-  and `CopyEnv.spAl` were added for it (ABI alignment; the model faults misaligned word access).
+  `Deframer/TailNoCopy.lean` (`tail` with consumed = 0 meets `TailPost`) and
+  `Deframer/TailCopy.lean` (`tail_from_copy : TailFromCopy`, conditional on `CopyContract`).
+  Corrections made for those proofs: `CallEnv.selfAl/spAl`, `CopyEnv.spAl` (ABI alignment; the model
+  faults misaligned word access) and the method posts' `saved` (now the ABI frame, `callerSaved`).
 
   The property (R2), in words: whatever bytes a host sends on the UART, the deframer's state
   invariant `consumed ≤ filled ≤ len` holds whenever its methods return, and no method reaches
@@ -74,6 +76,9 @@ def KeepsRam (frame : Nat) (m₀ m : Machine) : Prop :=
   ∀ x, Outside (m₀.core.get 10) (m₀.core.get 11) (m₀.core.get 12).toNat (m₀.core.get 2) frame x →
     m.ram x = m₀.ram x
 
+/-- The RISC-V caller-saved registers t0-t2, a0-a7, t3-t6: what a call may clobber. -/
+def callerSaved : List Nat := [5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 28, 29, 30, 31]
+
 /-- The state invariant. -/
 def Inv (ram : Word → BitVec 8) (p : Word) (len : Nat) : Prop :=
   consumed ram p ≤ filled ram p ∧ filled ram p ≤ len
@@ -116,8 +121,10 @@ structure TailPost (frame : Nat) (m₀ m : Machine) : Prop where
   pc : m.core.pc = m₀.core.get 1
   csr : m.core.sameCsr m₀.core
   sp : m.core.get 2 = m₀.core.get 2
-  /-- Every register but a0-a4, a6 and t1 (tail's results and memmove's clobbers) is kept. -/
-  saved : ∀ r : Reg, r.val ∉ [6, 10, 11, 12, 13, 14, 16] → m.core.get r = m₀.core.get r
+  /-- The ABI frame: every register but the caller-saved t0-t6, a0-a7 is kept. (Corrected from
+      "all but a0-a4, a6, t1", which is what memmove's proved paths clobber, but more than
+      `CopyContract`, memmove's ABI contract, promises.) -/
+  saved : ∀ r : Reg, r.val ∉ callerSaved → m.core.get r = m₀.core.get r
   hconsumed : consumed m.ram (m₀.core.get 10) = 0
   hfilled : filled m.ram (m₀.core.get 10) =
     filled m₀.ram (m₀.core.get 10) - consumed m₀.ram (m₀.core.get 10)
@@ -153,7 +160,7 @@ structure ParkPost (m₀ m : Machine) : Prop where
   pc : m.core.pc = m₀.core.get 1
   csr : m.core.sameCsr m₀.core
   sp : m.core.get 2 = m₀.core.get 2
-  saved : ∀ r : Reg, r.val ∉ [6, 10, 11, 12, 13, 14, 16] → m.core.get r = m₀.core.get r
+  saved : ∀ r : Reg, r.val ∉ callerSaved → m.core.get r = m₀.core.get r
   hconsumed : consumed m.ram (m₀.core.get 10) = 0
   hfilled : filled m.ram (m₀.core.get 10) = 0
   ret : (m.core.get 10).toNat = filled m₀.ram (m₀.core.get 10) - consumed m₀.ram (m₀.core.get 10)
@@ -177,7 +184,7 @@ structure UnparkPost (m₀ m : Machine) : Prop where
   pc : m.core.pc = m₀.core.get 1
   csr : m.core.sameCsr m₀.core
   sp : m.core.get 2 = m₀.core.get 2
-  saved : ∀ r : Reg, r.val ∉ [6, 10, 11, 12, 13, 14, 16] → m.core.get r = m₀.core.get r
+  saved : ∀ r : Reg, r.val ∉ callerSaved → m.core.get r = m₀.core.get r
   hconsumed : consumed m.ram (m₀.core.get 10) = 0
   hfilled : filled m.ram (m₀.core.get 10) = (m₀.core.get 13).toNat
   moved : ∀ j < (m₀.core.get 13).toNat,
@@ -196,9 +203,10 @@ def UnparkPanicControl : Prop :=
 
 /-! ## `next` (read from the bytes at 0x8001d43a)
 
-A 0x40-byte frame saving ra and s0-s11; callees: `cobs::dec::decode_in_place_report` (0x8001e02e,
-0x10-byte frame, leaf but for `panic_bounds_check`), the slice-range check 0x8001ad76 (frameless)
-and memmove (0x30 bytes), so `nextStack = 0x40 + 0x30`. Entry panics iff `filled > len` or
+A 0x40-byte frame saving ra and s0-s11; callees: `cobs::dec::decode_in_place` (0x8001e006, a
+0x20-byte wrapper that calls `decode_in_place_report` at 0x8001e02e, 0x10-byte frame, leaf but for
+`panic_bounds_check`: 0x30 in all; corrected from "calls decode_in_place_report directly"), the
+slice-range check 0x8001ad76 (frameless) and memmove (0x30 bytes), so `nextStack = 0x40 + 0x30`. Entry panics iff `filled > len` or
 `consumed > filled`. It scans `buf[consumed..filled)` for a 0 delimiter; a frame found moves
 `consumed` past it and, unless discarding, is COBS-decoded in place (errors are skipped); a decoded
 frame longer than 2 bytes is moved to the buffer's front and returned as `Some`. A full buffer
@@ -206,7 +214,11 @@ without a delimiter is discarded (`consumed := filled`, `discarding := 1`). Retu
 `Option<usize>` as (a0 = tag, a1 = value). The contract below is the SAFETY part R2 needs: no panic,
 the invariant kept, writes confined; the decoded value is not specified here. -/
 
-def nextStack : Nat := 0x40 + max 0x10 memmoveFrame
+/-- `decode_in_place_report`'s frame (`addi sp, sp, -0x10` at 0x8001e02e; CANDIDATE: the COBS
+    owner's proof fixes it). -/
+def cobsFrame : Nat := 0x10
+
+def nextStack : Nat := 0x40 + max (0x20 + cobsFrame) memmoveFrame
 
 def discarding (ram : Word → BitVec 8) (p : Word) : Nat := (ram (p + 8)).toNat
 
@@ -262,12 +274,48 @@ structure CopyPost (m₀ m : Machine) : Prop where
 /-- The dependency: memmove does what it should for every deframer call. -/
 def CopyContract : Prop := ∀ m₀, CopyEnv m₀ → ∃ k m, QRun B img k m₀ m ∧ CopyPost m₀ m
 
+/-! ## The COBS contract `next` needs (DEPENDENCY, not proved; owned by the COBS worker)
+
+INTERFACE CANDIDATE read from the bytes: the wrapper at 0x8001e006 calls the report function with
+a0 = a 12-byte report slot (r0, r1, r2), a1 = data, a2 = n; it returns `(r0 - 1) | r1` and `r2`,
+and `next` takes the first being -1 as Ok and the second as the decoded length. So the Ok encoding
+is r0 = 0 ∧ r1 = 0. All `next`'s safety needs: the call returns (no panic) whatever the bytes,
+writes only the data, the slot and its frame, and an Ok length is at most n. -/
+
+structure CobsEnv (m : Machine) : Prop where
+  pc : m.core.pc = 0x8001e02e
+  quiet : Quiet m.core
+  n : (m.core.get 12).toNat ≤ bufLen
+  data : B.inRam (m.core.get 11) (m.core.get 12).toNat = true
+  out : B.inRam (m.core.get 10) 12 = true
+  outAl : (m.core.get 10).toNat % 4 = 0
+  frame : B.inRam (m.core.get 2 - BitVec.ofNat 32 cobsFrame) cobsFrame = true
+  spAl : (m.core.get 2).toNat % 4 = 0
+  /-- data, report slot and frame pairwise disjoint -/
+  sep : ((m.core.get 11).toNat + (m.core.get 12).toNat ≤ (m.core.get 10).toNat ∨
+      (m.core.get 10).toNat + 12 ≤ (m.core.get 11).toNat) ∧
+    (m.core.get 11).toNat + (m.core.get 12).toNat ≤ (m.core.get 2).toNat - cobsFrame ∧
+    (m.core.get 10).toNat + 12 ≤ (m.core.get 2).toNat - cobsFrame
+  ra : (m.core.get 1).getLsbD 0 = false
+
+structure CobsPost (m₀ m : Machine) : Prop where
+  pc : m.core.pc = m₀.core.get 1
+  regs : ∀ r : Reg, r.val ∉ callerSaved → m.core.get r = m₀.core.get r
+  csr : m.core.sameCsr m₀.core
+  ram : ∀ x, ¬ ((m₀.core.get 11).toNat ≤ x.toNat ∧ x.toNat < (m₀.core.get 11).toNat + (m₀.core.get 12).toNat) →
+    ¬ ((m₀.core.get 10).toNat ≤ x.toNat ∧ x.toNat < (m₀.core.get 10).toNat + 12) →
+    ¬ ((m₀.core.get 2).toNat - cobsFrame ≤ x.toNat ∧ x.toNat < (m₀.core.get 2).toNat) → m.ram x = m₀.ram x
+  ok : word m.ram (m₀.core.get 10) = 0 → word m.ram (m₀.core.get 10 + 4) = 0 →
+    word m.ram (m₀.core.get 10 + 8) ≤ (m₀.core.get 12).toNat
+
+def CobsReportContract : Prop := ∀ m₀, CobsEnv m₀ → ∃ k m, QRun B img k m₀ m ∧ CobsPost m₀ m
+
 /-- The deframer obligations, stated against the dependency (each to be proved as an
     implication, then instantiated when `CopyContract` is a theorem). -/
 def TailFromCopy : Prop := CopyContract → TailContract tailStack
 def ParkFromCopy : Prop := CopyContract → ParkContract
 def UnparkFromCopy : Prop := CopyContract → UnparkContract
-def NextFromCopy : Prop := CopyContract → NextContract
+def NextFromDeps : Prop := CopyContract → CobsReportContract → NextContract
 
 /-! ## The session-level target (R2 acceptance; not proved) -/
 
