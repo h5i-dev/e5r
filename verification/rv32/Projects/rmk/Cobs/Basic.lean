@@ -332,7 +332,8 @@ theorem finish (c : Core) (R S : Word → BitVec 8) (e : Core) (h : CobsEnv ⟨c
       ramRead m.ram (c.get 10) .w = e.get 11 ∧
       ramRead m.ram (c.get 10 + e.get 16) .w = e.get 7 ∧
       (e.get 16 = 4 → ramRead m.ram (c.get 10 + 8#32) .w = ramRead S (c.get 10 + 8#32) .w) ∧
-      (e.get 16 = 8 → ramRead m.ram (c.get 10 + 4#32) .w = ramRead S (c.get 10 + 4#32) .w) := by
+      (e.get 16 = 8 → ramRead m.ram (c.get 10 + 4#32) .w = ramRead S (c.get 10 + 4#32) .w) ∧
+      (∀ x : Word, ¬ ((c.get 10).toNat ≤ x.toNat ∧ x.toNat < (c.get 10).toNat + 12) → m.ram x = S x) := by
   have hf := h.frame; have ho := h.out; have hoa := h.outAl; have hsa := h.spAl
   have hof := h.outFrame
   rw [B_ram] at hf ho
@@ -342,7 +343,7 @@ theorem finish (c : Core) (R S : Word → BitVec 8) (e : Core) (h : CobsEnv ⟨c
     (by rw [h10]; bv_omega) (by rw [h10, B_ram]; constructor <;> bv_omega)
     (by rw [h10]; bv_omega) (by rw [h10, B_ram]; constructor <;> bv_omega)
     (fun off hoff' => by rw [h2]; exact slot _ h.frame hsa off hoff')
-  refine ⟨_, run, ⟨?_, ?_, ?_, ?_⟩, ?_, ?_, ?_, ?_⟩
+  refine ⟨_, run, ⟨?_, ?_, ?_, ?_⟩, ?_, ?_, ?_, ?_, ?_⟩
   · simp [exitCore, h1]
   · intro r hr
     have W : ∀ b : Word, b.toNat + 4 ≤ 2 ^ 32 →
@@ -410,5 +411,9 @@ theorem finish (c : Core) (R S : Word → BitVec 8) (e : Core) (h : CobsEnv ⟨c
     show ramRead (exitRam e S) (c.get 10 + 4#32) .w = _
     unfold exitRam; rw [h10, h8]
     rw [ramRead_w_out, ramRead_w_out] <;> bv_omega
+  · intro x hx
+    show exitRam e S x = S x
+    unfold exitRam; rw [h10]
+    rw [ramWrite_w_out, ramWrite_w_out] <;> bv_omega
 
 end E5R.Rmk.Cobs
