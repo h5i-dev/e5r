@@ -761,19 +761,71 @@ or decompiler roadmap or authorize a firmware framework.
 - [x] Original `no_std` Rust fixture at O1 and O2 against the same binary spec,
       with an explicit memory ABI and pinned compiler. QEMU differential edge
       tests supplement, rather than prove, ISA model fidelity.
-- [ ] Generalize the compiled Rust range result beyond the finite byte-input
-      precondition, including ABI/representation abstraction, more compiler
-      layouts/optimization levels, symbolic proofs and stronger ISA validation.
-- [ ] Later: one Embassy executor with timer/channel, explicit interrupt,
-      MMIO/device, DMA and scheduling models. Firmware or microkernel semantics
-      replace Linux semantics; they do not remove semantic modeling obligations.
-      Privilege/CSR, RV32IMC, Cortex-M and temporal/deadline guarantees need
-      separate supported semantics and proof milestones.
+- [x] Superseded by F below: the owner's second authorization (2026-10-28)
+      turns this research result into a staged, scoped product.
 
 The supported subset, exact statements, build commands, assumptions, provenance
 and trusted computing base are together in
 [`verification-rv32.md`](verification-rv32.md). Implementation is isolated in
 `e5r-verify` and `verification/rv32`; no empty firmware crate or CI profile change.
+
+## F. Scoped firmware verification (2026-10-28 owner authorization)
+
+The owner expanded V0 into a production tool for one scope: a binary-level,
+Lean-kernel-checked safety guarantee for firmware on one RISC-V board. This is
+the only architecture exception; it does not reorder M1-M12 or the decoder
+priorities, and nothing in it trusts e5r's decompiler, CFG recovery or IR.
+Product documentation is [`firmware-verification.md`](firmware-verification.md).
+Each item is checked only when its acceptance criterion has been run.
+
+- [x] **F1. Stable baseline.** V0 committed as inherited, its fixture-corpus
+      regression fixed, re-checked from a clean clone. *Accepted:* V0 checker
+      exits 0 from a fresh clone with identical image hashes; the workspace
+      failures that remain are the corpus-gated tests that need
+      `scripts/build-fixtures.sh` prerequisites absent on the dev host.
+- [ ] **F2. One supported scope.** SiFive HiFive1 Rev B (FE310-G002, E31
+      RV32IMAC), M-mode only, boot at `0x20010000`, 16 KiB DTIM, CLINT timer.
+      *Accepted:* `boards/hifive1-revb.json` is the single source of the memory
+      map, device registers, boot assumptions and exclusions; the Lean board is
+      generated from it and the checker refuses a stale copy; the product doc
+      states guarantees and exclusions in the same terms.
+- [ ] **F3. Semantics for real compiler output.** RV32IMAC + Zicsr + Zifencei
+      + MRET/WFI, machine-mode CSRs, interrupt entry, aligned RAM, flash image,
+      device registers; unsupported behavior fails closed. *Accepted:* QEMU
+      `sifive_e` whole-firmware trace replay agrees on every register after
+      every transition; instruction-level differential cases cover every
+      supported opcode class; negative controls show each fault class.
+- [ ] **F4. Symbolic and compositional proofs.** *Accepted:* the clamp
+      binaries are proved for all 2^32 inputs including the wrapping case; a
+      loop over a buffer is proved by an invariant, not unrolling; function
+      contracts state pre/postconditions and frames; at least one successful
+      execution is exhibited (nonvacuity); the axiom audit shows only
+      `propext`, `Quot.sound` and `Classical.choice`.
+- [ ] **F5. General workflow.** *Accepted:* `e5r-verify check` takes a job
+      file (ELF, board, property, entry/boot model) and returns structured JSON
+      with one of `proved`, `counterexample`, `unknown`, `unsupported`,
+      `resource_exhausted`, `error`; resource limits and resumable runs; a new
+      target needs a job file, not a new runner; a counterexample is reported
+      only after it replays in the model.
+- [ ] **F6. Environment model for the board.** *Accepted:* boot state, CSRs,
+      interrupt entry/return, CLINT/UART/PWM registers and environmental
+      nondeterminism are explicit and documented; replay against QEMU covers
+      interrupts and device traffic.
+- [ ] **F7. Embassy firmware proof.** One executor, timer interrupt, channel,
+      built with plain cargo. *Accepted:* a kernel-checked theorem that, from
+      every boot state the board allows and under every environment behavior
+      the model allows, the emitted binary never leaves the modeled envelope
+      and every PWM duty write is at most 100; plus a concrete execution that
+      reaches such a write.
+- [ ] **F8. Packaging.** *Accepted:* pinned toolchains, one command that
+      rebuilds and rechecks from source, proof bound to ELF bytes, board,
+      property, model and toolchain hashes with stale results refused, CI job,
+      malformed-input tests, schema/version policy, tutorial, residual TCB,
+      and an independent review recorded (or recorded as not obtained).
+
+Not in this scope, and not to be described as done: Cortex-M, multiple harts,
+DMA, U-mode/PMP, microkernels, timing or deadline guarantees, other boards,
+verified Rust, verified compilers, or all of Embassy.
 
 ## Quality gates
 
@@ -1012,8 +1064,9 @@ it was closed.
   to avoid.
 - **Exotic architectures ahead of depth:** x86-64 and AArch64 on ELF, PE and
   Mach-O get finished before anything else gets attention, SLEIGH breadth aside.
-  The owner-authorized V0 research experiment above is a bounded exception for
-  byte-level firmware verification, not a general architecture expansion.
+  The owner-authorized V0 research experiment and the F firmware-verification
+  scope above are the only exception: one RISC-V board for binary-level
+  proofs, not a general architecture expansion.
 - **Reverse engineering the incumbents' internals:** Clean-room: public
   specifications, published papers, and the source of permissively licensed
   projects used within their licenses.

@@ -146,7 +146,8 @@ cargo test --release --workspace
 
 - [MANUAL.md](docs/MANUAL.md) / `man e5r`: the full command reference
 - [docs/tutorial.md](docs/tutorial.md): a stripped binary to a committed annotation log
-- [docs/verification-rv32.md](docs/verification-rv32.md): bounded binary-level RV32I Lean research proofs
+- [docs/firmware-verification.md](docs/firmware-verification.md): binary-level Lean firmware verification for the HiFive1 Rev B (scope, guarantees, assumptions, TCB)
+- [docs/verification-rv32.md](docs/verification-rv32.md): the bounded V0 RV32I Lean research proofs it grew from
 - [docs/design/](docs/design/): one document per subsystem, and why it is shaped that way
 - [docs/scorecard.md](docs/scorecard.md): every measured number, including the bad ones
 - [CONTRIBUTING.md](CONTRIBUTING.md): what a change has to measure, and the clean-room rule
