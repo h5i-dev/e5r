@@ -1880,6 +1880,36 @@ theorem stepOk_mono {cfg : Config} {ρ : Nat → Word} {ts ts' : List AState} {o
   obtain ⟨c, r, evs, hi, he, t, ht, hh⟩ := h
   exact ⟨c, r, evs, hi, he, t, hsub t ht, hh⟩
 
+/-- What a checked state's well-formedness gives the proofs. -/
+theorem wf_parts {cfg : Config} {s : AState} (h : s.wf cfg = true) :
+    s.regs.length = 31 ∧ (∀ c ∈ s.mem, c.wf cfg = true) ∧ (∀ c ∈ s.mem, c.base = .rel → s.hnd = true) := by
+  simp only [AState.wf, Bool.and_eq_true, beq_iff_eq, List.all_eq_true, Bool.or_eq_true,
+    Bool.not_eq_true'] at h
+  obtain ⟨⟨⟨hl, hc⟩, habs⟩, _⟩ := h
+  refine ⟨hl, hc, fun c hc' hb => ?_⟩
+  rcases habs with hh | habs
+  · exact hh
+  · have := habs c hc'; rw [hb] at this; cases this
+
+/-- A handler-frame cell lies in the stack region, so it is apart from any
+    static address. -/
+theorem rel_disj_static {cfg : Config} {ρ : Nat → Word} {c : Cell} {A : Word} {wd : Width}
+    (hs : SpOk cfg (ρ 2).toNat) (hc : c.wf cfg = true) (hb : c.base = .rel)
+    (hst : cfg.isStatic A.toNat wd.bytes = true) : Disj (c.at ρ) c.w A wd := by
+  simp only [Cell.wf, hb, Bool.and_eq_true, decide_eq_true_eq] at hc
+  obtain ⟨⟨ho, hn⟩, _⟩ := hc
+  obtain ⟨_, h1, h2⟩ := rel_addr (n := c.w.bytes) hs ho hn
+  have hat : c.at ρ = ρ 2 + w c.addr := by simp [Cell.at, hb]
+  have hram := hs.ram; have hpin := hs.pin; have hbase := hs.base; have hlo := hs.lo
+  have hd := static_disj_stack (A := ρ 2 + w c.addr) (m := c.w.bytes) hst h1 h2 hram
+  have hsA : A.toNat + wd.bytes ≤ cfg.ramEnd := by
+    simp only [Config.isStatic, Bool.or_eq_true, Bool.and_eq_true, decide_eq_true_eq] at hst
+    omega
+  unfold Config.ramEnd at hram hpin hsA
+  rw [hat]
+  apply disj_of_nat (by omega) (by omega)
+  omega
+
 /-! ### Instruction cases -/
 
 section Cases
@@ -2065,6 +2095,101 @@ theorem case_branch {cond : BrCond} {rs1 rs2 : Reg} {off : Word}
             simp only [w, BitVec.toNat_add, BitVec.toNat_ofNat, M32]; omega)
         hctl hregs (by rw [hmem]; exact hs.mem) o
       exact stepOk_mono this (fun t ht => List.mem_append_left _ ht)
+
+theorem case_load {wd : Width} {signed : Bool} {rd rs1 : Reg} {off : Word}
+    (hv : ValidImg cfg.img) (hsp : s.hnd = true → SpOk cfg (ρ 2).toNat)
+    (h : absExec cfg s len.toNat (.load wd signed rd rs1 off) = some ts) :
+    StepOk cfg ρ ts o (exec m.core len (.load wd signed rd rs1 off)) m.ram := by
+  simp only [absExec] at h
+  rw [exec_load]
+  have hA := addC_sound off.toNat (hs.regs rs1)
+  rw [w_len] at hA
+  cases hl' : absLoad cfg s (addC (s.get rs1) off.toNat) wd false with
+  | none => rw [hl'] at h; simp at h
+  | some v =>
+    rw [hl'] at h
+    simp only [Option.bind_some, Option.some.injEq] at h; subst h
+    generalize addC (s.get rs1) off.toNat = av at hA hl'
+    have finish : ∀ r, v.gam ρ r → Fits wd r →
+        StepOk cfg ρ [{ s.set rd (v.extend wd signed) with pc := (s.pc + len.toNat) % M32 }] o
+          (.done (m.core.wr rd (extend wd signed r) (m.core.pc + len))) m.ram ∧ True :=
+      fun r hr hf => ⟨regwrite_sound hs hl (extend_sound wd signed hr hf) o, trivial⟩
+    cases av with
+    | vals as =>
+      obtain ⟨r, i', he, hr, hf⟩ := absLoad_vals_sound hl' hv hA hs.mem o 0 [] _
+      obtain ⟨c, ram', evs, hi, hev, t, ht, hh⟩ := (finish r hr hf).1
+      refine ⟨c, ram', evs, ?_, hev, t, ht, hh⟩
+      rw [he]; simp only [interp_done] at hi ⊢; exact hi
+    | sym sv off' =>
+      by_cases hsv : sv = 2
+      · subst hsv
+        have hnd : s.hnd = true := by
+          have := hl'; simp only [absLoad] at this
+          split at this
+          · next hc => simp only [Bool.and_eq_true] at hc; exact hc.1.1.1
+          · simp at this
+        simp only [AV.gam] at hA
+        rw [hA]
+        obtain ⟨he, hr, hf⟩ := absLoad_rel_sound hl' (hsp hnd) hs.mem o 0 [] _
+        obtain ⟨c, ram', evs, hi, hev, t, ht, hh⟩ := (finish _ hr hf).1
+        exact ⟨c, ram', evs, by rw [he]; exact hi, hev, t, ht, hh⟩
+      · exfalso; simp [absLoad, hsv] at hl'
+    | _ => simp [absLoad] at hl'
+
+theorem case_store {wd : Width} {rs1 rs2 : Reg} {off : Word}
+    (hram : cfg.board.ramBase + cfg.board.ramSize ≤ M32) (hwf : s.wf cfg = true)
+    (hsp : s.hnd = true → SpOk cfg (ρ 2).toNat)
+    (h : absExec cfg s len.toNat (.store wd rs1 rs2 off) = some ts) :
+    StepOk cfg ρ ts o (exec m.core len (.store wd rs1 rs2 off)) m.ram := by
+  simp only [absExec] at h
+  rw [exec_store]
+  obtain ⟨_, hcells, hrelH⟩ := wf_parts hwf
+  have hA := addC_sound off.toNat (hs.regs rs1)
+  rw [w_len] at hA
+  cases hst : absStore cfg s (addC (s.get rs1) off.toNat) wd (s.get rs2) false with
+  | none => rw [hst] at h; simp at h
+  | some memF =>
+    rw [hst] at h
+    simp only [Option.bind_some, Option.some.injEq] at h; subst h
+    generalize addC (s.get rs1) off.toNat = av at hA hst
+    have conclude : ∀ ram' evs', StoreEffect cfg m.ram (m.core.get rs1 + off) (m.core.get rs2) wd ram' evs' →
+        MemHolds ρ ram' memF →
+        ∃ c, interp cfg.board cfg.img o (.done (m.core.goto (m.core.pc + len))) ram' 0 ([] ++ evs') =
+          .ok c ram' evs' ∧ StateHolds ρ { s with mem := memF, pc := (s.pc + len.toNat) % M32 } ⟨c, ram'⟩ := by
+      intro ram' evs' _ hm'
+      refine ⟨m.core.goto (m.core.pc + len), by simp, ?_⟩
+      exact holds_mk (pc_adv hs.pc) (fun r => hs.regs r) hm'
+        (ctl_same ⟨hs.mie, hs.mpie, hs.mpp, hs.mieReg, hs.mtvec, hs.mepc, hs.mcause, hs.mscratch⟩
+          (Core.sameCsr_goto _ _))
+    have evok : ∀ ram' evs', StoreEffect cfg m.ram (m.core.get rs1 + off) (m.core.get rs2) wd ram' evs' →
+        ∀ ev ∈ evs', EvOk cfg ev := by
+      intro ram' evs' he ev hev
+      cases he with
+      | ram => simp at hev
+      | dev hok => simp only [List.mem_singleton] at hev; subst hev; exact hok
+    cases av with
+    | vals as =>
+      obtain ⟨ram', evs', he, hi, hm'⟩ := absStore_vals_sound hst hram hA (hs.regs rs2) hs.mem hcells hrelH
+        (fun c hc hb hstat => rel_disj_static (hsp (hrelH c hc hb)) (hcells c hc) hb hstat) o 0 [] _
+      obtain ⟨c, hc, hh⟩ := conclude ram' evs' he hm'
+      exact ⟨c, ram', evs', by rw [hi]; exact hc, evok ram' evs' he, _, List.mem_singleton_self _, hh⟩
+    | sym sv off' =>
+      by_cases hsv : sv = 2
+      · subst hsv
+        have hnd : s.hnd = true := by
+          have := hst; simp only [absStore] at this
+          split at this
+          · next hc => simp only [Bool.and_eq_true] at hc; exact hc.1.1.1
+          · simp at this
+        simp only [AV.gam] at hA
+        obtain ⟨hi, hm'⟩ := absStore_rel_sound hst (hsp hnd) (hs.regs rs2) hs.mem hwf hnd o 0 [] _
+        have e1 : ρ 2 + BitVec.ofNat 32 off' = m.core.get rs1 + off := hA.symm
+        have e2 : ρ 2 + w off' = m.core.get rs1 + off := hA.symm
+        rw [e1, e2] at hi; rw [e2] at hm'
+        obtain ⟨c, hc, hh⟩ := conclude _ [] .ram hm'
+        exact ⟨c, _, [], by rw [hi]; simpa using hc, by simp, _, List.mem_singleton_self _, hh⟩
+      · exfalso; simp [absStore, hsv] at hst
+    | _ => simp [absStore] at hst
 
 end Cases
 
