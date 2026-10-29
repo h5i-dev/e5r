@@ -36,6 +36,11 @@ def unparkPc : Nat := 0x8001d3f2
 def nextPc : Nat := 0x8001d43a
 /-- `core::slice::index::slice_index_fail`: every bounds failure of the deframer calls it. -/
 def panicPc : Nat := 0x8001fafc
+/-- `core::panicking::panic_bounds_check`: the COBS decoder's two bounds checks call it. -/
+def boundsPanicPc : Nat := 0x8001f83a
+/-- `rust_begin_unwind`: every panic path ends here (panic-halt). -/
+def unwindPc : Nat := 0x8001e148
+
 /-- The firmware's buffer length (`RYNK_BUFFER_SIZE`; `li a2, 0x1e8` at every call site). -/
 def bufLen : Nat := 488
 /-- `tail`'s stack frame (`addi sp, sp, -0x20`; saves ra, s0-s3 at sp+0x1c..0xc) plus the 12 bytes
@@ -48,6 +53,18 @@ def tailStack : Nat := 0x20 + 12
 def word (ram : Word → BitVec 8) (a : Word) : Nat := (ramRead ram a .w).toNat
 def consumed (ram : Word → BitVec 8) (p : Word) : Nat := word ram p
 def filled (ram : Word → BitVec 8) (p : Word) : Nat := word ram (p + 4)
+
+/-- Byte `x` is outside the deframer at `p` (12 bytes), the buffer `[buf, buf+len)` and the
+    `frame` stack bytes below `sp`: a call's RAM writes are confined to those. -/
+def Outside (p buf : Word) (len : Nat) (sp : Word) (frame : Nat) (x : Word) : Prop :=
+  ¬ (p.toNat ≤ x.toNat ∧ x.toNat < p.toNat + 12) ∧
+  ¬ (buf.toNat ≤ x.toNat ∧ x.toNat < buf.toNat + len) ∧
+  ¬ (sp.toNat - frame ≤ x.toNat ∧ x.toNat < sp.toNat)
+
+/-- The RAM frame of a call from `m₀` (a0 = deframer, a1 = buffer, a2 = len). -/
+def KeepsRam (frame : Nat) (m₀ m : Machine) : Prop :=
+  ∀ x, Outside (m₀.core.get 10) (m₀.core.get 11) (m₀.core.get 12).toNat (m₀.core.get 2) frame x →
+    m.ram x = m₀.ram x
 
 /-- The state invariant. -/
 def Inv (ram : Word → BitVec 8) (p : Word) (len : Nat) : Prop :=
@@ -97,6 +114,7 @@ structure TailPost (frame : Nat) (m₀ m : Machine) : Prop where
     m.ram (m₀.core.get 11 + BitVec.ofNat 32 k) =
       m₀.ram (m₀.core.get 11 + BitVec.ofNat 32 (consumed m₀.ram (m₀.core.get 10) + k))
   inv : Inv m.ram (m₀.core.get 10) (m₀.core.get 12).toNat
+  ram : KeepsRam frame m₀ m
 
 /-- The obligation (not proved): `tail` returns, satisfying its postcondition. -/
 def TailContract (frame : Nat) : Prop :=
@@ -129,6 +147,7 @@ structure ParkPost (m₀ m : Machine) : Prop where
   moved : ∀ j < (m.core.get 10).toNat,
     m.ram (m₀.core.get 11 + BitVec.ofNat 32 ((m₀.core.get 12).toNat - (m.core.get 10).toNat + j)) =
       m₀.ram (m₀.core.get 11 + BitVec.ofNat 32 (consumed m₀.ram (m₀.core.get 10) + j))
+  ram : KeepsRam parkStack m₀ m
 
 def ParkContract : Prop :=
   ∀ m₀, CallEnv parkPc parkStack m₀ → Inv m₀.ram (m₀.core.get 10) (m₀.core.get 12).toNat →
@@ -151,6 +170,7 @@ structure UnparkPost (m₀ m : Machine) : Prop where
   moved : ∀ j < (m₀.core.get 13).toNat,
     m.ram (m₀.core.get 11 + BitVec.ofNat 32 j) =
       m₀.ram (m₀.core.get 11 + BitVec.ofNat 32 ((m₀.core.get 12).toNat - (m₀.core.get 13).toNat + j))
+  ram : KeepsRam parkStack m₀ m
 
 def UnparkContract : Prop :=
   ∀ m₀, CallEnv unparkPc parkStack m₀ → (m₀.core.get 13).toNat ≤ bufLen →
@@ -159,6 +179,40 @@ def UnparkContract : Prop :=
 /-- The control: with `parked = len + 1`, `unpark_pending` reaches the panic. -/
 def UnparkPanicControl : Prop :=
   ∀ m₀, CallEnv unparkPc parkStack m₀ → (m₀.core.get 13).toNat = bufLen + 1 →
+    ∃ k m, QRun B img k m₀ m ∧ m.core.pc = BitVec.ofNat 32 panicPc
+
+/-! ## `next` (read from the bytes at 0x8001d43a)
+
+A 0x40-byte frame saving ra and s0-s11; callees: `cobs::dec::decode_in_place_report` (0x8001e02e,
+0x10-byte frame, leaf but for `panic_bounds_check`), the slice-range check 0x8001ad76 (frameless)
+and memmove (12 bytes), so `nextStack = 0x40 + 0x10`. Entry panics iff `filled > len` or
+`consumed > filled`. It scans `buf[consumed..filled)` for a 0 delimiter; a frame found moves
+`consumed` past it and, unless discarding, is COBS-decoded in place (errors are skipped); a decoded
+frame longer than 2 bytes is moved to the buffer's front and returned as `Some`. A full buffer
+without a delimiter is discarded (`consumed := filled`, `discarding := 1`). Returns
+`Option<usize>` as (a0 = tag, a1 = value). The contract below is the SAFETY part R2 needs: no panic,
+the invariant kept, writes confined; the decoded value is not specified here. -/
+
+def nextStack : Nat := 0x40 + 0x10
+
+def discarding (ram : Word → BitVec 8) (p : Word) : Nat := (ram (p + 8)).toNat
+
+structure NextPost (m₀ m : Machine) : Prop where
+  pc : m.core.pc = m₀.core.get 1
+  csr : m.core.sameCsr m₀.core
+  sp : m.core.get 2 = m₀.core.get 2
+  saved : ∀ r : Reg, r.val ∈ [8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27] → m.core.get r = m₀.core.get r
+  tag : (m.core.get 10).toNat ≤ 1
+  inv : Inv m.ram (m₀.core.get 10) (m₀.core.get 12).toNat
+  disc : discarding m.ram (m₀.core.get 10) ≤ 1
+  ram : KeepsRam nextStack m₀ m
+
+def NextContract : Prop :=
+  ∀ m₀, CallEnv nextPc nextStack m₀ → Inv m₀.ram (m₀.core.get 10) (m₀.core.get 12).toNat →
+    discarding m₀.ram (m₀.core.get 10) ≤ 1 → ∃ k m, QRun B img k m₀ m ∧ NextPost m₀ m
+
+def NextPanicControl : Prop :=
+  ∀ m₀, CallEnv nextPc nextStack m₀ → filled m₀.ram (m₀.core.get 10) = bufLen + 1 →
     ∃ k m, QRun B img k m₀ m ∧ m.core.pc = BitVec.ofNat 32 panicPc
 
 /-! ## The session-level target (R2 acceptance; not proved) -/
@@ -184,7 +238,8 @@ def rynkSession : SessionPoint := ⟨0x80003e1a, 0x8002a78c, 0x8002a590⟩
     invariant holds whenever the loop head is reached again. -/
 def SessionSafe (sp : SessionPoint) : Prop :=
   ∀ m evs, Reach B img (fun m₀ => m₀.core.pc = BitVec.ofNat 32 sp.loopPc ∧ Inv m₀.ram sp.deframer bufLen) m evs →
-    m.core.pc ≠ BitVec.ofNat 32 panicPc ∧
+    m.core.pc ≠ BitVec.ofNat 32 panicPc ∧ m.core.pc ≠ BitVec.ofNat 32 boundsPanicPc ∧
+    m.core.pc ≠ BitVec.ofNat 32 unwindPc ∧
     (m.core.pc = BitVec.ofNat 32 sp.loopPc → Inv m.ram sp.deframer bufLen)
 
 end E5R.Rmk.Deframer
