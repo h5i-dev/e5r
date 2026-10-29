@@ -26,6 +26,7 @@
   checked against the flash image the checker uses (`Firmware.segments`).
 -/
 import Theories.Hybrid.Basic
+import Theories.Hybrid.Wrap
 import Theories.Board.Hifive1Revb
 import Projects.hifive1.Image
 
@@ -52,25 +53,6 @@ theorem i6 : fetchDecode img 0x200106ac = some (.op .and 10 10 12, 2) := by deci
 theorem i7 : fetchDecode img 0x200106ae = some (.store .w 9 10 0x14, 2) := by decide +kernel
 
 /-! ## Contract -/
-
-/-- The ring head after one receive: `head + 1`, wrapped at the capacity 4. -/
-def next (h : Word) : Word := if h = 3 then 0 else h + 1
-
-theorem next_lt {h : Word} (hh : h.toNat < 4) : (next h).toNat < 4 := by
-  unfold next; split
-  · simp
-  · rename_i hn
-    have : h.toNat ≠ 3 := fun e => hn (BitVec.eq_of_toNat_eq (by simp [e]))
-    rw [BitVec.toNat_add]; simp; omega
-
-/-- The branch-free wrap the compiler emitted computes `next`. -/
-theorem wrap {h : Word} (hh : h.toNat < 4) :
-    alu .and (alu .add (alu .sltu (h + 1 + 0xfffffffc) 1) 0xffffffff) (h + 1) = next h := by
-  have : h = 0 ∨ h = 1 ∨ h = 2 ∨ h = 3 := by
-    have e : h = BitVec.ofNat 32 h.toNat := by simp
-    rcases (by omega : h.toNat = 0 ∨ h.toNat = 1 ∨ h.toNat = 2 ∨ h.toNat = 3) with k | k | k | k <;>
-      rw [k] at e <;> simp [e]
-  rcases this with rfl | rfl | rfl | rfl <;> decide
 
 /-- What the summary needs at entry. Everything is checkable on an abstract
     state: an exact pc, the head below 4, MIE clear, and the two RAM
