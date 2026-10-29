@@ -33,8 +33,12 @@ def joinCells (a b : List Cell) : List Cell :=
       | none =>
         if off then some c else
         (plain b c.base c.addr c.w).map fun v => { c with v := c.v.join v }
+  -- Guarded facts only `b` states are kept when `a` implies them.
+  let fromB := b.filter fun c => c.guard.isSome &&
+    !(joined.any fun d => d.base == c.base && d.addr == c.addr && d.w == c.w && d.guard == c.guard) &&
+    Cell.leqIn a c
   -- A guarded fact whose value admits the guard's null is useless.
-  joined.filter fun c => match c.guard, c.v with
+  (joined ++ fromB).filter fun c => match c.guard, c.v with
     | some _, .vals l => !(0 ∈ l)
     | some _, _ => false
     | none, _ => true
