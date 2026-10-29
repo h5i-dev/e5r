@@ -319,4 +319,127 @@ theorem fwd_path (c : Core) (R0 : Word → BitVec 8) (hq : Quiet c)
       have h14 : r ≠ 14 := fun e => hr (by subst e; decide)
       rw [hfr r h11 h12 h13 h14, Core.goto_get]; exact f5 r hr
 
+/-- Backward (dst - src < n, unsigned: dst inside the source, above it):
+    small-copy test, then the backward byte loop from the top. -/
+theorem bwd_path (c : Core) (R0 : Word → BitVec 8) (hq : Quiet c)
+    (hn : (c.get 12).toNat < 16) (hdir : (c.get 10 - c.get 11).ult (c.get 12) = true)
+    (hd : B.inRam (c.get 10) (c.get 12).toNat = true) (hs : B.inRam (c.get 11) (c.get 12).toNat = true) :
+    ∃ k e, QRun B img k ⟨pro c, R0⟩
+      ⟨e, bwd R0 (c.get 11 + c.get 12 + 0xffffffff#32) (c.get 10 + c.get 12) (c.get 12).toNat⟩ ∧
+      e.pc = 0x800210b0 ∧ Frame c e [9, 11, 12, 13, 16] := by
+  let P := pro c
+  have qP : Quiet P := Quiet.of_sameCsr (pro_sameCsr c) hq
+  have g10 : P.get 10 = c.get 10 := pro_get c 10 (by decide) (by decide) (by decide)
+  have g11 : P.get 11 = c.get 11 := pro_get c 11 (by decide) (by decide) (by decide)
+  have g12 : P.get 12 = c.get 12 := pro_get c 12 (by decide) (by decide) (by decide)
+  have hdr := (B_ram _ _).mp hd
+  have hsr := (B_ram _ _).mp hs
+  have hpos : 0 < (c.get 12).toNat := by
+    simp only [BitVec.ult, decide_eq_true_iff] at hdir; omega
+  let e1 := P.goto 0x80020dae
+  let e2 := e1.wr 9 (alu .add (c.get 10) (c.get 12)) 0x80020db2
+  let e3 := e2.wr 13 (alu .add 0 0x10#32) 0x80020db4
+  let e4 := e3.wr 16 (alu .add (c.get 11) (c.get 12)) 0x80020db8
+  let e5 := e4.goto 0x80021092
+  let e6 := e5.wr 11 (alu .sub (alu .add (c.get 10) (c.get 12)) (c.get 12)) 0x80021096
+  let e7 := e6.goto 0x8002109a
+  let e8 := e7.wr 16 (alu .add (alu .add (c.get 11) (c.get 12)) 0xffffffff#32) 0x8002109c
+  have q1 : Quiet e1 := Quiet.of_sameCsr (Core.sameCsr_goto _ _) qP
+  have q2 : Quiet e2 := Quiet.of_sameCsr (Core.sameCsr_wr _ _ _ _) q1
+  have q3 : Quiet e3 := Quiet.of_sameCsr (Core.sameCsr_wr _ _ _ _) q2
+  have q4 : Quiet e4 := Quiet.of_sameCsr (Core.sameCsr_wr _ _ _ _) q3
+  have q5 : Quiet e5 := Quiet.of_sameCsr (Core.sameCsr_goto _ _) q4
+  have q6 : Quiet e6 := Quiet.of_sameCsr (Core.sameCsr_wr _ _ _ _) q5
+  have q7 : Quiet e7 := Quiet.of_sameCsr (Core.sameCsr_goto _ _) q6
+  have q8 : Quiet e8 := Quiet.of_sameCsr (Core.sameCsr_wr _ _ _ _) q7
+  have cs8 : e8.sameCsr c := (Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_goto _ _).trans
+    ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_goto _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
+      ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_goto _ _).trans
+        (pro_sameCsr c))))))))
+  have s0 : DetStep B img ⟨P, R0⟩ ⟨e1, R0⟩ := by
+    refine detStep_of (by show (0x80020daa : Word).getLsbD 0 = false; decide) f80020daa fun o => ?_
+    rw [exec_branch, pro_get13, g12]
+    simp only [taken, alu_sub, hdir, Bool.not_true, Bool.false_eq_true, if_false]
+    rfl
+  have s1 : DetStep B img ⟨e1, R0⟩ ⟨e2, R0⟩ := by
+    refine detStep_of (by show (0x80020dae : Word).getLsbD 0 = false; decide) f80020dae fun o => ?_
+    rw [exec_op]
+    have h10 : e1.get 10 = (c.get 10) := by simp [e1, g10]
+    have h12 : e1.get 12 = (c.get 12) := by simp [e1, g12]
+    rw [h10, h12]; rfl
+  have s2 : DetStep B img ⟨e2, R0⟩ ⟨e3, R0⟩ := by
+    refine detStep_of (by show (0x80020db2 : Word).getLsbD 0 = false; decide) f80020db2 fun o => ?_
+    rw [exec_opimm, Core.get_zero]; rfl
+  have s3 : DetStep B img ⟨e3, R0⟩ ⟨e4, R0⟩ := by
+    refine detStep_of (by show (0x80020db4 : Word).getLsbD 0 = false; decide) f80020db4 fun o => ?_
+    rw [exec_op]
+    have h11 : e3.get 11 = (c.get 11) := by simp [e3, e2, e1, Core.wr_get_ne, g11]
+    have h12 : e3.get 12 = (c.get 12) := by simp [e3, e2, e1, Core.wr_get_ne, g12]
+    rw [h11, h12]; rfl
+  have s4 : DetStep B img ⟨e4, R0⟩ ⟨e5, R0⟩ := by
+    refine detStep_of (by show (0x80020db8 : Word).getLsbD 0 = false; decide) f80020db8 fun o => ?_
+    rw [exec_branch]
+    have h12 : e4.get 12 = (c.get 12) := by simp [e4, e3, e2, e1, Core.wr_get_ne, g12]
+    have h13 : e4.get 13 = alu .add 0 0x10#32 := by simp [e4, e3, Core.wr_get_ne, Core.wr_get_self]
+    have ht : (c.get 12).ult (alu .add 0 0x10#32) = true := by
+      rw [alu_add]; simp only [BitVec.ult, decide_eq_true_iff]; bv_omega
+    rw [h12, h13]; simp only [taken, ht, if_true]
+    rw [show e4.pc + 0x2da#32 = 0x80021092 by rw [show e4.pc = 0x80020db8 from rfl]; decide,
+      jump_ok _ _ (by decide)]; rfl
+  have s5 : DetStep B img ⟨e5, R0⟩ ⟨e6, R0⟩ := by
+    refine detStep_of (by show (0x80021092 : Word).getLsbD 0 = false; decide) f80021092 fun o => ?_
+    rw [exec_op]
+    have h9 : e5.get 9 = alu .add (c.get 10) (c.get 12) := by simp [e5, e4, e3, e2, Core.wr_get_ne, Core.wr_get_self]
+    have h12 : e5.get 12 = (c.get 12) := by simp [e5, e4, e3, e2, e1, Core.wr_get_ne, g12]
+    rw [h9, h12]; rfl
+  have s6 : DetStep B img ⟨e6, R0⟩ ⟨e7, R0⟩ := by
+    refine detStep_of (by show (0x80021096 : Word).getLsbD 0 = false; decide) f80021096 fun o => ?_
+    rw [exec_branch]
+    have h11 : e6.get 11 = alu .sub (alu .add (c.get 10) (c.get 12)) (c.get 12) := by simp [e6, Core.wr_get_self]
+    have h9 : e6.get 9 = alu .add (c.get 10) (c.get 12) := by simp [e6, e5, e4, e3, e2, Core.wr_get_ne, Core.wr_get_self]
+    have ht : (alu .sub (alu .add (c.get 10) (c.get 12)) (c.get 12)).ult (alu .add (c.get 10) (c.get 12)) = true := by
+      rw [alu_add, alu_sub]; simp only [BitVec.ult, decide_eq_true_iff]; bv_omega
+    rw [h11, h9]; simp only [taken, ht, Bool.not_true, Bool.false_eq_true, if_false]; rfl
+  have s7 : DetStep B img ⟨e7, R0⟩ ⟨e8, R0⟩ := by
+    refine detStep_of (by show (0x8002109a : Word).getLsbD 0 = false; decide) f8002109a fun o => ?_
+    rw [exec_opimm]
+    have : e7.get 16 = alu .add (c.get 11) (c.get 12) := by simp [e7, e6, e5, e4, Core.wr_get_ne, Core.wr_get_self]
+    rw [this]; rfl
+  have hpre : QRun B img 8 ⟨P, R0⟩ ⟨e8, R0⟩ :=
+    .step qP s0 (.step q1 s1 (.step q2 s2 (.step q3 s3 (.step q4 s4 (.step q5 s5 (.step q6 s6
+      (.single q7 s7)))))))
+  let k := (c.get 12).toNat - 1
+  have hk : k + 1 = (c.get 12).toNat := by omega
+  have l9 : e8.get 9 = (c.get 10) + (c.get 12) := by simp [e8, e7, e6, e5, e4, e3, e2, Core.wr_get_ne, Core.wr_get_self, alu_add]
+  have l11 : e8.get 11 = (c.get 10) := by
+    simp only [e8, e7, e6, Core.wr_get_ne _ _ _ _ _ (show (11 : Reg) ≠ 16 by decide), Core.goto_get,
+      Core.wr_get_self _ _ _ _ (show (11 : Reg).val ≠ 0 by decide), alu_add, alu_sub]
+    bv_omega
+  have l16 : e8.get 16 = (c.get 11) + (c.get 12) + 0xffffffff#32 := by
+    simp [e8, Core.wr_get_self, alu_add]
+  obtain ⟨m, e, hr, hpc, hcs, hfr⟩ := bwd_loop k e8 R0 rfl q8
+    (by rw [l9, l11, show (BitVec.ofNat 32 (k + 1) : Word) = (c.get 12) by rw [hk]; simp]) (by rw [l11, hk]; omega)
+    (by rw [l16]; bv_omega) (by rw [l11, hk]; exact hd)
+    (by rw [l16, show (c.get 11) + (c.get 12) + 0xffffffff#32 - BitVec.ofNat 32 k = (c.get 11) by bv_omega, hk]; exact hs)
+  refine ⟨8 + m, e, ?_, hpc, hcs.trans cs8, ?_, ?_⟩
+  · rw [l16, l9, hk] at hr; exact hpre.trans hr
+  · rw [hfr 2 (by decide) (by decide) (by decide) (by decide)]
+    simp only [e8, e7, e6, e5, e4, e3, e2, e1, Core.wr_get_ne _ _ _ _ _ (show (2 : Reg) ≠ 16 by decide),
+      Core.wr_get_ne _ _ _ _ _ (show (2 : Reg) ≠ 11 by decide),
+      Core.wr_get_ne _ _ _ _ _ (show (2 : Reg) ≠ 13 by decide),
+      Core.wr_get_ne _ _ _ _ _ (show (2 : Reg) ≠ 9 by decide), Core.goto_get]
+    exact pro_get2 c
+  · intro r hr
+    have h2 : r ≠ 2 := fun e => hr (by subst e; decide)
+    have h6 : r ≠ 6 := fun e => hr (by subst e; decide)
+    have h9 : r ≠ 9 := fun e => hr (by subst e; decide)
+    have h11 : r ≠ 11 := fun e => hr (by subst e; decide)
+    have h12 : r ≠ 12 := fun e => hr (by subst e; decide)
+    have h13 : r ≠ 13 := fun e => hr (by subst e; decide)
+    have h16 : r ≠ 16 := fun e => hr (by subst e; decide)
+    rw [hfr r h9 h12 h13 h16]
+    simp only [e8, e7, e6, e5, e4, e3, e2, e1, Core.wr_get_ne _ _ _ _ _ h16, Core.wr_get_ne _ _ _ _ _ h11,
+      Core.wr_get_ne _ _ _ _ _ h13, Core.wr_get_ne _ _ _ _ _ h9, Core.goto_get]
+    exact pro_get c r h2 h6 h13
+
 end E5R.Rmk.Memmove
