@@ -8,6 +8,7 @@
   accepts the file, and the facts below.
 -/
 import Theories.RamElf
+import Theories.Chunk
 import Theories.Board.QemuVirtRv32
 import Projects.rmk.QemuRiscvRynk.Image
 
@@ -19,6 +20,13 @@ def dramSize : Nat := QemuVirtRv32.dramEnd - QemuVirtRv32.dramBase
 def image : RamElf.Image := RamElf.imageOf QemuVirtRv32.dramBase dramSize elf
 def img : List Segment := image.ro
 def board : Board := QemuVirtRv32.board image.rwBase
+
+/-- The image in 256-byte pieces, for proofs that fetch a lot: every model step on it is a step
+    on `img` (`stepInstr_chunk`), and lookups do not walk the 135 KB code segment. -/
+def imgC : List Segment := chunkImg 256 img
+
+theorem stepInstr_imgC (m : Machine) (o : Oracle) :
+    stepInstr board imgC m o = stepInstr board img m o := stepInstr_chunk 256 (by decide) board img m o
 
 /-- The reader accepts the pinned ELF for QEMU virt's DRAM window. -/
 theorem image_accepted : RamElf.accepts QemuVirtRv32.dramBase dramSize elf = true := by decide +kernel
