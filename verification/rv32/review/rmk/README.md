@@ -118,3 +118,22 @@ RMK claim. Main owns Platform/boards; this is reported, not changed.
   `virt` board; both are in main-owned crates/boards. Per-function proofs of the Deframer could use a
   review-owned image restricted to `.text` of those functions, but only once the RAM-fetch question (ALERT
   above) is settled, otherwise the theorem would not describe QEMU.
+
+## Independent review of the RAM-image exporter (exporter worker's commit 2752dd0)
+
+Built `e5r-verify` from 2752dd0 in a detached worktree (release) and exported the pinned ELF
+(`ram-image --ram 0x80000000:0x1000000 --mapping paddr=vaddr`): 4 PT_LOADs (.text RX, .rodata R,
+.data RW, .bss+stack RW zero-fill to 0x81000000), 170 955 file bytes.
+
+- `check_ram_image.py` (no shared code; ELF parsed with `struct`): manifest and blobs match the ELF
+  (header, every PT_LOAD field and flag, blob bytes and sha256, file/zero ranges, every ALLOC section's
+  bytes inside its segment, entry in executable bytes). Self-test: flipped byte, shifted segment, dropped
+  segment, wrong hash, removed zero range are all detected. Receipt `review/results/rmk-ram-image-check.txt`.
+- QEMU 8.2.2 oracle for A1/A4: `-M virt -cpu rv32 -bios none -kernel ELF -S`, `pmemsave` before the first
+  instruction: RAM 0x80000000.. equals seg-0..2 byte for byte; the first MiB of the zero range is zero.
+- A3 needs qualification: QEMU resets to **pc = 0x1000** (MROM), not the ELF entry. The ROM is
+  `auipc t0,0; addi a2,t0,0x28; csrr a0,mhartid; lw a1,0x20(t0); lw t0,0x18(t0); jr t0`, so the entry
+  0x80000000 is reached with a0 = mhartid (0), a1 = 0x87e00000 (device tree, above the 16 MiB window;
+  QEMU's default virt RAM is 128 MiB), a2 = 0x1028 (fw_dynamic info), t0 = 0x80000000, M-mode. A proof's
+  initial state should either model these 6 instructions or start at the entry with exactly this
+  register state (and not assume other RAM above 16 MiB is unused: the DTB is there).

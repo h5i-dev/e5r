@@ -1,0 +1,6 @@
+ok   export /dev/shm/e5r-isa-review-20261029T042314Z/ramimg matches /home/ht2673/.local/state/e5r-claude-isa-review-20261029T042314Z/rmk/rmk-qemu-riscv-f39d833f.elf
+ok   control flipped byte in seg-0.bin: detected: seg 0 blob bytes
+ok   control segment 1 shifted by 4: detected: seg 1 p_vaddr
+ok   control last segment dropped: detected: segment count 3 vs 4 PT_LOAD
+ok   control wrong blob hash: detected: seg 2 blob sha256
+ok   control zero range removed: detected: seg 3 zero range
