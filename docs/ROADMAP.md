@@ -824,10 +824,11 @@ Each item is checked only when its acceptance criterion has been run.
       every boot state the board allows and under every environment behavior
       the model allows, the emitted binary never leaves the modeled envelope
       and every PWM duty write is at most 100; plus a concrete execution that
-      reaches such a write. *Status:* not proved. `Theories/Absint.lean`
-      (checker) and `tools/Analyze.lean` (certificate search) exist but are
-      neither sound-by-proof nor precise enough yet; see
-      `firmware-verification.md`.
+      reaches such a write. *Status:* not proved. The checker
+      (`Theories/Absint.lean`) is proved sound (`E5R.AI.check_sound`,
+      kernel-replayed). The certificate search (`tools/Analyze.lean`) is
+      not yet precise enough (about 119 possible-fault reports), and its
+      certificate is too large to check. See `firmware-verification.md`.
 - [ ] **F8. Packaging.** *Accepted:* pinned toolchains, one command that
       rebuilds and rechecks from source, proof bound to ELF bytes, board,
       property, model and toolchain hashes with stale results refused, CI job,

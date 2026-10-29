@@ -18,7 +18,8 @@ the V0 research proofs it grew from are in
 | `duty()` contract on the Embassy firmware binary (buffer loop, frame, source-level result) | Proved |
 | Clamp binary for all 2^32 inputs, wraparound included | Proved |
 | Verification jobs: CLI, structured results, stale-result detection, limits | Done |
-| **Whole-firmware safety theorem for the Embassy example** (no escape from the model, every PWM duty ≤ 100) | **Not yet proved.** The checker it will rest on is written; its soundness proof and a certificate precise and small enough are open |
+| Soundness of the whole-firmware certificate checker (`E5R.AI.check_sound`) | Proved; kernel-replayed, standard axioms only |
+| **Whole-firmware safety theorem for the Embassy example** (no escape from the model, every PWM duty ≤ 100) | **Not yet proved.** It needs a certificate for the firmware that the checker accepts; the analyzer does not yet produce one that is precise and small enough |
 
 Nothing below claims more than this table. The function-level theorems are
 about the emitted instructions of one function under its calling convention,
@@ -355,7 +356,7 @@ rest on. It works by abstract interpretation:
 
 `tools/Analyze.lean` searches for certificates with the same transfer
 function. It is untrusted: whatever it emits either checks or is rejected.
-Three things are open:
+Two things are open, and one is done:
 
 1. **Precision.** The analysis still reports about 100 possible faults on
    the firmware. They are almost all one lost correlation: the timer
@@ -363,26 +364,39 @@ Three things are open:
    a null task.
 2. **Size.** About 30,000 nodes is too large to check in the kernel. Function
    summaries are the planned fix.
-3. **`check_sound`.** The soundness proof that turns `check cert = true`
-   into a theorem about every machine `Platform.Reach` allows. It is in
-   progress in `Theories/AbsintSound.lean`: about 160 kernel-checked lemmas,
-   with no `sorry`, cover these layers.
-   - **Abstract values:** every arithmetic, comparison and refinement
-     operation.
-   - **Memory:** reads, guarded facts, strong and weak stores, separation.
-   - **Accesses:** every load and store path through the platform,
-     including device events and the handler's own frame.
-   - **Machine states:** what a state description means, and the order the
-     checker tests coverage with.
-   - **Instructions:** soundness of every non-atomic, non-CSR instruction.
+3. **`check_sound`: done.** `Theories/AbsintSound.lean` proves
 
-   Still to prove: LR/SC/AMOs, CSR instructions, interrupt entry and the
-   `mret` summary, edge coverage (splits and pinned loads), and the
-   inductive invariant itself. Writing the proof has already found and
-   fixed several checker bugs, recorded in the git history, before the
-   checker was used for any result.
+   ```lean
+   theorem check_sound (hc : check cfg boot cert = true)
+       (hinit : ∀ m, Init m → StateHolds ρM boot m) :
+       ∀ m evs, Reach cfg.board cfg.img Init m evs →
+         ¬ Escapes cfg.board cfg.img m ∧ ∀ ev ∈ evs, EvOk cfg ev
+   ```
+
+   In words: if the checker accepts a certificate, then from any machine the
+   boot description covers, no reachable machine can fault, either on its
+   next instruction or on interrupt entry. Every device write along the way
+   is also within the configured bounds (`cfg.allow`). That is the shape the
+   firmware theorem needs: `pwmcmp1 ∈ 0..100` is one `allow` entry.
+   `#print axioms` lists only `propext`, `Classical.choice` and
+   `Quot.sound`, and `leanchecker` replays the module.
+
+   Interrupts are handled compositionally:
+   - The handler runs under the interrupted registers, pc, `mie`, `mtvec`
+     and `mscratch`, held as symbols.
+   - A frame lemma shows that handler stores touch only static RAM and the
+     handler's stack budget below the interrupted sp.
+   - `mret` provably resumes the interrupted node.
+
+   Writing the proof found these checker bugs, all fixed before the
+   checker was used for any result:
    - Byte stores recorded unmasked values.
    - Handler-frame loads were not range-checked.
    - Guards and pins were not restricted to RAM or static memory.
+   - Interrupt points required MPP = M, but `mret` resumes with MPP = U.
+   - A handler could change `mie`, `mtvec` or `mscratch`, which the return
+     summary assumed unchanged.
+   - A guarded stack fact at an interrupt point could be invalidated
+     through a static guard word the handler writes.
 
-Until all three are done, no whole-firmware guarantee is claimed.
+Until the first two are done, no whole-firmware guarantee is claimed.
