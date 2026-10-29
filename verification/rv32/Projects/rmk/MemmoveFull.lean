@@ -45,7 +45,7 @@ theorem finishC (c : Core) (ram R : Word → BitVec 8) (e : Core) (w : List Nat)
     (hdsep : (c.get 2).toNat ≤ (c.get 10).toNat ∨ (c.get 10).toNat + (c.get 12).toNat + 12 ≤ (c.get 2).toNat)
     (hssep : (c.get 2).toNat ≤ (c.get 11).toNat ∨ (c.get 11).toNat + (c.get 12).toNat + 12 ≤ (c.get 2).toNat)
     (hra : (c.get 1).getLsbD 0 = false) (he : e.pc = 0x800210b0) (hfr : Frame c e w)
-    (hw : ∀ r : Reg, r.val ∈ w → r.val ∈ [9, 5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 28, 29, 30, 31])
+    (hw : ∀ r : Reg, r.val ∈ w → r.val ∈ [8, 9, 18, 5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 28, 29, 30, 31])
     (hR : ∀ x, ¬ InTemps (c.get 2) x → R x = moved (saved c ram) (c.get 10) (c.get 11) (c.get 12).toNat x) :
     ∃ m, QRun B img 5 ⟨e, R⟩ m ∧ PostF ⟨c, ram⟩ m := by
   obtain ⟨hcs, hsp, hfr⟩ := hfr
@@ -107,6 +107,8 @@ theorem finishC (c : Core) (ram R : Word → BitVec 8) (e : Core) (w : List Nat)
     · exact h6 hm
     · have := hw r hm
       have h9' : r.val ≠ 9 := fun e => h9 (Fin.ext e)
+      have h8' : r.val ≠ 8 := fun e => h8 (Fin.ext e)
+      have h18' : r.val ≠ 18 := fun e => h18 (Fin.ext e)
       simp only [List.mem_cons, List.not_mem_nil, or_false] at this hr
       omega
   · exact (Core.sameCsr_goto _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
