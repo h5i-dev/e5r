@@ -905,6 +905,15 @@ optional; direct and hybrid proofs are equally valid routes.
       covered. *Accepted:* job `proved`, nonvacuity, mutation controls
       (changed instruction, false postcondition, weakened precondition),
       axioms audited.
+      *Status (partial, not accepted):* `jobs/rmk/rmk-memmove-small.json`
+      is proved on the pinned ELF `f39d833f`: `compiler_builtins` memmove
+      from its trampoline (0x80020c1e), for **n < 16 only**, both overlap
+      directions, a quiet deterministic run with no fault, event or enabled
+      interrupt, returning with memmove semantics on RAM and the stated
+      register/CSR frame; 7 negative controls. Not covered: n ≥ 16 (the
+      word and misaligned paths), which the 488-byte deframer buffer
+      needs, and the deframer itself (`Projects/rmk/Deframer/Spec.lean`
+      states its contracts; none is proved).
 - [ ] **R4. Toward the session.** Compose R3 with the surrounding session
       loop and interrupts (checker, direct regions or summaries). *Accepted:*
       a kernel-checked theorem about the whole `run_session` path for the
