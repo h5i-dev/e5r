@@ -700,4 +700,75 @@ theorem big (c : Core) (R : Word → BitVec 8) (h : CobsEnv ⟨c, R⟩) (n src :
         (by simp [hdlen]; omega)
       exact ⟨_, e, S'', run4.trans hr, hpc', hx⟩
 
+/-- **One iteration** from the loop head, against `block`. -/
+theorem iter (c : Core) (R : Word → BitVec 8) (h : CobsEnv ⟨c, R⟩) (n src : Nat) (acc : List Nat)
+    (d : Core) (S : Word → BitVec 8) (hi : LInv c R n src acc d S) (hpc : d.pc = 0x8001e068) (hs : src < n) :
+    IterOK c R n src acc d S := by
+  obtain ⟨hbad, hgood⟩ := head c R h n src acc d S hi hpc hs
+  unfold IterOK
+  by_cases bad : n < src + bufByte R (c.get 11) src
+  · rw [block_none bad]; exact hbad bad
+  · obtain ⟨d', hr, hpc', hi', h28, h19, h15⟩ := hgood (by omega)
+    by_cases hc : bufByte R (c.get 11) src < 2
+    · rw [block_small (by omega) hc]
+      obtain ⟨sx, sc⟩ := small c R h n src acc d' S hi' hpc' hs h28 hc
+      constructor
+      · intro hn
+        obtain ⟨k, e, S', hr2, hx⟩ := sx hn
+        rw [if_neg (by omega), List.append_nil]; exact ⟨_, e, S', hr.trans hr2, hx⟩
+      · intro hn
+        obtain ⟨k, e, S', hr2, hpc2, hx⟩ := sc hn
+        rw [if_pos hn]; exact ⟨_, e, S', hr.trans hr2, hpc2, hx⟩
+    · rw [block_big (by omega) (by omega)]
+      obtain ⟨bx, bc⟩ := big c R h n src acc d' S hi' hpc' hs h28 h19 h15 (by omega) (by omega)
+      constructor
+      · intro hn
+        obtain ⟨k, e, S', hr2, hx⟩ := bx hn
+        rw [if_neg (by omega), List.append_nil]; exact ⟨_, e, S', hr.trans hr2, hx⟩
+      · intro hn
+        obtain ⟨k, e, S', hr2, hpc2, hx⟩ := bc hn
+        refine ⟨_, e, S', hr.trans hr2, hpc2, ?_⟩
+        rw [← List.append_assoc]
+        by_cases hff : bufByte R (c.get 11) src = 0xff
+        · simp only [hff, ne_eq, not_true_eq_false, false_and, if_false, List.append_nil] at hx ⊢; exact hx
+        · rw [if_pos ⟨hff, hn⟩]; rw [if_pos hff] at hx; exact hx
+
+theorem run_done (orig : Nat → Nat) (n : Nat) : ∀ f src acc, n ≤ src → run orig n f src acc = (.ok, acc)
+  | 0, _, _, _ => rfl
+  | _ + 1, _, _, h => by simp [run, h]
+
+/-- The machine's final state for a `run` outcome. -/
+def Final (c : Core) (R : Word → BitVec 8) (n : Nat) (r : Outcome × List Nat) (e : Core) (S : Word → BitVec 8) :
+    Prop :=
+  match r.1 with
+  | .ok => ExitPrep c R 0 n r.2 e S
+  | .invalid => ExitPrep c R 1 1 r.2 e S
+
+/-- **The decode loop** from its head, against `Spec.run` on the original bytes. -/
+theorem loop (c : Core) (R : Word → BitVec 8) (h : CobsEnv ⟨c, R⟩) (n : Nat) :
+    ∀ f src acc d S, LInv c R n src acc d S → d.pc = 0x8001e068 → src < n → n - src < f →
+      ∃ k e S', QRun B img k ⟨d, S⟩ ⟨e, S'⟩ ∧ Final c R n (run (bufByte R (c.get 11)) n f src acc) e S' := by
+  intro f
+  induction f with
+  | zero => intro src acc d S _ _ _ hf; omega
+  | succ f ih =>
+    intro src acc d S hi hpc hs hf
+    have it := iter c R h n src acc d S hi hpc hs
+    unfold IterOK at it
+    unfold run
+    rw [if_neg (by omega)]
+    cases hb : block (bufByte R (c.get 11)) n src with
+    | none => rw [hb] at it; obtain ⟨k, e, S', hr, hx⟩ := it; exact ⟨k, e, S', hr, hx⟩
+    | some p =>
+      obtain ⟨out, src'⟩ := p
+      rw [hb] at it
+      obtain ⟨hlt, _, _⟩ := block_some hb hs
+      by_cases hn : n ≤ src'
+      · obtain ⟨k, e, S', hr, hx⟩ := it.1 hn
+        refine ⟨k, e, S', hr, ?_⟩
+        simp only; rw [run_done _ _ _ _ _ hn]; exact hx
+      · obtain ⟨k, e, S', hr, hpc', hx⟩ := it.2 (by omega)
+        obtain ⟨k2, e2, S2, hr2, hx2⟩ := ih src' (acc ++ out) e S' hx hpc' (by omega) (by omega)
+        exact ⟨_, e2, S2, hr.trans hr2, hx2⟩
+
 end E5R.Rmk.Cobs
