@@ -1982,6 +1982,163 @@ theorem ctl_mem {ρ : Nat → Word} {s : AState} {c : Core} (h : CtlHolds ρ s c
     CtlHolds ρ { s with mem := mem } c :=
   ⟨h.mie, h.mpie, h.mpp, h.mieReg, h.mtvec, h.mepc, h.mcause, h.mscratch⟩
 
+theorem mstatusOf_toNat_core : ∀ a b : Bool, ∀ p : Fin 4,
+    (((if a then 8 else 0) ||| (if b then 0x80 else 0) ||| ((BitVec.ofFin p : BitVec 2).setWidth 32 <<< 11)) :
+      Word).toNat = (if a then 8 else 0) + (if b then 0x80 else 0) + p.val * 2048 := by
+  decide +kernel
+
+theorem mstatusOf_toNat (c : Core) :
+    (mstatusOf c).toNat = (if c.mie_ then 8 else 0) + (if c.mpie then 0x80 else 0) + c.mpp.toNat * 2048 := by
+  have := mstatusOf_toNat_core c.mie_ c.mpie c.mpp.toFin
+  simpa [mstatusOf] using this
+
+theorem mayBe_mem {t : Tri} {b : Bool} (h : t.mayBe b = true) : b ∈ [false, true].filter t.mayBe := by
+  rw [List.mem_filter]; exact ⟨by cases b <;> simp, h⟩
+
+theorem mstatus_sound {ρ : Nat → Word} {s : AState} {c : Core} (h : CtlHolds ρ s c) :
+    (mkVals (mstatusVals s)).gam ρ (mstatusOf c) := by
+  apply mkVals_sound
+  refine ⟨_, ?_, by rw [mstatusOf_toNat]; exact Nat.mod_eq_of_lt (mstatusOf_toNat c ▸ toNat_lt _)⟩
+  simp only [mstatusVals, List.mem_flatMap, List.mem_map]
+  exact ⟨c.mie_, mayBe_mem h.mie, c.mpie, mayBe_mem h.mpie, c.mpp.toNat, h.mpp, rfl⟩
+
+theorem mip_le (v : Word) : (v &&& mieMask).toNat ≤ 0x888 := by
+  rw [BitVec.toNat_and]; exact Nat.and_le_right
+
+/-- Reading a CSR the abstract state describes: no fault, and a described value. -/
+theorem csrReadAbs_sound {ρ : Nat → Word} {s : AState} {c : Core} {addr : Nat} {av : AV}
+    (h : csrReadAbs s addr = some av) (hc : CtlHolds ρ s c) {B : Board} {img : List Segment} (o : Oracle)
+    (k : Word → Eff) (ram : Word → BitVec 8) (i : Nat) (evs : List Event) :
+    ∃ r i', interp B img o (csrRead c addr k) ram i evs = interp B img o (k r) ram i' evs ∧ av.gam ρ r := by
+  unfold csrReadAbs at h; unfold csrRead
+  split at h
+  · next h1 => rw [if_pos h1]; cases h; exact ⟨_, i, rfl, mstatus_sound hc⟩
+  rw [if_neg ‹_›]; split at h
+  · next h1 => rw [if_pos h1]; cases h; exact ⟨_, i, rfl, hc.mieReg⟩
+  rw [if_neg ‹_›]; split at h
+  · next h1 => rw [if_pos h1]; cases h; exact ⟨_, i, rfl, hc.mtvec⟩
+  rw [if_neg ‹_›]; split at h
+  · next h1 => rw [if_pos h1]; cases h; exact ⟨_, i, rfl, hc.mscratch⟩
+  rw [if_neg ‹_›]; split at h
+  · next h1 => rw [if_pos h1]; cases h; exact ⟨_, i, rfl, hc.mepc⟩
+  rw [if_neg ‹_›]; split at h
+  · next h1 => rw [if_pos h1]; cases h; exact ⟨_, i, rfl, hc.mcause⟩
+  rw [if_neg ‹_›]; split at h
+  · next h1 =>
+    rw [if_pos h1]; cases h
+    exact ⟨_, i + 1, rfl, Nat.zero_le _, mip_le _⟩
+  rw [if_neg ‹_›]; split at h
+  · next h1 => rw [if_pos h1]; cases h; exact ⟨_, i, rfl, const0_gam ρ⟩
+  · simp at h
+
+theorem tri_all {l : List Nat} {f : Nat → Bool} {y : Nat} (hy : y ∈ l) :
+    Tri.mayBe (if (l.map f).all id then .yes else if (l.map f).all (!·) then .no else .any) (f y) = true := by
+  by_cases h1 : (l.map f).all id = true
+  · rw [if_pos h1]
+    simp only [List.all_eq_true, List.mem_map, id] at h1
+    exact h1 _ ⟨y, hy, rfl⟩
+  · rw [if_neg h1]
+    by_cases h2 : (l.map f).all (!·) = true
+    · rw [if_pos h2]
+      simp only [List.all_eq_true, List.mem_map] at h2
+      simp [Tri.mayBe, h2 _ ⟨y, hy, rfl⟩]
+    · rw [if_neg h2]; rfl
+
+theorem getLsbD_div (x : Word) (i : Nat) : x.getLsbD i = (x.toNat / 2 ^ i % 2 == 1) := by
+  rw [BitVec.getLsbD, Nat.testBit_eq_decide_div_mod_eq]; cases h : x.toNat / 2 ^ i % 2 == 1 <;> simp_all
+
+theorem mstatus_mask (x : Word) (h : x.toNat &&& (M32 - 1 - 0x1888) = 0) : ¬ (x &&& ~~~(0x1888 : Word) ≠ 0) := by
+  intro hne; apply hne
+  apply BitVec.eq_of_toNat_eq
+  rw [BitVec.toNat_and, BitVec.toNat_not]
+  exact h
+
+theorem extract_toNat (x : Word) (s n : Nat) : (x.extractLsb' s n).toNat = x.toNat / 2 ^ s % 2 ^ n := by
+  rw [BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow]
+
+/-- Writing a CSR from a described value: no fault, and the control state
+    after it is described by the abstract one. Registers, RAM and pc are not
+    touched. -/
+theorem csrWriteAbs_sound {ρ : Nat → Word} {s s'' : AState} {c : Core} {addr : Nat} {nv : AV} {x : Word}
+    (h : csrWriteAbs s addr nv = some s'') (hc : CtlHolds ρ s c) (hx : nv.gam ρ x) (fin : Core → Eff) :
+    ∃ c', csrWrite c addr x fin = fin c' ∧ CtlHolds ρ s'' c' ∧ (∀ r, c'.get r = c.get r) ∧
+      s''.regs = s.regs ∧ s''.mem = s.mem ∧ s''.pc = s.pc := by
+  unfold csrWriteAbs at h; unfold csrWrite
+  split at h
+  · next h1 =>
+    rw [if_pos h1]
+    cases nv with
+    | vals l =>
+      simp only at h
+      split at h
+      · next hall =>
+        cases h
+        simp only [AV.gam] at hx
+        simp only [List.all_eq_true, Bool.and_eq_true, Bool.or_eq_true, decide_eq_true_eq] at hall
+        obtain ⟨hm, hp⟩ := hall _ hx
+        have hmpp : (x.extractLsb' 11 2).toNat = x.toNat / 2048 % 4 := extract_toNat x 11 2
+        have hmpp' : ¬ (x.extractLsb' 11 2 ≠ 0 ∧ x.extractLsb' 11 2 ≠ 3) := by
+          intro ⟨a, b⟩
+          rcases hp with hp | hp
+          · exact a (BitVec.eq_of_toNat_eq (by rw [hmpp, hp]; rfl))
+          · exact b (BitVec.eq_of_toNat_eq (by rw [hmpp, hp]; rfl))
+        rw [if_neg (mstatus_mask x hm), if_neg hmpp']
+        refine ⟨_, rfl, ⟨?_, ?_, ?_, hc.mieReg, hc.mtvec, hc.mepc, hc.mcause, hc.mscratch⟩,
+          fun _ => rfl, rfl, rfl, rfl⟩
+        · simp only; rw [getLsbD_div x 3]; exact tri_all (f := fun x => x / 8 % 2 == 1) hx
+        · simp only; rw [getLsbD_div x 7]; exact tri_all (f := fun x => x / 128 % 2 == 1) hx
+        · simp only; rw [hmpp]
+          exact mem_norm.mpr ⟨_, List.mem_map_of_mem hx, (Nat.mod_eq_of_lt (by simp [M32]; omega)).symm⟩
+      · simp at h
+    | _ => simp at h
+  rw [if_neg ‹_›]; split at h
+  · next h1 =>
+    rw [if_pos h1]; cases h
+    exact ⟨_, rfl, ⟨hc.mie, hc.mpie, hc.mpp, band_sound hx (const_sound' (by decide)), hc.mtvec, hc.mepc,
+      hc.mcause, hc.mscratch⟩, fun _ => rfl, rfl, rfl, rfl⟩
+  rw [if_neg ‹_›]; split at h
+  · next h1 =>
+    rw [if_pos h1]
+    cases nv with
+    | vals l =>
+      simp only at h
+      split at h
+      · next hall =>
+        cases h
+        simp only [AV.gam] at hx
+        simp only [List.all_eq_true, Bool.or_eq_true, decide_eq_true_eq] at hall
+        have hw : (if x.extractLsb' 0 2 = 0 then fin { c with mtvec := x }
+            else if x.extractLsb' 0 2 = 1 ∧ x.toNat % 128 = 1 then fin { c with mtvec := x }
+            else .unsupported "mtvec mode or vectored base alignment") = fin { c with mtvec := x } := by
+          have he := extract_toNat x 0 2
+          simp only [Nat.pow_zero, Nat.div_one] at he
+          by_cases h0 : x.extractLsb' 0 2 = 0
+          · rw [if_pos h0]
+          · rw [if_neg h0]
+            rcases hall _ hx with h4 | h128
+            · exact absurd (BitVec.eq_of_toNat_eq (by rw [he]; simpa using h4)) h0
+            · rw [if_pos ⟨BitVec.eq_of_toNat_eq (by rw [he]; simp; omega), h128⟩]
+        rw [hw]
+        exact ⟨_, rfl, ⟨hc.mie, hc.mpie, hc.mpp, hc.mieReg, hx, hc.mepc, hc.mcause, hc.mscratch⟩,
+          fun _ => rfl, rfl, rfl, rfl⟩
+      · simp at h
+    | _ => simp at h
+  rw [if_neg ‹_›]; split at h
+  · next h1 =>
+    rw [if_pos h1]; cases h
+    exact ⟨_, rfl, ⟨hc.mie, hc.mpie, hc.mpp, hc.mieReg, hc.mtvec, hc.mepc, hc.mcause, hx⟩,
+      fun _ => rfl, rfl, rfl, rfl⟩
+  rw [if_neg ‹_›]; split at h
+  · next h1 =>
+    rw [if_pos h1]; cases h
+    exact ⟨_, rfl, ⟨hc.mie, hc.mpie, hc.mpp, hc.mieReg, hc.mtvec,
+      band_sound hx (const_sound' (by decide)), hc.mcause, hc.mscratch⟩, fun _ => rfl, rfl, rfl, rfl⟩
+  rw [if_neg ‹_›]; split at h
+  · next h1 =>
+    rw [if_pos h1]; cases h
+    exact ⟨_, rfl, hc, fun _ => rfl, rfl, rfl, rfl⟩
+  · simp at h
+
 /-! ### Instruction cases -/
 
 section Cases
