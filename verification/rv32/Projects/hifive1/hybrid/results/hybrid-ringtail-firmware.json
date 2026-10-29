@@ -1,0 +1,373 @@
+{
+  "inputs": {
+    "allowed_axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ],
+    "board_sha256": "cc5a2fd97f25787952548216d65ba63f2018ba58713b46a573feb276bc2b4607",
+    "e5r_verify": "0.1.0",
+    "e5r_verify_sha256": "e2843e44b1993056b5b3a3029cdd94afbe468c3a490d8a051b3c113deb3496e6",
+    "elf": {
+      "bytes": 15160,
+      "path": "firmware/hifive1-embassy/target/riscv32imac-unknown-none-elf/release/hifive1-embassy",
+      "sha256": "1d8e45ce50c5a4c0abc9ae76321b0da6fad42b64236c1c836d62bfbf17eace2a"
+    },
+    "job_sha256": "49b135afe9be4542e21dc4cbe1e17f9874cc45c12c00659a9110bda86327f099",
+    "lean": "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release)",
+    "sources": {
+      "Projects/hifive1/Config.lean": "70b8828d7c36d16900741a03048ab436f6e700666593f171ea597d4a5f610c8d",
+      "Projects/hifive1/hybrid/Ring.lean": "3983f2a05e61e16c4591f08e6afe6b799f6087840662fc7680ce5341c875d8a6",
+      "Projects/hifive1/hybrid/RingAI.lean": "273dd0b55edc0eff442d9ce80fa529a5863e68b7add52e04b13a4d8a56e09cbb",
+      "Projects/hifive1/hybrid/Tail.lean": "24c012852d5d6dd7355128399ed95509f2d7301d6645c5c8370d1064c7396c5c",
+      "Projects/hifive1/hybrid/TailAI.lean": "cf1d8305d61160e49222f72b053802c6cab3133e76bd53ab6b359c2deeb0d38a",
+      "Theories/Absint.lean": "e0c59219eeeb753067a6c5f132f13428b27dcaa07b80f9163c62f938507c0a39",
+      "Theories/AbsintSound.lean": "83e308e8586511812cfb2f31d6b1173f2d4daf987c64f8c80a216c4726073417",
+      "Theories/Board/Hifive1Revb.lean": "9c4d1786b02048ff815849c8b73375d1651ea5cdf9c47d6062db8c170c2db92f",
+      "Theories/FlashElf.lean": "b3a5dd6e56e6e9444b88f05de6f020e326377f55af777b380249fc53cc0111a6",
+      "Theories/Hart.lean": "dde4a86db936c9ad60f58866c3ebb333fbc556ec0f94299da212d0ca08cfb82a",
+      "Theories/Hybrid/AIBridge.lean": "d1968e0a2ce95512589797a3a70f1b003c9bb8c100d3df70f45a47e575b5fe84",
+      "Theories/Hybrid/Basic.lean": "80aac8422f21a9558e1840992750790c4febfa3275e47627b3cdbdb3551a2a00",
+      "Theories/Hybrid/Wrap.lean": "9127d8afa2c52eca7b57c4bc8f131194a8305435da1d65b7577f010f3d86dcf9",
+      "Theories/Logic.lean": "2abb6fb82fc72308a5e7da7d482b94784b1490896634d7ea9d38c9b7b9460bf5",
+      "Theories/Platform.lean": "ffe57260ae4046ebd1bebbe687287edd049b87f3993d48a78495b2c61acde261",
+      "tools/gen_board.py": "72d35cd62bc43f7713e4711da44f26ff51a7e41d4ce58366de4eb33d3df7d764"
+    }
+  },
+  "job": "hybrid-ringtail-firmware",
+  "job_file": "Projects/hifive1/hybrid/jobs/hybrid-ringtail-firmware.json",
+  "modules": [
+    "Theories/Hart.lean",
+    "Theories/Platform.lean",
+    "Theories/Logic.lean",
+    "Theories/FlashElf.lean",
+    "Theories/Board/Hifive1Revb.lean",
+    "Projects/hifive1/Image.lean",
+    "Projects/hifive1/ImageFidelity.lean",
+    "Theories/Hybrid/Basic.lean",
+    "Theories/Hybrid/Wrap.lean",
+    "Projects/hifive1/hybrid/Ring.lean",
+    "Projects/hifive1/hybrid/Tail.lean",
+    "Theories/Absint.lean",
+    "Theories/AbsintSound.lean",
+    "Theories/Hybrid/AIBridge.lean",
+    "Projects/hifive1/Config.lean",
+    "Projects/hifive1/hybrid/RingAI.lean",
+    "Projects/hifive1/hybrid/TailAI.lean"
+  ],
+  "resumed": [],
+  "schema": "e5r.verify.result.v1",
+  "seconds": 135.957813236,
+  "stages": [
+    {
+      "name": "build cargo +1.98.1 build --release --locked",
+      "peak_rss_mib": 32,
+      "seconds": 0.402578672
+    },
+    {
+      "name": "lean Theories/Hart.lean",
+      "peak_rss_mib": 511,
+      "seconds": 3.008817801
+    },
+    {
+      "name": "lean Theories/Platform.lean",
+      "peak_rss_mib": 473,
+      "seconds": 2.006836703
+    },
+    {
+      "name": "lean Theories/Logic.lean",
+      "peak_rss_mib": 491,
+      "seconds": 2.708027873
+    },
+    {
+      "name": "lean Theories/FlashElf.lean",
+      "peak_rss_mib": 467,
+      "seconds": 1.605027754
+    },
+    {
+      "name": "lean Theories/Board/Hifive1Revb.lean",
+      "peak_rss_mib": 434,
+      "seconds": 1.505430902
+    },
+    {
+      "name": "lean Projects/hifive1/Image.lean",
+      "peak_rss_mib": 956,
+      "seconds": 13.826124005
+    },
+    {
+      "name": "lean Projects/hifive1/ImageFidelity.lean",
+      "peak_rss_mib": 789,
+      "seconds": 3.511841444
+    },
+    {
+      "name": "lean Theories/Hybrid/Basic.lean",
+      "peak_rss_mib": 481,
+      "seconds": 1.5047053209999999
+    },
+    {
+      "name": "lean Theories/Hybrid/Wrap.lean",
+      "peak_rss_mib": 471,
+      "seconds": 1.404620833
+    },
+    {
+      "name": "lean Projects/hifive1/hybrid/Ring.lean",
+      "peak_rss_mib": 583,
+      "seconds": 5.817348601
+    },
+    {
+      "name": "lean Projects/hifive1/hybrid/Tail.lean",
+      "peak_rss_mib": 584,
+      "seconds": 6.314731202
+    },
+    {
+      "name": "lean Theories/Absint.lean",
+      "peak_rss_mib": 536,
+      "seconds": 3.709275939
+    },
+    {
+      "name": "lean Theories/AbsintSound.lean",
+      "peak_rss_mib": 799,
+      "seconds": 28.860552543
+    },
+    {
+      "name": "lean Theories/Hybrid/AIBridge.lean",
+      "peak_rss_mib": 484,
+      "seconds": 2.006136009
+    },
+    {
+      "name": "lean Projects/hifive1/Config.lean",
+      "peak_rss_mib": 463,
+      "seconds": 1.5049584139999999
+    },
+    {
+      "name": "lean Projects/hifive1/hybrid/RingAI.lean",
+      "peak_rss_mib": 511,
+      "seconds": 2.206278677
+    },
+    {
+      "name": "lean Projects/hifive1/hybrid/TailAI.lean",
+      "peak_rss_mib": 511,
+      "seconds": 2.70885147
+    },
+    {
+      "name": "leanchecker Theories/Hart.lean",
+      "peak_rss_mib": 434,
+      "seconds": 5.913476275
+    },
+    {
+      "name": "leanchecker Theories/Platform.lean",
+      "peak_rss_mib": 364,
+      "seconds": 2.106779115
+    },
+    {
+      "name": "leanchecker Theories/Logic.lean",
+      "peak_rss_mib": 443,
+      "seconds": 2.105278358
+    },
+    {
+      "name": "leanchecker Theories/FlashElf.lean",
+      "peak_rss_mib": 433,
+      "seconds": 2.005929344
+    },
+    {
+      "name": "leanchecker Theories/Board/Hifive1Revb.lean",
+      "peak_rss_mib": 275,
+      "seconds": 1.906169742
+    },
+    {
+      "name": "leanchecker Projects/hifive1/Image.lean",
+      "peak_rss_mib": 267,
+      "seconds": 1.906310751
+    },
+    {
+      "name": "leanchecker Projects/hifive1/ImageFidelity.lean",
+      "peak_rss_mib": 768,
+      "seconds": 4.220924349
+    },
+    {
+      "name": "leanchecker Theories/Hybrid/Basic.lean",
+      "peak_rss_mib": 435,
+      "seconds": 1.905902695
+    },
+    {
+      "name": "leanchecker Theories/Hybrid/Wrap.lean",
+      "peak_rss_mib": 435,
+      "seconds": 2.005106643
+    },
+    {
+      "name": "leanchecker Projects/hifive1/hybrid/Ring.lean",
+      "peak_rss_mib": 538,
+      "seconds": 4.912552489
+    },
+    {
+      "name": "leanchecker Projects/hifive1/hybrid/Tail.lean",
+      "peak_rss_mib": 506,
+      "seconds": 5.11129829
+    },
+    {
+      "name": "leanchecker Theories/Absint.lean",
+      "peak_rss_mib": 433,
+      "seconds": 1.805355842
+    },
+    {
+      "name": "leanchecker Theories/AbsintSound.lean",
+      "peak_rss_mib": 466,
+      "seconds": 5.8131632920000005
+    },
+    {
+      "name": "leanchecker Theories/Hybrid/AIBridge.lean",
+      "peak_rss_mib": 330,
+      "seconds": 1.905333503
+    },
+    {
+      "name": "leanchecker Projects/hifive1/Config.lean",
+      "peak_rss_mib": 426,
+      "seconds": 1.7047128
+    },
+    {
+      "name": "leanchecker Projects/hifive1/hybrid/RingAI.lean",
+      "peak_rss_mib": 460,
+      "seconds": 1.9054954419999999
+    },
+    {
+      "name": "leanchecker Projects/hifive1/hybrid/TailAI.lean",
+      "peak_rss_mib": 456,
+      "seconds": 2.306511562
+    }
+  ],
+  "status": "proved",
+  "theorems": [
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.Tail.i0"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.Tail.i1"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.Tail.i2"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.Tail.i3"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.Tail.i4"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.Tail.i5"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.Tail.i6"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.Tail.i7"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.Tail.i8"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.Tail.i9"
+    },
+    {
+      "axioms": [],
+      "name": "E5R.Hifive1.Hybrid.Tail.masked_of_sameCsr"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.Tail.contract"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.Tail.post_tail_lt"
+    },
+    {
+      "axioms": [
+        "propext"
+      ],
+      "name": "E5R.Hifive1.Hybrid.TailAI.w_add_k"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.TailAI.forget_holds"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.TailAI.adapter"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.TailAI.hentry_of"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.TailAI.spec_sound"
+    },
+    {
+      "axioms": [
+        "propext"
+      ],
+      "name": "E5R.Firmware.image_fidelity"
+    }
+  ]
+}

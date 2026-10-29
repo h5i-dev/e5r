@@ -31,6 +31,8 @@ LOOP = ['Theories/Hybrid/Basic.lean', 'Theories/Hybrid/Wrap.lean', 'Theories/Hyb
         f'{H}/demo/LoopProof.lean', f'{H}/demo/LoopControls.lean']
 RING = ['Projects/hifive1/Image.lean', 'Theories/Hybrid/Basic.lean', 'Theories/Hybrid/Wrap.lean',
         f'{H}/Ring.lean']
+TAIL = ['Projects/hifive1/Image.lean', 'Theories/Hybrid/Basic.lean', 'Theories/Hybrid/Wrap.lean',
+        f'{H}/Tail.lean', f'{H}/TailAI.lean']
 
 REJECT = re.compile(r'decide|evaluated to|omega could not|unsolved goals|rfl. failed|The rfl tactic|'
                     r'failed to reduce|Type mismatch|type mismatch')
@@ -85,6 +87,24 @@ CONTROLS = [
     ('tampered certificate: the PWM values widened past 100', LOOP,
      [replace(f'{H}/demo/LoopCert.lean', '96, 97, 98, 99]', '96, 97, 98, 99, 132]', count=2)],
      f'{H}/demo/LoopProof.lean', 'ai_check', 'REJECTED'),
+    ('changed instruction in the firmware image (c.and -> c.or at 0x20010494, tail wrap)', TAIL,
+     [image_byte('Projects/hifive1/Image.lean', 0x20010494, 0xf9, 0xd9)],
+     f'{H}/Tail.lean', 'i6', 'REJECTED'),
+    ('tail: false postcondition, the new tail claimed in 0..2', TAIL,
+     [replace(f'{H}/TailAI.lean', "def tailAV : AV := .vals [0, 1, 2, 3]", "def tailAV : AV := .vals [0, 1, 2]")],
+     f'{H}/TailAI.lean', 'adapter', 'REJECTED'),
+    ('tail: invalid precondition, the tail word fact may be 4', TAIL,
+     [replace(f'{H}/TailAI.lean', "| some v => v.leq (.rng 0 3)", "| some v => v.leq (.rng 0 4)")],
+     f'{H}/TailAI.lean', 'adapter', 'REJECTED'),
+    ('tail: unknown tail word accepted', TAIL,
+     [replace(f'{H}/TailAI.lean', "  | none => false\n\ndef enterOk", "  | none => true\n\ndef enterOk")],
+     f'{H}/TailAI.lean', 'adapter', 'REJECTED'),
+    ('tail: interrupt obligation, the entry node may have MIE set', TAIL,
+     [replace(f'{H}/TailAI.lean', "s.mie == .no && ", "s.mie.mayBe false && ")],
+     f'{H}/TailAI.lean', 'adapter', 'REJECTED'),
+    ('tail: buffer facts invalidated for one byte only', TAIL,
+     [replace(f'{H}/TailAI.lean', "!c.staleAfter .abs a .w .top", "!c.staleAfter .abs a .b .top")],
+     f'{H}/TailAI.lean', 'forget_holds', 'REJECTED'),
     ('infrastructure: masked runs without the masking premise (does not elaborate)', LOOP,
      [replace('Theories/Hybrid/Basic.lean', '| step {n m m₁ m₂} : Masked m → DetStep',
               '| step {n m m₁ m₂} : DetStep')],
@@ -134,6 +154,11 @@ def main():
                         ignore=lambda d, names: [n for n in names if Path(d) == RV32 and n in skip])
         base = compile_chain(root, LOOP, 4)
         print(f'{"ok  " if base is None else "FAIL"} baseline: loop chain from LoopConfig compiles'
+              + ('' if base is None else f': {base}'))
+        if base is not None:
+            sys.exit('baseline does not compile; controls are meaningless')
+        base = compile_chain(root, TAIL, 3)
+        print(f'{"ok  " if base is None else "FAIL"} baseline: tail chain from Tail compiles'
               + ('' if base is None else f': {base}'))
         if base is not None:
             sys.exit('baseline does not compile; controls are meaningless')
