@@ -32,5 +32,8 @@
   "limits": {
     "seconds": 1800,
     "rss_mib": 5120
+  },
+  "symbols": {
+    "0x200102a0": "duty"
   }
 }

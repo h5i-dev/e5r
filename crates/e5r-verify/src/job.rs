@@ -60,6 +60,10 @@ pub struct Job {
     pub image: ImageSpec,
     pub modules: Vec<String>,
     pub theorems: Vec<String>,
+    /// Addresses the proofs hard-code, each with a substring of the ELF
+    /// symbol that must start there (`{"0x200102a0": "duty"}`).
+    #[serde(default)]
+    pub symbols: BTreeMap<String, String>,
     #[serde(default)]
     pub limits: Limits,
 }
@@ -244,6 +248,15 @@ pub fn lean_code(src: &str) -> String {
             while i < b.len() && b[i] != b'\n' {
                 i += 1;
             }
+        } else if b[i] == b'\''
+            && (i == 0
+                || !(b[i - 1].is_ascii_alphanumeric() || b[i - 1] == b'_' || b[i - 1] == b'\''))
+            && (b.get(i + 2) == Some(&b'\'')
+                || (b.get(i + 1) == Some(&b'\\') && b.get(i + 3) == Some(&b'\'')))
+        {
+            // A character literal such as '"' or '\n': skip it whole.
+            i += if b[i + 1] == b'\\' { 4 } else { 3 };
+            out.push_str("' '");
         } else if b[i] == b'"' {
             i += 1;
             while i < b.len() && b[i] != b'"' {
@@ -264,7 +277,13 @@ pub fn lean_code(src: &str) -> String {
 
 /// Commands and attributes that would let a proof bypass the kernel or add
 /// assumptions. Their presence anywhere in a checked module is an error.
-pub const FORBIDDEN: [&str; 11] = [
+///
+/// Metaprogramming is banned outright: a `run_cmd` can call the
+/// environment's `addDecl` with kernel checking switched off through an
+/// option name assembled from strings, which no word scan can see. The
+/// kernel replay stage (`leanchecker`) is the check that does not depend on
+/// this list.
+pub const FORBIDDEN: [&str; 23] = [
     "sorry",
     "admit",
     "axiom",
@@ -276,11 +295,23 @@ pub const FORBIDDEN: [&str; 11] = [
     "opaque",
     "skipKernelTC",
     "trustCompiler",
+    "run_cmd",
+    "run_elab",
+    "run_meta",
+    "#eval",
+    "elab",
+    "elab_rules",
+    "macro",
+    "macro_rules",
+    "syntax",
+    "initialize",
+    "builtin_initialize",
+    "addDecl",
 ];
 
 pub fn escapes(code: &str) -> Vec<&'static str> {
     let words: Vec<&str> = code
-        .split(|c: char| !(c.is_alphanumeric() || c == '_' || c == '.'))
+        .split(|c: char| !(c.is_alphanumeric() || c == '_' || c == '.' || c == '#'))
         .flat_map(|w| w.split('.'))
         .collect();
     FORBIDDEN
@@ -325,7 +356,15 @@ pub fn declared_theorems(code: &str) -> Vec<String> {
     let mut stack: Vec<String> = Vec::new();
     let mut out = Vec::new();
     for line in code.lines() {
-        let mut words = line.split_whitespace();
+        // Attributes and modifiers may precede `theorem` on its line.
+        let mut rest = line.trim_start();
+        while let Some(r) = rest.strip_prefix("@[") {
+            rest = r.split_once(']').map_or("", |(_, t)| t).trim_start();
+        }
+        for m in ["private ", "protected ", "noncomputable ", "nonrec "] {
+            rest = rest.strip_prefix(m).unwrap_or(rest).trim_start();
+        }
+        let mut words = rest.split_whitespace();
         match (words.next(), words.next()) {
             (Some("namespace"), Some(ns)) => stack.push(ns.to_string()),
             (Some("end"), Some(ns)) if stack.last().is_some_and(|l| l == ns) => {
@@ -364,6 +403,14 @@ pub fn identity(job: &Job, paths: &Paths) -> Result<Value, Stop> {
         sources.insert(f.clone(), sha256::hex(&read(&paths.root.join(f))?));
     }
     let elf = read(&paths.root.join(&job.elf))?;
+    let exe = std::env::current_exe()
+        .ok()
+        .and_then(|p| std::fs::read(p).ok())
+        .map(|b| sha256::hex(&b));
+    sources.insert(
+        "tools/gen_board.py".into(),
+        sha256::hex(&read(&paths.root.join("tools/gen_board.py"))?),
+    );
     Ok(json!({
         "job_sha256": sha256::hex(&read(&paths.job)?),
         "board_sha256": sha256::hex(&read(&paths.root.join(&job.board))?),
@@ -371,6 +418,7 @@ pub fn identity(job: &Job, paths: &Paths) -> Result<Value, Stop> {
         "sources": sources,
         "lean": tool_version(&["lean", "--version"]),
         "e5r_verify": env!("CARGO_PKG_VERSION"),
+        "e5r_verify_sha256": exe,
         "allowed_axioms": ALLOWED_AXIOMS,
     }))
 }
@@ -435,6 +483,24 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
                 )));
             }
         }
+        // Addresses the proofs hard-code must be where the named symbols are.
+        if !job.symbols.is_empty() {
+            let obj = e5r_format::load(&elf, &e5r_format::LoadOptions::default())
+                .map_err(|e| Stop::Error(format!("symbols: {e}")))?;
+            for (addr, name) in &job.symbols {
+                let a = u64::from_str_radix(addr.trim_start_matches("0x"), 16)
+                    .map_err(|e| Stop::Error(format!("symbol address {addr}: {e}")))?;
+                if !obj
+                    .symbols
+                    .iter()
+                    .any(|s| s.addr.get() == a && s.name.contains(name.as_str()))
+                {
+                    return Err(Stop::Error(format!(
+                        "no symbol containing {name:?} at {addr}: the proof's addresses are stale"
+                    )));
+                }
+            }
+        }
         // The generated board must match its JSON source.
         let board_text =
             std::fs::read_to_string(paths.root.join(&job.board)).map_err(err("board"))?;
@@ -481,13 +547,32 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
         order.push(Job::module_path(&fidelity_mod));
         order.extend(job.modules.iter().cloned());
         checked = order.clone();
-        for m in &order {
+        for (i, m) in order.iter().enumerate() {
             let src = std::fs::read_to_string(paths.root.join(m)).map_err(err(m))?;
-            let found = escapes(&lean_code(&src));
+            let code = lean_code(&src);
+            let found = escapes(&code);
             if !found.is_empty() {
                 return Err(Stop::Error(format!("{m}: forbidden {}", found.join(", "))));
             }
+            // Every import must be a module checked earlier in this job, so
+            // nothing is loaded from an olean this run did not produce.
+            let earlier: Vec<String> = order[..i]
+                .iter()
+                .map(|e| e.trim_end_matches(".lean").replace('/', "."))
+                .collect();
+            for line in code.lines() {
+                if let Some(rest) = line.trim_start().strip_prefix("import ") {
+                    for module in rest.split_whitespace() {
+                        if !earlier.iter().any(|e| e == module) {
+                            return Err(Stop::Error(format!(
+                                "{m} imports {module}, which this job does not check before it"
+                            )));
+                        }
+                    }
+                }
+            }
         }
+        let before = identity(&job, &paths)?;
         let manifest_path = paths
             .root
             .join(format!("build/jobs/{}/stages.json", job.id));
@@ -534,6 +619,22 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
                 &manifest_path,
                 serde_json::to_string_pretty(&manifest).unwrap(),
             );
+        }
+        // Replay every module's declarations through a fresh kernel. This is
+        // what catches declarations added without kernel checking, whatever
+        // the source looked like.
+        for m in &order {
+            let t = Instant::now();
+            let mut cmd = Command::new("leanchecker");
+            cmd.current_dir(&paths.root)
+                .env("LEAN_PATH", ".")
+                .arg(m.trim_end_matches(".lean").replace('/', "."));
+            let (_, rss) = run_limited(cmd, limits, &format!("leanchecker {m}"))?;
+            stages.push(Stage {
+                name: format!("leanchecker {m}"),
+                seconds: t.elapsed().as_secs_f64(),
+                peak_rss_mib: rss,
+            });
         }
         // Audit every named theorem plus the image binding. `Ns.*` names
         // every theorem the job's modules declare in namespace `Ns`.
@@ -603,7 +704,11 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
             }
             theorems.push(json!({ "name": n, "axioms": used }));
         }
-        Ok((identity(&job, &paths)?, Value::Array(theorems)))
+        let after = identity(&job, &paths)?;
+        if after != before {
+            return Err(Stop::Error("inputs changed while the job ran".into()));
+        }
+        Ok((after, Value::Array(theorems)))
     })();
     let stages_json: Vec<Value> = stages
         .iter()
@@ -651,7 +756,13 @@ pub fn stale(result: &Value) -> Result<Vec<String>, String> {
     let now = identity(&job, &paths).map_err(|s| s.message().to_string())?;
     let then = &result["inputs"];
     let mut changed = Vec::new();
-    for key in ["job_sha256", "board_sha256", "lean", "e5r_verify"] {
+    for key in [
+        "job_sha256",
+        "board_sha256",
+        "lean",
+        "e5r_verify",
+        "e5r_verify_sha256",
+    ] {
         if now[key] != then[key] {
             changed.push(key.to_string());
         }
@@ -782,6 +893,8 @@ mod tests {
         let src = "-- sorry in a comment\n/- admit /- nested native_decide -/ -/\n\
                    def s := \"axiom\"\ntheorem t : True := by trivial\n";
         assert!(escapes(&lean_code(src)).is_empty());
+        let quote = "def q := '\"'\ntheorem t : False := by sorry";
+        assert!(escapes(&lean_code(quote)).contains(&"sorry"));
         for bad in [
             "theorem t : False := by sorry",
             "axiom bad : False",
@@ -790,6 +903,9 @@ mod tests {
             "set_option debug.skipKernelTC true",
             "unsafe def f := 1",
             "theorem t := Lean.ofReduceBool _ _ rfl",
+            "run_cmd liftCoreM do pure ()",
+            "#eval 1",
+            "elab \"x\" : term => pure default",
         ] {
             assert!(!escapes(&lean_code(bad)).is_empty(), "missed {bad}");
         }
@@ -808,9 +924,9 @@ mod tests {
 
     #[test]
     fn theorem_names_follow_namespaces() {
-        let src =
-            "namespace A.B\ntheorem x : True := trivial\nend A.B\ntheorem y : True := trivial\n";
-        assert_eq!(declared_theorems(src), ["A.B.x", "y"]);
+        let src = "namespace A.B\ntheorem x : True := trivial\n\
+                   @[simp] private theorem z : True := trivial\nend A.B\ntheorem y : True := trivial\n";
+        assert_eq!(declared_theorems(src), ["A.B.x", "A.B.z", "y"]);
     }
 
     #[test]

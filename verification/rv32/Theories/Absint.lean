@@ -534,7 +534,7 @@ def csrWriteAbs (s : AState) (addr : Nat) (v : AV) : Option AState :=
   else if addr = csrMie then some { s with mieReg := v.band (.const 0x888) }
   else if addr = csrMtvec then
     match v with
-    | .vals l => if l.all (fun x => x % 4 < 2) then some { s with mtvec := v } else none
+    | .vals l => if l.all (fun x => x % 4 = 0 || x % 128 = 1) then some { s with mtvec := v } else none
     | _ => none
   else if addr = csrMscratch then some { s with mscratch := v }
   else if addr = csrMepc then some { s with mepc := v.band (.const (M32 - 2)) }
@@ -591,7 +591,9 @@ def absExec (cfg : Config) (s : AState) (len : Nat) (i : Instr) : Option (List A
   | .lr rd rs1 =>
     (absLoad cfg s (g rs1) .w true).bind fun v => adv (s.set rd v)
   | .sc rd rs1 rs2 =>
-    -- Success (store, rd = 0) or failure (rd = 1); the reservation is not tracked.
+    -- The address is probed first, as `exec` does; then success (store,
+    -- rd = 0) or failure (rd = 1). The reservation is not tracked.
+    (absLoad cfg s (g rs1) .w true).bind fun _ =>
     (absStore cfg s (g rs1) .w (g rs2) true).bind fun mem =>
       some [{ (s.set rd (.const 1)) with pc := next },
             { ({ s with mem := mem }).set rd (.const 0) with pc := next }]

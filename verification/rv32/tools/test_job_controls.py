@@ -41,6 +41,15 @@ def main():
     sorry_proof.write_text(proof.read_text().replace(
         'theorem wraps : spec 0xfffffffa = 1 := by decide',
         'theorem wraps : spec 0xfffffffa = 6 := by sorry'))
+    skip = VERIFY / 'Projects/hifive1/clamp/ControlSkip.lean'
+    skip.write_text('import Lean\nopen Lean Elab Command\nrun_cmd liftCoreM do\n'
+                    '  let decl := Declaration.thmDecl { name := `E5R.bad, levelParams := [], '
+                    'type := mkConst ``False, value := mkConst ``True.intro }\n'
+                    '  withOptions (fun o => o.setBool (Name.mkStr2 "debug" ("skipKernel" ++ "TC")) true) '
+                    '(addDecl decl)\n')
+    imp = VERIFY / 'Projects/hifive1/clamp/ControlImport.lean'
+    imp.write_text('import Theories.Absint\nnamespace E5R.Hifive1.Clamp\ntheorem ok : True := trivial\n'
+                   'end E5R.Hifive1.Clamp\n')
     failures = []
     try:
         cases = []
@@ -57,6 +66,14 @@ def main():
         cases.append((j, 'unsupported', 'a file that is not an ELF'))
         j = base(); j['id'] = 'control-theorem'; j['theorems'] = ['E5R.Hifive1.Clamp.no_such_theorem']
         cases.append((j, 'error', 'a theorem that does not exist'))
+        # The independent review's bypass: a theorem added with kernel
+        # checking switched off through metaprogramming.
+        j = base(); j['id'] = 'control-skipkernel'; j['modules'] = ['Projects/hifive1/clamp/ControlSkip.lean']
+        j['theorems'] = ['E5R.bad']
+        cases.append((j, 'error', 'a theorem added without kernel checking'))
+        j = base(); j['id'] = 'control-import'; j['modules'] = ['Projects/hifive1/clamp/ControlImport.lean']
+        j['theorems'] = ['E5R.Hifive1.Clamp.ok']
+        cases.append((j, 'error', 'an import the job does not check'))
         for job, want, what in cases:
             result, code = run(job)
             ok = result['status'] == want and code != 0
@@ -67,6 +84,8 @@ def main():
     finally:
         false_proof.unlink(missing_ok=True)
         sorry_proof.unlink(missing_ok=True)
+        skip.unlink(missing_ok=True)
+        imp.unlink(missing_ok=True)
         for p in VERIFY.glob('Projects/hifive1/clamp/Control*.olean'):
             p.unlink()
     if failures:

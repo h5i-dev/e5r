@@ -86,6 +86,16 @@ theorem sc_without_reservation :
 theorem sc_with_reservation :
     okWith (fun c => c.get 12 == 0 && !c.resv) (run scw (core 0x80000000 5 (resv := true))) = true := by
   decide +kernel
+-- A failing SC still checks its address (review finding D1).
+theorem sc_misaligned_without_reservation : isFault .misaligned (run scw (core 0x80000001 5)) = true := by
+  decide +kernel
+theorem sc_on_device_without_reservation : unsupportedFault (run scw (core 0x10013000 5)) = true := by
+  decide +kernel
+-- csrw mtvec, a1 in vectored mode with a base not aligned to 128 bytes.
+theorem mtvec_vectored_unaligned : unsupportedFault (run 0x30559073 (core 0 0x20010041)) = true := by
+  decide +kernel
+theorem mtvec_vectored_aligned :
+    okWith (fun c => c.mtvec == 0x20010081) (run 0x30559073 (core 0 0x20010081)) = true := by decide +kernel
 -- Fetch outside the image, and from an odd pc.
 theorem fetch_outside : unsupportedFault (stepInstr B (img lw) ⟨{ core 0 0 with pc := 0x20020000 }, fun _ => 0⟩
     (fun _ => 0)) = true := by decide +kernel

@@ -33,7 +33,7 @@ which would also cover interrupts arriving in the middle of the function.
 | ISA | RV32IMAC + Zicsr + Zifencei, MRET, WFI |
 | Privilege | Machine mode only |
 | Boot | The board's bootloader jumps to `0x20010000` (ELF `e_entry`) in M-mode |
-| Memory | 16 KiB DTIM RAM at `0x80000000`; XIP flash window `0x20000000`-`0x3fffffff` |
+| Memory | 16 KiB DTIM RAM at `0x80000000`; the 4 MiB SPI flash after the 64 KiB bootloader, `0x20010000`-`0x203fffff` |
 | Devices | CLINT (msip, mtimecmp, mtime), UART0, PWM0 registers as listed in the board file |
 | Interrupts | Machine software, timer and external, CLINT mode |
 | Toolchain | Rust 1.98.1, `riscv32imac-unknown-none-elf`, plain `cargo build --release` |
@@ -119,8 +119,7 @@ None of these is covered, and a result must not be read as covering them:
 A guarantee rests on these. Each needs review, because none is proved:
 
 1. The Lean 4.35.0 kernel and its core library, and the axiom audit, which
-   allows only `propext`, `Quot.sound` and `Classical.choice` and refuses any
-   project axiom, `sorry`, `native_decide` or `ofReduceBool`.
+   allows only `propext`, `Quot.sound` and `Classical.choice`.
 2. The semantics: `Theories/Hart.lean` (decoding and instruction meaning),
    `Theories/Platform.lean` (memory, devices, interrupts, reachability) and
    the generated board. They are written from the RISC-V specifications and
@@ -128,10 +127,18 @@ A guarantee rests on these. Each needs review, because none is proved:
    them, not proof.
 3. The property statement for each target, and the boot assumptions above.
 4. The binding from file to theorem. The exporter writes the ELF's bytes into
-   Lean. An independent Lean ELF reader then derives the flash image from
-   those bytes, and the image-fidelity theorem is proved by the kernel. The
-   runner checks the literal against every byte of the input file. The
+   Lean as a literal of the same buffer the runner hashed. An independent
+   Lean ELF reader then derives the flash image from those bytes, and the
+   image-fidelity theorem is proved by the kernel. Addresses a proof
+   hard-codes are checked against the ELF's symbol table when the job pins
+   them (`"symbols"`); that check is runner code, not a theorem. The
    runner, Python and the filesystem are not verified.
+5. The runner's checks around the kernel. Every module is replayed through
+   a fresh kernel (`leanchecker`) after it compiles, so a declaration added
+   with kernel checking switched off is rejected however its source was
+   written. The forbidden-word scan, the import check (every import must be
+   a module the same job checked earlier) and the axiom audit are runner
+   code.
 
 The design of the ISA/memory split, the distinction between "the architecture
 traps" and "the model declines", and frame summaries over regions follow
@@ -179,10 +186,15 @@ target/release/e5r-verify verify-result duty.json
 3. Exports the flash image and generates `image_fidelity`, a theorem that
    the independent Lean ELF reader reconstructs exactly that image from the
    original bytes.
-4. Scans every module for proof escapes: `sorry`, `admit`, `axiom`,
-   `native_decide`, `ofReduceBool`, `implemented_by`, `extern`, `unsafe`,
-   `opaque`, `skipKernelTC`, `trustCompiler`.
-5. Compiles each module from source with one Lean worker, under the limits.
+4. Scans every module for proof escapes and metaprogramming: `sorry`,
+   `admit`, `axiom`, `native_decide`, `ofReduceBool`, `implemented_by`,
+   `extern`, `unsafe`, `opaque`, `skipKernelTC`, `trustCompiler`, `run_cmd`,
+   `run_elab`, `run_meta`, `#eval`, `elab`, `macro`, `syntax`,
+   `initialize`, `addDecl`. Every import must be a module checked earlier
+   in the same job.
+5. Compiles each module from source with one Lean worker, under the limits,
+   then replays every module's declarations through a fresh kernel with
+   `leanchecker`.
 6. Prints each named theorem's axioms and refuses anything beyond `propext`,
    `Classical.choice` and `Quot.sound`.
 
@@ -256,6 +268,13 @@ points at 8 bytes of RAM), the function returns to `ra` with
 the compiler's `min(sum/8, 93) + 7`. RAM is unchanged, only `a1`-`a3` are
 clobbered, and every CSR is preserved. The loop is proved by an invariant.
 
+Both are statements about uninterrupted instruction sequences: they take no
+interrupt steps. For the clamp that is all the binary can do, because it
+never enables interrupts and boot assumption 1 says they start disabled.
+For `duty()` it is the function's own semantics; interrupts arriving in the
+middle of it are for the whole-firmware theorem. The `duty` job pins the
+proof's address `0x200102a0` to the ELF symbol containing `duty`.
+
 `clamp_all` is proved for the 32-bit clamp binary (`opt-level` 1, 2 and `s`
 emit the same bytes). From every boot state with the pc at the entry, the
 binary reaches its idle loop having stored `input.wrapping_add(7).min(100)`
@@ -286,6 +305,41 @@ These are tests of the model, not proofs about it:
 
 The replay found one model bug: a CSR read through the environment lost its
 pc advance. It was fixed before any proof depended on it.
+
+## Independent review
+
+A separate reviewer read the TCB (`Hart.lean`, `Platform.lean`,
+`FlashElf.lean`, `flash.rs`, `job.rs`) against the RISC-V specifications
+and these claims on 2026-10-29. The reviewer was a separate agent session,
+not a human expert. Every finding was fixed or documented in the same
+commit series:
+
+- **SC without a reservation skipped the address checks**, so a misaligned
+  or non-RAM SC did not trap. Fixed: SC probes its address first; two
+  controls added.
+- **A proof module could add a theorem without kernel checking** by
+  metaprogramming (`run_cmd` plus an option name built from strings), and
+  the scan and audit would accept it. Fixed: metaprogramming is banned, and
+  every module is replayed by `leanchecker`. The exploit is now a permanent
+  runner control.
+- **Vectored `mtvec` with an unaligned base computes a different vector on
+  SiFive cores.** Fixed: vectored mode needs a 128-byte-aligned base, else
+  unsupported.
+- **The flash window was the whole 512 MiB XIP alias.** Fixed: it is the
+  physical flash after the bootloader.
+- **Runner gaps.**
+  - Unchecked imports: now refused.
+  - The tool binary and `gen_board.py` were not in the result identity:
+    now hashed.
+  - Inputs changing mid-run: now detected.
+  - `Ns.*` missed attributed theorems: fixed.
+- **Two documentation overstatements** (literal checking, addresses bound
+  to symbols): corrected, and the `duty` address is now pinned.
+
+The reviewer found the decoders (every RV32C quadrant), immediates, M and A
+arithmetic, CSR rules, interrupt entry/return and the two ELF readers'
+rules correct. That was checked by reading and by evaluating about 20
+encodings. It is not a proof.
 
 ## What remains for the whole-firmware theorem
 
