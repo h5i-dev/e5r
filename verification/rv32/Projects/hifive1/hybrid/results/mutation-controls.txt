@@ -8,9 +8,6 @@ ok   interrupt obligation: the entry node may have MIE set: REJECTED in Projects
 ok   tampered certificate: the delegation removed: REJECTED in Projects/hifive1/hybrid/demo/LoopProof.lean:218 (ai_check): Tactic `decide` proved that the proposition
 ok   tampered certificate: the PWM values widened past 100: REJECTED in Projects/hifive1/hybrid/demo/LoopProof.lean:218 (ai_check): Tactic `decide` proved that the proposition
 ok   infrastructure: masked runs without the masking premise (does not elaborate): ELAB in Theories/Hybrid/Basic.lean:49 (MRun.trans): Too many variable names provided at alternative `step`: 4 provided, but 3 expected
-ok   infrastructure: a missing import: ELAB in Projects/hifive1/hybrid/demo/LoopProof.lean:28 (None): object file '/dev/shm/hybrid-controls-msdtznh_/rv32/.lake/build/lib/lean/Theories/Hybrid/Wrapp.olean' of modul
+ok   infrastructure: a missing import: ELAB in Projects/hifive1/hybrid/demo/LoopProof.lean:28 (None): object file '/dev/shm/hybrid-controls-27y0hbkp/rv32/.lake/build/lib/lean/Theories/Hybrid/Wrapp.olean' of modul
 every control failed in the expected declaration for the expected reason
-
-real	5m27.677s
-user	2m8.518s
-sys	1m33.389s
+exit=0
