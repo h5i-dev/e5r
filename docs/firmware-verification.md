@@ -364,9 +364,13 @@ rest on. It works by abstract interpretation:
 function. It is untrusted: whatever it emits either checks or is rejected.
 Two things are open, and one is done:
 
-1. **Precision.** The analysis still reports possible faults on the
-   firmware: 68 with default options; the best measured option set
-   (proved ring summary, kept static facts, address splits) reached 47.
+1. **Precision: a candidate exists.** With one interrupt invariant per
+   node partition (`Cert.Gs`/`Cert.part`, partitioned by the saved-pointer
+   words 0x800000d4, 0x8000008c and 0x80000010), the proved ring-head
+   summary, address and copy-before-branch splits, and value partitions in
+   0x200103b8..0x200104e4, the analyzer reports no possible fault and emits
+   a 65,845-node certificate. It is not accepted (item 2). With default
+   options it still reports 68; an earlier option set reached 47.
    Almost all are a lost correlation between a task's state byte and the
    saved pointer it guards (the actuator's channel pointer at 0x800000d4,
    the sampler's channel tail), plus `wake()` with a merged task pointer.
@@ -379,8 +383,12 @@ Two things are open, and one is done:
    (`tools/Analyze.lean` options `E5R_ADDR_SPLIT`, `E5R_TAG_DEPTH`,
    `E5R_KEEP`, `E5R_KEEP_GUARDED`, `E5R_FREEZE_G`, `E5R_RING`, with their
    measurements in the commit messages).
-2. **Size.** About 30,000 nodes is too large to check in the kernel. Function
-   summaries are the planned fix.
+2. **Size: the blocker.** The zero-report certificate's source (29 MB
+   after sharing repeated lists) aborts elaboration within 24 GB after
+   593 s, and the checker finds nodes by list index, so kernel evaluation
+   would be quadratic in 65,845 nodes. Needed: an O(log n) node index in the
+   checker, a compact encoding, and fewer nodes (a proved summary of the
+   sampler's channel-tail update would replace the value partitions).
 3. **`check_sound`: done.** `Theories/AbsintSound.lean` proves
 
    ```lean
