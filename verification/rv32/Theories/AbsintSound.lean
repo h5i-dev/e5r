@@ -3464,4 +3464,235 @@ theorem mret_sound {cfg : Config} {cert : Cert} {n0 : Node} {sh : AState} {m0 m 
     · have := hsh.mscratch; rw [hsc] at this; simp only [AV.gam, hEnv] at this; simp; rw [this]
       simpa using hs0.mscratch
 
+/-! ### The checker's facts -/
+
+structure Facts (cfg : Config) (cert : Cert) : Prop where
+  ram : cfg.board.ramBase + cfg.board.ramSize ≤ M32
+  img : ValidImg cfg.img
+  nodes : ∀ n ∈ cert.nodes, nodeOk cfg cert n = true
+  sigma : ∀ sp ∈ cert.sigma, SpOk cfg sp
+  base : cfg.board.ramBase ≤ cfg.stackLow
+  pin : cfg.pinLow ≤ M32
+
+theorem facts_of_check {cfg : Config} {boot : AState} {cert : Cert} (h : check cfg boot cert = true) :
+    Facts cfg cert ∧ boot.hnd = false ∧ ∃ n0, cert.nodes[0]? = some n0 ∧ boot.leq n0.s = true := by
+  unfold check at h
+  simp only [Bool.and_eq_true, Bool.not_eq_true', List.all_eq_true, decide_eq_true_eq] at h
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨hb, h0⟩, hram⟩, himg⟩, hn⟩, hsig⟩, hbase⟩, hdep⟩, _⟩, hpin⟩, _⟩ := h
+  refine ⟨⟨hram, validImg_of_check (by simpa [List.all_eq_true] using himg), hn, fun sp hs => ?_, hbase,
+    ?_⟩, hb, ?_⟩
+  · have := hsig sp hs
+    exact ⟨this.1.1, this.1.2, this.2, hdep, hbase, hpin, by unfold Config.ramEnd; exact hram⟩
+  · unfold Config.ramEnd at hpin; omega
+  · split at h0
+    · next n hn0 => exact ⟨n, hn0, h0⟩
+    · simp at h0
+
+theorem nodeOk_parts {cfg : Config} {cert : Cert} {n : Node} (h : nodeOk cfg cert n = true) :
+    n.s.wf cfg = true ∧ (n.s.hnd = false → noSym n.s = true) ∧ instrOk cfg cert n = true ∧
+      irqOk cfg cert n.s = true := by
+  unfold nodeOk at h
+  simp only [Bool.and_eq_true, Bool.or_eq_true] at h
+  obtain ⟨⟨⟨hw, hns⟩, hi⟩, hq⟩ := h
+  exact ⟨hw, fun hf => hns.resolve_left (by rw [hf]; simp), hi, hq⟩
+
+theorem instrOk_fetch {cfg : Config} {cert : Cert} {n : Node} (h : instrOk cfg cert n = true) :
+    ∃ i len, successors.fetchDecode' cfg.img n.s.pc = some (i, len) ∧
+      (i = .mret → mretOk cfg cert n.s = true) := by
+  unfold instrOk at h
+  split at h
+  · next len heq =>
+    simp only [Bool.and_eq_true] at h
+    exact ⟨_, _, heq, fun _ => h.1⟩
+  · next i len hne hfd => exact ⟨i, len, hfd, fun e => (hne e).elim⟩
+  · simp at h
+
+theorem stepInstr_bridge {cfg : Config} {ρ : Nat → Word} {s : AState} {m : Machine} {i : Instr} {len : Nat}
+    (hs : StateHolds ρ s m) (hfd : successors.fetchDecode' cfg.img s.pc = some (i, len)) (o : Oracle) :
+    ∃ len' : Word, len = len'.toNat ∧
+      stepInstr cfg.board cfg.img m o = interp cfg.board cfg.img o (exec m.core len' i) m.ram 0 [] := by
+  obtain ⟨hpc2, bits, len', hf, hd, rfl⟩ := fetch_bridge hfd
+  refine ⟨len', rfl, ?_⟩
+  unfold stepInstr
+  rw [hs.pc, lsb_even (by simp only [w, BitVec.toNat_ofNat]; omega)]
+  simp only [Bool.false_eq_true, if_false, hf, hd]
+
+theorem handlerEntry_hnd {G : List Cell} {s e : AState} {code : Nat} (h : handlerEntry G s code = some e) :
+    e.hnd = true := by
+  unfold handlerEntry at h
+  split at h
+  · dsimp only at h
+    split at h <;> split at h
+    all_goals first | (simp at h; done) | (obtain ⟨-, rfl⟩ := h; rfl) |
+      (simp only [Option.some.injEq] at h; subst h; rfl) | (simp at h; obtain ⟨-, rfl⟩ := h; rfl)
+  · simp at h
+
+/-! ### The invariant -/
+
+/-- Main-thread states carry no symbols, so any environment will do. -/
+def ρM : Nat → Word := fun _ => 0
+
+/-- The main thread, at a node. -/
+def MainInv (cert : Cert) (m : Machine) : Prop :=
+  ∃ (j : Nat) (n : Node), cert.nodes[j]? = some n ∧ n.s.hnd = false ∧ StateHolds ρM n.s m
+
+/-- Inside a handler: the interrupted machine `m0` is described by an
+    interruptible main node, the current machine by a handler node under the
+    interrupted registers, and RAM outside static memory and the handler's
+    budget is as `m0` left it. -/
+def HandInv (cfg : Config) (cert : Cert) (m : Machine) : Prop :=
+  ∃ (j0 : Nat) (n0 : Node) (m0 : Machine), cert.nodes[j0]? = some n0 ∧ n0.s.hnd = false ∧
+    StateHolds ρM n0.s m0 ∧ interruptibleOk cfg cert n0.s = true ∧ n0.s.mie.mayBe true = true ∧
+    ∃ (j : Nat) (n : Node), cert.nodes[j]? = some n ∧ n.s.hnd = true ∧ StateHolds (hEnv m0) n.s m ∧
+      Keep cfg (m0.core.get 2).toNat m0.ram m.ram ∧ SpOk cfg (m0.core.get 2).toNat
+
+def Inv (cfg : Config) (cert : Cert) (m : Machine) : Prop := MainInv cert m ∨ HandInv cfg cert m
+
+theorem node_ok {cfg : Config} {cert : Cert} (F : Facts cfg cert) {j : Nat} {n : Node}
+    (h : cert.nodes[j]? = some n) : nodeOk cfg cert n = true :=
+  F.nodes n (List.mem_of_getElem? h)
+
+theorem hEnv_sp (m : Machine) : hEnv m 2 = m.core.get 2 := by simp [hEnv]
+
+/-- An instruction step from a machine in the invariant: no fault, allowed
+    events, and the invariant again. -/
+theorem inv_instr {cfg : Config} {cert : Cert} (F : Facts cfg cert) {m : Machine} (hI : Inv cfg cert m)
+    (o : Oracle) :
+    ∃ c ram evs, stepInstr cfg.board cfg.img m o = .ok c ram evs ∧ (∀ ev ∈ evs, EvOk cfg ev) ∧
+      Inv cfg cert ⟨c, ram⟩ := by
+  rcases hI with ⟨j, n, hn, hnd, hs⟩ | ⟨j0, n0, m0, hn0, hnd0, hs0, hio, hmie0, j, n, hn, hnd, hs, hkeep, hsp⟩
+  · obtain ⟨hwf, _, hins, _⟩ := nodeOk_parts (node_ok F hn)
+    obtain ⟨i, len, hfd, hmr⟩ := instrOk_fetch hins
+    have hnm : i ≠ .mret := by
+      intro e
+      have := hmr e; unfold mretOk at this
+      simp only [Bool.and_eq_true] at this
+      rw [hnd] at this; simp at this
+    obtain ⟨c, ram, evs, hst, hev, _, _, j', _, n', hn', hh', hnd'⟩ :=
+      instr_sound (hins) hs hwf F.img F.ram (fun h => by rw [hnd] at h; cases h) hfd hnm o
+    exact ⟨c, ram, evs, hst, hev, .inl ⟨j', n', hn', by rw [hnd', hnd], hh'⟩⟩
+  · obtain ⟨hwf, _, hins, _⟩ := nodeOk_parts (node_ok F hn)
+    obtain ⟨i, len, hfd, hmr⟩ := instrOk_fetch hins
+    obtain ⟨len', -, hbr⟩ := stepInstr_bridge hs hfd o
+    by_cases hm : i = .mret
+    · subst hm
+      obtain ⟨_, hns0, hins0, _⟩ := nodeOk_parts (node_ok F hn0)
+      obtain ⟨_, _, hfd0, _⟩ := instrOk_fetch hins0
+      have hpc0 := (fetch_bridge hfd0).1
+      obtain ⟨c, hc, hh⟩ := mret_sound hs0 hio hmie0 (hns0 hnd0) hpc0 F.base F.pin hs (hmr rfl) hkeep o
+        (len := len')
+      exact ⟨c, m.ram, [], by rw [hbr, hc], by simp, .inl ⟨j0, n0, hn0, hnd0, hh⟩⟩
+    · have hsp' : n.s.hnd = true → SpOk cfg ((hEnv m0) 2).toNat := fun _ => by rw [hEnv_sp]; exact hsp
+      obtain ⟨c, ram, evs, hst, hev, _, _, j', _, n', hn', hh', hnd'⟩ :=
+        instr_sound hins hs hwf F.img F.ram hsp' hfd hm o
+      -- The step's stores stay in static RAM and the handler budget.
+      have hab : ∃ ts, absExec cfg n.s len i = some ts := by
+        unfold instrOk at hins; rw [hfd] at hins
+        split at hins
+        · next heq => simp only [Option.some.injEq, Prod.mk.injEq] at heq; exact absurd heq.1 hm
+        · next heq =>
+          simp only [Option.some.injEq, Prod.mk.injEq] at heq
+          obtain ⟨rfl, rfl⟩ := heq
+          split at hins
+          · next ts habs => exact ⟨ts, habs⟩
+          · simp at hins
+        · simp at hins
+      obtain ⟨ts, habs⟩ := hab
+      obtain ⟨len'', hlen, hbr'⟩ := stepInstr_bridge hs hfd o
+      rw [hlen] at habs
+      have hsi := exec_storesIn hs hnd (by rw [hEnv_sp]; exact hsp) habs
+      rw [hEnv_sp] at hsi
+      have hk := interp_keep hsp _ _ _ _ hsi (by rw [← hbr', hst])
+      exact ⟨c, ram, evs, hst, hev, .inr ⟨j0, n0, m0, hn0, hnd0, hs0, hio, hmie0, j', n', hn',
+        by rw [hnd', hnd], hh', hkeep.trans hk, hsp⟩⟩
+
+/-- An interrupt taken from a machine in the invariant enters the handler
+    (it cannot arrive inside one) and keeps the invariant. -/
+theorem inv_irq {cfg : Config} {cert : Cert} (F : Facts cfg cert) {m : Machine} (hI : Inv cfg cert m)
+    {code : Nat} (hen : irqEnabled m.core code = true) :
+    ∃ c, takeIrq m.core code = .done c ∧ Inv cfg cert ⟨c, m.ram⟩ := by
+  rcases hI with ⟨j, n, hn, hnd, hs⟩ | ⟨j0, n0, m0, hn0, hnd0, hs0, hio, hmie0, j, n, hn, hnd, hs, hkeep, hsp⟩
+  · obtain ⟨_, hns, _, hirq⟩ := nodeOk_parts (node_ok F hn)
+    have hcode := code_mem hs hen
+    unfold irqOk at hirq
+    simp only [Bool.or_eq_true, Bool.and_eq_true, Bool.not_eq_true', List.all_eq_true] at hirq
+    rcases hirq with hemp | ⟨⟨_, hio⟩, hall⟩
+    · simp only [List.isEmpty_iff] at hemp; rw [hemp] at hcode; simp at hcode
+    · have hc := hall code hcode
+      split at hc
+      · next e j' he hl =>
+        obtain ⟨hstat, ⟨sp, hsp2, hsig, _⟩, _⟩ := interruptible_parts hio
+        have hG : ∀ c ∈ cert.G, c ∈ n.s.mem ∧ c.base = .abs ∧ c.v.hasSym = false := by
+          intro c hc
+          rw [← hstat] at hc; unfold staticOf at hc
+          simp only [List.mem_filter, Bool.and_eq_true, beq_iff_eq] at hc
+          exact ⟨hc.1, noSym_cells (hns hnd) c hc.1⟩
+        obtain ⟨c1, htk, hh⟩ := entry_sound hs he hG hen
+        obtain ⟨nh, hnh, hhh, hndh⟩ := covered_sound hc hh
+        have hmie : n.s.mie.mayBe true = true := by
+          have := hs.mie
+          simp only [irqEnabled, Bool.and_eq_true] at hen
+          rw [hen.1.1] at this; exact this
+        have hσ : (m.core.get 2).toNat = sp := by
+          have := hs.regs 2; rw [hsp2] at this; simpa [AV.gam] using this
+        exact ⟨c1, htk, .inr ⟨j, n, m, hn, hnd, hs, hio, hmie, j', nh, hnh,
+          by rw [hndh, handlerEntry_hnd he], hhh, Keep.refl _ _ _, by rw [hσ]; exact F.sigma sp hsig⟩⟩
+      · simp at hc
+  · obtain ⟨_, _, _, hirq⟩ := nodeOk_parts (node_ok F hn)
+    have hcode := code_mem hs hen
+    unfold irqOk at hirq
+    simp only [Bool.or_eq_true, Bool.and_eq_true, Bool.not_eq_true'] at hirq
+    rcases hirq with hemp | ⟨⟨⟨hh, _⟩, _⟩⟩
+    · simp only [List.isEmpty_iff] at hemp; rw [hemp] at hcode; simp at hcode
+    · rw [hnd] at hh; cases hh
+
+/-! ## Soundness -/
+
+/-- **The certificate checker is sound.** If `check` accepts a certificate
+    for a board, an image and a boot description, then from every machine
+    the boot description covers, every reachable machine is inside the
+    verified envelope (no transition can fault) and every device write on
+    the way is allowed by the configuration. -/
+theorem check_sound {cfg : Config} {boot : AState} {cert : Cert} (hc : check cfg boot cert = true)
+    {Init : Machine → Prop} (hinit : ∀ m, Init m → StateHolds ρM boot m) :
+    ∀ m evs, Reach cfg.board cfg.img Init m evs →
+      ¬ Escapes cfg.board cfg.img m ∧ ∀ ev ∈ evs, EvOk cfg ev := by
+  obtain ⟨F, hb, n0, hn0, hleq⟩ := facts_of_check hc
+  have inv : ∀ m evs, Reach cfg.board cfg.img Init m evs → Inv cfg cert m ∧ ∀ ev ∈ evs, EvOk cfg ev := by
+    intro m evs hr
+    induction hr with
+    | init hI =>
+      refine ⟨.inl ⟨0, n0, hn0, ?_, leq_state_sound hleq (hinit _ hI)⟩, by simp⟩
+      simp only [AState.leq, Bool.and_eq_true, beq_iff_eq, and_assoc] at hleq
+      rw [← hleq.2.1, hb]
+    | step _ hst ih =>
+      obtain ⟨hI, hev⟩ := ih
+      cases hst with
+      | instr o h =>
+        obtain ⟨c, ram, evs', h', hev', hI'⟩ := inv_instr F hI o
+        rw [h] at h'
+        simp only [Result.ok.injEq] at h'
+        obtain ⟨rfl, rfl, rfl⟩ := h'
+        exact ⟨hI', fun ev hm => by
+          rcases List.mem_append.mp hm with hm | hm
+          · exact hev ev hm
+          · exact hev' ev hm⟩
+      | irq code hen htk =>
+        obtain ⟨c, htk', hI'⟩ := inv_irq F hI hen
+        rw [htk] at htk'
+        simp only [Eff.done.injEq] at htk'
+        subst htk'
+        exact ⟨hI', fun ev hm => by
+          rcases List.mem_append.mp hm with hm | hm
+          · exact hev ev hm
+          · simp at hm⟩
+  intro m evs hr
+  obtain ⟨hI, hev⟩ := inv m evs hr
+  refine ⟨?_, hev⟩
+  rintro (⟨o, f, hf⟩ | ⟨code, e, hen, ht⟩)
+  · obtain ⟨c, ram, evs', h, -⟩ := inv_instr F hI o
+    rw [h] at hf; cases hf
+  · obtain ⟨c, h, -⟩ := inv_irq F hI hen
+    rw [h] at ht; cases ht
+
 end E5R.AI

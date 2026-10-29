@@ -860,6 +860,8 @@ def nodeOk (cfg : Config) (cert : Cert) (n : Node) : Bool :=
   n.s.wf cfg && (n.s.hnd || noSym n.s) && instrOk cfg cert n && irqOk cfg cert n.s
 
 def check (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
+  -- Execution starts in the main thread, at node 0.
+  !boot.hnd &&
   (match cert.nodes[0]? with | some n => boot.leq n.s | none => false) &&
   -- RAM lies inside the 32-bit address space, and the image holds bytes.
   cfg.board.ramBase + cfg.board.ramSize ≤ M32 &&
