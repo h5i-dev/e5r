@@ -835,9 +835,13 @@ Each item is checked only when its acceptance criterion has been run.
       and an independent review recorded (or recorded as not obtained).
       *Done:* pinned toolchains, `scripts/check-firmware-verification.sh`,
       result binding and staleness, CI job (not yet run on a runner),
-      malformed-input and runner controls, schema names, docs. *Open:*
-      installation tutorial for a fresh machine, offline recheck bundle,
-      independent review.
+      malformed-input and runner controls, schema names, docs, an
+      installation guide (`firmware-verification-install.md`), Lean-only
+      offline recheck bundles (`e5r-verify bundle`), kernel replay of every
+      module (`leanchecker`), and an independent review by a separate
+      reviewer agent session (findings fixed and recorded in
+      `firmware-verification.md`). *Open:* a review by a human RISC-V or
+      Lean expert, and a first green CI run on a GitHub runner.
 
 Not in this scope, and not to be described as done: Cortex-M, multiple harts,
 DMA, U-mode/PMP, microkernels, timing or deadline guarantees, other boards,
