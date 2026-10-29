@@ -825,10 +825,17 @@ Each item is checked only when its acceptance criterion has been run.
       the model allows, the emitted binary never leaves the modeled envelope
       and every PWM duty write is at most 100; plus a concrete execution that
       reaches such a write. *Status:* not proved. The checker
-      (`Theories/Absint.lean`) is proved sound (`E5R.AI.check_sound`,
-      kernel-replayed). The certificate search (`tools/Analyze.lean`) is
-      not yet precise enough (about 119 possible-fault reports), and its
-      certificate is too large to check. See `firmware-verification.md`.
+      (`Theories/Absint.lean`) is proved sound (`check_sound`, and
+      `check_sound_hybrid` with directly proved regions and summaries),
+      kernel-replayed, standard axioms only. With per-partition interrupt
+      invariants (e41afad) and the proved ring-head summary, the analyzer
+      found a certificate with no possible-fault report (65,845 nodes,
+      2026-10-29). It is **resource-limited, not accepted**: its 29 MB source
+      does not elaborate within 24 GB (aborted after 593 s at 13.8 GB
+      resident), and the checker's list-indexed node lookup would make kernel
+      evaluation quadratic. Open: an O(log n) node index and a compact
+      certificate encoding, fewer nodes (the review worker's channel-tail
+      summary), and the checking job. See `firmware-verification.md`.
 - [ ] **F8. Packaging.** *Accepted:* pinned toolchains, one command that
       rebuilds and rechecks from source, proof bound to ELF bytes, board,
       property, model and toolchain hashes with stale results refused, CI job,
@@ -843,6 +850,48 @@ Each item is checked only when its acceptance criterion has been run.
       reviewer agent session (findings fixed and recorded in
       `firmware-verification.md`). *Open:* a review by a human RISC-V or
       Lean expert, and a first green CI run on a GitHub runner.
+
+## R. RMK on RISC-V (2026-10-29 owner authorization)
+
+The next product target is upstream [RMK](https://github.com/rmk-rs/rmk),
+RISC-V only, pinned at `71556128fa72881fc35f0bf6c292d5e28ad9568d`. The first
+acceptance target is its existing example `examples/use_rust/qemu-riscv-rynk`
+(`riscv32imac-unknown-none-elf`, Embassy executor, mock time, a UART16550 at
+`0x10000000`, semihosting, the Rynk host protocol through
+`HostService::run_session`, `LockConfig { insecure: true }`). It is not a
+replacement toy, and nothing here claims RMK as a whole is verified. The
+HiFive1 board model is not reused for it: QEMU `virt` is a different machine.
+ESP32-C3/C6 BLE examples are a later phase. Abstract interpretation stays
+optional; direct and hybrid proofs are equally valid routes.
+
+- [ ] **R0. Pinned, reproducible target.** *Accepted:* source pin, toolchain,
+      features and `Cargo.lock` recorded; one command rebuilds the ELF with
+      plain cargo, byte-identical across two clean builds and checkout paths;
+      its sha256 recorded with the symbols of the Rynk session and frame
+      handling; the example runs on the pinned QEMU.
+- [ ] **R1. Board model for QEMU `virt` (RV32).** *Accepted:* a board JSON
+      (memory map, UART16550 registers, timer, boot state, how semihosting
+      calls are treated: modeled, or a fail-closed exclusion) and the
+      generated Lean board; whole-program replay of the R0 ELF against QEMU
+      agrees on registers and device traffic, with negative controls; every
+      environment assumption listed.
+- [ ] **R2. Property chosen after code inspection.** Candidates: malformed
+      host input (any byte sequence on the UART) never makes the emitted code
+      fault or access memory outside its buffers; state mutations happen only
+      through accepted, authorized commands (with `insecure: true` stated as
+      an assumption, not hidden). *Accepted:* the property written as a job
+      (ELF, board, entry/boot model, property) with the inspected code paths
+      and why each is in or out of scope.
+- [ ] **R3. First proof on emitted RMK code.** The smallest useful region,
+      e.g. the Rynk frame decoder or command dispatch, proved on the emitted
+      instructions for every input, every intermediate step, fault and event
+      covered. *Accepted:* job `proved`, nonvacuity, mutation controls
+      (changed instruction, false postcondition, weakened precondition),
+      axioms audited.
+- [ ] **R4. Toward the session.** Compose R3 with the surrounding session
+      loop and interrupts (checker, direct regions or summaries). *Accepted:*
+      a kernel-checked theorem about the whole `run_session` path for the
+      chosen property, or a documented, measured blocker.
 
 Not in this scope, and not to be described as done: Cortex-M, multiple harts,
 DMA, U-mode/PMP, microkernels, timing or deadline guarantees, other boards,
