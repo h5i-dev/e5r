@@ -437,4 +437,267 @@ theorem head (c : Core) (R : Word → BitVec 8) (h : CobsEnv ⟨c, R⟩) (n src 
         Core.wr_get_ne _ _ _ _ _ (show (19 : Reg) ≠ 28 by decide)]; exact v2
     · simp only [Core.goto_get]; exact v4
 
+theorem block_small {orig : Nat → Nat} {n src : Nat} (h1 : src + orig src ≤ n) (h2 : orig src < 2) :
+    block orig n src = some ((if src + 1 < n then [0] else []), src + 1) := by
+  unfold block; simp only; rw [if_neg (by omega), if_pos h2]
+
+theorem block_big {orig : Nat → Nat} {n src : Nat} (h1 : src + orig src ≤ n) (h2 : 2 ≤ orig src) :
+    block orig n src = some ((List.range (orig src - 1)).map (fun i => orig (src + 1 + i)) ++
+      (if orig src ≠ 0xff ∧ src + orig src < n then [0] else []), src + orig src) := by
+  unfold block; simp only; rw [if_neg (by omega), if_neg (by omega)]
+
+theorem block_none {orig : Nat → Nat} {n src : Nat} (h1 : n < src + orig src) : block orig n src = none := by
+  unfold block; simp only; rw [if_pos h1]
+
+/-- What one iteration from the loop head achieves, against `block`. -/
+def IterOK (c : Core) (R : Word → BitVec 8) (n src : Nat) (acc : List Nat) (d : Core) (S : Word → BitVec 8) :
+    Prop :=
+  match block (bufByte R (c.get 11)) n src with
+  | none => ∃ k e S', QRun B img k ⟨d, S⟩ ⟨e, S'⟩ ∧ ExitPrep c R 1 1 acc e S'
+  | some (out, src') =>
+    (n ≤ src' → ∃ k e S', QRun B img k ⟨d, S⟩ ⟨e, S'⟩ ∧ ExitPrep c R 0 n (acc ++ out) e S') ∧
+    (src' < n → ∃ k e S', QRun B img k ⟨d, S⟩ ⟨e, S'⟩ ∧ e.pc = 0x8001e068 ∧ LInv c R n src' (acc ++ out) e S')
+
+/-- code < 2 (0x8001e07c → 0x8001e0d2 → 0x8001e0d8): src += 1, then the tail. -/
+theorem small (c : Core) (R : Word → BitVec 8) (h : CobsEnv ⟨c, R⟩) (n src : Nat) (acc : List Nat)
+    (d : Core) (S : Word → BitVec 8) (hi : LInv c R n src acc d S) (hpc : d.pc = 0x8001e07c) (hs : src < n)
+    (h28 : d.get 28 = BitVec.ofNat 32 (bufByte R (c.get 11) src)) (hc : bufByte R (c.get 11) src < 2) :
+    (n ≤ src + 1 → ∃ k e S', QRun B img k ⟨d, S⟩ ⟨e, S'⟩ ∧ ExitPrep c R 0 n acc e S') ∧
+    (src + 1 < n → ∃ k e S', QRun B img k ⟨d, S⟩ ⟨e, S'⟩ ∧ e.pc = 0x8001e068 ∧ LInv c R n (src + 1) (acc ++ [0]) e S') := by
+  have hl := h.len; have ord := hi.ord
+  have q := fun (x : Core) (hx : x.sameCsr c) => Quiet.of_sameCsr hx h.quiet
+  have tk : taken .ltu (d.get 28) (d.get 17) = true := by
+    rw [h28, hi.a7]; simp only [taken]
+    rw [show (2#32 : Word) = BitVec.ofNat 32 2 from rfl,
+      ult_small (bufByte R (c.get 11) src) 2 (by omega) (by omega)]; simp; omega
+  let d1 := d.goto 0x8001e0d2
+  let d2 := d1.wr 29 (alu .add (d1.get 29) 0x1#32) 0x8001e0d4
+  have nt : ¬ (taken .eq (d2.get 28) (d2.get 6) = true) := by
+    have : d2.get 28 = d.get 28 := by simp [d2, d1, Core.wr_get_ne]
+    have e6 : d2.get 6 = d.get 6 := by simp [d2, d1, Core.wr_get_ne]
+    rw [this, e6, h28, hi.t1]; simp only [taken, beq_iff_eq]
+    intro e; have := congrArg BitVec.toNat e; simp at this; omega
+  let d3 := d2.goto 0x8001e0d8
+  have s1 : DetStep B img ⟨d, S⟩ ⟨d1, S⟩ := dstep f8001e07c hpc (by
+    rw [exec_branch, if_pos tk]; exact jump_lit _ 0x8001e07c _ 0x8001e0d2 hpc (by decide) (by decide))
+  have s2 : DetStep B img ⟨d1, S⟩ ⟨d2, S⟩ := dstep f8001e0d2 rfl (by rw [exec_opimm]; rfl)
+  have s3 : DetStep B img ⟨d2, S⟩ ⟨d3, S⟩ := dstep f8001e0d4 rfl (by rw [exec_branch, if_neg nt]; rfl)
+  have k3 : d3.sameCsr c :=
+    (Core.sameCsr_goto _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_goto _ _).trans hi.csr))
+  have i3 : LInv c R n (src + 1) acc d3 S := hi.mk' d3 S (src + 1) acc k3
+    (fun r hr => by
+      have : r ≠ 29 := fun e => hr (by subst e; decide)
+      simp [d3, d2, d1, Core.wr_get_ne, this])
+    (by
+      simp only [d3, d2, Core.goto_get, Core.wr_get_self _ (29 : Reg) _ _ (by decide), alu, d1, hi.t4]
+      apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_add, BitVec.toNat_ofNat]; omega)
+    (by simp [d3, d2, d1, Core.wr_get_ne, hi.t2]) hi.bytes (fun _ _ => rfl) ⟨by omega, by omega⟩
+  have run3 : QRun B img 3 ⟨d, S⟩ ⟨d3, S⟩ :=
+    .step (q _ hi.csr) s1 (.step (q _ ((Core.sameCsr_goto _ _).trans hi.csr)) s2
+      (.single (q _ ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_goto _ _).trans hi.csr))) s3))
+  constructor
+  · intro hn
+    obtain ⟨k, e, S', hr, hx⟩ := tail_exit c R h n (src + 1) acc d3 S i3 rfl hn
+    exact ⟨_, e, S', run3.trans hr, hx⟩
+  · intro hn
+    obtain ⟨k, e, S', hr, hpc', hx⟩ := tail_cont c R h n (src + 1) acc d3 S i3 rfl hn (by omega)
+    exact ⟨_, e, S', run3.trans hr, hpc', hx⟩
+
+/-- 0x8001e082..0x8001e090: t6 := (len - dst) masked by (len < len - dst ? 0 : ~0), i.e. len - dst. -/
+theorem t6_val (len dst : Nat) (h : dst ≤ len) (hl : len < 2 ^ 32) :
+    (alu .and (alu .add (alu .sltu (BitVec.ofNat 32 len) (alu .sub (BitVec.ofNat 32 len) (BitVec.ofNat 32 dst)))
+      0xffffffff#32) (alu .sub (BitVec.ofNat 32 len) (BitVec.ofNat 32 dst))) = BitVec.ofNat 32 (len - dst) := by
+  have e : BitVec.ofNat 32 len - BitVec.ofNat 32 dst = BitVec.ofNat 32 (len - dst) := by
+    apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_sub, BitVec.toNat_ofNat]; omega
+  have nlt : ¬ ((BitVec.ofNat 32 len).ult (BitVec.ofNat 32 (len - dst)) = true) := by
+    rw [ult_small _ _ hl (by omega)]; simp
+  simp only [alu, e, if_neg nlt]
+  rw [show (0 : Word) + 0xffffffff#32 = BitVec.allOnes 32 from by decide, BitVec.allOnes_and]
+
+theorem zext_val (x : Nat) : (BitVec.ofNat 32 x) &&& 0xff#32 = BitVec.ofNat 32 (x % 256) := by
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_and, BitVec.toNat_ofNat]
+  rw [show (255 : Nat) % 2 ^ 32 = 2 ^ 8 - 1 from rfl, Nat.and_two_pow_sub_one_eq_mod]
+  omega
+
+/-- code ≥ 2 (0x8001e07c → setup → copy → 0x8001e0c6..0x8001e0cc): `code - 1` bytes moved, then
+    the tail (code ≠ 0xff) or 0x8001e064 (code = 0xff). -/
+theorem big (c : Core) (R : Word → BitVec 8) (h : CobsEnv ⟨c, R⟩) (n src : Nat) (acc : List Nat)
+    (d : Core) (S : Word → BitVec 8) (hi : LInv c R n src acc d S) (hpc : d.pc = 0x8001e07c) (hs : src < n)
+    (h28 : d.get 28 = BitVec.ofNat 32 (bufByte R (c.get 11) src))
+    (h19 : d.get 19 = c.get 11 + BitVec.ofNat 32 src)
+    (h15 : d.get 15 = BitVec.ofNat 32 (src + bufByte R (c.get 11) src))
+    (hc : 2 ≤ bufByte R (c.get 11) src) (hok : src + bufByte R (c.get 11) src ≤ n) :
+    let code := bufByte R (c.get 11) src
+    let data := (List.range (code - 1)).map (fun i => bufByte R (c.get 11) (src + 1 + i))
+    (n ≤ src + code → ∃ k e S', QRun B img k ⟨d, S⟩ ⟨e, S'⟩ ∧ ExitPrep c R 0 n (acc ++ data) e S') ∧
+    (src + code < n → ∃ k e S', QRun B img k ⟨d, S⟩ ⟨e, S'⟩ ∧ e.pc = 0x8001e068 ∧
+      LInv c R n (src + code) (acc ++ data ++ (if code ≠ 0xff then [0] else [])) e S') := by
+  intro code data
+  have hl := h.len; have ord := hi.ord
+  have hb := h.buf; rw [B_ram] at hb; simp only at hb
+  have hb' : 0x80029bc8 ≤ (c.get 11).toNat ∧ (c.get 11).toNat + (c.get 12).toNat ≤ 0x81000000 := hb
+  have hcode : code < 256 := (R _).isLt
+  have q := fun (x : Core) (hx : x.sameCsr c) => Quiet.of_sameCsr hx h.quiet
+  have hlen : c.get 12 = BitVec.ofNat 32 (c.get 12).toNat := (ofNat_toNat _).symm
+  -- 0x8001e07c: code ≥ 2, fall through to the copy setup
+  have nt : ¬ (taken .ltu (d.get 28) (d.get 17) = true) := by
+    rw [h28, hi.a7]; simp only [taken]
+    rw [show (2#32 : Word) = BitVec.ofNat 32 2 from rfl, ult_small code 2 (by omega) (by omega)]; simp; omega
+  let b0 := d.goto 0x8001e080
+  let b1 := b0.wr 13 (alu .add (b0.get 0) 0x0#32) 0x8001e082
+  let b2 := b1.wr 31 (alu .sub (b1.get 12) (b1.get 7)) 0x8001e086
+  let b3 := b2.wr 30 (alu .add (b2.get 5) (b2.get 29)) 0x8001e08a
+  let b4 := b3.wr 8 (alu .sltu (b3.get 12) (b3.get 31)) 0x8001e08e
+  let b5 := b4.wr 8 (alu .add (b4.get 8) 0xffffffff#32) 0x8001e090
+  let b6 := b5.wr 31 (alu .and (b5.get 8) (b5.get 31)) 0x8001e094
+  let b7 := b6.wr 18 (alu .add (b6.get 11) (b6.get 7)) 0x8001e098
+  let b8 := b7.wr 8 (alu .and (b7.get 15) 0xff#32) 0x8001e09c
+  have s0 : DetStep B img ⟨d, S⟩ ⟨b0, S⟩ := dstep f8001e07c hpc (by rw [exec_branch, if_neg nt, hpc]; rfl)
+  have s1 : DetStep B img ⟨b0, S⟩ ⟨b1, S⟩ := dstep f8001e080 rfl (by rw [exec_opimm]; rfl)
+  have s2 : DetStep B img ⟨b1, S⟩ ⟨b2, S⟩ := dstep f8001e082 rfl (by rw [exec_op]; rfl)
+  have s3 : DetStep B img ⟨b2, S⟩ ⟨b3, S⟩ := dstep f8001e086 rfl (by rw [exec_op]; rfl)
+  have s4 : DetStep B img ⟨b3, S⟩ ⟨b4, S⟩ := dstep f8001e08a rfl (by rw [exec_op]; rfl)
+  have s5 : DetStep B img ⟨b4, S⟩ ⟨b5, S⟩ := dstep f8001e08e rfl (by rw [exec_opimm]; rfl)
+  have s6 : DetStep B img ⟨b5, S⟩ ⟨b6, S⟩ := dstep f8001e090 rfl (by rw [exec_op]; rfl)
+  have s7 : DetStep B img ⟨b6, S⟩ ⟨b7, S⟩ := dstep f8001e094 rfl (by rw [exec_op]; rfl)
+  have s8 : DetStep B img ⟨b7, S⟩ ⟨b8, S⟩ := dstep f8001e098 rfl (by rw [exec_opimm]; rfl)
+  have k8 : b8.sameCsr c := by
+    simp only [b8, b7, b6, b5, b4, b3, b2, b1, b0]
+    exact (Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
+      ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
+      ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_goto _ _).trans hi.csr))))))))
+  have runb : QRun B img 9 ⟨d, S⟩ ⟨b8, S⟩ := by
+    have k : ∀ x : Core, x.sameCsr c → Quiet x := q
+    exact .step (k _ hi.csr) s0 (.step (k _ ((Core.sameCsr_goto _ _).trans hi.csr)) s1
+      (.step (k _ ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_goto _ _).trans hi.csr))) s2
+      (.step (k _ ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_goto _ _).trans
+        hi.csr)))) s3
+      (.step (k _ ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
+        ((Core.sameCsr_goto _ _).trans hi.csr))))) s4
+      (.step (k _ ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
+        ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_goto _ _).trans hi.csr)))))) s5
+      (.step (k _ ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
+        ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_goto _ _).trans hi.csr))))))) s6
+      (.step (k _ ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
+        ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
+        ((Core.sameCsr_goto _ _).trans hi.csr)))))))) s7
+      (.single (k _ ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
+        ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
+        ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_goto _ _).trans hi.csr))))))))) s8))))))))
+  -- the copy loop's registers
+  have gb : ∀ r : Reg, r.val ∉ [8, 13, 18, 30, 31] → b8.get r = d.get r := by
+    intro r hr
+    have a : r ≠ 8 := fun e => hr (by subst e; decide)
+    have b : r ≠ 13 := fun e => hr (by subst e; decide)
+    have c' : r ≠ 18 := fun e => hr (by subst e; decide)
+    have d' : r ≠ 30 := fun e => hr (by subst e; decide)
+    have e' : r ≠ 31 := fun e => hr (by subst e; decide)
+    simp [b8, b7, b6, b5, b4, b3, b2, b1, b0, Core.wr_get_ne, a, b, c', d', e']
+  have dl : acc.length ≤ (c.get 12).toNat := by omega
+  have cr : CopyRegs b8 (c.get 11) (c.get 12).toNat src acc.length code 0 := by
+    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    · simp [b8, b7, b6, b5, b4, b3, Core.wr_get_ne, Core.wr_get_self, alu, b2, b1, b0, hi.t0, hi.t4]
+    · have e1 : b6.get 31 = alu .and (alu .add (alu .sltu (c.get 12) (alu .sub (c.get 12) (BitVec.ofNat 32 acc.length)))
+          0xffffffff#32) (alu .sub (c.get 12) (BitVec.ofNat 32 acc.length)) := by
+        simp [b6, b5, b4, b3, b2, b1, b0, Core.wr_get_ne, Core.wr_get_self, hi.a2, hi.t2]
+      have e2 : b8.get 31 = b6.get 31 := by simp [b8, b7, Core.wr_get_ne]
+      have := t6_val (c.get 12).toNat acc.length dl (by omega)
+      simp only [ofNat_toNat] at this
+      rw [e2, e1]; exact this
+    · rw [gb 19 (by decide)]; exact h19
+    · simp [b8, b7, Core.wr_get_ne, Core.wr_get_self, alu, b6, b5, b4, b3, b2, b1, b0, hi.a1, hi.t2]
+    · rw [gb 29 (by decide)]; exact hi.t4
+    · simp only [b8, Core.wr_get_self _ (8 : Reg) _ _ (by decide), alu]
+      rw [show b7.get 15 = d.get 15 by simp [b7, b6, b5, b4, b3, b2, b1, b0, Core.wr_get_ne], h15, zext_val]
+    · simp [b8, b7, b6, b5, b4, b3, b2, Core.wr_get_ne, Core.wr_get_self, alu, b1]
+  obtain ⟨n1, f, S', hrc, hpcf, hcsf, h13f, hgf, hin, hout, hx⟩ :=
+    copy (c.get 11) (c.get 12).toNat src acc.length code hb' hl ⟨hc, by omega⟩ (by omega) ord.1
+      (code - 2) 0 b8 S (by omega) rfl (q _ k8) cr
+  -- 0x8001e0c6..0x8001e0ca: src += code, dst += code - 1
+  let f1 := f.wr 29 (alu .add (f.get 29) (f.get 13)) 0x8001e0c8
+  let f2 := f1.wr 29 (alu .add (f1.get 29) 0x1#32) 0x8001e0ca
+  let f3 := f2.wr 7 (alu .add (f2.get 7) (f2.get 13)) 0x8001e0cc
+  have t1 : DetStep B img ⟨f, S'⟩ ⟨f1, S'⟩ := dstep f8001e0c6 hpcf (by rw [exec_op, hpcf]; rfl)
+  have t2 : DetStep B img ⟨f1, S'⟩ ⟨f2, S'⟩ := dstep f8001e0c8 rfl (by rw [exec_opimm]; rfl)
+  have t3 : DetStep B img ⟨f2, S'⟩ ⟨f3, S'⟩ := dstep f8001e0ca rfl (by rw [exec_op]; rfl)
+  have kf : f.sameCsr c := hcsf.trans k8
+  have k3 : f3.sameCsr c := (Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
+    ((Core.sameCsr_wr _ _ _ _).trans kf))
+  have run3 : QRun B img _ ⟨d, S⟩ ⟨f3, S'⟩ :=
+    runb.trans (hrc.trans (.step (q _ kf) t1 (.step (q _ ((Core.sameCsr_wr _ _ _ _).trans kf)) t2
+      (.single (q _ ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans kf))) t3))))
+  have gf : ∀ r : Reg, r.val ∉ [8, 9, 13, 15, 18, 30, 31] → f.get r = d.get r := by
+    intro r hr
+    rw [hgf r (fun e => hr (by subst e; decide)) (fun e => hr (by subst e; decide)) (fun e => hr (by subst e; decide))]
+    exact gb r (by simp only [List.mem_cons, List.not_mem_nil, or_false] at hr ⊢; omega)
+  have hdlen : data.length = code - 1 := by simp [data]
+  have i3 : LInv c R n (src + code) (acc ++ data) f3 S' := hi.mk' f3 S' (src + code) (acc ++ data) k3
+    (fun r hr => by
+      have a : r ≠ 7 := fun e => hr (by subst e; decide)
+      have b : r ≠ 29 := fun e => hr (by subst e; decide)
+      simp only [f3, f2, f1, Core.wr_get_ne _ _ _ _ _ a, Core.wr_get_ne _ _ _ _ _ b]
+      exact gf r (by simp only [List.mem_cons, List.not_mem_nil, or_false] at hr ⊢; omega))
+    (by
+      simp only [f3, f2, f1, Core.wr_get_ne _ _ _ _ _ (show (29 : Reg) ≠ 7 by decide),
+        Core.wr_get_self _ (29 : Reg) _ _ (by decide), alu, h13f]
+      rw [gf 29 (by decide), hi.t4]
+      apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_add, BitVec.toNat_ofNat]; omega)
+    (by
+      simp only [f3, Core.wr_get_self _ (7 : Reg) _ _ (by decide), alu, f2, f1,
+        Core.wr_get_ne _ _ _ _ _ (show (7 : Reg) ≠ 29 by decide),
+        Core.wr_get_ne _ _ _ _ _ (show (13 : Reg) ≠ 29 by decide), h13f, List.length_append, hdlen]
+      rw [gf 7 (by decide), hi.t2]
+      apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_add, BitVec.toNat_ofNat]; omega)
+    (by
+      intro j hj
+      by_cases j1 : j < acc.length
+      · rw [hout j (Or.inl (by omega)) hj, hi.bytes j hj, dif_pos j1, dif_pos (by simp; omega),
+          List.getElem_append_left j1]
+      · by_cases j2 : j < acc.length + (code - 1)
+        · rw [hin j (by omega) (by omega), hi.bytes _ (by omega), dif_neg (by omega), dif_pos (by simp [hdlen]; omega),
+            List.getElem_append_right (by omega)]
+          simp only [data, List.getElem_map, List.getElem_range]
+        · rw [hout j (Or.inr (by omega)) hj, hi.bytes j hj, dif_neg j1, dif_neg (by simp [hdlen]; omega)])
+    hx ⟨by simp [hdlen]; omega, hok⟩
+  have h28' : f3.get 28 = BitVec.ofNat 32 code := by
+    simp only [f3, f2, f1, Core.wr_get_ne _ _ _ _ _ (show (28 : Reg) ≠ 7 by decide),
+      Core.wr_get_ne _ _ _ _ _ (show (28 : Reg) ≠ 29 by decide)]
+    rw [gf 28 (by decide)]; exact h28
+  have h6' : f3.get 6 = 0xff#32 := i3.t1
+  by_cases hff : code = 0xff
+  · -- 0x8001e0cc: bne not taken; 0x8001e0d0: j 0x8001e064
+    have nt : ¬ (taken .ne (f3.get 28) (f3.get 6) = true) := by
+      rw [h28', h6', hff]; simp [taken]
+    have u1 : DetStep B img ⟨f3, S'⟩ ⟨f3.goto 0x8001e0d0, S'⟩ := dstep f8001e0cc rfl (by rw [exec_branch, if_neg nt]; rfl)
+    have u2 : DetStep B img ⟨f3.goto 0x8001e0d0, S'⟩ ⟨(f3.goto 0x8001e0d0).goto 0x8001e064, S'⟩ :=
+      dstep f8001e0d0 rfl (by
+        rw [exec_jal, Core.set_zero]; exact jump_lit _ 0x8001e0d0 _ 0x8001e064 rfl (by decide) (by decide))
+    have i5 := (i3.goto 0x8001e0d0).goto 0x8001e064
+    have run5 := run3.trans (.step (q _ k3) u1 (.single (q _ (i3.goto 0x8001e0d0).csr) u2))
+    simp only [if_neg (show ¬ (code ≠ 0xff) from fun e => e hff), List.append_nil]
+    constructor
+    · intro hn
+      obtain ⟨k, e, S'', hr, hx⟩ := G_exit c R h n (src + code) (acc ++ data) _ S' i5 rfl hn
+      exact ⟨_, e, S'', run5.trans hr, hx⟩
+    · intro hn
+      exact ⟨_, _, S', run5.trans (G_cont c R h n (src + code) (acc ++ data) _ S' i5 rfl hn), rfl, i5.goto _⟩
+  · -- 0x8001e0cc: bne taken → the tail 0x8001e0d8
+    have tk : taken .ne (f3.get 28) (f3.get 6) = true := by
+      rw [h28', h6']; simp only [taken, bne_iff_ne, ne_eq]
+      intro e; have := congrArg BitVec.toNat e; simp at this; omega
+    have u1 : DetStep B img ⟨f3, S'⟩ ⟨f3.goto 0x8001e0d8, S'⟩ := dstep f8001e0cc rfl (by
+      rw [exec_branch, if_pos tk]; exact jump_lit _ 0x8001e0cc _ 0x8001e0d8 rfl (by decide) (by decide))
+    have i4 := i3.goto 0x8001e0d8
+    have run4 := run3.trans (.single (q _ k3) u1)
+    simp only [if_pos hff]
+    constructor
+    · intro hn
+      obtain ⟨k, e, S'', hr, hx⟩ := tail_exit c R h n (src + code) (acc ++ data) _ S' i4 rfl hn
+      exact ⟨_, e, S'', run4.trans hr, hx⟩
+    · intro hn
+      obtain ⟨k, e, S'', hr, hpc', hx⟩ := tail_cont c R h n (src + code) (acc ++ data) _ S' i4 rfl hn
+        (by simp [hdlen]; omega)
+      exact ⟨_, e, S'', run4.trans hr, hpc', hx⟩
+
 end E5R.Rmk.Cobs
