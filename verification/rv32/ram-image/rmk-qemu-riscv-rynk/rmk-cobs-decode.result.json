@@ -1,0 +1,327 @@
+{
+ "inputs": {
+  "allowed_axioms": [
+   "propext",
+   "Classical.choice",
+   "Quot.sound"
+  ],
+  "board_sha256": "6fe2d0db63ed5756db3ca2845b00931154c84359002daf47cff906b0df64287b",
+  "e5r_verify": "0.1.0",
+  "e5r_verify_sha256": "51c3bea108faafa695f5388401228151212ce468c9016fd47de229023dc4a255",
+  "elf": {
+   "bytes": 454024,
+   "path": "build/rmk-qemu-riscv-rynk.elf",
+   "sha256": "f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30"
+  },
+  "image": {
+   "fidelity": {
+    "path": "Projects/rmk/ElfFidelity.lean",
+    "sha256": "f9a53a204d90b5fbe0541a911f3f385569420be00010a237abf38613fa770c71"
+   },
+   "kind": "ram",
+   "manifest": {
+    "path": "build/jobs/rmk-cobs-decode/ram-image.json",
+    "sha256": "b369d7ceacfb0577b9fcd5fadd94e82623d31857c59bad66835e56007f4980e2"
+   },
+   "module": {
+    "path": "Projects/rmk/Elf.lean",
+    "sha256": "dec6babff7b3451871fc3cdcc77a040308f8c1859fd01acfa3b37ffce9c526a9"
+   }
+  },
+  "job_sha256": "701bc030e3bf4a98937a590b7078a709b2c60db161141bdf9dc3d75491be1725",
+  "lean": "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release)",
+  "sources": {
+   "Projects/ramimage/Cobs.lean": "889579b6b430b8e1af1fa8bd907a14851e44ce42aabd592a7b9bb09725b44d42",
+   "Projects/rmk/Cobs/Basic.lean": "1108d70dc6685d8959394ad9be29c1ea05ef778739dbfaf2ac0f38415ca26329",
+   "Projects/rmk/Cobs/Copy.lean": "0ed6ed79d597ead58671af4c3e2a1d9d94a940a0aaeab9034ddf09ad37e15f0f",
+   "Projects/rmk/Cobs/Decode.lean": "ebe0109d8e121658a3416405ba3b5a9ac4fd25123fdfdf5d30e34d283d118190",
+   "Projects/rmk/Cobs/Empty.lean": "0be9b4fb14c2f0b97d767a065090dad50aa05c8a2704060eef9e1dbef527c1b1",
+   "Projects/rmk/Cobs/Fetch.lean": "74885857944f0f189a7a0b9e09f1ba16c257b027794b1895f14bca0b359de397",
+   "Projects/rmk/Cobs/Loop.lean": "312c6a84188988a3c5c2f975e1905eb79f1565c15af5a200b85a4c22d078c6fd",
+   "Projects/rmk/Cobs/Scan.lean": "f89fd8531add1c389bfa80fd02486eab3750d9709e96e9f64258f7196f400a5b",
+   "Projects/rmk/Cobs/Spec.lean": "44d66554104f9329af5373a1e48af29a06bfe8e5fd5849d4c64e493b68326b12",
+   "Projects/rmk/Fetch.lean": "d1a3378e024b89090305e3f5d81a9670b328348f68c85933bdf05c243b29307f",
+   "Projects/rmk/Run.lean": "908851c1f949ef1340ec6c49e2cb283be6d4a3b26861f92c2e2cf901acfefff8",
+   "Theories/Board/QemuVirtRv32.lean": "d902dbaad9129b352fc736c62313615608ec2cabeb0667805653db9b9aff2a0f",
+   "Theories/FlashElf.lean": "b3a5dd6e56e6e9444b88f05de6f020e326377f55af777b380249fc53cc0111a6",
+   "Theories/Hart.lean": "dde4a86db936c9ad60f58866c3ebb333fbc556ec0f94299da212d0ca08cfb82a",
+   "Theories/Logic.lean": "bed5eee4c9a12c2eee16a3e3b9523cca51c91f17380b97d81673151ff3cc4f48",
+   "Theories/Platform.lean": "37939dcb4318bcea8b8a45c25a36d9f3ae59b78656fedd7dcc60c66442d11528",
+   "Theories/RamElf.lean": "9a8cb07ac5d869fe5297d1934eaefef94b535e1c91d9e144a9daf74fc7ce832f",
+   "tools/gen_board.py": "fd69bd893835b7e4738c119b9a496c26c22fbe40894abb339579e19dbf1eeefb"
+  }
+ },
+ "job": "rmk-cobs-decode",
+ "job_file": "jobs/rmk/rmk-cobs-decode.json",
+ "modules": [
+  "Theories/Hart.lean",
+  "Theories/Platform.lean",
+  "Theories/Logic.lean",
+  "Theories/FlashElf.lean",
+  "Theories/RamElf.lean",
+  "Theories/Board/QemuVirtRv32.lean",
+  "Projects/rmk/Elf.lean",
+  "Projects/rmk/ElfFidelity.lean",
+  "Projects/rmk/Run.lean",
+  "Projects/rmk/Fetch.lean",
+  "Projects/rmk/Cobs/Fetch.lean",
+  "Projects/rmk/Cobs/Basic.lean",
+  "Projects/rmk/Cobs/Empty.lean",
+  "Projects/rmk/Cobs/Scan.lean",
+  "Projects/rmk/Cobs/Copy.lean",
+  "Projects/rmk/Cobs/Spec.lean",
+  "Projects/rmk/Cobs/Loop.lean",
+  "Projects/rmk/Cobs/Decode.lean",
+  "Projects/ramimage/Cobs.lean"
+ ],
+ "resumed": [],
+ "schema": "e5r.verify.result.v1",
+ "seconds": 257.9,
+ "stages": [
+  {
+   "name": "lean Theories/Hart.lean",
+   "peak_rss_mib": 509,
+   "seconds": 3.0
+  },
+  {
+   "name": "lean Theories/Platform.lean",
+   "peak_rss_mib": 469,
+   "seconds": 1.9
+  },
+  {
+   "name": "lean Theories/Logic.lean",
+   "peak_rss_mib": 499,
+   "seconds": 2.2
+  },
+  {
+   "name": "lean Theories/FlashElf.lean",
+   "peak_rss_mib": 465,
+   "seconds": 1.5
+  },
+  {
+   "name": "lean Theories/RamElf.lean",
+   "peak_rss_mib": 468,
+   "seconds": 1.6
+  },
+  {
+   "name": "lean Theories/Board/QemuVirtRv32.lean",
+   "peak_rss_mib": 443,
+   "seconds": 1.3
+  },
+  {
+   "name": "lean Projects/rmk/Elf.lean",
+   "peak_rss_mib": 711,
+   "seconds": 9.1
+  },
+  {
+   "name": "lean Projects/rmk/ElfFidelity.lean",
+   "peak_rss_mib": 549,
+   "seconds": 2.9
+  },
+  {
+   "name": "lean Projects/rmk/Run.lean",
+   "peak_rss_mib": 444,
+   "seconds": 1.3
+  },
+  {
+   "name": "lean Projects/rmk/Fetch.lean",
+   "peak_rss_mib": 6508,
+   "seconds": 56.8
+  },
+  {
+   "name": "lean Projects/rmk/Cobs/Fetch.lean",
+   "peak_rss_mib": 646,
+   "seconds": 20.1
+  },
+  {
+   "name": "lean Projects/rmk/Cobs/Basic.lean",
+   "peak_rss_mib": 651,
+   "seconds": 10.4
+  },
+  {
+   "name": "lean Projects/rmk/Cobs/Empty.lean",
+   "peak_rss_mib": 481,
+   "seconds": 1.5
+  },
+  {
+   "name": "lean Projects/rmk/Cobs/Scan.lean",
+   "peak_rss_mib": 492,
+   "seconds": 2.6
+  },
+  {
+   "name": "lean Projects/rmk/Cobs/Copy.lean",
+   "peak_rss_mib": 521,
+   "seconds": 3.7
+  },
+  {
+   "name": "lean Projects/rmk/Cobs/Spec.lean",
+   "peak_rss_mib": 460,
+   "seconds": 1.5
+  },
+  {
+   "name": "lean Projects/rmk/Cobs/Loop.lean",
+   "peak_rss_mib": 718,
+   "seconds": 11.5
+  },
+  {
+   "name": "lean Projects/rmk/Cobs/Decode.lean",
+   "peak_rss_mib": 542,
+   "seconds": 3.6
+  },
+  {
+   "name": "lean Projects/ramimage/Cobs.lean",
+   "peak_rss_mib": 542,
+   "seconds": 1.6
+  },
+  {
+   "name": "leanchecker Theories/Hart.lean",
+   "peak_rss_mib": 432,
+   "seconds": 4.5
+  },
+  {
+   "name": "leanchecker Theories/Platform.lean",
+   "peak_rss_mib": 404,
+   "seconds": 1.8
+  },
+  {
+   "name": "leanchecker Theories/Logic.lean",
+   "peak_rss_mib": 441,
+   "seconds": 1.9
+  },
+  {
+   "name": "leanchecker Theories/FlashElf.lean",
+   "peak_rss_mib": 241,
+   "seconds": 1.9
+  },
+  {
+   "name": "leanchecker Theories/RamElf.lean",
+   "peak_rss_mib": 307,
+   "seconds": 1.8
+  },
+  {
+   "name": "leanchecker Theories/Board/QemuVirtRv32.lean",
+   "peak_rss_mib": 424,
+   "seconds": 1.7
+  },
+  {
+   "name": "leanchecker Projects/rmk/Elf.lean",
+   "peak_rss_mib": 442,
+   "seconds": 1.8
+  },
+  {
+   "name": "leanchecker Projects/rmk/ElfFidelity.lean",
+   "peak_rss_mib": 506,
+   "seconds": 3.3
+  },
+  {
+   "name": "leanchecker Projects/rmk/Run.lean",
+   "peak_rss_mib": 262,
+   "seconds": 1.8
+  },
+  {
+   "name": "leanchecker Projects/rmk/Fetch.lean",
+   "peak_rss_mib": 6464,
+   "seconds": 56.3
+  },
+  {
+   "name": "leanchecker Projects/rmk/Cobs/Fetch.lean",
+   "peak_rss_mib": 481,
+   "seconds": 16.1
+  },
+  {
+   "name": "leanchecker Projects/rmk/Cobs/Basic.lean",
+   "peak_rss_mib": 459,
+   "seconds": 4.7
+  },
+  {
+   "name": "leanchecker Projects/rmk/Cobs/Empty.lean",
+   "peak_rss_mib": 374,
+   "seconds": 3.0
+  },
+  {
+   "name": "leanchecker Projects/rmk/Cobs/Scan.lean",
+   "peak_rss_mib": 451,
+   "seconds": 3.3
+  },
+  {
+   "name": "leanchecker Projects/rmk/Cobs/Copy.lean",
+   "peak_rss_mib": 456,
+   "seconds": 2.6
+  },
+  {
+   "name": "leanchecker Projects/rmk/Cobs/Spec.lean",
+   "peak_rss_mib": 419,
+   "seconds": 1.8
+  },
+  {
+   "name": "leanchecker Projects/rmk/Cobs/Loop.lean",
+   "peak_rss_mib": 471,
+   "seconds": 5.0
+  },
+  {
+   "name": "leanchecker Projects/rmk/Cobs/Decode.lean",
+   "peak_rss_mib": 463,
+   "seconds": 2.2
+  },
+  {
+   "name": "leanchecker Projects/ramimage/Cobs.lean",
+   "peak_rss_mib": 520,
+   "seconds": 2.2
+  }
+ ],
+ "status": "proved",
+ "theorems": [
+  {
+   "axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+   ],
+   "name": "E5R.Rmk.Cobs.decode"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.RmkCobs.img_eq"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.RmkCobs.board_eq"
+  },
+  {
+   "axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+   ],
+   "name": "E5R.RmkCobs.decode"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.Rmk.Image.image_accepted"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.Rmk.Image.image_agrees"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.Rmk.Image.image_entry"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.Rmk.Image.image_rwBase"
+  }
+ ]
+}
