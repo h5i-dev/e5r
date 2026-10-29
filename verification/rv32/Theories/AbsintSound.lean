@@ -2139,6 +2139,21 @@ theorem csrWriteAbs_sound {ρ : Nat → Word} {s s'' : AState} {c : Core} {addr 
     exact ⟨_, rfl, hc, fun _ => rfl, rfl, rfl, rfl⟩
   · simp at h
 
+theorem lift_or_top_sound {ρ : Nat → Word} {f : Word → Word → Word} {a b : AV} {x y : Word}
+    (ha : a.gam ρ x) (hb : b.gam ρ y) :
+    (match a, b with | .vals p, .vals q => lift2 f p q | _, _ => .top).gam ρ (f x y) := by
+  split
+  · exact lift2_sound ha hb
+  · trivial
+
+theorem csr_operand_sound {ρ : Nat → Word} {s : AState} {c : Core}
+    (hr : ∀ r : Reg, (s.get r).gam ρ (c.get r)) (src : CsrSrc) :
+    (match src with | .reg r => s.get r | .imm v => AV.const v.toNat).gam ρ
+      (match src with | .reg r => c.get r | .imm v => v) := by
+  cases src with
+  | reg r => exact hr r
+  | imm v => exact const_sound' (Nat.mod_eq_of_lt (toNat_lt v)).symm
+
 /-! ### Instruction cases -/
 
 section Cases
@@ -2524,6 +2539,62 @@ theorem case_amo {op : AmoOp} {rd rs1 rs2 : Reg} (hv : ValidImg cfg.img)
   split at hst
   · next _ _ y z hy => exact finish (lift2_sound hr (hy ▸ hs.regs rs2)) hst
   · exact finish (new := .top) trivial hst
+
+/-- A CSR instruction, with the source operand and the written value
+    abstracted: `wA`/`wC` say whether it writes, `newA`/`newC` what. -/
+theorem csr_core {rd : Reg} {addr : Nat} {wA wC : Bool} {newA : AV → AV} {newC : Word → Word}
+    (hw : wA = wC) (hnew : ∀ a x, a.gam ρ x → (newA a).gam ρ (newC x))
+    (h : (if (wA && addr / 1024 == 3) = true then none else (csrReadAbs s addr).bind fun old =>
+        if (!wA) = true then some [{ s.set rd old with pc := (s.pc + len.toNat) % M32 }] else
+        (csrWriteAbs (s.set rd old) addr (newA old)).bind fun s'' =>
+          some [{ s'' with pc := (s.pc + len.toNat) % M32 }]) = some ts) :
+    StepOk cfg ρ ts o (if (wC && addr / 1024 == 3) = true then .trap .illegal else csrRead m.core addr fun old =>
+      if (!wC) = true then .done { m.core.set rd old with pc := m.core.pc + len } else
+      csrWrite (m.core.set rd old) addr (newC old) fun c' => .done { c' with pc := m.core.pc + len }) m.ram := by
+  subst hw
+  split at h
+  · simp at h
+  · next hcond =>
+    rw [if_neg hcond]
+    obtain ⟨old, hrd, hrest⟩ := Option.bind_eq_some_iff.mp h
+    obtain ⟨r, i', hi, hr⟩ := csrReadAbs_sound hrd (ctl_of_holds hs) o _ m.ram 0 []
+    unfold StepOk; rw [hi]
+    cases hwa : wA
+    · simp only [hwa, Bool.not_false, if_true, Option.some.injEq] at hrest ⊢
+      subst hrest
+      exact ⟨_, _, _, interp_done o _ _ _ _, by simp, _, List.mem_singleton_self _,
+        holds_after (memF := s.mem) hs hl (c := m.core) (fun _ => rfl) (ctl_of_holds hs) hs.mem hr⟩
+    · simp only [hwa, Bool.not_true, Bool.false_eq_true, if_false] at hrest ⊢
+      obtain ⟨s'', hwr, hts⟩ := Option.bind_eq_some_iff.mp hrest
+      simp only [Option.some.injEq] at hts; subst hts
+      obtain ⟨c', hcw, hctl, hget, hregs, hmem, _⟩ := csrWriteAbs_sound hwr
+        (ctl_setc (ctl_set (ctl_of_holds hs) rd old) rd r) (hnew _ _ hr)
+        (fun c' => .done { c' with pc := m.core.pc + len })
+      rw [hcw]
+      refine ⟨_, _, _, interp_done o _ _ _ _, by simp, _, List.mem_singleton_self _, ?_⟩
+      refine holds_mk (pc_adv hs.pc) ?_ ?_ (ctl_pc (ctl_withPc hctl _) _)
+      · intro q
+        rw [withPc_get, Core.get_withPc, hget]
+        have : s''.get q = (s.set rd old).get q := by unfold AState.get; rw [hregs]
+        rw [this]; exact regs_set hl hs.regs rd hr q
+      · show MemHolds ρ m.ram s''.mem
+        rw [hmem, (AState.set_other s rd old).1]; exact hs.mem
+
+theorem case_csr {op : CsrOp} {rd : Reg} {src : CsrSrc} {addr : Nat}
+    (h : absExec cfg s len.toNat (.csr op rd src addr) = some ts) :
+    StepOk cfg ρ ts o (exec m.core len (.csr op rd src addr)) m.ram := by
+  have he : exec m.core len (.csr op rd src addr) =
+      execCsr m.core op rd src addr (fun c' => .done { c' with pc := m.core.pc + len }) := rfl
+  rw [he]; unfold execCsr
+  simp only [absExec] at h
+  refine csr_core hs hl o ?_ ?_ h
+  · cases src <;> rfl
+  · intro a x hx
+    have hop := csr_operand_sound hs.regs src
+    cases op
+    · exact hop
+    · exact lift_or_top_sound (f := fun p q => p ||| q) hx hop
+    · exact lift_or_top_sound (f := fun p q => p &&& ~~~q) hx hop
 
 end Cases
 
