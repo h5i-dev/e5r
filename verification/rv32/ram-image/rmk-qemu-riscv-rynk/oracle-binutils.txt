@@ -1,0 +1,3 @@
+MISMATCH: ELF hash/size
+GNU readelf (GNU Binutils for Ubuntu) 2.42
+GNU objcopy (GNU Binutils for Ubuntu) 2.42

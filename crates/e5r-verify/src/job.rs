@@ -78,6 +78,23 @@ pub struct BuildStep {
 pub struct ImageSpec {
     pub module: String,
     pub namespace: String,
+    /// How the board holds the image. Absent means `flash`, the original
+    /// job kind, unchanged.
+    #[serde(default)]
+    pub kind: ImageKind,
+}
+
+/// `flash`: the board boots PT_LOAD file bytes stored at their physical
+/// addresses (`flash::export_flash`, `E5R.FlashElf`). `ram`: a loader puts
+/// every PT_LOAD into RAM in place (`ram::ram_image`); the image the model
+/// runs is defined by the checker's reader `E5R.RamElf.imageOf` applied to
+/// the packed file, and the board must say `"image_placement": "ram"`.
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ImageKind {
+    #[default]
+    Flash,
+    Ram,
 }
 
 #[derive(Debug, Deserialize)]
@@ -152,6 +169,40 @@ impl Job {
 
     pub fn module_path(module: &str) -> String {
         module.replace('.', "/") + ".lean"
+    }
+
+    /// The model sources this job is checked against, in dependency order.
+    pub fn model(&self) -> Vec<String> {
+        let mut m: Vec<String> = MODEL.iter().map(|s| s.to_string()).collect();
+        if self.image.kind == ImageKind::Ram {
+            m.push(RAM_READER.into());
+        }
+        m
+    }
+
+    /// The generated module that binds the image to the model.
+    pub fn fidelity_module(&self) -> String {
+        format!("{}Fidelity", self.image.module)
+    }
+
+    /// Where a RAM job's exporter manifest is kept, relative to the root.
+    pub fn ram_manifest(&self) -> String {
+        format!("build/jobs/{}/ram-image.json", self.id)
+    }
+}
+
+/// The checker's independent reader of RAM-resident ELF images.
+pub const RAM_READER: &str = "Theories/RamElf.lean";
+
+/// `image_placement` of a board JSON (`null` or absent for flash boards).
+fn image_placement(board_text: &str) -> Result<Option<String>, Stop> {
+    let v: Value = serde_json::from_str(board_text).map_err(err("board"))?;
+    match &v["image_placement"] {
+        Value::Null => Ok(None),
+        Value::String(s) => Ok(Some(s.clone())),
+        other => Err(Stop::Error(format!(
+            "board image_placement {other} is not a string"
+        ))),
     }
 }
 
@@ -393,7 +444,7 @@ pub fn identity(job: &Job, paths: &Paths) -> Result<Value, Stop> {
     let read =
         |p: &Path| std::fs::read(p).map_err(|e| Stop::Error(format!("{}: {e}", p.display())));
     let mut sources = BTreeMap::new();
-    let mut files: Vec<String> = MODEL.iter().map(|s| s.to_string()).collect();
+    let mut files: Vec<String> = job.model();
     files.push(format!(
         "Theories/Board/{}.lean",
         board_module_name(&job.board)?
@@ -411,7 +462,28 @@ pub fn identity(job: &Job, paths: &Paths) -> Result<Value, Stop> {
         "tools/gen_board.py".into(),
         sha256::hex(&read(&paths.root.join("tools/gen_board.py"))?),
     );
+    // A RAM job's generated files are pinned too: the packed module and its
+    // binding are regenerated from the ELF every run, and a result is stale
+    // if either on disk is not what that run produced.
+    let image = if job.image.kind == ImageKind::Ram {
+        let hash = |rel: &str| {
+            std::fs::read(paths.root.join(rel))
+                .ok()
+                .map(|b| sha256::hex(&b))
+        };
+        let module = Job::module_path(&job.image.module);
+        let fidelity = Job::module_path(&job.fidelity_module());
+        json!({
+            "kind": "ram",
+            "module": { "path": module, "sha256": hash(&module) },
+            "fidelity": { "path": fidelity, "sha256": hash(&fidelity) },
+            "manifest": { "path": job.ram_manifest(), "sha256": hash(&job.ram_manifest()) },
+        })
+    } else {
+        Value::Null
+    };
     Ok(json!({
+        "image": image,
         "job_sha256": sha256::hex(&read(&paths.job)?),
         "board_sha256": sha256::hex(&read(&paths.root.join(&job.board))?),
         "elf": { "path": job.elf, "sha256": sha256::hex(&elf), "bytes": elf.len() },
@@ -518,30 +590,84 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
                 String::from_utf8_lossy(&regen.stderr).trim()
             )));
         }
-        // Export the flash image. Refusal means the binary is out of scope.
-        let windows = board.windows().map_err(Stop::Error)?;
-        let image = crate::flash::export_flash(&elf, windows, &job.image.namespace)
-            .map_err(Stop::Unsupported)?;
+        // Export the image. Refusal means the binary is out of scope. The
+        // board must hold images the way the job says.
+        let placement = image_placement(&board_text)?;
+        let fidelity_mod = job.fidelity_module();
         let image_path = paths.root.join(Job::module_path(&job.image.module));
+        let fidelity_path = paths.root.join(Job::module_path(&fidelity_mod));
+        // Never leave a previous run's generated files to be checked.
+        for p in [&image_path, &fidelity_path] {
+            match std::fs::remove_file(p) {
+                Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+                    return Err(Stop::Error(format!("{}: {e}", p.display())));
+                }
+                _ => {}
+            }
+        }
+        let (image, fidelity, binding) = match job.image.kind {
+            ImageKind::Flash => {
+                if placement.is_some() {
+                    return Err(Stop::Error(format!(
+                        "board {} places images in {}; this job's image.kind is flash",
+                        board.id,
+                        placement.unwrap_or_default()
+                    )));
+                }
+                let windows = board.windows().map_err(Stop::Error)?;
+                let image = crate::flash::export_flash(&elf, windows, &job.image.namespace)
+                    .map_err(Stop::Unsupported)?;
+                // The independent Lean reader must reconstruct exactly this image.
+                let fidelity = format!(
+                    "-- Generated by e5r-verify check; regenerate, do not edit.\n\
+                     import Theories.FlashElf\nimport {img}\nset_option maxRecDepth 100000\n\
+                     theorem {ns}.image_fidelity : E5R.FlashElf.loadFlash ⟨{fb}, {fs}, {rb}, {rs}⟩ {ns}.elfBytes = \
+                     .ok ({ns}.entry, {ns}.segments) := by decide +kernel\n",
+                    img = job.image.module,
+                    ns = job.image.namespace,
+                    fb = windows.flash_base,
+                    fs = windows.flash_size,
+                    rb = windows.ram_base,
+                    rs = windows.ram_size,
+                );
+                (
+                    image,
+                    fidelity,
+                    vec![format!("{}.image_fidelity", job.image.namespace)],
+                )
+            }
+            ImageKind::Ram => {
+                if placement.as_deref() != Some("ram") {
+                    return Err(Stop::Error(format!(
+                        "board {} does not place images in RAM; this job's image.kind is ram",
+                        board.id
+                    )));
+                }
+                let (base, size) = crate::ram::board_window(&board).map_err(Stop::Error)?;
+                let policy = crate::ram::Policy::new(base, size);
+                let img = crate::ram::ram_image(&elf, policy).map_err(Stop::Unsupported)?;
+                let ns = &job.image.namespace;
+                let manifest = crate::ram::manifest(&elf, &img, policy);
+                let manifest_path = paths.root.join(job.ram_manifest());
+                if let Some(dir) = manifest_path.parent() {
+                    std::fs::create_dir_all(dir).map_err(err("manifest"))?;
+                }
+                std::fs::write(
+                    &manifest_path,
+                    serde_json::to_string_pretty(&manifest).unwrap() + "\n",
+                )
+                .map_err(err("manifest"))?;
+                (
+                    crate::ram::lean(&elf, ns),
+                    crate::ram::fidelity_source(&img, &job.image.module, ns, base, size),
+                    crate::ram::fidelity_theorems(ns),
+                )
+            }
+        };
         std::fs::write(&image_path, &image).map_err(err("image"))?;
-        // The independent Lean reader must reconstruct exactly this image.
-        let fidelity_mod = format!("{}Fidelity", job.image.module);
-        let fidelity = format!(
-            "-- Generated by e5r-verify check; regenerate, do not edit.\n\
-             import Theories.FlashElf\nimport {img}\nset_option maxRecDepth 100000\n\
-             theorem {ns}.image_fidelity : E5R.FlashElf.loadFlash ⟨{fb}, {fs}, {rb}, {rs}⟩ {ns}.elfBytes = \
-             .ok ({ns}.entry, {ns}.segments) := by decide +kernel\n",
-            img = job.image.module,
-            ns = job.image.namespace,
-            fb = windows.flash_base,
-            fs = windows.flash_size,
-            rb = windows.ram_base,
-            rs = windows.ram_size,
-        );
-        std::fs::write(paths.root.join(Job::module_path(&fidelity_mod)), fidelity)
-            .map_err(err("fidelity"))?;
+        std::fs::write(&fidelity_path, fidelity).map_err(err("fidelity"))?;
         // Check every module, model first, each from source.
-        let mut order: Vec<String> = MODEL.iter().map(|s| s.to_string()).collect();
+        let mut order: Vec<String> = job.model();
         order.push(format!("Theories/Board/{board_mod}.lean"));
         order.push(Job::module_path(&job.image.module));
         order.push(Job::module_path(&fidelity_mod));
@@ -659,7 +785,7 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
                 None => names.push(t.clone()),
             }
         }
-        names.push(format!("{}.image_fidelity", job.image.namespace));
+        names.extend(binding);
         let imports: Vec<String> = order
             .iter()
             .map(|m| format!("import {}", m.trim_end_matches(".lean").replace('/', ".")))
@@ -767,6 +893,9 @@ pub fn stale(result: &Value) -> Result<Vec<String>, String> {
             changed.push(key.to_string());
         }
     }
+    if now["image"] != then["image"] {
+        changed.push("generated image".to_string());
+    }
     if now["elf"]["sha256"] != then["elf"]["sha256"] {
         changed.push(format!("elf {}", job.elf));
     }
@@ -790,6 +919,21 @@ pub fn stale(result: &Value) -> Result<Vec<String>, String> {
     }
     Ok(changed)
 }
+
+/// Bundled with RAM-image jobs: unpack the `E5R.RamElf.File` literal and
+/// compare every byte with the ELF (independent of the Rust packer).
+const PACKING_CHECK: &str = r#"import re, sys
+src = open(sys.argv[1], encoding="utf-8").read()
+elf = open(sys.argv[2], "rb").read()
+m = re.search(r"def elf : E5R\.RamElf\.File := ⟨(\d+), \[([0-9,\s]*)\]⟩", src)
+assert m, "no File literal"
+n, words = int(m.group(1)), [int(w) for w in m.group(2).split(",") if w.strip()]
+assert n == len(elf) and len(words) == (n + 63) // 64, "length"
+assert all(w < 256 ** 64 for w in words), "word too large"
+data = b"".join(w.to_bytes(64, "little") for w in words)
+assert data[:n] == elf and not any(data[n:]), "bytes differ"
+print(f"packing: all {n} ELF bytes equal the Lean File literal")
+"#;
 
 /// After a fresh `proved` run, write everything needed to recheck the
 /// proofs with nothing but the pinned Lean: the sources and generated
@@ -818,6 +962,9 @@ pub fn bundle(job_path: &Path, out: &Path) -> Result<Value, String> {
     files.push("lean-toolchain".into());
     files.push(job.elf.clone());
     files.push(job.board.clone());
+    if job.image.kind == ImageKind::Ram {
+        files.push(job.ram_manifest());
+    }
     let mut sums = String::new();
     for f in &files {
         let src = paths.root.join(f);
@@ -850,11 +997,27 @@ pub fn bundle(job_path: &Path, out: &Path) -> Result<Value, String> {
             format!("'{name}' depends on axioms: [{}]\n", axioms.join(", "))
         });
     }
+    // A RAM image's Lean file is the ELF packed by the exporter; the bundle
+    // re-derives the bytes from it, without the exporter, and compares.
+    let packing = if job.image.kind == ImageKind::Ram {
+        std::fs::write(out.join("check-packing.py"), PACKING_CHECK).map_err(|e| e.to_string())?;
+        sums.push_str(&format!(
+            "{}  check-packing.py\n",
+            sha256::hex(PACKING_CHECK.as_bytes())
+        ));
+        format!(
+            "python3 -I check-packing.py {} {}\n",
+            Job::module_path(&job.image.module),
+            job.elf
+        )
+    } else {
+        String::new()
+    };
     let script = format!(
         "#!/usr/bin/env bash\n\
          # Recheck this bundle with only Lean (the version in lean-toolchain).\n\
          set -euo pipefail\ncd \"$(dirname \"$0\")\"\n\
-         sha256sum -c --quiet SHA256SUMS\n\
+         sha256sum -c --quiet SHA256SUMS\n{packing}\
          for m in {mods}; do\n  LEAN_PATH=. lean -j1 -o \"${{m%.lean}}.olean\" \"$m\"\ndone\n\
          LEAN_PATH=. lean -j1 Audit.lean > axioms.actual\n\
          diff axioms.expected axioms.actual\n\
@@ -935,5 +1098,42 @@ mod tests {
             board_module_name("boards/hifive1-revb.json").unwrap(),
             "Hifive1Revb"
         );
+    }
+
+    fn job_with_image(image: &str) -> Result<Job, serde_json::Error> {
+        serde_json::from_str(&format!(
+            r#"{{"schema": "{JOB_SCHEMA}", "id": "t", "root": ".", "board": "b.json",
+                "elf": "x.elf", "image": {image}, "modules": [], "theorems": []}}"#
+        ))
+    }
+
+    #[test]
+    fn image_kind_defaults_to_flash_and_rejects_unknown_kinds() {
+        let flash = job_with_image(r#"{"module": "A.Image", "namespace": "A"}"#).unwrap();
+        assert_eq!(flash.image.kind, ImageKind::Flash);
+        assert_eq!(flash.model(), MODEL);
+        let ram =
+            job_with_image(r#"{"kind": "ram", "module": "A.Image", "namespace": "A"}"#).unwrap();
+        assert_eq!(ram.image.kind, ImageKind::Ram);
+        assert_eq!(ram.model().last().unwrap(), RAM_READER);
+        assert_eq!(ram.fidelity_module(), "A.ImageFidelity");
+        assert_eq!(ram.ram_manifest(), "build/jobs/t/ram-image.json");
+        for bad in ["rom", "RAM", ""] {
+            let spec = format!(r#"{{"kind": "{bad}", "module": "A.Image", "namespace": "A"}}"#);
+            assert!(job_with_image(&spec).is_err(), "accepted kind {bad:?}");
+        }
+    }
+
+    #[test]
+    fn boards_say_where_images_live() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../verification/rv32/boards");
+        let virt = std::fs::read_to_string(dir.join("qemu-virt-rv32.json")).unwrap();
+        let hifive = std::fs::read_to_string(dir.join("hifive1-revb.json")).unwrap();
+        assert_eq!(image_placement(&virt).unwrap().as_deref(), Some("ram"));
+        assert_eq!(image_placement(&hifive).unwrap(), None);
+        assert!(image_placement(r#"{"image_placement": 1}"#).is_err());
+        let window = |t: &str| crate::ram::board_window(&Board::parse(t).unwrap());
+        assert_eq!(window(&virt).unwrap(), (0x8000_0000, 0x100_0000));
+        assert!(window(&hifive).unwrap_err().contains("flash image region"));
     }
 }

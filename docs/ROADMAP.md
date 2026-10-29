@@ -869,12 +869,29 @@ optional; direct and hybrid proofs are equally valid routes.
       plain cargo, byte-identical across two clean builds and checkout paths;
       its sha256 recorded with the symbols of the Rynk session and frame
       handling; the example runs on the pinned QEMU.
-- [ ] **R1. Board model for QEMU `virt` (RV32).** *Accepted:* a board JSON
+      *Status:* the release ELF built with Rust 1.98.1 `--locked` is pinned
+      (sha256 `f39d833f…`) and runs on QEMU 8.2.2; builds from other
+      checkout paths differ (paths are embedded in panic locations), so the
+      byte-identical criterion is open for that pin. A canonical recipe
+      (`verification/rv32/rmk/build-canonical.sh`: fixed checkout path, all
+      paths remapped) rebuilds byte-identically (`5871dcee…`, receipt in
+      `verification/rv32/rmk/R0-receipt.md`); Cargo hashes the absolute path
+      of path dependencies into function order, so path independence is not
+      achieved. Current evidence stays on `f39d833f`; migrating to the
+      canonical pin is a separate step.
+- [x] **R1. Board model for QEMU `virt` (RV32).** *Accepted:* a board JSON
       (memory map, UART16550 registers, timer, boot state, how semihosting
       calls are treated: modeled, or a fail-closed exclusion) and the
       generated Lean board; whole-program replay of the R0 ELF against QEMU
       agrees on registers and device traffic, with negative controls; every
-      environment assumption listed.
+      environment assumption listed. (Accepted 2026-10-29:
+      `boards/qemu-virt-rv32.json` with the read-only image carve-out and
+      byte-wide UART registers; image = `RamElf.imageOf` of the packed ELF,
+      reader acceptance kernel-checked; `tools/run_rmk_replay.py` replays
+      299,999 transitions from the entry with 13 UART input bytes consumed,
+      441 UART reads and 24 writes equal to QEMU's MMIO log, 3 semihosting
+      calls taken from QEMU under stated restrictions; 8 negative controls in
+      `tools/test_rmk_replay_controls.py` rejected for the expected reason.)
 - [ ] **R2. Property chosen after code inspection.** Candidates: malformed
       host input (any byte sequence on the UART) never makes the emitted code
       fault or access memory outside its buffers; state mutations happen only

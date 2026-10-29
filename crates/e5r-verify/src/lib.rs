@@ -10,6 +10,7 @@ use std::fmt::Write;
 pub mod board;
 pub mod flash;
 pub mod job;
+pub mod ram;
 pub mod sha256;
 
 /// Reject containers outside the small, static, relocation-free research contract.

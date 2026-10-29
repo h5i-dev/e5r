@@ -26,8 +26,7 @@
   the model.
 -/
 import tools.ReplayLib
-import Theories.Board.Hifive1Revb
-import Projects.hifive1.Image
+import Std.Data.HashMap
 open E5R
 
 namespace Replay.Mmio
@@ -72,6 +71,8 @@ def choiceFor (img : List Segment) (m : Machine) (next : Obs) : Option Word :=
 structure Supply where
   vals : Array Word := #[]
   reads : List Access
+  /-- RAM bytes the step wrote. -/
+  dirty : List Nat := []
 
 def hx (w : Word) : String := w.toHex
 
@@ -100,21 +101,23 @@ def walk (B : Board) (img : List Segment) (choice : Option Word) :
       | some v => walk B img choice (k v) ram evs s
       | none => match B.device? a with
         | some d =>
-          if d.read && wd = .w then
+          if d.read && wd.bytes = d.width then
             match s.reads with
             | r :: rest =>
-              if r.addr ≠ a ∨ r.size ≠ 4 then
-                .error s!"model reads device {hx a}, QEMU's next MMIO read is {hx r.addr} ({r.size} bytes)"
-              else walk B img choice (k r.val) ram evs { vals := s.vals.push r.val, reads := rest }
+              if r.addr ≠ a ∨ r.size ≠ d.width then
+                .error s!"model reads device {hx a} ({d.width} bytes), QEMU's next MMIO read is {hx r.addr} ({r.size} bytes)"
+              else walk B img choice (k (devVal wd r.val)) ram evs { s with vals := s.vals.push r.val, reads := rest }
             | [] => .error s!"model reads device {hx a}, QEMU performed no further MMIO read"
           else .ok (s, .fault (.unsupported "device read"))
         | none => .ok (s, .fault (.unsupported "load from an unmodeled address"))
   | .store wd a v atomic k, ram, evs, s =>
     if a.toNat % wd.bytes ≠ 0 then .ok (s, .fault .misaligned)
-    else if B.inRam a wd.bytes then walk B img choice k (ramWrite ram a v wd) evs s
+    else if B.inRam a wd.bytes then
+      walk B img choice k (ramWrite ram a v wd) evs
+        { s with dirty := (List.range wd.bytes).map (a.toNat + ·) ++ s.dirty }
     else if atomic then .ok (s, .fault (.unsupported "atomic access outside RAM"))
     else match B.device? a with
-      | some d => if d.write && wd = .w then walk B img choice k ram (evs ++ [⟨a, v⟩]) s
+      | some d => if d.write && wd.bytes = d.width then walk B img choice k ram (evs ++ [⟨a, devVal wd v⟩]) s
                   else .ok (s, .fault (.unsupported "device write"))
       | none => .ok (s, .fault (.unsupported "store to an unmodeled address"))
 
@@ -138,6 +141,7 @@ structure Stepped where
   walkAgrees : Bool
   /-- QEMU's MMIO reads in the transition the model did not perform. -/
   extraReads : List Access
+  dirty : List Nat
 
 /-- One instruction of the model, its device writes checked against QEMU's
     MMIO `writes` for the transition and its device reads answered from
@@ -148,11 +152,12 @@ def instr (B : Board) (img : List Segment) (m : Machine) (next : Obs)
   let some (bits, len) := fetch img m.core.pc
     | throw (.mismatch s!"model fault: fetch outside the executable image at {hx m.core.pc}")
   let some i := decode bits len | throw (.mismatch s!"model fault: illegal instruction at {hx m.core.pc}")
-  let (s, walked) ← (walk B img (choiceFor img m next) (exec m.core len i) m.ram [] ⟨#[], reads⟩).mapError .mismatch
+  let (s, walked) ← (walk B img (choiceFor img m next) (exec m.core len i) m.ram [] ⟨#[], reads, []⟩).mapError .mismatch
   match stepInstr B img m (fun k => s.vals.getD k 0) with
   | .fault f => throw (.mismatch s!"model fault {repr f} at {hx m.core.pc}")
   | .ok c ram evs =>
-    let ew : List (Word × Word × Nat) := evs.map fun e => (e.addr, e.val, 4)
+    let ew : List (Word × Word × Nat) := evs.map fun e =>
+      (e.addr, e.val, ((B.device? e.addr).map (·.width)).getD 4)
     let qw : List (Word × Word × Nat) := writes.map fun w => (w.addr, w.val, w.size)
     if ew ≠ qw then
       let fmt := fun (l : List (Word × Word × Nat)) => l.map fun (a, v, n) => s!"{hx a}<-{hx v}/{n}"
@@ -160,22 +165,33 @@ def instr (B : Board) (img : List Segment) (m : Machine) (next : Obs)
     let agrees := match walked with
       | .ok c' _ evs' => sameCore c c' && evs == evs'
       | .fault _ => false
-    return ⟨⟨c, ram⟩, agrees, s.reads⟩
+    return ⟨⟨c, ram⟩, agrees, s.reads, s.dirty⟩
 
 def regOf (xs : Array Word) (r : Reg) : Word := xs[r.val]!
 
-/-- Look up RAM in a flattened copy. Takes the array as an argument, so the
-    compiler cannot move the array's construction into the closure. -/
-def ramOf (B : Board) (arr : Array (BitVec 8)) (a : Word) : BitVec 8 :=
-  if B.ramBase ≤ a.toNat ∧ a.toNat < B.ramBase + B.ramSize then arr[a.toNat - B.ramBase]! else 0
+/-- RAM as the bytes written so far over the initial contents. Takes the map
+    as an argument, so the compiler cannot move its construction into the
+    closure. -/
+def ramOf (ram0 : Word → BitVec 8) (written : Std.HashMap Nat (BitVec 8)) (a : Word) : BitVec 8 :=
+  written.getD a.toNat (ram0 a)
+
+/-- RISC-V semihosting operations that write no guest memory: the replay
+    takes such a call's result from QEMU (the model does not execute
+    semihosting; see boards/qemu-virt-rv32.json). -/
+def semihostOps : List Nat := [0x01, 0x02, 0x03, 0x04, 0x05]
 
 def report (code : UInt32) (msg : String) : IO UInt32 := do
   IO.eprintln (if code == 1 then s!"MISMATCH: {msg}" else s!"TRACE OR TOOL ERROR: {msg}")
   return code
 
 /-- Replay a format 2 trace. `watch` lists the values written to one device
-    register. -/
-def replay (B : Board) (img : List Segment) (watch : Nat) (path : String) : IO UInt32 := do
+    register. The replay starts at the first state at `start` (if given),
+    with RAM `ram0`; at a pc in `semihost` (an `ebreak` of the semihosting
+    sequence) the step is QEMU's, accepted only for an operation in
+    `semihostOps`, with the pc advanced by 4 and every register but a0 kept. -/
+def replay (B : Board) (img : List Segment) (watch : Nat) (path : String)
+    (ram0 : Word → BitVec 8 := fun _ => 0) (start : Option Word := none)
+    (semihost : List Word := []) : IO UInt32 := do
   let lines := (← IO.FS.lines path).toList.filter (· ≠ "")
   match lines with
   | "V 2" :: _ => pure ()
@@ -190,8 +206,14 @@ def replay (B : Board) (img : List Segment) (watch : Nat) (path : String) : IO U
   if (ns, nr, nw, ni) ≠ (cnt (fun | .state _ => true | _ => false), cnt (fun | .read _ => true | _ => false),
       cnt (fun | .write _ => true | _ => false), cnt (fun | .irq .. => true | _ => false)) then
     return ← report 2 "the end marker's counts do not match the trace: lines were removed or added"
-  let some (.state first) := items.head? | return ← report 2 "the trace must start with a state"
-  let mut m : Machine := ⟨coreOf first, fun _ => 0⟩
+  -- Drop everything before the first state at `start` (QEMU's reset ROM).
+  let items := match start with
+    | none => items
+    | some pc => items.dropWhile fun | .state o => o.pc ≠ pc | _ => true
+  let some (.state first) := items.head? | return ← report 2 "the trace must start with a state (or never reaches the start pc)"
+  let mut written : Std.HashMap Nat (BitVec 8) := {}
+  let mut m : Machine := ⟨coreOf first, ramOf ram0 written⟩
+  let mut semis := 0
   -- QEMU's events since the last state: before an interrupt, after it.
   let mut reads : List Access := []
   let mut writes : List Access := []
@@ -219,7 +241,22 @@ def replay (B : Board) (img : List Segment) (watch : Nat) (path : String) : IO U
       let mut cur := m
       let mut checked : Option Stepped := none
       let stepped := irq.isNone || cur.core.pc ≠ (irq.map (·.2)).getD 0
-      if stepped then
+      let isSemi := semihost.contains cur.core.pc
+      if isSemi then
+        -- A semihosting call: QEMU's step, under the stated restrictions.
+        let op := (cur.core.get 10).toNat
+        if !semihostOps.contains op then
+          return ← report 1 s!"step {steps} (pc {hx pc0}): semihosting operation {op} may write memory; not replayed"
+        if !(reads.isEmpty && writes.isEmpty && irq.isNone) then
+          return ← report 1 s!"step {steps} (pc {hx pc0}): device traffic or an interrupt during a semihosting call"
+        if next.pc ≠ cur.core.pc + 4 then
+          return ← report 1 s!"step {steps} (pc {hx pc0}): semihosting call did not resume at pc + 4"
+        let c := coreOf next
+        let a0 := c.get 10
+        let kept : Core := { cur.core with pc := next.pc, x := fun r => if r.val = 10 then a0 else cur.core.get r }
+        cur := ⟨kept, cur.ram⟩
+        semis := semis + 1
+      else if stepped then
         match instr B img cur next reads writes with
         | .ok st => cur := st.m; checked := some st
         | .error (.mismatch e) => return ← report 1 s!"step {steps} (pc {hx pc0}): {e}"
@@ -251,18 +288,15 @@ def replay (B : Board) (img : List Segment) (watch : Nat) (path : String) : IO U
       m := { cur with core := { cur.core with x := regOf xs } }
       reads := []; writes := []; irq := none
       steps := steps + 1
-      -- RAM is a closure chain in the model; flatten it now and then. Only
-      -- RAM addresses are ever written.
-      if steps % 256 == 0 then
-        let ram := m.ram
-        let arr : Array (BitVec 8) := Array.ofFn (n := B.ramSize) fun i => ram (BitVec.ofNat 32 (B.ramBase + i))
-        m := { m with ram := ramOf B arr }
-  IO.println s!"replayed {steps} transitions, {irqs} interrupts, {nreads} device reads and {nwrites} device writes equal to QEMU's MMIO log; model and QEMU agree"
+      -- Record the bytes this step wrote, read back from the model's RAM,
+      -- so RAM never becomes a long closure chain. Only RAM is written.
+      if let some st := checked then
+        if !st.dirty.isEmpty then
+          let ram := m.ram
+          for a in st.dirty do written := written.insert a (ram (BitVec.ofNat 32 a))
+          m := { m with ram := ramOf ram0 written }
+  IO.println s!"replayed {steps} transitions, {irqs} interrupts, {nreads} device reads and {nwrites} device writes equal to QEMU's MMIO log, {semis} semihosting calls taken from QEMU; model and QEMU agree"
   IO.println s!"writes to {watch}: {pwm}"
   return 0
 
 end Replay.Mmio
-
-def main (args : List String) : IO UInt32 := do
-  let some path := args.head? | IO.eprintln "usage: replay TRACE"; return 2
-  Replay.Mmio.replay E5R.Hifive1Revb.board E5R.Firmware.segments 0x10015024 path

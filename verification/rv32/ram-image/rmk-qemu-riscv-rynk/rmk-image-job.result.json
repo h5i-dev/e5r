@@ -1,0 +1,191 @@
+{
+ "inputs": {
+  "allowed_axioms": [
+   "propext",
+   "Classical.choice",
+   "Quot.sound"
+  ],
+  "board_sha256": "6fe2d0db63ed5756db3ca2845b00931154c84359002daf47cff906b0df64287b",
+  "e5r_verify": "0.1.0",
+  "e5r_verify_sha256": "953e1538911737c6c804d128bf5870459f9885e61b9c05899d6ac71170d6ddd6",
+  "elf": {
+   "bytes": 454024,
+   "path": "build/rmk-qemu-riscv-rynk.elf",
+   "sha256": "f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30"
+  },
+  "image": {
+   "fidelity": {
+    "path": "Projects/ramimage/ImageFidelity.lean",
+    "sha256": "48831c90e70a885b60cd2cece46476de4228cc674de52c1f6ab4b4e93b26367a"
+   },
+   "kind": "ram",
+   "manifest": {
+    "path": "build/jobs/rmk-qemu-virt-image/ram-image.json",
+    "sha256": "b369d7ceacfb0577b9fcd5fadd94e82623d31857c59bad66835e56007f4980e2"
+   },
+   "module": {
+    "path": "Projects/ramimage/Image.lean",
+    "sha256": "a13da9f9fe56065f7032f3ccd1475d4247e5602602dc2d3ae3422b5543a33d81"
+   }
+  },
+  "job_sha256": "7d6b957a1f1bef215e3c2a28659745f3f9779b42f7dc2910c1f656c31c8741e2",
+  "lean": "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release)",
+  "sources": {
+   "Projects/ramimage/Entry.lean": "b8afab909458614cc2aa347a40f1655ac96f78cb1d560c9a07af9c7eab74bdc6",
+   "Theories/Board/QemuVirtRv32.lean": "d902dbaad9129b352fc736c62313615608ec2cabeb0667805653db9b9aff2a0f",
+   "Theories/FlashElf.lean": "b3a5dd6e56e6e9444b88f05de6f020e326377f55af777b380249fc53cc0111a6",
+   "Theories/Hart.lean": "dde4a86db936c9ad60f58866c3ebb333fbc556ec0f94299da212d0ca08cfb82a",
+   "Theories/Logic.lean": "bed5eee4c9a12c2eee16a3e3b9523cca51c91f17380b97d81673151ff3cc4f48",
+   "Theories/Platform.lean": "37939dcb4318bcea8b8a45c25a36d9f3ae59b78656fedd7dcc60c66442d11528",
+   "Theories/RamElf.lean": "9a8cb07ac5d869fe5297d1934eaefef94b535e1c91d9e144a9daf74fc7ce832f",
+   "tools/gen_board.py": "fd69bd893835b7e4738c119b9a496c26c22fbe40894abb339579e19dbf1eeefb"
+  }
+ },
+ "job": "rmk-qemu-virt-image",
+ "job_file": "jobs/rmk/rmk-qemu-virt-image.json",
+ "modules": [
+  "Theories/Hart.lean",
+  "Theories/Platform.lean",
+  "Theories/Logic.lean",
+  "Theories/FlashElf.lean",
+  "Theories/RamElf.lean",
+  "Theories/Board/QemuVirtRv32.lean",
+  "Projects/ramimage/Image.lean",
+  "Projects/ramimage/ImageFidelity.lean",
+  "Projects/ramimage/Entry.lean"
+ ],
+ "resumed": [],
+ "schema": "e5r.verify.result.v1",
+ "seconds": 49.7,
+ "stages": [
+  {
+   "name": "lean Theories/Hart.lean",
+   "peak_rss_mib": 496,
+   "seconds": 3.1
+  },
+  {
+   "name": "lean Theories/Platform.lean",
+   "peak_rss_mib": 485,
+   "seconds": 1.8
+  },
+  {
+   "name": "lean Theories/Logic.lean",
+   "peak_rss_mib": 490,
+   "seconds": 2.2
+  },
+  {
+   "name": "lean Theories/FlashElf.lean",
+   "peak_rss_mib": 464,
+   "seconds": 1.6
+  },
+  {
+   "name": "lean Theories/RamElf.lean",
+   "peak_rss_mib": 466,
+   "seconds": 1.7
+  },
+  {
+   "name": "lean Theories/Board/QemuVirtRv32.lean",
+   "peak_rss_mib": 436,
+   "seconds": 1.4
+  },
+  {
+   "name": "lean Projects/ramimage/Image.lean",
+   "peak_rss_mib": 701,
+   "seconds": 9.7
+  },
+  {
+   "name": "lean Projects/ramimage/ImageFidelity.lean",
+   "peak_rss_mib": 548,
+   "seconds": 2.9
+  },
+  {
+   "name": "lean Projects/ramimage/Entry.lean",
+   "peak_rss_mib": 533,
+   "seconds": 2.0
+  },
+  {
+   "name": "leanchecker Theories/Hart.lean",
+   "peak_rss_mib": 430,
+   "seconds": 4.8
+  },
+  {
+   "name": "leanchecker Theories/Platform.lean",
+   "peak_rss_mib": 430,
+   "seconds": 1.8
+  },
+  {
+   "name": "leanchecker Theories/Logic.lean",
+   "peak_rss_mib": 437,
+   "seconds": 2.0
+  },
+  {
+   "name": "leanchecker Theories/FlashElf.lean",
+   "peak_rss_mib": 280,
+   "seconds": 1.8
+  },
+  {
+   "name": "leanchecker Theories/RamElf.lean",
+   "peak_rss_mib": 234,
+   "seconds": 1.8
+  },
+  {
+   "name": "leanchecker Theories/Board/QemuVirtRv32.lean",
+   "peak_rss_mib": 347,
+   "seconds": 1.8
+  },
+  {
+   "name": "leanchecker Projects/ramimage/Image.lean",
+   "peak_rss_mib": 262,
+   "seconds": 1.8
+  },
+  {
+   "name": "leanchecker Projects/ramimage/ImageFidelity.lean",
+   "peak_rss_mib": 503,
+   "seconds": 3.2
+  },
+  {
+   "name": "leanchecker Projects/ramimage/Entry.lean",
+   "peak_rss_mib": 503,
+   "seconds": 2.5
+  }
+ ],
+ "status": "proved",
+ "theorems": [
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.RmkImage.Check.segments"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.RmkImage.Check.entry_bytes"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.RmkImage.image_accepted"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.RmkImage.image_agrees"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.RmkImage.image_entry"
+  },
+  {
+   "axioms": [
+    "propext"
+   ],
+   "name": "E5R.RmkImage.image_rwBase"
+  }
+ ]
+}
