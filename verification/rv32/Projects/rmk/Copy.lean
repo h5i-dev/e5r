@@ -115,4 +115,48 @@ theorem words_eq_fwd : ∀ (j : Nat) (ram : Word → BitVec 8) (s d : Word),
       rw [word_spec _ _ _ _ (by omega), fwd_spec _ _ _ _ _ (by omega) (by omega) hdir]
     rw [hw]; rfl
 
+/-! ## Backward composition and word copies -/
+
+/-- A backward copy splits into two consecutive ones (top part first). -/
+theorem bwd_add : ∀ (a b : Nat) (ram : Word → BitVec 8) (p q : Word),
+    bwd ram p q (a + b) = bwd (bwd ram p q a) (p - BitVec.ofNat 32 a) (q - BitVec.ofNat 32 a) b
+  | 0, b, ram, p, q => by simp [bwd]
+  | a+1, b, ram, p, q => by
+    rw [show a + 1 + b = (a + b) + 1 by omega]
+    simp only [bwd]
+    rw [bwd_add a b, show p + 0xffffffff#32 - BitVec.ofNat 32 a = p - BitVec.ofNat 32 (a + 1) by bv_omega,
+      show q + 0xffffffff#32 - BitVec.ofNat 32 a = q - BitVec.ofNat 32 (a + 1) by bv_omega]
+
+/-- The backward word loop: `sw (lw p) (q - 4)`, then both pointers - 4, `j` times. -/
+def wordsB : (Word → BitVec 8) → Word → Word → Nat → (Word → BitVec 8)
+  | ram, _, _, 0 => ram
+  | ram, p, q, j+1 => wordsB (ramWrite ram (q + 0xfffffffc#32) (ramRead ram p .w) .w) (p + 0xfffffffc#32)
+      (q + 0xfffffffc#32) j
+
+/-- The backward word loop is a backward byte copy of `4 j` bytes, reading
+    down from `p + 3`, when the source lies below the destination. -/
+theorem wordsB_eq_bwd : ∀ (j : Nat) (ram : Word → BitVec 8) (p q : Word),
+    4 * j ≤ q.toNat → 4 * j ≤ p.toNat + 3 → p.toNat + 4 < 2 ^ 32 → p.toNat + 4 ≤ q.toNat →
+    wordsB ram p q j = bwd ram (p + 3) q (4 * j)
+  | 0, ram, p, q, _, _, _, _ => rfl
+  | j+1, ram, p, q, h1, h2, h3, h4 => by
+    simp only [wordsB]
+    rw [show 4 * (j + 1) = 4 + 4 * j by omega, bwd_add 4 (4 * j)]
+    by_cases hj : j = 0
+    · subst hj
+      simp only [wordsB, bwd]
+      funext x
+      rw [word_spec _ _ _ _ (by bv_omega)]
+      have := bwd_spec 4 ram (p + 3) q x (by bv_omega) (by bv_omega)
+      simp only [bwd] at this
+      rw [this]
+      split <;> split <;> first | (exfalso; bv_omega) | (refine congrArg ram ?_; bv_omega) | rfl
+    · rw [wordsB_eq_bwd j _ _ _ (by bv_omega) (by bv_omega) (by bv_omega) (by bv_omega)]
+      have hw : ramWrite ram (q + 0xfffffffc#32) (ramRead ram p .w) .w = bwd ram (p + 3) q 4 := by
+        funext x
+        rw [word_spec _ _ _ _ (by bv_omega), bwd_spec 4 ram (p + 3) q x (by bv_omega) (by bv_omega)]
+        split <;> split <;> first | (exfalso; bv_omega) | (refine congrArg ram ?_; bv_omega) | rfl
+      rw [hw, show p + 0xfffffffc#32 + 3 = p + 3 - BitVec.ofNat 32 4 by bv_omega,
+        show q + 0xfffffffc#32 = q - BitVec.ofNat 32 4 by bv_omega]
+
 end E5R.Rmk
