@@ -9,6 +9,8 @@ use std::fmt::Write;
 
 pub mod board;
 pub mod flash;
+pub mod job;
+pub mod sha256;
 
 /// Reject containers outside the small, static, relocation-free research contract.
 pub fn load_image(bytes: &[u8]) -> Result<Object, String> {

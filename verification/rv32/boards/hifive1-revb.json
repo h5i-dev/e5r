@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.board/1",
+  "schema": "e5r.board.v1",
   "id": "hifive1-revb",
   "name": "SiFive HiFive1 Rev B",
   "soc": "SiFive FE310-G002",

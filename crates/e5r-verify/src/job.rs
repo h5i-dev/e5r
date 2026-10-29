@@ -1,0 +1,640 @@
+//! Verification jobs: one target binary, its board, its proofs, and a result
+//! that names every input it depends on.
+//!
+//! A job file (`e5r.verify.job.v1`) says how to obtain the ELF, which board it
+//! runs on, which Lean modules prove what, and the resource limits. `run`
+//! rebuilds and rechecks everything and returns an `e5r.verify.result.v1`
+//! document. The status vocabulary is fixed:
+//!
+//! * `proved`: every named theorem checked, with only allowed axioms;
+//! * `failed`: a proof did not check. This is *not* a counterexample: it says
+//!   nothing about whether the property holds;
+//! * `unsupported`: the binary or board is outside the supported scope (the
+//!   exporter refused it), so no proof was attempted;
+//! * `resource_exhausted`: a time or memory limit stopped a step;
+//! * `error`: the job could not run (missing tool, malformed job, stale
+//!   generated file).
+//!
+//! `counterexample` is reserved for a violation that has been replayed in the
+//! model; no current job kind produces one, and a failed proof never does.
+
+use serde::Deserialize;
+use serde_json::{Value, json};
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
+
+use crate::board::Board;
+use crate::sha256;
+
+pub const JOB_SCHEMA: &str = "e5r.verify.job.v1";
+pub const RESULT_SCHEMA: &str = "e5r.verify.result.v1";
+
+/// Axioms a checked theorem may depend on: Lean's standard ones.
+pub const ALLOWED_AXIOMS: [&str; 3] = ["propext", "Classical.choice", "Quot.sound"];
+
+/// The semantic model every job is checked against, in dependency order.
+/// Its sources are part of every result's identity.
+pub const MODEL: [&str; 4] = [
+    "Theories/Hart.lean",
+    "Theories/Platform.lean",
+    "Theories/Logic.lean",
+    "Theories/FlashElf.lean",
+];
+
+#[derive(Debug, Deserialize)]
+pub struct Job {
+    pub schema: String,
+    pub id: String,
+    /// The Lean root, relative to the job file.
+    pub root: String,
+    /// Relative to the root.
+    pub board: String,
+    pub elf: String,
+    /// The reviewed identity of the ELF. A mismatch is an error: review the
+    /// new bytes and update the job.
+    pub elf_sha256: Option<String>,
+    #[serde(default)]
+    pub build: Vec<BuildStep>,
+    pub image: ImageSpec,
+    pub modules: Vec<String>,
+    pub theorems: Vec<String>,
+    #[serde(default)]
+    pub limits: Limits,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BuildStep {
+    pub cwd: String,
+    pub argv: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ImageSpec {
+    pub module: String,
+    pub namespace: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Limits {
+    pub seconds: u64,
+    pub rss_mib: u64,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits {
+            seconds: 1800,
+            rss_mib: 5120,
+        }
+    }
+}
+
+/// Why a job stopped, mapped onto the result status.
+#[derive(Debug)]
+pub enum Stop {
+    Failed(String),
+    Unsupported(String),
+    Exhausted(String),
+    Error(String),
+}
+
+impl Stop {
+    fn status(&self) -> &'static str {
+        match self {
+            Stop::Failed(_) => "failed",
+            Stop::Unsupported(_) => "unsupported",
+            Stop::Exhausted(_) => "resource_exhausted",
+            Stop::Error(_) => "error",
+        }
+    }
+    fn message(&self) -> &str {
+        match self {
+            Stop::Failed(m) | Stop::Unsupported(m) | Stop::Exhausted(m) | Stop::Error(m) => m,
+        }
+    }
+}
+
+fn err<E: std::fmt::Display>(what: &str) -> impl FnOnce(E) -> Stop + '_ {
+    move |e| Stop::Error(format!("{what}: {e}"))
+}
+
+pub struct Paths {
+    pub job: PathBuf,
+    pub root: PathBuf,
+}
+
+impl Job {
+    pub fn load(path: &Path) -> Result<(Job, Paths), Stop> {
+        let text = std::fs::read_to_string(path).map_err(err("job"))?;
+        let job: Job = serde_json::from_str(&text).map_err(err("job"))?;
+        if job.schema != JOB_SCHEMA {
+            return Err(Stop::Error(format!(
+                "job schema {} is not {JOB_SCHEMA}",
+                job.schema
+            )));
+        }
+        let dir = path.parent().unwrap_or(Path::new("."));
+        let root = dir.join(&job.root);
+        Ok((
+            job,
+            Paths {
+                job: path.to_path_buf(),
+                root,
+            },
+        ))
+    }
+
+    pub fn module_path(module: &str) -> String {
+        module.replace('.', "/") + ".lean"
+    }
+}
+
+/// What happened to one step.
+struct Stage {
+    name: String,
+    seconds: f64,
+    peak_rss_mib: u64,
+}
+
+/// A child process under the job's limits. The memory limit is enforced by
+/// sampling resident memory through /proc, because Lean reserves far more
+/// virtual memory than it uses, which rules out RLIMIT_AS.
+fn run_limited(mut cmd: Command, limits: &Limits, what: &str) -> Result<(String, u64), Stop> {
+    let out_path = std::env::temp_dir().join(format!(
+        "e5r-verify-{}-{}.log",
+        std::process::id(),
+        what.replace(['/', ' '], "_")
+    ));
+    let out = std::fs::File::create(&out_path).map_err(err("log file"))?;
+    let child = cmd
+        .stdout(Stdio::from(out.try_clone().map_err(err("log file"))?))
+        .stderr(Stdio::from(out))
+        .spawn();
+    let mut child = child.map_err(|e| Stop::Error(format!("{what}: cannot start: {e}")))?;
+    let start = Instant::now();
+    let mut peak = 0u64;
+    let status = loop {
+        if let Some(status) = child.try_wait().map_err(err(what))? {
+            break status;
+        }
+        if let Ok(s) = std::fs::read_to_string(format!("/proc/{}/status", child.id())) {
+            if let Some(kb) = s
+                .lines()
+                .find_map(|l| l.strip_prefix("VmRSS:"))
+                .and_then(|v| v.trim().trim_end_matches(" kB").trim().parse::<u64>().ok())
+            {
+                peak = peak.max(kb / 1024);
+            }
+        }
+        let over_time = start.elapsed() > Duration::from_secs(limits.seconds);
+        if peak > limits.rss_mib || over_time {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = std::fs::remove_file(&out_path);
+            return Err(Stop::Exhausted(if over_time {
+                format!("{what}: exceeded {} s", limits.seconds)
+            } else {
+                format!("{what}: exceeded {} MiB resident", limits.rss_mib)
+            }));
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    };
+    let text = std::fs::read_to_string(&out_path).unwrap_or_default();
+    let _ = std::fs::remove_file(&out_path);
+    if !status.success() {
+        return Err(Stop::Failed(format!(
+            "{what}: exited with {status}\n{}",
+            tail(&text)
+        )));
+    }
+    Ok((text, peak))
+}
+
+fn tail(s: &str) -> String {
+    let lines: Vec<&str> = s.lines().collect();
+    lines[lines.len().saturating_sub(40)..].join("\n")
+}
+
+/// Strip Lean comments and string literals, so a scan for forbidden
+/// commands only sees code.
+pub fn lean_code(src: &str) -> String {
+    let b = src.as_bytes();
+    let mut out = String::with_capacity(src.len());
+    let mut i = 0;
+    let mut depth = 0usize;
+    while i < b.len() {
+        if depth > 0 {
+            if b[i..].starts_with(b"/-") {
+                depth += 1;
+                i += 2;
+            } else if b[i..].starts_with(b"-/") {
+                depth -= 1;
+                i += 2;
+            } else {
+                i += 1;
+            }
+            continue;
+        }
+        if b[i..].starts_with(b"/-") {
+            depth = 1;
+            i += 2;
+        } else if b[i..].starts_with(b"--") {
+            while i < b.len() && b[i] != b'\n' {
+                i += 1;
+            }
+        } else if b[i] == b'"' {
+            i += 1;
+            while i < b.len() && b[i] != b'"' {
+                if b[i] == b'\\' {
+                    i += 1;
+                }
+                i += 1;
+            }
+            i += 1;
+            out.push_str("\"\"");
+        } else {
+            out.push(b[i] as char);
+            i += 1;
+        }
+    }
+    out
+}
+
+/// Commands and attributes that would let a proof bypass the kernel or add
+/// assumptions. Their presence anywhere in a checked module is an error.
+pub const FORBIDDEN: [&str; 11] = [
+    "sorry",
+    "admit",
+    "axiom",
+    "native_decide",
+    "ofReduceBool",
+    "implemented_by",
+    "extern",
+    "unsafe",
+    "opaque",
+    "skipKernelTC",
+    "trustCompiler",
+];
+
+pub fn escapes(code: &str) -> Vec<&'static str> {
+    let words: Vec<&str> = code
+        .split(|c: char| !(c.is_alphanumeric() || c == '_' || c == '.'))
+        .flat_map(|w| w.split('.'))
+        .collect();
+    FORBIDDEN
+        .iter()
+        .copied()
+        .filter(|f| words.contains(f))
+        .collect()
+}
+
+/// Parse `#print axioms` output: every theorem's axioms, or an error naming
+/// the line that could not be understood.
+pub fn parse_axioms(out: &str) -> Result<BTreeMap<String, Vec<String>>, String> {
+    let mut map = BTreeMap::new();
+    for line in out.lines().filter(|l| !l.trim().is_empty()) {
+        if let Some(rest) = line.strip_prefix('\'') {
+            if let Some((name, tail)) = rest.split_once('\'') {
+                if tail == " does not depend on any axioms" {
+                    map.insert(name.to_string(), vec![]);
+                    continue;
+                }
+                if let Some(list) = tail
+                    .strip_prefix(" depends on axioms: [")
+                    .and_then(|t| t.strip_suffix(']'))
+                {
+                    map.insert(
+                        name.to_string(),
+                        list.split(", ").map(str::to_string).collect(),
+                    );
+                    continue;
+                }
+            }
+        }
+        return Err(format!("unexpected Lean output: {line}"));
+    }
+    Ok(map)
+}
+
+fn tool_version(argv: &[&str]) -> Option<String> {
+    let out = Command::new(argv[0]).args(&argv[1..]).output().ok()?;
+    let s = String::from_utf8_lossy(&out.stdout);
+    s.lines().next().map(|l| l.trim().to_string())
+}
+
+/// Everything a result depends on, hashed. `verify-result` recomputes this
+/// and compares it, so changing any input makes an old result stale.
+pub fn identity(job: &Job, paths: &Paths) -> Result<Value, Stop> {
+    let read =
+        |p: &Path| std::fs::read(p).map_err(|e| Stop::Error(format!("{}: {e}", p.display())));
+    let mut sources = BTreeMap::new();
+    let mut files: Vec<String> = MODEL.iter().map(|s| s.to_string()).collect();
+    files.push(format!(
+        "Theories/Board/{}.lean",
+        board_module_name(&job.board)?
+    ));
+    files.extend(job.modules.iter().cloned());
+    for f in &files {
+        sources.insert(f.clone(), sha256::hex(&read(&paths.root.join(f))?));
+    }
+    let elf = read(&paths.root.join(&job.elf))?;
+    Ok(json!({
+        "job_sha256": sha256::hex(&read(&paths.job)?),
+        "board_sha256": sha256::hex(&read(&paths.root.join(&job.board))?),
+        "elf": { "path": job.elf, "sha256": sha256::hex(&elf), "bytes": elf.len() },
+        "sources": sources,
+        "lean": tool_version(&["lean", "--version"]),
+        "e5r_verify": env!("CARGO_PKG_VERSION"),
+        "allowed_axioms": ALLOWED_AXIOMS,
+    }))
+}
+
+fn board_module_name(board: &str) -> Result<String, Stop> {
+    let stem = Path::new(board)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| Stop::Error(format!("board path {board}")))?;
+    Ok(stem
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|p| !p.is_empty())
+        .map(|p| {
+            let mut c = p.chars();
+            c.next()
+                .map(|f| f.to_ascii_uppercase().to_string() + &c.as_str().to_ascii_lowercase())
+                .unwrap_or_default()
+        })
+        .collect())
+}
+
+/// Rebuild, export, check and audit. Returns the result document whatever
+/// the outcome.
+pub fn run(job_path: &Path) -> Value {
+    let started = Instant::now();
+    let mut stages = Vec::new();
+    let outcome = (|| -> Result<(Value, Value), Stop> {
+        let (job, paths) = Job::load(job_path)?;
+        let limits = &job.limits;
+        // Build the ELF from source, if the job says how.
+        for (i, step) in job.build.iter().enumerate() {
+            let t = Instant::now();
+            let mut cmd = Command::new(&step.argv[0]);
+            cmd.args(&step.argv[1..])
+                .current_dir(paths.root.join(&step.cwd));
+            let (_, rss) =
+                run_limited(cmd, limits, &format!("build step {i}")).map_err(|s| match s {
+                    Stop::Failed(m) => Stop::Error(m),
+                    other => other,
+                })?;
+            stages.push(Stage {
+                name: format!("build {}", step.argv.join(" ")),
+                seconds: t.elapsed().as_secs_f64(),
+                peak_rss_mib: rss,
+            });
+        }
+        let elf_path = paths.root.join(&job.elf);
+        let elf = std::fs::read(&elf_path).map_err(err("elf"))?;
+        let digest = sha256::hex(&elf);
+        if let Some(pin) = &job.elf_sha256 {
+            if *pin != digest {
+                return Err(Stop::Error(format!(
+                    "ELF identity changed ({digest}, job pins {pin}); review the new bytes and update elf_sha256"
+                )));
+            }
+        }
+        // The generated board must match its JSON source.
+        let board_text =
+            std::fs::read_to_string(paths.root.join(&job.board)).map_err(err("board"))?;
+        let board = Board::parse(&board_text).map_err(Stop::Error)?;
+        let board_mod = board_module_name(&job.board)?;
+        let regen = Command::new("python3")
+            .arg(paths.root.join("tools/gen_board.py"))
+            .arg("--check")
+            .arg(paths.root.join(&job.board))
+            .output()
+            .map_err(err("gen_board"))?;
+        if !regen.status.success() {
+            return Err(Stop::Error(format!(
+                "Theories/Board/{board_mod}.lean is stale: {}",
+                String::from_utf8_lossy(&regen.stderr).trim()
+            )));
+        }
+        // Export the flash image. Refusal means the binary is out of scope.
+        let windows = board.windows().map_err(Stop::Error)?;
+        let image = crate::flash::export_flash(&elf, windows, &job.image.namespace)
+            .map_err(Stop::Unsupported)?;
+        let image_path = paths.root.join(Job::module_path(&job.image.module));
+        std::fs::write(&image_path, &image).map_err(err("image"))?;
+        // The independent Lean reader must reconstruct exactly this image.
+        let fidelity_mod = format!("{}Fidelity", job.image.module);
+        let fidelity = format!(
+            "-- Generated by e5r-verify check; regenerate, do not edit.\n\
+             import Theories.FlashElf\nimport {img}\nset_option maxRecDepth 100000\n\
+             theorem {ns}.image_fidelity : E5R.FlashElf.loadFlash ⟨{fb}, {fs}, {rb}, {rs}⟩ {ns}.elfBytes = \
+             .ok ({ns}.entry, {ns}.segments) := by decide +kernel\n",
+            img = job.image.module,
+            ns = job.image.namespace,
+            fb = windows.flash_base,
+            fs = windows.flash_size,
+            rb = windows.ram_base,
+            rs = windows.ram_size,
+        );
+        std::fs::write(paths.root.join(Job::module_path(&fidelity_mod)), fidelity)
+            .map_err(err("fidelity"))?;
+        // Check every module, model first, each from source.
+        let mut order: Vec<String> = MODEL.iter().map(|s| s.to_string()).collect();
+        order.push(format!("Theories/Board/{board_mod}.lean"));
+        order.push(Job::module_path(&job.image.module));
+        order.push(Job::module_path(&fidelity_mod));
+        order.extend(job.modules.iter().cloned());
+        for m in &order {
+            let src = std::fs::read_to_string(paths.root.join(m)).map_err(err(m))?;
+            let found = escapes(&lean_code(&src));
+            if !found.is_empty() {
+                return Err(Stop::Error(format!("{m}: forbidden {}", found.join(", "))));
+            }
+        }
+        for m in &order {
+            let t = Instant::now();
+            let olean = Path::new(m).with_extension("olean");
+            let mut cmd = Command::new("lean");
+            cmd.current_dir(&paths.root)
+                .env("LEAN_PATH", ".")
+                .args([
+                    "-j1",
+                    &format!("-M{}", limits.rss_mib.saturating_sub(512).max(512)),
+                ])
+                .arg("-o")
+                .arg(&olean)
+                .arg(m);
+            let (_, rss) = run_limited(cmd, limits, m)?;
+            stages.push(Stage {
+                name: format!("lean {m}"),
+                seconds: t.elapsed().as_secs_f64(),
+                peak_rss_mib: rss,
+            });
+        }
+        // Audit every named theorem plus the image binding.
+        let mut names = job.theorems.clone();
+        names.push(format!("{}.image_fidelity", job.image.namespace));
+        let imports: Vec<String> = order
+            .iter()
+            .map(|m| format!("import {}", m.trim_end_matches(".lean").replace('/', ".")))
+            .collect();
+        let audit = format!(
+            "{}\n{}\n",
+            imports.join("\n"),
+            names
+                .iter()
+                .map(|n| format!("#print axioms {n}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        let audit_path = format!("Audit_{}.lean", job.id.replace('-', "_"));
+        std::fs::write(paths.root.join(&audit_path), audit).map_err(err("audit"))?;
+        let mut cmd = Command::new("lean");
+        cmd.current_dir(&paths.root)
+            .env("LEAN_PATH", ".")
+            .arg("-j1")
+            .arg(&audit_path);
+        let audited = run_limited(cmd, limits, "axiom audit");
+        let _ = std::fs::remove_file(paths.root.join(&audit_path));
+        // The audit only prints; if it fails, a named theorem does not exist.
+        let (out, _) = audited.map_err(|s| match s {
+            Stop::Failed(m) => Stop::Error(m),
+            other => other,
+        })?;
+        let axioms = parse_axioms(&out).map_err(Stop::Error)?;
+        let mut theorems = Vec::new();
+        for n in &names {
+            let used = axioms
+                .get(n)
+                .ok_or_else(|| Stop::Error(format!("no axiom report for {n}")))?;
+            let bad: Vec<&String> = used
+                .iter()
+                .filter(|a| !ALLOWED_AXIOMS.contains(&a.as_str()))
+                .collect();
+            if !bad.is_empty() {
+                return Err(Stop::Failed(format!(
+                    "{n} depends on disallowed axioms {bad:?}"
+                )));
+            }
+            theorems.push(json!({ "name": n, "axioms": used }));
+        }
+        Ok((identity(&job, &paths)?, Value::Array(theorems)))
+    })();
+    let stages_json: Vec<Value> = stages
+        .iter()
+        .map(|s| json!({ "name": s.name, "seconds": s.seconds, "peak_rss_mib": s.peak_rss_mib }))
+        .collect();
+    let job_id = Job::load(job_path).map(|(j, _)| j.id).unwrap_or_default();
+    let mut result = json!({
+        "schema": RESULT_SCHEMA,
+        "job": job_id,
+        "job_file": job_path.display().to_string(),
+        "seconds": started.elapsed().as_secs_f64(),
+        "stages": stages_json,
+    });
+    match outcome {
+        Ok((ident, theorems)) => {
+            result["status"] = json!("proved");
+            result["inputs"] = ident;
+            result["theorems"] = theorems;
+        }
+        Err(stop) => {
+            result["status"] = json!(stop.status());
+            result["message"] = json!(stop.message());
+            if let Ok((job, paths)) = Job::load(job_path) {
+                if let Ok(ident) = identity(&job, &paths) {
+                    result["inputs"] = ident;
+                }
+            }
+        }
+    }
+    result
+}
+
+/// Is a stored result still about the current inputs? Returns the list of
+/// inputs that changed; empty means current.
+pub fn stale(result: &Value) -> Result<Vec<String>, String> {
+    if result["schema"] != RESULT_SCHEMA {
+        return Err("not an e5r.verify.result.v1 document".into());
+    }
+    let job_file = result["job_file"]
+        .as_str()
+        .ok_or("result has no job_file")?;
+    let (job, paths) = Job::load(Path::new(job_file)).map_err(|s| s.message().to_string())?;
+    let now = identity(&job, &paths).map_err(|s| s.message().to_string())?;
+    let then = &result["inputs"];
+    let mut changed = Vec::new();
+    for key in ["job_sha256", "board_sha256", "lean", "e5r_verify"] {
+        if now[key] != then[key] {
+            changed.push(key.to_string());
+        }
+    }
+    if now["elf"]["sha256"] != then["elf"]["sha256"] {
+        changed.push(format!("elf {}", job.elf));
+    }
+    let empty = serde_json::Map::new();
+    let (a, b) = (
+        now["sources"].as_object().unwrap_or(&empty),
+        then["sources"].as_object().unwrap_or(&empty),
+    );
+    for (k, v) in a {
+        if b.get(k) != Some(v) {
+            changed.push(k.clone());
+        }
+    }
+    for k in b.keys() {
+        if !a.contains_key(k) {
+            changed.push(k.clone());
+        }
+    }
+    if result["status"] != "proved" {
+        changed.push(format!("status is {}", result["status"]));
+    }
+    Ok(changed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_escape_scan_sees_code_not_comments() {
+        let src = "-- sorry in a comment\n/- admit /- nested native_decide -/ -/\n\
+                   def s := \"axiom\"\ntheorem t : True := by trivial\n";
+        assert!(escapes(&lean_code(src)).is_empty());
+        for bad in [
+            "theorem t : False := by sorry",
+            "axiom bad : False",
+            "theorem t : 1 = 1 := by native_decide",
+            "@[implemented_by f] def g := 1",
+            "set_option debug.skipKernelTC true",
+            "unsafe def f := 1",
+            "theorem t := Lean.ofReduceBool _ _ rfl",
+        ] {
+            assert!(!escapes(&lean_code(bad)).is_empty(), "missed {bad}");
+        }
+    }
+
+    #[test]
+    fn axiom_reports_are_parsed_strictly() {
+        let ok =
+            "'A.b' depends on axioms: [propext, Quot.sound]\n'C' does not depend on any axioms\n";
+        let m = parse_axioms(ok).unwrap();
+        assert_eq!(m["A.b"], ["propext", "Quot.sound"]);
+        assert!(m["C"].is_empty());
+        assert!(parse_axioms("error: unknown constant 'X'").is_err());
+        assert!(parse_axioms("'A' depends on axioms: [sorryAx]\nwarning: x").is_err());
+    }
+
+    #[test]
+    fn board_module_names_match_the_generator() {
+        assert_eq!(
+            board_module_name("boards/hifive1-revb.json").unwrap(),
+            "Hifive1Revb"
+        );
+    }
+}

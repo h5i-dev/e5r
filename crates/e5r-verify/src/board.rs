@@ -28,7 +28,7 @@ pub struct Device {
     pub write: bool,
 }
 
-pub const SCHEMA: &str = "e5r.board/1";
+pub const SCHEMA: &str = "e5r.board.v1";
 
 fn hex(s: &str) -> Result<u64, String> {
     let digits = s
