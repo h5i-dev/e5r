@@ -39,6 +39,16 @@ class Seg:
         self.qname = 'hq'
         self.lastcore_expr = core0
         self.ramlets = []
+        self.hyps = []                  # extra theorem hypotheses: '(name : prop)'
+
+    def side(self, spec, key, pc, prop):
+        """A side-condition proof: a tactic, or 'HYP' to make it a hypothesis of the theorem."""
+        t = spec[key]
+        if t == 'HYP':
+            name = f"h{key}_{pc:x}"
+            self.hyps.append(f"({name} : {prop})")
+            return f"exact {name}"
+        return t
 
     def E(self, r):
         r = int(r)
@@ -68,6 +78,7 @@ class Seg:
         f = parse(instr)
         kind = f[0]
         npc = pc + ln
+        cont = npc                      # where the segment continues
         src = self.core
         hal = f"(by show (0x{pc:x} : Word).getLsbD 0 = false; decide)"
         fact = f"f{pc:x}"
@@ -109,7 +120,8 @@ class Seg:
             if w != 'w':
                 val = f"extend .{w} {signed} ({val})"
             expr = f"{src}.wr {rd} ({val}) 0x{npc:x}"
-            al, inr = spec['al'], spec['in']
+            al = self.side(spec, 'al', pc, f"({addr}).toNat % {bytes_} = 0")
+            inr = self.side(spec, 'in', pc, f"B.inRam ({addr}) {bytes_} = true")
             z = ', BitVec.add_zero' if off == '0x00000000#32' else ''
             proof = (f"rw [exec_load, {self.getfact(src, rs1)}{z}, interp_load_ram (w := .{w}) o "
                      f"(show ({addr}).toNat % {bytes_} = 0 by {al}) "
@@ -126,7 +138,8 @@ class Seg:
             rws = [self.getfact(src, rs1)]
             rws.append('Core.get_zero' if rs2 == 0 else self.getfact(src, rs2))
             z = ', BitVec.add_zero' if off == '0x00000000#32' else ''
-            al, inr = spec['al'], spec['in']
+            al = self.side(spec, 'al', pc, f"({addr}).toNat % {bytes_} = 0")
+            inr = self.side(spec, 'in', pc, f"B.inRam ({addr}) {bytes_} = true")
             proof = (f"rw [exec_store, {', '.join(rws)}{z}, interp_store_ram (w := .{w}) o "
                      f"(show ({addr}).toNat % {bytes_} = 0 by {al}) "
                      f"(show B.inRam ({addr}) {bytes_} = true by {inr})]; rfl")
@@ -145,16 +158,21 @@ class Seg:
                 offv -= 1 << 32
             tgt = (pc + offv) & 0xffffffff
             expr = f"{src}.goto 0x{(tgt if tk else npc):x}"
+            cont = tgt if tk else npc
             rws = []
             for r in sorted({rs1, rs2}):
                 rws.append('Core.get_zero' if r == 0 else self.getfact(src, r))
             A = self.E(rs1); Bv = self.E(rs2)
-            ht = f"(show taken .{cond} ({A}) ({Bv}) = {'true' if tk else 'false'} by {spec['why']})"
+            why = self.side(spec, 'why', pc, f"taken .{cond} ({A}) ({Bv}) = {'true' if tk else 'false'}")
+            ht = f"(show taken .{cond} ({A}) ({Bv}) = {'true' if tk else 'false'} by {why})"
+            pcf = 'hpc' if self.n == 0 and FIRST_HPC else 'rfl'
             if tk:
                 proof = (f"rw [exec_branch, {', '.join(rws)}, {ht}]; simp only [↓reduceIte]; "
-                         f"rw [show ({src}).pc + {off} = 0x{tgt:x} from rfl, jump_ok _ _ (by decide)]; rfl")
+                         f"rw [show ({src}).pc = 0x{pc:x} from {pcf}, show (0x{pc:x} : Word) + {off} = 0x{tgt:x} by decide, "
+                         f"jump_ok _ _ (by decide)]; rfl")
             else:
-                proof = f"rw [exec_branch, {', '.join(rws)}, {ht}]; simp only [↓reduceIte, Bool.false_eq_true]; rfl"
+                fin = 'rw [hpc]; rfl' if self.n == 0 and FIRST_HPC else 'rfl'
+                proof = f"rw [exec_branch, {', '.join(rws)}, {ht}]; simp only [↓reduceIte, Bool.false_eq_true]; {fin}"
             sc = 'Core.sameCsr_goto _ _'
         elif kind == 'jal':
             rd, off = int(f[1]), f[2]
@@ -164,14 +182,31 @@ class Seg:
                 offv -= 1 << 32
             tgt = (pc + offv) & 0xffffffff
             expr = f"{src}.goto 0x{tgt:x}"
-            proof = (f"rw [exec_jal, Core.set_zero, show ({src}).pc + {off} = 0x{tgt:x} from rfl, "
-                     f"jump_ok _ _ (by decide)]; rfl")
+            cont = tgt
+            pcf = 'hpc' if self.n == 0 and FIRST_HPC else 'rfl'
+            proof = (f"rw [exec_jal, Core.set_zero, show ({src}).pc = 0x{pc:x} from {pcf}, "
+                     f"show (0x{pc:x} : Word) + {off} = 0x{tgt:x} by decide, jump_ok _ _ (by decide)]; rfl")
+            sc = 'Core.sameCsr_goto _ _'
+        elif kind == 'jalr' and int(f[1]) == 0:
+            # ret: jump to the (even) value of rs1; spec['ra'] names the evenness hypothesis
+            rs1, off = int(f[2]), f[3]
+            assert off == '0x00000000#32'
+            tgt = self.E(rs1)
+            expr = f"{src}.goto ({tgt})"
+            cont = int(tgt, 16) if tgt.startswith('0x') else None
+            hra = spec['ra']
+            if hra == 'HYP':
+                hra = f"hra_{pc:x}"
+                self.hyps.append(f"({hra} : ({tgt}).getLsbD 0 = false)")
+            proof = (f"rw [exec_jalr, Core.set_zero, {self.getfact(src, rs1)}, BitVec.add_zero, "
+                     f"Memmove.and_not_one _ {hra}, jump_ok _ _ {hra}]; rfl")
             sc = 'Core.sameCsr_goto _ _'
         elif kind == 'jalr':
             rd, rs1, off = int(f[1]), int(f[2]), f[3]
             tgt = spec['target']
             assert rd == 1
             expr = f"{src}.wr 1 0x{npc:x} 0x{tgt:x}"
+            cont = tgt
             proof = (f"rw [exec_jalr, {self.getfact(src, rs1)}, show ({self.E(rs1)}) + {off} &&& ~~~1 = 0x{tgt:x} by decide, "
                      f"jump_ok _ _ (by decide)]; rfl")
             sc = 'Core.sameCsr_wr _ _ _ _'
@@ -181,14 +216,15 @@ class Seg:
         if self.n == 0 and FIRST_HPC:
             hal = "(by rw [hpc]; decide)"
             fact = f"(by rw [hpc]; exact {fact})"
-            k = proof.rfind(']; rfl')
-            proof = proof[:k] + ', hpc' + proof[k:]
+            if kind not in ('branch', 'jal'):
+                k = proof.rfind(']; rfl')
+                proof = proof[:k] + ', hpc' + proof[k:]
         name, q = self.newcore(expr)
         self.steps.append((src, name, ramsrc, ramdst, f"refine detStep_of {hal} {fact} fun o => ?_\n    {proof}", self.qname))
         self.quiet.append((q, f"Quiet.of_sameCsr ({sc}) {self.qname}"))
         self.qname = q
         self.core = name
-        return npc
+        return cont
 
 
 BASE = 'c'
@@ -201,7 +237,7 @@ def emit(facts, name, params, hyps, start, stop, specs, regs, ram0='ram', prefix
     and ram returned as `let`-free expressions in a pair of defs."""
     s = Seg(facts, BASE, ram0, regs, prefix)
     pc = start
-    while pc != stop:
+    while pc != stop and pc is not None:
         pc = s.step(pc, specs.get(pc, {}))
     N = len(s.steps)
     # final expressions with lets inlined, for the defs
@@ -216,6 +252,8 @@ def emit(facts, name, params, hyps, start, stop, specs, regs, ram0='ram', prefix
     out.append(f"def {name}Core {params} : Core :=\n  {core_def}\n")
     out.append(f"def {name}Ram {params} : Word → BitVec 8 :=\n  {ram_def}\n")
     args = ' '.join(p.split(':')[0].strip('( ').split()[0] for p in re.findall(r'\([^()]*\)', params))
+    if s.hyps:
+        hyps = hyps + '\n    ' + '\n    '.join(s.hyps)
     out.append(f"theorem {name} {params} {hyps} :\n    QRun B img {N} ⟨{BASE}, {ram0}⟩ ⟨{name}Core {args}, {name}Ram {args}⟩ := by")
     if pre:
         out.append(pre)
