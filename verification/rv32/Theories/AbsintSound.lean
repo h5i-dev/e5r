@@ -3220,4 +3220,94 @@ theorem exec_storesIn {cfg : Config} {s : AState} {m : Machine} {ρ : Nat → Wo
   | lr => intro _; trivial
   | _ => trivial
 
+/-! ### Successors stay in their context -/
+
+theorem AState.set_hnd (s : AState) (r : Reg) (v : AV) : (s.set r v).hnd = s.hnd := by
+  unfold AState.set; split <;> rfl
+
+theorem jumpAbs_hnd {s : AState} {t : AV} {l : List AState} (h : jumpAbs s t = some l) :
+    ∀ x ∈ l, x.hnd = s.hnd := by
+  intro x hx
+  unfold jumpAbs at h
+  split at h
+  · split at h
+    · simp only [Option.some.injEq] at h; subst h
+      obtain ⟨p, _, rfl⟩ := List.mem_map.mp hx; rfl
+    · simp at h
+  · simp at h
+
+theorem refineState_hnd (c : BrCond) (t : Bool) (rs1 rs2 : Reg) (s' : AState) (a b : AV) :
+    (refineState c t rs1 rs2 s' a b).hnd = s'.hnd := by
+  unfold refineState; split <;> simp [AState.set_hnd]
+
+theorem csrWriteAbs_hnd {s s' : AState} {addr : Nat} {v : AV} (h : csrWriteAbs s addr v = some s') :
+    s'.hnd = s.hnd := by
+  unfold csrWriteAbs at h
+  repeat' (first | (simp only [Option.some.injEq] at h; subst h; rfl) | (simp at h; done) | split at h)
+
+/-- An instruction's successors are in the same context (main or handler). -/
+theorem absExec_hnd {cfg : Config} {s : AState} {len : Nat} {i : Instr} {ts : List AState}
+    (h : absExec cfg s len i = some ts) : ∀ t ∈ ts, t.hnd = s.hnd := by
+  intro t ht
+  cases i with
+  | jal rd off =>
+    simp only [absExec] at h
+    rw [jumpAbs_hnd h t ht, AState.set_hnd]
+  | jalr rd rs1 off =>
+    simp only [absExec] at h
+    rw [jumpAbs_hnd h t ht, AState.set_hnd]
+  | branch c rs1 rs2 off =>
+    simp only [absExec] at h
+    generalize canTake c (s.get rs1) (s.get rs2) = p at h
+    obtain ⟨yes, no⟩ := p
+    simp only at h
+    have hfall : ∀ t ∈ (if no = true then [{ refineState c false rs1 rs2 s (s.get rs1) (s.get rs2) with
+        pc := (s.pc + len) % M32 }] else []), t.hnd = s.hnd := by
+      intro t ht
+      split at ht
+      · simp only [List.mem_singleton] at ht; subst ht; exact refineState_hnd ..
+      · simp at ht
+    cases yes
+    · simp only [Bool.false_eq_true, if_false, Option.map_some, Option.some.injEq] at h; subst h
+      exact hfall t (by simpa using ht)
+    · simp only [if_true] at h
+      cases hj : jumpAbs _ _ with
+      | none => rw [hj] at h; simp at h
+      | some tj =>
+        rw [hj] at h; simp only [Option.map_some, Option.some.injEq] at h; subst h
+        rcases List.mem_append.mp ht with ht | ht
+        · rw [jumpAbs_hnd hj t ht, refineState_hnd]
+        · exact hfall t ht
+  | csr op rd src addr =>
+    have key : ∀ (wr : Bool) (newA : AV → AV),
+        (if (wr && addr / 1024 == 3) = true then none else (csrReadAbs s addr).bind fun old =>
+          if (!wr) = true then some [{ s.set rd old with pc := (s.pc + len) % M32 }] else
+          (csrWriteAbs (s.set rd old) addr (newA old)).bind fun s'' =>
+            some [{ s'' with pc := (s.pc + len) % M32 }]) = some ts → t.hnd = s.hnd := by
+      intro wr newA h
+      split at h
+      · simp at h
+      · obtain ⟨old, -, h⟩ := Option.bind_eq_some_iff.mp h
+        split at h
+        · simp only [Option.some.injEq] at h; subst h
+          simp only [List.mem_singleton] at ht; subst ht; simp [AState.set_hnd]
+        · obtain ⟨s'', hw, h⟩ := Option.bind_eq_some_iff.mp h
+          simp only [Option.some.injEq] at h; subst h
+          simp only [List.mem_singleton] at ht; subst ht
+          simp only; rw [csrWriteAbs_hnd hw, AState.set_hnd]
+    simp only [absExec] at h
+    exact key _ _ h
+  | ecall => simp [absExec] at h
+  | ebreak => simp [absExec] at h
+  | mret => simp [absExec] at h
+  | _ =>
+    simp only [absExec, Option.bind_eq_some_iff, Option.some.injEq] at h
+    first
+      | (subst h; simp only [List.mem_singleton] at ht; subst ht; simp [AState.set_hnd])
+      | (obtain ⟨_, -, rfl⟩ := h; simp only [List.mem_singleton] at ht; subst ht; simp [AState.set_hnd])
+      | (obtain ⟨_, -, _, -, rfl⟩ := h; simp only [List.mem_singleton, List.mem_cons] at ht
+         rcases ht with rfl | rfl | ht <;> simp_all [AState.set_hnd])
+      | (split at h <;> (simp only [Option.some.injEq] at h; subst h; simp only [List.mem_singleton] at ht
+                         subst ht; simp [AState.set_hnd]))
+
 end E5R.AI
