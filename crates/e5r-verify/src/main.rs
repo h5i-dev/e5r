@@ -3,6 +3,9 @@
 //! `e5r-verify IMAGE.elf` is the V0 research export (strict RV32I subset).
 //! `e5r-verify flash --board BOARD.json [--namespace NS] IMAGE.elf` exports
 //! the flash contents a board boots from.
+//! `e5r-verify ram-image (--ram BASE:SIZE | --board BOARD.json) --mapping paddr=vaddr
+//! [--max-file N] [--max-file-bytes N] [--namespace NS] --out DIR IMAGE.elf` exports the
+//! initial RAM a loader writes for a RAM-resident ELF (`docs/ram-image-export.md`).
 //! `e5r-verify check JOB.json [--resume] [--out RESULT.json]` rebuilds and rechecks a
 //! verification job and prints its `e5r.verify.result.v1` document; the exit
 //! status is 0 only for `proved`.
@@ -34,6 +37,7 @@ fn run(args: Vec<String>) -> Result<String, String> {
             let w = e5r_verify::board::Board::parse(&text)?.windows()?;
             e5r_verify::flash::export_flash(&read(&elf)?, w, &ns)
         }
+        Some("ram-image") => ram_image(&args[1..]),
         Some("check") => {
             let mut out = None;
             let mut job = None;
@@ -93,11 +97,78 @@ fn run(args: Vec<String>) -> Result<String, String> {
         Some(path) if args.len() == 1 && !path.starts_with('-') => e5r_verify::export(&read(path)?),
         _ => Err(
             "usage: e5r-verify IMAGE.elf | flash --board BOARD.json [--namespace NS] IMAGE.elf | \
+                  ram-image (--ram BASE:SIZE | --board BOARD.json) --mapping paddr=vaddr \
+                  [--max-file N] [--max-file-bytes N] [--namespace NS] --out DIR IMAGE.elf | \
                   check JOB.json [--resume] [--out RESULT.json] | verify-result RESULT.json | \
                   bundle JOB.json --out DIR"
                 .into(),
         ),
     }
+}
+
+fn number(s: &str) -> Result<u64, String> {
+    match s.strip_prefix("0x") {
+        Some(h) => u64::from_str_radix(h, 16),
+        None => s.parse(),
+    }
+    .map_err(|e| format!("{s}: {e}"))
+}
+
+fn ram_image(args: &[String]) -> Result<String, String> {
+    let (mut ram, mut board, mut mapping, mut out, mut elf) = (None, None, None, None, None);
+    let (mut max_file, mut max_file_bytes) = (None, None);
+    let mut ns = "Image".to_string();
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        let mut value = || it.next().cloned().ok_or(format!("{a} needs a value"));
+        match a.as_str() {
+            "--ram" => ram = Some(value()?),
+            "--board" => board = Some(value()?),
+            "--mapping" => mapping = Some(value()?),
+            "--max-file" => max_file = Some(number(&value()?)?),
+            "--max-file-bytes" => max_file_bytes = Some(number(&value()?)?),
+            "--namespace" => ns = value()?,
+            "--out" => out = Some(value()?),
+            _ if elf.is_none() && !a.starts_with('-') => elf = Some(a.clone()),
+            _ => return Err(format!("unexpected argument {a}")),
+        }
+    }
+    if mapping.as_deref() != Some(e5r_verify::ram::MAPPING) {
+        return Err(format!(
+            "ram-image needs --mapping {} (the only supported policy)",
+            e5r_verify::ram::MAPPING
+        ));
+    }
+    let (base, size) = match (ram, board) {
+        (Some(r), None) => {
+            let (b, s) = r.split_once(':').ok_or("--ram takes BASE:SIZE")?;
+            (number(b)?, number(s)?)
+        }
+        (None, Some(path)) => {
+            let text = std::fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
+            let b = e5r_verify::board::Board::parse(&text)?;
+            let mut rams = b.memory.iter().filter(|r| r.kind == "ram");
+            match (rams.next(), rams.next()) {
+                (Some(r), None) => (number(&r.base)?, number(&r.size)?),
+                _ => return Err(format!("board {} needs exactly one ram region", b.id)),
+            }
+        }
+        _ => return Err("ram-image needs exactly one of --ram BASE:SIZE and --board".into()),
+    };
+    let mut policy = e5r_verify::ram::Policy::new(base, size);
+    policy.max_file = max_file.unwrap_or(policy.max_file);
+    policy.max_file_bytes = max_file_bytes.unwrap_or(policy.max_file_bytes);
+    let out = out.ok_or("ram-image needs --out DIR")?;
+    let elf = elf.ok_or("ram-image needs an ELF path")?;
+    let bytes = std::fs::read(&elf).map_err(|e| format!("{elf}: {e}"))?;
+    let m = e5r_verify::ram::export(&bytes, policy, &ns, std::path::Path::new(&out))?;
+    Ok(format!(
+        "{out}: {} PT_LOADs, {} file bytes, {} zero bytes, ELF sha256 {}\n",
+        m["segments"].as_array().unwrap().len(),
+        m["totals"]["file_bytes"],
+        m["totals"]["zero_bytes"],
+        m["elf"]["sha256"].as_str().unwrap()
+    ))
 }
 
 fn main() -> ExitCode {
