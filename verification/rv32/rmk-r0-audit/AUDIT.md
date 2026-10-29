@@ -143,6 +143,11 @@ crate hashes and `.llvm.<n>` suffixes ignored:
 * **Image job (`jobs/rmk/rmk-qemu-virt-image.json`):** update `elf_sha256`, and
   the expected bytes in `Entry.lean` if any change (the entry bytes are the same).
   The generated fidelity module derives `rwBase` itself.
+* **Checked here, without migrating anything:** a throwaway RAM-image job on
+  5871dcee (`e5r-verify check`, board `qemu-virt-rv32`) is `proved`. The
+  exporter accepts the ELF, and the kernel proves `RamElf.accepts`, the manifest
+  agreement, entry 0x80000000, `rwBase` 0x80029590 and the same first four bytes
+  at the entry.
 * **memmove n<16 proof:** the code it is about is byte-identical at the same
   addresses, so the 40 instruction facts and the loop and contract proofs carry
   over. The data-layout constants do not:
