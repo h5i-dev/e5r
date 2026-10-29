@@ -19,6 +19,9 @@ the V0 research proofs it grew from are in
 | Clamp binary for all 2^32 inputs, wraparound included | Proved |
 | Verification jobs: CLI, structured results, stale-result detection, limits | Done |
 | Soundness of the whole-firmware certificate checker (`E5R.AI.check_sound`) | Proved; kernel-replayed, standard axioms only |
+| Hybrid composition: checker plus directly proved regions and masked summaries (`E5R.AI.check_sound_hybrid`) | Proved; standard axioms only |
+| Machine-code summary of the firmware's channel ring-head update (`RingAI.spec_sound`, review worker) | Proved; used by the analyzer with `E5R_RING=1` |
+| Two separate real binaries combining the checker with a direct summary (`demo_safe`, `loop_safe`) | Proved (labeled demos, not the Embassy firmware) |
 | **Whole-firmware safety theorem for the Embassy example** (no escape from the model, every PWM duty ≤ 100) | **Not yet proved.** It needs a certificate for the firmware that the checker accepts; the analyzer does not yet produce one that is precise and small enough |
 
 Nothing below claims more than this table. The function-level theorems are
@@ -261,7 +264,9 @@ As checked on 2026-10-29 on the development host (Lean 4.35.0, rustc 1.98.1):
 | --- | --- | --- | --- |
 | `hifive1-duty` (`duty_contract`, `nonvacuous`, 30 model controls, image fidelity) | 50 | 40 s | 957 MiB |
 | `hifive1-clamp32` (`clamp_all`, `spec_toNat`, `wraps`, `nonvacuous`, image fidelity) | 15 | 20 s | 596 MiB |
-| `hifive1-checker` (`E5R.AI.check_sound`, image fidelity) | 2 | 138 s | 952 MiB |
+| `hifive1-checker` (`check_sound`, `check_sound_hybrid`, image fidelity) | 3 | 90 s | 954 MiB |
+| `hybrid-ringhead-firmware` (ring-head contract on the firmware bytes, `RingAI.spec_sound`) | 17 | 120 s | 955 MiB |
+| `hybrid-ring-demo` / `hybrid-ring-loop-demo` (separate binaries) | 22 / 22 | 94 s / 100 s | 789 / 783 MiB |
 
 `duty_contract` is proved about the instructions rustc emitted for `duty()`
 in the checked image. From every state meeting the calling convention (`a0`
@@ -359,10 +364,21 @@ rest on. It works by abstract interpretation:
 function. It is untrusted: whatever it emits either checks or is rejected.
 Two things are open, and one is done:
 
-1. **Precision.** The analysis still reports about 100 possible faults on
-   the firmware. They are almost all one lost correlation: the timer
-   queue's waker vtable and data words, so `wake()` appears reachable with
-   a null task.
+1. **Precision.** The analysis still reports possible faults on the
+   firmware: 68 with default options; the best measured option set
+   (proved ring summary, kept static facts, address splits) reached 47.
+   Almost all are a lost correlation between a task's state byte and the
+   saved pointer it guards (the actuator's channel pointer at 0x800000d4,
+   the sampler's channel tail), plus `wake()` with a merged task pointer.
+   The checker now has the means to keep such facts across interrupts:
+   - kept intervals (`Cert.hkeep`): static RAM the handler never writes,
+     whose facts survive an interrupt window;
+   - unconditional facts implied by guarded ones whose guard holds;
+   - several facts about the same bytes are intersected.
+   The untrusted analyzer's merge and reuse choices still lose the fact
+   (`tools/Analyze.lean` options `E5R_ADDR_SPLIT`, `E5R_TAG_DEPTH`,
+   `E5R_KEEP`, `E5R_KEEP_GUARDED`, `E5R_FREEZE_G`, `E5R_RING`, with their
+   measurements in the commit messages).
 2. **Size.** About 30,000 nodes is too large to check in the kernel. Function
    summaries are the planned fix.
 3. **`check_sound`: done.** `Theories/AbsintSound.lean` proves
@@ -399,5 +415,16 @@ Two things are open, and one is done:
      summary assumed unchanged.
    - A guarded stack fact at an interrupt point could be invalidated
      through a static guard word the handler writes.
+
+4. **Hybrid composition: done.** Code the abstract domain handles badly can
+   be proved directly and composed into the same theorem:
+   `check_sound_hybrid` takes, next to an accepted `checkHybrid`
+   certificate, proofs of directly proved `Region`s (delegated pcs; every
+   step proved against `stepInstr` on the image bytes, interrupts allowed
+   only where a certificate node describes the machine) and of masked
+   summaries (`SumSpec`: a finite run with no interrupt enabled at any
+   machine, ending where the summary's exit state describes it). Plain
+   `check` accepts neither (`check_delegate`, `check_sums`), so
+   `check_sound` is unchanged.
 
 Until the first two are done, no whole-firmware guarantee is claimed.

@@ -308,9 +308,20 @@ def overlap (a n b m : Nat) : Bool :=
 def Cell.hits (c : Cell) (base : Base) (a n : Nat) : Bool :=
   c.base == base && overlap c.addr c.w.bytes a n
 
-/-- The unconditional fact about `wd` at `a`, if any. -/
+/-- Two facts about the same bytes both hold, so a value lies in both sets. -/
+def AV.meet : AV → AV → AV
+  | .vals x, .vals y => .vals (x.filter (· ∈ y))
+  | .top, b => b
+  | a, _ => a
+
+/-- What several facts about the same bytes say together. -/
+def meetAll (l : List Cell) : Option AV :=
+  l.foldl (fun acc c => some (match acc with | none => c.v | some v => v.meet c.v)) none
+
+/-- What the unconditional facts about `wd` at `a` say together: several
+    can hold at once (an interrupt-window fact kept next to `G`'s). -/
 def plain (mem : List Cell) (base : Base) (a : Nat) (wd : Width) : Option AV :=
-  (mem.find? fun c => c.base == base && c.addr == a && c.w == wd && c.guard.isNone).map (·.v)
+  meetAll (mem.filter fun c => c.base == base && c.addr == a && c.w == wd && c.guard.isNone)
 
 /-- The state knows the `g.2.1` value at `g.1` is not `g.2.2`. -/
 def guardHolds (mem : List Cell) (g : Nat × Width × Nat) : Bool :=
@@ -321,8 +332,8 @@ def guardHolds (mem : List Cell) (g : Nat × Width × Nat) : Bool :=
 
 /-- A fact about `wd` at `a` that applies in this state. -/
 def lookup (mem : List Cell) (base : Base) (a : Nat) (wd : Width) : Option AV :=
-  (mem.find? fun c => c.base == base && c.addr == a && c.w == wd &&
-    match c.guard with | none => true | some g => guardHolds mem g).map (·.v)
+  meetAll (mem.filter fun c => c.base == base && c.addr == a && c.w == wd &&
+    match c.guard with | none => true | some g => guardHolds mem g)
 
 /-- A cell that is stale after writing `v` to `wd` at `a` on `base`: it
     overlaps the write, or its guard reads bytes the write overlaps (unless
@@ -716,9 +727,14 @@ def handlerEntry (G : List Cell) (s : AState) (code : Nat) : Option AState :=
 /-- The facts in `mem` imply the fact `c`. -/
 def Cell.leqIn (mem : List Cell) (c : Cell) : Bool :=
   match c.guard with
-  | none => match plain mem c.base c.addr c.w with
-    | some v => v.leq c.v
-    | none => false
+  | none =>
+    -- An unconditional fact, or a guarded one whose guard `mem` shows holds.
+    (match plain mem c.base c.addr c.w with
+     | some v => v.leq c.v
+     | none => false) ||
+    (match lookup mem c.base c.addr c.w with
+     | some v => v.leq c.v
+     | none => false)
   | some g =>
     -- The same or an unconditional fact, or the guard known to be false.
     mem.any (fun d => d.base == c.base && d.addr == c.addr && d.w == c.w &&
