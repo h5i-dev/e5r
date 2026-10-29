@@ -239,3 +239,55 @@ a RAM job on a flash board, a flash job on a RAM board, an unknown kind, a
 missing ELF or proof module, a forbidden command (`error`), and a proof that
 does not check (`failed`). The transcript and the RMK job's result are in
 `verification/rv32/ram-image/rmk-qemu-riscv-rynk/`.
+
+## The RMK memmove job (`jobs/rmk/rmk-memmove-small.json`)
+
+This job checks the peer's proof of the emitted `memmove` for copies of fewer
+than 16 bytes (`Projects/rmk/MemmoveSmall.lean`, `E5R.Rmk.Memmove.contract`)
+against the image the runner generates. Its `image.module` is
+`Projects.rmk.Elf` in namespace `E5R.Rmk.Image`, which is the module the
+proofs already import (`Projects/rmk/Fetch.lean`). So the runner's packed file
+is the only image input. `Projects/rmk/gen_elf.py`, which wrote that module by
+hand, is not used, and a run replaces any `Elf.lean` it left (the file is
+gitignored).
+
+`Projects/ramimage/Memmove.lean` connects the proofs to the runner's binding.
+`img_eq : E5R.Rmk.img = E5R.Rmk.Image.image.ro` holds by `rfl`, and
+`board_eq : E5R.Rmk.B = QemuVirtRv32.board E5R.Rmk.Image.image.rwBase` follows
+from `image_rwBase`. `E5R.RmkMemmove.contract` restates the contract over that
+image and board: from every machine meeting `Memmove.Pre` (pc at the trampoline
+0x80020c1e, a quiet core, n < 16, dst and src in model RAM, aligned save slots
+in RAM and separate from dst and src, an even return address), a quiet,
+deterministic run reaches `Memmove.Post` (at `ra`, callee-saved registers and sp
+restored, CSRs unchanged, RAM outside the save slots equal to the memmove of
+the entry RAM, overlap in both directions). It covers this function, nothing
+more about RMK. The job's `symbols` pin both proof addresses (0x80020c1e,
+0x80020d9e) to the ELF's `memmove` symbols.
+
+Result (`verification/rv32/ram-image/rmk-qemu-riscv-rynk/rmk-memmove-small.result.json`):
+`proved` in 237 s. It checks eight theorems (the contract, the restated
+contract, the two equalities and the four image bindings), with the axioms
+`propext`, `Classical.choice` and `Quot.sound`. Every module is replayed by
+`leanchecker`. `e5r-verify bundle` plus `recheck.sh` recheck it offline in
+137 s.
+
+Limits. The runner enforces `rss_mib` by sampling resident memory and passes
+`-M (rss_mib − 512)` to Lean. It never sets an address-space limit:
+Lean reserves far more virtual memory than it touches, so `ulimit -v` at
+24–40 GB makes it fail with "failed to create thread" even though RSS stays
+below 1 GB for most modules. One module is heavy: `Projects/rmk/Fetch.lean`
+peaks at 6.5 GB RSS for 50 s, in the proof and again in its `leanchecker`
+replay. With `rss_mib` 6144 (Lean `-M 5632`) it fails with "(kernel) excessive
+memory consumption", so the job sets 10240.
+
+Controls (`python3 -I scripts/test-rmk-memmove-job.py E5R_VERIFY [BUNDLE]`,
+transcript `memmove-job-controls.txt`):
+- One instruction of memmove changed (0x80020da6 `sub a3,a0,a1` → `sub a5,a0,a1`):
+  - with the pin, this is an `error`;
+  - without it, the image exports and the reader accepts it, but the
+    instruction fact for 0x80020da6 fails (`failed`).
+- A stale proof address is an `error`.
+- The image declared as flash is an `error`.
+- A claim that model RAM starts 4 bytes later is `failed`.
+- In a bundle, one changed word of the packed file fails at the checksums. With
+  the checksum forged as well, it fails at `check-packing.py`.
