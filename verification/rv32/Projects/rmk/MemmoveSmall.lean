@@ -442,4 +442,198 @@ theorem bwd_path (c : Core) (R0 : Word → BitVec 8) (hq : Quiet c)
       Core.wr_get_ne _ _ _ _ _ h13, Core.wr_get_ne _ _ _ _ _ h9, Core.goto_get]
     exact pro_get c r h2 h6 h13
 
+/-! ## RAM: the save slots and the copy -/
+
+/-- The 12 bytes of save slots below `sp`. -/
+def InSlots (sp x : Word) : Prop := sp.toNat - 12 ≤ x.toNat ∧ x.toNat < sp.toNat
+
+theorem touches_slot {sp a x : Word} (hs : Slots sp) (k : Nat) (hk : k = 0x2c ∨ k = 0x28 ∨ k = 0x24)
+    (ha : a = sp + 0xffffffd0#32 + BitVec.ofNat 32 k) (h : E5R.AI.Touches a .w x) : InSlots sp x := by
+  obtain ⟨j, hj, rfl⟩ := h
+  have := hs.ram; simp only [Width.bytes] at hj; subst ha
+  unfold InSlots; simp only [E5R.AI.w]
+  rcases hk with rfl | rfl | rfl <;> constructor <;> bv_omega
+
+theorem saved_other (c : Core) (ram : Word → BitVec 8) (hs : Slots (c.get 2)) (x : Word)
+    (hx : ¬ InSlots (c.get 2) x) : saved c ram x = ram x := by
+  unfold saved
+  -- (saved unfolds to the three writes)
+  rw [E5R.AI.ramWrite_other _ _ _ _ _ (fun h => hx (touches_slot hs 0x24 (by decide) rfl h)),
+    E5R.AI.ramWrite_other _ _ _ _ _ (fun h => hx (touches_slot hs 0x28 (by decide) rfl h)),
+    E5R.AI.ramWrite_other _ _ _ _ _ (fun h => hx (touches_slot hs 0x2c (by decide) rfl h))]
+
+theorem disj_slots (sp : Word) (i j : Nat) (hi : i = 0x2c ∨ i = 0x28 ∨ i = 0x24)
+    (hj : j = 0x2c ∨ j = 0x28 ∨ j = 0x24) (hij : i ≠ j) :
+    E5R.AI.Disj (sp + 0xffffffd0#32 + BitVec.ofNat 32 i) .w (sp + 0xffffffd0#32 + BitVec.ofNat 32 j) .w := by
+  intro x ⟨a, ha, hx⟩ ⟨b, hb, hy⟩
+  simp only [Width.bytes, E5R.AI.w] at ha hb hx hy
+  rw [hx] at hy
+  rcases hi with rfl | rfl | rfl <;> rcases hj with rfl | rfl | rfl <;> first | exact hij rfl | bv_omega
+
+theorem saved_read (c : Core) (ram : Word → BitVec 8) :
+    ramRead (saved c ram) (c.get 2 + 0xffffffd0#32 + 0x2c#32) .w = c.get 8 ∧
+    ramRead (saved c ram) (c.get 2 + 0xffffffd0#32 + 0x28#32) .w = c.get 9 ∧
+    ramRead (saved c ram) (c.get 2 + 0xffffffd0#32 + 0x24#32) .w = c.get 18 := by
+  unfold saved
+  refine ⟨?_, ?_, ?_⟩
+  · rw [E5R.AI.ramRead_frame _ _ _ _ _ _ (disj_slots _ 0x2c 0x24 (by decide) (by decide) (by decide)),
+      E5R.AI.ramRead_frame _ _ _ _ _ _ (disj_slots _ 0x2c 0x28 (by decide) (by decide) (by decide)),
+      E5R.AI.ramRead_ramWrite_self]; rfl
+  · rw [E5R.AI.ramRead_frame _ _ _ _ _ _ (disj_slots _ 0x28 0x24 (by decide) (by decide) (by decide)),
+      E5R.AI.ramRead_ramWrite_self]; rfl
+  · rw [E5R.AI.ramRead_ramWrite_self]; rfl
+
+theorem ramRead_congr {R R' : Word → BitVec 8} {a : Word}
+    (h : ∀ k < 4, R (a + BitVec.ofNat 32 k) = R' (a + BitVec.ofNat 32 k)) : ramRead R a .w = ramRead R' a .w := by
+  have h0 := h 0 (by decide); have h1 := h 1 (by decide); have h2 := h 2 (by decide); have h3 := h 3 (by decide)
+  simp only [BitVec.add_zero] at h0
+  simp only [ramRead]
+  rw [h0, show a + 1 = a + BitVec.ofNat 32 1 from rfl, h1, show a + 2 = a + BitVec.ofNat 32 2 from rfl, h2,
+    show a + 3 = a + BitVec.ofNat 32 3 from rfl, h3]
+
+/-! ## The contract -/
+
+structure Pre (m : Machine) : Prop where
+  pc : m.core.pc = 0x80020c1e
+  quiet : Quiet m.core
+  small : (m.core.get 12).toNat < 16
+  dst : B.inRam (m.core.get 10) (m.core.get 12).toNat = true
+  src : B.inRam (m.core.get 11) (m.core.get 12).toNat = true
+  slots : Slots (m.core.get 2)
+  dstSep : (m.core.get 2).toNat ≤ (m.core.get 10).toNat ∨
+    (m.core.get 10).toNat + (m.core.get 12).toNat + 12 ≤ (m.core.get 2).toNat
+  srcSep : (m.core.get 2).toNat ≤ (m.core.get 11).toNat ∨
+    (m.core.get 11).toNat + (m.core.get 12).toNat + 12 ≤ (m.core.get 2).toNat
+  ra : (m.core.get 1).getLsbD 0 = false
+
+/-- memmove's result: `n` bytes of `src` at `dst`, read from the entry RAM. -/
+def moved (ram : Word → BitVec 8) (dst src : Word) (n : Nat) (x : Word) : BitVec 8 :=
+  if dst.toNat ≤ x.toNat ∧ x.toNat < dst.toNat + n then ram (src + (x - dst)) else ram x
+
+structure Post (m₀ m : Machine) : Prop where
+  pc : m.core.pc = m₀.core.get 1
+  regs : ∀ r : Reg, r.val ∉ [6, 11, 12, 13, 14, 16] → m.core.get r = m₀.core.get r
+  csr : m.core.sameCsr m₀.core
+  ram : ∀ x, ¬ InSlots (m₀.core.get 2) x →
+    m.ram x = moved m₀.ram (m₀.core.get 10) (m₀.core.get 11) (m₀.core.get 12).toNat x
+
+/-- From the epilogue entry of either path to `Post`. -/
+theorem finish (c : Core) (ram R : Word → BitVec 8) (e : Core) (w : List Nat) (hq : Quiet c)
+    (hn : (c.get 12).toNat < 16) (hd : B.inRam (c.get 10) (c.get 12).toNat = true)
+    (hs : B.inRam (c.get 11) (c.get 12).toNat = true) (hsl : Slots (c.get 2))
+    (hdsep : (c.get 2).toNat ≤ (c.get 10).toNat ∨ (c.get 10).toNat + (c.get 12).toNat + 12 ≤ (c.get 2).toNat)
+    (hssep : (c.get 2).toNat ≤ (c.get 11).toNat ∨ (c.get 11).toNat + (c.get 12).toNat + 12 ≤ (c.get 2).toNat)
+    (hra : (c.get 1).getLsbD 0 = false) (he : e.pc = 0x800210b0) (hfr : Frame c e w)
+    (hw : ∀ r : Reg, r.val ∈ w → r.val ∈ [9, 11, 12, 13, 14, 16])
+    (hR : ∀ x, R x = moved (saved c ram) (c.get 10) (c.get 11) (c.get 12).toNat x) :
+    ∃ m, QRun B img 5 ⟨e, R⟩ m ∧ Post ⟨c, ram⟩ m := by
+  obtain ⟨hcs, hsp, hfr⟩ := hfr
+  have hdr := (B_ram _ _).mp hd
+  have hsr := (B_ram _ _).mp hs
+  have hslr := hsl.ram
+  have e1 : e.get 1 = c.get 1 := hfr 1 (by
+    intro h
+    rcases List.mem_cons.mp h with h | h
+    · exact absurd h (by decide)
+    rcases List.mem_cons.mp h with h | h
+    · exact absurd h (by decide)
+    have := hw 1 h; revert this; decide)
+  have hep := epilogue e R (c.get 2 + 0xffffffd0#32) he (Quiet.of_sameCsr hcs hq) hsp (by rw [e1]; exact hra)
+    (hsl.al' 0x2c (by decide)) (hsl.al' 0x28 (by decide)) (hsl.al' 0x24 (by decide))
+    (hsl.in' 0x2c (by decide)) (hsl.in' 0x28 (by decide)) (hsl.in' 0x24 (by decide))
+  -- RAM outside the destination is the saved RAM, in particular at the slots.
+  have hRout : ∀ x, ¬ ((c.get 10).toNat ≤ x.toNat ∧ x.toNat < (c.get 10).toNat + (c.get 12).toNat) →
+      R x = saved c ram x := by
+    intro x hx; rw [hR, moved, if_neg hx]
+  have slot : ∀ k, (k = 0x2c ∨ k = 0x28 ∨ k = 0x24) →
+      ramRead R (c.get 2 + 0xffffffd0#32 + BitVec.ofNat 32 k) .w =
+        ramRead (saved c ram) (c.get 2 + 0xffffffd0#32 + BitVec.ofNat 32 k) .w := by
+    intro k hk
+    apply ramRead_congr
+    intro j hj
+    apply hRout
+    rcases hk with rfl | rfl | rfl <;> bv_omega
+  obtain ⟨r8, r9, r18⟩ := saved_read c ram
+  refine ⟨⟨epi e R (c.get 2 + 0xffffffd0#32), R⟩, hep, ?_, ?_, ?_, ?_⟩
+  · show (epi e R _).pc = c.get 1; simp [epi, e1]
+  · intro r hr
+    by_cases h8 : r = 8
+    · subst h8; simp only [epi, Core.goto_get, Core.wr_get_ne _ _ _ _ _ (show (8 : Reg) ≠ 2 by decide),
+        Core.wr_get_ne _ _ _ _ _ (show (8 : Reg) ≠ 18 by decide),
+        Core.wr_get_ne _ _ _ _ _ (show (8 : Reg) ≠ 9 by decide), Core.wr_get_self _ (8 : Reg) _ _ (by decide)]
+      rw [slot 0x2c (by decide)]; exact r8
+    by_cases h9 : r = 9
+    · subst h9; simp only [epi, Core.goto_get, Core.wr_get_ne _ _ _ _ _ (show (9 : Reg) ≠ 2 by decide),
+        Core.wr_get_ne _ _ _ _ _ (show (9 : Reg) ≠ 18 by decide), Core.wr_get_self _ (9 : Reg) _ _ (by decide)]
+      rw [slot 0x28 (by decide)]; exact r9
+    by_cases h18 : r = 18
+    · subst h18; simp only [epi, Core.goto_get, Core.wr_get_ne _ _ _ _ _ (show (18 : Reg) ≠ 2 by decide),
+        Core.wr_get_self _ (18 : Reg) _ _ (by decide)]
+      rw [slot 0x24 (by decide)]; exact r18
+    by_cases h2 : r = 2
+    · subst h2; simp only [epi, Core.goto_get, Core.wr_get_self _ (2 : Reg) _ _ (by decide)]
+      show c.get 2 + 0xffffffd0#32 + 0x30#32 = c.get 2; bv_omega
+    simp only [epi, Core.goto_get, Core.wr_get_ne _ _ _ _ _ h2, Core.wr_get_ne _ _ _ _ _ h18,
+      Core.wr_get_ne _ _ _ _ _ h9, Core.wr_get_ne _ _ _ _ _ h8]
+    apply hfr r
+    intro hm
+    have h6 : r.val ≠ 6 := fun e => hr (by simp [e])
+    have h2' : r.val ≠ 2 := fun e => h2 (Fin.ext e)
+    simp only [List.mem_cons] at hm
+    rcases hm with hm | hm | hm
+    · exact h2' hm
+    · exact h6 hm
+    · have := hw r hm
+      have h9' : r.val ≠ 9 := fun e => h9 (Fin.ext e)
+      simp only [List.mem_cons, List.not_mem_nil, or_false] at this hr
+      omega
+  · exact (Core.sameCsr_goto _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
+      ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans hcs))))
+  · intro x hx
+    show R x = _
+    rw [hR]; unfold moved; unfold InSlots at hx
+    by_cases hin : (c.get 10).toNat ≤ x.toNat ∧ x.toNat < (c.get 10).toNat + (c.get 12).toNat
+    · rw [if_pos hin, if_pos hin]
+      exact saved_other c ram hsl _ (by unfold InSlots; bv_omega)
+    · rw [if_neg hin, if_neg hin]
+      exact saved_other c ram hsl _ hx
+
+/-- **memmove, n < 16.** From every machine at the memmove trampoline with
+    `Pre`, a quiet run of the emitted code returns to `ra` in a machine
+    with `Post`. -/
+theorem contract (m₀ : Machine) (h : Pre m₀) : ∃ k m, QRun B img k m₀ m ∧ Post m₀ m := by
+  obtain ⟨c, ram⟩ := m₀
+  obtain ⟨hpc, hq, hn, hd, hs, hsl, hdsep, hssep, hra⟩ := h
+  simp only at hpc hq hn hd hs hsl hdsep hssep hra ⊢
+  have hpro := prologue c ram hpc hq hsl
+  have hdr := (B_ram _ _).mp hd
+  have hsr := (B_ram _ _).mp hs
+  cases hdir : (c.get 10 - c.get 11).ult (c.get 12) with
+  | false =>
+    obtain ⟨k, e, hr, he, hfr⟩ := fwd_path c (saved c ram) hq hn hdir hd hs
+    obtain ⟨m, hm, hpost⟩ := finish c ram (fwd (saved c ram) (c.get 11) (c.get 10) (c.get 12).toNat) e
+      [11, 12, 13, 14] hq hn hd hs hsl hdsep hssep hra he hfr
+      (by intro r hr; simp only [List.mem_cons, List.not_mem_nil, or_false] at hr ⊢; omega)
+      (fun x => by
+        rw [fwd_spec _ _ _ _ _ (by omega) (by omega) (by
+          simp only [BitVec.ult, decide_eq_false_iff_not] at hdir; bv_omega)]; rfl)
+    exact ⟨7 + k + 5, m, (hpro.trans hr).trans hm, hpost⟩
+  | true =>
+    obtain ⟨k, e, hr, he, hfr⟩ := bwd_path c (saved c ram) hq hn hdir hd hs
+    obtain ⟨m, hm, hpost⟩ := finish c ram
+      (bwd (saved c ram) (c.get 11 + c.get 12 + 0xffffffff#32) (c.get 10 + c.get 12) (c.get 12).toNat) e
+      [9, 11, 12, 13, 16] hq hn hd hs hsl hdsep hssep hra he hfr
+      (by intro r hr; simp only [List.mem_cons, List.not_mem_nil, or_false] at hr ⊢; omega)
+      (fun x => by
+        have hle : (c.get 11).toNat ≤ (c.get 10).toNat := by
+          simp only [BitVec.ult, decide_eq_true_iff] at hdir; bv_omega
+        rw [bwd_spec _ _ _ _ _ (by bv_omega) (by bv_omega)]
+        unfold moved
+        have hq : (c.get 10 + c.get 12).toNat = (c.get 10).toNat + (c.get 12).toNat := by bv_omega
+        rw [hq, show (c.get 10).toNat + (c.get 12).toNat - (c.get 12).toNat = (c.get 10).toNat by omega]
+        split
+        · exact congrArg _ (by bv_omega)
+        · rfl)
+    exact ⟨7 + k + 5, m, (hpro.trans hr).trans hm, hpost⟩
+
 end E5R.Rmk.Memmove
