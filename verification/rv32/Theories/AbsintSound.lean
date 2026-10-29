@@ -225,4 +225,213 @@ theorem addC_sound {ρ : Nat → Word} {a : AV} {x : Word} (c : Nat) (h : a.gam 
 theorem gam_single {ρ : Nat → Word} {c : Nat} {y : Word} (h : (AV.vals [c]).gam ρ y) : y = w c := by
   simp [AV.gam] at h; subst h; exact (w_toNat y).symm
 
+/-- Two values whose bounds are known add without wrapping when the bounds
+    say so. -/
+theorem add_bounds {x y : Word} {l1 h1 l2 h2 : Nat} (hx : l1 ≤ x.toNat ∧ x.toNat ≤ h1)
+    (hy : l2 ≤ y.toNat ∧ y.toNat ≤ h2) (h : h1 + h2 < M32) :
+    l1 + l2 ≤ (x + y).toNat ∧ (x + y).toNat ≤ h1 + h2 := by
+  rw [BitVec.toNat_add, Nat.mod_eq_of_lt (by simp only [M32] at h; omega)]; omega
+
+theorem add_sound {ρ : Nat → Word} {a b : AV} {x y : Word} (ha : a.gam ρ x) (hb : b.gam ρ y) :
+    (a.add b).gam ρ (x + y) := by
+  unfold AV.add
+  split
+  · exact lift2_sound ha hb
+  · rw [gam_single hb]; exact addC_sound _ ha
+  · rw [gam_single ha, BitVec.add_comm]; exact addC_sound _ hb
+  · split
+    · trivial
+    · trivial
+    · split
+      · rename_i l1 h1 l2 h2 e1 e2
+        split
+        · exact add_bounds (bounds_sound ha e1) (bounds_sound hb e2) (by assumption)
+        · trivial
+      · trivial
+
+theorem sub_eq_add (x : Word) (c : Nat) : x - w c = x + w ((M32 - c % M32) % M32) := by
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_sub, BitVec.toNat_add, w, BitVec.toNat_ofNat, M32]
+  omega
+
+theorem sub_sound {ρ : Nat → Word} {a b : AV} {x y : Word} (ha : a.gam ρ x) (hb : b.gam ρ y) :
+    (a.sub b).gam ρ (x - y) := by
+  unfold AV.sub
+  split
+  · rw [gam_single hb, sub_eq_add]; exact addC_sound _ ha
+  · split
+    · exact lift2_sound ha hb
+    · trivial
+
+theorem and_le_right (x y : Word) : (x &&& y).toNat ≤ y.toNat := by
+  rw [BitVec.toNat_and]; exact Nat.and_le_right
+
+theorem and_le_left (x y : Word) : (x &&& y).toNat ≤ x.toNat := by
+  rw [BitVec.toNat_and]; exact Nat.and_le_left
+
+theorem band_sound {ρ : Nat → Word} {a b : AV} {x y : Word} (ha : a.gam ρ x) (hb : b.gam ρ y) :
+    (a.band b).gam ρ (x &&& y) := by
+  unfold AV.band
+  split
+  · exact lift2_sound ha hb
+  · next _ _ c _ =>
+    rw [gam_single hb]
+    have h1 := and_le_right x (w c)
+    have h2 := and_le_left x (w c)
+    have hw : (w c).toNat = c % M32 := by simp [w, M32]
+    have hm := Nat.mod_le c M32
+    split
+    · next l h e =>
+      have := bounds_sound ha e
+      simp only [AV.gam]; omega
+    · simp only [AV.gam]; omega
+  · next _ _ c _ =>
+    rw [gam_single ha]
+    have h1 := and_le_left (w c) y
+    have h2 := and_le_right (w c) y
+    have hw : (w c).toNat = c % M32 := by simp [w, M32]
+    have hm := Nat.mod_le c M32
+    split
+    · next l h e =>
+      have := bounds_sound hb e
+      simp only [AV.gam]; omega
+    · simp only [AV.gam]; omega
+  · trivial
+
+theorem shr_mono {a b : Nat} (k : Nat) (h : a ≤ b) : a >>> k ≤ b >>> k := by
+  rw [Nat.shiftRight_eq_div_pow, Nat.shiftRight_eq_div_pow]; exact Nat.div_le_div_right h
+
+theorem shr_sound {ρ : Nat → Word} {a : AV} {x : Word} (k : Nat) (ha : a.gam ρ x) :
+    (a.shr k).gam ρ (x >>> k) := by
+  unfold AV.shr
+  split
+  · apply mkVals_sound
+    refine ⟨x.toNat >>> k, List.mem_map.mpr ⟨_, ha, rfl⟩, ?_⟩
+    rw [BitVec.toNat_ushiftRight]
+    exact Nat.mod_eq_of_lt (Nat.lt_of_le_of_lt (by rw [Nat.shiftRight_eq_div_pow]; exact Nat.div_le_self _ _)
+      (toNat_lt x))
+  · split
+    · next l h e =>
+      have := bounds_sound ha e
+      simp only [AV.gam, BitVec.toNat_ushiftRight]
+      exact ⟨shr_mono k this.1, shr_mono k this.2⟩
+    · trivial
+
+theorem shl_sound {ρ : Nat → Word} {a : AV} {x : Word} (k : Nat) (ha : a.gam ρ x) :
+    (a.shl k).gam ρ (x <<< k) := by
+  unfold AV.shl
+  split
+  · apply mkVals_sound
+    refine ⟨(x.toNat <<< k) % M32, List.mem_map.mpr ⟨_, ha, rfl⟩, ?_⟩
+    rw [BitVec.toNat_shiftLeft]; simp [M32]
+  · next l h =>
+    simp only [AV.gam] at ha
+    split
+    · next hk =>
+      simp only [AV.gam, BitVec.toNat_shiftLeft]
+      have hx : x.toNat <<< k ≤ h <<< k := by
+        rw [Nat.shiftLeft_eq, Nat.shiftLeft_eq]; exact Nat.mul_le_mul_right _ ha.2
+      have hl : l <<< k ≤ x.toNat <<< k := by
+        rw [Nat.shiftLeft_eq, Nat.shiftLeft_eq]; exact Nat.mul_le_mul_right _ ha.1
+      rw [Nat.mod_eq_of_lt (by simp only [M32] at hk; omega)]
+      exact ⟨hl, hx⟩
+    · trivial
+  · trivial
+
+/-- 0 or 1 is always described by `bool01`. -/
+theorem bool01_sound {ρ : Nat → Word} (b : Bool) : bool01.gam ρ (if b then 1 else 0) := by
+  cases b <;> simp [bool01, AV.gam]
+
+theorem ult_toNat (x y : Word) : x.ult y = decide (x.toNat < y.toNat) := by
+  simp [BitVec.ult]
+
+theorem sltu_sound {ρ : Nat → Word} {a b : AV} {x y : Word} (ha : a.gam ρ x) (hb : b.gam ρ y) :
+    (a.sltu b).gam ρ (if x.ult y then 1 else 0) := by
+  unfold AV.sltu
+  split
+  · exact lift2_sound (f := fun p q => if p.ult q then 1 else 0) ha hb
+  · split
+    · next l1 h1 l2 h2 e1 e2 =>
+      have hx := bounds_sound ha e1
+      have hy := bounds_sound hb e2
+      rw [ult_toNat]
+      split
+      · rw [if_pos (by simp; omega)]; exact const_sound _ 1
+      · split
+        · rw [if_neg (by simp; omega)]; exact const_sound _ 0
+        · exact bool01_sound _
+    · exact bool01_sound _
+
+theorem msb_false_of_lt {x : Word} (h : x.toNat < 2^31) : x.msb = false := by
+  rw [BitVec.msb_eq_false_iff_two_mul_lt]; omega
+
+theorem slt_sound {ρ : Nat → Word} {a b : AV} {x y : Word} (ha : a.gam ρ x) (hb : b.gam ρ y) :
+    (a.slt b).gam ρ (if x.slt y then 1 else 0) := by
+  unfold AV.slt
+  split
+  · exact lift2_sound (f := fun p q => if p.slt q then 1 else 0) ha hb
+  · split
+    · next l1 h1 l2 h2 e1 e2 =>
+      have hx := bounds_sound ha e1
+      have hy := bounds_sound hb e2
+      split
+      · next hn =>
+        have hs : x.slt y = x.ult y :=
+          BitVec.slt_eq_ult_of_msb_eq (by rw [msb_false_of_lt (by omega), msb_false_of_lt (by omega)])
+        rw [hs, ult_toNat]
+        split
+        · rw [if_pos (by simp; omega)]; exact const_sound _ 1
+        · split
+          · rw [if_neg (by simp; omega)]; exact const_sound _ 0
+          · exact bool01_sound _
+      · exact bool01_sound _
+    · exact bool01_sound _
+
+theorem shamt_w (k : Nat) : (w k).toNat % 32 = k % 32 := by
+  simp only [w, BitVec.toNat_ofNat]
+  exact Nat.mod_mod_of_dvd k (by decide)
+
+theorem alu_sound {ρ : Nat → Word} (op : AluOp) {a b : AV} {x y : Word} (ha : a.gam ρ x)
+    (hb : b.gam ρ y) : (AV.alu op a b).gam ρ (E5R.alu op x y) := by
+  cases op with
+  | add => exact add_sound ha hb
+  | sub => exact sub_sound ha hb
+  | and => exact band_sound ha hb
+  | or =>
+    simp only [AV.alu, E5R.alu]
+    split
+    · exact lift2_sound ha hb
+    · trivial
+  | xor =>
+    simp only [AV.alu, E5R.alu]
+    split
+    · exact lift2_sound ha hb
+    · trivial
+  | sll =>
+    simp only [AV.alu, E5R.alu]
+    split
+    · next k => rw [gam_single hb, shamt_w]; exact shl_sound _ ha
+    · trivial
+  | srl =>
+    simp only [AV.alu, E5R.alu]
+    split
+    · next k => rw [gam_single hb, shamt_w]; exact shr_sound _ ha
+    · trivial
+  | sra =>
+    simp only [AV.alu, E5R.alu]
+    split
+    · exact lift2_sound (f := fun p q => p.sshiftRight (q.toNat % 32)) ha hb
+    · next l h k =>
+      rw [gam_single hb, shamt_w]
+      split
+      · next hh =>
+        simp only [AV.gam] at ha
+        rw [BitVec.sshiftRight_eq_of_msb_false (msb_false_of_lt (by omega))]
+        simp only [AV.gam, BitVec.toNat_ushiftRight]
+        exact ⟨shr_mono _ ha.1, shr_mono _ ha.2⟩
+      · trivial
+    · trivial
+  | slt => exact slt_sound ha hb
+  | sltu => exact sltu_sound ha hb
+
 end E5R.AI
