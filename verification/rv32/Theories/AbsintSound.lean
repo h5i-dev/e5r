@@ -7,6 +7,7 @@
   transfer function and `check_sound` follow in later parts.
 -/
 import Theories.Absint
+import Theories.Logic
 
 set_option linter.constructorNameAsVariable false
 
@@ -752,5 +753,87 @@ theorem loadCell_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List
     · simp only [AV.gam]; have := ramRead_b_lt ram (addrOf ρ base a); omega
     · simp only [AV.gam]; have := ramRead_h_lt ram (addrOf ρ base a); omega
     · trivial
+
+/-! ## Writing RAM -/
+
+/-- The bytes an access of `wd` at `a` touches. -/
+def Touches (a : Word) (wd : Width) (x : Word) : Prop := ∃ k < wd.bytes, x = a + w k
+
+/-- Two accesses share no byte. -/
+def Disj (a : Word) (wd : Width) (b : Word) (wd' : Width) : Prop :=
+  ∀ x, Touches a wd x → ¬ Touches b wd' x
+
+theorem w0 : w 0 = 0 := rfl
+theorem w1 : w 1 = 1 := rfl
+theorem w2 : w 2 = 2 := rfl
+theorem w3 : w 3 = 3 := rfl
+
+theorem ramWrite_other (ram : Word → BitVec 8) (a v : Word) (wd : Width) (x : Word)
+    (h : ¬ Touches a wd x) : ramWrite ram a v wd x = ram x := by
+  have hk : ∀ k, k < wd.bytes → x ≠ a + w k := fun k hk e => h ⟨k, hk, e⟩
+  have n0 : x ≠ a := by have := hk 0 (by cases wd <;> decide); simpa [w] using this
+  cases wd
+  · simp only [ramWrite, ramPut]; rw [if_neg n0]
+  · simp only [ramWrite, ramPut]
+    split
+    · next he => exact absurd he (hk 1 (by decide))
+    · first | rfl | rw [if_neg n0]
+  · simp only [ramWrite, ramPut]
+    split
+    · next he => exact absurd he (hk 3 (by decide))
+    · split
+      · next he => exact absurd he (hk 2 (by decide))
+      · split
+        · next he => exact absurd he (hk 1 (by decide))
+        · first | rfl | rw [if_neg n0]
+
+theorem ramRead_frame (ram : Word → BitVec 8) (a v : Word) (wd : Width) (b : Word) (wd' : Width)
+    (h : Disj b wd' a wd) : ramRead (ramWrite ram a v wd) b wd' = ramRead ram b wd' := by
+  have t : ∀ k < wd'.bytes, ramWrite ram a v wd (b + w k) = ram (b + w k) :=
+    fun k hk => ramWrite_other ram a v wd _ (h _ ⟨k, hk, rfl⟩)
+  have e0 : ramWrite ram a v wd b = ram b := by
+    have := t 0 (by cases wd' <;> decide); simpa [w] using this
+  cases wd'
+  · simp only [ramRead, e0]
+  · have e1 := t 1 (by decide)
+    simp only [ramRead, e0]; rw [show b + 1 = b + w 1 from rfl, e1]
+  · have e1 := t 1 (by decide); have e2 := t 2 (by decide); have e3 := t 3 (by decide)
+    simp only [ramRead, e0]
+    rw [show b + 1 = b + w 1 from rfl, show b + 2 = b + w 2 from rfl,
+      show b + 3 = b + w 3 from rfl, e1, e2, e3]
+
+theorem ramRead_ramWrite_b (ram : Word → BitVec 8) (a v : Word) :
+    ramRead (ramWrite ram a v .b) a .b = v &&& 0xff := by
+  apply BitVec.eq_of_toNat_eq
+  simp only [ramRead, ramWrite, ramPut, if_true, byteOf, BitVec.toNat_ofNat, BitVec.toNat_and]
+  rw [show (0xff : Word).toNat = 2^8 - 1 from rfl, Nat.and_two_pow_sub_one_eq_mod]
+  have := v.isLt; simp; omega
+
+theorem ramRead_ramWrite_h (ram : Word → BitVec 8) (a v : Word) :
+    ramRead (ramWrite ram a v .h) a .h = v &&& 0xffff := by
+  have d : a + 1 ≠ a := by
+    intro e; have := congrArg BitVec.toNat e; simp [BitVec.toNat_add] at this; omega
+  apply BitVec.eq_of_toNat_eq
+  simp only [ramRead, ramWrite, ramPut, if_true, d, Ne.symm d, if_false, byteOf, BitVec.toNat_ofNat,
+    BitVec.toNat_and]
+  rw [show (0xffff : Word).toNat = 2^16 - 1 from rfl, Nat.and_two_pow_sub_one_eq_mod]
+  have := v.isLt; simp; omega
+
+theorem ramRead_ramWrite_w' (ram : Word → BitVec 8) (a v : Word) :
+    ramRead (ramWrite ram a v .w) a .w = v := ramRead_ramWrite_w ram a v
+
+/-- What a store of `v` reads back as, at its own address and width. -/
+def stored (wd : Width) (v : Word) : Word :=
+  match wd with
+  | .b => v &&& 0xff
+  | .h => v &&& 0xffff
+  | .w => v
+
+theorem ramRead_ramWrite_self (ram : Word → BitVec 8) (a v : Word) (wd : Width) :
+    ramRead (ramWrite ram a v wd) a wd = stored wd v := by
+  cases wd
+  · exact ramRead_ramWrite_b ram a v
+  · exact ramRead_ramWrite_h ram a v
+  · exact ramRead_ramWrite_w ram a v
 
 end E5R.AI
