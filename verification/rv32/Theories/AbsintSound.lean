@@ -655,4 +655,102 @@ theorem extend_sound {ρ : Nat → Word} (wd : Width) (signed : Bool) {v : AV} {
   · simp only [AV.extend, E5R.extend]; exact hv
   · simp only [AV.extend, E5R.extend]; exact hv
 
+/-! ## Memory cells -/
+
+/-- The address a cell describes: absolute, or relative to the interrupted
+    stack pointer `ρ 2`. -/
+def Cell.at (ρ : Nat → Word) (c : Cell) : Word :=
+  match c.base with
+  | .abs => E5R.AI.w c.addr
+  | .rel => ρ 2 + E5R.AI.w c.addr
+
+/-- A cell's fact holds in `ram` (when its guard does). -/
+def Cell.holds (ρ : Nat → Word) (ram : Word → BitVec 8) (c : Cell) : Prop :=
+  (∀ g, c.guard = some g → (ramRead ram (E5R.AI.w g.1) g.2.1).toNat ≠ g.2.2) →
+  c.v.gam ρ (ramRead ram (c.at ρ) c.w)
+
+def MemHolds (ρ : Nat → Word) (ram : Word → BitVec 8) (mem : List Cell) : Prop :=
+  ∀ c ∈ mem, c.holds ρ ram
+
+def addrOf (ρ : Nat → Word) (base : Base) (a : Nat) : Word :=
+  match base with
+  | .abs => w a
+  | .rel => ρ 2 + w a
+
+theorem find_map_some {α β : Type} {p : α → Bool} {f : α → β} {l : List α} {v : β}
+    (h : (l.find? p).map f = some v) : ∃ c ∈ l, p c = true ∧ f c = v := by
+  cases hf : l.find? p with
+  | none => rw [hf] at h; simp at h
+  | some c =>
+    rw [hf] at h; simp only [Option.map_some, Option.some.injEq] at h
+    exact ⟨c, List.mem_of_find?_eq_some hf, List.find?_some hf, h⟩
+
+theorem cell_at {ρ : Nat → Word} {c : Cell} {base : Base} {a : Nat} (hb : c.base = base)
+    (ha : c.addr = a) : c.at ρ = addrOf ρ base a := by
+  cases base <;> simp [Cell.at, addrOf, hb, ha]
+
+theorem plain_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Cell} {base : Base}
+    {a : Nat} {wd : Width} {v : AV} (hm : MemHolds ρ ram mem) (h : plain mem base a wd = some v) :
+    v.gam ρ (ramRead ram (addrOf ρ base a) wd) := by
+  obtain ⟨c, hc, hp, rfl⟩ := find_map_some h
+  simp only [Bool.and_eq_true, beq_iff_eq, Option.isNone_iff_eq_none] at hp
+  obtain ⟨⟨⟨hb, ha⟩, hw⟩, hg⟩ := hp
+  have := hm c hc (fun g e => by rw [hg] at e; cases e)
+  rw [← hw, ← cell_at hb ha]; exact this
+
+theorem guardHolds_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Cell}
+    {g : Nat × Width × Nat} (hm : MemHolds ρ ram mem) (h : guardHolds mem g = true) :
+    (ramRead ram (w g.1) g.2.1).toNat ≠ g.2.2 := by
+  unfold guardHolds at h
+  cases hp : plain mem .abs g.1 g.2.1 with
+  | none => rw [hp] at h; simp at h
+  | some v =>
+    have hv := plain_sound hm hp
+    simp only [addrOf] at hv
+    rw [hp] at h
+    cases v with
+    | vals l =>
+      intro e
+      simp only [AV.gam] at hv
+      rw [e] at hv
+      simp [hv] at h
+    | rng lo hi =>
+      simp only [Bool.or_eq_true, decide_eq_true_eq] at h
+      simp only [AV.gam] at hv; omega
+    | _ => simp at h
+
+theorem lookup_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Cell} {base : Base}
+    {a : Nat} {wd : Width} {v : AV} (hm : MemHolds ρ ram mem) (h : lookup mem base a wd = some v) :
+    v.gam ρ (ramRead ram (addrOf ρ base a) wd) := by
+  obtain ⟨c, hc, hp, rfl⟩ := find_map_some h
+  simp only [Bool.and_eq_true, beq_iff_eq] at hp
+  obtain ⟨⟨⟨hb, ha⟩, hw⟩, hg⟩ := hp
+  have := hm c hc (fun g e => by rw [e] at hg; exact guardHolds_sound hm hg)
+  rw [← hw, ← cell_at hb ha]; exact this
+
+theorem ramRead_b_lt (ram : Word → BitVec 8) (a : Word) : (ramRead ram a .b).toNat < 256 := by
+  have := (ram a).isLt
+  simp only [ramRead, BitVec.toNat_ofNat]; omega
+
+theorem ramRead_h_lt (ram : Word → BitVec 8) (a : Word) : (ramRead ram a .h).toNat < 65536 := by
+  have := (ram a).isLt; have := (ram (a+1)).isLt
+  simp only [ramRead, BitVec.toNat_ofNat]; omega
+
+theorem ramRead_fits (ram : Word → BitVec 8) (a : Word) (wd : Width) : Fits wd (ramRead ram a wd) := by
+  cases wd
+  · exact ramRead_b_lt ram a
+  · exact ramRead_h_lt ram a
+  · simp only [Fits, Width.bytes]; exact BitVec.isLt _
+
+theorem loadCell_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Cell} {base : Base}
+    {a : Nat} {wd : Width} (hm : MemHolds ρ ram mem) :
+    (loadCell mem base a wd).gam ρ (ramRead ram (addrOf ρ base a) wd) := by
+  unfold loadCell
+  split
+  · next v hv => exact lookup_sound hm hv
+  · cases wd
+    · simp only [AV.gam]; have := ramRead_b_lt ram (addrOf ρ base a); omega
+    · simp only [AV.gam]; have := ramRead_h_lt ram (addrOf ρ base a); omega
+    · trivial
+
 end E5R.AI
