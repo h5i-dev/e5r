@@ -1,5 +1,5 @@
 import tools.Analyze
-import tools.RingDraft
+import Projects.hifive1.hybrid.RingAI
 import Projects.hifive1.Config
 open E5R E5R.AI Analyze
 
@@ -9,9 +9,9 @@ def main (args : List String) : IO UInt32 := do
     tagDepth := ((← IO.getEnv "E5R_TAG_DEPTH").bind String.toNat?).getD 0
     keepAll := (← IO.getEnv "E5R_KEEP_ALL").isSome
     keepGuarded := (← IO.getEnv "E5R_KEEP_GUARDED").isSome }
-  -- `E5R_RING_DRAFT=1`: measure with an UNPROVED draft ring summary (no certificate from it checks
-  -- with `check`; it is for sizing the hybrid work).
-  let sums := if (← IO.getEnv "E5R_RING_DRAFT") == some "1" then [RingDraft.spec] else []
+  -- `E5R_RING=1`: use the proved channel ring-head summary (RingAI.spec_sound); a certificate
+  -- that relies on it checks with `checkHybrid` and `check_sound_hybrid`, not plain `check`.
+  let sums := if (← IO.getEnv "E5R_RING") == some "1" then [E5R.Hifive1.Hybrid.RingAI.spec] else []
   let su : Setup := { cfg := { E5R.Hifive1.Job.cfg with sums }, boot := E5R.Hifive1.Job.boot, opts }
   -- `E5R_KEEP=1` derives kept intervals (Cert.hkeep) from the handler's footprint.
   let st ← if (← IO.getEnv "E5R_KEEP") == some "1" then analyzeKeep su [] else fixG su none 0 false

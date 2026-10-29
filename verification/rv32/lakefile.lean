@@ -18,7 +18,11 @@ lean_exe analyze_firmware where
   root := `tools.AnalyzeFirmware
 
 lean_lib Tools where
-  roots := #[`tools.Analyze, `tools.RingDraft, `tools.ReplayLib]
+  roots := #[`tools.Analyze, `tools.ReplayLib]
+
+-- The proved ring-head summary the analyzer may use (`E5R_RING=1`).
+lean_lib Hybrid where
+  roots := #[`Projects.hifive1.hybrid.Ring, `Projects.hifive1.hybrid.RingAI]
 
 lean_exe replay_isa where
   root := `tools.ReplayIsa
