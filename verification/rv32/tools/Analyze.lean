@@ -144,7 +144,7 @@ def normalize (cfg : Config) (t : AState) : M AState := do
   let stack := t.mem.filter fun c => c.base == .abs && c.guard.isNone && !cfg.isStatic c.addr c.w.bytes &&
     sp ≤ c.addr && cfg.isStack c.addr c.w.bytes
   return { t with mem := G ++ stack, mepc := .top, mcause := .top,
-                  mpie := t.mpie.join .yes, mpp := norm (t.mpp ++ [3]) }
+                  mpie := t.mpie.join .yes, mpp := norm (t.mpp ++ [0]) }
 
 def newNode (key : String) (t : AState) : M Nat := do
   let st ← get

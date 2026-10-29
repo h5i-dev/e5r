@@ -2093,12 +2093,17 @@ theorem csrWriteAbs_sound {ρ : Nat → Word} {s s'' : AState} {c : Core} {addr 
     | _ => simp at h
   rw [if_neg ‹_›]; split at h
   · next h1 =>
-    rw [if_pos h1]; cases h
+    rw [if_pos h1]
+    split at h
+    · simp at h
+    cases h
     exact ⟨_, rfl, ⟨hc.mie, hc.mpie, hc.mpp, band_sound hx (const_sound' (by decide)), hc.mtvec, hc.mepc,
       hc.mcause, hc.mscratch⟩, fun _ => rfl, rfl, rfl, rfl⟩
   rw [if_neg ‹_›]; split at h
   · next h1 =>
     rw [if_pos h1]
+    split at h
+    · simp at h
     cases nv with
     | vals l =>
       simp only at h
@@ -2125,7 +2130,10 @@ theorem csrWriteAbs_sound {ρ : Nat → Word} {s s'' : AState} {c : Core} {addr 
     | _ => simp at h
   rw [if_neg ‹_›]; split at h
   · next h1 =>
-    rw [if_pos h1]; cases h
+    rw [if_pos h1]
+    split at h
+    · simp at h
+    cases h
     exact ⟨_, rfl, ⟨hc.mie, hc.mpie, hc.mpp, hc.mieReg, hc.mtvec, hc.mepc, hc.mcause, hx⟩,
       fun _ => rfl, rfl, rfl, rfl⟩
   rw [if_neg ‹_›]; split at h

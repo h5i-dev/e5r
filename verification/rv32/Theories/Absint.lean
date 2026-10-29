@@ -561,12 +561,15 @@ def csrWriteAbs (s : AState) (addr : Nat) (v : AV) : Option AState :=
           mpp := norm (l.map fun x => x / 2048 % 4) }
       else none
     | _ => none
-  else if addr = csrMie then some { s with mieReg := v.band (.const 0x888) }
+  -- A handler leaves mie, mtvec and mscratch alone: the return summary
+  -- assumes the interrupted values survive.
+  else if addr = csrMie then if s.hnd then none else some { s with mieReg := v.band (.const 0x888) }
   else if addr = csrMtvec then
+    if s.hnd then none else
     match v with
     | .vals l => if l.all (fun x => x % 4 = 0 || x % 128 = 1) then some { s with mtvec := v } else none
     | _ => none
-  else if addr = csrMscratch then some { s with mscratch := v }
+  else if addr = csrMscratch then if s.hnd then none else some { s with mscratch := v }
   else if addr = csrMepc then some { s with mepc := v.band (.const (M32 - 2)) }
   else if addr = csrMip then some s
   else none
@@ -748,7 +751,9 @@ def interruptibleOk (cfg : Config) (cert : Cert) (s : AState) : Bool :=
      sp ∈ cert.sigma &&
      s.mem.all fun c => cfg.isStatic c.addr c.w.bytes || (sp ≤ c.addr && cfg.isStack c.addr c.w.bytes)
    | _ => false) &&
-  s.mpie.mayBe true && 3 ∈ s.mpp && s.mepc == .top && s.mcause == .top
+  -- After the handler's mret: MIE and MPIE set, MPP = U (0), mepc and mcause
+  -- whatever the handler left.
+  s.mpie.mayBe true && 0 ∈ s.mpp && s.mepc == .top && s.mcause == .top
 
 /-- Every fact is about bytes inside RAM: absolute cells and guards lie in
     RAM, relative cells within the handler's budget below the interrupted
