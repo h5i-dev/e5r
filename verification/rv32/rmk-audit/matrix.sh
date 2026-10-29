@@ -29,7 +29,9 @@ L
 (cd "$A" && lake build memmove_matrix > "$OUT/build.log" 2>&1)
 X="$A/.lake/build/bin/memmove_matrix"
 seq 0 $((K - 1)) | xargs -P "$K" -I{} sh -c "/usr/bin/time -f 'shard {}: %e s, %M KB' '$X' main {} $K > '$OUT/shard-{}.log' 2> '$OUT/shard-{}.time'; echo \$? > '$OUT/shard-{}.exit'"
+"$X" controls > "$OUT/controls.log" 2>&1 || true
 /usr/bin/time -f 'bounds: %e s, %M KB' "$X" bounds > "$OUT/bounds.log" 2> "$OUT/bounds.time" || true
 cat "$OUT"/shard-*.time "$OUT/bounds.time"
+cat "$OUT/controls.log"
 grep -h "^shard\|^bounds:" "$OUT"/shard-*.log "$OUT/bounds.log"
 grep -h "^FAIL" "$OUT"/shard-*.log "$OUT/bounds.log" | head -50 || true

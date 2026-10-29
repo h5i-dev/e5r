@@ -71,17 +71,17 @@ structure Out where
   frame : List Int   -- changed bytes in [sp-48, sp), as offsets from sp
   why : String
 
-def check (bd : Board) (dst src n sp : Nat) : Out :=
+def check (bd : Board) (dst src n sp : Nat) (refSrc : Nat := src) (spAt : Nat := sp) : Out :=
   match run bd 20000 (start dst src n sp) 0 with
   | .error e => ⟨false, 0, [], e⟩
   | .ok (m, k) =>
     let win := (List.range (n + 32)).map (dst - 16 + ·) ++ (List.range (n + 32)).map (src - 16 + ·) ++
       (List.range 80).map (sp - 64 + ·)
-    let bad := win.eraseDups.filter fun x => m.ram (BitVec.ofNat 32 x) ≠ moved dst src n x
+    let bad := win.eraseDups.filter fun x => m.ram (BitVec.ofNat 32 x) ≠ moved dst refSrc n x
     let inDst := bad.filter fun x => dst ≤ x ∧ x < dst + n
     let inFrame := bad.filter fun x => sp - 48 ≤ x ∧ x < sp ∧ ¬ (dst ≤ x ∧ x < dst + n)
     let stray := bad.filter fun x => ¬ (dst ≤ x ∧ x < dst + n) ∧ ¬ (sp - 48 ≤ x ∧ x < sp)
-    let s0 := (start dst src n sp).core
+    let s0 := (start dst src n spAt).core
     let regs := (List.finRange 32).filter fun r =>
       !([5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 28, 29, 30, 31].contains r.val) && m.core.get r ≠ s0.get r
     let frame := (inFrame.map fun x => Int.ofNat x - Int.ofNat sp).mergeSort (· ≤ ·)
@@ -182,10 +182,27 @@ def mainBounds : IO UInt32 := do
   IO.println s!"bounds: {runs} runs, {fails} failures"
   return if fails = 0 then 0 else 1
 
+/-- Controls: each case must be reported as a failure, or the checker is blind. -/
+def mainControls : IO UInt32 := do
+  let mut blind := 0
+  for (name, o) in [
+      ("reference shifted by one source byte (misaligned, n=40)",
+        check B 0x80100000 0x80200001 40 SP (refSrc := 0x80200002)),
+      ("reference shifted by one source byte (aligned, n=200)",
+        check B 0x80100000 0x80200000 200 SP (refSrc := 0x80200001)),
+      ("M3: dst over the stack temporaries (misaligned, n=20)", check B (SP - 40) 0x80200401 20 SP),
+      ("M3: src over the stack temporaries (misaligned, n=20)", check B 0x80100000 (SP - 39) 20 SP),
+      ("sp expected 4 lower at return (register check)", check B 0x80100000 0x80200001 40 SP (spAt := SP - 4)),
+      ("M2: misaligned with sp = rwBase+12", check B 0x80100000 0x80200001 40 (image.rwBase + 12))] do
+    IO.println s!"control {name}: {if o.ok then "NOT DETECTED" else "detected: " ++ o.why}"
+    if o.ok then blind := blind + 1
+  return if blind = 0 then 0 else 1
+
 def main (args : List String) : IO UInt32 := do
   unless disjoint do IO.eprintln "image segments overlap: reordering would change lookups"; return 2
   unless RamElf.accepts 0x80000000 0x1000000 E5R.Rmk.Image.elf do IO.eprintln "reader refuses the ELF"; return 2
   match args with
   | ["main", s, k] => mainMatrix s.toNat! k.toNat!
   | ["bounds"] => mainBounds
+  | ["controls"] => mainControls
   | _ => IO.eprintln "usage: memmove_matrix main SHARD SHARDS | bounds"; return 2
