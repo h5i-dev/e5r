@@ -2596,6 +2596,36 @@ theorem case_csr {op : CsrOp} {rd : Reg} {src : CsrSrc} {addr : Nat}
     · exact lift_or_top_sound (f := fun p q => p ||| q) hx hop
     · exact lift_or_top_sound (f := fun p q => p &&& ~~~q) hx hop
 
+/-- One instruction: whatever the abstract transfer accepts, the concrete
+    step does not fault, emits only allowed events, and lands in a state one
+    of the abstract successors describes. -/
+theorem absExec_sound {i : Instr} (hv : ValidImg cfg.img)
+    (hram : cfg.board.ramBase + cfg.board.ramSize ≤ M32) (hwf : s.wf cfg = true)
+    (hsp : s.hnd = true → SpOk cfg (ρ 2).toNat)
+    (h : absExec cfg s len.toNat i = some ts) :
+    StepOk cfg ρ ts o (exec m.core len i) m.ram := by
+  cases i with
+  | lui => exact case_lui hs hl o h
+  | auipc => exact case_auipc hs hl o h
+  | jal => exact case_jal hs hl o h
+  | jalr => exact case_jalr hs hl o h
+  | branch => exact case_branch hs hl o h
+  | load => exact case_load hs hl o hv hsp h
+  | store => exact case_store hs hl o hram hwf hsp h
+  | opimm => exact case_opimm hs hl o h
+  | op => exact case_op hs hl o h
+  | muldiv => exact case_muldiv hs hl o h
+  | lr => exact case_lr hs hl o hv hsp h
+  | sc => exact case_sc hs hl o hv hram hwf hsp h
+  | amo => exact case_amo hs hl o hv hram hwf hsp h
+  | fence => exact case_fence hs hl o h
+  | fencei => exact case_fencei hs hl o h
+  | csr => exact case_csr hs hl o h
+  | wfi => exact case_wfi hs hl o h
+  | ecall => simp [absExec] at h
+  | ebreak => simp [absExec] at h
+  | mret => simp [absExec] at h
+
 end Cases
 
 end E5R.AI
