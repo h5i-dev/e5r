@@ -738,6 +738,21 @@ def interruptibleOk (cfg : Config) (cert : Cert) (s : AState) : Bool :=
    | _ => false) &&
   s.mpie.mayBe true && 3 ∈ s.mpp && s.mepc == .top && s.mcause == .top
 
+/-- Every fact is about bytes inside RAM: absolute cells and guards lie in
+    RAM, relative cells within the handler's budget below the interrupted
+    sp. The soundness proof relies on this (no access wraps around the
+    address space). -/
+def Cell.wf (cfg : Config) (c : Cell) : Bool :=
+  (match c.base with
+   | .abs => c.addr < M32 && cfg.board.inRam (E5R.AI.w c.addr) c.w.bytes
+   | .rel => M32 - cfg.hdepth ≤ c.addr && c.addr + c.w.bytes ≤ M32) &&
+  (match c.guard with
+   | some g => g.1 < M32 && cfg.board.inRam (E5R.AI.w g.1) g.2.1.bytes
+   | none => true)
+
+def AState.wf (cfg : Config) (s : AState) : Bool :=
+  s.regs.length == 31 && s.mem.all (Cell.wf cfg) && (s.hnd || s.mem.all (·.base == .abs))
+
 /-- A handler `mret` returns exactly to the interrupted machine. -/
 def mretOk (cfg : Config) (cert : Cert) (s : AState) : Bool :=
   s.hnd && s.regs == (List.range 31).map (fun i => .sym (i+1) 0) &&
@@ -790,7 +805,7 @@ def nodeOk (cfg : Config) (cert : Cert) (n : Node) : Bool :=
         | _ => false
       else false
   -- Static stack budget: sigma minus the handler depth stays above static RAM.
-  let wf := s.regs.length == 31 && (s.hnd || noSym s)
+  let wf := s.wf cfg && (s.hnd || noSym s)
   let instr : Bool :=
     match fetchDecodeN cfg.img s.pc with
     | some (.mret, _) => mretOk cfg cert s && n.succ.isEmpty
@@ -811,11 +826,13 @@ where
 
 def check (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
   (match cert.nodes[0]? with | some n => boot.leq n.s | none => false) &&
+  -- RAM lies inside the 32-bit address space.
+  cfg.board.ramBase + cfg.board.ramSize ≤ M32 &&
   cert.nodes.all (nodeOk cfg cert) &&
   -- The handler's stack frame never reaches static RAM, from any sp.
   cert.sigma.all (fun sp => cfg.stackLow + cfg.hdepth ≤ sp && sp ≤ cfg.pinLow) &&
   cfg.hdepth < 2^31 && cfg.stackLow ≤ cfg.pinLow && cfg.pinLow ≤ cfg.ramEnd &&
-  cert.G.all (fun c => c.base == .abs && cfg.isStatic c.addr c.w.bytes && !c.v.hasSym &&
+  cert.G.all (fun c => c.base == .abs && c.wf cfg && cfg.isStatic c.addr c.w.bytes && !c.v.hasSym &&
     match c.guard with | some g => cfg.isStatic g.1 g.2.1.bytes | none => true)
 
 end E5R.AI
