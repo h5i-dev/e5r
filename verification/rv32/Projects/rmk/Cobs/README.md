@@ -71,7 +71,7 @@ Building blocks:
   * the head, both bodies, tail and exits;
   * `iter` and `loop`, the latter by fuel induction against `run`.
 
-**Runner job** `jobs/rmk/rmk-memmove-small.json`-style: `jobs/rmk/rmk-cobs-decode.json` with
+**Runner job** `jobs/rmk/rmk-cobs-decode.json`, with
 wrapper `Projects/ramimage/Cobs.lean` (`E5R.RmkCobs.decode` on the runner's image and board via
 checked `img_eq`/`board_eq`).
 * Status: `proved` in 258 s (Lean compile, `leanchecker` replay of every module, axiom

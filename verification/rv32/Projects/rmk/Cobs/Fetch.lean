@@ -1,8 +1,9 @@
 /-
-  Instruction facts for `cobs::dec::decode_in_place_report` (0x8001e02e..0x8001e148,
-  0x11a bytes, 97 instructions) in the pinned RMK image (ELF sha256 f39d833f...).
-  Proposed by Projects/rmk/Cobs/GenFetch.lean from the model's own decoder and checked
-  here by the kernel against the packed ELF (Projects/rmk/Fetch.lean `fetchDecode_of`).
+  Instruction facts for `cobs::dec::decode_in_place` (0x8001e006..0x8001e02e, 18 instructions)
+  and `cobs::dec::decode_in_place_report` (0x8001e02e..0x8001e148, 97 instructions) in the
+  pinned RMK image (ELF sha256 f39d833f...). Proposed by Projects/rmk/Cobs/GenFetch.lean from
+  the model's own decoder and checked here by the kernel against the packed ELF
+  (Projects/rmk/Fetch.lean `fetchDecode_of`).
 
   Original e5r code, Apache-2.0. Regenerate rather than edit by hand.
 -/
@@ -13,6 +14,42 @@ set_option maxRecDepth 100000
 namespace E5R.Rmk.CobsFetch
 open E5R E5R.Rmk
 
+theorem f8001e006 : fetchDecode img 0x8001e006 = some (Instr.opimm (AluOp.add) 2 2 0xffffffe0#32, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 4353) (by decide +kernel) (by decide +kernel)
+theorem f8001e008 : fetchDecode img 0x8001e008 = some (Instr.store (Width.w) 2 1 0x0000001c#32, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 52742) (by decide +kernel) (by decide +kernel)
+theorem f8001e00a : fetchDecode img 0x8001e00a = some (Instr.store (Width.w) 2 8 0x00000018#32, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 52258) (by decide +kernel) (by decide +kernel)
+theorem f8001e00c : fetchDecode img 0x8001e00c = some (Instr.op (AluOp.add) 8 0 10, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 33834) (by decide +kernel) (by decide +kernel)
+theorem f8001e00e : fetchDecode img 0x8001e00e = some (Instr.opimm (AluOp.add) 10 2 0x0000000c#32, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 104) (by decide +kernel) (by decide +kernel)
+theorem f8001e010 : fetchDecode img 0x8001e010 = some (Instr.auipc 1 0x00000000#32, 4) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 151) (by decide +kernel) (by decide +kernel)
+theorem f8001e014 : fetchDecode img 0x8001e014 = some (Instr.jalr 1 1 0x0000001e#32, 4) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 31490279) (by decide +kernel) (by decide +kernel)
+theorem f8001e018 : fetchDecode img 0x8001e018 = some (Instr.load (Width.w) true 10 2 0x0000000c#32, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 17714) (by decide +kernel) (by decide +kernel)
+theorem f8001e01a : fetchDecode img 0x8001e01a = some (Instr.load (Width.w) true 11 2 0x00000010#32, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 17858) (by decide +kernel) (by decide +kernel)
+theorem f8001e01c : fetchDecode img 0x8001e01c = some (Instr.load (Width.w) true 12 2 0x00000014#32, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 18002) (by decide +kernel) (by decide +kernel)
+theorem f8001e01e : fetchDecode img 0x8001e01e = some (Instr.opimm (AluOp.add) 10 10 0xffffffff#32, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 5501) (by decide +kernel) (by decide +kernel)
+theorem f8001e020 : fetchDecode img 0x8001e020 = some (Instr.op (AluOp.or) 10 10 11, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 36173) (by decide +kernel) (by decide +kernel)
+theorem f8001e022 : fetchDecode img 0x8001e022 = some (Instr.store (Width.w) 8 10 0x00000000#32, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 49160) (by decide +kernel) (by decide +kernel)
+theorem f8001e024 : fetchDecode img 0x8001e024 = some (Instr.store (Width.w) 8 12 0x00000004#32, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 49232) (by decide +kernel) (by decide +kernel)
+theorem f8001e026 : fetchDecode img 0x8001e026 = some (Instr.load (Width.w) true 1 2 0x0000001c#32, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 16626) (by decide +kernel) (by decide +kernel)
+theorem f8001e028 : fetchDecode img 0x8001e028 = some (Instr.load (Width.w) true 8 2 0x00000018#32, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 17506) (by decide +kernel) (by decide +kernel)
+theorem f8001e02a : fetchDecode img 0x8001e02a = some (Instr.opimm (AluOp.add) 2 2 0x00000020#32, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 24837) (by decide +kernel) (by decide +kernel)
+theorem f8001e02c : fetchDecode img 0x8001e02c = some (Instr.jalr 0 1 0x00000000#32, 2) :=
+  fetchDecode_of _ (by decide) (by decide) (bits := 32898) (by decide +kernel) (by decide +kernel)
 theorem f8001e02e : fetchDecode img 0x8001e02e = some (Instr.opimm (AluOp.add) 2 2 0xfffffff0#32, 2) :=
   fetchDecode_of _ (by decide) (by decide) (bits := 4417) (by decide +kernel) (by decide +kernel)
 theorem f8001e030 : fetchDecode img 0x8001e030 = some (Instr.store (Width.w) 2 8 0x0000000c#32, 2) :=
