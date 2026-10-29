@@ -18,7 +18,7 @@ lean_exe analyze_firmware where
   root := `tools.AnalyzeFirmware
 
 lean_lib Tools where
-  roots := #[`tools.Analyze, `tools.ReplayLib]
+  roots := #[`tools.Analyze, `tools.RingDraft, `tools.ReplayLib]
 
 lean_exe replay_isa where
   root := `tools.ReplayIsa

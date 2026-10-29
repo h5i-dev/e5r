@@ -3565,11 +3565,23 @@ theorem facts_of_check {cfg : Config} {boot : AState} {cert : Cert} (h : checkAt
 
 theorem nodeOk_parts {cfg : Config} {cert : Cert} {n : Node} (h : nodeOk cfg cert n = true) :
     n.s.wf cfg = true ∧ (n.s.hnd = false → noSym n.s = true) ∧
-      (instrOk cfg cert n = true ∨ delegated cert n = true) ∧ irqOk cfg cert n.s = true := by
+      (instrOk cfg cert n = true ∨ delegated cert n = true ∨ summarized cfg cert n = true) ∧
+      irqOk cfg cert n.s = true := by
   unfold nodeOk at h
   simp only [Bool.and_eq_true, Bool.or_eq_true] at h
   obtain ⟨⟨⟨hw, hns⟩, hi⟩, hq⟩ := h
-  exact ⟨hw, fun hf => hns.resolve_left (by rw [hf]; simp), hi, hq⟩
+  exact ⟨hw, fun hf => hns.resolve_left (by rw [hf]; simp), or_assoc.mp hi, hq⟩
+
+theorem summarized_parts {cfg : Config} {cert : Cert} {n : Node} (h : summarized cfg cert n = true) :
+    n.s.hnd = false ∧ n.s.pc % 2 = 0 ∧ ∃ S ∈ cfg.sums, S.pc = n.s.pc ∧ S.accepts n.s = true ∧
+      (S.post n.s).hnd = false ∧ ∃ e, n.succ = [e] ∧ coveredE cert none (S.post n.s) e = true := by
+  unfold summarized at h
+  simp only [Bool.and_eq_true, Bool.not_eq_true', beq_iff_eq, List.any_eq_true] at h
+  obtain ⟨⟨hh, hp⟩, S, hS, ⟨⟨⟨hpc, ha⟩, hph⟩, he⟩⟩ := h
+  refine ⟨hh, hp, S, hS, hpc, ha, hph, ?_⟩
+  split at he
+  · next e hs => exact ⟨e, hs, he⟩
+  · simp at he
 
 theorem delegated_parts {cert : Cert} {n : Node} (h : delegated cert n = true) :
     n.s.hnd = false ∧ n.s.pc % 2 = 0 ∧ ∃ k, (n.s.pc, k) ∈ cert.delegate := by
@@ -3581,8 +3593,12 @@ theorem delegated_parts {cert : Cert} {n : Node} (h : delegated cert n = true) :
 
 /-- Handler nodes are never delegated. -/
 theorem instrOk_of_hnd {cert : Cert} {cfg : Config} {n : Node} (hnd : n.s.hnd = true)
-    (h : instrOk cfg cert n = true ∨ delegated cert n = true) : instrOk cfg cert n = true :=
-  h.resolve_right fun hd => by rw [(delegated_parts hd).1] at hnd; cases hnd
+    (h : instrOk cfg cert n = true ∨ delegated cert n = true ∨ summarized cfg cert n = true) :
+    instrOk cfg cert n = true := by
+  rcases h with h | h | h
+  · exact h
+  · rw [(delegated_parts h).1] at hnd; cases hnd
+  · rw [(summarized_parts h).1] at hnd; cases hnd
 
 theorem instrOk_fetch {cfg : Config} {cert : Cert} {n : Node} (h : instrOk cfg cert n = true) :
     ∃ i len, successors.fetchDecode' cfg.img n.s.pc = some (i, len) ∧
@@ -3634,10 +3650,39 @@ def HandInv (cfg : Config) (cert : Cert) (m : Machine) : Prop :=
     ∃ (j : Nat) (n : Node), cert.nodes[j]? = some n ∧ n.s.hnd = true ∧ StateHolds (hEnv m0) n.s m ∧
       Keep cfg (m0.core.get 2).toNat m0.ram m.ram ∧ SpOk cfg (m0.core.get 2).toNat
 
-/-- The invariant: at a node, inside the handler, or inside a directly
-    proved region `RR`. -/
+/-- From `m`, every run is safe with interrupts disabled until it reaches a
+    machine in `Q`, in finitely many steps. -/
+inductive SafeTo (cfg : Config) (Q : Machine → Prop) : Machine → Prop
+  | done {m : Machine} : Q m → SafeTo cfg Q m
+  | step {m : Machine} : (∀ code, irqEnabled m.core code = false) →
+      (∀ o : Oracle, ∃ c ram evs, stepInstr cfg.board cfg.img m o = .ok c ram evs) →
+      (∀ o c ram evs, stepInstr cfg.board cfg.img m o = .ok c ram evs → ∀ ev ∈ evs, EvOk cfg ev) →
+      (∀ o c ram evs, stepInstr cfg.board cfg.img m o = .ok c ram evs → SafeTo cfg Q ⟨c, ram⟩) →
+      SafeTo cfg Q m
+
+/-- At least one step of a `SafeTo` run. -/
+def SafeStep (cfg : Config) (Q : Machine → Prop) (m : Machine) : Prop :=
+  (∀ code, irqEnabled m.core code = false) ∧
+  ∀ o : Oracle, ∃ c ram evs, stepInstr cfg.board cfg.img m o = .ok c ram evs ∧
+    (∀ ev ∈ evs, EvOk cfg ev) ∧ SafeTo cfg Q ⟨c, ram⟩
+
+theorem SafeTo.mono {cfg : Config} {Q Q' : Machine → Prop} (hq : ∀ x, Q x → Q' x) {m : Machine}
+    (h : SafeTo cfg Q m) : SafeTo cfg Q' m := by
+  induction h with
+  | done hm => exact .done (hq _ hm)
+  | step hirq hok hev _ ih => exact .step hirq hok hev ih
+
+/-- What a summary's proof must show: from every machine an accepted
+    main-thread state at its pc describes, a masked safe run of at least one
+    step reaches a machine its exit state describes. -/
+def SumSound (cfg : Config) (S : SumSpec) : Prop :=
+  ∀ (s : AState) (m : Machine), s.pc = S.pc → S.accepts s = true → s.hnd = false →
+    StateHolds ρM s m → SafeStep cfg (StateHolds ρM (S.post s)) m
+
+/-- The invariant: at a node, inside the handler, inside a directly proved
+    region `RR`, or inside a summary's masked run. -/
 def Inv (cfg : Config) (cert : Cert) (RR : Machine → Prop) (m : Machine) : Prop :=
-  MainInv cert m ∨ HandInv cfg cert m ∨ RR m
+  MainInv cert m ∨ HandInv cfg cert m ∨ RR m ∨ SafeTo cfg (MainInv cert) m
 
 /-- What directly proved regions `RR` owe the composition: every machine a
     delegated node describes is in `RR`; from `RR` every instruction step is
@@ -3649,6 +3694,7 @@ structure RegionOk (cfg : Config) (cert : Cert) (RR : Machine → Prop) : Prop w
   step : ∀ m, RR m → ∀ o : Oracle, ∃ c ram evs, stepInstr cfg.board cfg.img m o = .ok c ram evs ∧
     (∀ ev ∈ evs, EvOk cfg ev) ∧ (RR ⟨c, ram⟩ ∨ MainInv cert ⟨c, ram⟩)
   irq : ∀ m, RR m → ∀ code, irqEnabled m.core code = true → MainInv cert m
+  sums : ∀ S ∈ cfg.sums, SumSound cfg S
 
 theorem node_ok {cfg : Config} {cert : Cert} (F : Facts cfg cert) {j : Nat} {n : Node}
     (h : cert.nodes[j]? = some n) : nodeOk cfg cert n = true :=
@@ -3662,22 +3708,44 @@ theorem inv_instr {cfg : Config} {cert : Cert} {RR : Machine → Prop} (F : Fact
     (RO : RegionOk cfg cert RR) {m : Machine} (hI : Inv cfg cert RR m) (o : Oracle) :
     ∃ c ram evs, stepInstr cfg.board cfg.img m o = .ok c ram evs ∧ (∀ ev ∈ evs, EvOk cfg ev) ∧
       Inv cfg cert RR ⟨c, ram⟩ := by
-  rcases hI with ⟨j, n, hn, hnd, hs⟩ | ⟨j0, n0, m0, hn0, hnd0, hs0, hio, hmie0, j, n, hn, hnd, hs, hkeep, hsp⟩ | hR
+  -- A summary run that has reached a node continues from that node.
+  have hI : MainInv cert m ∨ HandInv cfg cert m ∨ RR m ∨
+      ((∀ code, irqEnabled m.core code = false) ∧
+        ∃ c ram evs, stepInstr cfg.board cfg.img m o = .ok c ram evs ∧ (∀ ev ∈ evs, EvOk cfg ev) ∧
+          SafeTo cfg (MainInv cert) ⟨c, ram⟩) := by
+    rcases hI with h | h | h | h
+    · exact .inl h
+    · exact .inr (.inl h)
+    · exact .inr (.inr (.inl h))
+    · cases h with
+      | done h => exact .inl h
+      | step hirq hok hev hs =>
+        obtain ⟨c, ram, evs, h⟩ := hok o
+        exact .inr (.inr (.inr ⟨hirq, c, ram, evs, h, hev o c ram evs h, hs o c ram evs h⟩))
+  rcases hI with ⟨j, n, hn, hnd, hs⟩ | ⟨j0, n0, m0, hn0, hnd0, hs0, hio, hmie0, j, n, hn, hnd, hs, hkeep, hsp⟩ | hR |
+    ⟨_, c, ram, evs, h1, h2, h3⟩
   · obtain ⟨hwf, _, hins, _⟩ := nodeOk_parts (node_ok F hn)
-    by_cases hdel : delegated cert n = true
+    rcases hins with hins | hdel | hsm
+    · obtain ⟨i, len, hfd, hmr⟩ := instrOk_fetch hins
+      have hnm : i ≠ .mret := by
+        intro e
+        have := hmr e; unfold mretOk at this
+        simp only [Bool.and_eq_true] at this
+        rw [hnd] at this; simp at this
+      obtain ⟨c, ram, evs, hst, hev, _, _, j', _, n', hn', hh', hnd'⟩ :=
+        instr_sound (hins) hs hwf F.img F.ram (fun h => by rw [hnd] at h; cases h) hfd hnm o
+      exact ⟨c, ram, evs, hst, hev, .inl ⟨j', n', hn', by rw [hnd', hnd], hh'⟩⟩
     · -- A delegated node: its region takes the step.
       obtain ⟨c, ram, evs, h1, h2, h3⟩ := RO.step m (RO.entry n (List.mem_of_getElem? hn) hdel m hs) o
-      exact ⟨c, ram, evs, h1, h2, h3.elim (fun h => .inr (.inr h)) .inl⟩
-    replace hins := hins.resolve_right hdel
-    obtain ⟨i, len, hfd, hmr⟩ := instrOk_fetch hins
-    have hnm : i ≠ .mret := by
-      intro e
-      have := hmr e; unfold mretOk at this
-      simp only [Bool.and_eq_true] at this
-      rw [hnd] at this; simp at this
-    obtain ⟨c, ram, evs, hst, hev, _, _, j', _, n', hn', hh', hnd'⟩ :=
-      instr_sound (hins) hs hwf F.img F.ram (fun h => by rw [hnd] at h; cases h) hfd hnm o
-    exact ⟨c, ram, evs, hst, hev, .inl ⟨j', n', hn', by rw [hnd', hnd], hh'⟩⟩
+      exact ⟨c, ram, evs, h1, h2, h3.elim (fun h => .inr (.inr (.inl h))) .inl⟩
+    · -- A summarized node: the summary's masked run, which ends at a node.
+      obtain ⟨_, _, S, hS, hpc, ha, hph, e, -, hce⟩ := summarized_parts hsm
+      obtain ⟨_, hrun⟩ := RO.sums S hS n.s m hpc.symm ha hnd hs
+      obtain ⟨c, ram, evs, h1, h2, h3⟩ := hrun o
+      refine ⟨c, ram, evs, h1, h2, .inr (.inr (.inr (h3.mono fun x hx => ?_)))⟩
+      obtain ⟨j', _, n', hn', hh', hnd'⟩ :=
+        coveredE_sound hce hx (fun _ _ _ _ hp => by cases hp)
+      exact ⟨j', n', hn', by rw [hnd', hph], hh'⟩
   · obtain ⟨hwf, _, hins, _⟩ := nodeOk_parts (node_ok F hn)
     have hins := instrOk_of_hnd hnd hins
     obtain ⟨i, len, hfd, hmr⟩ := instrOk_fetch hins
@@ -3686,10 +3754,11 @@ theorem inv_instr {cfg : Config} {cert : Cert} {RR : Machine → Prop} (F : Fact
     · subst hm
       obtain ⟨_, hns0, hins0, _⟩ := nodeOk_parts (node_ok F hn0)
       have hpc0 : n0.s.pc % 2 = 0 := by
-        rcases hins0 with hins0 | hd0
+        rcases hins0 with hins0 | hd0 | hs0
         · obtain ⟨_, _, hfd0, _⟩ := instrOk_fetch hins0
           exact (fetch_bridge hfd0).1
         · exact (delegated_parts hd0).2.1
+        · exact (summarized_parts hs0).2.1
       obtain ⟨c, hc, hh⟩ := mret_sound hs0 hio hmie0 (hns0 hnd0) hpc0 F.base F.pin F.lp
         (by unfold Config.ramEnd; exact F.ram) hs (hmr rfl) hkeep o
         (len := len')
@@ -3718,7 +3787,8 @@ theorem inv_instr {cfg : Config} {cert : Cert} {RR : Machine → Prop} (F : Fact
       exact ⟨c, ram, evs, hst, hev, .inr (.inl ⟨j0, n0, m0, hn0, hnd0, hs0, hio, hmie0, j', n', hn',
         by rw [hnd', hnd], hh', hkeep.trans hk, hsp⟩)⟩
   · obtain ⟨c, ram, evs, h1, h2, h3⟩ := RO.step m hR o
-    exact ⟨c, ram, evs, h1, h2, h3.elim (fun h => .inr (.inr h)) .inl⟩
+    exact ⟨c, ram, evs, h1, h2, h3.elim (fun h => .inr (.inr (.inl h))) .inl⟩
+  · exact ⟨c, ram, evs, h1, h2, .inr (.inr (.inr h3))⟩
 
 /-- An interrupt taken from a machine in the invariant enters the handler
     (it cannot arrive inside one) and keeps the invariant. -/
@@ -3728,10 +3798,13 @@ theorem inv_irq {cfg : Config} {cert : Cert} {RR : Machine → Prop} (F : Facts 
     ∃ c, takeIrq m.core code = .done c ∧ Inv cfg cert RR ⟨c, m.ram⟩ := by
   -- In a region, an enabled interrupt arrives where a node describes the machine.
   have hI : MainInv cert m ∨ HandInv cfg cert m := by
-    rcases hI with h | h | h
+    rcases hI with h | h | h | h
     · exact .inl h
     · exact .inr h
     · exact .inl (RO.irq m h code hen)
+    · cases h with
+      | done h => exact .inl h
+      | step hirq _ _ _ => rw [hirq code] at hen; cases hen
   rcases hI with ⟨j, n, hn, hnd, hs⟩ | ⟨j0, n0, m0, hn0, hnd0, hs0, hio, hmie0, j, n, hn, hnd, hs, hkeep, hsp⟩
   · obtain ⟨_, hns, _, hirq⟩ := nodeOk_parts (node_ok F hn)
     have hcode := code_mem hs hen
@@ -3818,16 +3891,16 @@ theorem checkAt_sound_regions {cfg : Config} {boot : AState} {cert : Cert} {RR :
   · obtain ⟨c, h, -⟩ := inv_irq F RO hI hen
     rw [h] at ht; cases ht
 
-/-- Without delegated nodes no region is needed. -/
+/-- Without delegated nodes or summaries no direct proof is needed. -/
 theorem checkAt_sound {cfg : Config} {boot : AState} {cert : Cert} (hc : checkAt cfg boot cert = true)
-    (hd : cert.delegate = []) {Init : Machine → Prop} (hinit : ∀ m, Init m → StateHolds ρM boot m) :
+    (hd : cert.delegate = []) (hsum : cfg.sums = []) {Init : Machine → Prop} (hinit : ∀ m, Init m → StateHolds ρM boot m) :
     ∀ m evs, Reach cfg.board cfg.img Init m evs →
       ¬ Escapes cfg.board cfg.img m ∧ ∀ ev ∈ evs, EvOk cfg ev :=
   checkAt_sound_regions (RR := fun _ => False) hc
     ⟨(fun n _ hdel => by
         obtain ⟨_, _, k, hk⟩ := delegated_parts hdel
         rw [hd] at hk; cases hk),
-     (fun _ h => h.elim), (fun _ h => h.elim)⟩ hinit
+     (fun _ h => h.elim), (fun _ h => h.elim), (fun S hS => by rw [hsum] at hS; cases hS)⟩ hinit
 
 /-- **The certificate checker is sound**, with the kept intervals the
     certificate names: they only restrict what the handler may write. -/
@@ -3837,7 +3910,19 @@ theorem check_sound {cfg : Config} {boot : AState} {cert : Cert} (hc : check cfg
       ¬ Escapes cfg.board cfg.img m ∧ ∀ ev ∈ evs, EvOk cfg ev := by
   unfold check at hc
   simp only [Bool.and_eq_true, List.isEmpty_iff] at hc
-  exact checkAt_sound (cfg := { cfg with hkeep := cert.hkeep }) hc.2 hc.1 hinit
+  exact checkAt_sound (cfg := { cfg with hkeep := cert.hkeep, sums := [] }) hc.2 hc.1 rfl hinit
+
+/-- The plain checker accepts no delegation ... -/
+theorem check_delegate {cfg : Config} {boot : AState} {cert : Cert} (h : cert.delegate ≠ []) :
+    check cfg boot cert = false := by
+  unfold check
+  cases hd : cert.delegate with
+  | nil => exact absurd hd h
+  | cons _ _ => simp
+
+/-- ... and ignores the configuration's summaries. -/
+theorem check_sums (cfg : Config) (sums : List SumSpec) (boot : AState) (cert : Cert) :
+    check { cfg with sums := sums } boot cert = check cfg boot cert := rfl
 
 /-! ## Composition with directly proved regions -/
 
@@ -3853,14 +3938,16 @@ structure Region (cfg : Config) (cert : Cert) where
   irq : ∀ m, R m → ∀ code, irqEnabled m.core code = true → MainInv cert m
 
 /-- **Hybrid soundness.** The checker covers every node except the delegated
-    ones; each delegated pc names a proved region that every machine its
-    nodes describe enters. Together: the same safety property as
+    and summarized ones; each delegated pc names a proved region that every
+    machine its nodes describe enters, and each summary the configuration
+    lists is proved (`SumSound`). Together: the same safety property as
     `check_sound`, for every reachable machine. -/
 theorem check_sound_hybrid {cfg : Config} {boot : AState} {cert : Cert}
     (hc : checkHybrid cfg boot cert = true)
     (regions : Nat → Region { cfg with hkeep := cert.hkeep } cert)
     (hentry : ∀ k (n : Node), (n.s.pc, k) ∈ cert.delegate → n ∈ cert.nodes → n.s.hnd = false →
       ∀ m, StateHolds ρM n.s m → (regions k).R m)
+    (hsums : ∀ S ∈ cfg.sums, SumSound { cfg with hkeep := cert.hkeep } S)
     {Init : Machine → Prop} (hinit : ∀ m, Init m → StateHolds ρM boot m) :
     ∀ m evs, Reach cfg.board cfg.img Init m evs →
       ¬ Escapes cfg.board cfg.img m ∧ ∀ ev ∈ evs, EvOk cfg ev :=
@@ -3871,6 +3958,6 @@ theorem check_sound_hybrid {cfg : Config} {boot : AState} {cert : Cert}
      (fun m ⟨k, hk⟩ o => by
         obtain ⟨c, ram, evs, h1, h2, h3⟩ := (regions k).step m hk o
         exact ⟨c, ram, evs, h1, h2, h3.imp (fun h => ⟨k, h⟩) id⟩),
-     (fun m ⟨k, hk⟩ code hen => (regions k).irq m hk code hen)⟩ hinit
+     (fun m ⟨k, hk⟩ code hen => (regions k).irq m hk code hen), hsums⟩ hinit
 
 end E5R.AI
