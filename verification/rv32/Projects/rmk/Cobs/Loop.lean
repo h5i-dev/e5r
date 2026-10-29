@@ -342,4 +342,99 @@ theorem tail_exit (c : Core) (R : Word → BitVec 8) (h : CobsEnv ⟨c, R⟩) (n
   obtain ⟨k, e, S', hr, hx⟩ := G_exit c R h n src acc _ S (hi.goto _) rfl hs
   exact ⟨_, e, S', .step (Quiet.of_sameCsr hi.csr h.quiet) s hr, hx⟩
 
+/-- Re-establish the invariant after the loop changed src (t4), dst (t2), scratch registers
+    and buffer bytes. -/
+theorem LInv.mk' {c R n src acc d S} (hi : LInv c R n src acc d S) (d' : Core) (S' : Word → BitVec 8)
+    (src' : Nat) (acc' : List Nat) (hcs : d'.sameCsr c)
+    (hreg : ∀ r : Reg, r.val ∉ [7, 8, 9, 13, 15, 18, 19, 28, 29, 30, 31] → d'.get r = d.get r)
+    (h29 : d'.get 29 = BitVec.ofNat 32 src') (h7 : d'.get 7 = BitVec.ofNat 32 acc'.length)
+    (hbytes : ∀ j, j < (c.get 12).toNat →
+      bufByte S' (c.get 11) j = if h : j < acc'.length then acc'[j] else bufByte R (c.get 11) j)
+    (hout : ∀ x : Word, ¬ ((c.get 11).toNat ≤ x.toNat ∧ x.toNat < (c.get 11).toNat + (c.get 12).toNat) →
+      S' x = S x)
+    (hord : acc'.length ≤ src' ∧ src' ≤ n) : LInv c R n src' acc' d' S' := by
+  refine ⟨hcs, ?_, ?_, ?_, ?_, h29, h7, ?_, ?_, ?_, ?_, ?_, ?_, ?_, hbytes, fun x hx => (hout x hx).trans (hi.outside x hx),
+    ⟨hord.1, hord.2, hi.ord.2.2⟩⟩
+  · rw [hreg 10 (by decide)]; exact hi.a0
+  · rw [hreg 11 (by decide)]; exact hi.a1
+  · rw [hreg 12 (by decide)]; exact hi.a2
+  · rw [hreg 14 (by decide)]; exact hi.a4
+  · rw [hreg 17 (by decide)]; exact hi.a7
+  · rw [hreg 5 (by decide)]; exact hi.t0
+  · rw [hreg 6 (by decide)]; exact hi.t1
+  · rw [hreg 16 (by decide)]; exact hi.a6
+  · rw [hreg 2 (by decide)]; exact hi.sp
+  · rw [hreg 1 (by decide)]; exact hi.ra
+  · intro r hr hr'
+    rw [hreg r (by
+      intro hm; simp only [clobbered, List.mem_cons, List.not_mem_nil, or_false] at hr hr' hm; omega)]
+    exact hi.keep r hr hr'
+
+/-- The original buffer byte, as the loop reads it at index `src ≥ dst`. -/
+theorem read_orig {c R n src acc d S} (hi : LInv c R n src acc d S) (hs : src < n) :
+    bufByte S (c.get 11) src = bufByte R (c.get 11) src := by
+  rw [hi.bytes src (by have := hi.ord; omega), dif_neg (by have := hi.ord; omega)]
+
+/-- 0x8001e068..0x8001e078: the bounds check (never taken), the code byte, and the
+    invalid-frame test. -/
+theorem head (c : Core) (R : Word → BitVec 8) (h : CobsEnv ⟨c, R⟩) (n src : Nat) (acc : List Nat)
+    (d : Core) (S : Word → BitVec 8) (hi : LInv c R n src acc d S) (hpc : d.pc = 0x8001e068) (hs : src < n) :
+    (n < src + bufByte R (c.get 11) src → ∃ k e S', QRun B img k ⟨d, S⟩ ⟨e, S'⟩ ∧ ExitPrep c R 1 1 acc e S') ∧
+    (src + bufByte R (c.get 11) src ≤ n → ∃ d', QRun B img 5 ⟨d, S⟩ ⟨d', S⟩ ∧ d'.pc = 0x8001e07c ∧
+      LInv c R n src acc d' S ∧ d'.get 28 = BitVec.ofNat 32 (bufByte R (c.get 11) src) ∧
+      d'.get 19 = c.get 11 + BitVec.ofNat 32 src ∧
+      d'.get 15 = BitVec.ofNat 32 (src + bufByte R (c.get 11) src)) := by
+  have hl := h.len; have ord := hi.ord
+  have hb := h.buf; rw [B_ram] at hb; simp only at hb
+  have hb' : 0x80029bc8 ≤ (c.get 11).toNat ∧ (c.get 11).toNat + (c.get 12).toNat ≤ 0x81000000 := hb
+  have hcode : bufByte R (c.get 11) src < 256 := (R _).isLt
+  let code := bufByte R (c.get 11) src
+  have q := fun (x : Core) (hx : x.sameCsr c) => Quiet.of_sameCsr hx h.quiet
+  let d1 := d.goto 0x8001e06c
+  let d2 := d1.wr 19 (alu .add (d1.get 11) (d1.get 29)) 0x8001e070
+  let d3 := d2.wr 28 (extend .b false (ramRead S (d2.get 19 + 0x0#32) .b)) 0x8001e074
+  let d4 := d3.wr 15 (alu .add (d3.get 29) (d3.get 28)) 0x8001e078
+  have nt : ¬ (taken .geu (d.get 29) (d.get 12) = true) := by
+    simp only [taken, hi.t4, hi.a2]; rw [← ofNat_toNat (c.get 12), ult_small _ _ (by omega) (by omega)]; simp; omega
+  have v2 : d2.get 19 = c.get 11 + BitVec.ofNat 32 src := by simp [d2, d1, Core.wr_get_self, alu, hi.a1, hi.t4]
+  have v3 : d3.get 28 = BitVec.ofNat 32 code := by
+    simp only [d3, Core.wr_get_self _ (28 : Reg) _ _ (by decide), v2, BitVec.add_zero, lbu_val]
+    show BitVec.ofNat 32 (bufByte S (c.get 11) src) = _
+    rw [read_orig hi hs]
+  have v4 : d4.get 15 = BitVec.ofNat 32 (src + code) := by
+    have e29 : d3.get 29 = BitVec.ofNat 32 src := by simp [d3, d2, d1, Core.wr_get_ne, hi.t4]
+    have : d4.get 15 = d3.get 29 + d3.get 28 := by simp [d4, Core.wr_get_self, alu]
+    rw [this, e29, v3]
+    apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_add, BitVec.toNat_ofNat]; omega
+  have s1 : DetStep B img ⟨d, S⟩ ⟨d1, S⟩ := dstep f8001e068 hpc (by rw [exec_branch, if_neg nt, hpc]; rfl)
+  have s2 : DetStep B img ⟨d1, S⟩ ⟨d2, S⟩ := dstep f8001e06c rfl (by rw [exec_op]; rfl)
+  have s3 : DetStep B img ⟨d2, S⟩ ⟨d3, S⟩ :=
+    dstep_load f8001e070 rfl (exec_load _ _ _ _ _ _ _) (Nat.mod_one _)
+      (by show B.inRam _ 1 = true; rw [v2, BitVec.add_zero]; exact buf_inRam _ _ _ hb' (by omega)) rfl
+  have s4 : DetStep B img ⟨d3, S⟩ ⟨d4, S⟩ := dstep f8001e074 rfl (by rw [exec_op]; rfl)
+  have i4 : LInv c R n src acc d4 S :=
+    ((((hi.goto _).wr 19 _ _ (by decide)).wr 28 _ _ (by decide)).wr 15 _ _ (by decide))
+  have h14 : d4.get 14 = BitVec.ofNat 32 n := i4.a4
+  have run4 : QRun B img 4 ⟨d, S⟩ ⟨d4, S⟩ :=
+    .step (q _ hi.csr) s1 (.step (q _ (hi.goto _).csr) s2 (.step (q _ ((hi.goto _).wr 19 _ _ (by decide)).csr) s3
+      (.single (q _ (((hi.goto _).wr 19 _ _ (by decide)).wr 28 _ _ (by decide)).csr) s4)))
+  constructor
+  · intro hbad
+    have tk : taken .ltu (d4.get 14) (d4.get 15) = true := by
+      rw [h14, v4]; simp only [taken, ult_small n (src + code) (by omega) (by omega)]; simp; omega
+    have s5 : DetStep B img ⟨d4, S⟩ ⟨d4.goto 0x8001e116, S⟩ := dstep f8001e078 rfl (by
+      rw [exec_branch, if_pos tk]; exact jump_lit _ 0x8001e078 _ 0x8001e116 rfl (by decide) (by decide))
+    obtain ⟨k, e, S', hr, hx⟩ := invalid_exit c R h n src acc _ S (i4.goto _) rfl
+    exact ⟨_, e, S', run4.trans (.step (q _ i4.csr) s5 hr), hx⟩
+  · intro hok
+    have nt5 : ¬ (taken .ltu (d4.get 14) (d4.get 15) = true) := by
+      rw [h14, v4]; simp only [taken, ult_small n (src + code) (by omega) (by omega)]; simp; omega
+    have s5 : DetStep B img ⟨d4, S⟩ ⟨d4.goto 0x8001e07c, S⟩ := dstep f8001e078 rfl (by
+      rw [exec_branch, if_neg nt5]; rfl)
+    refine ⟨d4.goto 0x8001e07c, run4.trans (.single (q _ i4.csr) s5), rfl, i4.goto _, ?_, ?_, ?_⟩
+    · simp only [Core.goto_get, d4, Core.wr_get_ne _ _ _ _ _ (show (28 : Reg) ≠ 15 by decide)]; exact v3
+    · simp only [Core.goto_get, d4, d3, Core.wr_get_ne _ _ _ _ _ (show (19 : Reg) ≠ 15 by decide),
+        Core.wr_get_ne _ _ _ _ _ (show (19 : Reg) ≠ 28 by decide)]; exact v2
+    · simp only [Core.goto_get]; exact v4
+
 end E5R.Rmk.Cobs
