@@ -182,6 +182,11 @@ def resolve (cfg : Config) (t : AState) : M Nat := do
   match cands.find? fun j => t.leq st.nodes[j]! with
   | some j => return j
   | none =>
+    -- A state that subsumes an existing node replaces it rather than using
+    -- up the budget: an ascending chain of value sets is one node, not many.
+    match cands.find? fun j => st.nodes[j]!.leq t with
+    | some j => grow j t; return j
+    | none =>
     if cands.size < unroll then newNode key t
     else
       let j := cands.back!
