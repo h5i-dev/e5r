@@ -239,10 +239,15 @@ def canTake (c : BrCond) (a b : AV) : Bool × Bool :=
         else (true, true)
     | _, _ => (true, true)
 
+/-- `top` as the full range, so range refinement applies to it. -/
+def AV.topRng : AV → AV
+  | .top => .rng 0 (M32 - 1)
+  | a => a
+
 /-- Narrow `a` given that `taken c a k` has the outcome `t`, for a constant
     `k`. -/
-def refineL (c : BrCond) (t : Bool) (a : AV) (k : Nat) : AV :=
-  AV.small <| match (match a with | AV.top => AV.rng 0 (M32 - 1) | a => a) with
+def refineLCore (c : BrCond) (t : Bool) (a : AV) (k : Nat) : AV :=
+  match a with
   | .vals x => .vals (x.filter fun p => taken c (w p) (w k) == t)
   | .rng l h =>
     match c, t with
@@ -254,9 +259,12 @@ def refineL (c : BrCond) (t : Bool) (a : AV) (k : Nat) : AV :=
     | _, _ => .rng l h
   | a => a
 
+def refineL (c : BrCond) (t : Bool) (a : AV) (k : Nat) : AV :=
+  (refineLCore c t a.topRng k).small
+
 /-- The same, for a constant on the left: `taken c k a = t`. -/
-def refineR (c : BrCond) (t : Bool) (k : Nat) (a : AV) : AV :=
-  AV.small <| match (match a with | AV.top => AV.rng 0 (M32 - 1) | a => a) with
+def refineRCore (c : BrCond) (t : Bool) (k : Nat) (a : AV) : AV :=
+  match a with
   | .vals x => .vals (x.filter fun q => taken c (w k) (w q) == t)
   | .rng l h =>
     match c, t with
@@ -269,6 +277,9 @@ def refineR (c : BrCond) (t : Bool) (k : Nat) (a : AV) : AV :=
       if k = l ∧ l < h then .rng (l+1) h else if k = h ∧ l < h then .rng l (h-1) else .rng l h
     | _, _ => .rng l h
   | a => a
+
+def refineR (c : BrCond) (t : Bool) (k : Nat) (a : AV) : AV :=
+  (refineRCore c t k a.topRng).small
 
 /-! ## Abstract memory -/
 

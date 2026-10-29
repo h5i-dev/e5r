@@ -434,4 +434,158 @@ theorem alu_sound {ρ : Nat → Word} (op : AluOp) {a b : AV} {x y : Word} (ha :
   | slt => exact slt_sound ha hb
   | sltu => exact sltu_sound ha hb
 
+/-! ## Branches -/
+
+theorem taken_self (c : BrCond) (x : Word) :
+    taken c x x = (match c with | .eq | .ge | .geu => true | .ne | .lt | .ltu => false) := by
+  cases c <;> simp [taken, BitVec.slt, BitVec.ult]
+
+theorem slt_eq_ult_small {x y : Word} (hx : x.toNat < 2^31) (hy : y.toNat < 2^31) :
+    x.slt y = x.ult y :=
+  BitVec.slt_eq_ult_of_msb_eq (by rw [msb_false_of_lt hx, msb_false_of_lt hy])
+
+/-- `canTake` says a branch can go a way whenever some described pair goes
+    that way. -/
+theorem canTake_sound {ρ : Nat → Word} (c : BrCond) {a b : AV} {x y : Word} (ha : a.gam ρ x)
+    (hb : b.gam ρ y) :
+    (taken c x y = true → (canTake c a b).1 = true) ∧
+    (taken c x y = false → (canTake c a b).2 = true) := by
+  unfold canTake
+  split
+  · next xs ys =>
+    have mem : taken c x y ∈ xs.flatMap fun p => ys.map fun q => taken c (w p) (w q) :=
+      List.mem_flatMap.mpr ⟨x.toNat, ha, List.mem_map.mpr ⟨y.toNat, hb, by rw [w_toNat, w_toNat]⟩⟩
+    constructor
+    · intro h; rw [h] at mem; simp only [List.any_eq_true]; exact ⟨true, mem, rfl⟩
+    · intro h; rw [h] at mem; simp only [List.any_eq_true]; exact ⟨false, mem, rfl⟩
+  · next s o s' o' =>
+    split
+    · next he =>
+      obtain ⟨rfl, rfl⟩ := he
+      simp only [AV.gam] at ha hb
+      rw [ha, ← hb, taken_self]
+      cases c <;> simp
+    · exact ⟨fun _ => rfl, fun _ => rfl⟩
+  · split
+    · next l1 h1 l2 h2 e1 e2 =>
+      have hx := bounds_sound ha e1
+      have hy := bounds_sound hb e2
+      cases c with
+      | ltu => simp only [taken, ult_toNat, decide_eq_true_eq, decide_eq_false_iff_not]; omega
+      | geu =>
+        simp only [taken, ult_toNat, Bool.not_eq_true', decide_eq_false_iff_not,
+          Bool.not_eq_false', decide_eq_true_eq]; omega
+      | eq =>
+        simp only [taken, beq_iff_eq, beq_eq_false_iff_ne]
+        constructor
+        · intro h; subst h; simp; omega
+        · intro h
+          simp only [Bool.not_eq_true', decide_eq_false_iff_not, not_and]
+          intro e1 e2 e3; apply h; apply BitVec.eq_of_toNat_eq; omega
+      | ne =>
+        simp only [taken, bne_iff_ne, ne_eq, bne_eq_false_iff_eq]
+        constructor
+        · intro h
+          simp only [Bool.not_eq_true', decide_eq_false_iff_not, not_and]
+          intro e1 e2 e3; apply h; apply BitVec.eq_of_toNat_eq; omega
+        · intro h; subst h; simp; omega
+      | lt =>
+        simp only
+        split
+        · next hs =>
+          have := slt_eq_ult_small (x := x) (y := y) (by omega) (by omega)
+          simp only [taken, this, ult_toNat, decide_eq_true_eq, decide_eq_false_iff_not, if_true]
+          omega
+        · exact ⟨fun _ => rfl, fun _ => rfl⟩
+      | ge =>
+        simp only
+        split
+        · next hs =>
+          have := slt_eq_ult_small (x := x) (y := y) (by omega) (by omega)
+          simp only [taken, this, ult_toNat, Bool.not_eq_true', decide_eq_false_iff_not,
+            Bool.not_eq_false', decide_eq_true_eq]
+          simp; omega
+        · exact ⟨fun _ => rfl, fun _ => rfl⟩
+    · exact ⟨fun _ => rfl, fun _ => rfl⟩
+
+theorem w_toNat_of_lt {k : Nat} (h : k < M32) : (w k).toNat = k := by
+  simp only [w, BitVec.toNat_ofNat]; exact Nat.mod_eq_of_lt h
+
+theorem topRng_sound {ρ : Nat → Word} {a : AV} {x : Word} (h : a.gam ρ x) : a.topRng.gam ρ x := by
+  cases a with
+  | top => have := toNat_lt x; simp only [AV.topRng, AV.gam]; simp only [M32] at this ⊢; omega
+  | _ => exact h
+
+theorem ne_of_toNat {x : Word} {k : Nat} (hwk : (w k).toNat = k) (h : x ≠ w k) : x.toNat ≠ k :=
+  fun e => h (BitVec.eq_of_toNat_eq (by rw [e, hwk]))
+
+/-- Branch refinement against a constant on the right is sound for the
+    direction the branch took. -/
+theorem refineLCore_sound {ρ : Nat → Word} (c : BrCond) (t : Bool) {a : AV} {x : Word} {k : Nat}
+    (hk : k < M32) (ha : a.gam ρ x) (ht : taken c x (w k) = t) : (refineLCore c t a k).gam ρ x := by
+  have hwk := w_toNat_of_lt hk
+  cases a with
+  | vals l =>
+    simp only [refineLCore, AV.gam, List.mem_filter]
+    exact ⟨ha, by rw [w_toNat, ht]; simp⟩
+  | rng l h =>
+    simp only [AV.gam] at ha
+    cases c <;> cases t <;> simp only [refineLCore]
+    all_goals simp only [taken, ult_toNat, hwk, beq_iff_eq, bne_iff_ne, Bool.not_eq_true',
+      decide_eq_true_eq, decide_eq_false_iff_not, Bool.not_eq_false', beq_eq_false_iff_ne,
+      bne_eq_false_iff_eq, ne_eq, Bool.not_eq_eq_eq_not, Bool.not_true, Bool.not_false] at ht
+    all_goals first
+      | (simp only [AV.gam]; omega)
+      | (split
+         · simp only [AV.gam]; omega
+         · simp only [AV.gam]; omega)
+      | (have e := congrArg BitVec.toNat ht; rw [hwk] at e
+         split
+         · simp only [AV.gam]; simp only [List.mem_singleton]; omega
+         · simp only [AV.gam]; omega)
+      | (have hne := ne_of_toNat hwk ht
+         split
+         · simp only [AV.gam]; omega
+         · split
+           · simp only [AV.gam]; omega
+           · simp only [AV.gam]; omega)
+      | (simp only [AV.gam]; exact ha)
+  | _ => exact ha
+
+theorem refineL_sound {ρ : Nat → Word} (c : BrCond) (t : Bool) {a : AV} {x : Word} {k : Nat}
+    (hk : k < M32) (ha : a.gam ρ x) (ht : taken c x (w k) = t) : (refineL c t a k).gam ρ x :=
+  small_sound (refineLCore_sound c t hk (topRng_sound ha) ht)
+
+theorem refineRCore_sound {ρ : Nat → Word} (c : BrCond) (t : Bool) {a : AV} {x : Word} {k : Nat}
+    (hk : k < M32) (ha : a.gam ρ x) (ht : taken c (w k) x = t) : (refineRCore c t k a).gam ρ x := by
+  have hwk := w_toNat_of_lt hk
+  cases a with
+  | vals l =>
+    simp only [refineRCore, AV.gam, List.mem_filter]
+    exact ⟨ha, by rw [w_toNat, ht]; simp⟩
+  | rng l h =>
+    simp only [AV.gam] at ha
+    cases c <;> cases t <;> simp only [refineRCore]
+    all_goals simp only [taken, ult_toNat, hwk, beq_iff_eq, bne_iff_ne, Bool.not_eq_true',
+      decide_eq_true_eq, decide_eq_false_iff_not, Bool.not_eq_false', beq_eq_false_iff_ne,
+      bne_eq_false_iff_eq, ne_eq, Bool.not_eq_eq_eq_not, Bool.not_true, Bool.not_false] at ht
+    all_goals first
+      | (simp only [AV.gam]; omega)
+      | (have e := congrArg BitVec.toNat ht; rw [hwk] at e
+         split
+         · simp only [AV.gam]; simp only [List.mem_singleton]; omega
+         · simp only [AV.gam]; omega)
+      | (have hne : x.toNat ≠ k := fun e => ht (BitVec.eq_of_toNat_eq (by rw [e, hwk]))
+         split
+         · simp only [AV.gam]; omega
+         · split
+           · simp only [AV.gam]; omega
+           · simp only [AV.gam]; omega)
+      | (simp only [AV.gam]; exact ha)
+  | _ => exact ha
+
+theorem refineR_sound {ρ : Nat → Word} (c : BrCond) (t : Bool) {a : AV} {x : Word} {k : Nat}
+    (hk : k < M32) (ha : a.gam ρ x) (ht : taken c (w k) x = t) : (refineR c t k a).gam ρ x :=
+  small_sound (refineRCore_sound c t hk (topRng_sound ha) ht)
+
 end E5R.AI
