@@ -7,7 +7,8 @@ def main (args : List String) : IO UInt32 := do
   let opts : Opts := {
     addrSplit := (← IO.getEnv "E5R_ADDR_SPLIT") == some "1"
     tagDepth := ((← IO.getEnv "E5R_TAG_DEPTH").bind String.toNat?).getD 0
-    keepAll := (← IO.getEnv "E5R_KEEP_ALL").isSome }
+    keepAll := (← IO.getEnv "E5R_KEEP_ALL").isSome
+    keepGuarded := (← IO.getEnv "E5R_KEEP_GUARDED").isSome }
   -- `E5R_RING_DRAFT=1`: measure with an UNPROVED draft ring summary (no certificate from it checks
   -- with `check`; it is for sizing the hybrid work).
   let sums := if (← IO.getEnv "E5R_RING_DRAFT") == some "1" then [RingDraft.spec] else []

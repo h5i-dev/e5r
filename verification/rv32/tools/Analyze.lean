@@ -103,6 +103,8 @@ structure Opts where
   /-- Keep every handler-proof static fact across interrupts, not only
       the ones that rule out a null. -/
   keepAll : Bool := false
+  /-- Keep only facts about cells G has a guarded fact for (saved pointers). -/
+  keepGuarded : Bool := false
   deriving Repr
 
 structure Setup where
@@ -171,11 +173,23 @@ def normalize (cfg : Config) (t : AState) : M AState := do
   -- Facts the handler cannot change survive the interrupt.
   -- Only a fact that rules out a null G allows is worth a separate node.
   let keepAll := (← get).opts.keepAll
+  let keepGuarded := (← get).opts.keepGuarded
   let useful (c : Cell) : Bool := keepAll ||
     (c.guard.isNone && match plain G c.base c.addr c.w, c.v with
-      | some g, .vals l => nullable g && !(0 ∈ l) && c.v.leq g
+      | some g, .vals l => nullable g && !(0 ∈ l) && c.v.leq g &&
+        -- `keepGuarded`: only pointers G already knows non-null under some guard.
+        (!keepGuarded || G.any fun d => d.addr == c.addr && d.w == c.w && d.guard.isSome)
       | _, _ => false)
-  let kept := ((staticOf cfg t.mem).filter fun c => Cell.kept cfg c && !G.contains c && useful c).eraseDups
+  -- With `keepGuarded`, a saved pointer G only knows non-null under a guard
+  -- is read the way a load would (through a guard that holds now) and kept
+  -- as a plain fact; `Cell.leqIn` accepts it the same way.
+  let derived : List Cell := if !keepGuarded then [] else
+    ((G.filter (·.guard.isSome)).map fun d => (d.addr, d.w)).eraseDups.filterMap fun (a, wd) =>
+      match lookup t.mem .abs a wd with
+      | some v => some ⟨.abs, a, wd, v, none⟩
+      | none => none
+  let kept := ((staticOf cfg t.mem ++ derived).filter fun c =>
+    Cell.kept cfg c && !G.contains c && useful c).eraseDups
   return { t with mem := G ++ kept ++ stack, mepc := .top, mcause := .top,
                   mpie := t.mpie.join .yes, mpp := norm (t.mpp ++ [0]) }
 
@@ -300,7 +314,7 @@ def brief (s : AState) : String :=
   let rs := (List.range 31).filterMap fun k =>
     let v := s.regs.getD k .top
     if v == .top then none else some s!"x{k+1}={reprStr v}"
-  let ms := s.mem.map fun c => s!"{if c.base == .abs then "" else "rel"}{c.addr}{reprStr c.w}={reprStr c.v}"
+  let ms := s.mem.map fun c => s!"{if c.base == .abs then "" else "rel"}{c.addr}{reprStr c.w}={reprStr c.v}{match c.guard with | some g => s!"?{g.1}" | none => ""}"
   s!"hnd={s.hnd} mie={reprStr s.mie} regs {rs} mem {ms}"
 
 def process (cfg : Config) (i : Nat) : M Unit := do
@@ -375,7 +389,7 @@ partial def fixG (su : Setup) (G : Option (List Cell)) (round : Nat) (proposed :
     IO.eprintln s!"  guarded: {gs.map fun c => (c.addr, reprStr c.v, c.guard.map fun g => (g.1, reprStr g.2.1, g.2.2))}"
   -- Debug aid: `E5R_DUMP_PC=<pc>` prints that pc's nodes after every round.
   if let some pcs ← IO.getEnv "E5R_DUMP_PC" then
-    if let some pc := pcs.toNat? then
+    for pc in (pcs.splitOn ",").filterMap String.toNat? do
       for s in st.nodes.toList.filter (·.pc == pc) do IO.eprintln s!"dump round {round}: {brief s}"
   if round ≥ 60 then return st
   if st.restart then fixG su st.G (round+1) proposed
