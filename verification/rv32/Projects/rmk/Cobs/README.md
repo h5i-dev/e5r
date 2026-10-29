@@ -37,17 +37,47 @@ Owner: exporter/runner worker. Files: `Projects/rmk/Cobs/*.lean` only. No main
 
 ## Proved (kernel-checked; axioms propext, Classical.choice, Quot.sound; no sorry)
 
-* `Cobs/Fetch.lean`: the 97 instruction facts.
-* `Cobs/Basic.lean`:
-  * `CobsEnv` (precondition), `Returns` (frame postcondition);
-  * `prologue`, `exit_run`;
-  * `finish`: every exit from 0x8001e102 meets `Returns`, with the exact result
-    words.
-* `Cobs/Empty.lean`: `empty`. With len = 0 the call returns with
-  `[a0] = 1, [a0+4] = 0`, and `Returns` holds.
-* `Cobs/Scan.lean`: `scan`. The first loop ends at 0x8001e050 with
-  a4 = `firstZero (bufByte S buf) i len` (all bytes before it non-zero, a zero
-  there unless it is len). RAM is unchanged; only a3 and a4 are written.
+**`E5R.Rmk.Cobs.decode` (Decode.lean): the whole function.** For every machine meeting
+`CobsEnv` (len ≤ 488), a quiet deterministic run returns to ra, and:
+* `Returns` holds: frame, registers, CSRs, and RAM unchanged outside slot/buffer/frame.
+* `Res` holds:
+  * **len = 0:** `[a0] = 1`, `[a0+4] = 0`.
+  * **otherwise:**
+    * `[a0] = 0`/`1` (ok/invalid);
+    * `[a0+4] = n`/`1`, where n = the first zero index;
+    * `[a0+8]` = the decoded length;
+    * every buffer byte j < len equals the decoded output (j < its length) or the
+      original byte.
+  * All of it is a function of the ORIGINAL buffer bytes: `Spec.run`, a transliteration
+    of the emitted loop.
+
+Consequences:
+* No panic site is reached. A returning QRun is the model's only behaviour, so
+  neither `panic_bounds_check` call is taken; the guards are proved untaken.
+* The "target too small" error (code 2) never occurs for in-place calls.
+* Stores land only in the slot, the buffer or the frame.
+* The outcome reads nothing outside the buffer, apart from the frame's own
+  save/restore.
+
+Building blocks:
+* `Fetch.lean`: 97 instruction facts.
+* `Basic.lean`: `CobsEnv`, `Returns`, `prologue`, `exit_run`, `finish`.
+* `Empty.lean`: `empty`.
+* `Scan.lean`: the first-zero loop.
+* `Copy.lean`: the copy loop.
+* `Spec.lean`: `block`/`run`.
+* `Loop.lean`:
+  * `LInv`, `ExitPrep`;
+  * the head, both bodies, tail and exits;
+  * `iter` and `loop`, the latter by fuel induction against `run`.
+
+**Runner job** `jobs/rmk/rmk-memmove-small.json`-style: `jobs/rmk/rmk-cobs-decode.json` with
+wrapper `Projects/ramimage/Cobs.lean` (`E5R.RmkCobs.decode` on the runner's image and board via
+checked `img_eq`/`board_eq`).
+* Status: `proved` in 258 s (Lean compile, `leanchecker` replay of every module, axiom
+  audit), peak 6.5 GB in the shared `Fetch.lean`.
+* The symbols 0x8001e02e/0x8001e006 are pinned.
+* Receipt: `verification/rv32/ram-image/rmk-qemu-riscv-rynk/rmk-cobs-decode.result.json`.
 
 ## Interface for main's `next` composition (proposal)
 
@@ -69,20 +99,11 @@ structure Returns (m₀ m : Machine) : Prop where
   ram : RAM unchanged outside [a0, a0+12) ∪ [a1, a1+len) ∪ [sp−16, sp)
 ```
 
-Planned top-level theorem (not yet proved; the name is reserved):
+Top-level theorem (proved):
+`E5R.Rmk.Cobs.decode : ∀ m₀, CobsEnv m₀ → ∃ k m, QRun B img k m₀ m ∧ Returns m₀ m ∧ Res m₀ m`.
 
-`E5R.Rmk.Cobs.decode : ∀ m₀, CobsEnv m₀ → ∃ k m, QRun B img k m₀ m ∧ Returns m₀ m ∧ Res m₀ m`
-
-`Res` will state:
-* the tag ∈ {0, 1}, with the result words as in the table;
-* on success, [a0+4] ≤ len and [a0+8] ≤ [a0+4];
-* the buffer after the call is a function of the buffer before it alone (the
-  bound on reads), given by a transliteration of the emitted algorithm.
-
-A returning `QRun` excludes the panics: each step is the model's only behaviour,
-and the run ends at ra, not at 0x8001f83a.
-
-For `next`, the wrapper adds 16 bytes of frame (32 in total) on top of this
-16. A `decode_in_place` contract (0x8001e006, straight-line around this call)
-will follow, giving `[out] = 0xffffffff` on success and the error code
-otherwise.
+For `next`, the wrapper adds 32 bytes of frame on top of these 16, so 48 bytes
+below sp at the wrapper's entry. The `decode_in_place` contract (0x8001e006,
+straight-line around this call) is not proved yet. It should give
+`[out] = 0xffffffff` on success, the error code otherwise, and
+`[out+4] = [res+8]`.

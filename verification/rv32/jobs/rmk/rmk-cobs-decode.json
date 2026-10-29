@@ -1,0 +1,38 @@
+{
+  "schema": "e5r.verify.job.v1",
+  "id": "rmk-cobs-decode",
+  "root": "../..",
+  "board": "boards/qemu-virt-rv32.json",
+  "elf": "build/rmk-qemu-riscv-rynk.elf",
+  "elf_sha256": "f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30",
+  "image": {
+    "kind": "ram",
+    "module": "Projects.rmk.Elf",
+    "namespace": "E5R.Rmk.Image"
+  },
+  "modules": [
+    "Projects/rmk/Run.lean",
+    "Projects/rmk/Fetch.lean",
+    "Projects/rmk/Cobs/Fetch.lean",
+    "Projects/rmk/Cobs/Basic.lean",
+    "Projects/rmk/Cobs/Empty.lean",
+    "Projects/rmk/Cobs/Scan.lean",
+    "Projects/rmk/Cobs/Copy.lean",
+    "Projects/rmk/Cobs/Spec.lean",
+    "Projects/rmk/Cobs/Loop.lean",
+    "Projects/rmk/Cobs/Decode.lean",
+    "Projects/ramimage/Cobs.lean"
+  ],
+  "theorems": [
+    "E5R.Rmk.Cobs.decode",
+    "E5R.RmkCobs.*"
+  ],
+  "symbols": {
+    "0x8001e02e": "decode_in_place_report",
+    "0x8001e006": "decode_in_place"
+  },
+  "limits": {
+    "seconds": 3600,
+    "rss_mib": 10240
+  }
+}
