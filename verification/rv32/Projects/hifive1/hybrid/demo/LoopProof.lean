@@ -158,7 +158,7 @@ theorem adapter {s : AState} {m : Machine} (ha : enterOk s = true) (hs : StateHo
     have hH : (m.core.get 12).toNat < 4 := by
       have := leq_sound h12 (hs.regs 12); simp only [AV.gam] at this; omega
     have hmk : m.core.mie_ = false := by
-      have := hs.mie; rw [hmie] at this; simpa [Tri.mayBe] using this
+      have := hs.mie; revert this hmie; cases s.mie <;> cases m.core.mie_ <;> simp [Tri.mayBe]
     have hwa : (w a).toNat = a := by simp [w]; unfold M32 at hlt; omega
     have pre : Pre m := ⟨by rw [hs.pc, hpc]; rfl, hH, hmk,
       by rw [hA, hwa]; exact hal, by rw [hA]; exact hin⟩
@@ -167,9 +167,9 @@ theorem adapter {s : AState} {m : Machine} (ha : enterOk s = true) (hs : StateHo
     obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8⟩ := sameCsr_parts sp.csr
     have hlen : s.regs.length = 31 := by
       unfold AState.wf at hwf; simp only [Bool.and_eq_true, beq_iff_eq] at hwf; exact hwf.1.1.1
-    have pg : ∀ r, (post s).get r = ((s.set 12 (.vals [0, 1, 2, 3])).set 13 (.vals [0, 0xffffffff])).get r :=
+    have pg : ∀ r, (post s).get r = ((s.set 12 headAV).set 13 maskAV).get r :=
       fun _ => rfl
-    have hlen12 : (s.set 12 (.vals [0, 1, 2, 3])).regs.length = 31 := by
+    have hlen12 : (s.set 12 headAV).regs.length = 31 := by
       simp [AState.set, hlen]
     refine ⟨?pc, fun r => ?regs, ?mem, ?mie, ?mpie, ?mpp, ?mieReg, ?mtvec, ?mepc, ?mcause, ?msc⟩
     case pc => rw [sp.pc]; rfl
@@ -182,10 +182,10 @@ theorem adapter {s : AState} {m : Machine} (ha : enterOk s = true) (hs : StateHo
         by_cases r12 : r = 12
         · subst r12; rw [AState.get_set_self _ _ _ (by decide) hlen, sp.head]
           have := next_lt hH
-          simp only [AV.gam, List.mem_cons, List.not_mem_nil, or_false]; omega
+          simp only [headAV, AV.gam, List.mem_cons, List.not_mem_nil, or_false]; omega
         · rw [AState.get_set_ne _ _ _ _ r12, sp.frame r r12 r13]; exact hs.regs r
     case mem =>
-      show MemHolds ρM m'.ram (storeStrong s.mem .abs (match s.get 10 with | .vals [a] => a | _ => 0) .w _)
+      show MemHolds ρM m'.ram (storeStrong s.mem .abs (match s.get 10 with | .vals [a] => a | _ => 0) .w headAV)
       rw [ha10, sp.ram, hA]
       have hwfm : ∀ c ∈ s.mem, c.wf cfg = true ∧ c.base = .abs := by
         unfold AState.wf at hwf
@@ -196,7 +196,7 @@ theorem adapter {s : AState} {m : Machine} (ha : enterOk s = true) (hs : StateHo
         (storeSep_abs (cfg := cfg) (by decide) (fun c hc => (hwfm c hc).1) hlt hin
           (fun c hc hb => by rw [(hwfm c hc).2] at hb; cases hb))
       have := next_lt hH
-      simp only [stored, AV.gam, List.mem_cons, List.not_mem_nil, or_false]; omega
+      simp only [headAV, stored, AV.gam, List.mem_cons, List.not_mem_nil, or_false]; omega
     case mie => show s.mie.mayBe m'.core.mie_ = true; rw [e1]; exact hs.mie
     case mpie => show s.mpie.mayBe m'.core.mpie = true; rw [e2]; exact hs.mpie
     case mpp => show m'.core.mpp.toNat ∈ s.mpp; rw [e3]; exact hs.mpp

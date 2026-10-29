@@ -55,10 +55,12 @@
     "Theories/Hybrid/AIBridge.lean",
     "Projects/hifive1/hybrid/demo/LoopConfig.lean",
     "Projects/hifive1/hybrid/demo/LoopCert.lean",
-    "Projects/hifive1/hybrid/demo/LoopProof.lean"
+    "Projects/hifive1/hybrid/demo/LoopProof.lean",
+    "Projects/hifive1/hybrid/demo/LoopControls.lean"
   ],
   "theorems": [
-    "E5R.HybridLoop.Proof.*"
+    "E5R.HybridLoop.Proof.*",
+    "E5R.HybridLoop.Controls.*"
   ],
   "limits": {
     "seconds": 1800,

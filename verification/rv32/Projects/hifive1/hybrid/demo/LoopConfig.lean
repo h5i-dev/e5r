@@ -52,12 +52,16 @@ def enterOk (s : AState) : Bool :=
   | .vals [a] => a % 4 == 0 && cfg.board.inRam (w a) 4 && a < M32
   | _ => false
 
+/-- What the region promises about the new head and the wrap mask. -/
+def headAV : AV := .vals [0, 1, 2, 3]
+def maskAV : AV := .vals [0, 0xffffffff]
+
 /-- The abstract state at the region's exit: the new head in `a2`, the wrap
     mask in `a3`, the head word stored, everything else as at entry. -/
 def post (s : AState) : AState :=
   let a := match s.get 10 with | .vals [a] => a | _ => 0
-  { (s.set 12 (.vals [0, 1, 2, 3])).set 13 (.vals [0, 0xffffffff]) with
+  { (s.set 12 headAV).set 13 maskAV with
     pc := regionExit
-    mem := storeStrong s.mem .abs a .w (.vals [0, 1, 2, 3]) }
+    mem := storeStrong s.mem .abs a .w headAV }
 
 end E5R.HybridLoop.Job
