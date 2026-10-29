@@ -194,6 +194,25 @@ theorem interp_load_ram (o : Oracle) {w a atomic k ram i evs}
     interp B img o (.load w a atomic k) ram i evs = interp B img o (k (ramRead ram a w)) ram i evs := by
   simp [interp, hal, hin]
 
+theorem interp_load_rom (o : Oracle) {w a atomic k ram i evs} {v : Word}
+    (hal : a.toNat % w.bytes = 0) (hin : B.inRam a w.bytes = false) (hat : atomic = false)
+    (hr : romRead? img a.toNat w.bytes false = some v) :
+    interp B img o (.load w a atomic k) ram i evs = interp B img o (k v) ram i evs := by
+  simp [interp, hal, hin, hat, hr]
+
+theorem interp_load_dev (o : Oracle) {w a atomic k ram i evs} {d : DevReg}
+    (hal : a.toNat % w.bytes = 0) (hin : B.inRam a w.bytes = false) (hat : atomic = false)
+    (hr : romRead? img a.toNat w.bytes false = none) (hd : B.device? a = some d) (hdr : d.read = true)
+    (hw : w = .w) :
+    interp B img o (.load w a atomic k) ram i evs = interp B img o (k (o i)) ram (i+1) evs := by
+  subst hw; simp [interp, hal, hin, hat, hr, hd, hdr]
+
+theorem interp_store_dev (o : Oracle) {w a v atomic k ram i evs} {d : DevReg}
+    (hal : a.toNat % w.bytes = 0) (hin : B.inRam a w.bytes = false) (hat : atomic = false)
+    (hd : B.device? a = some d) (hdw : d.write = true) (hw : w = .w) :
+    interp B img o (.store w a v atomic k) ram i evs = interp B img o k ram i (evs ++ [⟨a, v⟩]) := by
+  subst hw; simp [interp, hal, hin, hat, hd, hdw]
+
 theorem interp_store_ram (o : Oracle) {w a v atomic k ram i evs}
     (hal : a.toNat % w.bytes = 0) (hin : B.inRam a w.bytes = true) :
     interp B img o (.store w a v atomic k) ram i evs = interp B img o k (ramWrite ram a v w) i evs := by

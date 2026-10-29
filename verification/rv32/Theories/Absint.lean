@@ -456,16 +456,19 @@ def classify (cfg : Config) (a : Nat) (wd : Width) : Option Target :=
       | some d => if wd = .w then some (.dev d) else none
       | none => none
 
+/-- What a load from one absolute candidate address can return, or `none`
+    if it could fault there. -/
+def loadAt (cfg : Config) (s : AState) (a : Nat) (wd : Width) (atomic : Bool) : Option AV :=
+  match classify cfg a wd with
+  | some .ram => some (loadCell s.mem .abs a wd)
+  | some (.rom v) => if atomic then none else some (.const v)
+  | some (.dev d) => if atomic || !d.read then none else some .top
+  | none => none
+
 /-- The values of a load, or `none` if some possible address could fault. -/
 def absLoad (cfg : Config) (s : AState) (addr : AV) (wd : Width) (atomic : Bool) : Option AV :=
   match addr with
-  | .vals as =>
-    as.foldlM (init := .vals []) fun acc a =>
-      match classify cfg a wd with
-      | some .ram => some (acc.join (loadCell s.mem .abs a wd))
-      | some (.rom v) => if atomic then none else some (acc.join (.const v))
-      | some (.dev d) => if atomic || !d.read then none else some .top
-      | none => none
+  | .vals as => as.foldlM (init := .vals []) fun acc a => (loadAt cfg s a wd atomic).map acc.join
   | .sym 2 off =>
     -- A handler's own stack frame, below the interrupted sp.
     if s.hnd && off % wd.bytes = 0 then some (loadCell s.mem .rel off wd) else none
@@ -487,31 +490,33 @@ def AV.extend (wd : Width) (signed : Bool) (v : AV) : AV :=
     | .rng l h => if h < signedLimit wd then .rng l h else .top
     | _ => .top
 
+/-- A store to one absolute candidate address: `strong` when it is the only
+    candidate. `none` if it could fault or write a disallowed device value. -/
+def storeAt (cfg : Config) (s : AState) (mem : List Cell) (a : Nat) (wd : Width) (v : AV)
+    (atomic strong : Bool) : Option (List Cell) :=
+  match classify cfg a wd with
+  | some .ram =>
+    -- Handler nodes may write static RAM but never the interrupted stack.
+    if s.hnd && !cfg.isStatic a wd.bytes then none
+    else some (if strong then storeStrong mem .abs a wd v else storeWeak mem .abs a wd v)
+  | some (.dev d) => if atomic || !d.write || !cfg.writeOk a v then none else some mem
+  | _ => none
+
+/-- The value memory keeps from a store of `wd`: its low bits. -/
+def AV.stored (wd : Width) (v : AV) : AV :=
+  match wd with
+  | .b => v.band (.const 0xff)
+  | .h => v.band (.const 0xffff)
+  | .w => v
+
 /-- The memory after a store, or `none` if some possible address could
     fault or write a disallowed device value. -/
 def absStore (cfg : Config) (s : AState) (addr : AV) (wd : Width) (v : AV) (atomic : Bool) :
     Option (List Cell) :=
-  -- Memory keeps only the stored width's low bits.
-  let v := match wd with
-    | .b => v.band (.const 0xff)
-    | .h => v.band (.const 0xffff)
-    | .w => v
+  let v := v.stored wd
   match addr with
-  | .vals [a] =>
-    match classify cfg a wd with
-    | some .ram =>
-      -- Handler nodes may write static RAM but never the interrupted stack.
-      if s.hnd && !cfg.isStatic a wd.bytes then none
-      else some (storeStrong s.mem .abs a wd v)
-    | some (.dev d) => if atomic || !d.write || !cfg.writeOk a v then none else some s.mem
-    | _ => none
-  | .vals as =>
-    as.foldlM (init := s.mem) fun mem a =>
-      match classify cfg a wd with
-      | some .ram =>
-        if s.hnd && !cfg.isStatic a wd.bytes then none else some (storeWeak mem .abs a wd v)
-      | some (.dev d) => if atomic || !d.write || !cfg.writeOk a v then none else some mem
-      | _ => none
+  | .vals [a] => storeAt cfg s s.mem a wd v atomic true
+  | .vals as => as.foldlM (init := s.mem) fun mem a => storeAt cfg s mem a wd v atomic false
   | .sym 2 off =>
     -- Below the interrupted sp, within the handler's stack budget.
     if s.hnd && off % wd.bytes = 0 && M32 - cfg.hdepth ≤ off && off + wd.bytes ≤ M32 then
@@ -830,7 +835,8 @@ def check (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
   cfg.board.ramBase + cfg.board.ramSize ≤ M32 &&
   cert.nodes.all (nodeOk cfg cert) &&
   -- The handler's stack frame never reaches static RAM, from any sp.
-  cert.sigma.all (fun sp => cfg.stackLow + cfg.hdepth ≤ sp && sp ≤ cfg.pinLow) &&
+  cert.sigma.all (fun sp => cfg.stackLow + cfg.hdepth ≤ sp && sp ≤ cfg.pinLow && sp % 4 = 0) &&
+  cfg.board.ramBase ≤ cfg.stackLow &&
   cfg.hdepth < 2^31 && cfg.stackLow ≤ cfg.pinLow && cfg.pinLow ≤ cfg.ramEnd &&
   cert.G.all (fun c => c.base == .abs && c.wf cfg && cfg.isStatic c.addr c.w.bytes && !c.v.hasSym &&
     match c.guard with | some g => cfg.isStatic g.1 g.2.1.bytes | none => true)
