@@ -245,6 +245,6 @@ theorem hentry : ∀ k (n : Node), (n.s.pc, k) ∈ Cert.cert.delegate → n ∈ 
     allows, no reachable machine can escape, and every device write on the
     way satisfies the configured property (pwmcmp1 at most 100). -/
 theorem loop_safe : Safe B img (StateHolds ρM boot) (EvOk cfg) :=
-  check_sound_hybrid ai_check (fun _ => region) hentry (fun _ h => h)
+  check_sound_hybrid ai_check (fun _ => region) hentry (fun _ h => by cases h) (fun _ h => h)
 
 end E5R.HybridLoop.Proof

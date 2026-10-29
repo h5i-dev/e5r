@@ -18,13 +18,13 @@
     "sources": {
       "Projects/hifive1/Config.lean": "70b8828d7c36d16900741a03048ab436f6e700666593f171ea597d4a5f610c8d",
       "Projects/hifive1/hybrid/Ring.lean": "3983f2a05e61e16c4591f08e6afe6b799f6087840662fc7680ce5341c875d8a6",
-      "Projects/hifive1/hybrid/RingAI.lean": "1c586083f55532d85d388d38791baaef163f2e8846efc1cb5a98a56cf3e6bd45",
-      "Theories/Absint.lean": "c9e93746635c3e97f083fb6138896d61a5569ed25fd6a9267038b3f901746311",
-      "Theories/AbsintSound.lean": "ce73c7c85aa98809ecbe79bc369624c07177e83deb58429232da31c55776a1fb",
+      "Projects/hifive1/hybrid/RingAI.lean": "273dd0b55edc0eff442d9ce80fa529a5863e68b7add52e04b13a4d8a56e09cbb",
+      "Theories/Absint.lean": "c582fed3bac0276fca7de94bd4e08987c17ab30badf74138e74fccc7f6dd312e",
+      "Theories/AbsintSound.lean": "111a64a831bfe1fafc3ba0616fd4d7342ed24624a87119139bb2a3996d729818",
       "Theories/Board/Hifive1Revb.lean": "9c4d1786b02048ff815849c8b73375d1651ea5cdf9c47d6062db8c170c2db92f",
       "Theories/FlashElf.lean": "b3a5dd6e56e6e9444b88f05de6f020e326377f55af777b380249fc53cc0111a6",
       "Theories/Hart.lean": "dde4a86db936c9ad60f58866c3ebb333fbc556ec0f94299da212d0ca08cfb82a",
-      "Theories/Hybrid/AIBridge.lean": "b089c43f22504768deb211648862823d61155e8e8b51603e89878674e324aaa2",
+      "Theories/Hybrid/AIBridge.lean": "d1968e0a2ce95512589797a3a70f1b003c9bb8c100d3df70f45a47e575b5fe84",
       "Theories/Hybrid/Basic.lean": "80aac8422f21a9558e1840992750790c4febfa3275e47627b3cdbdb3551a2a00",
       "Theories/Hybrid/Wrap.lean": "9127d8afa2c52eca7b57c4bc8f131194a8305435da1d65b7577f010f3d86dcf9",
       "Theories/Logic.lean": "2abb6fb82fc72308a5e7da7d482b94784b1490896634d7ea9d38c9b7b9460bf5",
@@ -53,162 +53,162 @@
   ],
   "resumed": [],
   "schema": "e5r.verify.result.v1",
-  "seconds": 115.212021296,
+  "seconds": 114.84804207,
   "stages": [
     {
       "name": "build cargo +1.98.1 build --release --locked",
       "peak_rss_mib": 32,
-      "seconds": 0.402103524
+      "seconds": 0.402782128
     },
     {
       "name": "lean Theories/Hart.lean",
-      "peak_rss_mib": 513,
-      "seconds": 3.108753019
+      "peak_rss_mib": 506,
+      "seconds": 3.208049524
     },
     {
       "name": "lean Theories/Platform.lean",
-      "peak_rss_mib": 471,
-      "seconds": 1.905354418
+      "peak_rss_mib": 472,
+      "seconds": 2.10772212
     },
     {
       "name": "lean Theories/Logic.lean",
-      "peak_rss_mib": 491,
-      "seconds": 2.305789333
+      "peak_rss_mib": 500,
+      "seconds": 2.5090440689999998
     },
     {
       "name": "lean Theories/FlashElf.lean",
       "peak_rss_mib": 467,
-      "seconds": 1.404024262
+      "seconds": 1.60579509
     },
     {
       "name": "lean Theories/Board/Hifive1Revb.lean",
-      "peak_rss_mib": 437,
-      "seconds": 1.303886345
+      "peak_rss_mib": 450,
+      "seconds": 1.405471943
     },
     {
       "name": "lean Projects/hifive1/Image.lean",
-      "peak_rss_mib": 955,
-      "seconds": 15.030470483
+      "peak_rss_mib": 957,
+      "seconds": 13.445103993
     },
     {
       "name": "lean Projects/hifive1/ImageFidelity.lean",
-      "peak_rss_mib": 789,
-      "seconds": 3.41179588
+      "peak_rss_mib": 790,
+      "seconds": 4.311263062
     },
     {
       "name": "lean Theories/Hybrid/Basic.lean",
-      "peak_rss_mib": 466,
-      "seconds": 1.605038709
+      "peak_rss_mib": 468,
+      "seconds": 2.811153069
     },
     {
       "name": "lean Theories/Hybrid/Wrap.lean",
       "peak_rss_mib": 461,
-      "seconds": 1.504575935
+      "seconds": 2.005929672
     },
     {
       "name": "lean Projects/hifive1/hybrid/Ring.lean",
-      "peak_rss_mib": 588,
-      "seconds": 6.014470526
+      "peak_rss_mib": 585,
+      "seconds": 6.220429997
     },
     {
       "name": "lean Theories/Absint.lean",
-      "peak_rss_mib": 521,
-      "seconds": 3.810019551
+      "peak_rss_mib": 524,
+      "seconds": 3.710133884
     },
     {
       "name": "lean Theories/AbsintSound.lean",
-      "peak_rss_mib": 794,
-      "seconds": 22.555999269
+      "peak_rss_mib": 792,
+      "seconds": 23.06120706
     },
     {
       "name": "lean Theories/Hybrid/AIBridge.lean",
-      "peak_rss_mib": 461,
-      "seconds": 1.707503788
+      "peak_rss_mib": 470,
+      "seconds": 1.50565389
     },
     {
       "name": "lean Projects/hifive1/Config.lean",
-      "peak_rss_mib": 433,
-      "seconds": 1.405952458
+      "peak_rss_mib": 427,
+      "seconds": 1.304186777
     },
     {
       "name": "lean Projects/hifive1/hybrid/RingAI.lean",
-      "peak_rss_mib": 511,
-      "seconds": 2.208582387
+      "peak_rss_mib": 499,
+      "seconds": 2.206429835
     },
     {
       "name": "leanchecker Theories/Hart.lean",
-      "peak_rss_mib": 434,
-      "seconds": 5.41344188
+      "peak_rss_mib": 433,
+      "seconds": 5.014247361
     },
     {
       "name": "leanchecker Theories/Platform.lean",
-      "peak_rss_mib": 365,
-      "seconds": 2.105895398
+      "peak_rss_mib": 434,
+      "seconds": 1.9061776080000001
     },
     {
       "name": "leanchecker Theories/Logic.lean",
-      "peak_rss_mib": 440,
-      "seconds": 2.207038158
+      "peak_rss_mib": 441,
+      "seconds": 2.006005611
     },
     {
       "name": "leanchecker Theories/FlashElf.lean",
-      "peak_rss_mib": 433,
-      "seconds": 2.006881224
+      "peak_rss_mib": 364,
+      "seconds": 1.904885626
     },
     {
       "name": "leanchecker Theories/Board/Hifive1Revb.lean",
       "peak_rss_mib": 434,
-      "seconds": 2.005786312
+      "seconds": 1.8048230840000001
     },
     {
       "name": "leanchecker Projects/hifive1/Image.lean",
-      "peak_rss_mib": 439,
-      "seconds": 1.905732615
+      "peak_rss_mib": 438,
+      "seconds": 1.804243188
     },
     {
       "name": "leanchecker Projects/hifive1/ImageFidelity.lean",
       "peak_rss_mib": 769,
-      "seconds": 4.010511441
+      "seconds": 4.010166258
     },
     {
       "name": "leanchecker Theories/Hybrid/Basic.lean",
-      "peak_rss_mib": 433,
-      "seconds": 2.005772082
+      "peak_rss_mib": 395,
+      "seconds": 1.90499333
     },
     {
       "name": "leanchecker Theories/Hybrid/Wrap.lean",
-      "peak_rss_mib": 326,
-      "seconds": 2.005226066
+      "peak_rss_mib": 436,
+      "seconds": 2.005241774
     },
     {
       "name": "leanchecker Projects/hifive1/hybrid/Ring.lean",
-      "peak_rss_mib": 538,
-      "seconds": 5.112763724
+      "peak_rss_mib": 539,
+      "seconds": 5.410885992
     },
     {
       "name": "leanchecker Theories/Absint.lean",
-      "peak_rss_mib": 434,
-      "seconds": 2.106403295
+      "peak_rss_mib": 435,
+      "seconds": 1.905109705
     },
     {
       "name": "leanchecker Theories/AbsintSound.lean",
-      "peak_rss_mib": 462,
-      "seconds": 6.52608265
+      "peak_rss_mib": 464,
+      "seconds": 5.711743193
     },
     {
       "name": "leanchecker Theories/Hybrid/AIBridge.lean",
-      "peak_rss_mib": 405,
-      "seconds": 2.106888192
+      "peak_rss_mib": 440,
+      "seconds": 1.905892946
     },
     {
       "name": "leanchecker Projects/hifive1/Config.lean",
-      "peak_rss_mib": 438,
-      "seconds": 2.106786172
+      "peak_rss_mib": 275,
+      "seconds": 1.806586598
     },
     {
       "name": "leanchecker Projects/hifive1/hybrid/RingAI.lean",
-      "peak_rss_mib": 458,
-      "seconds": 2.206531991
+      "peak_rss_mib": 455,
+      "seconds": 2.207231887
     }
   ],
   "status": "proved",
@@ -314,6 +314,14 @@
         "Quot.sound"
       ],
       "name": "E5R.Hifive1.Hybrid.RingAI.hentry_of"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "E5R.Hifive1.Hybrid.RingAI.spec_sound"
     },
     {
       "axioms": [
