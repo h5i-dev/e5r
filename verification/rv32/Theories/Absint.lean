@@ -409,6 +409,16 @@ structure Allow where
   hi : Nat
   deriving Repr, DecidableEq
 
+/-- A registered summary of masked main-thread code starting at `pc`: at a
+    node whose abstract state it accepts, the checker takes `post` of that
+    state as the one successor instead of running `absExec`. Its proof
+    (`SumSound`) is a hypothesis of `check_sound_hybrid`; a certificate can
+    only use summaries the configuration lists. -/
+structure SumSpec where
+  pc : Nat
+  accepts : AState → Bool
+  post : AState → AState
+
 structure Config where
   board : Board
   img : List Segment
@@ -426,6 +436,8 @@ structure Config where
       replaced) and refuses a handler store that touches one; facts about
       them then survive an interrupt. -/
   hkeep : List (Nat × Nat) := []
+  /-- Directly proved summaries (`checkHybrid` only; `check` uses none). -/
+  sums : List SumSpec := []
 
 def Config.ramEnd (cfg : Config) : Nat := cfg.board.ramBase + cfg.board.ramSize
 
@@ -890,9 +902,18 @@ def irqOk (cfg : Config) (cert : Cert) (s : AState) : Bool :=
 def delegated (cert : Cert) (n : Node) : Bool :=
   !n.s.hnd && n.succ.isEmpty && n.s.pc % 2 == 0 && cert.delegate.any (·.1 == n.s.pc)
 
+/-- A main-thread node covered by a registered summary: it accepts the
+    node's state, and the one edge covers the summary's main-thread exit. -/
+def summarized (cfg : Config) (cert : Cert) (n : Node) : Bool :=
+  !n.s.hnd && n.s.pc % 2 == 0 && cfg.sums.any fun S =>
+    S.pc == n.s.pc && S.accepts n.s && !(S.post n.s).hnd &&
+    match n.succ with
+    | [e] => coveredE cert none (S.post n.s) e
+    | _ => false
+
 def nodeOk (cfg : Config) (cert : Cert) (n : Node) : Bool :=
-  n.s.wf cfg && (n.s.hnd || noSym n.s) && (instrOk cfg cert n || delegated cert n) &&
-    irqOk cfg cert n.s
+  n.s.wf cfg && (n.s.hnd || noSym n.s) &&
+    (instrOk cfg cert n || delegated cert n || summarized cfg cert n) && irqOk cfg cert n.s
 
 def checkAt (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
   -- Execution starts in the main thread, at node 0.
@@ -912,10 +933,11 @@ def checkAt (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
 /-- The checker, with the kept intervals the certificate names. Nothing
     is delegated. -/
 def check (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
-  cert.delegate.isEmpty && checkAt { cfg with hkeep := cert.hkeep } boot cert
+  cert.delegate.isEmpty && checkAt { cfg with hkeep := cert.hkeep, sums := [] } boot cert
 
 /-- The checker for a certificate that delegates some nodes to directly
-    proved regions; `check_sound_hybrid` needs those proofs. -/
+    proved regions or uses the configuration's summaries;
+    `check_sound_hybrid` needs those proofs. -/
 def checkHybrid (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
   checkAt { cfg with hkeep := cert.hkeep } boot cert
 
