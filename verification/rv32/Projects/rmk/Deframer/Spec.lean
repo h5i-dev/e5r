@@ -19,14 +19,15 @@
   reaches a machine meeting `Post`. Because each step of such a run is the only behaviour of the
   model there, a returning run also shows the panic is not reached on the way.
 -/
-import Projects.rmk.Run
-import Projects.rmk.QemuRiscvRynk.Coherence
+import Projects.rmk.MemmoveContract
 
 namespace E5R.Rmk.Deframer
 open E5R E5R.Rmk
 
-abbrev B : Board := Rmk.QemuRiscvRynk.board
-abbrev img : List Segment := Rmk.QemuRiscvRynk.img
+-- The runner's one image module (Projects.rmk.Elf, as the memmove job uses), so these statements
+-- compose with E5R.Rmk.Memmove.contractB.
+abbrev B : Board := E5R.Rmk.B
+abbrev img : List Segment := E5R.Rmk.img
 
 /-! ## Constants read from the ELF (CANDIDATE until a proof uses them) -/
 
@@ -43,10 +44,15 @@ def unwindPc : Nat := 0x8001e148
 
 /-- The firmware's buffer length (`RYNK_BUFFER_SIZE`; `li a2, 0x1e8` at every call site). -/
 def bufLen : Nat := 488
-/-- `tail`'s stack frame (`addi sp, sp, -0x20`; saves ra, s0-s3 at sp+0x1c..0xc) plus the 12 bytes
-    memmove's save slots use below it (E5R.Rmk.Memmove.Slots): every stack byte a `tail` call
-    writes lies in `[sp - tailStack, sp)`. Read from the bytes at 0x8001d576. -/
-def tailStack : Nat := 0x20 + 12
+/-- `compiler_builtins::mem::memmove`'s whole frame (`addi sp, sp, -0x30` at 0x80020d9e). The
+    proved small/aligned paths only write its three save slots (12 bytes, Memmove.Slots); the
+    misaligned paths may use the rest, so a caller must allow all 48 bytes. -/
+def memmoveFrame : Nat := 0x30
+
+/-- `tail`'s stack frame (`addi sp, sp, -0x20`; saves ra, s0-s3 at sp+0x1c..0xc) plus memmove's
+    frame below it: every stack byte a `tail` call writes lies in `[sp - tailStack, sp)`. Read from
+    the bytes at 0x8001d576 (corrected from 0x20 + 12, which only covered memmove's proved paths). -/
+def tailStack : Nat := 0x20 + memmoveFrame
 
 /-! ## The deframer in memory: `consumed @ +0`, `filled @ +4`, `discarding @ +8` -/
 
@@ -129,10 +135,10 @@ def TailPanicControl (frame : Nat) : Prop :=
 
 /-! ## `park_pending` and `unpark_pending` (read from the bytes at 0x8001d388 and 0x8001d3f2)
 
-Both: a 0x10-byte frame (ra, s0, s1) and one memmove call, so `parkStack = 0x10 + 12`;
+Both: a 0x10-byte frame (ra, s0, s1) and one memmove call, so `parkStack = 0x10 + 0x30`;
 clobbers a0-a4, a6, t1. -/
 
-def parkStack : Nat := 0x10 + 12
+def parkStack : Nat := 0x10 + memmoveFrame
 
 /-- `park_pending(&mut self, buf) -> usize`: `k = filled - consumed` pending bytes moved to the
     end of the buffer, the deframer emptied, `k` returned. -/
@@ -185,7 +191,7 @@ def UnparkPanicControl : Prop :=
 
 A 0x40-byte frame saving ra and s0-s11; callees: `cobs::dec::decode_in_place_report` (0x8001e02e,
 0x10-byte frame, leaf but for `panic_bounds_check`), the slice-range check 0x8001ad76 (frameless)
-and memmove (12 bytes), so `nextStack = 0x40 + 0x10`. Entry panics iff `filled > len` or
+and memmove (0x30 bytes), so `nextStack = 0x40 + 0x30`. Entry panics iff `filled > len` or
 `consumed > filled`. It scans `buf[consumed..filled)` for a 0 delimiter; a frame found moves
 `consumed` past it and, unless discarding, is COBS-decoded in place (errors are skipped); a decoded
 frame longer than 2 bytes is moved to the buffer's front and returned as `Some`. A full buffer
@@ -193,7 +199,7 @@ without a delimiter is discarded (`consumed := filled`, `discarding := 1`). Retu
 `Option<usize>` as (a0 = tag, a1 = value). The contract below is the SAFETY part R2 needs: no panic,
 the invariant kept, writes confined; the decoded value is not specified here. -/
 
-def nextStack : Nat := 0x40 + 0x10
+def nextStack : Nat := 0x40 + max 0x10 memmoveFrame
 
 def discarding (ram : Word → BitVec 8) (p : Word) : Nat := (ram (p + 8)).toNat
 
@@ -214,6 +220,45 @@ def NextContract : Prop :=
 def NextPanicControl : Prop :=
   ∀ m₀, CallEnv nextPc nextStack m₀ → filled m₀.ram (m₀.core.get 10) = bufLen + 1 →
     ∃ k m, QRun B img k m₀ m ∧ m.core.pc = BitVec.ofNat 32 panicPc
+
+/-! ## The copy contract the methods need (DEPENDENCY, not proved)
+
+Every method copies with `memmove(dst, src, n)`, n up to `bufLen`, src and dst anywhere in the
+buffer (either direction, any alignment). The review worker's `E5R.Rmk.Memmove.contractB` proves
+n < 16 (either direction) and n ≥ 16 forward with src ≡ dst (mod 4); the n ≥ 16 backward and
+misaligned paths are in progress. `CopyContract` is the full statement the deframer proofs take as
+an explicit HYPOTHESIS until that work proves it; no result below holds without it. -/
+
+/-- memmove's calling environment for a deframer call: trampoline pc, quiet, both ranges in model
+    RAM, n ≤ bufLen, its 48-byte frame below sp in RAM and disjoint from both ranges. -/
+structure CopyEnv (m : Machine) : Prop where
+  pc : m.core.pc = 0x80020c1e
+  quiet : Quiet m.core
+  n : (m.core.get 12).toNat ≤ bufLen
+  dst : B.inRam (m.core.get 10) (m.core.get 12).toNat = true
+  src : B.inRam (m.core.get 11) (m.core.get 12).toNat = true
+  frame : B.inRam (m.core.get 2 - BitVec.ofNat 32 memmoveFrame) memmoveFrame = true
+  dstSep : (m.core.get 10).toNat + (m.core.get 12).toNat ≤ (m.core.get 2).toNat - memmoveFrame
+  srcSep : (m.core.get 11).toNat + (m.core.get 12).toNat ≤ (m.core.get 2).toNat - memmoveFrame
+  ra : (m.core.get 1).getLsbD 0 = false
+
+/-- memmove's effect, as Memmove.PostB states it, with the frame widened to 48 bytes. -/
+structure CopyPost (m₀ m : Machine) : Prop where
+  pc : m.core.pc = m₀.core.get 1
+  regs : ∀ r : Reg, r.val ∉ [5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 28, 29, 30, 31] → m.core.get r = m₀.core.get r
+  csr : m.core.sameCsr m₀.core
+  ram : ∀ x, ¬ ((m₀.core.get 2).toNat - memmoveFrame ≤ x.toNat ∧ x.toNat < (m₀.core.get 2).toNat) →
+    m.ram x = Memmove.moved m₀.ram (m₀.core.get 10) (m₀.core.get 11) (m₀.core.get 12).toNat x
+
+/-- The dependency: memmove does what it should for every deframer call. -/
+def CopyContract : Prop := ∀ m₀, CopyEnv m₀ → ∃ k m, QRun B img k m₀ m ∧ CopyPost m₀ m
+
+/-- The deframer obligations, stated against the dependency (each to be proved as an
+    implication, then instantiated when `CopyContract` is a theorem). -/
+def TailFromCopy : Prop := CopyContract → TailContract tailStack
+def ParkFromCopy : Prop := CopyContract → ParkContract
+def UnparkFromCopy : Prop := CopyContract → UnparkContract
+def NextFromCopy : Prop := CopyContract → NextContract
 
 /-! ## The session-level target (R2 acceptance; not proved) -/
 
