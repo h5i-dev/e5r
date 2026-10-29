@@ -1260,7 +1260,8 @@ theorem storeAt_written {cfg : Config} {s : AState} {mem mem' : List Cell} {a : 
     {V : AV} {atomic strong : Bool} (h : storeAt cfg s mem a wd V atomic strong = some mem')
     {ρ : Nat → Word} {ram : Word → BitVec 8} {A x : Word} (hAa : A.toNat = a)
     (hV : V.gam ρ (stored wd x)) (hVw : V.gam ρ x ∨ wd ≠ .w) (hm : MemHolds ρ ram mem)
-    (hsep : cfg.board.inRam (w a) wd.bytes = true → StoreSep ρ mem .abs a wd V)
+    (hsep : cfg.board.inRam (w a) wd.bytes = true → (s.hnd = true → cfg.isStatic a wd.bytes = true) →
+      StoreSep ρ mem .abs a wd V)
     (o : Oracle) (i : Nat) (evs : List Event) (k : Eff) :
     ∃ ram' evs', interp cfg.board cfg.img o (.store wd A x atomic k) ram i evs =
         interp cfg.board cfg.img o k ram' i (evs ++ evs') ∧ StoreEffect cfg ram A x wd ram' evs' ∧
@@ -1275,7 +1276,8 @@ theorem storeAt_written {cfg : Config} {s : AState} {mem mem' : List Cell} {a : 
     · simp only [Option.some.injEq] at h; subst h
       refine ⟨ramWrite ram A x wd, [], ?_, .ram, ?_⟩
       · rw [List.append_nil]; rw [hAw] at hin; exact interp_store_ram o (by rw [hAa]; exact hal) hin
-      · have hs := hsep hin
+      · next hst =>
+        have hs := hsep hin (fun hh => by simpa [hh] using hst)
         rw [← hAw]
         cases strong
         · exact storeWeak_write hm hV hs
@@ -1368,7 +1370,8 @@ theorem absStore_fold_sound {cfg : Config} {s : AState} {wd : Width} {V : AV} {a
     ∀ (as : List Nat) (mem memF : List Cell),
       as.foldlM (init := mem) (fun mem a => storeAt cfg s mem a wd V atomic false) = some memF →
       (∀ c ∈ mem, c.wf cfg = true) →
-      (∀ c ∈ mem, c.base = .rel → Disj (c.at ρ) c.w A wd) →
+      (∀ c ∈ mem, c.base = .rel → s.hnd = true) →
+      (∀ c ∈ mem, c.base = .rel → cfg.isStatic A.toNat wd.bytes = true → Disj (c.at ρ) c.w A wd) →
       -- Either the written address is still to come, and `mem` holds now ...
       (A.toNat ∈ as ∧ MemHolds ρ ram0 mem ∨
       -- ... or it was already processed, with this effect, and `mem` holds after it.
@@ -1378,12 +1381,12 @@ theorem absStore_fold_sound {cfg : Config} {s : AState} {wd : Width} {V : AV} {a
       ∃ ram' evs', StoreEffect cfg ram0 A x wd ram' evs' ∧
         interp cfg.board cfg.img o (.store wd A x atomic k) ram0 i evs =
           interp cfg.board cfg.img o k ram' i (evs ++ evs') ∧ MemHolds ρ ram' memF
-  | [], mem, memF, h, _, _, hst => by
+  | [], mem, memF, h, _, _, _, hst => by
     simp only [List.foldlM, pure, Option.some.injEq] at h; subst h
     rcases hst with ⟨hA, _⟩ | hdone
     · simp at hA
     · exact hdone
-  | a :: as, mem, memF, h, hwf, hrel, hst => by
+  | a :: as, mem, memF, h, hwf, hrelH, hrel, hst => by
     simp only [List.foldlM, bind, Option.bind] at h
     cases hs : storeAt cfg s mem a wd V atomic false with
     | none => rw [hs] at h; simp at h
@@ -1392,16 +1395,23 @@ theorem absStore_fold_sound {cfg : Config} {s : AState} {wd : Width} {V : AV} {a
       have hshape := storeAt_weak_shape hs
       have hwf1 : ∀ c ∈ mem1, c.wf cfg = true := fun c hc => by
         obtain ⟨d, hd, e⟩ := hshape c hc; exact cell_wf_of_shape e (hwf d hd)
-      have hrel1 : ∀ c ∈ mem1, c.base = .rel → Disj (c.at ρ) c.w A wd := fun c hc hb => by
+      have hrelH1 : ∀ c ∈ mem1, c.base = .rel → s.hnd = true := fun c hc hb => by
+        obtain ⟨d, hd, e⟩ := hshape c hc; exact hrelH d hd (e.1 ▸ hb)
+      have hrel1 : ∀ c ∈ mem1, c.base = .rel → cfg.isStatic A.toNat wd.bytes = true →
+          Disj (c.at ρ) c.w A wd := fun c hc hb hst => by
         obtain ⟨d, hd, e⟩ := hshape c hc
-        rw [cell_at_of_shape e, e.2.2.1]; exact hrel d hd (e.1 ▸ hb)
-      have ih := @absStore_fold_sound cfg s wd V atomic ρ A x hram hV hVw ram0 o i evs k as mem1 memF h hwf1 hrel1
+        rw [cell_at_of_shape e, e.2.2.1]; exact hrel d hd (e.1 ▸ hb) hst
+      have ih := @absStore_fold_sound cfg s wd V atomic ρ A x hram hV hVw ram0 o i evs k as mem1 memF h hwf1
+        hrelH1 hrel1
       rcases hst with ⟨hA, hm⟩ | ⟨ram', evs', he, hi, hm⟩
       · by_cases ha : A.toNat = a
         · -- This candidate is the address written.
-          have hsep : cfg.board.inRam (w a) wd.bytes = true → StoreSep ρ mem .abs a wd V := fun hin =>
+          have hsep : cfg.board.inRam (w a) wd.bytes = true → (s.hnd = true → cfg.isStatic a wd.bytes = true) →
+              StoreSep ρ mem .abs a wd V := fun hin hst =>
             storeSep_abs hram hwf (by rw [← ha]; exact toNat_lt A) hin
-              (fun c hc hb => by rw [show w a = A by rw [← ha]; exact w_toNat A]; exact hrel c hc hb)
+              (fun c hc hb => by
+                rw [show w a = A by rw [← ha]; exact w_toNat A]
+                exact hrel c hc hb (by rw [ha]; exact hst (hrelH c hc hb)))
           obtain ⟨ram', evs', hi, he, hm'⟩ := storeAt_written hs ha hV hVw hm hsep o i evs k
           exact ih (.inr ⟨ram', evs', he, hi, hm'⟩)
         · simp only [List.mem_cons] at hA
@@ -1425,7 +1435,8 @@ theorem absStore_vals_sound {cfg : Config} {s : AState} {as : List Nat} {wd : Wi
     (hram : cfg.board.ramBase + cfg.board.ramSize ≤ M32)
     {ρ : Nat → Word} {ram : Word → BitVec 8} {A x : Word} (hA : A.toNat ∈ as) (hV : V.gam ρ x)
     (hm : MemHolds ρ ram s.mem) (hwf : ∀ c ∈ s.mem, c.wf cfg = true)
-    (hrel : ∀ c ∈ s.mem, c.base = .rel → Disj (c.at ρ) c.w A wd)
+    (hrelH : ∀ c ∈ s.mem, c.base = .rel → s.hnd = true)
+    (hrel : ∀ c ∈ s.mem, c.base = .rel → cfg.isStatic A.toNat wd.bytes = true → Disj (c.at ρ) c.w A wd)
     (o : Oracle) (i : Nat) (evs : List Event) (k : Eff) :
     ∃ ram' evs', StoreEffect cfg ram A x wd ram' evs' ∧
       interp cfg.board cfg.img o (.store wd A x atomic k) ram i evs =
@@ -1437,15 +1448,18 @@ theorem absStore_vals_sound {cfg : Config} {s : AState} {as : List Nat} {wd : Wi
   · -- one candidate: a strong update
     simp only [absStore] at h
     simp only [List.mem_singleton] at hA
-    have hsep : cfg.board.inRam (w a) wd.bytes = true → StoreSep ρ s.mem .abs a wd (V.stored wd) :=
-      fun hin => storeSep_abs hram hwf (by rw [← hA]; exact toNat_lt A) hin
-        (fun c hc hb => by rw [show w a = A by rw [← hA]; exact w_toNat A]; exact hrel c hc hb)
+    have hsep : cfg.board.inRam (w a) wd.bytes = true → (s.hnd = true → cfg.isStatic a wd.bytes = true) →
+        StoreSep ρ s.mem .abs a wd (V.stored wd) :=
+      fun hin hst => storeSep_abs hram hwf (by rw [← hA]; exact toNat_lt A) hin
+        (fun c hc hb => by
+          rw [show w a = A by rw [← hA]; exact w_toNat A]
+          exact hrel c hc hb (by rw [hA]; exact hst (hrelH c hc hb)))
     obtain ⟨ram', evs', hi, he, hm'⟩ := storeAt_written h hA hS hSw hm hsep o i evs k
     exact ⟨ram', evs', he, hi, hm'⟩
   · -- several: weak updates folded over the candidates
     simp only [absStore] at h
-    exact absStore_fold_sound (s := s) (atomic := atomic) hram hS hSw ram o i evs k _ s.mem memF h hwf hrel
-      (.inl ⟨hA, hm⟩)
+    exact absStore_fold_sound (s := s) (atomic := atomic) hram hS hSw ram o i evs k _ s.mem memF h hwf hrelH
+      hrel (.inl ⟨hA, hm⟩)
 
 /-! ## The handler's own frame -/
 
