@@ -872,7 +872,13 @@ optional; direct and hybrid proofs are equally valid routes.
       *Status:* the release ELF built with Rust 1.98.1 `--locked` is pinned
       (sha256 `f39d833f…`) and runs on QEMU 8.2.2; builds from other
       checkout paths differ (paths are embedded in panic locations), so the
-      byte-identical criterion is open (path remapping needed).
+      byte-identical criterion is open for that pin. A canonical recipe
+      (`verification/rv32/rmk/build-canonical.sh`: fixed checkout path, all
+      paths remapped) rebuilds byte-identically (`5871dcee…`, receipt in
+      `verification/rv32/rmk/R0-receipt.md`); Cargo hashes the absolute path
+      of path dependencies into function order, so path independence is not
+      achieved. Current evidence stays on `f39d833f`; migrating to the
+      canonical pin is a separate step.
 - [x] **R1. Board model for QEMU `virt` (RV32).** *Accepted:* a board JSON
       (memory map, UART16550 registers, timer, boot state, how semihosting
       calls are treated: modeled, or a fail-closed exclusion) and the
