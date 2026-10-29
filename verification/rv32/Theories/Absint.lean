@@ -470,8 +470,11 @@ def absLoad (cfg : Config) (s : AState) (addr : AV) (wd : Width) (atomic : Bool)
   match addr with
   | .vals as => as.foldlM (init := .vals []) fun acc a => (loadAt cfg s a wd atomic).map acc.join
   | .sym 2 off =>
-    -- A handler's own stack frame, below the interrupted sp.
-    if s.hnd && off % wd.bytes = 0 then some (loadCell s.mem .rel off wd) else none
+    -- A handler's own stack frame, below the interrupted sp and within its
+    -- budget (so the bytes are RAM).
+    if s.hnd && off % wd.bytes = 0 && M32 - cfg.hdepth ≤ off && off + wd.bytes ≤ M32 then
+      some (loadCell s.mem .rel off wd)
+    else none
   | _ => none
 
 /-- Values below this are non-negative as signed `wd` values. -/
@@ -756,7 +759,9 @@ def Cell.wf (cfg : Config) (c : Cell) : Bool :=
    | none => true)
 
 def AState.wf (cfg : Config) (s : AState) : Bool :=
-  s.regs.length == 31 && s.mem.all (Cell.wf cfg) && (s.hnd || s.mem.all (·.base == .abs))
+  s.regs.length == 31 && s.mem.all (Cell.wf cfg) && (s.hnd || s.mem.all (·.base == .abs)) &&
+  -- A handler's absolute facts are about static memory, apart from its frame.
+  (!s.hnd || s.mem.all fun c => c.base == .rel || cfg.isStatic c.addr c.w.bytes)
 
 /-- A handler `mret` returns exactly to the interrupted machine. -/
 def mretOk (cfg : Config) (cert : Cert) (s : AState) : Bool :=

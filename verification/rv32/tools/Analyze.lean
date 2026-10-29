@@ -203,7 +203,8 @@ def edgeFor (cfg : Config) (s : AState) (i : Instr) (t : AState) : M Edge := do
     | .load wd signed _ rs1 off =>
       if signed && wd != .w then none else
       match addC (s.get rs1) off.toNat with
-      | .vals [a] => some (a, wd) | _ => none
+      | .vals [a] => if !s.hnd || cfg.isStatic a wd.bytes then some (a, wd) else none
+      | _ => none
     | _ => none
   let single : M Edge := do return { nodes := [← resolve cfg t], split := none, pin := false }
   match loadDest i with
