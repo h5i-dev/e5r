@@ -831,8 +831,9 @@ where
 
 def check (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
   (match cert.nodes[0]? with | some n => boot.leq n.s | none => false) &&
-  -- RAM lies inside the 32-bit address space.
+  -- RAM lies inside the 32-bit address space, and the image holds bytes.
   cfg.board.ramBase + cfg.board.ramSize ≤ M32 &&
+  cfg.img.all (fun seg => seg.bytes.all (· < 256)) &&
   cert.nodes.all (nodeOk cfg cert) &&
   -- The handler's stack frame never reaches static RAM, from any sp.
   cert.sigma.all (fun sp => cfg.stackLow + cfg.hdepth ≤ sp && sp ≤ cfg.pinLow && sp % 4 = 0) &&

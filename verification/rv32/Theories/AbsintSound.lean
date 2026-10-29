@@ -1009,4 +1009,175 @@ theorem disj_abs {a b : Nat} {wa wb : Width} (ha : a + wa.bytes ≤ M32) (hb : b
   simp only [overlap, Bool.and_eq_false_iff, decide_eq_false_iff_not] at h
   rw [ea, eb]; omega
 
+/-! ## Loads -/
+
+def ValidImg (img : List Segment) : Prop := ∀ seg ∈ img, ∀ b ∈ seg.bytes, b < 256
+
+theorem validImg_of_check {img : List Segment} (h : img.all (fun seg => seg.bytes.all (· < 256)) = true) :
+    ValidImg img := by
+  intro seg hs b hb
+  simp only [List.all_eq_true, decide_eq_true_eq] at h
+  exact h seg hs b hb
+
+theorem romByte_lt {img : List Segment} (hv : ValidImg img) {a : Nat} {f : Bool} {b : Nat}
+    (h : romByte? img a f = some b) : b < 256 := by
+  unfold romByte? at h
+  split at h
+  · next seg hseg =>
+    unfold Segment.byte? at h
+    split at h
+    · exact hv seg (List.mem_of_find?_eq_some hseg) b (List.mem_of_getElem? h)
+    · simp at h
+  · simp at h
+
+theorem romGo_lt {img : List Segment} (hv : ValidImg img) {a : Nat} {f : Bool} :
+    ∀ k x, romRead?.go img a f k = some x → x < 256 ^ k
+  | 0, x, h => by simp [romRead?.go] at h; subst h; decide
+  | k+1, x, h => by
+    simp only [romRead?.go] at h
+    cases hb : romByte? img (a + k) f with
+    | none => simp [hb] at h
+    | some b =>
+      cases hr : romRead?.go img a f k with
+      | none => simp [hb, hr] at h
+      | some r =>
+        simp only [hb, hr, bind, Option.bind, pure, Option.some.injEq] at h
+        subst h
+        have h1 := romByte_lt hv hb
+        have h2 := romGo_lt hv k r hr
+        rw [Nat.pow_succ]
+        have : b * 256 ^ k ≤ 255 * 256 ^ k := Nat.mul_le_mul_right _ (by omega)
+        omega
+
+theorem romRead_fits {img : List Segment} (hv : ValidImg img) {a : Nat} {wd : Width} {r : Word}
+    (h : romRead? img a wd.bytes false = some r) : Fits wd r := by
+  unfold romRead? at h
+  cases hg : romRead?.go img a false wd.bytes with
+  | none => rw [hg] at h; simp at h
+  | some x =>
+    rw [hg] at h; simp only [Option.map_some, Option.some.injEq] at h; subst h
+    have := romGo_lt hv wd.bytes x hg
+    simp only [Fits, BitVec.toNat_ofNat]
+    cases wd <;> simp [Width.bytes] at this ⊢ <;> omega
+
+/-- The concrete facts behind `classify`'s answers. -/
+theorem classify_ram {cfg : Config} {a : Nat} {wd : Width} (h : classify cfg a wd = some .ram) :
+    a % wd.bytes = 0 ∧ cfg.board.inRam (w a) wd.bytes = true := by
+  unfold classify at h
+  split at h
+  · simp at h
+  · next ha =>
+    split at h
+    · exact ⟨by simpa using ha, by assumption⟩
+    · split at h
+      · simp at h
+      · split at h
+        · split at h <;> simp at h
+        · simp at h
+
+theorem classify_rom {cfg : Config} {a : Nat} {wd : Width} {v : Nat} (h : classify cfg a wd = some (.rom v)) :
+    a % wd.bytes = 0 ∧ cfg.board.inRam (w a) wd.bytes = false ∧
+    ∃ r, romRead? cfg.img a wd.bytes false = some r ∧ r.toNat = v := by
+  unfold classify at h
+  split at h
+  · simp at h
+  · next ha =>
+    split at h
+    · simp at h
+    · next hr =>
+      split at h
+      · next r hrom =>
+        simp only [Option.some.injEq, Target.rom.injEq] at h
+        exact ⟨by simpa using ha, by simpa using hr, r, hrom, h⟩
+      · split at h
+        · split at h <;> simp at h
+        · simp at h
+
+theorem classify_dev {cfg : Config} {a : Nat} {wd : Width} {d : DevReg} (h : classify cfg a wd = some (.dev d)) :
+    a % wd.bytes = 0 ∧ cfg.board.inRam (w a) wd.bytes = false ∧
+    romRead? cfg.img a wd.bytes false = none ∧ cfg.board.device? (w a) = some d ∧ wd = .w := by
+  unfold classify at h
+  split at h
+  · simp at h
+  · next ha =>
+    split at h
+    · simp at h
+    · next hr =>
+      split at h
+      · simp at h
+      · next hrom =>
+        split at h
+        · next d' hd =>
+          split at h
+          · next hw =>
+            simp only [Option.some.injEq, Target.dev.injEq] at h; subst h
+            exact ⟨by simpa using ha, by simpa using hr, hrom, hd, hw⟩
+          · simp at h
+        · simp at h
+
+/-- A fold that joins per-address contributions covers each contribution. -/
+theorem foldJoin_covers {f : Nat → Option AV} {ρ : Nat → Word} :
+    ∀ (as : List Nat) (init v : AV),
+      as.foldlM (init := init) (fun acc a => (f a).map acc.join) = some v →
+      (∀ x, init.gam ρ x → v.gam ρ x) ∧ ∀ a ∈ as, ∃ c, f a = some c ∧ ∀ x, c.gam ρ x → v.gam ρ x
+  | [], init, v, h => by
+    simp only [List.foldlM, pure, Option.some.injEq] at h; subst h
+    exact ⟨fun _ h => h, by simp⟩
+  | a :: as, init, v, h => by
+    simp only [List.foldlM, bind, Option.bind] at h
+    cases hf : f a with
+    | none => rw [hf] at h; simp at h
+    | some c =>
+      rw [hf] at h; simp only [Option.map_some] at h
+      obtain ⟨hmono, hcov⟩ := foldJoin_covers as (init.join c) v h
+      refine ⟨fun x hx => hmono x (join_sound_left hx), ?_⟩
+      intro b hb
+      simp only [List.mem_cons] at hb
+      rcases hb with rfl | hb
+      · exact ⟨c, hf, fun x hx => hmono x (join_sound_right hx)⟩
+      · exact hcov b hb
+
+/-- A load from a set of absolute candidates: the platform does not fault and
+    hands the continuation a value the abstract load describes. -/
+theorem absLoad_vals_sound {cfg : Config} {s : AState} {as : List Nat} {wd : Width} {atomic : Bool}
+    {v : AV} (h : absLoad cfg s (.vals as) wd atomic = some v) (hv : ValidImg cfg.img)
+    {ρ : Nat → Word} {ram : Word → BitVec 8} {A : Word} (hA : A.toNat ∈ as)
+    (hm : MemHolds ρ ram s.mem) (o : Oracle) (i : Nat) (evs : List Event) (k : Word → Eff) :
+    ∃ r i', interp cfg.board cfg.img o (.load wd A atomic k) ram i evs =
+      interp cfg.board cfg.img o (k r) ram i' evs ∧ v.gam ρ r ∧ Fits wd r := by
+  simp only [absLoad] at h
+  obtain ⟨_, hcov⟩ := foldJoin_covers (ρ := ρ) as _ v h
+  obtain ⟨c, hc, hcv⟩ := hcov _ hA
+  have hAw : w A.toNat = A := w_toNat A
+  unfold loadAt at hc
+  split at hc
+  · next hcl =>
+    obtain ⟨hal, hin⟩ := classify_ram hcl
+    rw [hAw] at hin
+    simp only [Option.some.injEq] at hc; subst hc
+    refine ⟨ramRead ram A wd, i, interp_load_ram o hal hin, hcv _ ?_, ramRead_fits _ _ _⟩
+    have := loadCell_sound (ρ := ρ) (base := .abs) (a := A.toNat) (wd := wd) hm
+    simp only [addrOf, hAw] at this; exact this
+  · next vv hcl =>
+    obtain ⟨hal, hin, r, hr, hrv⟩ := classify_rom hcl
+    rw [hAw] at hin
+    split at hc
+    · simp at hc
+    · next hat =>
+      simp only [Option.some.injEq] at hc; subst hc
+      refine ⟨r, i, interp_load_rom o hal hin (by simpa using hat) hr, hcv _ ?_, romRead_fits hv hr⟩
+      exact const_sound' (by rw [hrv]; exact (Nat.mod_eq_of_lt (by rw [← hrv]; exact toNat_lt r)).symm)
+  · next d hcl =>
+    obtain ⟨hal, hin, hr, hd, hw⟩ := classify_dev hcl
+    rw [hAw] at hin hd
+    split at hc
+    · simp at hc
+    · next hat =>
+      simp only [Bool.or_eq_true, not_or, Bool.not_eq_true', Bool.not_eq_false'] at hat
+      simp only [Option.some.injEq] at hc; subst hc
+      refine ⟨o i, i + 1, interp_load_dev o hal hin (by simpa using hat.1) hr hd (by simpa using hat.2) hw,
+        hcv _ trivial, ?_⟩
+      subst hw; simp only [Fits, Width.bytes]; exact BitVec.isLt _
+  · simp at hc
+
 end E5R.AI
