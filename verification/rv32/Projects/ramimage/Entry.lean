@@ -1,5 +1,5 @@
 /-
-  A small check of the pinned RMK image (`jobs/rmk-qemu-virt-image.json`):
+  A small check of the pinned RMK image (`jobs/rmk/rmk-qemu-virt-image.json`):
   the layout and the first instruction bytes of the image the checker's
   reader defines. (`fetch` at the entry is not stated: it computes the length
   of the 135 KB code segment, which exceeded the kernel's memory limit here.) It is a statement about image contents only. It says nothing

@@ -163,3 +163,79 @@ stricter one, and the image is the reader's): the reader does not check
 segment's zero-fill (Rust requires its file bytes); its read-only budget is
 4 MiB of `p_memsz` (Rust: `--max-file-bytes`, default 512 KiB of materialised
 bytes).
+
+## Verification jobs over RAM images (`image.kind: "ram"`)
+
+`e5r-verify check JOB.json` runs RAM-image jobs alongside flash ones. The job
+format is still `e5r.verify.job.v1`; one field is added:
+
+```json
+"image": { "kind": "ram", "module": "Projects.ramimage.Image", "namespace": "E5R.RmkImage" }
+```
+
+`kind` absent means `"flash"`, and flash jobs run exactly as before (their
+results carry `"image": null`). A `ram` job:
+
+1. needs a board whose JSON says `"image_placement": "ram"` and has one `"ram"`
+   region and no `"image"` region (`boards/qemu-virt-rv32.json`); a flash job
+   on such a board, or a RAM job on a flash board, is an `error`;
+2. deletes the previous generated files, then exports with the board's window
+   (`ram::ram_image`); a refusal is `unsupported`;
+3. writes `<module>.lean` (the packed `E5R.RamElf.File`),
+   `build/jobs/<id>/ram-image.json` (the manifest) and `<module>Fidelity.lean`:
+   ```lean
+   def image : E5R.RamElf.Image := E5R.RamElf.imageOf BASE SIZE elf
+   theorem image_accepted : E5R.RamElf.accepts BASE SIZE elf = true := by decide +kernel
+   theorem image_agrees : (match E5R.RamElf.check BASE SIZE elf with ...) = true  -- = manifest
+   theorem image_entry : image.entry = ENTRY := by decide +kernel
+   theorem image_rwBase : image.rwBase = RWBASE := by decide +kernel
+   ```
+   in the image's namespace. Proof modules import the fidelity module and state
+   properties of `NS.image` (the checker's reader applied to the file), with
+   the board `E5R.QemuVirtRv32.board NS.image.rwBase`;
+4. checks the model (plus `Theories/RamElf.lean`), board, image, fidelity and
+   job modules from source, replays them with `leanchecker`, and audits the
+   axioms of the job's theorems and of the four binding theorems.
+
+What is trusted where: the image is whatever `RamElf.imageOf` makes of the
+file, so the Lean reader is authoritative. The exporter's parse enters only as
+`image_agrees`, a theorem the kernel must check; if the two readers disagree the
+job is `failed`. What remains outside Lean is the link from the ELF file to the
+`File` literal: the Rust packer, the ELF's sha256 pinned in the job, and, in a
+bundle, `check-packing.py`, which `recheck.sh` runs to unpack every word and
+compare it with the bundled ELF.
+
+Pinning: the result's `inputs.image` records the sha256 of the packed module,
+the fidelity module and the manifest, and `verify-result` reports
+`stale: generated image` when any of them changes; bundles include all three.
+
+The RMK job (`verification/rv32/jobs/rmk/rmk-qemu-virt-image.json`, outside
+`jobs/*.json` so CI, which has no RMK ELF, does not run it) needs the pinned ELF
+at `verification/rv32/build/rmk-qemu-riscv-rynk.elf`:
+
+```
+cd verification/rv32
+cp <rmk>/examples/use_rust/qemu-riscv-rynk/target/riscv32imac-unknown-none-elf/release/rmk-qemu-riscv \
+   build/rmk-qemu-riscv-rynk.elf
+e5r-verify check jobs/rmk/rmk-qemu-virt-image.json --out build/rmk-result.json   # proved
+e5r-verify verify-result build/rmk-result.json                                   # current
+```
+
+It proves six theorems (the four bindings, plus `Projects/ramimage/Entry.lean`:
+the read-only segments' bases and exec bits, and the first four bytes at the
+entry) in about 48 s with a peak of 724 MB. They describe the image, not what
+RMK does; nothing here is a safety property. Stating `fetch` at the entry by
+`decide +kernel` exhausted the kernel's memory, because looking a byte up in a
+segment computes the length of the whole 135 KB segment; proofs over this
+image need a cheaper path to its bytes (main's model).
+
+`python3 -I scripts/test-ram-image-job.py E5R_VERIFY IMAGE.elf` runs the
+lifecycle tests (19 cases, about 90 s): a proved job and a current result;
+the fidelity theorems with a wrong entry, `rwBase` or exec bit failing in
+`image_agrees` while the unmodified copy checks; an edited packed module or
+manifest making the result stale; a changed ELF against its pin (`error`), an
+ELF the exporter refuses (`unsupported`, with no generated module left behind),
+a RAM job on a flash board, a flash job on a RAM board, an unknown kind, a
+missing ELF or proof module, a forbidden command (`error`), and a proof that
+does not check (`failed`). The transcript and the RMK job's result are in
+`verification/rv32/ram-image/rmk-qemu-riscv-rynk/`.

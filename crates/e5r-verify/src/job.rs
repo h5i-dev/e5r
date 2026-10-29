@@ -200,7 +200,9 @@ fn image_placement(board_text: &str) -> Result<Option<String>, Stop> {
     match &v["image_placement"] {
         Value::Null => Ok(None),
         Value::String(s) => Ok(Some(s.clone())),
-        other => Err(Stop::Error(format!("board image_placement {other} is not a string"))),
+        other => Err(Stop::Error(format!(
+            "board image_placement {other} is not a string"
+        ))),
     }
 }
 
@@ -628,7 +630,11 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
                     rb = windows.ram_base,
                     rs = windows.ram_size,
                 );
-                (image, fidelity, vec![format!("{}.image_fidelity", job.image.namespace)])
+                (
+                    image,
+                    fidelity,
+                    vec![format!("{}.image_fidelity", job.image.namespace)],
+                )
             }
             ImageKind::Ram => {
                 if placement.as_deref() != Some("ram") {
@@ -914,6 +920,21 @@ pub fn stale(result: &Value) -> Result<Vec<String>, String> {
     Ok(changed)
 }
 
+/// Bundled with RAM-image jobs: unpack the `E5R.RamElf.File` literal and
+/// compare every byte with the ELF (independent of the Rust packer).
+const PACKING_CHECK: &str = r#"import re, sys
+src = open(sys.argv[1], encoding="utf-8").read()
+elf = open(sys.argv[2], "rb").read()
+m = re.search(r"def elf : E5R\.RamElf\.File := ⟨(\d+), \[([0-9,\s]*)\]⟩", src)
+assert m, "no File literal"
+n, words = int(m.group(1)), [int(w) for w in m.group(2).split(",") if w.strip()]
+assert n == len(elf) and len(words) == (n + 63) // 64, "length"
+assert all(w < 256 ** 64 for w in words), "word too large"
+data = b"".join(w.to_bytes(64, "little") for w in words)
+assert data[:n] == elf and not any(data[n:]), "bytes differ"
+print(f"packing: all {n} ELF bytes equal the Lean File literal")
+"#;
+
 /// After a fresh `proved` run, write everything needed to recheck the
 /// proofs with nothing but the pinned Lean: the sources and generated
 /// modules in their layout, the ELF, the result, a `recheck.sh` that
@@ -976,11 +997,27 @@ pub fn bundle(job_path: &Path, out: &Path) -> Result<Value, String> {
             format!("'{name}' depends on axioms: [{}]\n", axioms.join(", "))
         });
     }
+    // A RAM image's Lean file is the ELF packed by the exporter; the bundle
+    // re-derives the bytes from it, without the exporter, and compares.
+    let packing = if job.image.kind == ImageKind::Ram {
+        std::fs::write(out.join("check-packing.py"), PACKING_CHECK).map_err(|e| e.to_string())?;
+        sums.push_str(&format!(
+            "{}  check-packing.py\n",
+            sha256::hex(PACKING_CHECK.as_bytes())
+        ));
+        format!(
+            "python3 -I check-packing.py {} {}\n",
+            Job::module_path(&job.image.module),
+            job.elf
+        )
+    } else {
+        String::new()
+    };
     let script = format!(
         "#!/usr/bin/env bash\n\
          # Recheck this bundle with only Lean (the version in lean-toolchain).\n\
          set -euo pipefail\ncd \"$(dirname \"$0\")\"\n\
-         sha256sum -c --quiet SHA256SUMS\n\
+         sha256sum -c --quiet SHA256SUMS\n{packing}\
          for m in {mods}; do\n  LEAN_PATH=. lean -j1 -o \"${{m%.lean}}.olean\" \"$m\"\ndone\n\
          LEAN_PATH=. lean -j1 Audit.lean > axioms.actual\n\
          diff axioms.expected axioms.actual\n\
@@ -1061,5 +1098,42 @@ mod tests {
             board_module_name("boards/hifive1-revb.json").unwrap(),
             "Hifive1Revb"
         );
+    }
+
+    fn job_with_image(image: &str) -> Result<Job, serde_json::Error> {
+        serde_json::from_str(&format!(
+            r#"{{"schema": "{JOB_SCHEMA}", "id": "t", "root": ".", "board": "b.json",
+                "elf": "x.elf", "image": {image}, "modules": [], "theorems": []}}"#
+        ))
+    }
+
+    #[test]
+    fn image_kind_defaults_to_flash_and_rejects_unknown_kinds() {
+        let flash = job_with_image(r#"{"module": "A.Image", "namespace": "A"}"#).unwrap();
+        assert_eq!(flash.image.kind, ImageKind::Flash);
+        assert_eq!(flash.model(), MODEL);
+        let ram =
+            job_with_image(r#"{"kind": "ram", "module": "A.Image", "namespace": "A"}"#).unwrap();
+        assert_eq!(ram.image.kind, ImageKind::Ram);
+        assert_eq!(ram.model().last().unwrap(), RAM_READER);
+        assert_eq!(ram.fidelity_module(), "A.ImageFidelity");
+        assert_eq!(ram.ram_manifest(), "build/jobs/t/ram-image.json");
+        for bad in ["rom", "RAM", ""] {
+            let spec = format!(r#"{{"kind": "{bad}", "module": "A.Image", "namespace": "A"}}"#);
+            assert!(job_with_image(&spec).is_err(), "accepted kind {bad:?}");
+        }
+    }
+
+    #[test]
+    fn boards_say_where_images_live() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../verification/rv32/boards");
+        let virt = std::fs::read_to_string(dir.join("qemu-virt-rv32.json")).unwrap();
+        let hifive = std::fs::read_to_string(dir.join("hifive1-revb.json")).unwrap();
+        assert_eq!(image_placement(&virt).unwrap().as_deref(), Some("ram"));
+        assert_eq!(image_placement(&hifive).unwrap(), None);
+        assert!(image_placement(r#"{"image_placement": 1}"#).is_err());
+        let window = |t: &str| crate::ram::board_window(&Board::parse(t).unwrap());
+        assert_eq!(window(&virt).unwrap(), (0x8000_0000, 0x100_0000));
+        assert!(window(&hifive).unwrap_err().contains("flash image region"));
     }
 }
