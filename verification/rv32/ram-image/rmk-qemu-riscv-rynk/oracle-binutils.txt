@@ -1,7 +1,3 @@
-ok PT_LOAD 0: [0x80000000, 0x800210da) 135386 bytes sha256 6327ee65f6d15f1d..., zero 0
-ok PT_LOAD 1: [0x800210dc, 0x80029bc8) 35564 bytes sha256 8bcc02e1e8b9254e..., zero 0
-ok PT_LOAD 2: [0x80029bc8, 0x80029bcd) 5 bytes sha256 0bd288cecce2dfc6..., zero 0
-ok PT_LOAD 3: [0x80029bd0, 0x80029bd0) 0 bytes sha256 e3b0c44298fc1c14..., zero 16606256
-ok entry 0x80000000, ELF sha256 f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30
+MISMATCH: ELF hash/size
 GNU readelf (GNU Binutils for Ubuntu) 2.42
 GNU objcopy (GNU Binutils for Ubuntu) 2.42

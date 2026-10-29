@@ -1,0 +1,13 @@
+ok positive control (unmutated): rust 'accepted'; lean kernel accepts = true proved
+ok load address != run address: rust 'PT_LOAD 1: p_paddr 0x800220dc != p_vaddr 0x800210dc; only the paddr=vaddr mapping policy is supported'; lean kernel accepts = false proved
+ok writable and executable code: rust 'PT_LOAD 0: writable and executable'; lean kernel accepts = false proved
+ok read-only memsz overlaps the next segment: rust 'PT_LOAD 1 and 2 overlap or are out of address order'; lean kernel accepts = false proved
+ok odd entry: rust 'entry 0x80000001 is not 2-aligned inside the file bytes of an executable PT_LOAD'; lean kernel accepts = false proved
+ok entry outside every segment: rust 'entry 0x7ffffff0 is not 2-aligned inside the file bytes of an executable PT_LOAD'; lean kernel accepts = false proved
+ok segment past the end of RAM: rust 'PT_LOAD 3: [0x8002abd0, +0xfd6430) is not inside RAM [0x80000000, +0x1000000)'; lean kernel accepts = false proved
+ok file bytes past EOF: rust 'program header 0: file bytes outside the file'; lean kernel accepts = false proved
+ok float ABI e_flags: rust 'e_flags 0x3: only RVC with the soft-float ABI is supported'; lean kernel accepts = false proved
+ok dynamic program header: rust 'program header 4: unsupported type 0x2'; lean kernel accepts = false proved
+ok p_filesz > p_memsz: rust 'PT_LOAD 1: needs 0 < p_memsz and p_filesz <= p_memsz'; lean kernel accepts = false proved
+ok writable segment below a read-only one: rust 'PT_LOAD 1: writable segment at 0x800210dc below the end 0x80029bcd of the read-only segments'; lean kernel accepts = false proved
+RamElf.lean from support-lean4 d96ca4557cd0eb35dd7dc1bddbf6a59114d70e1e

@@ -36,7 +36,7 @@ Output:
 | --- | --- |
 | `manifest.json` | `e5r.ram-image.v1`, below |
 | `seg-<i>.bin` | `ELF[p_offset, p_offset + p_filesz)` of program header `i`, exactly |
-| `image.lean` | `import Theories.Platform`; in namespace NS: `elfBytes` (the whole file), `entry`, `roSegments : List E5R.Segment` (each non-writable `PT_LOAD`, file bytes then zeros to `p_memsz`), `rwLoads : List (Nat × List Nat × Nat)` (each writable `PT_LOAD` as vaddr, file bytes, memsz), `rwBase` |
+| `image.lean` | only the packed file: `import Theories.RamElf`, then in namespace NS `def elf : E5R.RamElf.File := ⟨len, [w0, w1, ...]⟩`, word `i` = Σ_{k<64} byte(64i+k)·256^k (decimal; the last word is short). Packing is one function, `ram::pack`. |
 
 ## What the image means
 
@@ -88,6 +88,18 @@ relocation or dynamic sections.
   every header field and the entry, `objcopy -I elf32-little -O binary` (writes
   file-backed contents at their load addresses) and `hashlib` for the bytes.
   `objcopy` needs section headers, which linked firmware has.
+- `python3 -I scripts/check-ram-image-lean.py IMAGE.elf DIR RV32_DIR`: unpacks
+  every word of `image.lean` in Python and compares all bytes and the sha256
+  with the ELF, then compiles `Theories.{Hart,Platform,RamElf}` from `RV32_DIR`
+  and the image module with plain `lean`, and has the kernel decide
+  (`decide +kernel`) that `RamElf.accepts` holds and that `RamElf.check`
+  returns exactly the manifest's entry, PT_LOAD table and `rw_base`.
+- `python3 -I scripts/check-ram-image-negative.py E5R_VERIFY IMAGE.elf RV32_DIR`:
+  11 header mutations of the ELF (load != run address, W+X, overlap, odd or
+  stray entry, past RAM, truncated, float ABI, PT_DYNAMIC, filesz > memsz,
+  writable below read-only); each must be refused by `ram-image` (nothing
+  written) and the kernel must prove `accepts = false` for the reader. The
+  unmutated file is the positive control.
 - `QEMU=.../qemu-system-riscv32 python3 -I scripts/check-ram-image-qemu.py
   IMAGE.elf DIR [QEMU args]`: boots QEMU halted (`-S`) after its loader ran,
   checks `info roms` (segments exactly as in the manifest, nothing overlapping
@@ -125,13 +137,29 @@ when `E5R_RMK_ELF` names the ELF (it passes vacuously otherwise).
 
 ## Handoff to the Lean side
 
-`image.lean` follows the shape the checker asked for (exporter-coordination,
-2026-10-29): the checker's own reader of `elfBytes` is to be proved equal to
-`entry`, `roSegments`, `rwLoads` and `rwBase`, independently of this Rust. With
-read-only segments as the immutable image, a store into code faults in the
-model, so a no-fault theorem discharges A2; A1 is added to the initial state
-only where a proof needs `.data` values. A shape check of the generated file
-against `Theories.Platform` (Lean v4.35.0) passed on a small synthetic image;
-the RMK file is 2.5 MB (`elfBytes` is 454 024 elements) and has not been
-elaborated here: that cost is the checker's call. Its sha256 is in
-`SHA256SUMS`; it is regenerated, not committed.
+The image the model runs is **defined** by the checker's reader,
+`E5R.RamElf.imageOf base size elf` (`Theories/RamElf.lean`, written
+independently of this Rust), so `image.lean` carries only the file. Nothing the
+exporter parses is trusted by Lean; the manifest's `entry`, `segments` and
+`rw_base` are a cross-check, which `check-ram-image-lean.py` turns into
+kernel-checked theorems. What links the Lean literal to the ELF is the packing:
+checked over every byte by the Python unpacker above (and equal to the checker's
+own packing of the same ELF).
+
+Measured on the pinned RMK ELF against `RamElf.lean` at support-lean4
+`d96ca45` (Lean v4.35.0): the module elaborates in ~9-10 s / ~730 MB; the
+kernel decides `accepts = true` and the manifest agreement in 2-16 s / ~550 MB.
+`image.lean` is 1.1 MB, regenerated rather than committed (its sha256 is in
+`SHA256SUMS`).
+
+These theorems are about the reader's output on these bytes. They are not a
+proof of anything RMK does, and the reset-state facts (A3: registers at entry,
+A5: QEMU's RAM size and device-tree placement) remain board assumptions.
+
+Where the two readers differ (from reading `RamElf.lean`; the Rust side is the
+stricter one, and the image is the reader's): the reader does not check
+`p_align`, a `PT_GNU_STACK`'s flags, `Tag_RISCV_arch`, section headers
+(relocations), or `PT_NULL` fields; it lets the entry lie in a read-only
+segment's zero-fill (Rust requires its file bytes); its read-only budget is
+4 MiB of `p_memsz` (Rust: `--max-file-bytes`, default 512 KiB of materialised
+bytes).
