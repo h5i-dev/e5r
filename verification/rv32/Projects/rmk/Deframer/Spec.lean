@@ -59,8 +59,8 @@ def Inv (ram : Word → BitVec 8) (p : Word) (len : Nat) : Prop :=
     bytes: a0 = &mut Deframer, (a1, a2) = buf; returns (a0, a1) = the free tail): the deframer and the
     buffer in model RAM and disjoint; the `frame` stack bytes below sp in RAM and disjoint from both;
     a quiet machine; an even return address. Use `frame = tailStack`. -/
-structure TailEnv (frame : Nat) (m : Machine) : Prop where
-  pc : m.core.pc = BitVec.ofNat 32 tailPc
+structure CallEnv (entry frame : Nat) (m : Machine) : Prop where
+  pc : m.core.pc = BitVec.ofNat 32 entry
   quiet : Quiet m.core
   self : B.inRam (m.core.get 10) 12 = true
   buf : B.inRam (m.core.get 11) (m.core.get 12).toNat = true
@@ -71,6 +71,8 @@ structure TailEnv (frame : Nat) (m : Machine) : Prop where
   stackSep : (m.core.get 10).toNat + 12 ≤ (m.core.get 2).toNat - frame ∧
     (m.core.get 11).toNat + (m.core.get 12).toNat ≤ (m.core.get 2).toNat - frame
   ra : (m.core.get 1).getLsbD 0 = false
+
+abbrev TailEnv (frame : Nat) (m : Machine) : Prop := CallEnv tailPc frame m
 
 /-- The precondition: the environment and the invariant. -/
 def TailPre (frame : Nat) (m : Machine) : Prop :=
@@ -105,6 +107,58 @@ def TailContract (frame : Nat) : Prop :=
     contract's invariant premise is what keeps `tail` from panicking. -/
 def TailPanicControl (frame : Nat) : Prop :=
   ∀ m₀, TailEnv frame m₀ → filled m₀.ram (m₀.core.get 10) = bufLen + 1 →
+    ∃ k m, QRun B img k m₀ m ∧ m.core.pc = BitVec.ofNat 32 panicPc
+
+/-! ## `park_pending` and `unpark_pending` (read from the bytes at 0x8001d388 and 0x8001d3f2)
+
+Both: a 0x10-byte frame (ra, s0, s1) and one memmove call, so `parkStack = 0x10 + 12`;
+clobbers a0-a4, a6, t1. -/
+
+def parkStack : Nat := 0x10 + 12
+
+/-- `park_pending(&mut self, buf) -> usize`: `k = filled - consumed` pending bytes moved to the
+    end of the buffer, the deframer emptied, `k` returned. -/
+structure ParkPost (m₀ m : Machine) : Prop where
+  pc : m.core.pc = m₀.core.get 1
+  csr : m.core.sameCsr m₀.core
+  sp : m.core.get 2 = m₀.core.get 2
+  saved : ∀ r : Reg, r.val ∉ [6, 10, 11, 12, 13, 14, 16] → m.core.get r = m₀.core.get r
+  hconsumed : consumed m.ram (m₀.core.get 10) = 0
+  hfilled : filled m.ram (m₀.core.get 10) = 0
+  ret : (m.core.get 10).toNat = filled m₀.ram (m₀.core.get 10) - consumed m₀.ram (m₀.core.get 10)
+  moved : ∀ j < (m.core.get 10).toNat,
+    m.ram (m₀.core.get 11 + BitVec.ofNat 32 ((m₀.core.get 12).toNat - (m.core.get 10).toNat + j)) =
+      m₀.ram (m₀.core.get 11 + BitVec.ofNat 32 (consumed m₀.ram (m₀.core.get 10) + j))
+
+def ParkContract : Prop :=
+  ∀ m₀, CallEnv parkPc parkStack m₀ → Inv m₀.ram (m₀.core.get 10) (m₀.core.get 12).toNat →
+    ∃ k m, QRun B img k m₀ m ∧ ParkPost m₀ m
+
+/-- The control: with `filled = len + 1`, `park_pending` reaches the panic. -/
+def ParkPanicControl : Prop :=
+  ∀ m₀, CallEnv parkPc parkStack m₀ → filled m₀.ram (m₀.core.get 10) = bufLen + 1 →
+    ∃ k m, QRun B img k m₀ m ∧ m.core.pc = BitVec.ofNat 32 panicPc
+
+/-- `unpark_pending(&mut self, buf, parked)` (a3 = parked): the `parked` bytes at the end of the
+    buffer moved to its front; consumed := 0, filled := parked. It reads neither field. -/
+structure UnparkPost (m₀ m : Machine) : Prop where
+  pc : m.core.pc = m₀.core.get 1
+  csr : m.core.sameCsr m₀.core
+  sp : m.core.get 2 = m₀.core.get 2
+  saved : ∀ r : Reg, r.val ∉ [6, 10, 11, 12, 13, 14, 16] → m.core.get r = m₀.core.get r
+  hconsumed : consumed m.ram (m₀.core.get 10) = 0
+  hfilled : filled m.ram (m₀.core.get 10) = (m₀.core.get 13).toNat
+  moved : ∀ j < (m₀.core.get 13).toNat,
+    m.ram (m₀.core.get 11 + BitVec.ofNat 32 j) =
+      m₀.ram (m₀.core.get 11 + BitVec.ofNat 32 ((m₀.core.get 12).toNat - (m₀.core.get 13).toNat + j))
+
+def UnparkContract : Prop :=
+  ∀ m₀, CallEnv unparkPc parkStack m₀ → (m₀.core.get 13).toNat ≤ bufLen →
+    ∃ k m, QRun B img k m₀ m ∧ UnparkPost m₀ m
+
+/-- The control: with `parked = len + 1`, `unpark_pending` reaches the panic. -/
+def UnparkPanicControl : Prop :=
+  ∀ m₀, CallEnv unparkPc parkStack m₀ → (m₀.core.get 13).toNat = bufLen + 1 →
     ∃ k m, QRun B img k m₀ m ∧ m.core.pc = BitVec.ofNat 32 panicPc
 
 /-! ## The session-level target (R2 acceptance; not proved) -/
