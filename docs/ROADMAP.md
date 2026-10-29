@@ -869,16 +869,19 @@ optional; direct and hybrid proofs are equally valid routes.
       plain cargo, byte-identical across two clean builds and checkout paths;
       its sha256 recorded with the symbols of the Rynk session and frame
       handling; the example runs on the pinned QEMU.
-      *Status:* the release ELF built with Rust 1.98.1 `--locked` is pinned
-      (sha256 `f39d833f…`) and runs on QEMU 8.2.2; builds from other
-      checkout paths differ (paths are embedded in panic locations), so the
-      byte-identical criterion is open for that pin. A canonical recipe
-      (`verification/rv32/rmk/build-canonical.sh`: fixed checkout path, all
-      paths remapped) rebuilds byte-identically (`5871dcee…`, receipt in
-      `verification/rv32/rmk/R0-receipt.md`); Cargo hashes the absolute path
-      of path dependencies into function order, so path independence is not
-      achieved. Current evidence stays on `f39d833f`; migrating to the
-      canonical pin is a separate step.
+      *Status:* not accepted. Evidence pin: `f39d833f…` (built inside the
+      review worker's scratch tree, no remapping); it is not cleanly
+      reproduced: the third worker found an in-place rebuild there with the
+      same bytes, not a fresh-checkout, fresh-cache build, and no other path
+      can give it. Canonical recipe (`verification/rv32/rmk/build-canonical.sh`):
+      reproducible byte for byte (`5871dcee…`, three times, two independent
+      scripts, `verification/rv32/rmk-r0-audit/AUDIT.md`) ONLY at its fixed
+      checkout path on this machine. The checkout path changes code, not only
+      layout (66,551 `.text` bytes between two remapped paths), through
+      Cargo's metadata of the path crates. Another machine, rustup home or
+      user is untested. All evidence stays on `f39d833f`; migration to
+      `5871dcee` (rwBase 0x80029590; memmove and deframer bytes keep their
+      addresses) is not done and not implied.
 - [x] **R1. Board model for QEMU `virt` (RV32).** *Accepted:* a board JSON
       (memory map, UART16550 registers, timer, boot state, how semihosting
       calls are treated: modeled, or a fail-closed exclusion) and the
@@ -906,14 +909,14 @@ optional; direct and hybrid proofs are equally valid routes.
       (changed instruction, false postcondition, weakened precondition),
       axioms audited.
       *Status (partial, not accepted):* `jobs/rmk/rmk-memmove-small.json`
-      is proved on the pinned ELF `f39d833f`: `compiler_builtins` memmove
-      from its trampoline (0x80020c1e), for **n < 16 only**, both overlap
-      directions, a quiet deterministic run with no fault, event or enabled
-      interrupt, returning with memmove semantics on RAM and the stated
-      register/CSR frame; 7 negative controls. Not covered: n ≥ 16 (the
-      word and misaligned paths), which the 488-byte deframer buffer
-      needs, and the deframer itself (`Projects/rmk/Deframer/Spec.lean`
-      states its contracts; none is proved).
+      is proved on `f39d833f` (memmove n < 16, both directions; 7 negative
+      controls). Integrated and compiling on support-lean4, without a runner
+      job yet: `E5R.Rmk.Memmove.contractB` (n < 16 either direction, or
+      n ≥ 16 forward with src ≡ dst mod 4). Not covered: n ≥ 16 backward and
+      the misaligned forward path, both reachable from the 488-byte deframer
+      buffer, and the deframer methods themselves
+      (`Projects/rmk/Deframer/Spec.lean` states their contracts against an
+      explicit `CopyContract` hypothesis; none is proved).
 - [ ] **R4. Toward the session.** Compose R3 with the surrounding session
       loop and interrupts (checker, direct regions or summaries). *Accepted:*
       a kernel-checked theorem about the whole `run_session` path for the
