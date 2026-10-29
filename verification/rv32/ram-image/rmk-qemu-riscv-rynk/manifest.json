@@ -22,6 +22,7 @@
     "base": 2147483648,
     "size": 16777216
   },
+  "rw_base": 2147654600,
   "schema": "e5r.ram-image.v1",
   "segments": [
     {

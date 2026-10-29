@@ -24,8 +24,9 @@ e5r-verify ram-image (--ram BASE:SIZE | --board BOARD.json) --mapping paddr=vadd
   (a flash image with `.data` copied to RAM) is refused, not reinterpreted.
 - Budgets, explicit and bounded: `--max-file` (default 1 MiB, ceiling 16 MiB)
   caps the ELF size; `--max-file-bytes` (default 512 KiB, ceiling 4 MiB) caps
-  the sum of `p_filesz`. Zero-fill is never materialised, so it is bounded only
-  by the RAM window.
+  the materialised bytes: `p_filesz` of writable segments plus `p_memsz` of
+  read-only ones (their zero-fill becomes image bytes in Lean). Writable
+  zero-fill is never materialised, so it is bounded only by the RAM window.
 - `DIR` must not exist. Everything is validated before it is created, so a
   refusal writes nothing. Exit status 0 only on success.
 
@@ -35,7 +36,7 @@ Output:
 | --- | --- |
 | `manifest.json` | `e5r.ram-image.v1`, below |
 | `seg-<i>.bin` | `ELF[p_offset, p_offset + p_filesz)` of program header `i`, exactly |
-| `image.lean` | entry and the load table as plain Lean data (no bytes yet, see Handoff) |
+| `image.lean` | `import Theories.Platform`; in namespace NS: `elfBytes` (the whole file), `entry`, `roSegments : List E5R.Segment` (each non-writable `PT_LOAD`, file bytes then zeros to `p_memsz`), `rwLoads : List (Nat × List Nat × Nat)` (each writable `PT_LOAD` as vaddr, file bytes, memsz), `rwBase` |
 
 ## What the image means
 
@@ -73,6 +74,10 @@ the RAM window (no 32-bit wraparound); `p_align` 0, 1 or a power of two with
 `p_vaddr ≡ p_offset`. Segments ascend and are disjoint over `p_memsz`, so the
 zero-fill of one cannot overlap the bytes of the next. The entry is 2-aligned
 and its first halfword lies in the file bytes of an executable segment.
+`rw_base`, the end of the highest read-only segment, must lie inside the RAM
+window with RAM left above it, and every writable segment must start at or above
+it: the checker models read-only segments as the immutable image and
+`[rw_base, RAM end)` as RAM.
 `Tag_RISCV_arch` must start with `rv32`. Finally e5r's analysis loader, a
 second reader, must map the same bytes with the same execute bit and see no
 relocation or dynamic sections.
@@ -82,6 +87,7 @@ relocation or dynamic sections.
 - `python3 -I scripts/check-ram-image.py IMAGE.elf DIR`: GNU `readelf -hlW` for
   every header field and the entry, `objcopy -I elf32-little -O binary` (writes
   file-backed contents at their load addresses) and `hashlib` for the bytes.
+  `objcopy` needs section headers, which linked firmware has.
 - `QEMU=.../qemu-system-riscv32 python3 -I scripts/check-ram-image-qemu.py
   IMAGE.elf DIR [QEMU args]`: boots QEMU halted (`-S`) after its loader ran,
   checks `info roms` (segments exactly as in the manifest, nothing overlapping
@@ -110,17 +116,22 @@ OUT: 4 PT_LOADs, 170955 file bytes, 16606256 zero bytes, ELF sha256 f39d833f...
 | 3 `.bss .uninit .heap .stack` | 0x80029bd0..0x81000000 | 0 | 0xfd6430 | RW | (empty) |
 
 `--ram` is the linker script's 16 MiB (`memory.x`), the tighter of it and QEMU's
-128 MiB. The manifest, `image.lean`, `SHA256SUMS` of every output and both
+128 MiB. The manifest, `SHA256SUMS` of every output (including `image.lean`) and both
 oracle transcripts are in
 [`verification/rv32/ram-image/rmk-qemu-riscv-rynk/`](../verification/rv32/ram-image/rmk-qemu-riscv-rynk/).
 Two exports, and one of a copy at another path, are byte-identical. The unit
 test `ram::tests::pinned_rmk_qemu_riscv_rynk` re-checks the layout and hashes
 when `E5R_RMK_ELF` names the ELF (it passes vacuously otherwise).
 
-## Handoff to the Lean side (not done here)
+## Handoff to the Lean side
 
-`image.lean` carries the entry and the load table only. Embedding ~171 KB of
-bytes, how `Platform` should read them (the current `Segment`/`fetch` treat the
-image as ROM, which A2 says is exact only under a no-code-write invariant), and
-an independent Lean reader of the ELF are the checker's decisions; the blobs and
-their hashes are the contract until then.
+`image.lean` follows the shape the checker asked for (exporter-coordination,
+2026-10-29): the checker's own reader of `elfBytes` is to be proved equal to
+`entry`, `roSegments`, `rwLoads` and `rwBase`, independently of this Rust. With
+read-only segments as the immutable image, a store into code faults in the
+model, so a no-fault theorem discharges A2; A1 is added to the initial state
+only where a proof needs `.data` values. A shape check of the generated file
+against `Theories.Platform` (Lean v4.35.0) passed on a small synthetic image;
+the RMK file is 2.5 MB (`elfBytes` is 454 024 elements) and has not been
+elaborated here: that cost is the checker's call. Its sha256 is in
+`SHA256SUMS`; it is regenerated, not committed.
