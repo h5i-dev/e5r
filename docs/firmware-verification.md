@@ -364,6 +364,25 @@ Three things are open:
 2. **Size.** About 30,000 nodes is too large to check in the kernel. Function
    summaries are the planned fix.
 3. **`check_sound`.** The soundness proof that turns `check cert = true`
-   into a theorem about every machine `Platform.Reach` allows.
+   into a theorem about every machine `Platform.Reach` allows. It is in
+   progress in `Theories/AbsintSound.lean`: about 160 kernel-checked lemmas,
+   with no `sorry`, cover these layers.
+   - **Abstract values:** every arithmetic, comparison and refinement
+     operation.
+   - **Memory:** reads, guarded facts, strong and weak stores, separation.
+   - **Accesses:** every load and store path through the platform,
+     including device events and the handler's own frame.
+   - **Machine states:** what a state description means, and the order the
+     checker tests coverage with.
+   - **Instructions:** soundness of every non-atomic, non-CSR instruction.
+
+   Still to prove: LR/SC/AMOs, CSR instructions, interrupt entry and the
+   `mret` summary, edge coverage (splits and pinned loads), and the
+   inductive invariant itself. Writing the proof has already found and
+   fixed several checker bugs, recorded in the git history, before the
+   checker was used for any result.
+   - Byte stores recorded unmasked values.
+   - Handler-frame loads were not range-checked.
+   - Guards and pins were not restricted to RAM or static memory.
 
 Until all three are done, no whole-firmware guarantee is claimed.
