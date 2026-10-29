@@ -690,24 +690,13 @@ theorem cell_at {ρ : Nat → Word} {c : Cell} {base : Base} {a : Nat} (hb : c.b
     (ha : c.addr = a) : c.at ρ = addrOf ρ base a := by
   cases base <;> simp [Cell.at, addrOf, hb, ha]
 
-theorem plain_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Cell} {base : Base}
-    {a : Nat} {wd : Width} {v : AV} (hm : MemHolds ρ ram mem) (h : plain mem base a wd = some v) :
-    v.gam ρ (ramRead ram (addrOf ρ base a) wd) := by
-  unfold plain at h
-  have hall : ∀ c ∈ mem.filter (fun c => c.base == base && c.addr == a && c.w == wd && c.guard.isNone),
-      c.v.gam ρ (ramRead ram (addrOf ρ base a) wd) := by
-    intro c hc
-    obtain ⟨hc, hp⟩ := List.mem_filter.mp hc
-    simp only [Bool.and_eq_true, beq_iff_eq, Option.isNone_iff_eq_none] at hp
-    obtain ⟨⟨⟨hb, ha⟩, hw⟩, hg⟩ := hp
-    have := hm c hc (fun g e => by rw [hg] at e; cases e)
-    rw [← hw, ← cell_at hb ha]; exact this
-  generalize mem.filter _ = l at hall h
-  have key : ∀ (l : List Cell) (acc : Option AV),
-      (∀ c ∈ l, c.v.gam ρ (ramRead ram (addrOf ρ base a) wd)) →
-      (∀ u, acc = some u → u.gam ρ (ramRead ram (addrOf ρ base a) wd)) →
+theorem meetAll_sound {ρ : Nat → Word} {x : Word} {l : List Cell} {v : AV}
+    (hall : ∀ c ∈ l, c.v.gam ρ x) (h : meetAll l = some v) : v.gam ρ x := by
+  unfold meetAll at h
+  have key : ∀ (l : List Cell) (acc : Option AV), (∀ c ∈ l, c.v.gam ρ x) →
+      (∀ u, acc = some u → u.gam ρ x) →
       ∀ u, l.foldl (fun acc c => some (match acc with | none => c.v | some v => v.meet c.v)) acc = some u →
-        u.gam ρ (ramRead ram (addrOf ρ base a) wd) := by
+        u.gam ρ x := by
     intro l
     induction l with
     | nil => intro acc _ hacc u h; exact hacc u h
@@ -726,6 +715,17 @@ theorem plain_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Ce
         simp only
         cases v <;> cases hc' : c.v <;> rw [hc'] at hc <;> simp_all [AV.meet, AV.gam]
   exact key l none hall (fun _ h => by cases h) v h
+
+theorem plain_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Cell} {base : Base}
+    {a : Nat} {wd : Width} {v : AV} (hm : MemHolds ρ ram mem) (h : plain mem base a wd = some v) :
+    v.gam ρ (ramRead ram (addrOf ρ base a) wd) := by
+  unfold plain at h
+  refine meetAll_sound (fun c hc => ?_) h
+  obtain ⟨hc, hp⟩ := List.mem_filter.mp hc
+  simp only [Bool.and_eq_true, beq_iff_eq, Option.isNone_iff_eq_none] at hp
+  obtain ⟨⟨⟨hb, ha⟩, hw⟩, hg⟩ := hp
+  have := hm c hc (fun g e => by rw [hg] at e; cases e)
+  rw [← hw, ← cell_at hb ha]; exact this
 
 theorem guardHolds_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Cell}
     {g : Nat × Width × Nat} (hm : MemHolds ρ ram mem) (h : guardHolds mem g = true) :
@@ -751,7 +751,9 @@ theorem guardHolds_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : Li
 theorem lookup_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Cell} {base : Base}
     {a : Nat} {wd : Width} {v : AV} (hm : MemHolds ρ ram mem) (h : lookup mem base a wd = some v) :
     v.gam ρ (ramRead ram (addrOf ρ base a) wd) := by
-  obtain ⟨c, hc, hp, rfl⟩ := find_map_some h
+  unfold lookup at h
+  refine meetAll_sound (fun c hc => ?_) h
+  obtain ⟨hc, hp⟩ := List.mem_filter.mp hc
   simp only [Bool.and_eq_true, beq_iff_eq] at hp
   obtain ⟨⟨⟨hb, ha⟩, hw⟩, hg⟩ := hp
   have := hm c hc (fun g e => by rw [e] at hg; exact guardHolds_sound hm hg)

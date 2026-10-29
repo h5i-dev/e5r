@@ -314,11 +314,14 @@ def AV.meet : AV → AV → AV
   | .top, b => b
   | a, _ => a
 
+/-- What several facts about the same bytes say together. -/
+def meetAll (l : List Cell) : Option AV :=
+  l.foldl (fun acc c => some (match acc with | none => c.v | some v => v.meet c.v)) none
+
 /-- What the unconditional facts about `wd` at `a` say together: several
     can hold at once (an interrupt-window fact kept next to `G`'s). -/
 def plain (mem : List Cell) (base : Base) (a : Nat) (wd : Width) : Option AV :=
-  (mem.filter fun c => c.base == base && c.addr == a && c.w == wd && c.guard.isNone).foldl
-    (fun acc c => some (match acc with | none => c.v | some v => v.meet c.v)) none
+  meetAll (mem.filter fun c => c.base == base && c.addr == a && c.w == wd && c.guard.isNone)
 
 /-- The state knows the `g.2.1` value at `g.1` is not `g.2.2`. -/
 def guardHolds (mem : List Cell) (g : Nat × Width × Nat) : Bool :=
@@ -329,8 +332,8 @@ def guardHolds (mem : List Cell) (g : Nat × Width × Nat) : Bool :=
 
 /-- A fact about `wd` at `a` that applies in this state. -/
 def lookup (mem : List Cell) (base : Base) (a : Nat) (wd : Width) : Option AV :=
-  (mem.find? fun c => c.base == base && c.addr == a && c.w == wd &&
-    match c.guard with | none => true | some g => guardHolds mem g).map (·.v)
+  meetAll (mem.filter fun c => c.base == base && c.addr == a && c.w == wd &&
+    match c.guard with | none => true | some g => guardHolds mem g)
 
 /-- A cell that is stale after writing `v` to `wd` at `a` on `base`: it
     overlaps the write, or its guard reads bytes the write overlaps (unless
