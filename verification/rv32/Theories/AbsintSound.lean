@@ -859,6 +859,22 @@ def stored (wd : Width) (v : Word) : Word :=
   | .h => v &&& 0xffff
   | .w => v
 
+theorem devVal_stored (wd : Width) (v : Word) : devVal wd v = stored wd v := by cases wd <;> rfl
+
+theorem stored_fits (wd : Width) (v : Word) : Fits wd (stored wd v) := by
+  cases wd
+  · have := Nat.and_le_right (n := v.toNat) (m := 255)
+    show (v &&& 0xff).toNat < 256 ^ 1
+    rw [BitVec.toNat_and]
+    have h : (0xff : Word).toNat = 255 := rfl
+    rw [h]; omega
+  · have := Nat.and_le_right (n := v.toNat) (m := 65535)
+    show (v &&& 0xffff).toNat < 256 ^ 2
+    rw [BitVec.toNat_and]
+    have h : (0xffff : Word).toNat = 65535 := rfl
+    rw [h]; omega
+  · simp only [Fits, stored, Width.bytes]; exact BitVec.isLt _
+
 theorem ramRead_ramWrite_self (ram : Word → BitVec 8) (a v : Word) (wd : Width) :
     ramRead (ramWrite ram a v wd) a wd = stored wd v := by
   cases wd
@@ -1125,7 +1141,7 @@ theorem classify_rom {cfg : Config} {a : Nat} {wd : Width} {v : Nat} (h : classi
 
 theorem classify_dev {cfg : Config} {a : Nat} {wd : Width} {d : DevReg} (h : classify cfg a wd = some (.dev d)) :
     a % wd.bytes = 0 ∧ cfg.board.inRam (w a) wd.bytes = false ∧
-    romRead? cfg.img a wd.bytes false = none ∧ cfg.board.device? (w a) = some d ∧ wd = .w := by
+    romRead? cfg.img a wd.bytes false = none ∧ cfg.board.device? (w a) = some d ∧ wd.bytes = d.width := by
   unfold classify at h
   split at h
   · simp at h
@@ -1205,9 +1221,9 @@ theorem absLoad_vals_sound {cfg : Config} {s : AState} {as : List Nat} {wd : Wid
     · next hat =>
       simp only [Bool.or_eq_true, not_or, Bool.not_eq_true', Bool.not_eq_false'] at hat
       simp only [Option.some.injEq] at hc; subst hc
-      refine ⟨o i, i + 1, interp_load_dev o hal hin (by simpa using hat.1) hr hd (by simpa using hat.2) hw,
+      refine ⟨devVal wd (o i), i + 1, interp_load_dev o hal hin (by simpa using hat.1) hr hd (by simpa using hat.2) hw,
         hcv _ trivial, ?_⟩
-      subst hw; simp only [Fits, Width.bytes]; exact BitVec.isLt _
+      rw [devVal_stored]; exact stored_fits wd (o i)
   · simp at hc
 
 /-! ## Stores -/
@@ -1283,7 +1299,7 @@ theorem writeOk_sound {cfg : Config} {a : Nat} {V : AV} {ρ : Nat → Word} {x A
 inductive StoreEffect (cfg : Config) (ram : Word → BitVec 8) (A x : Word) (wd : Width) :
     (Word → BitVec 8) → List Event → Prop
   | ram : StoreEffect cfg ram A x wd (ramWrite ram A x wd) []
-  | dev : EvOk cfg ⟨A, x⟩ → StoreEffect cfg ram A x wd ram [⟨A, x⟩]
+  | dev : EvOk cfg ⟨A, devVal wd x⟩ → StoreEffect cfg ram A x wd ram [⟨A, devVal wd x⟩]
 
 /-- One candidate address of a store, at the address actually written. -/
 theorem storeAt_written {cfg : Config} {s : AState} {mem mem' : List Cell} {a : Nat} {wd : Width}
@@ -1322,14 +1338,10 @@ theorem storeAt_written {cfg : Config} {s : AState} {mem mem' : List Cell} {a : 
       simp only [Bool.or_eq_true, not_or, Bool.not_eq_true', Bool.not_eq_false'] at hok
       obtain ⟨⟨hat, hdw⟩, hwo⟩ := hok
       simp only [Option.some.injEq] at h; subst h
-      subst hw
-      have hVx : V.gam ρ x := by
-        rcases hVw with h | h
-        · exact h
-        · exact absurd rfl h
-      refine ⟨ram, [⟨A, x⟩], ?_, .dev (writeOk_sound (by simpa using hwo) hVx hAa), hm⟩
+      have hVx : V.gam ρ (devVal wd x) := by rw [devVal_stored]; exact hV
+      refine ⟨ram, [⟨A, devVal wd x⟩], ?_, .dev (writeOk_sound (by simpa using hwo) hVx hAa), hm⟩
       rw [hAw] at hin hd
-      exact interp_store_dev o (by rw [hAa]; exact hal) hin (by simpa using hat) hd (by simpa using hdw) rfl
+      exact interp_store_dev o (by rw [hAa]; exact hal) hin (by simpa using hat) hd (by simpa using hdw) hw
   · simp at h
 
 /-- Cells a weak store keeps sit where cells of its input sat. -/

@@ -39,8 +39,9 @@ def render(board):
     ]
     for i, d in enumerate(board['devices']):
         sep = ',' if i + 1 < len(board['devices']) else ''
+        # `width` (bytes per access) defaults to a word register.
         lines.append(f'    ⟨{int(d["addr"], 16):#010x}, "{d["name"]}", '
-                     f'{str(d["read"]).lower()}, {str(d["write"]).lower()}⟩{sep}')
+                     f'{str(d["read"]).lower()}, {str(d["write"]).lower()}, {int(d.get("width", 4))}⟩{sep}')
     lines += ['  ]', f'end E5R.{ns}', '']
     return '\n'.join(lines)
 
