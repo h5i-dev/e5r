@@ -581,4 +581,67 @@ theorem bwd_aligned (c : Core) (R0 : Word → BitVec 8) (hq : Quiet c)
     rw [hfre r h9 h11 h12 h13 h16, f5 r h11 h12 h13 h14]
     exact hm.frame r (fun h => hr (by simp only [List.mem_cons, List.not_mem_nil, or_false] at h ⊢; omega))
 
+/-! ## Contract: everything but backward n ≥ 16 with src, dst not congruent mod 4 -/
+
+structure PreG (m : Machine) : Prop where
+  pc : m.core.pc = 0x80020c1e
+  quiet : Quiet m.core
+  case : (m.core.get 12).toNat < 16 ∨ (m.core.get 10 - m.core.get 11).ult (m.core.get 12) = false ∨
+    (m.core.get 11).toNat % 4 = (m.core.get 10).toNat % 4
+  dst : B.inRam (m.core.get 10) (m.core.get 12).toNat = true
+  src : B.inRam (m.core.get 11) (m.core.get 12).toNat = true
+  spAl : (m.core.get 2).toNat % 4 = 0
+  stack : 0x80029bc8 + 48 ≤ (m.core.get 2).toNat ∧ (m.core.get 2).toNat ≤ 0x81000000
+  dstSep : (m.core.get 10).toNat + (m.core.get 12).toNat + 48 ≤ (m.core.get 2).toNat ∨
+    (m.core.get 2).toNat ≤ (m.core.get 10).toNat
+  srcSep : (m.core.get 11).toNat + (m.core.get 12).toNat + 48 ≤ (m.core.get 2).toNat ∨
+    (m.core.get 2).toNat ≤ (m.core.get 11).toNat
+  ra : (m.core.get 1).getLsbD 0 = false
+
+/-- The backward copy is the memmove result (dst above src, overlapping or not). -/
+theorem bwd_moved (R : Word → BitVec 8) (d s n : Word) (hdir : (d - s).ult n = true)
+    (hd : 0x80029bc8 ≤ d.toNat ∧ d.toNat + n.toNat ≤ 0x81000000)
+    (hs : 0x80029bc8 ≤ s.toNat ∧ s.toNat + n.toNat ≤ 0x81000000) (x : Word) :
+    bwd R (s + n + 0xffffffff#32) (d + n) n.toNat x = moved R d s n.toNat x := by
+  have hle : s.toNat ≤ d.toNat := by
+    simp only [BitVec.ult, decide_eq_true_iff] at hdir; bv_omega
+  have hpos : 0 < n.toNat := by simp only [BitVec.ult, decide_eq_true_iff] at hdir; omega
+  rw [bwd_spec _ _ _ _ _ (by bv_omega) (by bv_omega)]
+  unfold moved
+  have hq : (d + n).toNat = d.toNat + n.toNat := by bv_omega
+  rw [hq, show d.toNat + n.toNat - n.toNat = d.toNat by omega]
+  split
+  · exact congrArg _ (by bv_omega)
+  · rfl
+
+/-- **memmove, all but one case**: n < 16 either way; n ≥ 16 forward; n ≥ 16
+    backward with src ≡ dst (mod 4). -/
+theorem contractG (m₀ : Machine) (h : PreG m₀) : ∃ k m, QRun B img k m₀ m ∧ PostF m₀ m := by
+  by_cases hF : (m₀.core.get 12).toNat < 16 ∨ (m₀.core.get 10 - m₀.core.get 11).ult (m₀.core.get 12) = false
+  · exact contractF m₀ ⟨h.pc, h.quiet, hF, h.dst, h.src, h.spAl, h.stack, h.dstSep, h.srcSep, h.ra⟩
+  obtain ⟨c, ram⟩ := m₀
+  obtain ⟨hpc, hq, hcase, hd, hs, hspal, hst, hdsep, hssep, hra⟩ := h
+  simp only at hpc hq hcase hd hs hspal hst hdsep hssep hra hF ⊢
+  have hn : 16 ≤ (c.get 12).toNat := by omega
+  have hdir : (c.get 10 - c.get 11).ult (c.get 12) = true := by
+    cases h : (c.get 10 - c.get 11).ult (c.get 12)
+    · exact absurd (Or.inr h) hF
+    · rfl
+  have hcong : (c.get 11).toNat % 4 = (c.get 10).toNat % 4 := by
+    rcases hcase with h | h | h
+    · omega
+    · rw [hdir] at h; cases h
+    · exact h
+  have hsl : Slots (c.get 2) := ⟨hspal, by omega⟩
+  have hpro := prologue c ram hpc hq hsl
+  have hdr := (B_ram _ _).mp hd
+  have hsr := (B_ram _ _).mp hs
+  obtain ⟨k, e, hr, he, hfr⟩ := bwd_aligned c (saved c ram) hq hn hdir hd hs hcong
+  obtain ⟨m, hm, hpost⟩ := finishC c ram
+    (bwd (saved c ram) (c.get 11 + c.get 12 + 0xffffffff#32) (c.get 10 + c.get 12) (c.get 12).toNat) e
+    [5, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 28] hq hd hs hsl hst.1 (by omega) (by omega) hra he hfr
+    (by intro r hr; simp only [List.mem_cons, List.not_mem_nil, or_false] at hr ⊢; omega)
+    (fun x _ => bwd_moved _ _ _ _ hdir hdr hsr x)
+  exact ⟨7 + k + 5, m, (hpro.trans hr).trans hm, hpost⟩
+
 end E5R.Rmk.Memmove
