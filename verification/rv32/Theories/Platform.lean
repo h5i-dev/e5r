@@ -29,6 +29,8 @@ structure DevReg where
   name : String
   read : Bool
   write : Bool
+  /-- Access width in bytes (4 for a word register, 1 for a UART16550's). -/
+  width : Nat
   deriving Repr, DecidableEq
 
 /-- One loaded, read-only segment of the firmware image. -/
@@ -107,6 +109,14 @@ def ramWrite (ram : Word → BitVec 8) (a v : Word) : Width → (Word → BitVec
   | .w => ramPut (ramPut (ramPut (ramPut ram a (byteOf v 0)) (a+1) (byteOf v 1))
             (a+2) (byteOf v 2)) (a+3) (byteOf v 3)
 
+/-- The low `wd` bytes of a value: what a device register of that width
+    returns on a load, and what it receives from a store. -/
+def devVal (wd : Width) (v : Word) : Word :=
+  match wd with
+  | .b => v &&& 0xff
+  | .h => v &&& 0xffff
+  | .w => v
+
 def Board.device? (B : Board) (a : Word) : Option DevReg :=
   B.devices.find? (fun d => d.addr == a.toNat)
 
@@ -126,7 +136,7 @@ def interp (B : Board) (img : List Segment) (o : Oracle) :
     else match romRead? img a.toNat w.bytes false with
       | some v => interp B img o (k v) ram i evs
       | none => match B.device? a with
-        | some d => if d.read && w = .w then interp B img o (k (o i)) ram (i+1) evs
+        | some d => if d.read && w.bytes = d.width then interp B img o (k (devVal w (o i))) ram (i+1) evs
                     else .fault (.unsupported "device read")
         | none => .fault (.unsupported "load from an unmodeled address")
   | .store w a v atomic k, ram, i, evs =>
@@ -134,7 +144,7 @@ def interp (B : Board) (img : List Segment) (o : Oracle) :
     else if B.inRam a w.bytes then interp B img o k (ramWrite ram a v w) i evs
     else if atomic then .fault (.unsupported "atomic access outside RAM")
     else match B.device? a with
-      | some d => if d.write && w = .w then interp B img o k ram i (evs ++ [⟨a, v⟩])
+      | some d => if d.write && w.bytes = d.width then interp B img o k ram i (evs ++ [⟨a, devVal w v⟩])
                   else .fault (.unsupported "device write")
       | none => .fault (.unsupported "store to an unmodeled address")
 

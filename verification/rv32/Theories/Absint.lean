@@ -489,7 +489,7 @@ def classify (cfg : Config) (a : Nat) (wd : Width) : Option Target :=
   else match romRead? cfg.img a wd.bytes false with
     | some v => some (.rom v.toNat)
     | none => match cfg.board.device? (w a) with
-      | some d => if wd = .w then some (.dev d) else none
+      | some d => if wd.bytes = d.width then some (.dev d) else none
       | none => none
 
 /-- What a load from one absolute candidate address can return, or `none`

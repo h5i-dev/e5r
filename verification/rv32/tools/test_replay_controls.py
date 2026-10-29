@@ -33,10 +33,10 @@ REPLAY = VERIFY / '.lake/build/bin/replay'
 
 MUTANTS = [
     ('device write off by one', 'Theories/Platform.lean',
-     'interp B img o k ram i (evs ++ [⟨a, v⟩])', 'interp B img o k ram i (evs ++ [⟨a, v + 1⟩])',
+     'interp B img o k ram i (evs ++ [⟨a, devVal w v⟩])', 'interp B img o k ram i (evs ++ [⟨a, devVal w v + 1⟩])',
      'device writes'),
     ('device write dropped', 'Theories/Platform.lean',
-     'interp B img o k ram i (evs ++ [⟨a, v⟩])', 'interp B img o k ram i evs',
+     'interp B img o k ram i (evs ++ [⟨a, devVal w v⟩])', 'interp B img o k ram i evs',
      'device writes'),
     ('word store to RAM loses its top byte', 'Theories/Platform.lean',
      '(a+3) (byteOf v 3)', '(a+3) (byteOf v 2)',
