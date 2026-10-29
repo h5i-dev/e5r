@@ -22,7 +22,8 @@ lean_lib Tools where
 
 -- The proved ring-head summary the analyzer may use (`E5R_RING=1`).
 lean_lib Hybrid where
-  roots := #[`Projects.hifive1.hybrid.Ring, `Projects.hifive1.hybrid.RingAI]
+  roots := #[`Projects.hifive1.hybrid.Ring, `Projects.hifive1.hybrid.RingAI,
+    `Projects.hifive1.hybrid.Tail, `Projects.hifive1.hybrid.TailAI]
 
 lean_exe replay_isa where
   root := `tools.ReplayIsa

@@ -1,5 +1,6 @@
 import tools.Analyze
 import Projects.hifive1.hybrid.RingAI
+import Projects.hifive1.hybrid.TailAI
 import Projects.hifive1.Config
 open E5R E5R.AI Analyze
 
@@ -18,7 +19,8 @@ def main (args : List String) : IO UInt32 := do
     tracePc := (← IO.getEnv "E5R_TRACE_PC").bind String.toNat? }
   -- `E5R_RING=1`: use the proved channel ring-head summary (RingAI.spec_sound); a certificate
   -- that relies on it checks with `checkHybrid` and `check_sound_hybrid`, not plain `check`.
-  let sums := if (← IO.getEnv "E5R_RING") == some "1" then [E5R.Hifive1.Hybrid.RingAI.spec] else []
+  let sums := if (← IO.getEnv "E5R_RING") == some "1"
+    then [E5R.Hifive1.Hybrid.RingAI.spec, E5R.Hifive1.Hybrid.TailAI.spec] else []
   let su : Setup := { cfg := { E5R.Hifive1.Job.cfg with sums }, boot := E5R.Hifive1.Job.boot, opts }
   -- `E5R_KEEP=1` derives kept intervals (Cert.hkeep) from the handler's footprint.
   let st ← if (← IO.getEnv "E5R_KEEP") == some "1" then analyzeKeep su [] else fixG su none 0 false
