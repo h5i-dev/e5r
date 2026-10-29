@@ -2993,4 +2993,166 @@ theorem entry_sound {G : List Cell} {ρ : Nat → Word} {s e : AState} {m : Mach
       · simp [AV.gam, hEnv]
   · simp at he
 
+/-! ### What a handler step may write -/
+
+/-- Every store in an effect tree satisfies `P`. -/
+def _root_.E5R.Eff.StoresIn (P : Word → Width → Prop) : Eff → Prop
+  | .done _ | .trap _ | .unsupported _ => True
+  | .choose k => ∀ b, (k b).StoresIn P
+  | .pick k => ∀ v, (k v).StoresIn P
+  | .load _ _ _ k => ∀ v, (k v).StoresIn P
+  | .store wd a _ _ k => P a wd ∧ k.StoresIn P
+
+/-- A RAM store a handler may make: to static RAM, or within its stack
+    budget below the interrupted sp `σ`. -/
+def FrameOk (cfg : Config) (σ : Nat) (A : Word) (wd : Width) : Prop :=
+  cfg.isStatic A.toNat wd.bytes = true ∨ (σ ≤ A.toNat + cfg.hdepth ∧ A.toNat + wd.bytes ≤ σ)
+
+/-- RAM outside static memory and the handler budget is unchanged. -/
+def Keep (cfg : Config) (σ : Nat) (ram ram' : Word → BitVec 8) : Prop :=
+  ∀ b : Word, cfg.isStatic b.toNat 1 = false → (b.toNat + cfg.hdepth < σ ∨ σ ≤ b.toNat) → ram' b = ram b
+
+theorem Keep.refl (cfg : Config) (σ : Nat) (ram : Word → BitVec 8) : Keep cfg σ ram ram := fun _ _ _ => rfl
+
+theorem Keep.trans {cfg : Config} {σ : Nat} {r1 r2 r3 : Word → BitVec 8} (h1 : Keep cfg σ r1 r2)
+    (h2 : Keep cfg σ r2 r3) : Keep cfg σ r1 r3 :=
+  fun b hb hr => (h2 b hb hr).trans (h1 b hb hr)
+
+theorem keep_write {cfg : Config} {σ : Nat} {ram : Word → BitVec 8} {A x : Word} {wd : Width}
+    (hsp : SpOk cfg σ) (hf : FrameOk cfg σ A wd) : Keep cfg σ ram (ramWrite ram A x wd) := by
+  intro b hb hr
+  apply ramWrite_other
+  rintro ⟨k, hk, rfl⟩
+  have h1 := hsp.lo; have h2 := hsp.hi; have h3 := hsp.pin; have h4 := hsp.ram
+  unfold Config.ramEnd at h3 h4
+  unfold FrameOk at hf
+  have hfit : A.toNat + k < M32 := by
+    rcases hf with hf | hf
+    · unfold Config.isStatic Config.ramEnd at hf
+      simp only [Bool.or_eq_true, Bool.and_eq_true, decide_eq_true_eq] at hf
+      omega
+    · obtain ⟨hf1, hf2⟩ := hf
+      omega
+  rw [toNat_add_small A hfit] at hb hr
+  rcases hf with hf | hf
+  · unfold Config.isStatic Config.ramEnd at hf hb
+    simp only [Bool.or_eq_true, Bool.and_eq_true, decide_eq_true_eq] at hf
+    simp only [Bool.or_eq_false_iff, Bool.and_eq_false_iff, decide_eq_false_iff_not, Nat.not_le] at hb
+    omega
+  · obtain ⟨hf1, hf2⟩ := hf
+    omega
+
+/-- Running an effect whose RAM stores are all allowed keeps the rest of RAM. -/
+theorem interp_keep {cfg : Config} {σ : Nat} {o : Oracle} (hsp : SpOk cfg σ) :
+    ∀ (e : Eff) (ram : Word → BitVec 8) (i : Nat) (evs : List Event) {c : Core} {ram' : Word → BitVec 8}
+      {evs' : List Event},
+      e.StoresIn (fun A wd => cfg.board.inRam A wd.bytes = true → FrameOk cfg σ A wd) →
+      interp cfg.board cfg.img o e ram i evs = .ok c ram' evs' → Keep cfg σ ram ram' := by
+  intro e
+  induction e with
+  | done c0 =>
+    intro ram i evs c ram' evs' _ h
+    simp only [interp, Result.ok.injEq] at h
+    obtain ⟨-, rfl, -⟩ := h; exact Keep.refl _ _ _
+  | trap _ => intro ram i evs c ram' evs' _ h; simp [interp] at h
+  | unsupported _ => intro ram i evs c ram' evs' _ h; simp [interp] at h
+  | choose k ih => intro ram i evs c ram' evs' hs h; simp only [interp] at h; exact ih _ _ _ _ (hs _) h
+  | pick k ih => intro ram i evs c ram' evs' hs h; simp only [interp] at h; exact ih _ _ _ _ (hs _) h
+  | load wd a atomic k ih =>
+    intro ram i evs c ram' evs' hs h
+    simp only [interp] at h
+    split at h
+    · simp at h
+    · split at h
+      · exact ih _ _ _ _ (hs _) h
+      · split at h
+        · simp at h
+        · split at h
+          · exact ih _ _ _ _ (hs _) h
+          · split at h
+            · split at h
+              · exact ih _ _ _ _ (hs _) h
+              · simp at h
+            · simp at h
+  | store wd a v atomic k ih =>
+    intro ram i evs c ram' evs' hs h
+    simp only [interp] at h
+    split at h
+    · simp at h
+    · split at h
+      · next hin => exact (keep_write hsp (hs.1 hin)).trans (ih _ _ _ hs.2 h)
+      · split at h
+        · simp at h
+        · split at h
+          · split at h
+            · exact ih _ _ _ hs.2 h
+            · simp at h
+          · simp at h
+
+theorem storeAt_static {cfg : Config} {s : AState} {mem mem' : List Cell} {a : Nat} {wd : Width} {V : AV}
+    {atomic strong : Bool} (h : storeAt cfg s mem a wd V atomic strong = some mem') (hnd : s.hnd = true)
+    (hin : cfg.board.inRam (w a) wd.bytes = true) : cfg.isStatic a wd.bytes = true := by
+  unfold storeAt at h
+  split at h
+  · split at h
+    · simp at h
+    · next hst => simpa [hnd] using hst
+  · next d hcl => rw [(classify_dev hcl).2.1] at hin; simp at hin
+  · simp at h
+
+theorem foldlM_each {f : List Cell → Nat → Option (List Cell)} :
+    ∀ (as : List Nat) (mem memF : List Cell), as.foldlM f mem = some memF →
+      ∀ a ∈ as, ∃ m m', f m a = some m' := by
+  intro as
+  induction as with
+  | nil => intro _ _ _ a ha; simp at ha
+  | cons b bs ih =>
+    intro mem memF h a ha
+    simp only [List.foldlM_cons] at h
+    cases h1 : f mem b with
+    | none => rw [h1] at h; simp at h
+    | some m1 =>
+      rw [h1] at h
+      rcases List.mem_cons.mp ha with rfl | ha
+      · exact ⟨_, _, h1⟩
+      · exact ih _ _ h a ha
+
+/-- A handler's abstract store that succeeds writes only where a handler may. -/
+theorem absStore_frame {cfg : Config} {s : AState} {av : AV} {wd : Width} {V : AV} {atomic : Bool}
+    {mem : List Cell} (h : absStore cfg s av wd V atomic = some mem) (hnd : s.hnd = true)
+    {ρ : Nat → Word} {A : Word} (hA : av.gam ρ A) (hsp : SpOk cfg (ρ 2).toNat)
+    (hin : cfg.board.inRam A wd.bytes = true) : FrameOk cfg (ρ 2).toNat A wd := by
+  cases av with
+  | vals as =>
+    simp only [AV.gam] at hA
+    have hw : w A.toNat = A := w_toNat A
+    left
+    rcases as with _ | ⟨a, _ | ⟨b, rest⟩⟩
+    · simp at hA
+    · simp only [absStore] at h
+      simp only [List.mem_singleton] at hA
+      rw [hA]
+      exact storeAt_static h hnd (by rw [← hA, hw]; exact hin)
+    · simp only [absStore] at h
+      obtain ⟨m, m', hm⟩ := foldlM_each _ _ _ h _ hA
+      exact storeAt_static hm hnd (by rw [hw]; exact hin)
+  | sym sv off =>
+    by_cases hsv : sv = 2
+    · subst hsv
+      simp only [absStore] at h
+      split at h
+      · next hc =>
+        simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at hc
+        obtain ⟨⟨⟨_, _⟩, ho⟩, hn⟩ := hc
+        simp only [AV.gam] at hA
+        obtain ⟨e, _, _⟩ := rel_addr (n := wd.bytes) hsp ho hn
+        have hAw : A = ρ 2 + w off := hA
+        rw [hAw]; right
+        have := toNat_lt (ρ 2)
+        have := hsp.lo
+        omega
+      · simp at h
+    · exfalso; simp [absStore, hsv] at h
+  | _ => simp [absStore] at h
+
 end E5R.AI
