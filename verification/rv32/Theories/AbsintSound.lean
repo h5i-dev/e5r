@@ -1447,4 +1447,64 @@ theorem absStore_vals_sound {cfg : Config} {s : AState} {as : List Nat} {wd : Wi
     exact absStore_fold_sound (s := s) (atomic := atomic) hram hS hSw ram o i evs k _ s.mem memF h hwf hrel
       (.inl ⟨hA, hm⟩)
 
+/-! ## The handler's own frame -/
+
+/-- What the checker establishes about an interrupted stack pointer (it is
+    one of `sigma`) and the stack layout. -/
+structure SpOk (cfg : Config) (σ : Nat) : Prop where
+  lo : cfg.stackLow + cfg.hdepth ≤ σ
+  hi : σ ≤ cfg.pinLow
+  al : σ % 4 = 0
+  dep : cfg.hdepth < 2 ^ 31
+  base : cfg.board.ramBase ≤ cfg.stackLow
+  pin : cfg.pinLow ≤ cfg.ramEnd
+  ram : cfg.ramEnd ≤ M32
+
+/-- A handler-frame offset in budget names an address below sp, inside the
+    stack region. -/
+theorem rel_addr {cfg : Config} {ρ : Nat → Word} {off n : Nat} (hs : SpOk cfg (ρ 2).toNat)
+    (ho : M32 - cfg.hdepth ≤ off) (hn : off + n ≤ M32) :
+    (ρ 2 + w off).toNat = (ρ 2).toNat + off - M32 ∧
+    cfg.stackLow ≤ (ρ 2 + w off).toNat ∧ (ρ 2 + w off).toNat + n ≤ cfg.pinLow := by
+  have hl := hs.lo; have hh := hs.hi; have hd := hs.dep; have hp := hs.pin; have hr := hs.ram
+  have hσ := toNat_lt (ρ 2)
+  unfold Config.ramEnd at hp hr
+  have e : (ρ 2 + w off).toNat = (ρ 2).toNat + off - M32 := by
+    rw [toNat_add_w]; simp only [M32] at *; omega
+  refine ⟨e, ?_, ?_⟩ <;> rw [e] <;> simp only [M32] at * <;> omega
+
+theorem rel_inRam {cfg : Config} {ρ : Nat → Word} {off : Nat} {wd : Width} (hs : SpOk cfg (ρ 2).toNat)
+    (ho : M32 - cfg.hdepth ≤ off) (hn : off + wd.bytes ≤ M32) :
+    cfg.board.inRam (ρ 2 + w off) wd.bytes = true := by
+  obtain ⟨_, h1, h2⟩ := rel_addr (n := wd.bytes) hs ho hn
+  have := hs.base; have := hs.pin
+  simp only [Board.inRam, Bool.and_eq_true, decide_eq_true_eq]
+  unfold Config.ramEnd at *; omega
+
+theorem rel_aligned {cfg : Config} {ρ : Nat → Word} {off : Nat} {wd : Width} (hs : SpOk cfg (ρ 2).toNat)
+    (ho : M32 - cfg.hdepth ≤ off) (hn : off + wd.bytes ≤ M32) (ha : off % wd.bytes = 0) :
+    (ρ 2 + w off).toNat % wd.bytes = 0 := by
+  obtain ⟨e, _, _⟩ := rel_addr (n := wd.bytes) hs ho hn
+  rw [e]; have := hs.al; have := hs.lo
+  cases wd <;> simp only [Width.bytes, M32] at * <;> omega
+
+/-- A handler-frame load: RAM, aligned, and the abstract cell lookup is sound. -/
+theorem absLoad_rel_sound {cfg : Config} {s : AState} {off : Nat} {wd : Width} {atomic : Bool}
+    {v : AV} (h : absLoad cfg s (.sym 2 off) wd atomic = some v)
+    {ρ : Nat → Word} {ram : Word → BitVec 8} (hs : SpOk cfg (ρ 2).toNat) (hm : MemHolds ρ ram s.mem)
+    (o : Oracle) (i : Nat) (evs : List Event) (k : Word → Eff) :
+    interp cfg.board cfg.img o (.load wd (ρ 2 + BitVec.ofNat 32 off) atomic k) ram i evs =
+      interp cfg.board cfg.img o (k (ramRead ram (ρ 2 + w off) wd)) ram i evs ∧
+    v.gam ρ (ramRead ram (ρ 2 + w off) wd) ∧ Fits wd (ramRead ram (ρ 2 + w off) wd) := by
+  simp only [absLoad] at h
+  split at h
+  · next hc =>
+    simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at hc
+    obtain ⟨⟨⟨_, ha⟩, ho⟩, hn⟩ := hc
+    simp only [Option.some.injEq] at h; subst h
+    refine ⟨interp_load_ram o (rel_aligned hs ho hn ha) (rel_inRam hs ho hn), ?_, ramRead_fits _ _ _⟩
+    have := loadCell_sound (ρ := ρ) (base := .rel) (a := off) (wd := wd) hm
+    simpa [addrOf] using this
+  · simp at h
+
 end E5R.AI
