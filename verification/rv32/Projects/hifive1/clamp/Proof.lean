@@ -134,4 +134,23 @@ theorem clamp_all (c₀ : Core) (ram : Word → BitVec 8) (hpc : c₀.pc = 0x200
 #print axioms clamp_all
 #print axioms spec_toNat
 
+/-! ## Nonvacuity
+
+A concrete boot state whose input word is 0xfffffffa really reaches the idle
+loop with the wrapped result 1 stored. -/
+
+def demo : Core :=
+  { pc := 0x20010000, x := fun _ => 0, mie_ := false, mpie := false, mpp := 3, mieReg := 0,
+    mtvec := 0, mepc := 0, mcause := 0, mscratch := 0, resv := false }
+
+/-- RAM holding 0xfffffffa at the input word, zero elsewhere. -/
+def demoRam : Word → BitVec 8 := fun a =>
+  if a = 0x80000000 then 0xfa else if a = 0x80000001 ∨ a = 0x80000002 ∨ a = 0x80000003 then 0xff else 0
+
+theorem nonvacuous : ∃ n m, DetSteps B img n ⟨demo, demoRam⟩ m ∧ m.core.pc = donePc ∧
+    ramRead m.ram outAddr .w = 1 := by
+  obtain ⟨n, m, h, post⟩ := clamp_all demo demoRam rfl
+  refine ⟨n, m, h, post.pc, ?_⟩
+  rw [post.out]; decide
+
 end E5R.Hifive1.Clamp

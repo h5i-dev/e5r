@@ -4,17 +4,57 @@
   "root": "..",
   "board": "boards/hifive1-revb.json",
   "build": [
-    {"cwd": ".", "argv": ["mkdir", "-p", "build"]},
-    {"cwd": "Projects/hifive1/clamp", "argv": ["rustup", "run", "1.98.1", "rustc",
-      "--target", "riscv32imac-unknown-none-elf", "--crate-type", "bin", "--edition", "2024",
-      "-C", "opt-level=2", "-C", "panic=abort", "-C", "relocation-model=static",
-      "-C", "link-arg=-Tlink.ld", "-C", "strip=none",
-      "-o", "../../../build/hifive1-clamp-O2.elf", "clamp.rs"]}
+    {
+      "cwd": ".",
+      "argv": [
+        "mkdir",
+        "-p",
+        "build"
+      ]
+    },
+    {
+      "cwd": "Projects/hifive1/clamp",
+      "argv": [
+        "rustup",
+        "run",
+        "1.98.1",
+        "rustc",
+        "--target",
+        "riscv32imac-unknown-none-elf",
+        "--crate-type",
+        "bin",
+        "--edition",
+        "2024",
+        "-C",
+        "opt-level=2",
+        "-C",
+        "panic=abort",
+        "-C",
+        "relocation-model=static",
+        "-C",
+        "link-arg=-Tlink.ld",
+        "-C",
+        "strip=none",
+        "-o",
+        "../../../build/hifive1-clamp-O2.elf",
+        "clamp.rs"
+      ]
+    }
   ],
   "elf": "build/hifive1-clamp-O2.elf",
   "elf_sha256": "0294b5dd6198b281cf166726f093c6db507ae7c5eef261ffa00202abbb879544",
-  "image": {"module": "Projects.hifive1.clamp.Image", "namespace": "E5R.Clamp32"},
-  "modules": ["Projects/hifive1/clamp/Proof.lean"],
-  "theorems": ["E5R.Hifive1.Clamp.clamp_all", "E5R.Hifive1.Clamp.spec_toNat", "E5R.Hifive1.Clamp.wraps"],
-  "limits": {"seconds": 1800, "rss_mib": 5120}
+  "image": {
+    "module": "Projects.hifive1.clamp.Image",
+    "namespace": "E5R.Clamp32"
+  },
+  "modules": [
+    "Projects/hifive1/clamp/Proof.lean"
+  ],
+  "theorems": [
+    "E5R.Hifive1.Clamp.*"
+  ],
+  "limits": {
+    "seconds": 1800,
+    "rss_mib": 5120
+  }
 }

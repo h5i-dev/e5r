@@ -26,7 +26,7 @@
     "Projects/Controls.lean"
   ],
   "theorems": [
-    "E5R.Hifive1.Duty.duty_contract",
+    "E5R.Hifive1.Duty.*",
     "E5R.Controls.*"
   ],
   "limits": {

@@ -309,4 +309,17 @@ theorem duty_contract (c₀ : Core) (ram : Word → BitVec 8) (p : Word) (h : Pr
 
 #print axioms duty_contract
 
+/-! ## Nonvacuity
+
+The precondition is satisfiable and the run is real: from a concrete state
+with a window of eight 10s, the function returns 17. -/
+
+def demo : Core :=
+  { pc := entry, x := fun r => if r.val = 10 then 0x80000000 else 0, mie_ := false, mpie := false,
+    mpp := 3, mieReg := 0, mtvec := 0, mepc := 0, mcause := 0, mscratch := 0, resv := false }
+
+theorem nonvacuous : ∃ n m, DetSteps B img n ⟨demo, fun _ => 10⟩ m ∧ (m.core.get 10).toNat = 17 := by
+  obtain ⟨n, m, h, post⟩ := duty_contract demo (fun _ => 10) 0x80000000 ⟨rfl, rfl, by decide, by decide⟩
+  exact ⟨n, m, h, by rw [post.result]; decide⟩
+
 end E5R.Hifive1.Duty
