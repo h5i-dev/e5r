@@ -2859,4 +2859,138 @@ theorem instr_sound {cfg : Config} {cert : Cert} {n : Node} {ρ : Nat → Word} 
     · simp at hok
   · simp at hok
 
+/-! ### Interrupt entry -/
+
+theorem and_not3 (n : Nat) (h : n < 2^32) : n &&& (2^32 - 1 - 3) = n / 4 * 4 := by
+  have hK : (2^32 - 1 - 3 : Nat) = (2^32 - 1) ^^^ 3 := by decide
+  have hR : n / 4 * 4 = (n >>> 2) <<< 2 := by
+    rw [Nat.shiftLeft_eq, Nat.shiftRight_eq_div_pow]
+  rw [hK, hR]
+  apply Nat.eq_of_testBit_eq
+  intro i
+  rw [Nat.testBit_and, Nat.testBit_xor, Nat.testBit_two_pow_sub_one, Nat.testBit_shiftLeft,
+    Nat.testBit_shiftRight]
+  rcases Nat.lt_or_ge i 2 with hi | hi
+  · have : i = 0 ∨ i = 1 := by omega
+    have h31 : Nat.testBit 3 1 = true := by decide
+    rcases this with rfl | rfl <;> simp [h31]
+  · have h3 : Nat.testBit 3 i = false := Nat.testBit_lt_two_pow (by
+      calc 3 < 2 ^ 2 := by decide
+        _ ≤ 2 ^ i := Nat.pow_le_pow_right (by decide) hi)
+    rw [h3, show 2 + (i - 2) = i by omega]
+    rcases Nat.lt_or_ge i 32 with h32 | h32
+    · simp [h32, hi]
+    · have : n.testBit i = false := Nat.testBit_lt_two_pow (by
+        calc n < 2 ^ 32 := h
+          _ ≤ 2 ^ i := Nat.pow_le_pow_right (by decide) h32)
+      simp [this]
+
+/-- The symbol environment of a handler: the interrupted machine's
+    registers (1..31), pc (32), mie, mtvec and mscratch (33..35). -/
+def hEnv (m : Machine) : Nat → Word := fun k =>
+  if k = 32 then m.core.pc else if k = 33 then m.core.mieReg else if k = 34 then m.core.mtvec
+  else if k = 35 then m.core.mscratch else if h : k < 32 then m.core.get ⟨k, h⟩ else 0
+
+theorem gam_indep {ρ ρ' : Nat → Word} {v : AV} {x : Word} (hv : v.hasSym = false) (h : v.gam ρ x) :
+    v.gam ρ' x := by
+  cases v <;> simp_all [AV.gam, AV.hasSym]
+
+theorem holds_indep {ρ ρ' : Nat → Word} {ram : Word → BitVec 8} {c : Cell} (hb : c.base = .abs)
+    (hv : c.v.hasSym = false) (h : c.holds ρ ram) : c.holds ρ' ram := by
+  unfold Cell.holds Cell.at at *
+  rw [hb] at h ⊢
+  intro hg; exact gam_indep hv (h hg)
+
+theorem code_mem {ρ : Nat → Word} {s : AState} {m : Machine} {code : Nat} (hs : StateHolds ρ s m)
+    (hen : irqEnabled m.core code = true) : code ∈ irqCodesAbs s := by
+  simp only [irqEnabled, Bool.and_eq_true, decide_eq_true_eq] at hen
+  obtain ⟨⟨hmie, hc⟩, hbit⟩ := hen
+  have hm := hs.mie; rw [hmie] at hm
+  unfold irqCodesAbs
+  rw [hm]
+  simp only [Bool.not_true, Bool.false_eq_true, if_false, List.mem_filter]
+  refine ⟨hc, ?_⟩
+  have hr := hs.mieReg
+  split
+  · next l hl =>
+    rw [hl] at hr
+    simp only [AV.gam] at hr
+    exact List.any_eq_true.mpr ⟨_, hr, by rw [w_toNat]; exact hbit⟩
+  · rfl
+
+theorem entry_regs (r : Reg) (h : r.val ≠ 0) :
+    ((List.range 31).map fun i => AV.sym (i+1) 0).getD (r.val - 1) .top = .sym r.val 0 := by
+  have hr := r.isLt
+  rw [List.getD_eq_getElem?_getD, List.getElem?_map, List.getElem?_range (by omega)]
+  simp only [Option.map_some, Option.getD_some]
+  congr 1; omega
+
+/-- Taking an interrupt from a described main-thread machine enters the
+    handler at the state `handlerEntry` computes, described under `hEnv`. -/
+theorem entry_sound {G : List Cell} {ρ : Nat → Word} {s e : AState} {m : Machine} {code : Nat}
+    (hs : StateHolds ρ s m) (he : handlerEntry G s code = some e)
+    (hG : ∀ c ∈ G, c ∈ s.mem ∧ c.base = .abs ∧ c.v.hasSym = false)
+    (hen : irqEnabled m.core code = true) :
+    ∃ c1, takeIrq m.core code = .done c1 ∧ StateHolds (hEnv m) e ⟨c1, m.ram⟩ := by
+  have hmie : m.core.mie_ = true := by
+    simp only [irqEnabled, Bool.and_eq_true] at hen; exact hen.1.1
+  unfold handlerEntry at he
+  split at he
+  · next v hv =>
+    have hmt := hs.mtvec
+    rw [hv] at hmt
+    simp only [AV.gam, List.mem_singleton] at hmt
+    dsimp only at he
+    generalize hP : (if v % 4 = 1 then (v / 4 * 4 + 4 * code) % M32 else v / 4 * 4) = P at he
+    split at he
+    · simp at he
+    · next hpc =>
+      simp only [Option.some.injEq] at he
+      subst he
+      have hvl : v < 2^32 := hmt ▸ toNat_lt _
+      have hbase : (m.core.mtvec &&& ~~~3).toNat = v / 4 * 4 := by
+        rw [BitVec.toNat_and, BitVec.toNat_not, hmt]; exact and_not3 v hvl
+      have hext : (m.core.mtvec.extractLsb' 0 2).toNat = v % 4 := by
+        rw [extract_toNat, hmt]; simp
+      let T := if m.core.mtvec.extractLsb' 0 2 = 1 then (m.core.mtvec &&& ~~~3) + BitVec.ofNat 32 (4 * code)
+        else m.core.mtvec &&& ~~~3
+      have hT : T.toNat = P := by
+        simp only [T, ← hP]
+        by_cases h1 : v % 4 = 1
+        · rw [if_pos (BitVec.eq_of_toNat_eq (by rw [hext, h1]; rfl)), if_pos h1, BitVec.toNat_add, hbase,
+            BitVec.toNat_ofNat]
+          simp only [M32]; omega
+        · rw [if_neg (fun h => h1 (by rw [← hext, h]; rfl)), if_neg h1, hbase]
+      have hP2 : P % 2 = 0 := by omega
+      have hlsb : T.getLsbD 0 = false := lsb_even (by rw [hT]; exact hP2)
+      refine ⟨_, by unfold takeIrq; exact if_neg (by rw [hlsb]; simp), ?_⟩
+      refine ⟨BitVec.eq_of_toNat_eq ?_, ?_, ?_, by rfl, ?_, by simp, ?_, ?_, ?_, ?_, ?_⟩
+      · show T.toNat = (w P).toNat
+        rw [hT, w_toNat_of_lt]
+        rw [← hP]; split
+        · exact Nat.mod_lt _ (by decide)
+        · simp only [M32]; omega
+      · intro r
+        by_cases h0 : r.val = 0
+        · have : r = 0 := Fin.ext h0
+          subst this; exact const0_gam _
+        · have hr := r.isLt
+          have h32 : r.val ≠ 32 := by omega
+          have h33 : r.val ≠ 33 := by omega
+          have h34 : r.val ≠ 34 := by omega
+          have h35 : r.val ≠ 35 := by omega
+          simp only [AState.get, if_neg h0, entry_regs r h0, AV.gam, hEnv, if_neg h32, if_neg h33,
+            if_neg h34, if_neg h35, dif_pos hr, BitVec.ofNat_eq_ofNat, BitVec.add_zero]
+          rfl
+      · intro c hc
+        obtain ⟨hcm, hb, hsy⟩ := hG c hc
+        exact holds_indep hb hsy (hs.mem c hcm)
+      · simp [Tri.mayBe, hmie]
+      · simp [AV.gam, hEnv]
+      · simp [AV.gam, hEnv]
+      · simp [AV.gam, hEnv]
+      · exact const_sound' (by simp [M32])
+      · simp [AV.gam, hEnv]
+  · simp at he
+
 end E5R.AI
