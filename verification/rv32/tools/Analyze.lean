@@ -595,23 +595,65 @@ def certSource (ns : String) (st : St) (sigma : List Nat) : String := Id.run do
     s!"namespace {ns}\nopen E5R E5R.AI\n" ++
     "local notation \"T\" => AV.top\nlocal notation \"V\" => AV.vals\n" ++
     "local notation \"R\" => AV.rng\nlocal notation \"S\" => AV.sym\n"
-  let mut parts : Array String := #[]
-  for c in [0:(n + chunk - 1) / chunk] do
-    let lo := c * chunk
-    let hi := min n (lo + chunk)
-    let items := (List.range (hi - lo)).map fun k =>
-      let j := lo + k
-      s!"  ⟨{stateStr st.nodes[j]!}, {listStr (st.edges[j]!.map edgeStr)}⟩"
-    out := out ++ s!"def part{c} : List Node := [\n" ++ ",\n".intercalate items ++ "]\n"
-    parts := parts.push s!"part{c}"
   -- Partitions (`Opts.gdisc`): key -> index; index 0 is `G`, the rest `Gs`.
   let partitioned := st.opts.gdisc.isSome
   let keys : List Nat := if partitioned then (st.Gs.toList.map (·.1)).mergeSort else [0]
   let idx (k : Nat) : Nat := keys.idxOf k
   let gOfKey (k : Nat) : List Cell := if partitioned then st.Gs.getD k [] else st.G.getD []
   let Gs := keys.map gOfKey
+  -- Shared lists: every distinct register list and memory list is one
+  -- definition (`r<k>`, `m<k>`), so the source and its elaboration grow
+  -- with the distinct facts, not with the nodes.
+  let mut regIds : Std.HashMap String Nat := {}
+  let mut memIds : Std.HashMap String Nat := {}
+  let mut defs : Array String := #[]
+  let mut nodeStrs : Array String := #[]
+  for j in [0:n] do
+    let s := st.nodes[j]!
+    let rs := listStr (s.regs.map avStr)
+    let ms := listStr (s.mem.map cellStr)
+    -- A memory list is written as a partition invariant prefix, new cells,
+    -- and a suffix that is already a definition, where they exist.
+    let cells := s.mem.map cellStr
+    let gpre : Option (Nat × Nat) := (List.range Gs.length).findSome? fun k =>
+      let g := Gs[k]!
+      if !g.isEmpty && s.mem.take g.length == g then some (k, g.length) else none
+    let (preStr, rest) := match gpre with
+      | some (k, len) => (s!"{if k == 0 then "G" else s!"(Gs.getD {k-1} [])"} ++ ", cells.drop len)
+      | none => ("", cells)
+    let suffix : Option (Nat × Nat) := (List.range rest.length).findSome? fun i =>
+      if i == 0 then none else (memIds.get? (listStr (rest.drop i))).map (i, ·)
+    let body := match suffix with
+      | some (i, k) => s!"{listStr (rest.take i)} ++ m{k}"
+      | none => listStr rest
+    let ri ← match regIds.get? rs with
+      | some k => pure k
+      | none => do
+        let k := regIds.size
+        regIds := regIds.insert rs k
+        defs := defs.push s!"def r{k} : List AV := {rs}"
+        pure k
+    let mi ← match memIds.get? ms with
+      | some k => pure k
+      | none => do
+        let k := memIds.size
+        memIds := memIds.insert ms k
+        defs := defs.push s!"def m{k} : List Cell := {preStr}{body}"
+        pure k
+    nodeStrs := nodeStrs.push
+      (s!"  ⟨⟨{s.pc}, r{ri}, m{mi}, {triStr s.mie}, {triStr s.mpie}, {s.mpp}, {avStr s.mieReg}, " ++
+       s!"{avStr s.mtvec}, {avStr s.mepc}, {avStr s.mcause}, {avStr s.mscratch}, {s.hnd}⟩, " ++
+       s!"{listStr (st.edges[j]!.map edgeStr)}⟩")
   out := out ++ s!"def G : List Cell := {listStr ((Gs.headD []).map cellStr)}\n"
   out := out ++ s!"def Gs : List (List Cell) := {listStr (Gs.drop 1 |>.map fun g => listStr (g.map cellStr))}\n"
+  out := out ++ "\n".intercalate defs.toList ++ "\n"
+  let mut parts : Array String := #[]
+  for c in [0:(n + chunk - 1) / chunk] do
+    let lo := c * chunk
+    let hi := min n (lo + chunk)
+    let items := (List.range (hi - lo)).map fun k => nodeStrs[lo + k]!
+    out := out ++ s!"def part{c} : List Node := [\n" ++ ",\n".intercalate items ++ "]\n"
+    parts := parts.push s!"part{c}"
   let partList := if partitioned then st.part.toList.map idx else []
   let handlers := st.handlers.map fun (hk, j) => (if partitioned then hk % 65536 else hk, j)
   let joined := " ++ ".intercalate parts.toList
