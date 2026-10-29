@@ -8,11 +8,12 @@
   proofs' `img` and `B` are that image and the QEMU virt board at its rwBase (checked
   equalities below); `decode` is the proofs' contract over them.
 
-  Scope: `cobs::dec::decode_in_place_report` (0x8001e02e) for len ≤ 488 under `CobsEnv`.
+  Scope: `cobs::dec::decode_in_place_report` (0x8001e02e) for len ≤ 488 under `CobsEnv`, and
+  its caller `cobs::dec::decode_in_place` (0x8001e006, what `next` calls) under `WEnv`.
   Not a property of RMK as a whole.
 -/
 import Projects.rmk.ElfFidelity
-import Projects.rmk.Cobs.Decode
+import Projects.rmk.Cobs.Wrapper
 
 namespace E5R.RmkCobs
 open E5R
@@ -28,5 +29,12 @@ theorem decode (m₀ : Machine) (h : E5R.Rmk.Cobs.CobsEnv m₀) :
       E5R.Rmk.Cobs.Returns m₀ m ∧ E5R.Rmk.Cobs.Res m₀ m := by
   rw [← img_eq, ← board_eq]
   exact E5R.Rmk.Cobs.decode m₀ h
+
+/-- `decode_in_place` (the function `next` calls) on the runner's image and board. -/
+theorem decode_in_place (m₀ : Machine) (h : E5R.Rmk.Cobs.WEnv m₀) :
+    ∃ k m, E5R.Rmk.QRun (QemuVirtRv32.board E5R.Rmk.Image.image.rwBase) E5R.Rmk.Image.image.ro k m₀ m ∧
+      E5R.Rmk.Cobs.WReturns m₀ m ∧ E5R.Rmk.Cobs.WRes m₀ m := by
+  rw [← img_eq, ← board_eq]
+  exact E5R.Rmk.Cobs.decode_in_place m₀ h
 
 end E5R.RmkCobs

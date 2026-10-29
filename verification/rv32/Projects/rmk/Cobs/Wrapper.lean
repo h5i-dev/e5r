@@ -239,4 +239,180 @@ theorem wepi (d : Core) (M : Word → BitVec 8) (hpc : d.pc = 0x8001e018) (hq : 
     (.step (q _ k5) s6 (.step (q _ k6) s7 (.step (q _ k7) s8 (.step (q _ k8) s9 (.step (q _ k9) s10
     (.single (q _ k10) s11))))))))))
 
+theorem wEpi_get (d : Core) (M : Word → BitVec 8) (r : Reg) (h1 : r ≠ 1) (h2 : r ≠ 2) (h8 : r ≠ 8)
+    (h10 : r ≠ 10) (h11 : r ≠ 11) (h12 : r ≠ 12) : (wEpi d M).get r = d.get r := by
+  simp only [wEpi, Core.goto_get, Core.wr_get_ne _ _ _ _ _ h2, Core.wr_get_ne _ _ _ _ _ h8,
+    Core.wr_get_ne _ _ _ _ _ h1, Core.wr_get_ne _ _ _ _ _ h10, Core.wr_get_ne _ _ _ _ _ h12,
+    Core.wr_get_ne _ _ _ _ _ h11]
+
+theorem wEpi_ra (d : Core) (M : Word → BitVec 8) :
+    (wEpi d M).get 1 = ramRead (wEpiRam d M) (d.get 2 + 0x1c#32) .w := by
+  simp only [wEpi, Core.goto_get, Core.wr_get_ne _ _ _ _ _ (show (1 : Reg) ≠ 2 by decide),
+    Core.wr_get_ne _ _ _ _ _ (show (1 : Reg) ≠ 8 by decide), Core.wr_get_self _ (1 : Reg) _ _ (by decide)]
+  rfl
+
+theorem wEpi_s0 (d : Core) (M : Word → BitVec 8) :
+    (wEpi d M).get 8 = ramRead (wEpiRam d M) (d.get 2 + 0x18#32) .w := by
+  simp only [wEpi, Core.goto_get, Core.wr_get_ne _ _ _ _ _ (show (8 : Reg) ≠ 2 by decide),
+    Core.wr_get_self _ (8 : Reg) _ _ (by decide)]
+  rfl
+
+theorem wEpi_sp (d : Core) (M : Word → BitVec 8) : (wEpi d M).get 2 = d.get 2 + 0x20#32 := by
+  simp only [wEpi, Core.goto_get, Core.wr_get_self _ (2 : Reg) _ _ (by decide)]
+
+theorem sp_back (x : Word) : x + 0xffffffe0#32 + 0x20#32 = x := by
+  rw [BitVec.add_assoc, show (0xffffffe0#32 + 0x20#32 : Word) = 0#32 by decide, BitVec.add_zero]
+
+theorem add_c4 (x : Word) : x + 0xc#32 + 4 = x + 0x10#32 := by
+  rw [BitVec.add_assoc]; rfl
+
+theorem add_c8 (x : Word) : x + 0xc#32 + 8 = x + 0x14#32 := by
+  rw [BitVec.add_assoc]; rfl
+
+theorem or_ones (x : Word) : (0#32 + 0xffffffff#32) ||| x = 0xffffffff#32 := by
+  rw [show (0#32 : Word) + 0xffffffff#32 = BitVec.allOnes 32 from by decide, BitVec.allOnes_or]; decide
+
+/-- **`decode_in_place`'s contract.** -/
+theorem decode_in_place (m₀ : Machine) (h : WEnv m₀) :
+    ∃ k m, QRun B img k m₀ m ∧ WReturns m₀ m ∧ WRes m₀ m := by
+  obtain ⟨c, R⟩ := m₀
+  have hf := h.frame; have ho := h.out; have hb := h.buf; have hoa := h.outAl; have hsa := h.spAl
+  have hob := h.outBuf; have hof := h.outFrame; have hbf := h.bufFrame; have hl := h.len
+  rw [B_ram] at hf ho hb
+  simp only at hf ho hb hoa hsa hob hof hbf hl
+  have esp : (c.get 2 - 48).toNat = (c.get 2).toNat - 48 := by bv_omega
+  have hsp' : (c.get 2 + 0xffffffe0#32).toNat = (c.get 2).toNat - 32 := by bv_omega
+  let c' := wCore c
+  let R' := wRam c R
+  have c10 : c'.get 10 = c.get 2 + 0xffffffe0#32 + 0xc#32 := by simp [c', wCore, Core.wr_get_ne, Core.goto_get, Core.get_set, Core.wr_get_self]
+  have c11 : c'.get 11 = c.get 11 := wCore_get c 11 (by decide) (by decide) (by decide) (by decide)
+  have c12 : c'.get 12 = c.get 12 := wCore_get c 12 (by decide) (by decide) (by decide) (by decide)
+  have c2 : c'.get 2 = c.get 2 + 0xffffffe0#32 := by simp [c', wCore, Core.wr_get_ne, Core.goto_get, Core.get_set, Core.wr_get_self]
+  have c1 : c'.get 1 = 0x8001e018#32 := by simp [c', wCore, Core.goto_get, Core.get_set]
+  have c8 : c'.get 8 = c.get 10 := by
+    simp [c', wCore, Core.wr_get_ne, Core.goto_get, Core.get_set, Core.wr_get_self]
+  have hce : CobsEnv ⟨c', R'⟩ := by
+    refine ⟨rfl, Quiet.of_sameCsr (wCore_sameCsr c) h.quiet, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+      simp only [c10, c11, c12, c2, c1]
+    · rw [B_ram]; constructor <;> bv_omega
+    · bv_omega
+    · rw [B_ram]; exact hb
+    · exact hl
+    · rw [B_ram]; constructor <;> bv_omega
+    · bv_omega
+    · rcases hbf with e | e <;> bv_omega
+    · right; bv_omega
+    · rcases hbf with e | e <;> bv_omega
+    · decide
+  obtain ⟨k1, ⟨d, M⟩, hr1, hret1, hres1⟩ := decode ⟨c', R'⟩ hce
+  have dpc : d.pc = 0x8001e018#32 := by rw [hret1.pc]; exact c1
+  have dk : ∀ r : Reg, r.val ∉ clobbered → d.get r = c'.get r := hret1.regs
+  have d2 : d.get 2 = c.get 2 + 0xffffffe0#32 := by rw [dk 2 (by decide), c2]
+  have d8 : d.get 8 = c.get 10 := by rw [dk 8 (by decide), c8]
+  have dq : Quiet d := Quiet.of_sameCsr (hret1.csr.trans (wCore_sameCsr c)) h.quiet
+  -- RAM facts
+  have hM : ∀ x : Word, ¬ ((c.get 2).toNat - 48 ≤ x.toNat ∧ x.toNat < (c.get 2).toNat - 32) →
+      ¬ ((c.get 2).toNat - 20 ≤ x.toNat ∧ x.toNat < (c.get 2).toNat - 8) →
+      ¬ ((c.get 11).toNat ≤ x.toNat ∧ x.toNat < (c.get 11).toNat + (c.get 12).toNat) → M x = R' x := by
+    intro x a b e
+    apply hret1.ram
+    simp only [Writable, c10, c11, c12, c2, not_or]
+    exact ⟨by bv_omega, e, by bv_omega⟩
+  have hR' : ∀ x : Word, ¬ ((c.get 2).toNat - 8 ≤ x.toNat ∧ x.toNat < (c.get 2).toNat) → R' x = R x := by
+    intro x hx; simp only [R', wRam]; rw [ramWrite_w_out, ramWrite_w_out] <;> bv_omega
+  have slotM : ∀ off : Word, (off = 0x18#32 ∨ off = 0x1c#32) →
+      ramRead M (c.get 2 + 0xffffffe0#32 + off) .w = ramRead R' (c.get 2 + 0xffffffe0#32 + off) .w := by
+    intro off hoff
+    apply ramRead_w_congr; intro k hk
+    apply hM <;> rcases hoff with rfl | rfl <;> bv_omega
+  have v1 : ramRead R' (c.get 2 + 0xffffffe0#32 + 0x1c#32) .w = c.get 1 := by
+    simp only [R', wRam]; rw [ramRead_w_out, ramRead_ramWrite_w] <;> bv_omega
+  have v8 : ramRead R' (c.get 2 + 0xffffffe0#32 + 0x18#32) .w = c.get 8 := by
+    simp only [R', wRam]; rw [ramRead_ramWrite_w]
+  have epiFrame : ∀ b : Word, (c.get 2).toNat - 48 ≤ b.toNat → b.toNat + 4 ≤ (c.get 2).toNat →
+      ramRead (wEpiRam d M) b .w = ramRead M b .w := by
+    intro b h1 h2; simp only [wEpiRam, d8]; rw [ramRead_w_out, ramRead_w_out] <;> bv_omega
+  have ra1 : ramRead (wEpiRam d M) (d.get 2 + 0x1c#32) .w = c.get 1 := by
+    rw [d2, epiFrame _ (by bv_omega) (by bv_omega), slotM _ (by simp), v1]
+  have ra8 : ramRead (wEpiRam d M) (d.get 2 + 0x18#32) .w = c.get 8 := by
+    rw [d2, epiFrame _ (by bv_omega) (by bv_omega), slotM _ (by simp), v8]
+  have run2 := wepi d M dpc dq
+    (fun off hoff => by rw [d2]; exact wslot _ h.frame h.spAl off hoff)
+    (fun off hoff => by
+      rw [d8]; rcases hoff with rfl | rfl
+      · exact ⟨by bv_omega, by rw [B_ram]; constructor <;> bv_omega⟩
+      · exact ⟨by bv_omega, by rw [B_ram]; constructor <;> bv_omega⟩)
+    (by rw [ra1]; exact h.ra)
+  refine ⟨_, _, ((wcall c R h).trans hr1).trans run2, ⟨?_, ?_, ?_, ?_⟩, ?_⟩
+  · simp only [wEpi]; exact ra1
+  · intro r hr
+    by_cases r1 : r = 1
+    · subst r1; rw [wEpi_ra]; exact ra1
+    by_cases r8 : r = 8
+    · subst r8; rw [wEpi_s0]; exact ra8
+    by_cases r2 : r = 2
+    · subst r2; rw [wEpi_sp, d2, sp_back]
+    rw [wEpi_get d M r r1 r2 r8 (fun e => hr (by subst e; decide)) (fun e => hr (by subst e; decide))
+      (fun e => hr (by subst e; decide)), dk r hr]
+    exact wCore_get c r r1 r2 r8 (fun e => hr (by subst e; decide))
+  · simp only [wEpi]
+    exact (Core.sameCsr_goto _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
+      ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_goto _ _).trans ((Core.sameCsr_goto _ _).trans
+      ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
+      ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans (hret1.csr.trans (wCore_sameCsr c))))))))))))
+  · intro x xo xb xf
+    show wEpiRam d M x = R x
+    simp only [wEpiRam, d8]
+    rw [ramWrite_w_out, ramWrite_w_out]
+    · rw [hM x (by bv_omega) (by bv_omega) xb, hR' x (by bv_omega)]
+    all_goals bv_omega
+  · -- the result, through the inner `Res`
+    have horig : ∀ j, j < (c.get 12).toNat → bufByte R' (c.get 11) j = bufByte R (c.get 11) j := by
+      intro j hj; unfold bufByte; rw [hR' _ (by simp only [BitVec.toNat_add, BitVec.toNat_ofNat]; omega)]
+    have hn : firstZero (bufByte R' (c.get 11)) 0 (c.get 12).toNat = firstZero (bufByte R (c.get 11)) 0 (c.get 12).toNat :=
+      firstZero_congr _ _ _ horig (c.get 12).toNat 0 (by omega)
+    obtain ⟨-, hnl, -, -⟩ := firstZero_spec (bufByte R (c.get 11)) (c.get 12).toNat (c.get 12).toNat 0 (by omega)
+    have hrun : run (bufByte R' (c.get 11)) (firstZero (bufByte R (c.get 11)) 0 (c.get 12).toNat)
+        (firstZero (bufByte R (c.get 11)) 0 (c.get 12).toNat + 1) 0 [] =
+        run (bufByte R (c.get 11)) (firstZero (bufByte R (c.get 11)) 0 (c.get 12).toNat)
+        (firstZero (bufByte R (c.get 11)) 0 (c.get 12).toNat + 1) 0 [] :=
+      run_congr _ _ _ (fun j hj => horig j (by omega)) _ _ _
+    unfold Res at hres1
+    simp only [c10, c11, c12, hn, hrun, add_c4, add_c8] at hres1
+    obtain ⟨hz, hp⟩ := hres1
+    have W0 : ramRead (wEpiRam d M) (c.get 10) .w =
+        (ramRead M (c.get 2 + 0xffffffe0#32 + 0xc#32) .w + 0xffffffff#32) |||
+          ramRead M (c.get 2 + 0xffffffe0#32 + 0x10#32) .w := by
+      simp only [wEpiRam, d8, d2, BitVec.add_zero]
+      rw [ramRead_w_out, ramRead_ramWrite_w] <;> bv_omega
+    have W4 : ramRead (wEpiRam d M) (c.get 10 + 4) .w = ramRead M (c.get 2 + 0xffffffe0#32 + 0x14#32) .w := by
+      simp only [wEpiRam, d8, d2]
+      rw [show c.get 10 + (4 : Word) = c.get 10 + 0x4#32 from rfl, ramRead_ramWrite_w]
+    have WB : ∀ j, j < (c.get 12).toNat → bufByte (wEpiRam d M) (c.get 11) j = bufByte M (c.get 11) j := by
+      intro j hj
+      have hx : (c.get 11 + BitVec.ofNat 32 j).toNat = (c.get 11).toNat + j := by
+        simp only [BitVec.toNat_add, BitVec.toNat_ofNat]; omega
+      unfold bufByte; simp only [wEpiRam, d8]
+      rw [ramWrite_w_out, ramWrite_w_out]
+      all_goals (try rw [hx])
+      all_goals bv_omega
+    refine ⟨fun h0 => ?_, fun hpos => ?_⟩
+    · obtain ⟨t0, t4⟩ := hz h0
+      show ramRead (wEpiRam d M) (c.get 10) .w = 0
+      rw [W0, t0, t4]; decide
+    · obtain ⟨t0, t4, t8, tb⟩ := hp hpos
+      refine ⟨?_, ?_, fun j hj => ?_⟩
+      · show ramRead (wEpiRam d M) (c.get 10) .w = _
+        rw [W0, t0, t4]
+        split
+        · exact or_ones _
+        · decide
+      · show ramRead (wEpiRam d M) (c.get 10 + 4) .w = _
+        rw [W4, t8]
+      · show bufByte (wEpiRam d M) (c.get 11) j = _
+        rw [WB j hj, tb j hj]
+        split
+        · rfl
+        · exact horig j hj
+
 end E5R.Rmk.Cobs

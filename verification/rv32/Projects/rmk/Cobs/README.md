@@ -79,6 +79,42 @@ checked `img_eq`/`board_eq`).
 * The symbols 0x8001e02e/0x8001e006 are pinned.
 * Receipt: `verification/rv32/ram-image/rmk-qemu-riscv-rynk/rmk-cobs-decode.result.json`.
 
+## `decode_in_place` (0x8001e006), the function `next` calls: PROVED
+
+`E5R.Rmk.Cobs.decode_in_place` (Wrapper.lean):
+
+```lean
+structure WEnv (m : Machine) : Prop where     -- a0 = out (8 bytes), a1 = buf, a2 = len
+  pc : m.core.pc = 0x8001e006 ; quiet : Quiet m.core
+  out : B.inRam a0 8 ; outAl : a0 % 4 = 0
+  buf : B.inRam a1 len ; len : len ≤ 488
+  frame : B.inRam (sp - 48) 48 ; spAl : sp % 4 = 0      -- 32 bytes here + 16 in the inner call
+  outBuf, outFrame, bufFrame : pairwise disjoint (frame = [sp - 48, sp))
+  ra : ra even
+structure WReturns (m₀ m) : Prop   -- pc = ra; all but a0-a7, t0-t6 kept; CSRs kept;
+                                   -- RAM unchanged outside [a0, a0+8) ∪ buf ∪ [sp-48, sp)
+def WRes (m₀ m) : Prop :=          -- orig = original buffer bytes, n = firstZero orig 0 len,
+                                   -- r = Spec.run orig n (n+1) 0 []
+  (len = 0 → [a0] = 0) ∧
+  (0 < len → [a0] = (if r.1 = ok then 0xffffffff else 1) ∧ [a0+4] = |r.2| ∧
+     ∀ j < len, buf[j] = if j < |r.2| then r.2[j] else orig j)
+theorem decode_in_place (m₀) (h : WEnv m₀) : ∃ k m, QRun B img k m₀ m ∧ WReturns m₀ m ∧ WRes m₀ m
+```
+
+In `next` (0x8001d4be):
+* **Argument registers:**
+  * a0 = next's sp + 4 (the 8-byte result);
+  * a1 = buf + consumed;
+  * a2 = the frame length up to the delimiter.
+* **How `next` reads the result:** it compares `[sp+4]` against s9 = −1 (success), then
+  reads `[sp+8]` as the decoded length.
+* **For main's `next` composition:** `WEnv` needs 48 bytes below `next`'s sp at the
+  call, disjoint from the buffer and from next's result slot.
+
+Both contracts are in the runner job `jobs/rmk/rmk-cobs-decode.json`, restated on the
+runner's image in `Projects/ramimage/Cobs.lean`. Status: `proved` in 294 s, 10 theorems
+audited, standard axioms.
+
 ## Interface for main's `next` composition (proposal)
 
 ```lean

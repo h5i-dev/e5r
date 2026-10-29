@@ -21,10 +21,12 @@
     "Projects/rmk/Cobs/Spec.lean",
     "Projects/rmk/Cobs/Loop.lean",
     "Projects/rmk/Cobs/Decode.lean",
+    "Projects/rmk/Cobs/Wrapper.lean",
     "Projects/ramimage/Cobs.lean"
   ],
   "theorems": [
     "E5R.Rmk.Cobs.decode",
+    "E5R.Rmk.Cobs.decode_in_place",
     "E5R.RmkCobs.*"
   ],
   "symbols": {
