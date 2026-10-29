@@ -49,7 +49,7 @@ theorem empty (m₀ : Machine) (h : CobsEnv m₀) (hn : (m₀.core.get 12).toNat
         ((Core.sameCsr_goto _ _).trans k0)))) s4)))
   have g : ∀ r : Reg, r ≠ 7 → r ≠ 11 → e4.get r = e0.get r := fun r h7 h11 => by
     simp [e4, e3, e2, e1, Core.wr_get_ne, h7, h11]
-  obtain ⟨m, hm, hret, r0, r4, -, -⟩ := finish c R (saved c R) e4 h rfl (q _ k4) k4
+  obtain ⟨m, hm, hret, r0, r4, -, -, -⟩ := finish c R (saved c R) e4 h rfl (q _ k4) k4
     (by rw [g 2 (by decide) (by decide)]; exact pro_sp c)
     (by rw [g 1 (by decide) (by decide), pro_get c 1 (by decide) (by decide)])
     (by rw [g 10 (by decide) (by decide), pro_get c 10 (by decide) (by decide)])
