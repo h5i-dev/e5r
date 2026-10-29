@@ -89,3 +89,20 @@ Call sites by callee, selected:
 - QEMU run of the example (needs the rynk host client `qemu_behavior`; host build not attempted).
 - No e5r image export of this ELF yet; no `virt` board model in e5r (main owns boards/integration).
 - ELF reproducibility from a second checkout path.
+
+## ALERT: the e5r machine model does not fit a RAM-resident image as is
+
+`Theories/Platform.lean` `stepInstr` fetches instructions from the immutable image (`fetch img pc`,
+`romRead?`), while loads and stores check `B.inRam` first and only then the image. That is exact for
+the FE310 (code in flash, RAM separate). For the RMK `virt` ELF every segment, code included, lies in
+RAM (0x80000000..), so:
+
+1. The real hart fetches from RAM, which stores can change; the model fetches the original bytes. A
+   proof over this model transfers to QEMU only with an extra invariant: no store ever hits the
+   `.text`/`.init.rust` bytes (or fetch must be modeled from RAM).
+2. Loads from `.rodata`/`.data` go to the `ram` function, not to the image, so the initial-state
+   predicate must state `ram` = image bytes on every loaded segment (and zero `.bss` if relied on).
+   With an unconstrained initial `ram` a proof would be about a different program state.
+
+Neither is a bug in the FE310 work; they are obligations a `virt` board/loader must add before any
+RMK claim. Main owns Platform/boards; this is reported, not changed.
