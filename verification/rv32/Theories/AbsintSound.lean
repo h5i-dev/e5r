@@ -3155,4 +3155,69 @@ theorem absStore_frame {cfg : Config} {s : AState} {av : AV} {wd : Width} {V : A
     · exfalso; simp [absStore, hsv] at h
   | _ => simp [absStore] at h
 
+theorem jump_si {P : Word → Width → Prop} (c : Core) (t : Word) : (jump c t).StoresIn P := by
+  unfold jump; split <;> trivial
+
+theorem csrRead_si {P : Word → Width → Prop} {c : Core} {addr : Nat} {k : Word → Eff}
+    (hk : ∀ v, (k v).StoresIn P) : (csrRead c addr k).StoresIn P := by
+  unfold csrRead
+  repeat' (first | exact hk _ | exact fun _ => hk _ | trivial | split)
+
+theorem csrWrite_si {P : Word → Width → Prop} {c : Core} {addr : Nat} {v : Word} {fin : Core → Eff}
+    (hk : ∀ c', (fin c').StoresIn P) : (csrWrite c addr v fin).StoresIn P := by
+  unfold csrWrite
+  repeat' (first | exact hk _ | trivial | split | (dsimp only))
+
+/-- Every store a handler instruction makes is to a place a handler may write. -/
+theorem exec_storesIn {cfg : Config} {s : AState} {m : Machine} {ρ : Nat → Word} {len : Word}
+    {i : Instr} {ts : List AState} (hs : StateHolds ρ s m) (hnd : s.hnd = true)
+    (hsp : SpOk cfg (ρ 2).toNat) (h : absExec cfg s len.toNat i = some ts) :
+    (exec m.core len i).StoresIn (fun A wd => cfg.board.inRam A wd.bytes = true → FrameOk cfg (ρ 2).toNat A wd) := by
+  cases i with
+  | store wd rs1 rs2 off =>
+    simp only [absExec, Option.bind_eq_some_iff] at h
+    obtain ⟨mem, hst, -⟩ := h
+    have hA := addC_sound off.toNat (hs.regs rs1)
+    rw [w_len] at hA
+    rw [exec_store]
+    exact ⟨fun hin => absStore_frame hst hnd hA hsp hin, trivial⟩
+  | sc rd rs1 rs2 =>
+    simp only [absExec, Option.bind_eq_some_iff] at h
+    obtain ⟨_, -, mem, hst, -⟩ := h
+    show Eff.StoresIn _ (.load .w (m.core.get rs1) true _)
+    intro _
+    split
+    · trivial
+    · intro ok
+      dsimp only
+      split
+      · exact ⟨fun hin => absStore_frame hst hnd (hs.regs rs1) hsp hin, trivial⟩
+      · trivial
+  | amo op rd rs1 rs2 =>
+    simp only [absExec, Option.bind_eq_some_iff] at h
+    obtain ⟨_, -, mem, hst, -⟩ := h
+    show Eff.StoresIn _ (.load .w (m.core.get rs1) true _)
+    intro _
+    exact ⟨fun hin => absStore_frame hst hnd (hs.regs rs1) hsp hin, trivial⟩
+  | jal => exact jump_si _ _
+  | jalr => exact jump_si _ _
+  | branch =>
+    show Eff.StoresIn _ (if _ then _ else _)
+    split
+    · exact jump_si _ _
+    · trivial
+  | csr op rd src addr =>
+    show Eff.StoresIn _ (execCsr _ _ _ _ _ _)
+    unfold execCsr
+    repeat' (first | trivial | (apply csrRead_si; intro v) | exact csrWrite_si (fun _ => trivial) |
+      (dsimp only) | split)
+  | mret =>
+    show Eff.StoresIn _ (if _ then _ else _)
+    split
+    · trivial
+    · exact jump_si _ _
+  | load => intro _; trivial
+  | lr => intro _; trivial
+  | _ => trivial
+
 end E5R.AI
