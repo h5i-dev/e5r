@@ -163,4 +163,15 @@ theorem hentry_of {cert : Cert}
   obtain ⟨m', hr, hpost⟩ := adapter ha hs
   exact regionOf_entry hr (mainInv_of_cover hn' hnd' hleq hpost)
 
+/-- The summary as the checker's data: the analyzer follows it, `summarized`
+    checks a node against it (support-lean4 34fadf2). -/
+def spec : SumSpec := { pc := 0x20010698, accepts := enterOk, post := post }
+
+/-- **The ring-head summary is sound** in the checker's sense, for any kept
+    intervals: `check_sound_hybrid`'s `hsums` for `spec`. -/
+theorem spec_sound (keep : List (Nat × Nat)) : SumSound { cfg with hkeep := keep } spec := by
+  intro s m _ ha _ hs
+  obtain ⟨m', hr, hpost⟩ := adapter ha hs
+  exact safeStep_of_mrun (cfg := { cfg with hkeep := keep }) (n := 7) hr hpost
+
 end E5R.Hifive1.Hybrid.RingAI

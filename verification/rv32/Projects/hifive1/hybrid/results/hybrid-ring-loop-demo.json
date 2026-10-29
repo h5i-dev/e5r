@@ -19,13 +19,13 @@
       "Projects/hifive1/hybrid/demo/LoopCert.lean": "11563e9607d629f74e98172ed56f13942ba48e8695cb47016f09ab83f7f31bdb",
       "Projects/hifive1/hybrid/demo/LoopConfig.lean": "74283de9dfc84004854218612d637df8db17463c83e38bf89c42b3d26b13eabd",
       "Projects/hifive1/hybrid/demo/LoopControls.lean": "f2b7420ab22b178e182e7b13e92a1c4723b5dbe5f23f6932d6152f6109459ded",
-      "Projects/hifive1/hybrid/demo/LoopProof.lean": "a391dac3c53dc3b8bc33069a1626c8b0ba8976b4ef04e9c12c88cba4801d4158",
-      "Theories/Absint.lean": "c9e93746635c3e97f083fb6138896d61a5569ed25fd6a9267038b3f901746311",
-      "Theories/AbsintSound.lean": "ce73c7c85aa98809ecbe79bc369624c07177e83deb58429232da31c55776a1fb",
+      "Projects/hifive1/hybrid/demo/LoopProof.lean": "dea2b8c64bcdf6a7cba2d9d8503cee8651cdb4edb22e503ab507d69892394d55",
+      "Theories/Absint.lean": "c582fed3bac0276fca7de94bd4e08987c17ab30badf74138e74fccc7f6dd312e",
+      "Theories/AbsintSound.lean": "111a64a831bfe1fafc3ba0616fd4d7342ed24624a87119139bb2a3996d729818",
       "Theories/Board/Hifive1Revb.lean": "9c4d1786b02048ff815849c8b73375d1651ea5cdf9c47d6062db8c170c2db92f",
       "Theories/FlashElf.lean": "b3a5dd6e56e6e9444b88f05de6f020e326377f55af777b380249fc53cc0111a6",
       "Theories/Hart.lean": "dde4a86db936c9ad60f58866c3ebb333fbc556ec0f94299da212d0ca08cfb82a",
-      "Theories/Hybrid/AIBridge.lean": "b089c43f22504768deb211648862823d61155e8e8b51603e89878674e324aaa2",
+      "Theories/Hybrid/AIBridge.lean": "d1968e0a2ce95512589797a3a70f1b003c9bb8c100d3df70f45a47e575b5fe84",
       "Theories/Hybrid/Basic.lean": "80aac8422f21a9558e1840992750790c4febfa3275e47627b3cdbdb3551a2a00",
       "Theories/Hybrid/Wrap.lean": "9127d8afa2c52eca7b57c4bc8f131194a8305435da1d65b7577f010f3d86dcf9",
       "Theories/Logic.lean": "2abb6fb82fc72308a5e7da7d482b94784b1490896634d7ea9d38c9b7b9460bf5",
@@ -55,177 +55,177 @@
   ],
   "resumed": [],
   "schema": "e5r.verify.result.v1",
-  "seconds": 95.014027206,
+  "seconds": 93.23285055,
   "stages": [
     {
       "name": "build mkdir -p build",
       "peak_rss_mib": 0,
-      "seconds": 0.101319448
+      "seconds": 0.101214122
     },
     {
       "name": "build rustup run 1.98.1 rustc --target riscv32imac-unknown-none-elf --crate-type bin --edition 2024 -C opt-level=2 -C panic=abort -C relocation-model=static -C link-arg=-Tlink.ld -C strip=none -o ../../../../build/hybrid-ring-loop-O2.elf ring_loop.rs",
       "peak_rss_mib": 94,
-      "seconds": 0.201673652
+      "seconds": 0.201675704
     },
     {
       "name": "lean Theories/Hart.lean",
-      "peak_rss_mib": 505,
-      "seconds": 3.109568734
+      "peak_rss_mib": 513,
+      "seconds": 3.108529087
     },
     {
       "name": "lean Theories/Platform.lean",
-      "peak_rss_mib": 486,
-      "seconds": 1.905872834
+      "peak_rss_mib": 471,
+      "seconds": 1.906382104
     },
     {
       "name": "lean Theories/Logic.lean",
-      "peak_rss_mib": 500,
-      "seconds": 2.5066009620000003
+      "peak_rss_mib": 492,
+      "seconds": 2.7086685790000002
     },
     {
       "name": "lean Theories/FlashElf.lean",
       "peak_rss_mib": 467,
-      "seconds": 1.604496642
+      "seconds": 1.504440797
     },
     {
       "name": "lean Theories/Board/Hifive1Revb.lean",
-      "peak_rss_mib": 464,
-      "seconds": 2.206506161
+      "peak_rss_mib": 440,
+      "seconds": 1.304081027
     },
     {
       "name": "lean Projects/hifive1/hybrid/demo/LoopImage.lean",
-      "peak_rss_mib": 595,
-      "seconds": 5.612250462
+      "peak_rss_mib": 596,
+      "seconds": 4.013392111
     },
     {
       "name": "lean Projects/hifive1/hybrid/demo/LoopImageFidelity.lean",
-      "peak_rss_mib": 540,
-      "seconds": 1.704714418
+      "peak_rss_mib": 539,
+      "seconds": 1.806274551
     },
     {
       "name": "lean Theories/Hybrid/Basic.lean",
-      "peak_rss_mib": 477,
-      "seconds": 1.403827013
+      "peak_rss_mib": 466,
+      "seconds": 1.404518852
     },
     {
       "name": "lean Theories/Hybrid/Wrap.lean",
-      "peak_rss_mib": 461,
-      "seconds": 1.404023221
+      "peak_rss_mib": 457,
+      "seconds": 1.404343603
     },
     {
       "name": "lean Theories/Absint.lean",
-      "peak_rss_mib": 518,
-      "seconds": 3.809023477
+      "peak_rss_mib": 528,
+      "seconds": 3.708976882
     },
     {
       "name": "lean Theories/AbsintSound.lean",
       "peak_rss_mib": 794,
-      "seconds": 22.347498504
+      "seconds": 22.246303478
     },
     {
       "name": "lean Theories/Hybrid/AIBridge.lean",
-      "peak_rss_mib": 452,
-      "seconds": 1.704720588
+      "peak_rss_mib": 467,
+      "seconds": 1.905817419
     },
     {
       "name": "lean Projects/hifive1/hybrid/demo/LoopConfig.lean",
-      "peak_rss_mib": 450,
-      "seconds": 1.204158176
+      "peak_rss_mib": 462,
+      "seconds": 1.303988428
     },
     {
       "name": "lean Projects/hifive1/hybrid/demo/LoopCert.lean",
       "peak_rss_mib": 472,
-      "seconds": 1.804775615
+      "seconds": 1.804907902
     },
     {
       "name": "lean Projects/hifive1/hybrid/demo/LoopProof.lean",
-      "peak_rss_mib": 535,
-      "seconds": 2.5050746630000003
+      "peak_rss_mib": 536,
+      "seconds": 2.406288842
     },
     {
       "name": "lean Projects/hifive1/hybrid/demo/LoopControls.lean",
-      "peak_rss_mib": 488,
-      "seconds": 1.504179618
+      "peak_rss_mib": 490,
+      "seconds": 1.604468274
     },
     {
       "name": "leanchecker Theories/Hart.lean",
-      "peak_rss_mib": 432,
-      "seconds": 5.11036569
+      "peak_rss_mib": 436,
+      "seconds": 4.710789485
     },
     {
       "name": "leanchecker Theories/Platform.lean",
-      "peak_rss_mib": 434,
-      "seconds": 1.805124733
+      "peak_rss_mib": 363,
+      "seconds": 1.90598425
     },
     {
       "name": "leanchecker Theories/Logic.lean",
-      "peak_rss_mib": 444,
-      "seconds": 2.005002907
+      "peak_rss_mib": 440,
+      "seconds": 2.006031803
     },
     {
       "name": "leanchecker Theories/FlashElf.lean",
-      "peak_rss_mib": 218,
-      "seconds": 1.804880064
+      "peak_rss_mib": 233,
+      "seconds": 1.80576069
     },
     {
       "name": "leanchecker Theories/Board/Hifive1Revb.lean",
-      "peak_rss_mib": 236,
-      "seconds": 1.804223648
+      "peak_rss_mib": 430,
+      "seconds": 1.806210284
     },
     {
       "name": "leanchecker Projects/hifive1/hybrid/demo/LoopImage.lean",
-      "peak_rss_mib": 238,
-      "seconds": 1.803738192
+      "peak_rss_mib": 427,
+      "seconds": 1.8053045060000001
     },
     {
       "name": "leanchecker Projects/hifive1/hybrid/demo/LoopImageFidelity.lean",
       "peak_rss_mib": 520,
-      "seconds": 2.204318057
+      "seconds": 2.305956688
     },
     {
       "name": "leanchecker Theories/Hybrid/Basic.lean",
-      "peak_rss_mib": 430,
-      "seconds": 1.703763764
+      "peak_rss_mib": 437,
+      "seconds": 2.00596873
     },
     {
       "name": "leanchecker Theories/Hybrid/Wrap.lean",
-      "peak_rss_mib": 386,
-      "seconds": 1.805048953
+      "peak_rss_mib": 435,
+      "seconds": 2.005858428
     },
     {
       "name": "leanchecker Theories/Absint.lean",
-      "peak_rss_mib": 436,
-      "seconds": 1.90504911
+      "peak_rss_mib": 435,
+      "seconds": 1.905841511
     },
     {
       "name": "leanchecker Theories/AbsintSound.lean",
-      "peak_rss_mib": 466,
-      "seconds": 5.311225168
+      "peak_rss_mib": 465,
+      "seconds": 5.513346671
     },
     {
       "name": "leanchecker Theories/Hybrid/AIBridge.lean",
-      "peak_rss_mib": 435,
-      "seconds": 1.804666626
+      "peak_rss_mib": 449,
+      "seconds": 1.805146388
     },
     {
       "name": "leanchecker Projects/hifive1/hybrid/demo/LoopConfig.lean",
-      "peak_rss_mib": 257,
-      "seconds": 1.804853614
+      "peak_rss_mib": 425,
+      "seconds": 1.805439742
     },
     {
       "name": "leanchecker Projects/hifive1/hybrid/demo/LoopCert.lean",
-      "peak_rss_mib": 207,
-      "seconds": 1.805039933
+      "peak_rss_mib": 435,
+      "seconds": 1.805548599
     },
     {
       "name": "leanchecker Projects/hifive1/hybrid/demo/LoopProof.lean",
-      "peak_rss_mib": 486,
-      "seconds": 2.105210513
+      "peak_rss_mib": 487,
+      "seconds": 2.205950566
     },
     {
       "name": "leanchecker Projects/hifive1/hybrid/demo/LoopControls.lean",
-      "peak_rss_mib": 449,
-      "seconds": 1.905166889
+      "peak_rss_mib": 447,
+      "seconds": 1.805594701
     }
   ],
   "status": "proved",
