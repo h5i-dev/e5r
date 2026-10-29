@@ -693,11 +693,39 @@ theorem cell_at {ρ : Nat → Word} {c : Cell} {base : Base} {a : Nat} (hb : c.b
 theorem plain_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Cell} {base : Base}
     {a : Nat} {wd : Width} {v : AV} (hm : MemHolds ρ ram mem) (h : plain mem base a wd = some v) :
     v.gam ρ (ramRead ram (addrOf ρ base a) wd) := by
-  obtain ⟨c, hc, hp, rfl⟩ := find_map_some h
-  simp only [Bool.and_eq_true, beq_iff_eq, Option.isNone_iff_eq_none] at hp
-  obtain ⟨⟨⟨hb, ha⟩, hw⟩, hg⟩ := hp
-  have := hm c hc (fun g e => by rw [hg] at e; cases e)
-  rw [← hw, ← cell_at hb ha]; exact this
+  unfold plain at h
+  have hall : ∀ c ∈ mem.filter (fun c => c.base == base && c.addr == a && c.w == wd && c.guard.isNone),
+      c.v.gam ρ (ramRead ram (addrOf ρ base a) wd) := by
+    intro c hc
+    obtain ⟨hc, hp⟩ := List.mem_filter.mp hc
+    simp only [Bool.and_eq_true, beq_iff_eq, Option.isNone_iff_eq_none] at hp
+    obtain ⟨⟨⟨hb, ha⟩, hw⟩, hg⟩ := hp
+    have := hm c hc (fun g e => by rw [hg] at e; cases e)
+    rw [← hw, ← cell_at hb ha]; exact this
+  generalize mem.filter _ = l at hall h
+  have key : ∀ (l : List Cell) (acc : Option AV),
+      (∀ c ∈ l, c.v.gam ρ (ramRead ram (addrOf ρ base a) wd)) →
+      (∀ u, acc = some u → u.gam ρ (ramRead ram (addrOf ρ base a) wd)) →
+      ∀ u, l.foldl (fun acc c => some (match acc with | none => c.v | some v => v.meet c.v)) acc = some u →
+        u.gam ρ (ramRead ram (addrOf ρ base a) wd) := by
+    intro l
+    induction l with
+    | nil => intro acc _ hacc u h; exact hacc u h
+    | cons c cs ih =>
+      intro acc hl hacc u h
+      simp only [List.foldl_cons] at h
+      refine ih _ (fun d hd => hl d (List.mem_cons_of_mem _ hd)) ?_ u h
+      intro u' hu'
+      simp only [Option.some.injEq] at hu'
+      subst hu'
+      have hc := hl c (List.mem_cons_self ..)
+      cases acc with
+      | none => exact hc
+      | some v =>
+        have hv := hacc v rfl
+        simp only
+        cases v <;> cases hc' : c.v <;> rw [hc'] at hc <;> simp_all [AV.meet, AV.gam]
+  exact key l none hall (fun _ h => by cases h) v h
 
 theorem guardHolds_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Cell}
     {g : Nat × Width × Nat} (hm : MemHolds ρ ram mem) (h : guardHolds mem g = true) :

@@ -308,9 +308,17 @@ def overlap (a n b m : Nat) : Bool :=
 def Cell.hits (c : Cell) (base : Base) (a n : Nat) : Bool :=
   c.base == base && overlap c.addr c.w.bytes a n
 
-/-- The unconditional fact about `wd` at `a`, if any. -/
+/-- Two facts about the same bytes both hold, so a value lies in both sets. -/
+def AV.meet : AV → AV → AV
+  | .vals x, .vals y => .vals (x.filter (· ∈ y))
+  | .top, b => b
+  | a, _ => a
+
+/-- What the unconditional facts about `wd` at `a` say together: several
+    can hold at once (an interrupt-window fact kept next to `G`'s). -/
 def plain (mem : List Cell) (base : Base) (a : Nat) (wd : Width) : Option AV :=
-  (mem.find? fun c => c.base == base && c.addr == a && c.w == wd && c.guard.isNone).map (·.v)
+  (mem.filter fun c => c.base == base && c.addr == a && c.w == wd && c.guard.isNone).foldl
+    (fun acc c => some (match acc with | none => c.v | some v => v.meet c.v)) none
 
 /-- The state knows the `g.2.1` value at `g.1` is not `g.2.2`. -/
 def guardHolds (mem : List Cell) (g : Nat × Width × Nat) : Bool :=
