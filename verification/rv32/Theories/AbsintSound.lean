@@ -2671,12 +2671,32 @@ theorem holds_split {ρ : Nat → Word} {t : AState} {m : Machine} (hs : StateHo
   have := hregs q
   rwa [Core.set_get_same] at this
 
+theorem covered_len {cert : Cert} {t : AState} {j : Nat} (h : covered cert t j = true) :
+    t.regs.length = 31 := by
+  unfold covered at h
+  split at h
+  · simp only [AState.leq, Bool.and_eq_true, beq_iff_eq, and_assoc] at h; exact h.2.2.1
+  · simp at h
+
+theorem AState.set_len (s : AState) (r : Reg) (v : AV) : (s.set r v).regs.length = s.regs.length := by
+  unfold AState.set; split <;> simp
+
+theorem pinned_regs {pin : Option (Nat × Nat × Width)} {e : Edge} {r v : Nat} {t0 t' : AState}
+    (h : pinned pin e r v t0 = some t') : t'.regs = t0.regs := by
+  unfold pinned at h
+  split at h
+  · cases h; rfl
+  · split at h
+    · split at h
+      · cases h; rfl
+      · simp at h
+    · simp at h
+
 /-- A covered successor lands in a node. A pinning edge needs the loaded
     word to equal the destination register, which the load establishes. -/
 theorem coveredE_sound {ρ : Nat → Word} {cert : Cert} {pin : Option (Nat × Nat × Width)} {t : AState}
     {e : Edge} {m : Machine} (h : coveredE cert pin t e = true) (hs : StateHolds ρ t m)
-    (hl : t.regs.length = 31)
-    (hpin : e.pin = true → ∀ rd a wd, pin = some (rd, a, wd) → ∀ hr : rd < 32,
+    (hpin : e.pin = true → ∀ rd a wd, pin = some (rd, a, wd) → ∀ hr : rd < 32, 0 < rd →
       ramRead m.ram (w a) wd = m.core.get ⟨rd, hr⟩) :
     ∃ j ∈ e.nodes, ∃ n, cert.nodes[j]? = some n ∧ StateHolds ρ n.s m := by
   unfold coveredE at h
@@ -2697,6 +2717,9 @@ theorem coveredE_sound {ρ : Nat → Word} {cert : Cert} {pin : Option (Nat × N
         split at hv
         · next t' hp =>
           obtain ⟨j, hj, hc⟩ := List.any_eq_true.mp hv
+          have hl : t.regs.length = 31 := by
+            rw [← AState.set_len t ⟨r, h0.2⟩ (.vals [(m.core.get ⟨r, h0.2⟩).toNat]), ← pinned_regs hp]
+            exact covered_len hc
           have ht' : StateHolds ρ t' m := by
             have hsp := holds_split hs hl ⟨r, h0.2⟩ (v := (m.core.get ⟨r, h0.2⟩).toNat) rfl
             unfold pinned at hp
@@ -2713,12 +2736,127 @@ theorem coveredE_sound {ρ : Nat → Word} {cert : Cert} {pin : Option (Nat × N
                   apply holds_with_mem hsp
                   apply setPlain_sound hsp.mem
                   simp only [AV.gam, List.mem_singleton]
-                  rw [hpin hnp rd a wd rfl h0.2]
+                  rw [hpin hnp rd a wd rfl h0.2 h0.1]
                 · simp at hp
               · simp at hp
           exact ⟨j, hj, covered_sound hc ht'⟩
         · simp at hv
       · simp at h
     · simp at h
+
+/-! ### One node, one instruction -/
+
+theorem ram_aligned {cfg : Config} {a : Nat} {wd : Width} (h : classify cfg a wd = some .ram) :
+    (w a).toNat % wd.bytes = 0 := by
+  have := (classify_ram h).1
+  simp only [w, BitVec.toNat_ofNat]
+  cases wd <;> simp only [Width.bytes] at this ⊢ <;> omega
+
+/-- A load at a known RAM address, zero-extended or a whole word: the
+    destination register ends up equal to the loaded word. -/
+theorem load_exact {cfg : Config} {ρ : Nat → Word} {s : AState} {m : Machine} {len : Word}
+    {wd : Width} {signed : Bool} {rd rs1 : Reg} {off : Word} {a : Nat}
+    (hs : StateHolds ρ s m) (hsg : (signed && wd != .w) = false)
+    (ha : addC (s.get rs1) off.toNat = .vals [a]) (hc : classify cfg a wd = some .ram) (o : Oracle) :
+    interp cfg.board cfg.img o (exec m.core len (.load wd signed rd rs1 off)) m.ram 0 [] =
+      .ok (m.core.wr rd (ramRead m.ram (w a) wd) (m.core.pc + len)) m.ram [] := by
+  rw [exec_load]
+  have hA := addC_sound off.toNat (hs.regs rs1)
+  rw [w_len, ha] at hA
+  simp only [AV.gam, List.mem_singleton] at hA
+  have hA' : m.core.get rs1 + off = w a := by rw [← hA, w_toNat]
+  rw [hA', interp_load_ram o (ram_aligned hc) (classify_ram hc).2, interp_done]
+  have hf := ramRead_fits m.ram (w a) wd
+  simp only [Fits, Width.bytes] at hf
+  cases wd <;> cases signed <;> simp at hsg
+  · simp only [E5R.extend]; rw [and_ff _ (by omega)]
+  · simp only [E5R.extend]; rw [and_ffff _ (by omega)]
+  · rfl
+  · rfl
+
+theorem fetch_bridge {img : List Segment} {pc : Nat} {i : Instr} {len : Nat}
+    (h : successors.fetchDecode' img pc = some (i, len)) :
+    pc % 2 = 0 ∧ ∃ bits len', fetch img (w pc) = some (bits, len') ∧ decode bits len' = some i ∧
+      len = len'.toNat := by
+  unfold successors.fetchDecode' at h
+  split at h
+  · simp at h
+  · next hpc =>
+    refine ⟨by omega, ?_⟩
+    split at h
+    · next bits len' hf =>
+      cases hd : decode bits len' with
+      | none => rw [hd] at h; simp at h
+      | some i' =>
+        rw [hd] at h; simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at h
+        obtain ⟨rfl, rfl⟩ := h
+        exact ⟨bits, len', hf, hd, rfl⟩
+    · simp at h
+
+/-- A node's non-`mret` instruction: under every environment the step does
+    not fault, emits allowed events, and lands in a node of one of its edges. -/
+theorem instr_sound {cfg : Config} {cert : Cert} {n : Node} {ρ : Nat → Word} {m : Machine}
+    {i : Instr} {len : Nat} (hok : instrOk cfg cert n = true) (hs : StateHolds ρ n.s m)
+    (hwf : n.s.wf cfg = true) (hv : ValidImg cfg.img) (hram : cfg.board.ramBase + cfg.board.ramSize ≤ M32)
+    (hsp : n.s.hnd = true → SpOk cfg (ρ 2).toNat)
+    (hfd : successors.fetchDecode' cfg.img n.s.pc = some (i, len)) (hnm : i ≠ .mret) (o : Oracle) :
+    ∃ c ram evs, stepInstr cfg.board cfg.img m o = .ok c ram evs ∧ (∀ ev ∈ evs, EvOk cfg ev) ∧
+      ∃ e ∈ n.succ, ∃ j ∈ e.nodes, ∃ n', cert.nodes[j]? = some n' ∧ StateHolds ρ n'.s ⟨c, ram⟩ := by
+  have hl := (wf_parts hwf).1
+  obtain ⟨hpc2, bits, len', hf, hd, rfl⟩ := fetch_bridge hfd
+  have hstep : stepInstr cfg.board cfg.img m o =
+      interp cfg.board cfg.img o (exec m.core len' i) m.ram 0 [] := by
+    unfold stepInstr
+    rw [hs.pc, lsb_even (by simp only [w, BitVec.toNat_ofNat]; omega)]
+    simp only [Bool.false_eq_true, if_false, hf, hd]
+  unfold instrOk at hok
+  rw [hfd] at hok
+  split at hok
+  · next heq => simp only [Option.some.injEq, Prod.mk.injEq] at heq; exact absurd heq.1 hnm
+  · next _ _ heq =>
+    simp only [Option.some.injEq, Prod.mk.injEq] at heq
+    obtain ⟨rfl, rfl⟩ := heq
+    split at hok
+    · next ts habs =>
+      simp only [Bool.and_eq_true, beq_iff_eq, List.all_eq_true] at hok
+      obtain ⟨hlen, hall⟩ := hok
+      obtain ⟨c, ram, evs, hi, hev, t, ht, hh⟩ := absExec_sound hs hl o hv hram hwf hsp habs
+      refine ⟨c, ram, evs, by rw [hstep, hi], hev, ?_⟩
+      obtain ⟨k, hk, rfl⟩ := List.mem_iff_getElem.mp ht
+      have hk' : k < n.succ.length := hlen ▸ hk
+      have hz : (ts[k], n.succ[k]) ∈ List.zip ts n.succ := by
+        have hkz : k < (List.zip ts n.succ).length := by simp; omega
+        have := List.getElem_mem hkz
+        simpa using this
+      have hcov := hall _ hz
+      refine ⟨n.succ[k], List.getElem_mem hk', coveredE_sound hcov hh ?_⟩
+      intro _ rd a wd hpa hr hr0
+      unfold pinAddr at hpa
+      rw [hfd] at hpa
+      split at hpa
+      · next wd' signed rd' rs1 off _ heq =>
+        simp only [Option.some.injEq, Prod.mk.injEq] at heq
+        obtain ⟨rfl, -⟩ := heq
+        split at hpa
+        · simp at hpa
+        · next hsg =>
+          split at hpa
+          · next a' ha =>
+            split at hpa
+            · next hc =>
+              simp only [Option.some.injEq, Prod.mk.injEq] at hpa
+              obtain ⟨rfl, rfl, rfl⟩ := hpa
+              have hex := load_exact (len := len') (rd := rd') hs (Bool.eq_false_iff.mpr hsg) ha
+                (by simpa using hc) o
+              rw [hi] at hex
+              simp only [Result.ok.injEq] at hex
+              obtain ⟨rfl, rfl, -⟩ := hex
+              have : (⟨rd'.val, hr⟩ : Reg) = rd' := rfl
+              rw [this, Core.wr_get_self _ _ _ _ (by omega)]
+            · simp at hpa
+          · simp at hpa
+      · simp at hpa
+    · simp at hok
+  · simp at hok
 
 end E5R.AI
