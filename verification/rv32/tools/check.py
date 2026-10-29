@@ -12,7 +12,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[3]
 VERIFY = ROOT / 'verification/rv32'
-BUILD = ROOT / 'fixtures/build/lean-rv32'
+BUILD = VERIFY / 'build'
 CROSS = os.environ.get('CROSS_COMPILE', 'riscv64-linux-gnu-')
 QEMU = os.environ.get('QEMU_RISCV32', 'qemu-riscv32')
 PINS = json.loads((VERIFY/'toolchain.json').read_text())

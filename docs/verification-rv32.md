@@ -46,7 +46,9 @@ budget and was stopped. The final control rewrites with the already proved
 mutation-rejection theorem and requires Lean to reject the resulting small
 `false = true` claim; the watchdog also guards every Lean invocation.
 
-Build artifacts go in `fixtures/build/lean-rv32/`; generated Lean image/oracle
+Build artifacts go in `verification/rv32/build/` (ignored). They must not go
+under `fixtures/build/`: the corpus-gated workspace tests treat that directory's
+existence as "the fixture corpus was built". Generated Lean image/oracle
 modules and oleans are ignored. `provenance.json` records full tool versions,
 exact fixture build commands, ELF and generated-image hashes and byte lengths.
 The runner also enforces the reviewed ELF identities in

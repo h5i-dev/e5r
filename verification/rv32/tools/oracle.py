@@ -8,7 +8,7 @@ import struct
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[3]
-BUILD = ROOT / 'fixtures/build/lean-rv32'
+BUILD = ROOT / 'verification/rv32/build'
 CROSS = os.environ.get('CROSS_COMPILE', 'riscv64-linux-gnu-')
 QEMU = os.environ.get('QEMU_RISCV32', 'qemu-riscv32')
 
