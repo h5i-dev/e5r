@@ -1,0 +1,7 @@
+ok QEMU roms: mrom.reset@0x1000+0x28, mrom.finfo@0x1028+0x18, rmk-qemu-riscv ELF program header segment 0@0x80000000+0x210da, rmk-qemu-riscv ELF program header segment 1@0x800210dc+0x8aec, rmk-qemu-riscv ELF program header segment 2@0x80029bc8+0x5, rmk-qemu-riscv ELF program header segment 3@0x80029bd0+0xfd6430, fdt@0x87e00000+0x10fa
+ok reset ROM at 0x1000 jumps to entry 0x80000000
+ok PT_LOAD 0: QEMU RAM [0x80000000, +0x210da) = 135386 blob bytes + 0 zeros
+ok PT_LOAD 1: QEMU RAM [0x800210dc, +0x8aec) = 35564 blob bytes + 0 zeros
+ok PT_LOAD 2: QEMU RAM [0x80029bc8, +0x5) = 5 blob bytes + 0 zeros
+ok PT_LOAD 3: QEMU RAM [0x80029bd0, +0xfd6430) = 0 blob bytes + 16606256 zeros
+QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
