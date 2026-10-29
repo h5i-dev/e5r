@@ -26,7 +26,8 @@
     "Theories/AbsintSound.lean"
   ],
   "theorems": [
-    "E5R.AI.check_sound"
+    "E5R.AI.check_sound",
+    "E5R.AI.check_sound_hybrid"
   ],
   "limits": {
     "seconds": 1800,

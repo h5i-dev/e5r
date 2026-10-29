@@ -748,6 +748,9 @@ structure Cert where
   handlers : List (Nat × Nat)
   /-- Static RAM the handler never writes (`Config.hkeep`). -/
   hkeep : List (Nat × Nat) := []
+  /-- Main-thread pcs whose code is proved directly rather than by this
+      checker, with the index of the proved region (`checkHybrid`). -/
+  delegate : List (Nat × Nat) := []
   deriving Repr
 
 def staticOf (cfg : Config) (mem : List Cell) : List Cell :=
@@ -882,8 +885,14 @@ def irqOk (cfg : Config) (cert : Cert) (s : AState) : Bool :=
     | some e, some j => covered cert e j
     | _, _ => false)
 
+/-- A main-thread node whose steps a directly proved region covers instead
+    of `instrOk`. It has no successors; interrupts at it are still checked. -/
+def delegated (cert : Cert) (n : Node) : Bool :=
+  !n.s.hnd && n.succ.isEmpty && n.s.pc % 2 == 0 && cert.delegate.any (·.1 == n.s.pc)
+
 def nodeOk (cfg : Config) (cert : Cert) (n : Node) : Bool :=
-  n.s.wf cfg && (n.s.hnd || noSym n.s) && instrOk cfg cert n && irqOk cfg cert n.s
+  n.s.wf cfg && (n.s.hnd || noSym n.s) && (instrOk cfg cert n || delegated cert n) &&
+    irqOk cfg cert n.s
 
 def checkAt (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
   -- Execution starts in the main thread, at node 0.
@@ -900,8 +909,14 @@ def checkAt (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
   cert.G.all (fun c => c.base == .abs && c.wf cfg && cfg.isStatic c.addr c.w.bytes && !c.v.hasSym &&
     match c.guard with | some g => cfg.isStatic g.1 g.2.1.bytes | none => true)
 
-/-- The checker, with the kept intervals the certificate names. -/
+/-- The checker, with the kept intervals the certificate names. Nothing
+    is delegated. -/
 def check (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
+  cert.delegate.isEmpty && checkAt { cfg with hkeep := cert.hkeep } boot cert
+
+/-- The checker for a certificate that delegates some nodes to directly
+    proved regions; `check_sound_hybrid` needs those proofs. -/
+def checkHybrid (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
   checkAt { cfg with hkeep := cert.hkeep } boot cert
 
 end E5R.AI

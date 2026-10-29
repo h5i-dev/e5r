@@ -90,13 +90,31 @@ def proposeGuards (G : List Cell) : List Cell :=
   -- Guarded facts first: `lookup` takes the first fact that applies.
   P ++ G
 
+/-- Partitioning choices (all untrusted; they only change which nodes exist). -/
+structure Opts where
+  /-- Split an edge on the base register of the next memory access when it
+      holds a few values, so the address and what is loaded through it stay
+      related (a task pointer and its poll function). -/
+  addrSplit : Bool := false
+  /-- How many split values a node remembers. A node's partition is the
+      split values still held exactly by some register; partitions are part
+      of the context key, so a merge never mixes them. -/
+  tagDepth : Nat := 0
+  /-- Keep every handler-proof static fact across interrupts, not only
+      the ones that rule out a null. -/
+  keepAll : Bool := false
+  deriving Repr
+
 structure Setup where
   cfg : Config
   boot : AState
+  opts : Opts := {}
 
 structure St where
   log : Array String := #[]
   nodes : Array AState := #[]
+  /-- Each node's partition (see `Opts.tagDepth`). -/
+  tags : Array (List Nat) := #[]
   edges : Array (List Edge) := #[]
   index : Std.HashMap String (Array Nat) := {}
   joins : Array Nat := #[]
@@ -105,6 +123,9 @@ structure St where
   restart : Bool := false
   handlers : List (Nat × Nat) := []
   errors : Array String := #[]
+  opts : Opts := {}
+  /-- The kept intervals the run used. -/
+  keep : List (Nat × Nat) := []
 
 abbrev M := StateM St
 
@@ -147,13 +168,21 @@ def normalize (cfg : Config) (t : AState) : M AState := do
   let sp := match t.get 2 with | .vals [sp] => sp | _ => 0
   let stack := t.mem.filter fun c => c.base == .abs && c.guard.isNone && !cfg.isStatic c.addr c.w.bytes &&
     sp ≤ c.addr && cfg.isStack c.addr c.w.bytes
-  return { t with mem := G ++ stack, mepc := .top, mcause := .top,
+  -- Facts the handler cannot change survive the interrupt.
+  -- Only a fact that rules out a null G allows is worth a separate node.
+  let keepAll := (← get).opts.keepAll
+  let useful (c : Cell) : Bool := keepAll ||
+    (c.guard.isNone && match plain G c.base c.addr c.w, c.v with
+      | some g, .vals l => nullable g && !(0 ∈ l) && c.v.leq g
+      | _, _ => false)
+  let kept := ((staticOf cfg t.mem).filter fun c => Cell.kept cfg c && !G.contains c && useful c).eraseDups
+  return { t with mem := G ++ kept ++ stack, mepc := .top, mcause := .top,
                   mpie := t.mpie.join .yes, mpp := norm (t.mpp ++ [0]) }
 
-def newNode (key : String) (t : AState) : M Nat := do
+def newNode (key : String) (tag : List Nat) (t : AState) : M Nat := do
   let st ← get
   let j := st.nodes.size
-  set { st with nodes := st.nodes.push t, edges := st.edges.push [], joins := st.joins.push 0,
+  set { st with nodes := st.nodes.push t, tags := st.tags.push tag, edges := st.edges.push [], joins := st.joins.push 0,
                 work := st.work.push j,
                 index := st.index.insert key ((st.index.getD key #[]).push j) }
   return j
@@ -178,9 +207,11 @@ def grow (j : Nat) (t : AState) : M Unit := do
                 work := st.work.push j }
 
 /-- The node that covers `t`, creating or growing one. -/
-def resolve (cfg : Config) (t : AState) : M Nat := do
+def resolve (cfg : Config) (tag : List Nat) (t : AState) : M Nat := do
   let t ← normalize cfg t
-  let key := ctxKey cfg t
+  -- A partition lasts while some register still holds its value exactly.
+  let tag := tag.filter fun v => t.regs.any (· == .vals [v])
+  let key := s!"{ctxKey cfg t}|{tag}"
   let st ← get
   let cands := st.index.getD key #[]
   match cands.find? fun j => t.leq st.nodes[j]! with
@@ -191,7 +222,7 @@ def resolve (cfg : Config) (t : AState) : M Nat := do
     match cands.find? fun j => st.nodes[j]!.leq t with
     | some j => grow j t; return j
     | none =>
-    if cands.size < unroll then newNode key t
+    if cands.size < unroll then newNode key tag t
     else
       let j := cands.back!
       grow j t
@@ -203,7 +234,23 @@ def loadDest : Instr → Option Reg
   | .amo _ rd _ _ => some rd
   | _ => none
 
-def edgeFor (cfg : Config) (s : AState) (i : Instr) (t : AState) : M Edge := do
+/-- The base register of a memory access. -/
+def addrReg : Instr → Option Reg
+  | .load _ _ _ rs1 _ => some rs1
+  | .store _ rs1 _ _ => some rs1
+  | .lr _ rs1 => some rs1
+  | .sc _ rs1 _ => some rs1
+  | .amo _ _ rs1 _ => some rs1
+  | _ => none
+
+def splittable (v : AV) : Option (List Nat) :=
+  match v with
+  | .vals l => if 2 ≤ l.length ∧ l.length ≤ 8 then some l else none
+  | _ => none
+
+def edgeFor (cfg : Config) (tag : List Nat) (s : AState) (i : Instr) (t : AState) : M Edge := do
+  let opts := (← get).opts
+  let sub (v : Nat) : List Nat := (v :: tag.erase v).take opts.tagDepth
   -- Split a freshly loaded small value set, so that later arithmetic on it
   -- is exact per value (this is what keeps wrap-around indices in range).
   -- A word loaded from an exact address is pinned in memory as well, which
@@ -216,7 +263,22 @@ def edgeFor (cfg : Config) (s : AState) (i : Instr) (t : AState) : M Edge := do
         if classify cfg a wd == some .ram && (!s.hnd || cfg.isStatic a wd.bytes) then some (a, wd) else none
       | _ => none
     | _ => none
-  let single : M Edge := do return { nodes := [← resolve cfg t], split := none, pin := false }
+  let single : M Edge := do return { nodes := [← resolve cfg tag t], split := none, pin := false }
+  -- Otherwise split on the next access's base register.
+  let byAddr : M Edge := do
+    if !opts.addrSplit then single else
+    match successors.fetchDecode' cfg.img t.pc with
+    | some (ni, _) =>
+      match addrReg ni with
+      | some r =>
+        match splittable (t.get r) with
+        | some l =>
+          if r.val = 0 then single else
+          let js ← l.mapM fun v => resolve cfg (sub v) (t.set r (.vals [v]))
+          return { nodes := js, split := some r.val, pin := false }
+        | none => single
+      | none => single
+    | none => single
   match loadDest i with
   | some rd =>
     match t.get rd with
@@ -224,13 +286,13 @@ def edgeFor (cfg : Config) (s : AState) (i : Instr) (t : AState) : M Edge := do
       if 2 ≤ l.length ∧ l.length ≤ 8 ∧ rd.val ≠ 0 then
         let js ← l.mapM fun v =>
           let t' := t.set rd (.vals [v])
-          resolve cfg (match pinAt with
+          resolve cfg (sub v) (match pinAt with
             | some (a, wd) => { t' with mem := setPlain t'.mem a wd (.vals [v]) }
             | none => t')
         return { nodes := js, split := some rd.val, pin := pinAt.isSome }
-      else single
-    | _ => single
-  | none => single
+      else byAddr
+    | _ => byAddr
+  | none => byAddr
 
 def err (msg : String) : M Unit := modify fun st => { st with errors := st.errors.push msg }
 
@@ -263,7 +325,8 @@ def process (cfg : Config) (i : Nat) : M Unit := do
     match absExec cfg s len ins with
     | none => err s!"node {i}: {reprStr ins} at {s.pc} may fault: {brief s}"
     | some ts =>
-      let es ← ts.mapM (edgeFor cfg s ins)
+      let tag := (← get).tags[i]!
+      let es ← ts.mapM (edgeFor cfg tag s ins)
       modify fun st => { st with edges := st.edges.set! i es }
   -- Interrupts.
   let codes := irqCodesAbs s
@@ -277,7 +340,7 @@ def process (cfg : Config) (i : Nat) : M Unit := do
         match (← get).handlers.lookup code with
         | some j => if !e.leq (← get).nodes[j]! then grow j e
         | none =>
-          let j ← newNode s!"handler {code}" e
+          let j ← newNode s!"handler {code}" [] e
           modify fun st => { st with handlers := st.handlers ++ [(code, j)] }
 
 partial def drain (cfg : Config) : M Unit := do
@@ -292,9 +355,9 @@ partial def drain (cfg : Config) : M Unit := do
 
 def runOnce (su : Setup) (G : Option (List Cell)) : St :=
   let act : M Unit := do
-    let _ ← resolve su.cfg su.boot
+    let _ ← resolve su.cfg [] su.boot
     drain su.cfg
-  (act.run { G := G }).2
+  (act.run { G := G, opts := su.opts }).2
 
 partial def fixG (su : Setup) (G : Option (List Cell)) (round : Nat) (proposed : Bool) : IO St := do
   let st := runOnce su G
@@ -318,6 +381,59 @@ partial def fixG (su : Setup) (G : Option (List Cell)) (round : Nat) (proposed :
       fixG su (some P) (round+1) true
     | none => return st
   else return st
+
+/-! ## What the handler leaves alone -/
+
+/-- Bytes a handler node's store may write, or `none` if unbounded. Stores
+    relative to the interrupted sp are the handler's own frame. -/
+def storeBytes (cfg : Config) (s : AState) : Option (List Nat) :=
+  let at_ (v : AV) (n : Nat) : Option (List Nat) := match v with
+    | .vals l => some (l.flatMap fun a => (List.range n).map (a + ·))
+    | .rng lo hi => some ((List.range (hi + n - lo)).map (lo + ·))
+    | .sym 2 _ => some []
+    | _ => none
+  match successors.fetchDecode' cfg.img s.pc with
+  | some (.store wd rs1 _ off, _) => at_ (addC (s.get rs1) off.toNat) wd.bytes
+  | some (.amo _ _ rs1 _, _) => at_ (s.get rs1) 4
+  | some (.sc _ rs1 _, _) => at_ (s.get rs1) 4
+  | _ => some []
+
+/-- The handler's static footprint over a run, or `none` if unbounded. -/
+def footprint (cfg : Config) (st : St) : Option (List Nat) :=
+  st.nodes.toList.filter (·.hnd) |>.foldlM (init := []) fun acc s =>
+    (storeBytes cfg s).map (acc ++ ·)
+
+/-- Static RAM minus `fp`, as maximal intervals. -/
+def keepOf (cfg : Config) (fp : List Nat) : List (Nat × Nat) := Id.run do
+  let fp := Std.HashSet.ofList fp
+  let mut out : Array (Nat × Nat) := #[]
+  for (lo, hi) in [(cfg.board.ramBase, cfg.stackLow), (cfg.pinLow, cfg.ramEnd)] do
+    let mut start : Option Nat := none
+    for a in [lo:hi] do
+      if fp.contains a then
+        if let some b := start then out := out.push (b, a)
+        start := none
+      else if start.isNone then start := some a
+    if let some b := start then out := out.push (b, hi)
+  return out.toList
+
+/-- Analyze until the kept intervals the run assumed are ones its handler
+    leaves alone. Each round only shrinks them. -/
+partial def analyzeKeep (su : Setup) (fp : List Nat) (round : Nat := 0) : IO St := do
+  -- Round 0 keeps nothing, so that the whole handler is explored.
+  let keep := if round = 0 then [] else keepOf su.cfg fp
+  IO.eprintln s!"keep round {round}: {keep.length} intervals, footprint {fp.length} bytes"
+  let st ← fixG { su with cfg := { su.cfg with hkeep := keep } } none 0 false
+  match footprint su.cfg st with
+  | none =>
+    IO.eprintln "handler footprint unbounded: nothing is kept"
+    if keep.isEmpty then return st
+    fixG { su with cfg := { su.cfg with hkeep := [] } } none 0 false
+  | some fp' =>
+    let fresh := (fp'.filter (!fp.contains ·)).eraseDups
+    IO.eprintln s!"  keep {keep.map fun (a, b) => (String.ofList (Nat.toDigits 16 a), b - a)}; new footprint {(fresh.take 40).map fun a => String.ofList (Nat.toDigits 16 a)}"
+    if (round > 0 && fresh.isEmpty) || round ≥ 8 then return { st with keep := keep }
+    analyzeKeep su (fp ++ fresh) (round + 1)
 
 /-! ## Output -/
 
@@ -368,7 +484,7 @@ def certSource (ns : String) (st : St) (sigma : List Nat) : String := Id.run do
   out := out ++ s!"def G : List Cell := {listStr ((st.G.getD []).map cellStr)}\n"
   let joined := " ++ ".intercalate parts.toList
   out := out ++ s!"def cert : Cert where\n  nodes := {joined}\n"
-  out := out ++ s!"  G := G\n  sigma := {sigma}\n  handlers := {st.handlers}\n"
+  out := out ++ s!"  G := G\n  sigma := {sigma}\n  handlers := {st.handlers}\n  hkeep := {st.keep}\n"
   out := out ++ s!"end {ns}\n"
   return out
 
