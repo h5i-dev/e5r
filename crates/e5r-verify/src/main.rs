@@ -146,12 +146,7 @@ fn ram_image(args: &[String]) -> Result<String, String> {
         }
         (None, Some(path)) => {
             let text = std::fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
-            let b = e5r_verify::board::Board::parse(&text)?;
-            let mut rams = b.memory.iter().filter(|r| r.kind == "ram");
-            match (rams.next(), rams.next()) {
-                (Some(r), None) => (number(&r.base)?, number(&r.size)?),
-                _ => return Err(format!("board {} needs exactly one ram region", b.id)),
-            }
+            e5r_verify::ram::board_window(&e5r_verify::board::Board::parse(&text)?)?
         }
         _ => return Err("ram-image needs exactly one of --ram BASE:SIZE and --board".into()),
     };
