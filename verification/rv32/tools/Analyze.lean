@@ -107,6 +107,9 @@ structure Opts where
       of nodes that led to the state. -/
   traceLoss : Option Nat := none
   tracePc : Option Nat := none
+  /-- Keep G fixed during a round; violations accumulate into the next
+      round's G (a decreasing iteration: every node of a round sees one G). -/
+  freezeG : Bool := false
   /-- Keep only facts about cells G has a guarded fact for (saved pointers). -/
   keepGuarded : Bool := false
   deriving Repr
@@ -134,6 +137,8 @@ structure St where
   handlers : List (Nat × Nat) := []
   errors : Array String := #[]
   opts : Opts := {}
+  /-- With `Opts.freezeG`: the next round's G. -/
+  pending : Option (List Cell) := none
   /-- The kept intervals the run used. -/
   keep : List (Nat × Nat) := []
 
@@ -166,6 +171,9 @@ def normalize (cfg : Config) (t : AState) : M AState := do
     | none => do set { st with G := some S }; pure S
     | some G =>
       if G.all (Cell.leqIn S) then pure G
+      else if st.opts.freezeG then do
+        set { st with pending := some (joinCells (st.pending.getD G) S), restart := true }
+        pure G
       else do
         let G' := joinCells G S
         let lost := G.filter fun c => !(G'.any fun d => d.addr == c.addr && d.w == c.w && d.v == c.v && d.guard == c.guard)
@@ -350,7 +358,9 @@ def process (cfg : Config) (i : Nat) : M Unit := do
   | some (.mret, _) =>
     let st ← get
     let G := st.G.getD []
-    if !G.all (Cell.leqIn s.mem) then
+    if !G.all (Cell.leqIn s.mem) && st.opts.freezeG then
+      set { st with pending := some (joinCells (st.pending.getD G) (staticOf cfg s.mem)), restart := true }
+    else if !G.all (Cell.leqIn s.mem) then
       let G' := joinCells G (staticOf cfg s.mem)
       let lost := G.filter fun c => !(G'.any fun d => d.addr == c.addr && d.w == c.w && d.v == c.v && d.guard == c.guard)
       let S := s.mem
@@ -416,9 +426,13 @@ partial def fixG (su : Setup) (G : Option (List Cell)) (round : Nat) (proposed :
   -- Debug aid: `E5R_DUMP_PC=<pc>` prints that pc's nodes after every round.
   if let some pcs ← IO.getEnv "E5R_DUMP_PC" then
     for pc in (pcs.splitOn ",").filterMap String.toNat? do
-      for s in st.nodes.toList.filter (·.pc == pc) do IO.eprintln s!"dump round {round}: {brief s}"
+      for j in [0:st.nodes.size] do
+        let s := st.nodes[j]!
+        if s.pc == pc then
+          let p := st.pred[j]!
+          IO.eprintln s!"dump round {round}: node {j} pred {p}@{st.nodes[p]!.pc} {brief s}"
   if round ≥ 60 then return st
-  if st.restart then fixG su st.G (round+1) proposed
+  if st.restart then fixG su (if su.opts.freezeG then st.pending.orElse fun _ => st.G else st.G) (round+1) proposed
   else if !proposed && st.errors.size > 0 then
     match st.G with
     | some G =>

@@ -9,6 +9,7 @@ def main (args : List String) : IO UInt32 := do
     tagDepth := ((← IO.getEnv "E5R_TAG_DEPTH").bind String.toNat?).getD 0
     keepAll := (← IO.getEnv "E5R_KEEP_ALL").isSome
     keepGuarded := (← IO.getEnv "E5R_KEEP_GUARDED").isSome
+    freezeG := (← IO.getEnv "E5R_FREEZE_G").isSome
     traceLoss := (← IO.getEnv "E5R_TRACE_LOSS").bind String.toNat?
     tracePc := (← IO.getEnv "E5R_TRACE_PC").bind String.toNat? }
   -- `E5R_RING=1`: use the proved channel ring-head summary (RingAI.spec_sound); a certificate
