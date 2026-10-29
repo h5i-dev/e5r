@@ -12,3 +12,6 @@ lean_exe fwreplay where
 
 lean_exe diff where
   root := `Diff
+
+lean_exe decodesweep where
+  root := `DecodeSweep
