@@ -1586,4 +1586,129 @@ theorem absStore_rel_sound {cfg : Config} {s : AState} {off : Nat} {wd : Width} 
     simpa [addrOf] using this
   · simp at h
 
+/-! ## Abstract machine states -/
+
+/-- A concrete machine described by an abstract state. The reservation is
+    not tracked: the abstract SC allows both outcomes. -/
+structure StateHolds (ρ : Nat → Word) (s : AState) (m : Machine) : Prop where
+  pc : m.core.pc = w s.pc
+  regs : ∀ r : Reg, (s.get r).gam ρ (m.core.get r)
+  mem : MemHolds ρ m.ram s.mem
+  mie : s.mie.mayBe m.core.mie_ = true
+  mpie : s.mpie.mayBe m.core.mpie = true
+  mpp : m.core.mpp.toNat ∈ s.mpp
+  mieReg : s.mieReg.gam ρ m.core.mieReg
+  mtvec : s.mtvec.gam ρ m.core.mtvec
+  mepc : s.mepc.gam ρ m.core.mepc
+  mcause : s.mcause.gam ρ m.core.mcause
+  mscratch : s.mscratch.gam ρ m.core.mscratch
+
+theorem AState.get_zero (s : AState) : s.get 0 = .const 0 := rfl
+
+theorem AState.get_set_self (s : AState) (r : Reg) (v : AV) (h : r.val ≠ 0) (hl : s.regs.length = 31) :
+    (s.set r v).get r = v := by
+  have := r.isLt
+  simp only [AState.set, AState.get, h, if_false]
+  rw [List.getD_eq_getElem?_getD, List.getElem?_set_self (by omega)]; rfl
+
+theorem AState.get_set_ne (s : AState) (r q : Reg) (v : AV) (h : q ≠ r) :
+    (s.set r v).get q = s.get q := by
+  unfold AState.set AState.get
+  by_cases hr : r.val = 0
+  · simp [hr]
+  · simp only [hr, if_false]
+    by_cases hq : q.val = 0
+    · simp [hq]
+    · simp only [hq, if_false]
+      rw [List.getD_eq_getElem?_getD, List.getD_eq_getElem?_getD, List.getElem?_set_ne]
+      intro e; apply h; apply Fin.ext; omega
+
+theorem AState.set_regs_length (s : AState) (r : Reg) (v : AV) :
+    (s.set r v).regs.length = s.regs.length := by
+  unfold AState.set; split <;> simp
+
+theorem const0_gam (ρ : Nat → Word) : (AV.const 0).gam ρ 0 := by simp [AV.const, AV.gam, M32]
+
+/-- Writing a register on both sides keeps the description. -/
+theorem regs_set {ρ : Nat → Word} {s : AState} {c : Core} (hl : s.regs.length = 31)
+    (hr : ∀ q : Reg, (s.get q).gam ρ (c.get q)) (r : Reg) {v : AV} {x : Word} (hv : v.gam ρ x) :
+    ∀ q : Reg, ((s.set r v).get q).gam ρ ((c.set r x).get q) := by
+  intro q
+  by_cases hq : q.val = 0
+  · have : q = 0 := Fin.ext hq
+    subst this; rw [AState.get_zero, Core.get_zero]; exact const0_gam ρ
+  · by_cases e : q = r
+    · subst e; rw [AState.get_set_self _ _ _ hq hl, Core.get_set_self _ _ _ hq]; exact hv
+    · rw [AState.get_set_ne _ _ _ _ e, Core.get_set_ne _ _ _ _ e]; exact hr q
+
+/-! ## The order on states -/
+
+theorem Tri.leq_mayBe {a b : Tri} {x : Bool} (h : a.leq b = true) (hx : a.mayBe x = true) : b.mayBe x = true := by
+  cases a <;> cases b <;> cases x <;> simp_all [Tri.leq, Tri.mayBe]
+
+theorem leqIn_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Cell} {c : Cell}
+    (hm : MemHolds ρ ram mem) (h : Cell.leqIn mem c = true) : c.holds ρ ram := by
+  unfold Cell.leqIn at h
+  split at h
+  · cases hp : plain mem c.base c.addr c.w with
+    | none => rw [hp] at h; simp at h
+    | some v =>
+      rw [hp] at h
+      intro _
+      rw [cell_at rfl rfl]
+      exact leq_sound h (plain_sound hm hp)
+  · next g hg =>
+    rw [Bool.or_eq_true] at h
+    rcases h with h | h
+    · obtain ⟨d, hd, hp⟩ := List.any_eq_true.mp h
+      simp only [Bool.and_eq_true, beq_iff_eq, Bool.or_eq_true, Option.isNone_iff_eq_none] at hp
+      obtain ⟨⟨⟨⟨hb, ha⟩, hw⟩, hgd⟩, hl⟩ := hp
+      intro hguard
+      have hat : c.at ρ = d.at ρ := by unfold Cell.at; rw [hb, ha]
+      rw [hat, ← hw]
+      apply leq_sound hl
+      apply hm d hd
+      intro g' hg'
+      rcases hgd with hn | he
+      · rw [hn] at hg'; cases hg'
+      · rw [he] at hg'; cases hg'
+        exact hguard g hg
+    · cases hp : plain mem .abs g.1 g.2.1 with
+      | none => rw [hp] at h; simp at h
+      | some x =>
+        rw [hp] at h
+        intro hguard
+        exfalso
+        have hx := leq_sound h (plain_sound hm hp)
+        simp only [addrOf, AV.gam, List.mem_singleton] at hx
+        exact hguard g hg hx
+
+theorem zip_all_get {l1 l2 : List AV} (hz : (List.zip l1 l2).all (fun p => p.1.leq p.2) = true)
+    (hl : l1.length = l2.length) (i : Nat) (hi : i < l1.length) :
+    (l1.getD i .top).leq (l2.getD i .top) = true := by
+  rw [List.getD_eq_getElem?_getD, List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hi,
+    List.getElem?_eq_getElem (hl ▸ hi)]
+  simp only [Option.getD_some]
+  rw [List.all_eq_true] at hz
+  exact hz (l1[i], l2[i]) (List.mem_iff_getElem.mpr ⟨i, by simp [List.length_zip, hl] at hi ⊢; omega,
+    by simp [List.getElem_zip]⟩)
+
+theorem get_leq {a b : AState} (hz : (List.zip a.regs b.regs).all (fun p => p.1.leq p.2) = true)
+    (ha : a.regs.length = 31) (hb : b.regs.length = 31) (r : Reg) : (a.get r).leq (b.get r) = true := by
+  unfold AState.get
+  split
+  · simp [AV.leq, AV.const]
+  · next h0 => have := r.isLt; exact zip_all_get hz (by rw [ha, hb]) _ (by omega)
+
+/-- `leq` is sound: a state's machines are all machines of a larger state. -/
+theorem leq_state_sound {ρ : Nat → Word} {a b : AState} {m : Machine} (h : a.leq b = true)
+    (hs : StateHolds ρ a m) : StateHolds ρ b m := by
+  simp only [AState.leq, Bool.and_eq_true, beq_iff_eq, List.all_eq_true, decide_eq_true_eq,
+    and_assoc] at h
+  obtain ⟨hpc, _, ha, hb, hz, hmem, hmie, hmpie, hmpp, hmr, htv, hepc, hca, hsc⟩ := h
+  refine ⟨hpc ▸ hs.pc, fun r => leq_sound (get_leq (List.all_eq_true.mpr hz) ha hb r) (hs.regs r),
+    fun c hc => leqIn_sound hs.mem (hmem c hc), Tri.leq_mayBe hmie hs.mie, Tri.leq_mayBe hmpie hs.mpie,
+    hmpp _ hs.mpp, leq_sound hmr hs.mieReg, leq_sound htv hs.mtvec, leq_sound hepc hs.mepc,
+    leq_sound hca hs.mcause, leq_sound hsc hs.mscratch⟩
+
 end E5R.AI
