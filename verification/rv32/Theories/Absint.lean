@@ -776,10 +776,20 @@ structure Cert where
   handlers : List (Nat × Nat)
   /-- Static RAM the handler never writes (`Config.hkeep`). -/
   hkeep : List (Nat × Nat) := []
+  /-- Further static-RAM invariants: node `j` uses invariant `part[j]`
+      (0, the default, is `G`; `k + 1` is `Gs[k]`), and each has its own
+      handler nodes. A partition is the analyzer's choice, e.g. by the value
+      of a task's saved pointer. -/
+  Gs : List (List Cell) := []
+  part : List Nat := []
   /-- Main-thread pcs whose code is proved directly rather than by this
       checker, with the index of the proved region (`checkHybrid`). -/
   delegate : List (Nat × Nat) := []
   deriving Repr
+
+/-- Node `j`'s invariant partition, and partition `k`'s invariant. -/
+def Cert.gOf (cert : Cert) (j : Nat) : Nat := cert.part.getD j 0
+def Cert.Gat (cert : Cert) (k : Nat) : List Cell := (cert.G :: cert.Gs).getD k []
 
 def staticOf (cfg : Config) (mem : List Cell) : List Cell :=
   mem.filter fun c => c.base == .abs && cfg.isStatic c.addr c.w.bytes
@@ -802,9 +812,9 @@ def noSym (s : AState) : Bool :=
     cannot change, every tracked stack cell
     is at or above sp (the handler only writes below it), the CSRs the
     handler changes are unconstrained, and sp is one of `sigma`. -/
-def interruptibleOk (cfg : Config) (cert : Cert) (s : AState) : Bool :=
-  (staticOf cfg s.mem).take cert.G.length == cert.G &&
-  ((staticOf cfg s.mem).drop cert.G.length).all (Cell.kept cfg) &&
+def interruptibleOk (cfg : Config) (cert : Cert) (G : List Cell) (s : AState) : Bool :=
+  (staticOf cfg s.mem).take G.length == G &&
+  ((staticOf cfg s.mem).drop G.length).all (Cell.kept cfg) &&
   (match s.get 2 with
    | .vals [sp] =>
      sp ∈ cert.sigma &&
@@ -836,11 +846,11 @@ def AState.wf (cfg : Config) (s : AState) : Bool :=
     match c.guard with | some g => cfg.isStatic g.1 g.2.1.bytes | none => true)
 
 /-- A handler `mret` returns exactly to the interrupted machine. -/
-def mretOk (cfg : Config) (cert : Cert) (s : AState) : Bool :=
+def mretOk (cfg : Config) (G : List Cell) (s : AState) : Bool :=
   s.hnd && s.regs == (List.range 31).map (fun i => .sym (i+1) 0) &&
   s.mepc == .sym 32 0 && s.mpie == .yes && s.mpp == [3] &&
   s.mieReg == .sym 33 0 && s.mtvec == .sym 34 0 && s.mscratch == .sym 35 0 &&
-  (staticOf cfg s.mem).all (fun _ => true) && cert.G.all (Cell.leqIn s.mem) &&
+  (staticOf cfg s.mem).all (fun _ => true) && G.all (Cell.leqIn s.mem) &&
   s.mem.all fun c => c.base == .rel || cfg.isStatic c.addr c.w.bytes
 
 /-- The successors of a node, as the checker computes them. -/
@@ -896,9 +906,9 @@ def coveredE (cert : Cert) (pin : Option (Nat × Nat × Width)) (t : AState) (e 
     else false
 
 /-- The instruction at the node: an `mret` summary, or every successor covered. -/
-def instrOk (cfg : Config) (cert : Cert) (n : Node) : Bool :=
+def instrOk (cfg : Config) (cert : Cert) (G : List Cell) (n : Node) : Bool :=
   match successors.fetchDecode' cfg.img n.s.pc with
-  | some (.mret, _) => mretOk cfg cert n.s && n.succ.isEmpty
+  | some (.mret, _) => mretOk cfg G n.s && n.succ.isEmpty
   | some (i, len) => match absExec cfg n.s len i with
     | some ts => ts.length == n.succ.length &&
         (List.zip ts n.succ).all fun (t, e) => coveredE cert (pinAddr cfg n.s) t e
@@ -906,12 +916,13 @@ def instrOk (cfg : Config) (cert : Cert) (n : Node) : Bool :=
   | none => false
 
 /-- Every interrupt that may arrive at the node enters a covered handler. -/
-def irqOk (cfg : Config) (cert : Cert) (s : AState) : Bool :=
+def irqOk (cfg : Config) (cert : Cert) (j : Nat) (s : AState) : Bool :=
   let codes := irqCodesAbs s
-  codes.isEmpty || (!s.hnd && interruptibleOk cfg cert s && codes.all fun code =>
-    match handlerEntry cert.G s code, cert.handlers.lookup code with
-    | some e, some j => covered cert e j
-    | _, _ => false)
+  let G := cert.Gat (cert.gOf j)
+  codes.isEmpty || (!s.hnd && interruptibleOk cfg cert G s && codes.all fun code =>
+    match handlerEntry G s code with
+    | some e => cert.handlers.any fun h => h.1 == code && cert.gOf h.2 == cert.gOf j && covered cert e h.2
+    | none => false)
 
 /-- A main-thread node whose steps a directly proved region covers instead
     of `instrOk`. It has no successors; interrupts at it are still checked. -/
@@ -927,9 +938,12 @@ def summarized (cfg : Config) (cert : Cert) (n : Node) : Bool :=
     | [e] => coveredE cert none (S.post n.s) e
     | _ => false
 
-def nodeOk (cfg : Config) (cert : Cert) (n : Node) : Bool :=
+def nodeOk (cfg : Config) (cert : Cert) (j : Nat) (n : Node) : Bool :=
   n.s.wf cfg && (n.s.hnd || noSym n.s) &&
-    (instrOk cfg cert n || delegated cert n || summarized cfg cert n) && irqOk cfg cert n.s
+    (instrOk cfg cert (cert.Gat (cert.gOf j)) n || delegated cert n || summarized cfg cert n) &&
+    irqOk cfg cert j n.s &&
+    -- A handler node's successors are handler nodes of the same partition.
+    (!n.s.hnd || n.succ.all fun e => e.nodes.all fun h => cert.gOf h == cert.gOf j)
 
 def checkAt (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
   -- Execution starts in the main thread, at node 0.
@@ -938,13 +952,13 @@ def checkAt (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
   -- RAM lies inside the 32-bit address space, and the image holds bytes.
   cfg.board.ramBase + cfg.board.ramSize ≤ M32 &&
   cfg.img.all (fun seg => seg.bytes.all (· < 256)) &&
-  cert.nodes.all (nodeOk cfg cert) &&
+  cert.nodes.zipIdx.all (fun p => nodeOk cfg cert p.2 p.1) &&
   -- The handler's stack frame never reaches static RAM, from any sp.
   cert.sigma.all (fun sp => cfg.stackLow + cfg.hdepth ≤ sp && sp ≤ cfg.pinLow && sp % 4 = 0) &&
   cfg.board.ramBase ≤ cfg.stackLow &&
   cfg.hdepth < 2^31 && cfg.stackLow ≤ cfg.pinLow && cfg.pinLow ≤ cfg.ramEnd &&
-  cert.G.all (fun c => c.base == .abs && c.wf cfg && cfg.isStatic c.addr c.w.bytes && !c.v.hasSym &&
-    match c.guard with | some g => cfg.isStatic g.1 g.2.1.bytes | none => true)
+  (cert.G :: cert.Gs).all (·.all fun c => c.base == .abs && c.wf cfg && cfg.isStatic c.addr c.w.bytes &&
+    !c.v.hasSym && match c.guard with | some g => cfg.isStatic g.1 g.2.1.bytes | none => true)
 
 /-- The checker, with the kept intervals the certificate names. Nothing
     is delegated. -/

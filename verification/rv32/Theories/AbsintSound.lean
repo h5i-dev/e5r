@@ -2943,7 +2943,7 @@ theorem fetch_bridge {img : List Segment} {pc : Nat} {i : Instr} {len : Nat}
 /-- A node's non-`mret` instruction: under every environment the step does
     not fault, emits allowed events, and lands in a node of one of its edges. -/
 theorem instr_sound {cfg : Config} {cert : Cert} {n : Node} {ρ : Nat → Word} {m : Machine}
-    {i : Instr} {len : Nat} (hok : instrOk cfg cert n = true) (hs : StateHolds ρ n.s m)
+    {i : Instr} {len : Nat} {G : List Cell} (hok : instrOk cfg cert G n = true) (hs : StateHolds ρ n.s m)
     (hwf : n.s.wf cfg = true) (hv : ValidImg cfg.img) (hram : cfg.board.ramBase + cfg.board.ramSize ≤ M32)
     (hsp : n.s.hnd = true → SpOk cfg (ρ 2).toNat)
     (hfd : successors.fetchDecode' cfg.img n.s.pc = some (i, len)) (hnm : i ≠ .mret) (o : Oracle) :
@@ -3422,15 +3422,16 @@ theorem ramRead_congr {r1 r2 : Word → BitVec 8} {a : Word} {wd : Width}
     rw [w1] at h1; rw [w2] at h2; rw [w3] at h3
     simp only [ramRead, h0, h1, h2, h3]
 
-theorem interruptible_parts {cfg : Config} {cert : Cert} {s : AState} (h : interruptibleOk cfg cert s = true) :
-    (∃ U, staticOf cfg s.mem = cert.G ++ U ∧ ∀ c ∈ U, Cell.kept cfg c = true) ∧
+theorem interruptible_parts {cfg : Config} {cert : Cert} {G : List Cell} {s : AState}
+    (h : interruptibleOk cfg cert G s = true) :
+    (∃ U, staticOf cfg s.mem = G ++ U ∧ ∀ c ∈ U, Cell.kept cfg c = true) ∧
     (∃ sp, s.get 2 = .vals [sp] ∧ sp ∈ cert.sigma ∧ ∀ c ∈ s.mem, cfg.isStatic c.addr c.w.bytes = true ∨
       (sp ≤ c.addr ∧ cfg.isStack c.addr c.w.bytes = true ∧ c.guard = none)) ∧
     s.mpie.mayBe true = true ∧ 0 ∈ s.mpp ∧ s.mepc = .top ∧ s.mcause = .top := by
   unfold interruptibleOk at h
   simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at h
   obtain ⟨⟨⟨⟨⟨⟨hG, hU⟩, hsp⟩, hmp⟩, h0⟩, he⟩, hc⟩ := h
-  have hS := List.take_append_drop cert.G.length (staticOf cfg s.mem)
+  have hS := List.take_append_drop G.length (staticOf cfg s.mem)
   rw [hG] at hS
   refine ⟨⟨_, hS.symm, List.all_eq_true.mp hU⟩, ?_, hmp, h0, he, hc⟩
   split at hsp
@@ -3443,10 +3444,10 @@ theorem interruptible_parts {cfg : Config} {cert : Cert} {s : AState} (h : inter
       · exact .inr ⟨h.1.1, h.1.2, h.2⟩⟩
   · simp at hsp
 
-theorem mret_parts {cfg : Config} {cert : Cert} {s : AState} (h : mretOk cfg cert s = true) :
+theorem mret_parts {cfg : Config} {G : List Cell} {s : AState} (h : mretOk cfg G s = true) :
     s.regs = (List.range 31).map (fun i => .sym (i+1) 0) ∧ s.mepc = .sym 32 0 ∧ s.mpie = .yes ∧
     s.mpp = [3] ∧ s.mieReg = .sym 33 0 ∧ s.mtvec = .sym 34 0 ∧ s.mscratch = .sym 35 0 ∧
-    ∀ c ∈ cert.G, Cell.leqIn s.mem c = true := by
+    ∀ c ∈ G, Cell.leqIn s.mem c = true := by
   unfold mretOk at h
   simp only [Bool.and_eq_true, beq_iff_eq, List.all_eq_true] at h
   obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, hr⟩, he⟩, hp⟩, hpp⟩, hmi⟩, htv⟩, hsc⟩, _⟩, hG⟩, _⟩ := h
@@ -3500,11 +3501,11 @@ theorem holds_kept {cfg : Config} {σ : Nat} {ρ : Nat → Word} {r0 r1 : Word �
     interrupted machine in a state its own node describes. -/
 theorem mret_sound {cfg : Config} {cert : Cert} {n0 : Node} {sh : AState} {m0 m : Machine}
     {ρ0 : Nat → Word} {len : Word}
-    (hs0 : StateHolds ρ0 n0.s m0) (hio : interruptibleOk cfg cert n0.s = true)
+    {G : List Cell} (hs0 : StateHolds ρ0 n0.s m0) (hio : interruptibleOk cfg cert G n0.s = true)
     (hmie0 : n0.s.mie.mayBe true = true) (hns : noSym n0.s = true) (hpc0 : n0.s.pc % 2 = 0)
     (hbase : cfg.board.ramBase ≤ cfg.stackLow) (hpin : cfg.pinLow ≤ M32)
     (hlp : cfg.stackLow ≤ cfg.pinLow) (hram : cfg.ramEnd ≤ M32)
-    (hsh : StateHolds (hEnv m0) sh m) (hmret : mretOk cfg cert sh = true)
+    (hsh : StateHolds (hEnv m0) sh m) (hmret : mretOk cfg G sh = true)
     (hkeep : Keep cfg (m0.core.get 2).toNat m0.ram m.ram) (o : Oracle) :
     ∃ c, interp cfg.board cfg.img o (exec m.core len .mret) m.ram 0 [] = .ok c m.ram [] ∧
       StateHolds ρ0 n0.s ⟨c, m.ram⟩ := by
@@ -3544,7 +3545,7 @@ theorem mret_sound {cfg : Config} {cert : Cert} {n0 : Node} {sh : AState} {m0 m 
     · intro c hc
       obtain ⟨hb, hsy⟩ := noSym_cells hns c hc
       rcases hcells c hc with hst | ⟨hle, hstk, hgn⟩
-      · have hcS : c ∈ cert.G ++ U := by
+      · have hcS : c ∈ G ++ U := by
           rw [← hstat]; unfold staticOf
           simp only [List.mem_filter, Bool.and_eq_true, beq_iff_eq]; exact ⟨hc, hb, hst⟩
         rcases List.mem_append.mp hcS with hcG | hcU
@@ -3582,7 +3583,7 @@ theorem mret_sound {cfg : Config} {cert : Cert} {n0 : Node} {sh : AState} {m0 m 
 structure Facts (cfg : Config) (cert : Cert) : Prop where
   ram : cfg.board.ramBase + cfg.board.ramSize ≤ M32
   img : ValidImg cfg.img
-  nodes : ∀ n ∈ cert.nodes, nodeOk cfg cert n = true
+  nodes : ∀ j n, cert.nodes[j]? = some n → nodeOk cfg cert j n = true
   sigma : ∀ sp ∈ cert.sigma, SpOk cfg sp
   base : cfg.board.ramBase ≤ cfg.stackLow
   pin : cfg.pinLow ≤ M32
@@ -3593,7 +3594,8 @@ theorem facts_of_check {cfg : Config} {boot : AState} {cert : Cert} (h : checkAt
   unfold checkAt at h
   simp only [Bool.and_eq_true, Bool.not_eq_true', List.all_eq_true, decide_eq_true_eq] at h
   obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨hb, h0⟩, hram⟩, himg⟩, hn⟩, hsig⟩, hbase⟩, hdep⟩, hlp⟩, hpin⟩, _⟩ := h
-  refine ⟨⟨hram, validImg_of_check (by simpa [List.all_eq_true] using himg), hn, fun sp hs => ?_, hbase,
+  refine ⟨⟨hram, validImg_of_check (by simpa [List.all_eq_true] using himg),
+    fun j n h => hn (n, j) (List.mem_zipIdx_iff_getElem?.mpr h), fun sp hs => ?_, hbase,
     ?_, hlp⟩, hb, ?_⟩
   · have := hsig sp hs
     exact ⟨this.1.1, this.1.2, this.2, hdep, hbase, hpin, by unfold Config.ramEnd; exact hram⟩
@@ -3602,14 +3604,20 @@ theorem facts_of_check {cfg : Config} {boot : AState} {cert : Cert} (h : checkAt
     · next n hn0 => exact ⟨n, hn0, h0⟩
     · simp at h0
 
-theorem nodeOk_parts {cfg : Config} {cert : Cert} {n : Node} (h : nodeOk cfg cert n = true) :
+theorem nodeOk_parts {cfg : Config} {cert : Cert} {j : Nat} {n : Node} (h : nodeOk cfg cert j n = true) :
     n.s.wf cfg = true ∧ (n.s.hnd = false → noSym n.s = true) ∧
-      (instrOk cfg cert n = true ∨ delegated cert n = true ∨ summarized cfg cert n = true) ∧
-      irqOk cfg cert n.s = true := by
+      (instrOk cfg cert (cert.Gat (cert.gOf j)) n = true ∨ delegated cert n = true ∨
+        summarized cfg cert n = true) ∧
+      irqOk cfg cert j n.s = true ∧
+      (n.s.hnd = true → ∀ e ∈ n.succ, ∀ h ∈ e.nodes, cert.gOf h = cert.gOf j) := by
   unfold nodeOk at h
   simp only [Bool.and_eq_true, Bool.or_eq_true] at h
-  obtain ⟨⟨⟨hw, hns⟩, hi⟩, hq⟩ := h
-  exact ⟨hw, fun hf => hns.resolve_left (by rw [hf]; simp), or_assoc.mp hi, hq⟩
+  obtain ⟨⟨⟨⟨hw, hns⟩, hi⟩, hq⟩, hsu⟩ := h
+  refine ⟨hw, fun hf => hns.resolve_left (by rw [hf]; simp), or_assoc.mp hi, hq, fun hh e he h' hh' => ?_⟩
+  rcases hsu with hs | hs
+  · rw [hh] at hs; cases hs
+  · simp only [List.all_eq_true, beq_iff_eq] at hs
+    exact hs e he h' hh'
 
 theorem summarized_parts {cfg : Config} {cert : Cert} {n : Node} (h : summarized cfg cert n = true) :
     n.s.hnd = false ∧ n.s.pc % 2 = 0 ∧ ∃ S ∈ cfg.sums, S.pc = n.s.pc ∧ S.accepts n.s = true ∧
@@ -3631,17 +3639,18 @@ theorem delegated_parts {cert : Cert} {n : Node} (h : delegated cert n = true) :
   exact ⟨hh, hp, k, hm⟩
 
 /-- Handler nodes are never delegated. -/
-theorem instrOk_of_hnd {cert : Cert} {cfg : Config} {n : Node} (hnd : n.s.hnd = true)
-    (h : instrOk cfg cert n = true ∨ delegated cert n = true ∨ summarized cfg cert n = true) :
-    instrOk cfg cert n = true := by
+theorem instrOk_of_hnd {cert : Cert} {cfg : Config} {G : List Cell} {n : Node} (hnd : n.s.hnd = true)
+    (h : instrOk cfg cert G n = true ∨ delegated cert n = true ∨ summarized cfg cert n = true) :
+    instrOk cfg cert G n = true := by
   rcases h with h | h | h
   · exact h
   · rw [(delegated_parts h).1] at hnd; cases hnd
   · rw [(summarized_parts h).1] at hnd; cases hnd
 
-theorem instrOk_fetch {cfg : Config} {cert : Cert} {n : Node} (h : instrOk cfg cert n = true) :
+theorem instrOk_fetch {cfg : Config} {cert : Cert} {G : List Cell} {n : Node}
+    (h : instrOk cfg cert G n = true) :
     ∃ i len, successors.fetchDecode' cfg.img n.s.pc = some (i, len) ∧
-      (i = .mret → mretOk cfg cert n.s = true) := by
+      (i = .mret → mretOk cfg G n.s = true) := by
   unfold instrOk at h
   split at h
   · next len heq =>
@@ -3685,8 +3694,10 @@ def MainInv (cert : Cert) (m : Machine) : Prop :=
     budget is as `m0` left it. -/
 def HandInv (cfg : Config) (cert : Cert) (m : Machine) : Prop :=
   ∃ (j0 : Nat) (n0 : Node) (m0 : Machine), cert.nodes[j0]? = some n0 ∧ n0.s.hnd = false ∧
-    StateHolds ρM n0.s m0 ∧ interruptibleOk cfg cert n0.s = true ∧ n0.s.mie.mayBe true = true ∧
-    ∃ (j : Nat) (n : Node), cert.nodes[j]? = some n ∧ n.s.hnd = true ∧ StateHolds (hEnv m0) n.s m ∧
+    StateHolds ρM n0.s m0 ∧ interruptibleOk cfg cert (cert.Gat (cert.gOf j0)) n0.s = true ∧
+    n0.s.mie.mayBe true = true ∧
+    ∃ (j : Nat) (n : Node), cert.nodes[j]? = some n ∧ n.s.hnd = true ∧ cert.gOf j = cert.gOf j0 ∧
+      StateHolds (hEnv m0) n.s m ∧
       Keep cfg (m0.core.get 2).toNat m0.ram m.ram ∧ SpOk cfg (m0.core.get 2).toNat
 
 /-- From `m`, every run is safe with interrupts disabled until it reaches a
@@ -3736,8 +3747,8 @@ structure RegionOk (cfg : Config) (cert : Cert) (RR : Machine → Prop) : Prop w
   sums : ∀ S ∈ cfg.sums, SumSound cfg S
 
 theorem node_ok {cfg : Config} {cert : Cert} (F : Facts cfg cert) {j : Nat} {n : Node}
-    (h : cert.nodes[j]? = some n) : nodeOk cfg cert n = true :=
-  F.nodes n (List.mem_of_getElem? h)
+    (h : cert.nodes[j]? = some n) : nodeOk cfg cert j n = true :=
+  F.nodes j n h
 
 theorem hEnv_sp (m : Machine) : hEnv m 2 = m.core.get 2 := by simp [hEnv]
 
@@ -3761,9 +3772,9 @@ theorem inv_instr {cfg : Config} {cert : Cert} {RR : Machine → Prop} (F : Fact
       | step hirq hok hev hs =>
         obtain ⟨c, ram, evs, h⟩ := hok o
         exact .inr (.inr (.inr ⟨hirq, c, ram, evs, h, hev o c ram evs h, hs o c ram evs h⟩))
-  rcases hI with ⟨j, n, hn, hnd, hs⟩ | ⟨j0, n0, m0, hn0, hnd0, hs0, hio, hmie0, j, n, hn, hnd, hs, hkeep, hsp⟩ | hR |
+  rcases hI with ⟨j, n, hn, hnd, hs⟩ | ⟨j0, n0, m0, hn0, hnd0, hs0, hio, hmie0, j, n, hn, hnd, hgj, hs, hkeep, hsp⟩ | hR |
     ⟨_, c, ram, evs, h1, h2, h3⟩
-  · obtain ⟨hwf, _, hins, _⟩ := nodeOk_parts (node_ok F hn)
+  · obtain ⟨hwf, _, hins, _, _⟩ := nodeOk_parts (node_ok F hn)
     rcases hins with hins | hdel | hsm
     · obtain ⟨i, len, hfd, hmr⟩ := instrOk_fetch hins
       have hnm : i ≠ .mret := by
@@ -3785,25 +3796,27 @@ theorem inv_instr {cfg : Config} {cert : Cert} {RR : Machine → Prop} (F : Fact
       obtain ⟨j', _, n', hn', hh', hnd'⟩ :=
         coveredE_sound hce hx (fun _ _ _ _ hp => by cases hp)
       exact ⟨j', n', hn', by rw [hnd', hph], hh'⟩
-  · obtain ⟨hwf, _, hins, _⟩ := nodeOk_parts (node_ok F hn)
+  · obtain ⟨hwf, _, hins, _, hsucc⟩ := nodeOk_parts (node_ok F hn)
     have hins := instrOk_of_hnd hnd hins
     obtain ⟨i, len, hfd, hmr⟩ := instrOk_fetch hins
     obtain ⟨len', -, hbr⟩ := stepInstr_bridge hs hfd o
     by_cases hm : i = .mret
     · subst hm
-      obtain ⟨_, hns0, hins0, _⟩ := nodeOk_parts (node_ok F hn0)
+      obtain ⟨_, hns0, hins0, _, _⟩ := nodeOk_parts (node_ok F hn0)
       have hpc0 : n0.s.pc % 2 = 0 := by
         rcases hins0 with hins0 | hd0 | hs0
         · obtain ⟨_, _, hfd0, _⟩ := instrOk_fetch hins0
           exact (fetch_bridge hfd0).1
         · exact (delegated_parts hd0).2.1
         · exact (summarized_parts hs0).2.1
+      have hmr' := hmr rfl
+      rw [hgj] at hmr'
       obtain ⟨c, hc, hh⟩ := mret_sound hs0 hio hmie0 (hns0 hnd0) hpc0 F.base F.pin F.lp
-        (by unfold Config.ramEnd; exact F.ram) hs (hmr rfl) hkeep o
+        (by unfold Config.ramEnd; exact F.ram) hs hmr' hkeep o
         (len := len')
       exact ⟨c, m.ram, [], by rw [hbr, hc], by simp, .inl ⟨j0, n0, hn0, hnd0, hh⟩⟩
     · have hsp' : n.s.hnd = true → SpOk cfg ((hEnv m0) 2).toNat := fun _ => by rw [hEnv_sp]; exact hsp
-      obtain ⟨c, ram, evs, hst, hev, _, _, j', _, n', hn', hh', hnd'⟩ :=
+      obtain ⟨c, ram, evs, hst, hev, e, he, j', hj', n', hn', hh', hnd'⟩ :=
         instr_sound hins hs hwf F.img F.ram hsp' hfd hm o
       -- The step's stores stay in static RAM and the handler budget.
       have hab : ∃ ts, absExec cfg n.s len i = some ts := by
@@ -3824,7 +3837,7 @@ theorem inv_instr {cfg : Config} {cert : Cert} {RR : Machine → Prop} (F : Fact
       rw [hEnv_sp] at hsi
       have hk := interp_keep hsp _ _ _ _ hsi (by rw [← hbr', hst])
       exact ⟨c, ram, evs, hst, hev, .inr (.inl ⟨j0, n0, m0, hn0, hnd0, hs0, hio, hmie0, j', n', hn',
-        by rw [hnd', hnd], hh', hkeep.trans hk, hsp⟩)⟩
+        by rw [hnd', hnd], (hsucc hnd e he j' hj').trans hgj, hh', hkeep.trans hk, hsp⟩)⟩
   · obtain ⟨c, ram, evs, h1, h2, h3⟩ := RO.step m hR o
     exact ⟨c, ram, evs, h1, h2, h3.elim (fun h => .inr (.inr (.inl h))) .inl⟩
   · exact ⟨c, ram, evs, h1, h2, .inr (.inr (.inr h3))⟩
@@ -3844,8 +3857,8 @@ theorem inv_irq {cfg : Config} {cert : Cert} {RR : Machine → Prop} (F : Facts 
     · cases h with
       | done h => exact .inl h
       | step hirq _ _ _ => rw [hirq code] at hen; cases hen
-  rcases hI with ⟨j, n, hn, hnd, hs⟩ | ⟨j0, n0, m0, hn0, hnd0, hs0, hio, hmie0, j, n, hn, hnd, hs, hkeep, hsp⟩
-  · obtain ⟨_, hns, _, hirq⟩ := nodeOk_parts (node_ok F hn)
+  rcases hI with ⟨j, n, hn, hnd, hs⟩ | ⟨j0, n0, m0, hn0, hnd0, hs0, hio, hmie0, j, n, hn, hnd, hgj, hs, hkeep, hsp⟩
+  · obtain ⟨_, hns, _, hirq, _⟩ := nodeOk_parts (node_ok F hn)
     have hcode := code_mem hs hen
     unfold irqOk at hirq
     simp only [Bool.or_eq_true, Bool.and_eq_true, Bool.not_eq_true', List.all_eq_true] at hirq
@@ -3853,9 +3866,12 @@ theorem inv_irq {cfg : Config} {cert : Cert} {RR : Machine → Prop} (F : Facts 
     · simp only [List.isEmpty_iff] at hemp; rw [hemp] at hcode; simp at hcode
     · have hc := hall code hcode
       split at hc
-      · next e j' he hl =>
+      · next e he =>
+        obtain ⟨⟨c', j'⟩, -, hpp⟩ := List.any_eq_true.mp hc
+        simp only [Bool.and_eq_true, beq_iff_eq] at hpp
+        obtain ⟨⟨-, hgj'⟩, hc⟩ := hpp
         obtain ⟨⟨U, hstat, _⟩, ⟨sp, hsp2, hsig, _⟩, _⟩ := interruptible_parts hio
-        have hG : ∀ c ∈ cert.G, c ∈ n.s.mem ∧ c.base = .abs ∧ c.v.hasSym = false := by
+        have hG : ∀ c ∈ cert.Gat (cert.gOf j), c ∈ n.s.mem ∧ c.base = .abs ∧ c.v.hasSym = false := by
           intro c hc
           have hc : c ∈ staticOf cfg n.s.mem := by rw [hstat]; exact List.mem_append_left _ hc
           unfold staticOf at hc
@@ -3870,9 +3886,9 @@ theorem inv_irq {cfg : Config} {cert : Cert} {RR : Machine → Prop} (F : Facts 
         have hσ : (m.core.get 2).toNat = sp := by
           have := hs.regs 2; rw [hsp2] at this; simpa [AV.gam] using this
         exact ⟨c1, htk, .inr (.inl ⟨j, n, m, hn, hnd, hs, hio, hmie, j', nh, hnh,
-          by rw [hndh, handlerEntry_hnd he], hhh, Keep.refl _ _ _, by rw [hσ]; exact F.sigma sp hsig⟩)⟩
+          by rw [hndh, handlerEntry_hnd he], hgj', hhh, Keep.refl _ _ _, by rw [hσ]; exact F.sigma sp hsig⟩)⟩
       · simp at hc
-  · obtain ⟨_, _, _, hirq⟩ := nodeOk_parts (node_ok F hn)
+  · obtain ⟨_, _, _, hirq, _⟩ := nodeOk_parts (node_ok F hn)
     have hcode := code_mem hs hen
     unfold irqOk at hirq
     simp only [Bool.or_eq_true, Bool.and_eq_true, Bool.not_eq_true'] at hirq
