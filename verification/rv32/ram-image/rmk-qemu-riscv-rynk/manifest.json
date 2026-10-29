@@ -13,6 +13,12 @@
   },
   "e_flags": 1,
   "elf": {
+    "lean_file": {
+      "len": 454024,
+      "order": "little-endian",
+      "word_bytes": 64,
+      "words": 7095
+    },
     "sha256": "f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30",
     "size": 454024
   },
