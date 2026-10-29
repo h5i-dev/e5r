@@ -793,57 +793,66 @@ where
     | some (bits, len) => (decode bits len).map (·, len.toNat)
     | none => none
 
-def nodeOk (cfg : Config) (cert : Cert) (n : Node) : Bool :=
-  let s := n.s
-  let covered (t : AState) (j : Nat) : Bool :=
-    match cert.nodes[j]? with
-    | some m => t.leq m.s
-    | none => false
-  -- The word a pinning split refers to: a word load at an exact address.
-  let pinAddr : Option (Nat × Nat × Width) :=
-    match fetchDecodeN cfg.img s.pc with
-    | some (.load wd signed rd rs1 off, _) =>
-      if signed && wd != .w then none else
-      match addC (s.get rs1) off.toNat with
-      | .vals [a] => if classify cfg a wd == some .ram then some (rd.val, a, wd) else none
-      | _ => none
+/-- `t` is described by node `j`. -/
+def covered (cert : Cert) (t : AState) (j : Nat) : Bool :=
+  match cert.nodes[j]? with
+  | some m => t.leq m.s
+  | none => false
+
+/-- The word a pinning split refers to: a word load at an exact RAM address,
+    as (destination register, address, width). -/
+def pinAddr (cfg : Config) (s : AState) : Option (Nat × Nat × Width) :=
+  match successors.fetchDecode' cfg.img s.pc with
+  | some (.load wd signed rd rs1 off, _) =>
+    if signed && wd != .w then none else
+    match addC (s.get rs1) off.toNat with
+    | .vals [a] => if classify cfg a wd == some .ram then some (rd.val, a, wd) else none
     | _ => none
-  let coveredE (t : AState) (e : Edge) : Bool :=
-    match e.split with
-    | none => !e.pin && match e.nodes with | [j] => covered t j | _ => false
-    | some r =>
-      if h : 0 < r ∧ r < 32 then
-        let pinned (v : Nat) (t' : AState) : Option AState :=
-          if !e.pin then some t' else
-          match pinAddr with
-          | some (rd, a, wd) => if rd = r then some { t' with mem := setPlain t'.mem a wd (.vals [v]) } else none
-          | none => none
-        match t.get ⟨r, h.2⟩ with
-        | .vals l => l.all fun v =>
-          match pinned v (t.set ⟨r, h.2⟩ (.vals [v])) with
-          | some t' => e.nodes.any fun j => covered t' j
-          | none => false
-        | _ => false
-      else false
-  -- Static stack budget: sigma minus the handler depth stays above static RAM.
-  let wf := s.wf cfg && (s.hnd || noSym s)
-  let instr : Bool :=
-    match fetchDecodeN cfg.img s.pc with
-    | some (.mret, _) => mretOk cfg cert s && n.succ.isEmpty
-    | some (i, len) => match absExec cfg s len i with
-      | some ts => ts.length == n.succ.length && (List.zip ts n.succ).all fun (t, e) => coveredE t e
-      | none => false
+  | _ => none
+
+/-- The successor after splitting register `r` on value `v`, with the loaded
+    word pinned to `v` too when the edge asks for it. -/
+def pinned (pin : Option (Nat × Nat × Width)) (e : Edge) (r v : Nat) (t' : AState) : Option AState :=
+  if !e.pin then some t' else
+  match pin with
+  | some (rd, a, wd) => if rd = r then some { t' with mem := setPlain t'.mem a wd (.vals [v]) } else none
+  | none => none
+
+/-- How one successor is covered: by one node, or split on the value of a
+    register over several nodes. -/
+def coveredE (cert : Cert) (pin : Option (Nat × Nat × Width)) (t : AState) (e : Edge) : Bool :=
+  match e.split with
+  | none => !e.pin && match e.nodes with | [j] => covered cert t j | _ => false
+  | some r =>
+    if h : 0 < r ∧ r < 32 then
+      match t.get ⟨r, h.2⟩ with
+      | .vals l => l.all fun v =>
+        match pinned pin e r v (t.set ⟨r, h.2⟩ (.vals [v])) with
+        | some t' => e.nodes.any fun j => covered cert t' j
+        | none => false
+      | _ => false
+    else false
+
+/-- The instruction at the node: an `mret` summary, or every successor covered. -/
+def instrOk (cfg : Config) (cert : Cert) (n : Node) : Bool :=
+  match successors.fetchDecode' cfg.img n.s.pc with
+  | some (.mret, _) => mretOk cfg cert n.s && n.succ.isEmpty
+  | some (i, len) => match absExec cfg n.s len i with
+    | some ts => ts.length == n.succ.length &&
+        (List.zip ts n.succ).all fun (t, e) => coveredE cert (pinAddr cfg n.s) t e
     | none => false
-  let irq : Bool :=
-    let codes := irqCodesAbs s
-    codes.isEmpty || (!s.hnd && interruptibleOk cfg cert s && codes.all fun code =>
-      match handlerEntry cert.G s code, cert.handlers.lookup code with
-      | some e, some j => covered e j
-      | _, _ => false)
-  wf && instr && irq
-where
-  fetchDecodeN (img : List Segment) (pc : Nat) : Option (Instr × Nat) :=
-    successors.fetchDecode' img pc
+  | none => false
+
+/-- Every interrupt that may arrive at the node enters a covered handler. -/
+def irqOk (cfg : Config) (cert : Cert) (s : AState) : Bool :=
+  let codes := irqCodesAbs s
+  codes.isEmpty || (!s.hnd && interruptibleOk cfg cert s && codes.all fun code =>
+    match handlerEntry cert.G s code, cert.handlers.lookup code with
+    | some e, some j => covered cert e j
+    | _, _ => false)
+
+def nodeOk (cfg : Config) (cert : Cert) (n : Node) : Bool :=
+  n.s.wf cfg && (n.s.hnd || noSym n.s) && instrOk cfg cert n && irqOk cfg cert n.s
 
 def check (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
   (match cert.nodes[0]? with | some n => boot.leq n.s | none => false) &&
