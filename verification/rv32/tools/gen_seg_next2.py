@@ -42,6 +42,7 @@ seg('nfront', 'e', 0x8001d530, 0x8001d510, {0x8001d530: T})
 seg('nmove1', 'e', 0x8001d530, 0x8001ad76, {0x8001d530: F, 0x8001d546: {'target': 0x8001ad76}}, prefix='nv')
 seg('nmove2', 'e', 0x8001ad76, 0x80020c1e, {0x8001ad76: F, 0x8001ad7a: F, 0x8001ad7e: {'ra': H},
                                              0x8001d558: {'target': 0x80020c1e}}, prefix='nw')
+seg('nmove3', 'e', 0x8001d54a, 0x80020c1e, {0x8001d558: {'target': 0x80020c1e}}, prefix='nu')
 seg('nmoved', 'e', 0x8001d55c, 0x8001d510, {})
 # the exit test at 0x8001d4f8
 seg('nx1', 'e', 0x8001d4f8, 0x8001d510, {0x8001d4fc: T, 0x8001d508: MEM, 0x8001d50c: MEM})

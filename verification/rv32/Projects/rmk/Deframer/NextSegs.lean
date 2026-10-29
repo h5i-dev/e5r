@@ -452,6 +452,41 @@ theorem nmove2 (e : Core) (M : Word → BitVec 8) (hpc : e.pc = 0x8001ad76) (hq 
     rw [exec_jalr, Core.set_zero, (show nw2.get 1 = e.get 1 by simp [nw1, nw2, Core.wr_get_ne, Core.wr_get_self]), BitVec.add_zero, Memmove.and_not_one _ hra_8001ad7e, jump_ok _ _ hra_8001ad7e]; rfl
   exact .step hq s0 (.step qnw1 s1 (.single qnw2 s2))
 
+def nmove3Core (e : Core) (M : Word → BitVec 8) : Core :=
+  ((((e.wr 12 (alu .sub (e.get 11) (e.get 10)) 0x8001d54e).wr 11 (alu .add (e.get 20) (e.get 10)) 0x8001d552).wr 10 (alu .add (0) (e.get 20)) 0x8001d554).wr 1 (0x8001d554 + 0x00003000#32) 0x8001d558).wr 1 0x8001d55c 0x80020c1e
+
+def nmove3Ram (e : Core) (M : Word → BitVec 8) : Word → BitVec 8 :=
+  M
+
+theorem nmove3 (e : Core) (M : Word → BitVec 8) (hpc : e.pc = 0x8001d54a) (hq : Quiet e) :
+    QRun B img 5 ⟨e, M⟩ ⟨nmove3Core e M, nmove3Ram e M⟩ := by
+  let nu1 := e.wr 12 (alu .sub (e.get 11) (e.get 10)) 0x8001d54e
+  let nu2 := nu1.wr 11 (alu .add (e.get 20) (e.get 10)) 0x8001d552
+  let nu3 := nu2.wr 10 (alu .add (0) (e.get 20)) 0x8001d554
+  let nu4 := nu3.wr 1 (0x8001d554 + 0x00003000#32) 0x8001d558
+  let nu5 := nu4.wr 1 0x8001d55c 0x80020c1e
+  have qnu1 : Quiet nu1 := Quiet.of_sameCsr (Core.sameCsr_wr _ _ _ _) hq
+  have qnu2 : Quiet nu2 := Quiet.of_sameCsr (Core.sameCsr_wr _ _ _ _) qnu1
+  have qnu3 : Quiet nu3 := Quiet.of_sameCsr (Core.sameCsr_wr _ _ _ _) qnu2
+  have qnu4 : Quiet nu4 := Quiet.of_sameCsr (Core.sameCsr_wr _ _ _ _) qnu3
+  have qnu5 : Quiet nu5 := Quiet.of_sameCsr (Core.sameCsr_wr _ _ _ _) qnu4
+  have s0 : DetStep B img ⟨e, M⟩ ⟨nu1, M⟩ := by
+    refine detStep_of (by rw [hpc]; decide) (by rw [hpc]; exact f8001d54a) fun o => ?_
+    rw [exec_op, (show e.get 10 = e.get 10 by simp [Core.wr_get_ne, Core.wr_get_self]), (show e.get 11 = e.get 11 by simp [Core.wr_get_ne, Core.wr_get_self]), hpc]; rfl
+  have s1 : DetStep B img ⟨nu1, M⟩ ⟨nu2, M⟩ := by
+    refine detStep_of (by show (0x8001d54e : Word).getLsbD 0 = false; decide) f8001d54e fun o => ?_
+    rw [exec_op, (show nu1.get 10 = e.get 10 by simp [nu1, Core.wr_get_ne, Core.wr_get_self]), (show nu1.get 20 = e.get 20 by simp [nu1, Core.wr_get_ne, Core.wr_get_self])]; rfl
+  have s2 : DetStep B img ⟨nu2, M⟩ ⟨nu3, M⟩ := by
+    refine detStep_of (by show (0x8001d552 : Word).getLsbD 0 = false; decide) f8001d552 fun o => ?_
+    rw [exec_op, Core.get_zero, (show nu2.get 20 = e.get 20 by simp [nu1, nu2, Core.wr_get_ne, Core.wr_get_self])]; rfl
+  have s3 : DetStep B img ⟨nu3, M⟩ ⟨nu4, M⟩ := by
+    refine detStep_of (by show (0x8001d554 : Word).getLsbD 0 = false; decide) f8001d554 fun o => ?_
+    rw [exec_auipc]; rfl
+  have s4 : DetStep B img ⟨nu4, M⟩ ⟨nu5, M⟩ := by
+    refine detStep_of (by show (0x8001d558 : Word).getLsbD 0 = false; decide) f8001d558 fun o => ?_
+    rw [exec_jalr, (show nu4.get 1 = (0x8001d554 + 0x00003000#32) by simp [nu1, nu2, nu3, nu4, Core.wr_get_ne, Core.wr_get_self]), show ((0x8001d554 + 0x00003000#32)) + 0x000006ca#32 &&& ~~~1 = 0x80020c1e by decide, jump_ok _ _ (by decide)]; rfl
+  exact .step hq s0 (.step qnu1 s1 (.step qnu2 s2 (.step qnu3 s3 (.single qnu4 s4))))
+
 def nmovedCore (e : Core) (M : Word → BitVec 8) : Core :=
   (e.wr 10 (alu .add (0) 0x00000001#32) 0x8001d55e).goto 0x8001d510
 
