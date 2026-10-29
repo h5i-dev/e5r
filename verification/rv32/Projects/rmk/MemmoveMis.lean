@@ -205,4 +205,207 @@ theorem end_any (g : Core) (R0 : Word → BitVec 8) (o : Nat) (ho : 0 < o ∧ o 
   · obtain ⟨g', R', hr, ha⟩ := end3 g R0 hpc hq h6 h28 (by omega) hprev hsrc ht10 ht0e hsep hD hDr
     exact ⟨_, g', R', hr, ha⟩
 
+/-! ## The whole misaligned forward path -/
+
+/-- memmove's own stack frame below `sp`. -/
+def InFrame (sp x : Word) : Prop := sp.toNat - 48 ≤ x.toNat ∧ x.toNat < sp.toNat
+
+/-- The RAM of the misaligned path, outside memmove's frame (abstract, small context). -/
+theorem mis_ram (R0 R2 Rt : Word → BitVec 8) (s d sp H W T : Word) (n j : Nat)
+    (hsum : H.toNat + W.toNat + T.toNat = n) (hj : 4 * (j + 1) + 4 = W.toNat) (hH : H.toNat < 4)
+    (hs : s.toNat + n ≤ 0x81000000) (hd : d.toNat + n ≤ 0x81000000)
+    (hs0 : 0x80029bc8 ≤ s.toNat) (hd0 : 0x80029bc8 ≤ d.toNat)
+    (hfr : 0x80029bc8 + 48 ≤ sp.toNat ∧ sp.toNat ≤ 0x81000000)
+    (hdir : d.toNat ≤ s.toNat ∨ s.toNat + n ≤ d.toNat)
+    (hsepd : d.toNat + n + 48 ≤ sp.toNat ∨ sp.toNat ≤ d.toNat)
+    (hseps : s.toNat + n + 48 ≤ sp.toNat ∨ sp.toNat ≤ s.toNat)
+    (hal : (d + H).toNat % 4 = 0)
+    (hZ2 : ∀ y, ¬ InFrame sp y → R2 y = fwd R0 s d H.toNat y)
+    (hRt : ∀ y, ¬ InFrame sp y → Rt y = words R2 (s + H) (d + H) (j + 1) y) :
+    ∀ x, ¬ InFrame sp x →
+      fwd (ramWrite Rt (d + H + BitVec.ofNat 32 (4 * (j + 1)))
+          (ramRead (words R2 (s + H) (d + H) (j + 1)) (s + H + BitVec.ofNat 32 (4 * (j + 1))) .w) .w)
+        (s + H + W) (d + H + W) T.toNat x = fwd R0 s d n x := by
+  intro x hx
+  let Z := InFrame sp
+  let R1 := fwd R0 s d H.toNat
+  let F1 := fwd R1 (s + H) (d + H) (4 * (j + 1))
+  have nZs : ∀ i, i < n - H.toNat → ¬ Z (s + H + BitVec.ofNat 32 i) := by
+    intro i hi hz; simp only [Z, InFrame] at hz; bv_omega
+  have nZd : ∀ i, i < n - H.toNat → ¬ Z (d + H + BitVec.ofNat 32 i) := by
+    intro i hi hz; simp only [Z, InFrame] at hz; bv_omega
+  have hloop : words R2 (s + H) (d + H) (j + 1) = fwd R2 (s + H) (d + H) (4 * (j + 1)) :=
+    words_eq_fwd _ _ _ _ (by bv_omega) (by bv_omega) (by bv_omega)
+  have hZl : ∀ y, ¬ Z y → words R2 (s + H) (d + H) (j + 1) y = F1 y := by
+    intro y hy; rw [hloop]
+    exact fwd_frame Z _ _ _ _ _ hZ2 (fun i hi => nZs i (by omega)) (fun i hi => nZd i (by omega)) y hy
+  have hZ3 : ∀ y, ¬ Z y → ramWrite Rt (d + H + BitVec.ofNat 32 (4 * (j + 1)))
+      (ramRead (words R2 (s + H) (d + H) (j + 1)) (s + H + BitVec.ofNat 32 (4 * (j + 1))) .w) .w y =
+      fwd F1 (s + H + BitVec.ofNat 32 (4 * (j + 1))) (d + H + BitVec.ofNat 32 (4 * (j + 1))) 4 y := by
+    intro y hy
+    rw [word_spec2 _ _ _ _ _ (by bv_omega), fwd_spec _ _ _ _ _ (by bv_omega) (by bv_omega) (by bv_omega)]
+    split
+    · exact hZl _ (by intro hz; simp only [Z, InFrame] at hz; bv_omega)
+    · rw [hRt y hy]; exact hZl y hy
+  have hF2 : fwd F1 (s + H + BitVec.ofNat 32 (4 * (j + 1))) (d + H + BitVec.ofNat 32 (4 * (j + 1))) 4 =
+      fwd R1 (s + H) (d + H) (4 * (j + 1) + 4) := by rw [fwd_add]
+  rw [fwd_frame Z _ _ (fwd R1 (s + H) (d + H) (4 * (j + 1) + 4)) _ _ (fun y hy => by rw [hZ3 y hy, hF2])
+    (fun i hi => by
+      have := nZs (W.toNat + i) (by omega)
+      rwa [show s + H + BitVec.ofNat 32 (W.toNat + i) = s + H + W + BitVec.ofNat 32 i by bv_omega] at this)
+    (fun i hi => by
+      have := nZd (W.toNat + i) (by omega)
+      rwa [show d + H + BitVec.ofNat 32 (W.toNat + i) = d + H + W + BitVec.ofNat 32 i by bv_omega] at this) x hx]
+  rw [show s + H + W = s + H + BitVec.ofNat 32 (4 * (j + 1) + 4) by bv_omega,
+    show d + H + W = d + H + BitVec.ofNat 32 (4 * (j + 1) + 4) by bv_omega, ← fwd_add,
+    show n = H.toNat + (4 * (j + 1) + 4 + T.toNat) by omega, fwd_add H.toNat]
+  show fwd R1 (s + H) (d + H) _ x = fwd R1 _ _ _ x
+  rw [show s + BitVec.ofNat 32 H.toNat = s + H by simp, show d + BitVec.ofNat 32 H.toNat = d + H by simp]
+
+set_option maxHeartbeats 40000000 in
+theorem big_mis (c : Core) (R0 : Word → BitVec 8) (hq : Quiet c)
+    (hn : 16 ≤ (c.get 12).toNat) (hdir : (c.get 10 - c.get 11).ult (c.get 12) = false)
+    (hd : B.inRam (c.get 10) (c.get 12).toNat = true) (hs : B.inRam (c.get 11) (c.get 12).toNat = true)
+    (hnc : (c.get 11).toNat % 4 ≠ (c.get 10).toNat % 4)
+    (hsp : (c.get 2).toNat % 4 = 0) (hfr : 0x80029bc8 + 48 ≤ (c.get 2).toNat ∧ (c.get 2).toNat ≤ 0x81000000)
+    (hsepd : (c.get 10).toNat + (c.get 12).toNat + 48 ≤ (c.get 2).toNat ∨ (c.get 2).toNat ≤ (c.get 10).toNat)
+    (hseps : (c.get 11).toNat + (c.get 12).toNat + 48 ≤ (c.get 2).toNat ∨ (c.get 2).toNat ≤ (c.get 11).toNat) :
+    ∃ k e Rf, QRun B img k ⟨Memmove.pro c, R0⟩ ⟨e, Rf⟩ ∧ e.pc = 0x800210b0 ∧
+      Memmove.Frame c e [5, 7, 9, 11, 12, 13, 14, 15, 16, 17, 28, 29, 30] ∧
+      ∀ x, ¬ InFrame (c.get 2) x → Rf x = fwd R0 (c.get 11) (c.get 10) (c.get 12).toNat x := by
+  have hdr := (B_ram _ _).mp hd
+  have hsr := (B_ram _ _).mp hs
+  have hHl := Memmove.headN_lt (c.get 10)
+  have hHa := Memmove.headN_al (c.get 10)
+  have hdirN : (c.get 10).toNat ≤ (c.get 11).toNat ∨ (c.get 11).toNat + (c.get 12).toNat ≤ (c.get 10).toNat := by
+    simp only [BitVec.ult, decide_eq_false_iff_not] at hdir; bv_omega
+  obtain ⟨k1, g, hr1, hm⟩ := Memmove.big_entry c R0 hq hn hdir hd hs
+  have qg : Quiet g := Quiet.of_sameCsr hm.csr hq
+  have hsH3 := Memmove.and3 (c.get 11 + Memmove.headN (c.get 10))
+  have hmis : (g.get 11 + g.get 16) &&& 3#32 ≠ 0 := by
+    rw [hm.r11, hm.r16]; intro h0
+    have := congrArg BitVec.toNat h0; rw [hsH3] at this; simp at this; bv_omega
+  obtain ⟨h, hr2, hmi⟩ := mis_mid g (fwd R0 (c.get 11) (c.get 10) (Memmove.headN (c.get 10)).toNat) hm.pc qg hmis
+  have qh : Quiet h := Quiet.of_sameCsr (hmi.csr.trans hm.csr) hq
+  -- the quantities
+  have h5 : h.get 5 = c.get 11 + Memmove.headN (c.get 10) := by rw [hmi.r5, hm.r11, hm.r16]
+  have h16 : h.get 16 = c.get 12 - Memmove.headN (c.get 10) := by rw [hmi.r16, hm.r12, hm.r16]
+  have h17 : h.get 17 = (c.get 12 - Memmove.headN (c.get 10)) &&& 0xfffffffc#32 := by
+    rw [hmi.r17, hm.r12, hm.r16]
+  have h6 : h.get 6 = (c.get 11 + Memmove.headN (c.get 10)) &&& 3#32 := by rw [hmi.r6, hm.r11, hm.r16]
+  have h30 : h.get 30 = c.get 10 + Memmove.headN (c.get 10) := by
+    rw [hmi.frame 30 (by decide), hm.r30]
+  have h13 : h.get 13 = c.get 10 + Memmove.headN (c.get 10) + ((c.get 12 - Memmove.headN (c.get 10)) &&& 0xfffffffc#32) := by
+    rw [hmi.r13, hm.r30, hm.r12, hm.r16]
+  have h2 : h.get 2 = c.get 2 + 0xffffffd0#32 := by rw [hmi.frame 2 (by decide), hm.sp]
+  have hW := Memmove.andm4 (c.get 12 - Memmove.headN (c.get 10))
+  have hnH : (c.get 12 - Memmove.headN (c.get 10)).toNat = (c.get 12).toNat - (Memmove.headN (c.get 10)).toNat := by
+    bv_omega
+  -- names
+  have hHd : (c.get 10 + Memmove.headN (c.get 10)).toNat = (c.get 10).toNat + (Memmove.headN (c.get 10)).toNat := by
+    bv_omega
+  have hHs : (c.get 11 + Memmove.headN (c.get 10)).toNat = (c.get 11).toNat + (Memmove.headN (c.get 10)).toNat := by
+    bv_omega
+  let o := (c.get 11 + Memmove.headN (c.get 10)).toNat % 4
+  have ho : 0 < o ∧ o < 4 := by
+    constructor
+    · have : (c.get 11 + Memmove.headN (c.get 10)).toNat % 4 ≠ 0 := by bv_omega
+      omega
+    · omega
+  have h6o : h.get 6 = BitVec.ofNat 32 o := by
+    rw [h6]; apply BitVec.eq_of_toNat_eq; rw [hsH3]; simp; omega
+  let W := (c.get 12 - Memmove.headN (c.get 10)) &&& 0xfffffffc#32
+  have hWv : W.toNat = (c.get 12).toNat - (Memmove.headN (c.get 10)).toNat -
+      ((c.get 12).toNat - (Memmove.headN (c.get 10)).toNat) % 4 := by rw [← hnH]; exact hW
+  have hW12 : 12 ≤ W.toNat := by omega
+  obtain ⟨j, hj⟩ : ∃ j, 4 * (j + 1) + 4 = W.toNat := ⟨W.toNat / 4 - 2, by omega⟩
+  -- the stack temporary
+  have hT : (h.get 2 + 0x14#32).toNat % 4 = 0 := by rw [h2]; bv_omega
+  have hTr : B.inRam (h.get 2 + 0x14#32) 4 = true := by rw [h2, B_ram]; constructor <;> bv_omega
+  obtain ⟨n2, g7, R2, hr3, hl⟩ := start_any h (fwd R0 (c.get 11) (c.get 10) (Memmove.headN (c.get 10)).toNat) o ho
+    hmi.pc qh h6o (by rw [h5]) (by rw [h5, B_ram]; constructor <;> bv_omega) hT hTr
+    (by rw [h5, h2]; bv_omega)
+    (by rw [h30, h13]; simp only [BitVec.ult, decide_eq_true_iff]; bv_omega)
+  have qg7 : Quiet g7 := Quiet.of_sameCsr (hl.csr.trans (hmi.csr.trans hm.csr)) hq
+  have l30 : g7.get 30 = c.get 10 + Memmove.headN (c.get 10) := by rw [hl.frame 30 (by decide), h30]
+  have l13 : g7.get 13 = c.get 10 + Memmove.headN (c.get 10) + W := by rw [hl.frame 13 (by decide), h13]
+  have l11 : g7.get 11 = c.get 11 + Memmove.headN (c.get 10) - BitVec.ofNat 32 o := by rw [hl.a1, h5]
+  have hA : (g7.get 11).toNat % 4 = 0 := by rw [l11]; bv_omega
+  obtain ⟨n3, g8, hr4, hpc8, hcs8, h8_11, h8_30, h8_28, h8_13, h8_12, hpv8, hfr8⟩ :=
+    mis_loop o ho j g7 R2 hl.pc qg7 hl.t3 hl.a2 (by rw [l13, l30]; bv_omega) (by rw [l30]; bv_omega)
+      (by rw [l11]; bv_omega) hA (by rw [l30]; exact hHa) (by rw [l30, l11]; bv_omega)
+      (fun k a b => by rw [hl.prev k a b, l11, h5])
+      (by rw [l11, B_ram]; constructor <;> bv_omega) (by rw [l30, B_ram]; constructor <;> bv_omega)
+  have qg8 : Quiet g8 := Quiet.of_sameCsr hcs8 qg7
+  have g8_5 : g8.get 5 = c.get 11 + Memmove.headN (c.get 10) := by
+    rw [hfr8 5 (by decide) (by decide) (by decide) (by decide) (by decide), hl.frame 5 (by decide), h5]
+  have g8_6 : g8.get 6 = BitVec.ofNat 32 o := by
+    rw [hfr8 6 (by decide) (by decide) (by decide) (by decide) (by decide), hl.frame 6 (by decide), h6o]
+  have g8_2 : g8.get 2 = c.get 2 + 0xffffffd0#32 := by
+    rw [hfr8 2 (by decide) (by decide) (by decide) (by decide) (by decide), hl.frame 2 (by decide), h2]
+  have hRl := (B_ram _ _).mp hTr
+  obtain ⟨n4, g9, R3, hr5, ht⟩ := end_any g8 (words R2 (g7.get 11 + BitVec.ofNat 32 o) (g7.get 30) (j + 1)) o ho
+    hpc8 qg8 g8_6 (by rw [h8_28, hl.t3]) (by rw [g8_5]; omega) hpv8
+    (by rw [h8_11, l11, B_ram]; constructor <;> bv_omega)
+    (by rw [g8_2, B_ram]; constructor <;> bv_omega) (by rw [g8_2, B_ram]; constructor <;> bv_omega)
+    (fun jj hjj => by rw [h8_11, l11, g8_2]; constructor <;> bv_omega)
+    (by rw [h8_30, l30]; bv_omega) (by rw [h8_30, l30, B_ram]; constructor <;> bv_omega)
+  have qg9 : Quiet g9 := Quiet.of_sameCsr ht.csr qg8
+  have g9_5 : g9.get 5 = c.get 11 + Memmove.headN (c.get 10) := by rw [ht.frame 5 (by decide), g8_5]
+  have g9_17 : g9.get 17 = W := by
+    rw [ht.frame 17 (by decide), hfr8 17 (by decide) (by decide) (by decide) (by decide) (by decide),
+      hl.frame 17 (by decide), h17]
+  have g9_16 : g9.get 16 = c.get 12 - Memmove.headN (c.get 10) := by
+    rw [ht.frame 16 (by decide), hfr8 16 (by decide) (by decide) (by decide) (by decide) (by decide),
+      hl.frame 16 (by decide), h16]
+  have g9_13 : g9.get 13 = c.get 10 + Memmove.headN (c.get 10) + W := by
+    rw [ht.frame 13 (by decide), h8_13, l13]
+  have hT3 := Memmove.and3 (c.get 12 - Memmove.headN (c.get 10))
+  obtain ⟨n5, e, hr6, hpe, hcse, hfre⟩ := tail_dispatch g9 R3 ht.pc qg9
+    (by rw [g9_5, g9_17, g9_16, B_ram]; constructor <;> bv_omega)
+    (by rw [g9_13, g9_16, B_ram]; constructor <;> bv_omega)
+  refine ⟨k1 + 6 + n2 + n3 + n4 + n5, e, _, ((((hr1.trans hr2).trans hr3).trans hr4).trans hr5).trans hr6, hpe,
+    ⟨hcse.trans (ht.csr.trans (hcs8.trans (hl.csr.trans (hmi.csr.trans hm.csr)))), ?_, ?_⟩, ?_⟩
+  · rw [hfre 2 (by decide) (by decide) (by decide) (by decide), ht.frame 2 (by decide), g8_2]
+  · intro r hr
+    have ne : ∀ q : Nat, q ∈ [2, 6, 5, 7, 9, 11, 12, 13, 14, 15, 16, 17, 28, 29, 30] → r.val ≠ q := by
+      intro q hq e; exact hr (e ▸ hq)
+    have r11 : r ≠ 11 := fun e => ne 11 (by simp) (by subst e; rfl)
+    have r12 : r ≠ 12 := fun e => ne 12 (by simp) (by subst e; rfl)
+    have r13 : r ≠ 13 := fun e => ne 13 (by simp) (by subst e; rfl)
+    have r14 : r ≠ 14 := fun e => ne 14 (by simp) (by subst e; rfl)
+    have r9 : r ≠ 9 := fun e => ne 9 (by simp) (by subst e; rfl)
+    have r15 : r ≠ 15 := fun e => ne 15 (by simp) (by subst e; rfl)
+    have r30 : r ≠ 30 := fun e => ne 30 (by simp) (by subst e; rfl)
+    rw [hfre r r11 r12 r13 r14, ht.frame r (by
+        intro hm'; simp only [List.mem_cons, List.not_mem_nil, or_false] at hm'; apply hr; simp only [List.mem_cons,
+          List.not_mem_nil, or_false]; omega),
+      hfr8 r r9 r11 r14 r15 r30, hl.frame r (by
+        intro hm'; simp only [List.mem_cons, List.not_mem_nil, or_false] at hm'; apply hr; simp only [List.mem_cons,
+          List.not_mem_nil, or_false]; omega),
+      hmi.frame r (by
+        intro hm'; simp only [List.mem_cons, List.not_mem_nil, or_false] at hm'; apply hr; simp only [List.mem_cons,
+          List.not_mem_nil, or_false]; omega),
+      hm.frame r (by
+        intro hm'; simp only [List.mem_cons, List.not_mem_nil, or_false] at hm'; apply hr; simp only [List.mem_cons,
+          List.not_mem_nil, or_false]; omega)]
+  · -- RAM: everything outside memmove's frame is the forward copy of n bytes
+    intro x hx
+    obtain ⟨Rt, hRt, hR3⟩ := ht.ram
+    have hl11 : g7.get 11 + BitVec.ofNat 32 o = c.get 11 + Memmove.headN (c.get 10) := by rw [l11]; bv_omega
+    have e30 : g8.get 30 = c.get 10 + Memmove.headN (c.get 10) + BitVec.ofNat 32 (4 * (j + 1)) := by rw [h8_30, l30]
+    have e11 : g8.get 11 + BitVec.ofNat 32 o =
+        c.get 11 + Memmove.headN (c.get 10) + BitVec.ofNat 32 (4 * (j + 1)) := by rw [h8_11, l11]; bv_omega
+    rw [hl11, l30] at hR3 hRt
+    rw [e30, e11] at hR3
+    rw [g9_5, g9_17, g9_13, g9_16, hR3]
+    have hT3' : (c.get 12 - Memmove.headN (c.get 10) &&& 3#32).toNat =
+        ((c.get 12).toNat - (Memmove.headN (c.get 10)).toNat) % 4 := by rw [hT3, hnH]
+    exact mis_ram R0 R2 Rt (c.get 11) (c.get 10) (c.get 2) (Memmove.headN (c.get 10)) W
+      (c.get 12 - Memmove.headN (c.get 10) &&& 3#32) (c.get 12).toNat j
+      (by rw [hT3']; omega) hj hHl hsr.2 hdr.2 hsr.1 hdr.1 hfr hdirN hsepd hseps hHa
+      (fun y hy => hl.ram y (by rw [h2]; intro ht'; apply hy; unfold InFrame; bv_omega))
+      (fun y hy => hRt y (by rw [g8_2]; intro e'; apply hy; subst e'; unfold InFrame; bv_omega)
+        (by rw [g8_2]; intro e'; apply hy; subst e'; unfold InFrame; bv_omega)) x hx
+
 end E5R.Rmk
