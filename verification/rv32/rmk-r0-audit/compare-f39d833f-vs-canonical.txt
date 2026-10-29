@@ -1,0 +1,52 @@
+old f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30 454024 B
+new 5871dceee5aa302705f4d3ef423ee6765951c0c7d314e996559641630bf16a06 452408 B
+entry 0x80000000 / 0x80000000
+PT diff: old ['0x1', '0x220dc', '0x800210dc', '0x800210dc', '0x8aec', '0x8aec', '0x4', '0x1000']
+         new ['0x1', '0x220dc', '0x800210dc', '0x800210dc', '0x84b4', '0x84b4', '0x4', '0x1000']
+PT diff: old ['0x1', '0x2abc8', '0x80029bc8', '0x80029bc8', '0x5', '0x5', '0x6', '0x1000']
+         new ['0x1', '0x2a590', '0x80029590', '0x80029590', '0x5', '0x5', '0x6', '0x1000']
+PT diff: old ['0x1', '0x2abd0', '0x80029bd0', '0x80029bd0', '0x0', '0xfd6430', '0x6', '0x1000']
+         new ['0x1', '0x2a598', '0x80029598', '0x80029598', '0x0', '0xfd6a68', '0x6', '0x1000']
+PT diff: old ['0x70000003', '0x2ac5b', '0x0', '0x0', '0x4e', '0x4e', '0x4', '0x1']
+         new ['0x70000003', '0x2a623', '0x0', '0x0', '0x4e', '0x4e', '0x4', '0x1']
+section        old addr  old size   new addr  new size  diff
+.text        0x80000000   0x210c4 0x80000000   0x210c4  29460
+.text.dummy  0x80000000       0x0 0x80000000       0x0  same
+.init.rust   0x800210c4      0x16 0x800210c4      0x16  2
+.rodata      0x800210dc    0x7f20 0x800210dc    0x78e8  size/addr
+.eh_frame    0x80028ffc     0xbcc 0x800289c4     0xbcc  136
+.data        0x80029bc8       0x5 0x80029590       0x5  same
+.bss         0x80029bd0     0xfd1 0x80029598     0xfd1  same
+.heap        0x8002aba4       0x0 0x8002a56c       0x0  same
+.uninit      0x8002aba4       0x0 0x8002a56c       0x0  same
+.stack       0x8002aba4  0xfd545c 0x8002a56c  0xfd5a94  same
+functions: {'same-bytes': 138, 'same-up-to-imm': 316}; moved: 77
+focus memmove: old 0x80020c1e+0x8 new 0x80020c1e+0x8 same-bytes
+focus compiler_builtins::mem::memmove: old 0x80020d9e+0x31c new 0x80020d9e+0x31c same-bytes
+focus compiler_builtins::mem::memcpy: old 0x80020c26+0x178 new 0x80020c26+0x178 same-bytes
+focus <rmk_types::protocol::rynk::deframer::Deframer>::tail: old 0x8001d576+0x92 new 0x8001d576+0x92 same-up-to-imm, 5 of 52 instructions differ
+    8001d5cc:      	addi	a3, a3, -0x1bc  |  8001d5cc:      	addi	a3, a3, -0x7f4
+    8001d5de:      	lui	a3, 0x80028  |  8001d5de:      	lui	a3, 0x80027
+    8001d5e2:      	addi	a3, a3, -0x3e0  |  8001d5e2:      	addi	a3, a3, 0x5e8
+    8001d5f4:      	lui	a3, 0x80028  |  8001d5f4:      	lui	a3, 0x80027
+    8001d5f8:      	addi	a3, a3, -0x3d0  |  8001d5f8:      	addi	a3, a3, 0x5f8
+focus <rmk_types::protocol::rynk::deframer::Deframer>::next: old 0x8001d43a+0x13c new 0x8001d43a+0x13c same-up-to-imm, 6 of 114 instructions differ
+    8001d4e0:      	lui	a3, 0x80028  |  8001d4e0:      	lui	a3, 0x80027
+    8001d4e4:      	addi	a3, a3, -0x1cc  |  8001d4e4:      	addi	a3, a3, 0x7fc
+    8001d536:      	lui	a3, 0x80028  |  8001d536:      	lui	a3, 0x80027
+    8001d53a:      	addi	a3, a3, -0x1ec  |  8001d53a:      	addi	a3, a3, 0x7dc
+    8001d560:      	lui	a3, 0x80028  |  8001d560:      	lui	a3, 0x80027
+    8001d564:      	addi	a3, a3, -0x1dc  |  8001d564:      	addi	a3, a3, 0x7ec
+focus <rmk_types::protocol::rynk::deframer::Deframer>::park_pending: old 0x8001d388+0x6a new 0x8001d388+0x6a same-up-to-imm, 4 of 36 instructions differ
+    8001d3cc:      	lui	a3, 0x80028  |  8001d3cc:      	lui	a3, 0x80027
+    8001d3d0:      	addi	a3, a3, -0x3e0  |  8001d3d0:      	addi	a3, a3, 0x5e8
+    8001d3e0:      	lui	a3, 0x80028  |  8001d3e0:      	lui	a3, 0x80027
+    8001d3e4:      	addi	a3, a3, -0x3d0  |  8001d3e4:      	addi	a3, a3, 0x5f8
+focus <rmk_types::protocol::rynk::deframer::Deframer>::unpark_pending: old 0x8001d3f2+0x48 new 0x8001d3f2+0x48 same-up-to-imm, 2 of 26 instructions differ
+    8001d428:      	lui	a3, 0x80028  |  8001d428:      	lui	a3, 0x80027
+    8001d42c:      	addi	a3, a3, -0x3d0  |  8001d42c:      	addi	a3, a3, 0x5f8
+focus core::slice::index::slice_index_fail: old 0x8001fafc+0xce new 0x8001fafc+0xce same-up-to-imm, 4 of 55 instructions differ
+    8001fb34:      	addi	a0, a0, -0x38  |  8001fb34:      	addi	a0, a0, -0x405
+    8001fb76:      	lui	a0, 0x80022  |  8001fb76:      	lui	a0, 0x80021
+    8001fb7a:      	addi	a0, a0, -0x5d3  |  8001fb7a:      	addi	a0, a0, 0x6fc
+    8001fbb8:      	addi	a0, a0, -0xb7  |  8001fbb8:      	addi	a0, a0, -0x4ac

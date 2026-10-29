@@ -1,0 +1,22 @@
+checkout=/dev/shm/e5r-rmk-canonical/rmk mode=remap
+CARGO_HOME=/dev/shm/e5r-rmk-canonical/cargo-home
+CARGO_TERM_COLOR=never
+RUSTFLAGS=--remap-path-prefix=/dev/shm/e5r-rmk-canonical/rmk=/rmk --remap-path-prefix=/dev/shm/e5r-rmk-canonical/cargo-home=/cargo --remap-path-prefix=/home/ht2673/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu=/rustup-toolchain
+RUSTUP_TOOLCHAIN=1.98.1
+rustc 1.98.1 (48a229cea 2026-09-01)
+binary: rustc
+commit-hash: 48a229ceaefd4985c50990b14116b6d856af0985
+commit-date: 2026-09-01
+host: x86_64-unknown-linux-gnu
+release: 1.98.1
+LLVM version: 22.1.8
+cargo 1.98.1 (797e8a9bc 2026-08-05)
+release: 1.98.1
+commit-hash: 797e8a9bca276c1c9f9f738d2a20f484fa4eea9d
+commit-date: 2026-08-05
+host: x86_64-unknown-linux-gnu
+libgit2: 1.9.4 (sys:0.21.0 vendored)
+libcurl: 8.21.0-DEV (sys:0.4.90+curl-8.21.0 vendored ssl:OpenSSL/3.6.3)
+ssl: OpenSSL 3.6.3 9 Jun 2026
+os: Ubuntu 24.4.0 (noble) [64-bit]
+embedded build paths: 0

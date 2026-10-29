@@ -1,0 +1,76 @@
+old f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30 454024 B
+new e95989308a27531733b766913d2e2d01f88bfdebd0f1c044368d667c3bccc39a 453784 B
+entry 0x80000000 / 0x80000000
+PT diff: old ['0x1', '0x1000', '0x80000000', '0x80000000', '0x210da', '0x210da', '0x5', '0x1000']
+         new ['0x1', '0x1000', '0x80000000', '0x80000000', '0x2110a', '0x2110a', '0x5', '0x1000']
+PT diff: old ['0x1', '0x220dc', '0x800210dc', '0x800210dc', '0x8aec', '0x8aec', '0x4', '0x1000']
+         new ['0x1', '0x2210c', '0x8002110c', '0x8002110c', '0x8840', '0x8840', '0x4', '0x1000']
+PT diff: old ['0x1', '0x2abc8', '0x80029bc8', '0x80029bc8', '0x5', '0x5', '0x6', '0x1000']
+         new ['0x1', '0x2a94c', '0x8002994c', '0x8002994c', '0x5', '0x5', '0x6', '0x1000']
+PT diff: old ['0x1', '0x2abd0', '0x80029bd0', '0x80029bd0', '0x0', '0xfd6430', '0x6', '0x1000']
+         new ['0x1', '0x2a958', '0x80029958', '0x80029958', '0x0', '0xfd66a8', '0x6', '0x1000']
+PT diff: old ['0x70000003', '0x2ac5b', '0x0', '0x0', '0x4e', '0x4e', '0x4', '0x1']
+         new ['0x70000003', '0x2a9e3', '0x0', '0x0', '0x4e', '0x4e', '0x4', '0x1']
+section        old addr  old size   new addr  new size  diff
+.text        0x80000000   0x210c4 0x80000000   0x210f4  size/addr
+.text.dummy  0x80000000       0x0 0x80000000       0x0  same
+.init.rust   0x800210c4      0x16 0x800210f4      0x16  2
+.rodata      0x800210dc    0x7f20 0x8002110c    0x7c74  size/addr
+.eh_frame    0x80028ffc     0xbcc 0x80028d80     0xbcc  136
+.data        0x80029bc8       0x5 0x8002994c       0x5  same
+.bss         0x80029bd0     0xfd1 0x80029958     0xfd1  same
+.stack       0x8002aba4  0xfd545c 0x8002a92c  0xfd56d4  same
+.heap        0x8002aba4       0x0 0x8002a92c       0x0  same
+.uninit      0x8002aba4       0x0 0x8002a92c       0x0  same
+functions: {'same-bytes': 121, 'same-up-to-imm': 305, 'different': 28, 'only-or-count-differs': 1}; moved: 297
+focus memmove: old 0x80020c1e+0x8 new 0x80020c4e+0x8 same-bytes
+focus compiler_builtins::mem::memmove: old 0x80020d9e+0x31c new 0x80020dce+0x31c same-bytes
+focus compiler_builtins::mem::memcpy: old 0x80020c26+0x178 new 0x80020c56+0x178 same-bytes
+focus <rmk_types::protocol::rynk::deframer::Deframer>::tail: old 0x8001d576+0x92 new 0x8001d5a6+0x92 same-up-to-imm, 7 of 52 instructions differ
+    8001d58c:      	beqz	a0, 0x8001d5ae  |  8001d5bc:      	beqz	a0, 0x8001d5de
+    8001d58e:      	bltu	s2, s1, 0x8001d5de  |  8001d5be:      	bltu	s2, s1, 0x8001d60e
+    8001d592:      	bltu	s1, a0, 0x8001d5f4  |  8001d5c2:      	bltu	s1, a0, 0x8001d624
+    8001d5ae:      	bltu	s2, s1, 0x8001d5c8  |  8001d5de:      	bltu	s2, s1, 0x8001d5f8
+    8001d5cc:      	addi	a3, a3, -0x1bc  |  8001d5fc:      	addi	a3, a3, -0x438
+    8001d5e2:      	addi	a3, a3, -0x3e0  |  8001d612:      	addi	a3, a3, -0x65c
+    8001d5f8:      	addi	a3, a3, -0x3d0  |  8001d628:      	addi	a3, a3, -0x64c
+focus <rmk_types::protocol::rynk::deframer::Deframer>::next: old 0x8001d43a+0x13c new 0x8001d46a+0x13c same-up-to-imm, 21 of 114 instructions differ
+    8001d45c:      	bltu	a2, s0, 0x8001d4e0  |  8001d48c:      	bltu	a2, s0, 0x8001d510
+    8001d460:      	bltu	s0, s1, 0x8001d4e0  |  8001d490:      	bltu	s0, s1, 0x8001d510
+    8001d476:      	beq	s1, s0, 0x8001d4f6  |  8001d4a6:      	beq	s1, s0, 0x8001d526
+    8001d48e:      	beqz	a5, 0x8001d49a  |  8001d4be:      	beqz	a5, 0x8001d4ca
+    8001d494:      	bne	a3, a2, 0x8001d486  |  8001d4c4:      	bne	a3, a2, 0x8001d4b6
+    8001d498:      	j	0x8001d4f8  |  8001d4c8:      	j	0x8001d528
+    8001d4a8:      	beqz	a0, 0x8001d4b2  |  8001d4d8:      	beqz	a0, 0x8001d4e2
+    8001d4b0:      	j	0x8001d4d4  |  8001d4e0:      	j	0x8001d504
+    8001d4b2:      	bltu	s5, s1, 0x8001d560  |  8001d4e2:      	bltu	s5, s1, 0x8001d590
+    8001d4b6:      	bltu	s2, s5, 0x8001d560  |  8001d4e6:      	bltu	s2, s5, 0x8001d590
+    8001d4ca:      	bne	a0, s9, 0x8001d4d4  |  8001d4fa:      	bne	a0, s9, 0x8001d504
+    8001d4d0:      	bltu	s10, s6, 0x8001d530  |  8001d500:      	bltu	s10, s6, 0x8001d560
+    8001d4d8:      	bgeu	s0, s11, 0x8001d476  |  8001d508:      	bgeu	s0, s11, 0x8001d4a6
+    8001d4e4:      	addi	a3, a3, -0x1cc  |  8001d514:      	addi	a3, a3, -0x448
+    8001d4fc:      	bnez	a0, 0x8001d504  |  8001d52c:      	bnez	a0, 0x8001d534
+    8001d4fe:      	bne	s0, s2, 0x8001d510  |  8001d52e:      	bne	s0, s2, 0x8001d540
+    8001d502:      	bnez	s1, 0x8001d510  |  8001d532:      	bnez	s1, 0x8001d540
+    8001d530:      	beqz	s1, 0x8001d55c  |  8001d560:      	beqz	s1, 0x8001d58c
+    8001d53a:      	addi	a3, a3, -0x1ec  |  8001d56a:      	addi	a3, a3, -0x468
+    8001d55e:      	j	0x8001d510  |  8001d58e:      	j	0x8001d540
+    8001d564:      	addi	a3, a3, -0x1dc  |  8001d594:      	addi	a3, a3, -0x458
+focus <rmk_types::protocol::rynk::deframer::Deframer>::park_pending: old 0x8001d388+0x6a new 0x8001d3b8+0x6a same-up-to-imm, 4 of 36 instructions differ
+    8001d392:      	bltu	a2, a4, 0x8001d3cc  |  8001d3c2:      	bltu	a2, a4, 0x8001d3fc
+    8001d39a:      	bltu	a4, a0, 0x8001d3e0  |  8001d3ca:      	bltu	a4, a0, 0x8001d410
+    8001d3d0:      	addi	a3, a3, -0x3e0  |  8001d400:      	addi	a3, a3, -0x65c
+    8001d3e4:      	addi	a3, a3, -0x3d0  |  8001d414:      	addi	a3, a3, -0x64c
+focus <rmk_types::protocol::rynk::deframer::Deframer>::unpark_pending: old 0x8001d3f2+0x48 new 0x8001d422+0x48 same-up-to-imm, 2 of 26 instructions differ
+    8001d400:      	bltu	a2, a3, 0x8001d428  |  8001d430:      	bltu	a2, a3, 0x8001d458
+    8001d42c:      	addi	a3, a3, -0x3d0  |  8001d45c:      	addi	a3, a3, -0x64c
+focus core::slice::index::slice_index_fail: old 0x8001fafc+0xce new 0x8001fb2c+0xce same-up-to-imm, 9 of 55 instructions differ
+    8001fb04:      	bgeu	a2, a0, 0x8001fb46  |  8001fb34:      	bgeu	a2, a0, 0x8001fb76
+    8001fb18:      	addi	a1, a1, 0x20c  |  8001fb48:      	addi	a1, a1, 0x23c
+    8001fb34:      	addi	a0, a0, -0x38  |  8001fb64:      	addi	a0, a0, -0x254
+    8001fb46:      	bltu	a2, a1, 0x8001fb8c  |  8001fb76:      	bltu	a2, a1, 0x8001fbbc
+    8001fb4a:      	bgeu	a1, a0, 0x8001fb8c  |  8001fb7a:      	bgeu	a1, a0, 0x8001fbbc
+    8001fb5e:      	addi	a1, a1, 0x20c  |  8001fb8e:      	addi	a1, a1, 0x23c
+    8001fb7a:      	addi	a0, a0, -0x5d3  |  8001fbaa:      	addi	a0, a0, -0x581
+    8001fb9c:      	addi	a1, a1, 0x20c  |  8001fbcc:      	addi	a1, a1, 0x23c
+    8001fbb8:      	addi	a0, a0, -0xb7  |  8001fbe8:      	addi	a0, a0, -0x2c9
