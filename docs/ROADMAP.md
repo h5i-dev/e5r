@@ -783,45 +783,61 @@ Each item is checked only when its acceptance criterion has been run.
       exits 0 from a fresh clone with identical image hashes; the workspace
       failures that remain are the corpus-gated tests that need
       `scripts/build-fixtures.sh` prerequisites absent on the dev host.
-- [ ] **F2. One supported scope.** SiFive HiFive1 Rev B (FE310-G002, E31
+- [x] **F2. One supported scope.** SiFive HiFive1 Rev B (FE310-G002, E31
       RV32IMAC), M-mode only, boot at `0x20010000`, 16 KiB DTIM, CLINT timer.
       *Accepted:* `boards/hifive1-revb.json` is the single source of the memory
       map, device registers, boot assumptions and exclusions; the Lean board is
       generated from it and the checker refuses a stale copy; the product doc
-      states guarantees and exclusions in the same terms.
-- [ ] **F3. Semantics for real compiler output.** RV32IMAC + Zicsr + Zifencei
+      states guarantees and exclusions in the same terms. (Accepted
+      2026-10-29.)
+- [x] **F3. Semantics for real compiler output.** RV32IMAC + Zicsr + Zifencei
       + MRET/WFI, machine-mode CSRs, interrupt entry, aligned RAM, flash image,
       device registers; unsupported behavior fails closed. *Accepted:* QEMU
       `sifive_e` whole-firmware trace replay agrees on every register after
       every transition; instruction-level differential cases cover every
       supported opcode class; negative controls show each fault class.
-- [ ] **F4. Symbolic and compositional proofs.** *Accepted:* the clamp
+      (Accepted 2026-10-29: 62,773-transition firmware replay with 170
+      interrupts; ~30k random instructions over all 84 kinds; 30 controls.)
+- [x] **F4. Symbolic and compositional proofs.** *Accepted:* the clamp
       binaries are proved for all 2^32 inputs including the wrapping case; a
       loop over a buffer is proved by an invariant, not unrolling; function
       contracts state pre/postconditions and frames; at least one successful
       execution is exhibited (nonvacuity); the axiom audit shows only
-      `propext`, `Quot.sound` and `Classical.choice`.
+      `propext`, `Quot.sound` and `Classical.choice`. (Accepted 2026-10-29:
+      `clamp_all`, `duty_contract`, both `nonvacuous`.)
 - [ ] **F5. General workflow.** *Accepted:* `e5r-verify check` takes a job
       file (ELF, board, property, entry/boot model) and returns structured JSON
       with one of `proved`, `counterexample`, `unknown`, `unsupported`,
       `resource_exhausted`, `error`; resource limits and resumable runs; a new
       target needs a job file, not a new runner; a counterexample is reported
-      only after it replays in the model.
-- [ ] **F6. Environment model for the board.** *Accepted:* boot state, CSRs,
+      only after it replays in the model. *Done:* job files, the statuses
+      (a failed proof is never a counterexample), limits, `--resume`,
+      stale-result detection, a new target needs a job file plus its proof
+      module. *Open:* automatic proofs (the F7 checker) and a counterexample
+      producer with replay, so `counterexample` is still never emitted.
+- [x] **F6. Environment model for the board.** *Accepted:* boot state, CSRs,
       interrupt entry/return, CLINT/UART/PWM registers and environmental
       nondeterminism are explicit and documented; replay against QEMU covers
-      interrupts and device traffic.
+      interrupts and device traffic. (Accepted 2026-10-29.)
 - [ ] **F7. Embassy firmware proof.** One executor, timer interrupt, channel,
       built with plain cargo. *Accepted:* a kernel-checked theorem that, from
       every boot state the board allows and under every environment behavior
       the model allows, the emitted binary never leaves the modeled envelope
       and every PWM duty write is at most 100; plus a concrete execution that
-      reaches such a write.
+      reaches such a write. *Status:* not proved. `Theories/Absint.lean`
+      (checker) and `tools/Analyze.lean` (certificate search) exist but are
+      neither sound-by-proof nor precise enough yet; see
+      `firmware-verification.md`.
 - [ ] **F8. Packaging.** *Accepted:* pinned toolchains, one command that
       rebuilds and rechecks from source, proof bound to ELF bytes, board,
       property, model and toolchain hashes with stale results refused, CI job,
       malformed-input tests, schema/version policy, tutorial, residual TCB,
       and an independent review recorded (or recorded as not obtained).
+      *Done:* pinned toolchains, `scripts/check-firmware-verification.sh`,
+      result binding and staleness, CI job (not yet run on a runner),
+      malformed-input and runner controls, schema names, docs. *Open:*
+      installation tutorial for a fresh machine, offline recheck bundle,
+      independent review.
 
 Not in this scope, and not to be described as done: Cortex-M, multiple harts,
 DMA, U-mode/PMP, microkernels, timing or deadline guarantees, other boards,

@@ -169,3 +169,36 @@ jobs:
       # unpacks into a path nobody looks at.
       - name: The installer agrees with the release layout
         run: ./scripts/check-installer.sh
+
+  # Scope F (docs/firmware-verification.md): rebuild the firmware and the
+  # clamp fixture with the pinned rustc, recheck every verification job from
+  # source with the pinned Lean, run the negative controls, and replay QEMU
+  # traces (instruction-level in user mode, the whole firmware on sifive_e)
+  # in the model. e5r-verify itself is the dev profile here, like the rest
+  # of this workflow; the firmware is built --release because its bytes are
+  # pinned.
+  firmware-verification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Pinned Rust for the firmware and fixtures
+        run: rustup toolchain install 1.98.1 --profile minimal --target riscv32imac-unknown-none-elf --component llvm-tools
+      - name: Lean (elan; the version comes from verification/rv32/lean-toolchain)
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/v4.1.2/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: RISC-V binutils 2.42 and QEMU 8.2.2 (Ubuntu 24.04)
+        run: sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update -q && sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y --no-install-recommends binutils-riscv64-linux-gnu qemu-user qemu-system-misc
+      - run: cargo build -p e5r-verify
+      - name: Every firmware proof, control and differential test
+        env:
+          E5R_VERIFY: target/debug/e5r-verify
+        run: ./scripts/check-firmware-verification.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: firmware-verification-results
+          path: verification/rv32/build/results/

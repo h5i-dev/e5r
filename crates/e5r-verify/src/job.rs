@@ -394,9 +394,17 @@ fn board_module_name(board: &str) -> Result<String, Stop> {
 
 /// Rebuild, export, check and audit. Returns the result document whatever
 /// the outcome.
-pub fn run(job_path: &Path) -> Value {
+///
+/// With `resume`, a module whose source and every earlier module's source
+/// (and the Lean version) are unchanged since it last compiled successfully
+/// is not recompiled; its `.olean` from that run is used. The result lists
+/// such modules under `resumed`. Without it (the default, and what CI and
+/// releases use) every module is checked from source.
+pub fn run(job_path: &Path, resume: bool) -> Value {
     let started = Instant::now();
     let mut stages = Vec::new();
+    let mut resumed: Vec<String> = Vec::new();
+    let mut checked: Vec<String> = Vec::new();
     let outcome = (|| -> Result<(Value, Value), Stop> {
         let (job, paths) = Job::load(job_path)?;
         let limits = &job.limits;
@@ -472,6 +480,7 @@ pub fn run(job_path: &Path) -> Value {
         order.push(Job::module_path(&job.image.module));
         order.push(Job::module_path(&fidelity_mod));
         order.extend(job.modules.iter().cloned());
+        checked = order.clone();
         for m in &order {
             let src = std::fs::read_to_string(paths.root.join(m)).map_err(err(m))?;
             let found = escapes(&lean_code(&src));
@@ -479,9 +488,28 @@ pub fn run(job_path: &Path) -> Value {
                 return Err(Stop::Error(format!("{m}: forbidden {}", found.join(", "))));
             }
         }
+        let manifest_path = paths
+            .root
+            .join(format!("build/jobs/{}/stages.json", job.id));
+        let mut manifest: BTreeMap<String, String> = std::fs::read_to_string(&manifest_path)
+            .ok()
+            .and_then(|t| serde_json::from_str(&t).ok())
+            .unwrap_or_default();
+        let mut chain = sha256::hex(
+            tool_version(&["lean", "--version"])
+                .unwrap_or_default()
+                .as_bytes(),
+        );
         for m in &order {
+            let src = std::fs::read(paths.root.join(m)).map_err(err(m))?;
+            chain = sha256::hex(format!("{chain} {m} {}", sha256::hex(&src)).as_bytes());
             let t = Instant::now();
             let olean = Path::new(m).with_extension("olean");
+            if resume && manifest.get(m) == Some(&chain) && paths.root.join(&olean).exists() {
+                resumed.push(m.clone());
+                continue;
+            }
+            manifest.remove(m);
             let mut cmd = Command::new("lean");
             cmd.current_dir(&paths.root)
                 .env("LEAN_PATH", ".")
@@ -498,6 +526,14 @@ pub fn run(job_path: &Path) -> Value {
                 seconds: t.elapsed().as_secs_f64(),
                 peak_rss_mib: rss,
             });
+            manifest.insert(m.clone(), chain.clone());
+            if let Some(dir) = manifest_path.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            let _ = std::fs::write(
+                &manifest_path,
+                serde_json::to_string_pretty(&manifest).unwrap(),
+            );
         }
         // Audit every named theorem plus the image binding. `Ns.*` names
         // every theorem the job's modules declare in namespace `Ns`.
@@ -580,6 +616,8 @@ pub fn run(job_path: &Path) -> Value {
         "job_file": job_path.display().to_string(),
         "seconds": started.elapsed().as_secs_f64(),
         "stages": stages_json,
+        "resumed": resumed,
+        "modules": checked,
     });
     match outcome {
         Ok((ident, theorems)) => {
@@ -640,6 +678,99 @@ pub fn stale(result: &Value) -> Result<Vec<String>, String> {
         changed.push(format!("status is {}", result["status"]));
     }
     Ok(changed)
+}
+
+/// After a fresh `proved` run, write everything needed to recheck the
+/// proofs with nothing but the pinned Lean: the sources and generated
+/// modules in their layout, the ELF, the result, a `recheck.sh` that
+/// recompiles every module and compares the axiom report with the recorded
+/// one, and SHA-256 sums of every file.
+pub fn bundle(job_path: &Path, out: &Path) -> Result<Value, String> {
+    let result = run(job_path, false);
+    if result["status"] != "proved" {
+        return Err(format!(
+            "not bundling: status {} ({})",
+            result["status"],
+            result["message"].as_str().unwrap_or("")
+        ));
+    }
+    let (job, paths) = Job::load(job_path).map_err(|s| s.message().to_string())?;
+    let modules: Vec<String> = result["modules"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|m| m.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut files: Vec<String> = modules.clone();
+    files.push("lean-toolchain".into());
+    files.push(job.elf.clone());
+    files.push(job.board.clone());
+    let mut sums = String::new();
+    for f in &files {
+        let src = paths.root.join(f);
+        let dst = out.join(f);
+        std::fs::create_dir_all(dst.parent().unwrap()).map_err(|e| e.to_string())?;
+        let bytes = std::fs::read(&src).map_err(|e| format!("{f}: {e}"))?;
+        std::fs::write(&dst, &bytes).map_err(|e| format!("{f}: {e}"))?;
+        sums.push_str(&format!("{}  {f}\n", sha256::hex(&bytes)));
+    }
+    let mut expected = String::new();
+    let mut audit = String::new();
+    for m in &modules {
+        audit.push_str(&format!(
+            "import {}\n",
+            m.trim_end_matches(".lean").replace('/', ".")
+        ));
+    }
+    for t in result["theorems"].as_array().into_iter().flatten() {
+        let name = t["name"].as_str().unwrap_or("");
+        let axioms: Vec<&str> = t["axioms"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|a| a.as_str())
+            .collect();
+        audit.push_str(&format!("#print axioms {name}\n"));
+        expected.push_str(&if axioms.is_empty() {
+            format!("'{name}' does not depend on any axioms\n")
+        } else {
+            format!("'{name}' depends on axioms: [{}]\n", axioms.join(", "))
+        });
+    }
+    let script = format!(
+        "#!/usr/bin/env bash\n\
+         # Recheck this bundle with only Lean (the version in lean-toolchain).\n\
+         set -euo pipefail\ncd \"$(dirname \"$0\")\"\n\
+         sha256sum -c --quiet SHA256SUMS\n\
+         for m in {mods}; do\n  LEAN_PATH=. lean -j1 -o \"${{m%.lean}}.olean\" \"$m\"\ndone\n\
+         LEAN_PATH=. lean -j1 Audit.lean > axioms.actual\n\
+         diff axioms.expected axioms.actual\n\
+         echo \"recheck: every theorem checked, with exactly the recorded axioms\"\n",
+        mods = modules.join(" ")
+    );
+    for (name, text) in [
+        ("Audit.lean", audit),
+        ("axioms.expected", expected),
+        ("recheck.sh", script),
+        ("SHA256SUMS", sums),
+        (
+            "result.json",
+            serde_json::to_string_pretty(&result).unwrap() + "\n",
+        ),
+    ] {
+        std::fs::write(out.join(name), text).map_err(|e| format!("{name}: {e}"))?;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(
+            out.join("recheck.sh"),
+            std::fs::Permissions::from_mode(0o755),
+        );
+    }
+    Ok(result)
 }
 
 #[cfg(test)]

@@ -7,7 +7,9 @@ def main (args : List String) : IO UInt32 := do
   let st ← fixG su none 0 false
   for e in st.errors.toList.take 30 do IO.eprintln e
   IO.eprintln s!"{st.errors.size} errors"
-  if !st.errors.isEmpty then return 1
+  -- `--force` writes the certificate even with errors (it will not check),
+  -- for measuring the checker.
+  if !st.errors.isEmpty && !args.contains "--force" then return 1
   let sigma := norm (st.nodes.toList.filterMap fun s =>
     if !s.hnd && !(irqCodesAbs s).isEmpty then
       match s.get 2 with | .vals [sp] => some sp | _ => none

@@ -11,7 +11,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[3]
 VERIFY = ROOT / 'verification/rv32'
-BIN = ROOT / 'target/release/e5r-verify'
+BIN = Path(os.environ.get('E5R_VERIFY', ROOT / 'target/release/e5r-verify'))
 WORK = VERIFY / 'build/controls'
 
 

@@ -3,11 +3,13 @@
 //! `e5r-verify IMAGE.elf` is the V0 research export (strict RV32I subset).
 //! `e5r-verify flash --board BOARD.json [--namespace NS] IMAGE.elf` exports
 //! the flash contents a board boots from.
-//! `e5r-verify check JOB.json [--out RESULT.json]` rebuilds and rechecks a
+//! `e5r-verify check JOB.json [--resume] [--out RESULT.json]` rebuilds and rechecks a
 //! verification job and prints its `e5r.verify.result.v1` document; the exit
 //! status is 0 only for `proved`.
 //! `e5r-verify verify-result RESULT.json` says whether a stored result still
 //! describes the current inputs.
+//! `e5r-verify bundle JOB.json --out DIR` writes a self-contained directory
+//! whose `recheck.sh` rechecks the proofs with only the pinned Lean.
 use std::process::ExitCode;
 
 fn run(args: Vec<String>) -> Result<String, String> {
@@ -35,16 +37,18 @@ fn run(args: Vec<String>) -> Result<String, String> {
         Some("check") => {
             let mut out = None;
             let mut job = None;
+            let mut resume = false;
             let mut it = args[1..].iter();
             while let Some(a) = it.next() {
                 match a.as_str() {
                     "--out" => out = it.next().cloned(),
+                    "--resume" => resume = true,
                     _ if job.is_none() && !a.starts_with('-') => job = Some(a.clone()),
                     _ => return Err(format!("unexpected argument {a}")),
                 }
             }
             let job = job.ok_or("check needs a job file")?;
-            let result = e5r_verify::job::run(std::path::Path::new(&job));
+            let result = e5r_verify::job::run(std::path::Path::new(&job), resume);
             let text = serde_json::to_string_pretty(&result).unwrap() + "\n";
             if let Some(out) = out {
                 std::fs::write(&out, &text).map_err(|e| format!("{out}: {e}"))?;
@@ -58,6 +62,21 @@ fn run(args: Vec<String>) -> Result<String, String> {
             };
             print!("{text}");
             std::process::exit(code);
+        }
+        Some("bundle") => {
+            let (job, out) = match (args.get(1), args.get(2), args.get(3)) {
+                (Some(job), Some(flag), Some(out)) if flag == "--out" => (job, out),
+                _ => return Err("usage: e5r-verify bundle JOB.json --out DIR".into()),
+            };
+            let out = std::path::Path::new(out);
+            if out.exists() {
+                return Err(format!("{}: already exists", out.display()));
+            }
+            e5r_verify::job::bundle(std::path::Path::new(job), out)?;
+            Ok(format!(
+                "{}: bundle written; run its recheck.sh with the pinned Lean\n",
+                out.display()
+            ))
         }
         Some("verify-result") => {
             let path = args.get(1).ok_or("verify-result needs a result file")?;
@@ -74,7 +93,8 @@ fn run(args: Vec<String>) -> Result<String, String> {
         Some(path) if args.len() == 1 && !path.starts_with('-') => e5r_verify::export(&read(path)?),
         _ => Err(
             "usage: e5r-verify IMAGE.elf | flash --board BOARD.json [--namespace NS] IMAGE.elf | \
-                  check JOB.json [--out RESULT.json] | verify-result RESULT.json"
+                  check JOB.json [--resume] [--out RESULT.json] | verify-result RESULT.json | \
+                  bundle JOB.json --out DIR"
                 .into(),
         ),
     }
