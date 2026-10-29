@@ -836,4 +836,149 @@ theorem ramRead_ramWrite_self (ram : Word → BitVec 8) (a v : Word) (wd : Width
   · exact ramRead_ramWrite_h ram a v
   · exact ramRead_ramWrite_w ram a v
 
+/-! ## Joins -/
+
+theorem join_sound_left {ρ : Nat → Word} {a b : AV} {x : Word} (h : a.gam ρ x) : (a.join b).gam ρ x := by
+  unfold AV.join
+  split
+  · trivial
+  · trivial
+  · next xs ys => exact mkVals_sound ⟨x.toNat, List.mem_append_left _ h, Nat.mod_eq_of_lt (toNat_lt x)⟩
+  · next s o s' o' =>
+    split
+    · exact h
+    · trivial
+  · trivial
+  · trivial
+  · split
+    · next l1 h1 l2 h2 e1 e2 =>
+      have := bounds_sound h e1
+      simp only [AV.gam]; omega
+    · next e1 =>
+      exfalso
+      cases a with
+      | vals l => cases l with
+        | nil => simp [AV.gam] at h
+        | cons _ _ => simp [AV.bounds] at e1
+      | rng _ _ => simp [AV.bounds] at e1
+      | top => simp [AV.bounds] at e1
+      | sym _ _ => simp_all
+    · exact h
+
+theorem join_sound_right {ρ : Nat → Word} {a b : AV} {x : Word} (h : b.gam ρ x) : (a.join b).gam ρ x := by
+  unfold AV.join
+  split
+  · trivial
+  · trivial
+  · next xs ys => exact mkVals_sound ⟨x.toNat, List.mem_append_right _ h, Nat.mod_eq_of_lt (toNat_lt x)⟩
+  · next s o s' o' =>
+    split
+    · next he => obtain ⟨rfl, rfl⟩ := he; exact h
+    · trivial
+  · trivial
+  · trivial
+  · split
+    · next l1 h1 l2 h2 e1 e2 =>
+      have := bounds_sound h e2
+      simp only [AV.gam]; omega
+    · exact h
+    · exfalso
+      cases b with
+      | vals l => cases l <;> simp_all [AV.bounds, AV.gam]
+      | _ => simp_all [AV.bounds, AV.gam]
+
+/-! ## Stores -/
+
+/-- What a store must know about each cell it keeps: the cell's bytes, and
+    its guard's, are untouched, or the store wrote exactly the guard value. -/
+def StoreSep (ρ : Nat → Word) (mem : List Cell) (base : Base) (a : Nat) (wd : Width) (V : AV) : Prop :=
+  ∀ c ∈ mem, c.staleAfter base a wd V = false →
+    Disj (c.at ρ) c.w (addrOf ρ base a) wd ∧
+    (∀ g, c.guard = some g → Disj (w g.1) g.2.1 (addrOf ρ base a) wd ∨
+      (base = .abs ∧ g.1 = a ∧ g.2.1 = wd ∧ V = .vals [g.2.2]))
+
+theorem kept_holds {ρ : Nat → Word} {ram : Word → BitVec 8} {c : Cell} {base : Base} {a : Nat}
+    {wd : Width} {V : AV} {v : Word} (hc : c.holds ρ ram) (hV : V.gam ρ (stored wd v))
+    (hd : Disj (c.at ρ) c.w (addrOf ρ base a) wd)
+    (hg : ∀ g, c.guard = some g → Disj (w g.1) g.2.1 (addrOf ρ base a) wd ∨
+      (base = .abs ∧ g.1 = a ∧ g.2.1 = wd ∧ V = .vals [g.2.2])) :
+    c.holds ρ (ramWrite ram (addrOf ρ base a) v wd) := by
+  intro hguard
+  rw [ramRead_frame _ _ _ _ _ _ hd]
+  apply hc
+  intro g hgc
+  rcases hg g hgc with hdg | ⟨hb, ha, hw, hv⟩
+  · have := hguard g hgc; rwa [ramRead_frame _ _ _ _ _ _ hdg] at this
+  · exfalso
+    have := hguard g hgc
+    subst hb; subst hv
+    rw [show w g.1 = addrOf ρ .abs a from by rw [ha]; rfl, hw, ramRead_ramWrite_self] at this
+    simp only [AV.gam, List.mem_singleton] at hV
+    exact this hV
+
+theorem storeStrong_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Cell} {base : Base}
+    {a : Nat} {wd : Width} {V : AV} {v : Word} (hm : MemHolds ρ ram mem)
+    (hV : V.gam ρ (stored wd v)) (hsep : StoreSep ρ mem base a wd V) :
+    MemHolds ρ (ramWrite ram (addrOf ρ base a) v wd) (storeStrong mem base a wd V) := by
+  intro c hc
+  simp only [storeStrong, List.mem_cons, List.mem_filter, Bool.not_eq_true'] at hc
+  rcases hc with rfl | ⟨hc, hns⟩
+  · intro _
+    show V.gam ρ (ramRead _ (Cell.at ρ ⟨base, a, wd, V, none⟩) wd)
+    rw [cell_at rfl rfl, ramRead_ramWrite_self]; exact hV
+  · obtain ⟨hd, hg⟩ := hsep c hc hns
+    exact kept_holds (hm c hc) hV hd hg
+
+/-- A weak store at a candidate address only weakens or forgets facts, so it
+    keeps every fact that held, in any memory. -/
+theorem storeWeak_weakens {ρ : Nat → Word} {R : Word → BitVec 8} {mem : List Cell} {base : Base}
+    {a : Nat} {wd : Width} {V : AV} (hm : MemHolds ρ R mem) :
+    MemHolds ρ R (storeWeak mem base a wd V) := by
+  intro c hc
+  simp only [storeWeak, List.mem_filterMap] at hc
+  obtain ⟨d, hd, he⟩ := hc
+  split at he
+  · next hx =>
+    simp only [Option.some.injEq] at he; subst he
+    intro hg
+    exact join_sound_left (hm d hd hg)
+  · split at he
+    · simp at he
+    · simp only [Option.some.injEq] at he; subst he; exact hm _ hd
+
+/-- At the address actually written, the weak store's facts hold after the
+    write. -/
+theorem storeWeak_write {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Cell} {base : Base}
+    {a : Nat} {wd : Width} {V : AV} {v : Word} (hm : MemHolds ρ ram mem)
+    (hV : V.gam ρ (stored wd v)) (hsep : StoreSep ρ mem base a wd V) :
+    MemHolds ρ (ramWrite ram (addrOf ρ base a) v wd) (storeWeak mem base a wd V) := by
+  intro c hc
+  simp only [storeWeak, List.mem_filterMap] at hc
+  obtain ⟨d, hd, he⟩ := hc
+  split at he
+  · next hx =>
+    simp only [Option.some.injEq] at he; subst he
+    simp only [Bool.and_eq_true, beq_iff_eq, Option.isNone_iff_eq_none] at hx
+    obtain ⟨⟨⟨hb, ha⟩, hw⟩, hg⟩ := hx
+    intro _
+    show (d.v.join V).gam ρ (ramRead _ (d.at ρ) d.w)
+    rw [cell_at hb ha, hw, ramRead_ramWrite_self]
+    exact join_sound_right hV
+  · split at he
+    · simp at he
+    · next _ hns =>
+      simp only [Option.some.injEq] at he; subst he
+      obtain ⟨hd', hg⟩ := hsep _ hd (by simpa using hns)
+      exact kept_holds (hm _ hd) hV hd' hg
+
+/-- Pinning a just-loaded value keeps every fact and adds a true one. -/
+theorem setPlain_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Cell} {a : Nat}
+    {wd : Width} {v : AV} (hm : MemHolds ρ ram mem) (hv : v.gam ρ (ramRead ram (w a) wd)) :
+    MemHolds ρ ram (setPlain mem a wd v) := by
+  intro c hc
+  simp only [setPlain, List.mem_cons, List.mem_filter] at hc
+  rcases hc with rfl | ⟨hc, _⟩
+  · intro _; exact hv
+  · exact hm c hc
+
 end E5R.AI
