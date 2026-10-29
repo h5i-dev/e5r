@@ -7,6 +7,9 @@ use e5r_core::{Arch, Bits, Endian};
 use e5r_format::{LoadOptions, Object};
 use std::fmt::Write;
 
+pub mod board;
+pub mod flash;
+
 /// Reject containers outside the small, static, relocation-free research contract.
 pub fn load_image(bytes: &[u8]) -> Result<Object, String> {
     if bytes.len() > 65536 || bytes.len() < 52 {

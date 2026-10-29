@@ -7,3 +7,4 @@ Oracle.lean
 Projects/rust_clamp/ImageO*.lean
 Audit.lean
 build/
+Projects/hifive1/Image.lean
