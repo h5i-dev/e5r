@@ -68,4 +68,47 @@ theorem merge_store (R R' : Word → BitVec 8) (D A prev : Word) (o : Nat) (ho :
   · rw [hprev (k + o) (by omega) (by omega)]; congr 1; bv_omega
   · rw [byte_read_k _ _ _ (by omega)]; congr 1; bv_omega
 
+/-- `merge_store` with a second word known only in its low `o` bytes (the
+    final word, assembled byte by byte from the last source bytes). -/
+theorem merge_store_q (R R' : Word → BitVec 8) (D A prev q : Word) (o : Nat) (ho : 0 < o ∧ o < 4)
+    (hprev : ∀ k, o ≤ k → k < 4 → byteOf prev k = R (A + BitVec.ofNat 32 k))
+    (hq : ∀ j, j < o → byteOf q j = R (A + 4 + BitVec.ofNat 32 j)) :
+    ramWrite R' D ((prev >>> (8 * o)) ||| (q <<< (32 - 8 * o))) .w =
+      ramWrite R' D (ramRead R (A + BitVec.ofNat 32 o) .w) .w := by
+  apply ramWrite_w_bytes
+  intro k hk
+  rw [merge_byte _ _ _ _ ho hk, byte_read_k _ _ _ hk]
+  split
+  · rw [hprev (k + o) (by omega) (by omega)]; congr 1; bv_omega
+  · rw [hq _ (by omega)]; congr 1; bv_omega
+
+/-- A loaded byte as a word: below 256. -/
+theorem lbu_lt (R : Word → BitVec 8) (a : Word) : (extend .b false (ramRead R a .b)).toNat < 256 := by
+  simp only [extend, BitVec.toNat_and]
+  exact Nat.lt_of_le_of_lt Nat.and_le_right (by decide)
+
+theorem lbu_byte (R : Word → BitVec 8) (a : Word) : byteOf (extend .b false (ramRead R a .b)) 0 = R a := by
+  have := congrArg (fun f => f a) (copyByte R a a)
+  simp only [ramWrite, ramPut, if_pos rfl] at this
+  exact this
+
+/-- The final word's assembly `(y <<< 8) ||| (z <<< 16) ||| x` of byte-sized words. -/
+theorem asm_toNat (x y z : Word) (hx : x.toNat < 256) (hy : y.toNat < 256) (hz : z.toNat < 256) :
+    ((y <<< 8) ||| (z <<< 16) ||| x).toNat = x.toNat + 256 * y.toNat + 65536 * z.toNat := by
+  simp only [BitVec.toNat_or, BitVec.toNat_shiftLeft]
+  rw [show y.toNat <<< 8 % 2 ^ 32 = y.toNat <<< 8 by rw [Nat.shiftLeft_eq]; omega,
+    show z.toNat <<< 16 % 2 ^ 32 = (z.toNat <<< 8) <<< 8 by
+      rw [Nat.shiftLeft_eq, Nat.shiftLeft_eq, Nat.shiftLeft_eq]; omega,
+    Nat.or_comm (y.toNat <<< 8), ← Nat.shiftLeft_or_distrib,
+    ← Nat.shiftLeft_add_eq_or_of_lt (show y.toNat < 2 ^ 8 by omega),
+    ← Nat.shiftLeft_add_eq_or_of_lt (show x.toNat < 2 ^ 8 by omega)]
+  simp only [Nat.shiftLeft_eq]; omega
+
+theorem asm_byte (x y z : Word) (hx : x.toNat < 256) (hy : y.toNat < 256) (hz : z.toNat < 256) :
+    byteOf ((y <<< 8) ||| (z <<< 16) ||| x) 0 = byteOf x 0 ∧
+    byteOf ((y <<< 8) ||| (z <<< 16) ||| x) 1 = byteOf y 0 ∧
+    byteOf ((y <<< 8) ||| (z <<< 16) ||| x) 2 = byteOf z 0 := by
+  have h := asm_toNat x y z hx hy hz
+  refine ⟨?_, ?_, ?_⟩ <;> apply BitVec.eq_of_toNat_eq <;> simp only [byteOf, BitVec.toNat_ofNat, h] <;> omega
+
 end E5R.Rmk
