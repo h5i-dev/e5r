@@ -297,6 +297,44 @@ the fix touches only `Theories/Hart.lean`, which V0 does not import.
 Nothing was merged or cherry-picked into `support-lean4`.
 
 
+## 8. Integration round (continuation 20261029T111106Z)
+
+Base: published `origin/support-lean4` @ `e9e71a1`, merged into this branch
+(`acaafd0`); Hart.lean taken from support-lean4, whose `dcd2b33` probes the
+SC address on every path (equivalent to `90b12ad` for faults).
+`review/Repro.lean` on the merged head: 5 PASS + control PASS. Harness: one
+case changed expectation (`csrrw mtvec 0x20010041` is now declined by
+`dcd2b33`'s 128-byte vectored-base rule, which is conservative); 1726 cases,
+every one as expected (`results/harness-e9e71a1.json`).
+
+The production replay now checks device traffic (owned by this branch for
+this round; `tools/Replay.lean`, `tools/qemu_trace.py`):
+
+* `qemu_trace.py` writes trace format 2: `V 2` header, `S` states, `R`/`W`
+  MMIO reads/writes from `-trace memory_region_ops_read/_write`, `I cause
+  epc` from QEMU's interrupt line, and an `E` end marker with the counts. A
+  state with missing fields in the middle of the log is an error. `--user`
+  (ReplayIsa) still writes format 1.
+* `Replay.lean` follows each step's effect tree the way `interp` does and
+  answers each device read with QEMU's next MMIO read, which must be at the
+  same address and a word; it then runs `stepInstr` with those values and
+  compares registers, CSRs and device writes (address, value, width, order)
+  with QEMU. The walk is checked against `stepInstr` on every step (exit 2
+  if they differ). Interrupts use QEMU's epc. Exit 0 agree, 1 semantic
+  mismatch, 2 trace or tool error.
+* `tools/test_replay_controls.py` (run by `run_firmware_replay.py`): 14
+  edited traces and 4 model mutants, each required to fail with a specific
+  exit code and message (`results/replay-controls-e9e71a1.txt`).
+
+Firmware trace (2 s host time, the `run_firmware_replay.py` input): 64 472
+transitions, 175 timer interrupts, 2 279 device reads and 1 059 device writes
+equal to QEMU's; PWM 15, 30, 38, 70, 70, 80 = the input's expected duties.
+
+Residual gaps of the replay: RAM is compared only through values loaded
+back into registers; SC success is read from `rd` (unobservable for
+`rd = x0`), not from a memory write; the trace has only timer interrupts;
+QEMU differs from the E31 (D1–D5); the trace length depends on host timing.
+
 ## Residual gaps
 
 * No result here says the model matches the E31. QEMU is the only executable

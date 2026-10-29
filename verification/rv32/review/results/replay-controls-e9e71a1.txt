@@ -1,0 +1,19 @@
+ok   unchanged prefix: exit 0 (want 0) replayed 827 transitions, 1 interrupts, 13 device reads and 9 device writes equal to QEMU's MMIO log; model and QEMU agree
+ok   device write value changed: exit 1 (want 1) MISMATCH: step 359 (pc 20010832): device writes: model [02004004<-ffffffff/4], QEMU [02004004<-00000000/4]
+ok   device write removed: exit 1 (want 1) MISMATCH: step 359 (pc 20010832): device writes: model [02004004<-ffffffff/4], QEMU []
+ok   device write duplicated: exit 1 (want 1) MISMATCH: step 359 (pc 20010832): device writes: model [02004004<-ffffffff/4], QEMU [02004004<-ffffffff/4, 02004004<-ffffffff/4]
+ok   device read removed: exit 1 (want 1) MISMATCH: step 480 (pc 20010512): model reads device 0200bffc, QEMU performed no further MMIO read
+ok   device read duplicated: exit 1 (want 1) MISMATCH: step 480 (pc 20010512): QEMU read device 0200bffc, the model performed no such read
+ok   device read at another address: exit 1 (want 1) MISMATCH: step 480 (pc 20010512): model reads device 0200bffc, QEMU's next MMIO read is 0200bff8 (4 bytes)
+ok   device read value changed: exit 1 (want 1) MISMATCH: step 480 (pc 20010512): [x10 model 00000001 qemu 00000000]
+ok   interrupt epc changed: exit 1 (want 1) MISMATCH: step 626 (pc 20010292): QEMU took an interrupt with epc 20010298, the model is at 20010296
+ok   interrupt removed: exit 1 (want 1) MISMATCH: step 626 (pc 20010292): [pc model 20010296 qemu 20010094, mstatus model 00000008 qemu 00001880, mepc model 00000000 qemu 20010296, mcause mo
+ok   register changed: exit 1 (want 1) MISMATCH: step 211 (pc 20010904): [x10 model 20010094 qemu 20010095]
+ok   end marker removed: exit 2 (want 2) TRACE OR TOOL ERROR: end marker missing: the trace is cut off
+ok   device write removed, end marker kept: exit 2 (want 2) TRACE OR TOOL ERROR: the end marker's counts do not match the trace: lines were removed or added
+ok   format 1 (no header): exit 2 (want 2) TRACE OR TOOL ERROR: not a format 2 trace (`V 2` header missing); regenerate it with tools/qemu_trace.py from a log with -trace memory_region_ops_read
+ok   mutant device write off by one: exit 1 (want 1) MISMATCH: step 359 (pc 20010832): device writes: model [02004004<-00000000/4], QEMU [02004004<-ffffffff/4]
+ok   mutant device write dropped: exit 1 (want 1) MISMATCH: step 359 (pc 20010832): device writes: model [], QEMU [02004004<-ffffffff/4]
+ok   mutant word store to RAM loses its top byte: exit 1 (want 1) MISMATCH: step 271 (pc 2001024e): [x10 model 00000030 qemu 80000030]
+ok   mutant mtvec write off by four: exit 1 (want 1) MISMATCH: step 7 (pc 2001001c): [mtvec model 2001018c qemu 20010188]
+every replay control was rejected for the expected reason

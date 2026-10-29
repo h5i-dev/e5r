@@ -369,8 +369,12 @@ def csrs():
                         model='oracle-divergence' if odd else 'agree',
                         note='spec: mepc[0] is always zero; QEMU 8.2 keeps the bit' if odd else ''))
     # mtvec: direct and vectored modes; modes 2/3 are outside the model.
-    for v in [0x20010000, 0x20010041, 0x20010004]:
+    # Since support-lean4 dcd2b33 the model also declines a vectored base
+    # that is not 128-byte aligned (SiFive cores OR the cause into BASE).
+    for v in [0x20010000, 0x20010081, 0x20010004]:
         out.append(Case(f'csrrw mtvec {v:#x}', 'csr', [c('csrrw', 10, 11, MTVEC)], regs={11: v}))
+    out.append(Case('csrrw mtvec 0x20010041', 'csr', [c('csrrw', 10, 11, MTVEC)], regs={11: 0x20010041},
+                    model='decline', note='vectored base only 64-byte aligned'))
     out.append(Case('csrrw mtvec mode 2', 'csr', [c('csrrw', 10, 11, MTVEC)], regs={11: 0x20010002},
                     model='decline'))
     # mie: only MSIE/MTIE/MEIE are implemented on the E31.
