@@ -586,10 +586,15 @@ pub fn fidelity_source(img: &RamImage, module: &str, ns: &str, base: u64, size: 
 
 /// The theorems `fidelity_source` declares, in namespace `ns`.
 pub fn fidelity_theorems(ns: &str) -> Vec<String> {
-    ["image_accepted", "image_agrees", "image_entry", "image_rwBase"]
-        .iter()
-        .map(|t| format!("{ns}.{t}"))
-        .collect()
+    [
+        "image_accepted",
+        "image_agrees",
+        "image_entry",
+        "image_rwBase",
+    ]
+    .iter()
+    .map(|t| format!("{ns}.{t}"))
+    .collect()
 }
 
 /// Export to a new directory `out`: `manifest.json`, one blob per `PT_LOAD`,
@@ -1021,6 +1026,30 @@ mod tests {
             "overwrote an export"
         );
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The generated binding states the exporter's parse as a theorem to be
+    /// checked, and contains nothing the job's forbidden-command scan rejects.
+    #[test]
+    fn fidelity_binds_the_reader_and_states_the_parse() {
+        let img = ram_image(&image(), RAM).unwrap();
+        let src = fidelity_source(&img, "P.Image", "P.Ns", 0x8000_0000, 0x1000);
+        for want in [
+            "import Theories.RamElf\nimport P.Image\n",
+            "def image : E5R.RamElf.Image := E5R.RamElf.imageOf 2147483648 4096 elf\n",
+            "theorem image_accepted : E5R.RamElf.accepts 2147483648 4096 elf = true := by decide +kernel\n",
+            "entry == 2147483648 && rwBase == 2147483660 &&",
+            "[(2147483648, 8, false, true, 256, 8), (2147483656, 4, false, false, 264, 4), \
+             (2147483664, 16, true, false, 268, 4), (2147483680, 256, true, false, 272, 0)]",
+            "| .error _ => false) = true := by decide +kernel\n",
+        ] {
+            assert!(src.contains(want), "fidelity lacks {want:?}:\n{src}");
+        }
+        let code = crate::job::lean_code(&src);
+        assert!(crate::job::escapes(&code).is_empty());
+        let declared: Vec<String> = crate::job::declared_theorems(&code);
+        assert_eq!(declared, fidelity_theorems("P.Ns"));
+        assert!(crate::job::escapes(&crate::job::lean_code(&lean(&image(), "P.Ns"))).is_empty());
     }
 
     /// The pinned RMK example, when its ELF is at hand (`E5R_RMK_ELF`): the
