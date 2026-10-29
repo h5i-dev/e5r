@@ -421,6 +421,11 @@ structure Config where
   allow : List Allow
   /-- The deepest a handler may push below the interrupted stack pointer. -/
   hdepth : Nat
+  /-- Static RAM intervals `[lo, hi)` the interrupt handler never writes.
+      `check` takes them from the certificate (any value given here is
+      replaced) and refuses a handler store that touches one; facts about
+      them then survive an interrupt. -/
+  hkeep : List (Nat × Nat) := []
 
 def Config.ramEnd (cfg : Config) : Nat := cfg.board.ramBase + cfg.board.ramSize
 
@@ -429,6 +434,14 @@ def Config.isStatic (cfg : Config) (a n : Nat) : Bool :=
 
 def Config.isStack (cfg : Config) (a n : Nat) : Bool :=
   cfg.stackLow ≤ a && a + n ≤ cfg.pinLow
+
+/-- Bytes `[a, a+n)` are static and inside one kept interval. -/
+def Config.keeps (cfg : Config) (a n : Nat) : Bool :=
+  cfg.isStatic a n && cfg.hkeep.any fun p => p.1 ≤ a && a + n ≤ p.2
+
+/-- Some byte of `[a, a+n)` is in a kept interval. -/
+def Config.touchesKeep (cfg : Config) (a n : Nat) : Bool :=
+  cfg.hkeep.any fun p => a < p.2 && p.1 < a + n
 
 /-- Is a write of a value in `v` to device register `a` allowed? -/
 def Config.writeOk (cfg : Config) (a : Nat) (v : AV) : Bool :=
@@ -499,8 +512,9 @@ def storeAt (cfg : Config) (s : AState) (mem : List Cell) (a : Nat) (wd : Width)
     (atomic strong : Bool) : Option (List Cell) :=
   match classify cfg a wd with
   | some .ram =>
-    -- Handler nodes may write static RAM but never the interrupted stack.
-    if s.hnd && !cfg.isStatic a wd.bytes then none
+    -- Handler nodes may write static RAM outside the kept intervals, but
+    -- never the interrupted stack.
+    if s.hnd && (!cfg.isStatic a wd.bytes || cfg.touchesKeep a wd.bytes) then none
     else some (if strong then storeStrong mem .abs a wd v else storeWeak mem .abs a wd v)
   | some (.dev d) => if atomic || !d.write || !cfg.writeOk a v then none else some mem
   | _ => none
@@ -732,10 +746,20 @@ structure Cert where
   sigma : List Nat
   /-- For each interrupt code, the handler entry node. -/
   handlers : List (Nat × Nat)
+  /-- Static RAM the handler never writes (`Config.hkeep`). -/
+  hkeep : List (Nat × Nat) := []
   deriving Repr
 
 def staticOf (cfg : Config) (mem : List Cell) : List Cell :=
   mem.filter fun c => c.base == .abs && cfg.isStatic c.addr c.w.bytes
+
+/-- A static fact the handler cannot change: its bytes, and its guard's,
+    are kept. -/
+def Cell.kept (cfg : Config) (c : Cell) : Bool :=
+  c.base == .abs && cfg.keeps c.addr c.w.bytes &&
+  match c.guard with
+  | some g => cfg.keeps g.1 g.2.1.bytes
+  | none => true
 
 def noSym (s : AState) : Bool :=
   !s.hnd && s.regs.all (!·.hasSym) && s.mem.all (fun c => c.base == .abs && !c.v.hasSym) &&
@@ -743,11 +767,13 @@ def noSym (s : AState) : Bool :=
   !s.mscratch.hasSym
 
 /-- A main-thread node at which an interrupt may arrive is well-formed for
-    the handler summary: static RAM is exactly `G`, every tracked stack cell
+    the handler summary: static RAM is `G` followed by facts the handler
+    cannot change, every tracked stack cell
     is at or above sp (the handler only writes below it), the CSRs the
     handler changes are unconstrained, and sp is one of `sigma`. -/
 def interruptibleOk (cfg : Config) (cert : Cert) (s : AState) : Bool :=
-  staticOf cfg s.mem == cert.G &&
+  (staticOf cfg s.mem).take cert.G.length == cert.G &&
+  ((staticOf cfg s.mem).drop cert.G.length).all (Cell.kept cfg) &&
   (match s.get 2 with
    | .vals [sp] =>
      sp ∈ cert.sigma &&
@@ -859,7 +885,7 @@ def irqOk (cfg : Config) (cert : Cert) (s : AState) : Bool :=
 def nodeOk (cfg : Config) (cert : Cert) (n : Node) : Bool :=
   n.s.wf cfg && (n.s.hnd || noSym n.s) && instrOk cfg cert n && irqOk cfg cert n.s
 
-def check (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
+def checkAt (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
   -- Execution starts in the main thread, at node 0.
   !boot.hnd &&
   (match cert.nodes[0]? with | some n => boot.leq n.s | none => false) &&
@@ -873,5 +899,9 @@ def check (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
   cfg.hdepth < 2^31 && cfg.stackLow ≤ cfg.pinLow && cfg.pinLow ≤ cfg.ramEnd &&
   cert.G.all (fun c => c.base == .abs && c.wf cfg && cfg.isStatic c.addr c.w.bytes && !c.v.hasSym &&
     match c.guard with | some g => cfg.isStatic g.1 g.2.1.bytes | none => true)
+
+/-- The checker, with the kept intervals the certificate names. -/
+def check (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
+  checkAt { cfg with hkeep := cert.hkeep } boot cert
 
 end E5R.AI

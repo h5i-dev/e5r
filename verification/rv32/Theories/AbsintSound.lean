@@ -1277,7 +1277,9 @@ theorem storeAt_written {cfg : Config} {s : AState} {mem mem' : List Cell} {a : 
       refine ⟨ramWrite ram A x wd, [], ?_, .ram, ?_⟩
       · rw [List.append_nil]; rw [hAw] at hin; exact interp_store_ram o (by rw [hAa]; exact hal) hin
       · next hst =>
-        have hs := hsep hin (fun hh => by simpa [hh] using hst)
+        have hs := hsep hin (fun hh => by
+          rw [hh] at hst; simp only [Bool.true_and, Bool.or_eq_true, Bool.not_eq_true', not_or] at hst
+          simpa using hst.1)
         rw [← hAw]
         cases strong
         · exact storeWeak_write hm hV hs
@@ -3113,44 +3115,81 @@ def _root_.E5R.Eff.StoresIn (P : Word → Width → Prop) : Eff → Prop
   | .load _ _ _ k => ∀ v, (k v).StoresIn P
   | .store wd a _ _ k => P a wd ∧ k.StoresIn P
 
-/-- A RAM store a handler may make: to static RAM, or within its stack
-    budget below the interrupted sp `σ`. -/
+/-- A RAM store a handler may make: to static RAM outside the kept
+    intervals, or within its stack budget below the interrupted sp `σ`. -/
 def FrameOk (cfg : Config) (σ : Nat) (A : Word) (wd : Width) : Prop :=
-  cfg.isStatic A.toNat wd.bytes = true ∨ (σ ≤ A.toNat + cfg.hdepth ∧ A.toNat + wd.bytes ≤ σ)
+  (cfg.isStatic A.toNat wd.bytes = true ∧ cfg.touchesKeep A.toNat wd.bytes = false) ∨
+    (σ ≤ A.toNat + cfg.hdepth ∧ A.toNat + wd.bytes ≤ σ)
 
-/-- RAM outside static memory and the handler budget is unchanged. -/
+/-- A byte no handler store reaches: outside static memory and the handler
+    budget, or kept. -/
+def KeepByte (cfg : Config) (σ : Nat) (b : Word) : Prop :=
+  (cfg.isStatic b.toNat 1 = false ∧ (b.toNat + cfg.hdepth < σ ∨ σ ≤ b.toNat)) ∨ cfg.keeps b.toNat 1 = true
+
+/-- Every byte no handler store reaches is unchanged. -/
 def Keep (cfg : Config) (σ : Nat) (ram ram' : Word → BitVec 8) : Prop :=
-  ∀ b : Word, cfg.isStatic b.toNat 1 = false → (b.toNat + cfg.hdepth < σ ∨ σ ≤ b.toNat) → ram' b = ram b
+  ∀ b : Word, KeepByte cfg σ b → ram' b = ram b
 
-theorem Keep.refl (cfg : Config) (σ : Nat) (ram : Word → BitVec 8) : Keep cfg σ ram ram := fun _ _ _ => rfl
+theorem Keep.refl (cfg : Config) (σ : Nat) (ram : Word → BitVec 8) : Keep cfg σ ram ram := fun _ _ => rfl
 
 theorem Keep.trans {cfg : Config} {σ : Nat} {r1 r2 r3 : Word → BitVec 8} (h1 : Keep cfg σ r1 r2)
     (h2 : Keep cfg σ r2 r3) : Keep cfg σ r1 r3 :=
-  fun b hb hr => (h2 b hb hr).trans (h1 b hb hr)
+  fun b hb => (h2 b hb).trans (h1 b hb)
+
+theorem keeps_static {cfg : Config} {a n : Nat} (h : cfg.keeps a n = true) : cfg.isStatic a n = true := by
+  unfold Config.keeps at h; simp only [Bool.and_eq_true] at h; exact h.1
+
+/-- A kept byte is not one a store that touches no kept interval writes. -/
+theorem keeps_touch {cfg : Config} {a n b : Nat} (hk : cfg.keeps b 1 = true)
+    (ht : cfg.touchesKeep a n = false) (h1 : a ≤ b) (h2 : b < a + n) : False := by
+  unfold Config.keeps at hk; unfold Config.touchesKeep at ht
+  simp only [Bool.and_eq_true, List.any_eq_true, decide_eq_true_eq] at hk
+  obtain ⟨_, p, hp, hp1, hp2⟩ := hk
+  have := List.any_eq_false.mp ht p hp
+  simp only [Bool.and_eq_true, decide_eq_true_eq, not_and, Nat.not_lt] at this
+  have := this (by omega)
+  omega
+
+theorem keeps_byte {cfg : Config} {a n k : Nat} (h : cfg.keeps a n = true) (hk : k < n) :
+    cfg.keeps (a + k) 1 = true := by
+  unfold Config.keeps Config.isStatic at h ⊢
+  simp only [Bool.and_eq_true, Bool.or_eq_true, List.any_eq_true, decide_eq_true_eq] at h ⊢
+  obtain ⟨hs, p, hp, hp1, hp2⟩ := h
+  refine ⟨by omega, p, hp, by omega, by omega⟩
 
 theorem keep_write {cfg : Config} {σ : Nat} {ram : Word → BitVec 8} {A x : Word} {wd : Width}
     (hsp : SpOk cfg σ) (hf : FrameOk cfg σ A wd) : Keep cfg σ ram (ramWrite ram A x wd) := by
-  intro b hb hr
+  intro b hb
   apply ramWrite_other
   rintro ⟨k, hk, rfl⟩
   have h1 := hsp.lo; have h2 := hsp.hi; have h3 := hsp.pin; have h4 := hsp.ram
   unfold Config.ramEnd at h3 h4
   unfold FrameOk at hf
   have hfit : A.toNat + k < M32 := by
-    rcases hf with hf | hf
+    rcases hf with ⟨hf, _⟩ | hf
     · unfold Config.isStatic Config.ramEnd at hf
       simp only [Bool.or_eq_true, Bool.and_eq_true, decide_eq_true_eq] at hf
       omega
     · obtain ⟨hf1, hf2⟩ := hf
       omega
-  rw [toNat_add_small A hfit] at hb hr
-  rcases hf with hf | hf
-  · unfold Config.isStatic Config.ramEnd at hf hb
-    simp only [Bool.or_eq_true, Bool.and_eq_true, decide_eq_true_eq] at hf
-    simp only [Bool.or_eq_false_iff, Bool.and_eq_false_iff, decide_eq_false_iff_not, Nat.not_le] at hb
-    omega
-  · obtain ⟨hf1, hf2⟩ := hf
-    omega
+  unfold KeepByte at hb
+  rw [toNat_add_small A hfit] at hb
+  rcases hb with ⟨hb, hr⟩ | hb
+  · rcases hf with ⟨hf, _⟩ | hf
+    · unfold Config.isStatic Config.ramEnd at hf hb
+      simp only [Bool.or_eq_true, Bool.and_eq_true, decide_eq_true_eq] at hf
+      simp only [Bool.or_eq_false_iff, Bool.and_eq_false_iff, decide_eq_false_iff_not, Nat.not_le] at hb
+      omega
+    · obtain ⟨hf1, hf2⟩ := hf
+      omega
+  · rcases hf with ⟨_, ht⟩ | hf
+    · exact keeps_touch hb ht (by omega) (by omega)
+    · -- The handler's frame is stack, and kept bytes are static.
+      have hs := keeps_static hb
+      unfold Config.isStatic Config.ramEnd at hs
+      simp only [Bool.or_eq_true, Bool.and_eq_true, decide_eq_true_eq] at hs
+      obtain ⟨hf1, hf2⟩ := hf
+      omega
 
 /-- Running an effect whose RAM stores are all allowed keeps the rest of RAM. -/
 theorem interp_keep {cfg : Config} {σ : Nat} {o : Oracle} (hsp : SpOk cfg σ) :
@@ -3201,7 +3240,8 @@ theorem interp_keep {cfg : Config} {σ : Nat} {o : Oracle} (hsp : SpOk cfg σ) :
 
 theorem storeAt_static {cfg : Config} {s : AState} {mem mem' : List Cell} {a : Nat} {wd : Width} {V : AV}
     {atomic strong : Bool} (h : storeAt cfg s mem a wd V atomic strong = some mem') (hnd : s.hnd = true)
-    (hin : cfg.board.inRam (w a) wd.bytes = true) : cfg.isStatic a wd.bytes = true := by
+    (hin : cfg.board.inRam (w a) wd.bytes = true) :
+    cfg.isStatic a wd.bytes = true ∧ cfg.touchesKeep a wd.bytes = false := by
   unfold storeAt at h
   split at h
   · split at h
@@ -3344,14 +3384,16 @@ theorem ramRead_congr {r1 r2 : Word → BitVec 8} {a : Word} {wd : Width}
     simp only [ramRead, h0, h1, h2, h3]
 
 theorem interruptible_parts {cfg : Config} {cert : Cert} {s : AState} (h : interruptibleOk cfg cert s = true) :
-    staticOf cfg s.mem = cert.G ∧
+    (∃ U, staticOf cfg s.mem = cert.G ++ U ∧ ∀ c ∈ U, Cell.kept cfg c = true) ∧
     (∃ sp, s.get 2 = .vals [sp] ∧ sp ∈ cert.sigma ∧ ∀ c ∈ s.mem, cfg.isStatic c.addr c.w.bytes = true ∨
       (sp ≤ c.addr ∧ cfg.isStack c.addr c.w.bytes = true ∧ c.guard = none)) ∧
     s.mpie.mayBe true = true ∧ 0 ∈ s.mpp ∧ s.mepc = .top ∧ s.mcause = .top := by
   unfold interruptibleOk at h
   simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at h
-  obtain ⟨⟨⟨⟨⟨hG, hsp⟩, hmp⟩, h0⟩, he⟩, hc⟩ := h
-  refine ⟨hG, ?_, hmp, h0, he, hc⟩
+  obtain ⟨⟨⟨⟨⟨⟨hG, hU⟩, hsp⟩, hmp⟩, h0⟩, he⟩, hc⟩ := h
+  have hS := List.take_append_drop cert.G.length (staticOf cfg s.mem)
+  rw [hG] at hS
+  refine ⟨⟨_, hS.symm, List.all_eq_true.mp hU⟩, ?_, hmp, h0, he, hc⟩
   split at hsp
   · next sp hg =>
     simp only [Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true, Bool.or_eq_true,
@@ -3386,6 +3428,35 @@ theorem static_byte {cfg : Config} {a n k : Nat} (hst : cfg.isStack a n = true) 
   simp only [Bool.or_eq_false_iff, Bool.and_eq_false_iff, decide_eq_false_iff_not, Nat.not_le]
   omega
 
+/-- A kept fact survives anything that keeps the kept bytes. -/
+theorem holds_kept {cfg : Config} {σ : Nat} {ρ : Nat → Word} {r0 r1 : Word → BitVec 8} {c : Cell}
+    (hlp : cfg.stackLow ≤ cfg.pinLow) (hpin : cfg.pinLow ≤ M32) (hram : cfg.ramEnd ≤ M32)
+    (hk : Cell.kept cfg c = true) (hkeep : Keep cfg σ r0 r1) (h : c.holds ρ r0) : c.holds ρ r1 := by
+  unfold Cell.kept at hk
+  simp only [Bool.and_eq_true, beq_iff_eq] at hk
+  obtain ⟨⟨hb, hka⟩, hkg⟩ := hk
+  -- Every byte of a kept range reads the same in both.
+  have same : ∀ {a n : Nat}, cfg.keeps a n = true → ∀ k < n, r1 (w a + w k) = r0 (w a + w k) := by
+    intro a n ha k hk
+    have hs := keeps_static ha
+    unfold Config.isStatic Config.ramEnd at hs
+    unfold Config.ramEnd at hram
+    simp only [Bool.or_eq_true, Bool.and_eq_true, decide_eq_true_eq] at hs
+    have e : (w a + w k).toNat = a + k := by
+      rw [toNat_add_small _ (by rw [w_toNat_of_lt (by omega)]; omega), w_toNat_of_lt (by omega)]
+    apply hkeep
+    right; rw [e]; exact keeps_byte ha hk
+  unfold Cell.holds Cell.at at h ⊢
+  rw [hb] at h ⊢
+  simp only at h ⊢
+  intro hg
+  rw [ramRead_congr (same hka)]
+  apply h
+  intro g hgs hne
+  apply hg g hgs
+  rw [hgs] at hkg
+  rw [ramRead_congr (same hkg)]; exact hne
+
 /-- The handler's `mret`, from a state `mretOk` accepts, resumes the
     interrupted machine in a state its own node describes. -/
 theorem mret_sound {cfg : Config} {cert : Cert} {n0 : Node} {sh : AState} {m0 m : Machine}
@@ -3393,12 +3464,13 @@ theorem mret_sound {cfg : Config} {cert : Cert} {n0 : Node} {sh : AState} {m0 m 
     (hs0 : StateHolds ρ0 n0.s m0) (hio : interruptibleOk cfg cert n0.s = true)
     (hmie0 : n0.s.mie.mayBe true = true) (hns : noSym n0.s = true) (hpc0 : n0.s.pc % 2 = 0)
     (hbase : cfg.board.ramBase ≤ cfg.stackLow) (hpin : cfg.pinLow ≤ M32)
+    (hlp : cfg.stackLow ≤ cfg.pinLow) (hram : cfg.ramEnd ≤ M32)
     (hsh : StateHolds (hEnv m0) sh m) (hmret : mretOk cfg cert sh = true)
     (hkeep : Keep cfg (m0.core.get 2).toNat m0.ram m.ram) (o : Oracle) :
     ∃ c, interp cfg.board cfg.img o (exec m.core len .mret) m.ram 0 [] = .ok c m.ram [] ∧
       StateHolds ρ0 n0.s ⟨c, m.ram⟩ := by
   obtain ⟨hregs, hepc, hmpie, hmpp, hmir, htv, hsc, hG⟩ := mret_parts hmret
-  obtain ⟨hstat, ⟨sp, hsp2, _, hcells⟩, hmpie0, hmpp0, hepc0, hca0⟩ := interruptible_parts hio
+  obtain ⟨⟨U, hstat, hU⟩, ⟨sp, hsp2, _, hcells⟩, hmpie0, hmpp0, hepc0, hca0⟩ := interruptible_parts hio
   have hmpp' := hsh.mpp; rw [hmpp] at hmpp'
   have hm3 : m.core.mpp = 3 := by
     apply BitVec.eq_of_toNat_eq; simpa using hmpp'
@@ -3433,10 +3505,12 @@ theorem mret_sound {cfg : Config} {cert : Cert} {n0 : Node} {sh : AState} {m0 m 
     · intro c hc
       obtain ⟨hb, hsy⟩ := noSym_cells hns c hc
       rcases hcells c hc with hst | ⟨hle, hstk, hgn⟩
-      · have hcG : c ∈ cert.G := by
+      · have hcS : c ∈ cert.G ++ U := by
           rw [← hstat]; unfold staticOf
           simp only [List.mem_filter, Bool.and_eq_true, beq_iff_eq]; exact ⟨hc, hb, hst⟩
-        exact holds_indep hb hsy (leqIn_sound hsh.mem (hG c hcG))
+        rcases List.mem_append.mp hcS with hcG | hcU
+        · exact holds_indep hb hsy (leqIn_sound hsh.mem (hG c hcG))
+        · exact holds_kept hlp hpin hram (hU c hcU) hkeep (hs0.mem c hc)
       · have h0 := hs0.mem c hc
         intro _
         have hr0 := h0 (fun g hg => by rw [hgn] at hg; cases hg)
@@ -3449,8 +3523,8 @@ theorem mret_sound {cfg : Config} {cert : Cert} {n0 : Node} {sh : AState} {m0 m 
           have e : (w c.addr + w k).toNat = c.addr + k := by
             rw [toNat_add_small _ (by rw [w_toNat_of_lt (by omega)]; omega), w_toNat_of_lt (by omega)]
           apply hkeep
-          · rw [e]; exact static_byte hstk hk hbase
-          · right; rw [e, hσ]; omega
+          left
+          exact ⟨by rw [e]; exact static_byte hstk hk hbase, by right; rw [e, hσ]; omega⟩
         rw [ramRead_congr hpk]; exact hr0
     · simp [hmp, hmie0]
     · simpa using hmpie0
@@ -3473,14 +3547,15 @@ structure Facts (cfg : Config) (cert : Cert) : Prop where
   sigma : ∀ sp ∈ cert.sigma, SpOk cfg sp
   base : cfg.board.ramBase ≤ cfg.stackLow
   pin : cfg.pinLow ≤ M32
+  lp : cfg.stackLow ≤ cfg.pinLow
 
-theorem facts_of_check {cfg : Config} {boot : AState} {cert : Cert} (h : check cfg boot cert = true) :
+theorem facts_of_check {cfg : Config} {boot : AState} {cert : Cert} (h : checkAt cfg boot cert = true) :
     Facts cfg cert ∧ boot.hnd = false ∧ ∃ n0, cert.nodes[0]? = some n0 ∧ boot.leq n0.s = true := by
-  unfold check at h
+  unfold checkAt at h
   simp only [Bool.and_eq_true, Bool.not_eq_true', List.all_eq_true, decide_eq_true_eq] at h
-  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨hb, h0⟩, hram⟩, himg⟩, hn⟩, hsig⟩, hbase⟩, hdep⟩, _⟩, hpin⟩, _⟩ := h
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨hb, h0⟩, hram⟩, himg⟩, hn⟩, hsig⟩, hbase⟩, hdep⟩, hlp⟩, hpin⟩, _⟩ := h
   refine ⟨⟨hram, validImg_of_check (by simpa [List.all_eq_true] using himg), hn, fun sp hs => ?_, hbase,
-    ?_⟩, hb, ?_⟩
+    ?_, hlp⟩, hb, ?_⟩
   · have := hsig sp hs
     exact ⟨this.1.1, this.1.2, this.2, hdep, hbase, hpin, by unfold Config.ramEnd; exact hram⟩
   · unfold Config.ramEnd at hpin; omega
@@ -3579,7 +3654,8 @@ theorem inv_instr {cfg : Config} {cert : Cert} (F : Facts cfg cert) {m : Machine
       obtain ⟨_, hns0, hins0, _⟩ := nodeOk_parts (node_ok F hn0)
       obtain ⟨_, _, hfd0, _⟩ := instrOk_fetch hins0
       have hpc0 := (fetch_bridge hfd0).1
-      obtain ⟨c, hc, hh⟩ := mret_sound hs0 hio hmie0 (hns0 hnd0) hpc0 F.base F.pin hs (hmr rfl) hkeep o
+      obtain ⟨c, hc, hh⟩ := mret_sound hs0 hio hmie0 (hns0 hnd0) hpc0 F.base F.pin F.lp
+        (by unfold Config.ramEnd; exact F.ram) hs (hmr rfl) hkeep o
         (len := len')
       exact ⟨c, m.ram, [], by rw [hbr, hc], by simp, .inl ⟨j0, n0, hn0, hnd0, hh⟩⟩
     · have hsp' : n.s.hnd = true → SpOk cfg ((hEnv m0) 2).toNat := fun _ => by rw [hEnv_sp]; exact hsp
@@ -3621,10 +3697,11 @@ theorem inv_irq {cfg : Config} {cert : Cert} (F : Facts cfg cert) {m : Machine} 
     · have hc := hall code hcode
       split at hc
       · next e j' he hl =>
-        obtain ⟨hstat, ⟨sp, hsp2, hsig, _⟩, _⟩ := interruptible_parts hio
+        obtain ⟨⟨U, hstat, _⟩, ⟨sp, hsp2, hsig, _⟩, _⟩ := interruptible_parts hio
         have hG : ∀ c ∈ cert.G, c ∈ n.s.mem ∧ c.base = .abs ∧ c.v.hasSym = false := by
           intro c hc
-          rw [← hstat] at hc; unfold staticOf at hc
+          have hc : c ∈ staticOf cfg n.s.mem := by rw [hstat]; exact List.mem_append_left _ hc
+          unfold staticOf at hc
           simp only [List.mem_filter, Bool.and_eq_true, beq_iff_eq] at hc
           exact ⟨hc.1, noSym_cells (hns hnd) c hc.1⟩
         obtain ⟨c1, htk, hh⟩ := entry_sound hs he hG hen
@@ -3648,12 +3725,12 @@ theorem inv_irq {cfg : Config} {cert : Cert} (F : Facts cfg cert) {m : Machine} 
 
 /-! ## Soundness -/
 
-/-- **The certificate checker is sound.** If `check` accepts a certificate
+/-- Soundness of `checkAt`, for any kept intervals. If it accepts a certificate
     for a board, an image and a boot description, then from every machine
     the boot description covers, every reachable machine is inside the
     verified envelope (no transition can fault) and every device write on
     the way is allowed by the configuration. -/
-theorem check_sound {cfg : Config} {boot : AState} {cert : Cert} (hc : check cfg boot cert = true)
+theorem checkAt_sound {cfg : Config} {boot : AState} {cert : Cert} (hc : checkAt cfg boot cert = true)
     {Init : Machine → Prop} (hinit : ∀ m, Init m → StateHolds ρM boot m) :
     ∀ m evs, Reach cfg.board cfg.img Init m evs →
       ¬ Escapes cfg.board cfg.img m ∧ ∀ ev ∈ evs, EvOk cfg ev := by
@@ -3694,5 +3771,13 @@ theorem check_sound {cfg : Config} {boot : AState} {cert : Cert} (hc : check cfg
     rw [h] at hf; cases hf
   · obtain ⟨c, h, -⟩ := inv_irq F hI hen
     rw [h] at ht; cases ht
+
+/-- **The certificate checker is sound**, with the kept intervals the
+    certificate names: they only restrict what the handler may write. -/
+theorem check_sound {cfg : Config} {boot : AState} {cert : Cert} (hc : check cfg boot cert = true)
+    {Init : Machine → Prop} (hinit : ∀ m, Init m → StateHolds ρM boot m) :
+    ∀ m evs, Reach cfg.board cfg.img Init m evs →
+      ¬ Escapes cfg.board cfg.img m ∧ ∀ ev ∈ evs, EvOk cfg ev :=
+  checkAt_sound (cfg := { cfg with hkeep := cert.hkeep }) hc hinit
 
 end E5R.AI
