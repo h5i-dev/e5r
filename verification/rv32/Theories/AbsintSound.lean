@@ -1507,4 +1507,83 @@ theorem absLoad_rel_sound {cfg : Config} {s : AState} {off : Nat} {wd : Width} {
     simpa [addrOf] using this
   · simp at h
 
+theorem static_disj_stack {cfg : Config} {a n : Nat} {A : Word} {m : Nat} (hs : cfg.isStatic a n = true)
+    (hA1 : cfg.stackLow ≤ A.toNat) (hA2 : A.toNat + m ≤ cfg.pinLow) (hram : cfg.ramEnd ≤ M32) :
+    (a + n ≤ A.toNat ∨ A.toNat + m ≤ a) := by
+  simp only [Config.isStatic, Bool.or_eq_true, Bool.and_eq_true, decide_eq_true_eq] at hs
+  omega
+
+/-- A handler-frame store: RAM, aligned, and the abstract memory after the
+    strong update holds. Needs the handler state's well-formedness. -/
+theorem absStore_rel_sound {cfg : Config} {s : AState} {off : Nat} {wd : Width} {V : AV} {atomic : Bool}
+    {memF : List Cell} (h : absStore cfg s (.sym 2 off) wd V atomic = some memF)
+    {ρ : Nat → Word} {ram : Word → BitVec 8} {x : Word} (hs : SpOk cfg (ρ 2).toNat) (hV : V.gam ρ x)
+    (hm : MemHolds ρ ram s.mem) (hwf : s.wf cfg = true) (hnd : s.hnd = true)
+    (o : Oracle) (i : Nat) (evs : List Event) (k : Eff) :
+    interp cfg.board cfg.img o (.store wd (ρ 2 + BitVec.ofNat 32 off) x atomic k) ram i evs =
+      interp cfg.board cfg.img o k (ramWrite ram (ρ 2 + w off) x wd) i evs ∧
+    MemHolds ρ (ramWrite ram (ρ 2 + w off) x wd) memF := by
+  simp only [absStore] at h
+  split at h
+  · next hc =>
+    simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at hc
+    obtain ⟨⟨⟨_, ha⟩, ho⟩, hn⟩ := hc
+    simp only [Option.some.injEq] at h; subst h
+    refine ⟨interp_store_ram o (rel_aligned hs ho hn ha) (rel_inRam hs ho hn), ?_⟩
+    obtain ⟨eA, hA1, hA2⟩ := rel_addr (n := wd.bytes) hs ho hn
+    have hram := hs.ram
+    have hM : M32 = 4294967296 := rfl
+    have hpin := hs.pin
+    have hsl := hs.lo
+    simp only [AState.wf, Bool.and_eq_true, List.all_eq_true, hnd, Bool.not_true, Bool.false_or,
+      Bool.true_or, beq_iff_eq] at hwf
+    obtain ⟨⟨⟨_, hcells⟩, _⟩, hhnd⟩ := hwf
+    have key : StoreSep ρ s.mem .rel off wd (V.stored wd) := by
+      intro c hc hns
+      have hcw := hcells c hc
+      have hch := hhnd c hc
+      simp only [Bool.and_eq_true, Bool.or_eq_true, beq_iff_eq] at hch
+      obtain ⟨hbase, hgs⟩ := hch
+      simp only [Cell.staleAfter, Bool.or_eq_false_iff] at hns
+      obtain ⟨hhit, _⟩ := hns
+      constructor
+      · cases hb : c.base with
+        | abs =>
+          have hst : cfg.isStatic c.addr c.w.bytes = true := by
+            rcases hbase with e | e
+            · rw [hb] at e; cases e
+            · exact e
+          simp only [Cell.wf, hb, Bool.and_eq_true, decide_eq_true_eq] at hcw
+          have hC := inRam_nat hcw.1.1 hcw.1.2
+          have hat : c.at ρ = w c.addr := by simp [Cell.at, hb]
+          rw [hat, show addrOf ρ .rel off = ρ 2 + w off from rfl]
+          apply disj_of_nat (by rw [toNat_w_of_lt hcw.1.1]; unfold Config.ramEnd at hram; omega)
+            (by unfold Config.ramEnd at hram; omega)
+          rw [toNat_w_of_lt hcw.1.1]
+          exact static_disj_stack hst hA1 hA2 hram
+        | rel =>
+          simp only [Cell.wf, hb, Bool.and_eq_true, decide_eq_true_eq] at hcw
+          obtain ⟨⟨hco, hcn⟩, _⟩ := hcw
+          obtain ⟨eC, hC1, hC2⟩ := rel_addr (n := c.w.bytes) hs hco hcn
+          have hat : c.at ρ = ρ 2 + w c.addr := by simp [Cell.at, hb]
+          simp only [Cell.hits, hb, beq_self_eq_true, Bool.true_and, overlap, Bool.and_eq_false_iff,
+            decide_eq_false_iff_not] at hhit
+          rw [hat, show addrOf ρ .rel off = ρ 2 + w off from rfl]
+          apply disj_of_nat (by unfold Config.ramEnd at hram; omega) (by unfold Config.ramEnd at hram; omega)
+          rw [eC, eA]; omega
+      · intro g hg
+        left
+        rw [hg] at hgs
+        have hgw := hcw
+        simp only [Cell.wf, hg, Bool.and_eq_true, decide_eq_true_eq] at hgw
+        have hG := inRam_nat hgw.2.1 hgw.2.2
+        rw [show addrOf ρ .rel off = ρ 2 + w off from rfl]
+        apply disj_of_nat (by rw [toNat_w_of_lt hgw.2.1]; unfold Config.ramEnd at hram; omega)
+          (by unfold Config.ramEnd at hram; omega)
+        rw [toNat_w_of_lt hgw.2.1]
+        exact static_disj_stack (by simpa using hgs) hA1 hA2 hram
+    have := storeStrong_sound hm (stored_sound wd hV) key
+    simpa [addrOf] using this
+  · simp at h
+
 end E5R.AI

@@ -760,8 +760,10 @@ def Cell.wf (cfg : Config) (c : Cell) : Bool :=
 
 def AState.wf (cfg : Config) (s : AState) : Bool :=
   s.regs.length == 31 && s.mem.all (Cell.wf cfg) && (s.hnd || s.mem.all (·.base == .abs)) &&
-  -- A handler's absolute facts are about static memory, apart from its frame.
-  (!s.hnd || s.mem.all fun c => c.base == .rel || cfg.isStatic c.addr c.w.bytes)
+  -- A handler's absolute facts and every guard are about static memory,
+  -- apart from its frame (a frame store does not invalidate guards).
+  (!s.hnd || s.mem.all fun c => (c.base == .rel || cfg.isStatic c.addr c.w.bytes) &&
+    match c.guard with | some g => cfg.isStatic g.1 g.2.1.bytes | none => true)
 
 /-- A handler `mret` returns exactly to the interrupted machine. -/
 def mretOk (cfg : Config) (cert : Cert) (s : AState) : Bool :=
