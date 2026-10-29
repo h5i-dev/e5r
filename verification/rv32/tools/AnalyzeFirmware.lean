@@ -11,6 +11,9 @@ def main (args : List String) : IO UInt32 := do
     keepGuarded := (← IO.getEnv "E5R_KEEP_GUARDED").isSome
     freezeG := (← IO.getEnv "E5R_FREEZE_G").isSome
     gdisc := (← IO.getEnv "E5R_GDISC").map fun r => (r.splitOn ",").filterMap String.toNat?
+    tagPcs := (← IO.getEnv "E5R_TAG_PCS").bind fun r => match r.splitOn ":" with
+      | [a, b] => (a.toNat?).bind fun a => (b.toNat?).map (a, ·)
+      | _ => none
     traceLoss := (← IO.getEnv "E5R_TRACE_LOSS").bind String.toNat?
     tracePc := (← IO.getEnv "E5R_TRACE_PC").bind String.toNat? }
   -- `E5R_RING=1`: use the proved channel ring-head summary (RingAI.spec_sound); a certificate

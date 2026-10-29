@@ -115,6 +115,8 @@ structure Opts where
       a node's partition is inherited along edges and changes only where an
       interrupt may arrive. -/
   gdisc : Option (List Nat) := none
+  /-- pc range `[lo, hi)` whose splits start partitions (`tagDepth`). -/
+  tagPcs : Option (Nat × Nat) := none
   /-- Keep only facts about cells G has a guarded fact for (saved pointers). -/
   keepGuarded : Bool := false
   deriving Repr
@@ -329,7 +331,11 @@ def splittable (v : AV) : Option (List Nat) :=
 
 def edgeFor (cfg : Config) (tag : List Nat) (part : Nat) (s : AState) (i : Instr) (t : AState) : M Edge := do
   let opts := (← get).opts
-  let sub (v : Nat) : List Nat := (v :: tag.erase v).take opts.tagDepth
+  -- `tagPcs`: only splits at pcs in this range start a partition.
+  let here := match opts.tagPcs with
+    | some (lo, hi) => lo ≤ s.pc && s.pc < hi
+    | none => true
+  let sub (v : Nat) : List Nat := if here then (v :: tag.erase v).take opts.tagDepth else tag
   -- Split a freshly loaded small value set, so that later arithmetic on it
   -- is exact per value (this is what keeps wrap-around indices in range).
   -- A word loaded from an exact address is pinned in memory as well, which
@@ -347,8 +353,22 @@ def edgeFor (cfg : Config) (tag : List Nat) (part : Nat) (s : AState) (i : Instr
   let byAddr : M Edge := do
     if !opts.addrSplit then single else
     match successors.fetchDecode' cfg.img t.pc with
-    | some (ni, _) =>
-      match addrReg ni with
+    | some (ni, nlen) =>
+      -- A copy `mv rd, rs` followed by a branch on `rd` or `rs`: split on `rs`
+      -- first, so the copy and the branch see one value (the branch then
+      -- refines both).
+      let copyOf : Option (Reg × Reg) := match ni with
+        | .opimm .add rd rs 0 => some (rd, rs)
+        | .op .add rd z rs => if z.val = 0 then some (rd, rs) else none
+        | _ => none
+      let copySplit : Option Reg := match copyOf with
+        | some (rd, rs) =>
+          match successors.fetchDecode' cfg.img (t.pc + nlen) with
+          | some (.branch _ b1 b2 _, _) =>
+            if rs.val ≠ 0 && (b1 == rd || b2 == rd || b1 == rs || b2 == rs) then some rs else none
+          | _ => none
+        | none => none
+      match copySplit.orElse fun _ => addrReg ni with
       | some r =>
         match splittable (t.get r) with
         | some l =>
@@ -403,7 +423,7 @@ def process (cfg : Config) (i : Nat) : M Unit := do
           s!"[{c.addr} if {g.1}≠{g.2.2}: S plain {(plain S c.base c.addr c.w).map reprStr} guard-cell {(plain S .abs g.1 g.2.1).map reprStr} same {(S.find? fun d => d.addr == c.addr && d.guard == c.guard).map (reprStr ·.v)}]"
       let msg := s!"mret node {i} {why}: G weakens {lost.map fun (c : Cell) => (c.addr, reprStr c.v, (lookup s.mem c.base c.addr c.w).map reprStr)}"
       set { st with G := some G', restart := true, log := st.log.push msg }
-    if !mretOk cfg { nodes := [], G := (← get).G.getD [], sigma := [], handlers := [] } s then
+    if !mretOk cfg ((← get).G.getD []) s then
       err s!"node {i}: mret does not restore the interrupted machine: {brief s}"
   | some (ins, len) =>
     -- A registered summary that accepts the state replaces the instruction.
@@ -584,10 +604,19 @@ def certSource (ns : String) (st : St) (sigma : List Nat) : String := Id.run do
       s!"  ⟨{stateStr st.nodes[j]!}, {listStr (st.edges[j]!.map edgeStr)}⟩"
     out := out ++ s!"def part{c} : List Node := [\n" ++ ",\n".intercalate items ++ "]\n"
     parts := parts.push s!"part{c}"
-  out := out ++ s!"def G : List Cell := {listStr ((st.G.getD []).map cellStr)}\n"
+  -- Partitions (`Opts.gdisc`): key -> index; index 0 is `G`, the rest `Gs`.
+  let partitioned := st.opts.gdisc.isSome
+  let keys : List Nat := if partitioned then (st.Gs.toList.map (·.1)).mergeSort else [0]
+  let idx (k : Nat) : Nat := keys.idxOf k
+  let gOfKey (k : Nat) : List Cell := if partitioned then st.Gs.getD k [] else st.G.getD []
+  let Gs := keys.map gOfKey
+  out := out ++ s!"def G : List Cell := {listStr ((Gs.headD []).map cellStr)}\n"
+  out := out ++ s!"def Gs : List (List Cell) := {listStr (Gs.drop 1 |>.map fun g => listStr (g.map cellStr))}\n"
+  let partList := if partitioned then st.part.toList.map idx else []
+  let handlers := st.handlers.map fun (hk, j) => (if partitioned then hk % 65536 else hk, j)
   let joined := " ++ ".intercalate parts.toList
   out := out ++ s!"def cert : Cert where\n  nodes := {joined}\n"
-  out := out ++ s!"  G := G\n  sigma := {sigma}\n  handlers := {st.handlers}\n  hkeep := {st.keep}\n"
+  out := out ++ s!"  G := G\n  Gs := Gs\n  part := {partList}\n  sigma := {sigma}\n  handlers := {handlers}\n  hkeep := {st.keep}\n"
   out := out ++ s!"end {ns}\n"
   return out
 
