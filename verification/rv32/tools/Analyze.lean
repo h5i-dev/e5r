@@ -103,6 +103,10 @@ structure Opts where
   /-- Keep every handler-proof static fact across interrupts, not only
       the ones that rule out a null. -/
   keepAll : Bool := false
+  /-- Debugging: when G loses a guarded fact at this address, log the chain
+      of nodes that led to the state. -/
+  traceLoss : Option Nat := none
+  tracePc : Option Nat := none
   /-- Keep only facts about cells G has a guarded fact for (saved pointers). -/
   keepGuarded : Bool := false
   deriving Repr
@@ -115,6 +119,10 @@ structure Setup where
 structure St where
   log : Array String := #[]
   nodes : Array AState := #[]
+  /-- The node whose successor created each node (debugging). -/
+  pred : Array Nat := #[]
+  /-- The node being processed. -/
+  cur : Nat := 0
   /-- Each node's partition (see `Opts.tagDepth`). -/
   tags : Array (List Nat) := #[]
   edges : Array (List Edge) := #[]
@@ -164,8 +172,19 @@ def normalize (cfg : Config) (t : AState) : M AState := do
         let why := (lost.filter (·.guard.isSome)).take 3 |>.map fun (c : Cell) =>
           let g := c.guard.getD (0, .w, 0)
           s!"[{c.addr} if {g.1}≠{g.2.2}: S plain {(plain S c.base c.addr c.w).map reprStr} guard-cell {(plain S .abs g.1 g.2.1).map reprStr}]"
+        let chain : List String := match st.opts.traceLoss with
+          | some a =>
+            if !(lost.any fun c => c.addr == a && c.guard.isSome) then [] else
+            let rec go (j : Nat) : Nat → List String
+              | 0 => []
+              | k+1 =>
+                let n := st.nodes[j]!
+                let v := n.mem.filter (·.addr == a) |>.map fun c => s!"{reprStr c.v}{if c.guard.isSome then "?" else ""}"
+                s!"{j}@{n.pc}:{v}" :: (if j == 0 then [] else go (st.pred[j]!) k)
+            s!"t {(t.mem.filter (·.addr == a)).map fun c => reprStr c.v}" :: go st.cur 120
+          | none => []
         set { st with G := some G', restart := true,
-                      log := st.log.push s!"pc {t.pc} (G {G.length} -> {G'.length}) {why}: G weakens {lost.map fun (c : Cell) => (c.addr, reprStr c.v, (lookup S c.base c.addr c.w).map reprStr)}" }
+                      log := st.log.push s!"pc {t.pc} (G {G.length} -> {G'.length}) {why} chain {chain}: G weakens {lost.map fun (c : Cell) => (c.addr, reprStr c.v, (lookup S c.base c.addr c.w).map reprStr)}" }
         pure G'
   let sp := match t.get 2 with | .vals [sp] => sp | _ => 0
   let stack := t.mem.filter fun c => c.base == .abs && c.guard.isNone && !cfg.isStatic c.addr c.w.bytes &&
@@ -190,13 +209,17 @@ def normalize (cfg : Config) (t : AState) : M AState := do
       | none => none
   let kept := ((staticOf cfg t.mem ++ derived).filter fun c =>
     Cell.kept cfg c && !G.contains c && useful c).eraseDups
+  if let some a := (← get).opts.traceLoss then
+    if (← get).opts.tracePc == some t.pc then
+      let cs := (staticOf cfg t.mem ++ derived).filter (·.addr == a)
+      modify fun st => { st with log := st.log.push s!"norm pc {t.pc}: {cs.map fun c => (reprStr c.v, c.guard.isSome, Cell.kept cfg c, G.contains c, useful c)} G-guarded {G.any fun d => d.addr == a && d.guard.isSome}" }
   return { t with mem := G ++ kept ++ stack, mepc := .top, mcause := .top,
                   mpie := t.mpie.join .yes, mpp := norm (t.mpp ++ [0]) }
 
 def newNode (key : String) (tag : List Nat) (t : AState) : M Nat := do
   let st ← get
   let j := st.nodes.size
-  set { st with nodes := st.nodes.push t, tags := st.tags.push tag, edges := st.edges.push [], joins := st.joins.push 0,
+  set { st with nodes := st.nodes.push t, tags := st.tags.push tag, pred := st.pred.push st.cur, edges := st.edges.push [], joins := st.joins.push 0,
                 work := st.work.push j,
                 index := st.index.insert key ((st.index.getD key #[]).push j) }
   return j
@@ -297,7 +320,9 @@ def edgeFor (cfg : Config) (tag : List Nat) (s : AState) (i : Instr) (t : AState
   | some rd =>
     match t.get rd with
     | .vals l =>
-      if 2 ≤ l.length ∧ l.length ≤ 8 ∧ rd.val ≠ 0 then
+      -- With `keepGuarded`, a single loaded value is pinned too, so a pointer
+      -- read through a guard becomes a plain fact that can be kept.
+      if (2 ≤ l.length || (opts.keepGuarded && l.length == 1 && pinAt.isSome)) ∧ l.length ≤ 8 ∧ rd.val ≠ 0 then
         let js ← l.mapM fun v =>
           let t' := t.set rd (.vals [v])
           resolve cfg (sub v) (match pinAt with
@@ -318,6 +343,7 @@ def brief (s : AState) : String :=
   s!"hnd={s.hnd} mie={reprStr s.mie} regs {rs} mem {ms}"
 
 def process (cfg : Config) (i : Nat) : M Unit := do
+  modify fun st => { st with cur := i }
   let s := (← get).nodes[i]!
   match successors.fetchDecode' cfg.img s.pc with
   | none => err s!"node {i}: no instruction at {s.pc}"

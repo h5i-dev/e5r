@@ -8,7 +8,9 @@ def main (args : List String) : IO UInt32 := do
     addrSplit := (← IO.getEnv "E5R_ADDR_SPLIT") == some "1"
     tagDepth := ((← IO.getEnv "E5R_TAG_DEPTH").bind String.toNat?).getD 0
     keepAll := (← IO.getEnv "E5R_KEEP_ALL").isSome
-    keepGuarded := (← IO.getEnv "E5R_KEEP_GUARDED").isSome }
+    keepGuarded := (← IO.getEnv "E5R_KEEP_GUARDED").isSome
+    traceLoss := (← IO.getEnv "E5R_TRACE_LOSS").bind String.toNat?
+    tracePc := (← IO.getEnv "E5R_TRACE_PC").bind String.toNat? }
   -- `E5R_RING=1`: use the proved channel ring-head summary (RingAI.spec_sound); a certificate
   -- that relies on it checks with `checkHybrid` and `check_sound_hybrid`, not plain `check`.
   let sums := if (← IO.getEnv "E5R_RING") == some "1" then [E5R.Hifive1.Hybrid.RingAI.spec] else []
