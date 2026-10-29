@@ -58,6 +58,12 @@ def alu():
     out.append(Case('srli f7=0x10', 'illegal', [E.shifti('srli', 10, 11, 1, f7_extra=0x10)],
                     expect='trap:2'))
     out.append(Case('addi x0,x11,7 (hint)', 'x0', [E.opimm('addi', 0, 11, 7)]))
+    # Write x0, then read it back through every operand position.
+    out.append(Case('write x0 then read', 'x0', [E.opimm('addi', 0, 11, 7), E.op('add', 10, 0, 0),
+                                                E.opimm('addi', 12, 0, 0), E.store('sw', 13, 0, 0)],
+                    regs={11: 5, 13: WINDOW}))
+    out.append(Case('c.li x0 then c.mv', 'x0', [E.c_li(0, 5), E.op('or', 10, 0, 10)],
+                    regs={10: 0x55}))
     for imm20 in [0, 1, 0x7ffff, 0x80000, 0xfffff]:
         out.append(Case(f'lui {imm20:#x}', 'rv32i-imm', [E.u_type(0x37, 10, imm20)]))
         out.append(Case(f'auipc {imm20:#x}', 'rv32i-imm', [E.u_type(0x17, 10, imm20)]))

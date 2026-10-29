@@ -111,7 +111,9 @@ def emit(cases):
          'j case_0']
     for n, c in enumerate(cases):
         rb = c._rb
-        a += ['.balign 4', f'case_{n}:', f'la a0, desc_{n}', 'call setup', f'la x31, desc_{n}']
+        # Under `.option norvc` gas cannot pad from a 2-byte boundary, so
+        # align with RVC allowed (the padding is never executed).
+        a += ['.option rvc', '.balign 4', '.option norvc', f'case_{n}:', f'la a0, desc_{n}', 'call setup', f'la x31, desc_{n}']
         a += [f'lw x{i}, {4 * (i - 1)}(x31)' for i in range(1, 32)]
         a += [f'j cand_{n}']
         if c.tk and c.tk[0] == 'bk':
@@ -127,17 +129,17 @@ def emit(cases):
         a += ['la t0, save_common', 'jr t0']
         if c.tk and c.tk[0] == 'fwd':
             a += ([f'.skip {c.tk[1]}'] if c.tk[1] else []) + [f'tk_{n}:', f'sw x{rb}, 152(x{rb})', f'j save_{n}']
-    a += ['.balign 4', f'case_{len(cases)}:', 'li a0, 68', 'call putc', 'li a0, 10', 'call putc',
+    a += ['.option rvc', '.balign 4', '.option norvc', f'case_{len(cases)}:', 'li a0, 68', 'call putc', 'li a0, 10', 'call putc',
           '1: j 1b']
-    a += ['.balign 4', 'save_common:', f'li t0, {RECORD}']
+    a += ['.option rvc', '.balign 4', '.option norvc', 'save_common:', f'li t0, {RECORD}']
     for off, name in [(128, 'mstatus'), (132, 'mie'), (136, 'mtvec'), (140, 'mepc'),
                       (144, 'mcause'), (148, 'mscratch'), (156, 'mtval'), (160, 'mip')]:
         a += [f'csrr t1, {name}', f'sw t1, {off}(t0)']
     a += ['li t2, 0x2000000', 'lw t1, 0(t2)', 'sw t1, 164(t0)', 'li t1, 1', 'sw t1, 0(t0)',
           'j finish']
     # Trap entry: direct handler and a 16-entry vector table.
-    a += ['.balign 64', 'handler:', 'csrrw t6, mscratch, t6', 'sw t5, 120(t6)', 'la t5, handler',
-          'sw t5, 152(t6)', 'j trap_common', '.balign 64', 'vtable:']
+    a += ['.option rvc', '.balign 64', '.option norvc', 'handler:', 'csrrw t6, mscratch, t6', 'sw t5, 120(t6)', 'la t5, handler',
+          'sw t5, 152(t6)', 'j trap_common', '.option rvc', '.balign 64', '.option norvc', 'vtable:']
     a += [f'j vh_{k}' for k in range(16)]
     for k in range(16):
         a += [f'vh_{k}:', 'csrrw t6, mscratch, t6', 'sw t5, 120(t6)', f'la t5, vtable + {4 * k}',

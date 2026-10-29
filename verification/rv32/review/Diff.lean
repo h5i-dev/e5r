@@ -75,7 +75,9 @@ def oracleFor (r : Rec) (m : Machine) : Oracle :=
   | none => fun _ => 0
 
 def gprDiff (c : Core) (r : Rec) : List String := Id.run do
-  let mut d := []
+  -- x0 has no record slot (word 0 is the status); QEMU's x0 is zero by
+  -- construction, so the model's must read as zero too.
+  let mut d := if c.get (reg 0) ≠ 0 then [s!"x0 model {(c.get (reg 0)).toHex}"] else []
   for i in [1:32] do
     if c.get (reg i) ≠ r.post[i]! then
       d := d ++ [s!"x{i} model {(c.get (reg i)).toHex} qemu {r.post[i]!.toHex}"]

@@ -1,0 +1,410 @@
+[
+ {
+  "mutant": "mulh-truncating",
+  "outcome": "KILLED",
+  "cases": 24,
+  "first": [
+   "mulh 0x1,0x80000000: MISMATCH x10 model 00000000 qemu ffffffff (expected model agree) ",
+   "mulh 0x1,0xffffffff: MISMATCH x10 model 00000000 qemu ffffffff (expected model agree) ",
+   "mulh 0x1,0xfffffffe: MISMATCH x10 model 00000000 qemu ffffffff (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "mulhsu-unsigned",
+  "outcome": "KILLED",
+  "cases": 25,
+  "first": [
+   "mulhsu 0x80000000,0x1: MISMATCH x10 model 00000000 qemu ffffffff (expected model agree) ",
+   "mulhsu 0x80000000,0x7fffffff: MISMATCH x10 model 3fffffff qemu c0000000 (expected model agree) ",
+   "mulhsu 0x80000000,0x80000000: MISMATCH x10 model 40000000 qemu c0000000 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "div-by-zero-0",
+  "outcome": "KILLED",
+  "cases": 11,
+  "first": [
+   "div 0x0,0x0: MISMATCH x10 model 00000000 qemu ffffffff (expected model agree) ",
+   "div 0x1,0x0: MISMATCH x10 model 00000000 qemu ffffffff (expected model agree) ",
+   "div 0x7fffffff,0x0: MISMATCH x10 model 00000000 qemu ffffffff (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "div-floor",
+  "outcome": "KILLED",
+  "cases": 14,
+  "first": [
+   "div 0x1,0x80000000: MISMATCH x10 model ffffffff qemu 00000000 (expected model agree) ",
+   "div 0x1,0xfffffffe: MISMATCH x10 model ffffffff qemu 00000000 (expected model agree) ",
+   "div 0x7fffffff,0x80000000: MISMATCH x10 model ffffffff qemu 00000000 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "rem-by-zero-0",
+  "outcome": "KILLED",
+  "cases": 9,
+  "first": [
+   "rem 0x1,0x0: MISMATCH x10 model 00000000 qemu 00000001 (expected model agree) ",
+   "rem 0x7fffffff,0x0: MISMATCH x10 model 00000000 qemu 7fffffff (expected model agree) ",
+   "rem 0x80000000,0x0: MISMATCH x10 model 00000000 qemu 80000000 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "remu-by-zero-0",
+  "outcome": "KILLED",
+  "cases": 9,
+  "first": [
+   "remu 0x1,0x0: MISMATCH x10 model 00000000 qemu 00000001 (expected model agree) ",
+   "remu 0x7fffffff,0x0: MISMATCH x10 model 00000000 qemu 7fffffff (expected model agree) ",
+   "remu 0x80000000,0x0: MISMATCH x10 model 00000000 qemu 80000000 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "sra-logical",
+  "outcome": "KILLED",
+  "cases": 21,
+  "first": [
+   "sra 0x80000001,0x1: MISMATCH x10 model 40000000 qemu c0000000 (expected model agree) ",
+   "sra 0x80000001,0xf: MISMATCH x10 model 00010000 qemu ffff0000 (expected model agree) ",
+   "sra 0x80000001,0x1f: MISMATCH x10 model 00000001 qemu ffffffff (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "sll-unmasked",
+  "outcome": "KILLED",
+  "cases": 19,
+  "first": [
+   "sll 0x80000001,0x20: MISMATCH x10 model 00000000 qemu 80000001 (expected model agree) ",
+   "sll 0x80000001,0x21: MISMATCH x10 model 00000000 qemu 00000002 (expected model agree) ",
+   "sll 0x80000001,0x3f: MISMATCH x10 model 00000000 qemu 80000000 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "sltu-signed",
+  "outcome": "KILLED",
+  "cases": 38,
+  "first": [
+   "sltu 0x0,0x80000000: MISMATCH x10 model 00000000 qemu 00000001 (expected model agree) ",
+   "sltu 0x0,0xffffffff: MISMATCH x10 model 00000000 qemu 00000001 (expected model agree) ",
+   "sltu 0x0,0xfffffffe: MISMATCH x10 model 00000000 qemu 00000001 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "x0-writable",
+  "outcome": "KILLED",
+  "note": "SURVIVED the first run: Diff.lean did not compare x0. Fixed (x0 must read 0) and re-run: killed by 44 cases."
+ },
+ {
+  "mutant": "lb-zero-extends",
+  "outcome": "KILLED",
+  "cases": 8,
+  "first": [
+   "lb -32: MISMATCH x10 model 000000c3 qemu ffffffc3 (expected model agree) ",
+   "lb -31: MISMATCH x10 model 000000d2 qemu ffffffd2 (expected model agree) ",
+   "lb -30: MISMATCH x10 model 000000e1 qemu ffffffe1 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "lhu-sign-extends",
+  "outcome": "KILLED",
+  "cases": 5,
+  "first": [
+   "lhu -32: MISMATCH x10 model ffffd2c3 qemu 0000d2c3 (expected model agree) ",
+   "lhu -30: MISMATCH x10 model fffff0e1 qemu 0000f0e1 (expected model agree) ",
+   "lhu 0: MISMATCH x10 model ffffbd33 qemu 0000bd33 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "immB-bit11",
+  "outcome": "KILLED",
+  "cases": 6,
+  "first": [
+   "beq back -8: MISMATCH pc model 2006b94c qemu 2006bd4c (expected model agree) ",
+   "beq fwd +4094: MISMATCH pc model 2006dbaa qemu 2006dfaa (expected model agree) ",
+   "bge back -8: MISMATCH pc model 200742c2 qemu 200746c2 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "immJ-bit11",
+  "outcome": "KILLED",
+  "cases": 4,
+  "first": [
+   "jal x0 back: MISMATCH pc model 2007c502 qemu 2007c902 (expected model agree) ",
+   "jal x1 back: MISMATCH pc model 2007c76a qemu 2007cb6a (expected model agree) ",
+   "jal x5 back: MISMATCH pc model 2007c9d2 qemu 2007cdd2 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "immS-split",
+  "outcome": "KILLED",
+  "cases": 6,
+  "first": [
+   "sb -32: MISMATCH mem[800010c0] model f0e1d2c3 qemu f0e1d20d (expected model agree) ",
+   "sb -31: MISMATCH mem[800010c0] model f0e1d2c3 qemu f0e10dc3 (expected model agree) ",
+   "sb -30: MISMATCH mem[800010c0] model f0e1d2c3 qemu f00dd2c3 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "c.lui-zero-ext",
+  "outcome": "KILLED",
+  "cases": 2,
+  "first": [
+   "c.lui -32: MISMATCH x10 model 00020000 qemu fffe0000 (expected model agree) ",
+   "c.lui -1: MISMATCH x10 model 0003f000 qemu fffff000 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "c.srli-accepts-shamt5",
+  "outcome": "KILLED",
+  "cases": 1,
+  "first": [
+   "c.srli shamt[5]=1 (RV32 NSE): MISMATCH QEMU status 2 cause 2, model completed 1 steps (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "c.addi4spn-scale",
+  "outcome": "KILLED",
+  "cases": 1,
+  "first": [
+   "c.addi4spn 1020: MISMATCH x15 model 0000020c qemu 000003ec (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "c.lwsp-rd0-accepted",
+  "outcome": "KILLED",
+  "cases": 1,
+  "first": [
+   "c.lwsp x0 reserved: MISMATCH QEMU status 2 cause 2, model completed 1 steps (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "cj-bit-swap",
+  "outcome": "KILLED",
+  "cases": 1,
+  "first": [
+   "c.j fwd: MISMATCH pc model 20290a48 qemu 20290a88 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "jalr-keeps-bit0",
+  "outcome": "KILLED",
+  "cases": 2,
+  "first": [
+   "jalr x0,0(x11) bit0=1: MISMATCH step 0: model trap E5R.Exc.misalignedFetch, QEMU completed normally (expected model agree) ",
+   "jalr x1,-4(x1) bit0=1: MISMATCH step 0: model trap E5R.Exc.misalignedFetch, QEMU completed normally (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "jal-link-pc+4",
+  "outcome": "KILLED",
+  "cases": 2,
+  "first": [
+   "c.jal fwd 2046: MISMATCH x1 model 20291588 qemu 20291586 (expected model agree) ",
+   "c.jal back: MISMATCH x1 model 20291e2e qemu 20291e2c (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "jalr-link-after-read",
+  "outcome": "KILLED",
+  "cases": 3,
+  "first": [
+   "jalr x11,2047(x11) bit0=0: MISMATCH pc model 2027cc6e qemu 2027c500 (expected model agree) ",
+   "jalr x1,-4(x1) bit0=1: MISMATCH pc model 2027c6d4 qemu 2027c768 (expected model agree) ",
+   "c.jalr x1 (rs1 = link): MISMATCH pc model 202908c6 qemu 20290956 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "amomax-unsigned",
+  "outcome": "KILLED",
+  "cases": 5,
+  "first": [
+   "amomax.w 0x80000000,0x7fffffff: MISMATCH mem[800010d0] model 80000000 qemu 7fffffff (expected model agree) ",
+   "amomax.w 0x7fffffff,0x80000000: MISMATCH mem[800010d0] model 80000000 qemu 7fffffff (expected model agree) ",
+   "amomax.w 0xffffffff,0x1: MISMATCH mem[800010d0] model ffffffff qemu 00000001 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "amo-rd-new",
+  "outcome": "KILLED",
+  "cases": 46,
+  "first": [
+   "amoadd.w 0x80000000,0x7fffffff: MISMATCH x10 model ffffffff qemu 80000000 (expected model agree) ",
+   "amoadd.w 0x7fffffff,0x80000000: MISMATCH x10 model ffffffff qemu 7fffffff (expected model agree) ",
+   "amoadd.w 0xffffffff,0x1: MISMATCH x10 model 00000000 qemu ffffffff (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "sc-success-rd1",
+  "outcome": "KILLED",
+  "cases": 2,
+  "first": [
+   "lr;sc same addr: MISMATCH x13 model 00000001 qemu 00000000 (expected model agree) ",
+   "lr;sc;sc: MISMATCH x13 model 00000001 qemu 00000000 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "lr-no-reservation",
+  "outcome": "KILLED",
+  "cases": 2,
+  "first": [
+   "lr;sc same addr: MISMATCH x13 model 00000001 qemu 00000000; mem[800010d0] model 5d92c7fb qemu abcdef01 (expected model agree) ",
+   "lr;sc;sc: MISMATCH x13 model 00000001 qemu 00000000; mem[800010d0] model 5d92c7fb qemu 00000005 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "mret-mpie-kept",
+  "outcome": "KILLED",
+  "cases": 3,
+  "first": [
+   "mret mstatus 0x1800: MISMATCH mstatus model 00000000 qemu 00000080 (expected model agree) ",
+   "mret mstatus 0x1808: MISMATCH mstatus model 00000000 qemu 00000080 (expected model agree) ",
+   "mret to 2-aligned mepc: MISMATCH mstatus model 00000000 qemu 00000080 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "mret-mpp-kept",
+  "outcome": "KILLED",
+  "cases": 5,
+  "first": [
+   "mret mstatus 0x1880: MISMATCH mstatus model 00001888 qemu 00000088 (expected model agree) ",
+   "mret mstatus 0x1800: MISMATCH mstatus model 00001880 qemu 00000080 (expected model agree) ",
+   "mret mstatus 0x1808: MISMATCH mstatus model 00001880 qemu 00000080 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "irq-mepc-next",
+  "outcome": "KILLED",
+  "cases": 6,
+  "first": [
+   "irq msip after csrsi (mtvec mode 0): MISMATCH mepc model 20299aec qemu 20299ae8 (expected model agree) ",
+   "irq mtip after csrsi (mtvec mode 0): MISMATCH mepc model 20299c18 qemu 20299c14 (expected model agree) ",
+   "irq msip after csrsi (mtvec mode 1): MISMATCH mepc model 20299d44 qemu 20299d40 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "irq-vector-ignored",
+  "outcome": "KILLED",
+  "cases": 2,
+  "first": [
+   "irq msip after csrsi (mtvec mode 1): MISMATCH entry pc model 2029a340 qemu 2029a34c (expected model agree) ",
+   "irq mtip after csrsi (mtvec mode 1): MISMATCH entry pc model 2029a340 qemu 2029a35c (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "irq-mpie-not-saved",
+  "outcome": "KILLED",
+  "cases": 4,
+  "first": [
+   "irq mtip after csrsi (mtvec mode 0): MISMATCH mstatus model 00001800 qemu 00001880 (expected model agree) ",
+   "irq mtip after csrsi (mtvec mode 1): MISMATCH mstatus model 00001800 qemu 00001880 (expected model agree) ",
+   "irq raised by sw msip: MISMATCH mstatus model 00001800 qemu 00001880 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "irq-ignores-mie-reg",
+  "outcome": "SURVIVED"
+ },
+ {
+  "mutant": "mstatus-mpp-shift",
+  "outcome": "KILLED",
+  "cases": 1608,
+  "first": [
+   "add 0x0,0x0: MISMATCH mstatus model 00003000 qemu 00001800 (expected model agree) ",
+   "add 0x0,0x1: MISMATCH mstatus model 00003000 qemu 00001800 (expected model agree) ",
+   "add 0x0,0x7fffffff: MISMATCH mstatus model 00003000 qemu 00001800 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "mie-mask-no-mtie",
+  "outcome": "KILLED",
+  "cases": 5,
+  "first": [
+   "csrrw mie 0x888: MISMATCH mie model 00000808 qemu 00000888 (expected model agree) ",
+   "csrrc mie: MISMATCH x10 model 00000808 qemu 00000888; mie model 00000800 qemu 00000880 (expected model agree) ",
+   "irq mtip after csrsi (mtvec mode 0): MISMATCH QEMU took interrupt 7, model says not enabled (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "mepc-keeps-bit0",
+  "outcome": "KILLED",
+  "cases": 2,
+  "first": [
+   "csrrw mepc 0x20010003: AGREE 1 (expected model oracle-divergence) spec: mepc[0] is always zero; QEMU 8.2 keeps the bit",
+   "csrrw mepc 0xffffffff: AGREE 1 (expected model oracle-divergence) spec: mepc[0] is always zero; QEMU 8.2 keeps the bit"
+  ]
+ },
+ {
+  "mutant": "csr-ro-write-allowed",
+  "outcome": "KILLED",
+  "cases": 3,
+  "first": [
+   "csrrw mhartid (write ro): DECLINE step 0: CSR write (QEMU exception 2) (expected model agree) ",
+   "csrrs mhartid,x11 (write ro): DECLINE step 0: CSR write (QEMU exception 2) (expected model agree) ",
+   "csrrwi x0, mhartid (write ro): DECLINE step 0: CSR write (QEMU exception 2) (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "csrrs-x0-writes",
+  "outcome": "KILLED",
+  "cases": 4,
+  "first": [
+   "csrr mcause: DECLINE step 0: CSR write (expected model agree) ",
+   "csrr mhartid: MISMATCH step 0: model trap E5R.Exc.illegal, QEMU completed normally (expected model agree) ",
+   "csrrsi mhartid,0 (no write): MISMATCH step 0: model trap E5R.Exc.illegal, QEMU completed normally (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "csr-rd-written-late",
+  "outcome": "KILLED",
+  "cases": 28,
+  "first": [
+   "csrrw mscratch: MISMATCH x10 model 2f4e06a1 qemu 3c3c3c3c (expected model agree) ",
+   "csrrw mscratch rs=x0: MISMATCH x10 model 2f4e06a1 qemu 3c3c3c3c (expected model agree) ",
+   "csrrw mscratch rd=rs: MISMATCH x11 model f0f0f0f0 qemu 3c3c3c3c (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "fencei-illegal",
+  "outcome": "KILLED",
+  "cases": 1,
+  "first": [
+   "fence.i: MISMATCH step 0: model trap E5R.Exc.illegal, QEMU completed normally (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "ecall-as-ebreak",
+  "outcome": "KILLED",
+  "cases": 1,
+  "first": [
+   "ecall: MISMATCH step 0: model trap E5R.Exc.ebreak, QEMU exception 11 (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "ramWrite-h-swapped",
+  "outcome": "KILLED",
+  "cases": 6,
+  "first": [
+   "sh -32: MISMATCH mem[800010c0] model f0e10df0 qemu f0e1f00d (expected model agree) ",
+   "sh -30: MISMATCH mem[800010c0] model 0df0d2c3 qemu f00dd2c3 (expected model agree) ",
+   "sh 0: MISMATCH mem[800010e0] model ca430df0 qemu ca43f00d (expected model agree) "
+  ]
+ },
+ {
+  "mutant": "load-misaligned-unchecked",
+  "outcome": "KILLED",
+  "cases": 18,
+  "first": [
+   "lh -31: AGREE 1 (expected model oracle-divergence) QEMU emulates misaligned access",
+   "lh -29: AGREE 1 (expected model oracle-divergence) QEMU emulates misaligned access",
+   "lh 1: AGREE 1 (expected model oracle-divergence) QEMU emulates misaligned access"
+  ]
+ },
+ {
+  "mutant": "device-read-from-ram",
+  "outcome": "KILLED",
+  "cases": 1,
+  "first": [
+   "lw mtime_lo: MISMATCH x10 model 00000000 qemu 00021a24 (expected model agree) "
+  ]
+ }
+]
