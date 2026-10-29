@@ -1796,22 +1796,163 @@ theorem nop_sound {cfg : Config} {ρ : Nat → Word} {s : AState} {m : Machine} 
 
 /-! ### Jumps and branches -/
 
+/-- The CSR part of a description. -/
+structure CtlHolds (ρ : Nat → Word) (s : AState) (c : Core) : Prop where
+  mie : s.mie.mayBe c.mie_ = true
+  mpie : s.mpie.mayBe c.mpie = true
+  mpp : c.mpp.toNat ∈ s.mpp
+  mieReg : s.mieReg.gam ρ c.mieReg
+  mtvec : s.mtvec.gam ρ c.mtvec
+  mepc : s.mepc.gam ρ c.mepc
+  mcause : s.mcause.gam ρ c.mcause
+  mscratch : s.mscratch.gam ρ c.mscratch
+
+theorem ctl_of_holds {ρ : Nat → Word} {s : AState} {m : Machine} (hs : StateHolds ρ s m) :
+    CtlHolds ρ s m.core :=
+  ⟨hs.mie, hs.mpie, hs.mpp, hs.mieReg, hs.mtvec, hs.mepc, hs.mcause, hs.mscratch⟩
+
+theorem ctl_same {ρ : Nat → Word} {s : AState} {c d : Core} (h : CtlHolds ρ s d) (hc : c.sameCsr d) :
+    CtlHolds ρ s c := by
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8⟩ := sameCsr_fields hc
+  exact ⟨e1 ▸ h.mie, e2 ▸ h.mpie, e3 ▸ h.mpp, e4 ▸ h.mieReg, e5 ▸ h.mtvec, e6 ▸ h.mepc, e7 ▸ h.mcause,
+    e8 ▸ h.mscratch⟩
+
+theorem ctl_set {ρ : Nat → Word} {s : AState} {c : Core} (h : CtlHolds ρ s c) (r : Reg) (v : AV) :
+    CtlHolds ρ (s.set r v) c := by
+  obtain ⟨_, e2, e3, e4, e5, e6, e7, e8, e9, _, _⟩ := AState.set_other s r v
+  exact ⟨e2 ▸ h.mie, e3 ▸ h.mpie, e4 ▸ h.mpp, e5 ▸ h.mieReg, e6 ▸ h.mtvec, e7 ▸ h.mepc, e8 ▸ h.mcause,
+    e9 ▸ h.mscratch⟩
+
+theorem ctl_withPc {ρ : Nat → Word} {s : AState} {c : Core} (h : CtlHolds ρ s c) (p : Nat) :
+    CtlHolds ρ { s with pc := p } c :=
+  ⟨h.mie, h.mpie, h.mpp, h.mieReg, h.mtvec, h.mepc, h.mcause, h.mscratch⟩
+
+theorem holds_mk {ρ : Nat → Word} {t : AState} {c : Core} {ram : Word → BitVec 8} (hpc : c.pc = w t.pc)
+    (hregs : ∀ r : Reg, (t.get r).gam ρ (c.get r)) (hmem : MemHolds ρ ram t.mem) (hctl : CtlHolds ρ t c) :
+    StateHolds ρ t ⟨c, ram⟩ :=
+  ⟨hpc, hregs, hmem, hctl.mie, hctl.mpie, hctl.mpp, hctl.mieReg, hctl.mtvec, hctl.mepc, hctl.mcause,
+    hctl.mscratch⟩
+
+theorem lsb_even {T : Word} (h : T.toNat % 2 = 0) : T.getLsbD 0 = false := by
+  rw [← BitVec.testBit_toNat, Nat.testBit_zero]; simp [h]
+
+/-- An abstract jump to a set of even targets is a real jump that does not
+    fault, to a successor the abstract state describes. -/
 theorem jumpAbs_sound {cfg : Config} {ρ : Nat → Word} {s : AState} {l : List Nat} {ts : List AState}
-    (h : jumpAbs s (.vals l) = some ts) {m : Machine} {c : Core} (hs : StateHolds ρ s m) {T : Word}
-    (hT : T.toNat ∈ l) (hc : c.sameCsr m.core) (hregs : ∀ r : Reg, (s.get r).gam ρ (c.get r)) (o : Oracle) :
-    StepOk cfg ρ ts o (jump c T) m.ram := by
+    (h : jumpAbs s (.vals l) = some ts) {c : Core} {ram : Word → BitVec 8} {T : Word}
+    (hT : T.toNat ∈ l) (hctl : CtlHolds ρ s c) (hregs : ∀ r : Reg, (s.get r).gam ρ (c.get r))
+    (hmem : MemHolds ρ ram s.mem) (o : Oracle) :
+    StepOk cfg ρ ts o (jump c T) ram := by
   simp only [jumpAbs] at h
   split at h
   · next hall =>
     simp only [Option.some.injEq] at h; subst h
     have heven : T.toNat % 2 = 0 := by
       simp only [List.all_eq_true, decide_eq_true_eq] at hall; exact hall _ hT
-    have hb : T.getLsbD 0 = false := by
-      rw [← BitVec.testBit_toNat, Nat.testBit_zero]; simp [heven]
-    refine ⟨_, _, _, by rw [jump_ok _ _ hb]; exact interp_done o _ _ _ _, by simp, _,
+    refine ⟨_, _, _, by rw [jump_ok _ _ (lsb_even heven)]; exact interp_done o _ _ _ _, by simp, _,
       List.mem_map.mpr ⟨_, hT, rfl⟩, ?_⟩
-    exact holds_succ hs ((Core.sameCsr_goto _ _).trans hc) (by simp [Core.goto, w_toNat])
-      (fun r => hregs r) hs.mem ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+    exact holds_mk (by simp [Core.goto, w_toNat]) (fun r => hregs r) hmem
+      (ctl_same (ctl_withPc hctl _) (Core.sameCsr_goto _ _))
   · simp at h
+
+/-! ### Instruction cases -/
+
+section Cases
+variable {cfg : Config} {ρ : Nat → Word} {s : AState} {m : Machine} {len : Word} {ts : List AState}
+  (hs : StateHolds ρ s m) (hl : s.regs.length = 31) (o : Oracle)
+include hs hl
+
+theorem case_lui {rd : Reg} {imm : Word} (h : absExec cfg s len.toNat (.lui rd imm) = some ts) :
+    StepOk cfg ρ ts o (exec m.core len (.lui rd imm)) m.ram := by
+  simp only [absExec, Option.some.injEq] at h; subst h
+  rw [exec_lui]
+  exact regwrite_sound hs hl (const_sound' (Nat.mod_eq_of_lt (toNat_lt imm)).symm) o
+
+theorem case_auipc {rd : Reg} {imm : Word} (h : absExec cfg s len.toNat (.auipc rd imm) = some ts) :
+    StepOk cfg ρ ts o (exec m.core len (.auipc rd imm)) m.ram := by
+  simp only [absExec, Option.some.injEq] at h; subst h
+  rw [exec_auipc]
+  refine regwrite_sound hs hl (const_sound' ?_) o
+  rw [hs.pc]; simp only [w, BitVec.toNat_add, BitVec.toNat_ofNat, M32]; omega
+
+theorem case_opimm {op : AluOp} {rd rs1 : Reg} {imm : Word}
+    (h : absExec cfg s len.toNat (.opimm op rd rs1 imm) = some ts) :
+    StepOk cfg ρ ts o (exec m.core len (.opimm op rd rs1 imm)) m.ram := by
+  simp only [absExec, Option.some.injEq] at h; subst h
+  rw [exec_opimm]
+  exact regwrite_sound hs hl (alu_sound op (hs.regs rs1)
+    (const_sound' (Nat.mod_eq_of_lt (toNat_lt imm)).symm)) o
+
+theorem case_op {op : AluOp} {rd rs1 rs2 : Reg}
+    (h : absExec cfg s len.toNat (.op op rd rs1 rs2) = some ts) :
+    StepOk cfg ρ ts o (exec m.core len (.op op rd rs1 rs2)) m.ram := by
+  simp only [absExec, Option.some.injEq] at h; subst h
+  rw [exec_op]
+  exact regwrite_sound hs hl (alu_sound op (hs.regs rs1) (hs.regs rs2)) o
+
+theorem case_muldiv {op : MulOp} {rd rs1 rs2 : Reg}
+    (h : absExec cfg s len.toNat (.muldiv op rd rs1 rs2) = some ts) :
+    StepOk cfg ρ ts o (exec m.core len (.muldiv op rd rs1 rs2)) m.ram := by
+  have he : exec m.core len (.muldiv op rd rs1 rs2) =
+      .done (m.core.wr rd (E5R.muldiv op (m.core.get rs1) (m.core.get rs2)) (m.core.pc + len)) := rfl
+  rw [he]
+  simp only [absExec] at h
+  split at h
+  · next x y ex ey =>
+    simp only [Option.some.injEq] at h; subst h
+    have h1 := hs.regs rs1; have h2 := hs.regs rs2
+    rw [ex] at h1; rw [ey] at h2
+    exact regwrite_sound hs hl (lift2_sound h1 h2) o
+  · simp only [Option.some.injEq] at h; subst h
+    exact regwrite_sound hs hl (v := .top) trivial o
+
+theorem case_fence (h : absExec cfg s len.toNat .fence = some ts) :
+    StepOk cfg ρ ts o (exec m.core len .fence) m.ram := by
+  simp only [absExec, Option.some.injEq] at h; subst h; exact nop_sound hs o
+
+theorem case_fencei (h : absExec cfg s len.toNat .fencei = some ts) :
+    StepOk cfg ρ ts o (exec m.core len .fencei) m.ram := by
+  simp only [absExec, Option.some.injEq] at h; subst h; exact nop_sound hs o
+
+theorem case_wfi (h : absExec cfg s len.toNat .wfi = some ts) :
+    StepOk cfg ρ ts o (exec m.core len .wfi) m.ram := by
+  simp only [absExec, Option.some.injEq] at h; subst h; exact nop_sound hs o
+
+theorem link_holds {rd : Reg} :
+    ∀ r : Reg, ((s.set rd (.const ((s.pc + len.toNat) % M32))).get r).gam ρ
+      ((m.core.set rd (m.core.pc + len)).get r) :=
+  regs_set hl hs.regs rd (const_sound' (by rw [pc_adv hs.pc]; simp [w, M32]))
+
+theorem case_jal {rd : Reg} {off : Word} (h : absExec cfg s len.toNat (.jal rd off) = some ts) :
+    StepOk cfg ρ ts o (exec m.core len (.jal rd off)) m.ram := by
+  simp only [absExec] at h
+  rw [exec_jal]
+  refine jumpAbs_sound h ?_ (ctl_same (ctl_set (ctl_of_holds hs) _ _)
+    (by unfold Core.sameCsr; rw [Core.set_ctl])) (link_holds hs hl)
+    (by rw [(AState.set_other _ _ _).1]; exact hs.mem) o
+  simp only [List.mem_singleton]
+  rw [hs.pc]; simp only [w, BitVec.toNat_add, BitVec.toNat_ofNat, M32]; omega
+
+theorem case_jalr {rd rs1 : Reg} {off : Word} (h : absExec cfg s len.toNat (.jalr rd rs1 off) = some ts) :
+    StepOk cfg ρ ts o (exec m.core len (.jalr rd rs1 off)) m.ram := by
+  simp only [absExec] at h
+  rw [exec_jalr]
+  have hr := hs.regs rs1
+  split at h
+  · next l el =>
+    rw [el] at hr
+    have hT := mkVals_sound (ρ := ρ) (l := l.map fun x => ((w x + off) &&& ~~~1).toNat)
+      (x := (m.core.get rs1 + off) &&& ~~~1)
+      ⟨_, List.mem_map.mpr ⟨_, hr, rfl⟩, by rw [w_toNat]; exact Nat.mod_eq_of_lt (toNat_lt _)⟩
+    generalize mkVals (l.map fun x => ((w x + off) &&& ~~~1).toNat) = t at h hT
+    cases t with
+    | vals l' =>
+      exact jumpAbs_sound h hT (ctl_same (ctl_set (ctl_of_holds hs) _ _)
+        (by unfold Core.sameCsr; rw [Core.set_ctl])) (link_holds hs hl)
+        (by rw [(AState.set_other _ _ _).1]; exact hs.mem) o
+    | _ => simp [jumpAbs] at h
+  · simp [jumpAbs] at h
+
+end Cases
 
 end E5R.AI
