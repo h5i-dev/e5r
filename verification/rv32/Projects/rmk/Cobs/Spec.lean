@@ -67,4 +67,34 @@ theorem block_some {orig : Nat → Nat} {n src : Nat} {out : List Nat} {src' : N
       simp only [List.length_append, List.length_map, List.length_range]
       split <;> simp <;> omega
 
+/-! ## The loop reads only bytes below `n` -/
+
+theorem block_congr (f g : Nat → Nat) (n src : Nat) (h : ∀ j, j < n → f j = g j) (hs : src < n) :
+    block f n src = block g n src := by
+  unfold block
+  simp only [h src hs]
+  split
+  · rfl
+  · split
+    · rfl
+    · rename_i h1 h2
+      congr 3
+      apply List.map_congr_left
+      intro i hi
+      simp only [List.mem_range] at hi
+      exact h _ (by omega)
+
+theorem run_congr (f g : Nat → Nat) (n : Nat) (h : ∀ j, j < n → f j = g j) :
+    ∀ fuel src acc, run f n fuel src acc = run g n fuel src acc
+  | 0, _, _ => rfl
+  | fuel + 1, src, acc => by
+    unfold run
+    split
+    · rfl
+    · rename_i hs
+      rw [block_congr f g n src h (by omega)]
+      split
+      · rfl
+      · exact run_congr f g n h fuel _ _
+
 end E5R.Rmk.Cobs
