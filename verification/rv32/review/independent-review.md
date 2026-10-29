@@ -330,6 +330,21 @@ Firmware trace (2 s host time, the `run_firmware_replay.py` input): 64 472
 transitions, 175 timer interrupts, 2 279 device reads and 1 059 device writes
 equal to QEMU's; PWM 15, 30, 38, 70, 70, 80 = the input's expected duties.
 
+Decoder sweep (`review/decode_sweep.py`, `review/DecodeSweep.lean`, commit
+`36808c5`): all 49 152 16-bit parcels and 1 004 352 seeded 32-bit words
+(half in-scope major opcodes, half any 32-bit major, every SYSTEM funct12,
+every AMO funct5 x funct3) decoded by the model and by binutils 2.42 objdump
+(`rv32imac_zicsr_zifencei`, `-M no-aliases,numeric`; RVC expanded by this
+script from the spec's table). Result (`results/decode-sweep-e9e71a1.json`):
+no WRONG (model decodes something objdump rejects, or another instruction)
+and no unexplained STRICT. Where they differ the spec decides: reserved
+FENCE/FENCE.I fields are executed as a fence (14 285, objdump rejects),
+RV32 shamt[5]=1 (1 536 RVC + 176) and C.ADDI16SP nzimm=0 are reserved
+(objdump accepts; the model traps), and S/U/debug-mode instructions (38) are
+illegal on the M-only E31. Five decoder mutants are each reported WRONG
+(`results/decode-controls-e9e71a1.txt`). Decoding only: execution of the
+decoded instruction is the harness's and replay's job.
+
 Residual gaps of the replay: RAM is compared only through values loaded
 back into registers; SC success is read from `rd` (unobservable for
 `rd = x0`), not from a memory write; the trace has only timer interrupts;
@@ -343,8 +358,8 @@ QEMU differs from the E31 (D1–D5); the trace length depends on host timing.
 * Over-approximations (interrupt pending, SC success, the unaddressed
   reservation) cannot be tested differentially; they were reviewed in source.
 * Not covered: PLIC/external interrupts, UART/PWM device behavior beyond
-  word writes, MRET to U-mode in QEMU, random-encoding decode sweeps (a
-  10^8-encoding decoder sweep against objdump would be the next step), and
+  word writes, MRET to U-mode in QEMU, an exhaustive (rather than sampled)
+  32-bit decode sweep, and
   the boot-state/initial-RAM generality of the safety theorem.
 * F8 "independent review recorded": this document is that record for the ISA
   and execution-model part only. Board-file device list, ELF/flash reader,
