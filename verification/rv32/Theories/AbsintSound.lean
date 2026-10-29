@@ -981,4 +981,32 @@ theorem setPlain_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List
   · intro _; exact hv
   · exact hm c hc
 
+/-! ## From address arithmetic to disjointness -/
+
+theorem toNat_add_small (A : Word) {k : Nat} (h : A.toNat + k < M32) : (A + w k).toNat = A.toNat + k := by
+  simp only [w, BitVec.toNat_add, BitVec.toNat_ofNat]; simp only [M32] at h; omega
+
+/-- Accesses whose byte ranges are disjoint as numbers, and do not wrap
+    around the address space, share no byte. -/
+theorem disj_of_nat {A B : Word} {wa wb : Width} (ha : A.toNat + wa.bytes ≤ M32)
+    (hb : B.toNat + wb.bytes ≤ M32) (h : A.toNat + wa.bytes ≤ B.toNat ∨ B.toNat + wb.bytes ≤ A.toNat) :
+    Disj A wa B wb := by
+  rintro x ⟨i, hi, rfl⟩ ⟨j, hj, e⟩
+  have e1 := toNat_add_small A (k := i) (by omega)
+  have e2 := toNat_add_small B (k := j) (by omega)
+  have := congrArg BitVec.toNat e
+  omega
+
+theorem toNat_w_of_lt {a : Nat} (h : a < M32) : (w a).toNat = a := w_toNat_of_lt h
+
+/-- Two absolute ranges the checker's `overlap` says are apart, both below
+    the top of the address space, share no byte. -/
+theorem disj_abs {a b : Nat} {wa wb : Width} (ha : a + wa.bytes ≤ M32) (hb : b + wb.bytes ≤ M32)
+    (h : overlap a wa.bytes b wb.bytes = false) : Disj (w a) wa (w b) wb := by
+  have ea : (w a).toNat = a := toNat_w_of_lt (by cases wa <;> simp [Width.bytes] at ha ⊢ <;> omega)
+  have eb : (w b).toNat = b := toNat_w_of_lt (by cases wb <;> simp [Width.bytes] at hb ⊢ <;> omega)
+  apply disj_of_nat (by rw [ea]; exact ha) (by rw [eb]; exact hb)
+  simp only [overlap, Bool.and_eq_false_iff, decide_eq_false_iff_not] at h
+  rw [ea, eb]; omega
+
 end E5R.AI
