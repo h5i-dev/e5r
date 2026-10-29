@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-#!/usr/bin/env python3
 """Generate a straight-line QRun segment proof in the style of Projects/rmk/Deframer/*.lean.
 
 The segment is given as a Python dict (see SEGMENTS in the caller); instruction encodings come
