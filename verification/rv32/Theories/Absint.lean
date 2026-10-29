@@ -590,7 +590,7 @@ def absExec (cfg : Config) (s : AState) (len : Nat) (i : Instr) : Option (List A
   | .jal rd off => jumpAbs (s.set rd (.const next)) (.const (s.pc + off.toNat))
   | .jalr rd rs1 off =>
     let t := match g rs1 with
-      | .vals l => mkVals (l.map fun x => ((x + off.toNat) % M32) / 2 * 2)
+      | .vals l => mkVals (l.map fun x => ((w x + off) &&& ~~~1).toNat)
       | _ => .top
     jumpAbs (s.set rd (.const next)) t
   | .branch c rs1 rs2 off =>

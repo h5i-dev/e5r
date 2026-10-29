@@ -1794,4 +1794,24 @@ theorem nop_sound {cfg : Config} {ρ : Nat → Word} {s : AState} {m : Machine} 
   exact holds_succ hs (Core.sameCsr_goto _ _) (pc_adv hs.pc) (fun r => hs.regs r) hs.mem
     ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
+/-! ### Jumps and branches -/
+
+theorem jumpAbs_sound {cfg : Config} {ρ : Nat → Word} {s : AState} {l : List Nat} {ts : List AState}
+    (h : jumpAbs s (.vals l) = some ts) {m : Machine} {c : Core} (hs : StateHolds ρ s m) {T : Word}
+    (hT : T.toNat ∈ l) (hc : c.sameCsr m.core) (hregs : ∀ r : Reg, (s.get r).gam ρ (c.get r)) (o : Oracle) :
+    StepOk cfg ρ ts o (jump c T) m.ram := by
+  simp only [jumpAbs] at h
+  split at h
+  · next hall =>
+    simp only [Option.some.injEq] at h; subst h
+    have heven : T.toNat % 2 = 0 := by
+      simp only [List.all_eq_true, decide_eq_true_eq] at hall; exact hall _ hT
+    have hb : T.getLsbD 0 = false := by
+      rw [← BitVec.testBit_toNat, Nat.testBit_zero]; simp [heven]
+    refine ⟨_, _, _, by rw [jump_ok _ _ hb]; exact interp_done o _ _ _ _, by simp, _,
+      List.mem_map.mpr ⟨_, hT, rfl⟩, ?_⟩
+    exact holds_succ hs ((Core.sameCsr_goto _ _).trans hc) (by simp [Core.goto, w_toNat])
+      (fun r => hregs r) hs.mem ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+  · simp at h
+
 end E5R.AI
