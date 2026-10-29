@@ -1,0 +1,18 @@
+[package]
+name = "hifive1-embassy"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "Apache-2.0"
+
+[workspace]
+
+[dependencies]
+embassy-executor = { version = "=0.10.0", features = ["platform-riscv32", "executor-thread"] }
+embassy-time = { version = "=0.5.1", features = ["tick-hz-32_768"] }
+embassy-time-driver = "=0.2.2"
+embassy-sync = "=0.8.0"
+riscv-rt = { version = "=0.16.0", features = ["single-hart"] }
+embassy-time-queue-utils = "=0.3.2"
+critical-section = "=1.2.0"
+riscv = { version = "=0.15.0", features = ["critical-section-single-hart"] }

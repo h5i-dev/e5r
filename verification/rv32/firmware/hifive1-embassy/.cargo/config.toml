@@ -1,0 +1,12 @@
+[build]
+target = "riscv32imac-unknown-none-elf"
+
+[target.riscv32imac-unknown-none-elf]
+rustflags = ["-C", "link-arg=-Tmemory.x", "-C", "link-arg=-Tlink.x"]
+
+[profile.release]
+opt-level = "s"
+debug = false
+codegen-units = 1
+lto = true
+panic = "abort"
