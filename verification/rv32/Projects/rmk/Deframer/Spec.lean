@@ -226,8 +226,12 @@ structure NextPost (m₀ m : Machine) : Prop where
   pc : m.core.pc = m₀.core.get 1
   csr : m.core.sameCsr m₀.core
   sp : m.core.get 2 = m₀.core.get 2
-  saved : ∀ r : Reg, r.val ∈ [8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27] → m.core.get r = m₀.core.get r
+  /-- The ABI frame (corrected from "s0-s11", which left out ra, gp, tp). -/
+  saved : ∀ r : Reg, r.val ∉ callerSaved → m.core.get r = m₀.core.get r
   tag : (m.core.get 10).toNat ≤ 1
+  /-- `Some(k)`: the frame the caller then slices, `buf[..k]`, lies in the buffer (added: the
+      session needs it to show its own slice does not panic). -/
+  val : (m.core.get 10).toNat = 1 → 2 < (m.core.get 11).toNat ∧ (m.core.get 11).toNat ≤ (m₀.core.get 12).toNat
   inv : Inv m.ram (m₀.core.get 10) (m₀.core.get 12).toNat
   disc : discarding m.ram (m₀.core.get 10) ≤ 1
   ram : KeepsRam nextStack m₀ m
@@ -278,9 +282,10 @@ def CopyContract : Prop := ∀ m₀, CopyEnv m₀ → ∃ k m, QRun B img k m₀
 
 INTERFACE CANDIDATE read from the bytes: the wrapper at 0x8001e006 calls the report function with
 a0 = a 12-byte report slot (r0, r1, r2), a1 = data, a2 = n; it returns `(r0 - 1) | r1` and `r2`,
-and `next` takes the first being -1 as Ok and the second as the decoded length. So the Ok encoding
-is r0 = 0 ∧ r1 = 0. All `next`'s safety needs: the call returns (no panic) whatever the bytes,
-writes only the data, the slot and its frame, and an Ok length is at most n. -/
+and `next` takes the first being -1 as Ok and the second as the decoded length. (Corrected: an
+earlier draft took "Ok" to mean r0 = 0 ∧ r1 = 0, which `(r0 - 1) | r1 = -1` does not imply.) All
+`next`'s safety needs: the call returns (no panic) whatever the bytes, writes only the data, the
+slot and its frame, and whenever `next` would take the result as Ok, r2 is at most n. -/
 
 structure CobsEnv (m : Machine) : Prop where
   pc : m.core.pc = 0x8001e02e
@@ -305,7 +310,7 @@ structure CobsPost (m₀ m : Machine) : Prop where
   ram : ∀ x, ¬ ((m₀.core.get 11).toNat ≤ x.toNat ∧ x.toNat < (m₀.core.get 11).toNat + (m₀.core.get 12).toNat) →
     ¬ ((m₀.core.get 10).toNat ≤ x.toNat ∧ x.toNat < (m₀.core.get 10).toNat + 12) →
     ¬ ((m₀.core.get 2).toNat - cobsFrame ≤ x.toNat ∧ x.toNat < (m₀.core.get 2).toNat) → m.ram x = m₀.ram x
-  ok : word m.ram (m₀.core.get 10) = 0 → word m.ram (m₀.core.get 10 + 4) = 0 →
+  ok : (ramRead m.ram (m₀.core.get 10) .w - 1) ||| ramRead m.ram (m₀.core.get 10 + 4) .w = 0xffffffff#32 →
     word m.ram (m₀.core.get 10 + 8) ≤ (m₀.core.get 12).toNat
 
 def CobsReportContract : Prop := ∀ m₀, CobsEnv m₀ → ∃ k m, QRun B img k m₀ m ∧ CobsPost m₀ m
