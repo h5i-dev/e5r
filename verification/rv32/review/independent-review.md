@@ -258,7 +258,7 @@ through stdin is not deterministic, so traces differ between runs.
 On the same log both converters produce the same first 20 000 states and drop
 the same 56 repeated entries.
 
-Negative controls (`results/replay-negatives.log`):
+Negative controls (`results/replay-negatives.txt`):
 
 | Control | Production replay | Review replay |
 | --- | --- | --- |
