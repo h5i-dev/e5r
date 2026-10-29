@@ -296,6 +296,8 @@ version = "0.1.0"
 dependencies = [
  "e5r-core",
  "e5r-format",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
