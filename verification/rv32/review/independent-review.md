@@ -364,3 +364,17 @@ QEMU differs from the E31 (D1–D5); the trace length depends on host timing.
 * F8 "independent review recorded": this document is that record for the ISA
   and execution-model part only. Board-file device list, ELF/flash reader,
   checker orchestration and the proof statements were not reviewed.
+
+## 9. Partitioned interrupt invariant (support-lean4 e41afad), reviewed on merge 5dd5859
+
+- Statements of `check_sound` and `check_sound_hybrid` unchanged by e41afad (only internal predicates
+  gained the node index/partition); conclusion is still global `Reach` safety (no escape, every event allowed).
+- `review/partition_controls.py`: each new condition made trivially true with the same term shape, Absint and
+  AbsintSound recompiled. Receipt `review/results/partition-controls.txt`:
+  - handler successors stay in the partition: proof fails (AbsintSound:3620) — load-bearing;
+  - interrupt enters a handler node of the same partition: fails (:3889) — load-bearing;
+  - mret checked against the node's own partition invariant: fails (:3616) — load-bearing;
+  - interruptible node checked against its own partition invariant: fails (:3876) — load-bearing;
+  - well-formedness check of the extra invariants `Gs`: proof still compiles — redundant for soundness
+    (consistent with node states already being `wf`-checked); not a bug, could be dropped or kept as hygiene.
+- Tail summary job re-proved on the merge (19 theorems); TailAI integrated by main as 1f1e202/a8b3fbf.
