@@ -296,11 +296,14 @@ structure CobsEnv (m : Machine) : Prop where
   outAl : (m.core.get 10).toNat % 4 = 0
   frame : B.inRam (m.core.get 2 - BitVec.ofNat 32 cobsFrame) cobsFrame = true
   spAl : (m.core.get 2).toNat % 4 = 0
-  /-- data, report slot and frame pairwise disjoint -/
+  /-- data, report slot and frame pairwise disjoint (either side of the frame: the wrapper's slot
+      lies above the callee's sp, in the wrapper's own frame) -/
   sep : ((m.core.get 11).toNat + (m.core.get 12).toNat ≤ (m.core.get 10).toNat ∨
       (m.core.get 10).toNat + 12 ≤ (m.core.get 11).toNat) ∧
-    (m.core.get 11).toNat + (m.core.get 12).toNat ≤ (m.core.get 2).toNat - cobsFrame ∧
-    (m.core.get 10).toNat + 12 ≤ (m.core.get 2).toNat - cobsFrame
+    ((m.core.get 11).toNat + (m.core.get 12).toNat ≤ (m.core.get 2).toNat - cobsFrame ∨
+      (m.core.get 2).toNat ≤ (m.core.get 11).toNat) ∧
+    ((m.core.get 10).toNat + 12 ≤ (m.core.get 2).toNat - cobsFrame ∨
+      (m.core.get 2).toNat ≤ (m.core.get 10).toNat)
   ra : (m.core.get 1).getLsbD 0 = false
 
 structure CobsPost (m₀ m : Machine) : Prop where
