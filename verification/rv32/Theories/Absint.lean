@@ -579,6 +579,14 @@ def jumpAbs (s : AState) (t : AV) : Option (List AState) :=
   | .vals l => if l.all (· % 2 = 0) then some (l.map fun p => { s with pc := p }) else none
   | _ => none
 
+/-- Narrow one branch operand by the branch outcome `t`, when the other is a
+    constant. -/
+def refineState (c : BrCond) (t : Bool) (rs1 rs2 : Reg) (s' : AState) (a b : AV) : AState :=
+  match b.isConst, a.isConst with
+  | some k, _ => s'.set rs1 (refineL c t a k)
+  | none, some k => s'.set rs2 (refineR c t k b)
+  | none, none => s'
+
 /-- Successor states of one instruction, or `none` if it might fault. -/
 def absExec (cfg : Config) (s : AState) (len : Nat) (i : Instr) : Option (List AState) :=
   let next := (s.pc + len) % M32
@@ -597,11 +605,7 @@ def absExec (cfg : Config) (s : AState) (len : Nat) (i : Instr) : Option (List A
     let a := g rs1
     let b := g rs2
     let (yes, no) := canTake c a b
-    let refine (t : Bool) (s' : AState) : AState :=
-      match b.isConst, a.isConst with
-      | some k, _ => s'.set rs1 (refineL c t a k)
-      | none, some k => s'.set rs2 (refineR c t k b)
-      | none, none => s'
+    let refine (t : Bool) (s' : AState) : AState := refineState c t rs1 rs2 s' a b
     let taken? : Option (List AState) :=
       if yes then jumpAbs (refine true s) (.const (s.pc + off.toNat)) else some []
     let fall := if no then [{ refine false s with pc := next }] else []

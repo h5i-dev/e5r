@@ -1855,6 +1855,17 @@ theorem jumpAbs_sound {cfg : Config} {ρ : Nat → Word} {s : AState} {l : List 
       (ctl_same (ctl_withPc hctl _) (Core.sameCsr_goto _ _))
   · simp at h
 
+theorem isConst_eq {a : AV} {k : Nat} (h : a.isConst = some k) : a = .vals [k] := by
+  unfold AV.isConst at h
+  split at h
+  · simp only [Option.some.injEq] at h; subst h; rfl
+  · simp at h
+
+theorem stepOk_mono {cfg : Config} {ρ : Nat → Word} {ts ts' : List AState} {o : Oracle} {e : Eff} {ram : Word → BitVec 8}
+    (h : StepOk cfg ρ ts o e ram) (hsub : ∀ t ∈ ts, t ∈ ts') : StepOk cfg ρ ts' o e ram := by
+  obtain ⟨c, r, evs, hi, he, t, ht, hh⟩ := h
+  exact ⟨c, r, evs, hi, he, t, hsub t ht, hh⟩
+
 /-! ### Instruction cases -/
 
 section Cases
@@ -1952,6 +1963,94 @@ theorem case_jalr {rd rs1 : Reg} {off : Word} (h : absExec cfg s len.toNat (.jal
         (by rw [(AState.set_other _ _ _).1]; exact hs.mem) o
     | _ => simp [jumpAbs] at h
   · simp [jumpAbs] at h
+
+/-- Refining one register's fact by the branch outcome keeps the
+    description of the (unchanged) core. -/
+theorem refine_holds {cond : BrCond} {rs1 rs2 : Reg} (t : Bool)
+    (ht : taken cond (m.core.get rs1) (m.core.get rs2) = t) :
+    ∀ q : Reg, ((refineState cond t rs1 rs2 s (s.get rs1) (s.get rs2)).get q).gam ρ (m.core.get q) := by
+  have keep : ∀ (r : Reg) (v : AV), v.gam ρ (m.core.get r) →
+      ∀ q : Reg, ((s.set r v).get q).gam ρ (m.core.get q) := by
+    intro r v hv q
+    by_cases e : q = r
+    · subst e
+      by_cases hq : q.val = 0
+      · have : q = 0 := Fin.ext hq
+        subst this; rw [AState.get_zero, Core.get_zero]; exact const0_gam ρ
+      · rw [AState.get_set_self _ _ _ hq hl]; exact hv
+    · rw [AState.get_set_ne _ _ _ _ e]; exact hs.regs q
+  unfold refineState
+  split
+  · next k hk =>
+    have hb := hs.regs rs2
+    rw [isConst_eq hk] at hb
+    have hy := gam_single hb
+    have hk' : k < M32 := by simp only [AV.gam, List.mem_singleton] at hb; rw [← hb]; exact toNat_lt _
+    exact keep rs1 _ (refineL_sound cond t hk' (hs.regs rs1) (hy ▸ ht))
+  · next k _ hk =>
+    have ha := hs.regs rs1
+    rw [isConst_eq hk] at ha
+    have hx := gam_single ha
+    have hk' : k < M32 := by simp only [AV.gam, List.mem_singleton] at ha; rw [← ha]; exact toNat_lt _
+    exact keep rs2 _ (refineR_sound cond t hk' (hs.regs rs2) (hx ▸ ht))
+  · exact hs.regs
+
+theorem refine_other {cond : BrCond} {rs1 rs2 : Reg} (t : Bool) :
+    (refineState cond t rs1 rs2 s (s.get rs1) (s.get rs2)).mem = s.mem ∧
+    CtlHolds ρ (refineState cond t rs1 rs2 s (s.get rs1) (s.get rs2)) m.core := by
+  unfold refineState
+  split
+  · exact ⟨(AState.set_other _ _ _).1, ctl_set (ctl_of_holds hs) _ _⟩
+  · exact ⟨(AState.set_other _ _ _).1, ctl_set (ctl_of_holds hs) _ _⟩
+  · exact ⟨rfl, ctl_of_holds hs⟩
+
+theorem case_branch {cond : BrCond} {rs1 rs2 : Reg} {off : Word}
+    (h : absExec cfg s len.toNat (.branch cond rs1 rs2 off) = some ts) :
+    StepOk cfg ρ ts o (exec m.core len (.branch cond rs1 rs2 off)) m.ram := by
+  simp only [absExec] at h
+  rw [exec_branch]
+  have hct := canTake_sound cond (hs.regs rs1) (hs.regs rs2)
+  generalize hp : canTake cond (s.get rs1) (s.get rs2) = p at h hct
+  obtain ⟨yes, no⟩ := p
+  simp only at h hct
+  cases htk : taken cond (m.core.get rs1) (m.core.get rs2)
+  · -- falls through
+    have hno := hct.2 htk
+    subst hno
+    simp only [if_true] at h
+    obtain ⟨hmem, hctl⟩ := refine_other (cond := cond) (rs1 := rs1) (rs2 := rs2) hs hl false
+    have hregs := refine_holds hs hl false htk
+    cases hy : yes
+    · rw [hy] at h; simp only [Bool.false_eq_true, if_false, Option.map_some, List.nil_append,
+        Option.some.injEq] at h
+      subst h
+      refine ⟨_, _, _, interp_done o _ _ _ _, by simp, _, List.mem_singleton_self _, ?_⟩
+      exact holds_mk (pc_adv hs.pc) (fun r => hregs r) (by simp only; rw [hmem]; exact hs.mem)
+        (ctl_same (ctl_withPc hctl _) (Core.sameCsr_goto _ _))
+    · rw [hy] at h
+      simp only [if_true] at h
+      cases hj : jumpAbs _ (.const (s.pc + off.toNat)) with
+      | none => rw [hj] at h; simp at h
+      | some tj =>
+        rw [hj] at h; simp only [Option.map_some, Option.some.injEq] at h; subst h
+        refine ⟨_, _, _, interp_done o _ _ _ _, by simp, _, List.mem_append_right _ (List.mem_singleton_self _), ?_⟩
+        exact holds_mk (pc_adv hs.pc) (fun r => hregs r) (by simp only; rw [hmem]; exact hs.mem)
+          (ctl_same (ctl_withPc hctl _) (Core.sameCsr_goto _ _))
+  · -- taken
+    have hyes := hct.1 htk
+    subst hyes
+    simp only [if_true] at h
+    obtain ⟨hmem, hctl⟩ := refine_other (cond := cond) (rs1 := rs1) (rs2 := rs2) hs hl true
+    have hregs := refine_holds hs hl true htk
+    cases hj : jumpAbs _ (.const (s.pc + off.toNat)) with
+    | none => rw [hj] at h; simp at h
+    | some tj =>
+      rw [hj] at h; simp only [Option.map_some, Option.some.injEq] at h; subst h
+      have := jumpAbs_sound (cfg := cfg) hj (T := m.core.pc + off) (ram := m.ram) (c := m.core)
+        (by simp only [AV.const, List.mem_singleton]; rw [hs.pc]
+            simp only [w, BitVec.toNat_add, BitVec.toNat_ofNat, M32]; omega)
+        hctl hregs (by rw [hmem]; exact hs.mem) o
+      exact stepOk_mono this (fun t ht => List.mem_append_left _ ht)
 
 end Cases
 
