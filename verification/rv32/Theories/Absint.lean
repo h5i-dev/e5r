@@ -716,9 +716,14 @@ def handlerEntry (G : List Cell) (s : AState) (code : Nat) : Option AState :=
 /-- The facts in `mem` imply the fact `c`. -/
 def Cell.leqIn (mem : List Cell) (c : Cell) : Bool :=
   match c.guard with
-  | none => match plain mem c.base c.addr c.w with
-    | some v => v.leq c.v
-    | none => false
+  | none =>
+    -- An unconditional fact, or a guarded one whose guard `mem` shows holds.
+    (match plain mem c.base c.addr c.w with
+     | some v => v.leq c.v
+     | none => false) ||
+    (match lookup mem c.base c.addr c.w with
+     | some v => v.leq c.v
+     | none => false)
   | some g =>
     -- The same or an unconditional fact, or the guard known to be false.
     mem.any (fun d => d.base == c.base && d.addr == c.addr && d.w == c.w &&

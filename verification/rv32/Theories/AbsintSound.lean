@@ -1666,13 +1666,22 @@ theorem leqIn_sound {ρ : Nat → Word} {ram : Word → BitVec 8} {mem : List Ce
     (hm : MemHolds ρ ram mem) (h : Cell.leqIn mem c = true) : c.holds ρ ram := by
   unfold Cell.leqIn at h
   split at h
-  · cases hp : plain mem c.base c.addr c.w with
-    | none => rw [hp] at h; simp at h
-    | some v =>
-      rw [hp] at h
-      intro _
-      rw [cell_at rfl rfl]
-      exact leq_sound h (plain_sound hm hp)
+  · rw [Bool.or_eq_true] at h
+    rcases h with h | h
+    · cases hp : plain mem c.base c.addr c.w with
+      | none => rw [hp] at h; simp at h
+      | some v =>
+        rw [hp] at h
+        intro _
+        rw [cell_at rfl rfl]
+        exact leq_sound h (plain_sound hm hp)
+    · cases hp : lookup mem c.base c.addr c.w with
+      | none => rw [hp] at h; simp at h
+      | some v =>
+        rw [hp] at h
+        intro _
+        rw [cell_at rfl rfl]
+        exact leq_sound h (lookup_sound hm hp)
   · next g hg =>
     rw [Bool.or_eq_true] at h
     rcases h with h | h
