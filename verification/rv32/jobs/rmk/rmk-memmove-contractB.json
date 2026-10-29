@@ -1,0 +1,42 @@
+{
+  "schema": "e5r.verify.job.v1",
+  "id": "rmk-memmove-contractB",
+  "root": "../..",
+  "board": "boards/qemu-virt-rv32.json",
+  "elf": "build/rmk-qemu-riscv-rynk.elf",
+  "elf_sha256": "f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30",
+  "image": {
+    "kind": "ram",
+    "module": "Projects.rmk.Elf",
+    "namespace": "E5R.Rmk.Image"
+  },
+  "modules": [
+    "Theories/Absint.lean",
+    "Theories/AbsintSound.lean",
+    "Projects/rmk/Copy.lean",
+    "Projects/rmk/Run.lean",
+    "Projects/rmk/Fetch.lean",
+    "Projects/rmk/MemmoveFetch.lean",
+    "Projects/rmk/MemmoveLoops.lean",
+    "Projects/rmk/MemmoveSmall.lean",
+    "Projects/rmk/MemmoveBigLoops.lean",
+    "Projects/rmk/MemmoveAligned.lean",
+    "Projects/rmk/MemmoveContract.lean",
+    "Projects/ramimage/Memmove.lean",
+    "Projects/ramimage/MemmoveB.lean"
+  ],
+  "theorems": [
+    "E5R.Rmk.Memmove.contractB",
+    "E5R.RmkMemmove.img_eq",
+    "E5R.RmkMemmove.board_eq",
+    "E5R.RmkMemmoveB.*"
+  ],
+  "symbols": {
+    "0x80020c1e": "memmove",
+    "0x80020d9e": "memmove"
+  },
+  "limits": {
+    "seconds": 3600,
+    "rss_mib": 10240
+  }
+}
