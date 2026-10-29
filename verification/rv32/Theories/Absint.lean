@@ -671,7 +671,9 @@ def irqCodesAbs (s : AState) : List Nat :=
     | _ => true
 
 /-- The handler entry for `code`: the interrupted registers, symbolically;
-    static RAM described by `G`. `none` if the vector is unknown. -/
+    static RAM described by `G`. `none` if the vector is unknown. Symbols
+    1..31 are the interrupted registers, 32 its pc, 33..35 its mie, mtvec and
+    mscratch, which the handler must hand back unchanged. -/
 def handlerEntry (G : List Cell) (s : AState) (code : Nat) : Option AState :=
   match s.mtvec with
   | .vals [v] =>
@@ -679,8 +681,8 @@ def handlerEntry (G : List Cell) (s : AState) (code : Nat) : Option AState :=
     let pc := if v % 4 = 1 then (base + 4 * code) % M32 else base
     if pc % 2 ≠ 0 then none else
     some { pc := pc, regs := (List.range 31).map fun i => .sym (i+1) 0, mem := G,
-           mie := .no, mpie := .yes, mpp := [3], mieReg := s.mieReg, mtvec := s.mtvec,
-           mepc := .sym 32 0, mcause := .const (2^31 + code), mscratch := .top, hnd := true }
+           mie := .no, mpie := .yes, mpp := [3], mieReg := .sym 33 0, mtvec := .sym 34 0,
+           mepc := .sym 32 0, mcause := .const (2^31 + code), mscratch := .sym 35 0, hnd := true }
   | _ => none
 
 /-! ## Certificates -/
@@ -749,7 +751,9 @@ def interruptibleOk (cfg : Config) (cert : Cert) (s : AState) : Bool :=
   (match s.get 2 with
    | .vals [sp] =>
      sp ∈ cert.sigma &&
-     s.mem.all fun c => cfg.isStatic c.addr c.w.bytes || (sp ≤ c.addr && cfg.isStack c.addr c.w.bytes)
+     -- A stack fact must not hang on a static guard word the handler may change.
+     s.mem.all fun c => cfg.isStatic c.addr c.w.bytes ||
+       (sp ≤ c.addr && cfg.isStack c.addr c.w.bytes && c.guard.isNone)
    | _ => false) &&
   -- After the handler's mret: MIE and MPIE set, MPP = U (0), mepc and mcause
   -- whatever the handler left.
@@ -778,6 +782,7 @@ def AState.wf (cfg : Config) (s : AState) : Bool :=
 def mretOk (cfg : Config) (cert : Cert) (s : AState) : Bool :=
   s.hnd && s.regs == (List.range 31).map (fun i => .sym (i+1) 0) &&
   s.mepc == .sym 32 0 && s.mpie == .yes && s.mpp == [3] &&
+  s.mieReg == .sym 33 0 && s.mtvec == .sym 34 0 && s.mscratch == .sym 35 0 &&
   (staticOf cfg s.mem).all (fun _ => true) && cert.G.all (Cell.leqIn s.mem) &&
   s.mem.all fun c => c.base == .rel || cfg.isStatic c.addr c.w.bytes
 
