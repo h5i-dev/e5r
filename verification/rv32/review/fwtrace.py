@@ -78,7 +78,8 @@ def main():
                     continue
                 if m[1] != '1':
                     raise SystemExit(f'synchronous exception in trace: {line.strip()}')
-                events.append(f'I {int(m[2], 16):x} {int(m[3], 16):x}')
+                # QEMU prints the cause code without the interrupt bit.
+                events.append(f'I {int(m[2], 16) | 1 << 31:x} {int(m[3], 16):x}')
                 irqs += 1
                 continue
             m = MMIO_RE.search(line)

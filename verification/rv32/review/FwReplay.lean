@@ -68,9 +68,13 @@ def oracleFor (m : Machine) (next : Array Word) : Oracle :=
     | _ => fun _ => 0
   | none => fun _ => 0
 
-def flatten (ram : Word → BitVec 8) : Word → BitVec 8 :=
-  let arr : Array (BitVec 8) := Array.ofFn (n := B.ramSize) fun i => ram (BitVec.ofNat 32 (B.ramBase + i))
-  fun a => if B.ramBase ≤ a.toNat ∧ a.toNat < B.ramBase + B.ramSize then arr[a.toNat - B.ramBase]! else 0
+def regOf (xs : Array Word) (r : Reg) : Word := xs[r.val]!
+
+/-- Look up RAM in a flattened copy. Takes the array as an argument: a helper
+    that built the array and returned a closure let the compiler move the
+    construction into the closure, rebuilding 16 KiB on every read. -/
+def ramOf (arr : Array (BitVec 8)) (a : Word) : BitVec 8 :=
+  if B.ramBase ≤ a.toNat ∧ a.toNat < B.ramBase + B.ramSize then arr[a.toNat - B.ramBase]! else 0
 
 end FwReplay
 
@@ -126,10 +130,16 @@ def main (args : List String) : IO UInt32 := do
       writes := writes + ew.length
       let d := diff cur.core next
       if !d.isEmpty then IO.eprintln s!"step {steps} (pc {m.core.pc.toHex}): {d}"; return 1
-      m := cur
+      -- Flatten the register closure chain (values unchanged; nothing is
+      -- taken from QEMU here) so the replay stays linear.
+      let xs : Array Word := Array.ofFn (n := 32) fun i => cur.core.x ⟨i.val, i.isLt⟩
+      m := { cur with core := { cur.core with x := regOf xs } }
       pendI := []
       pendW := []
       steps := steps + 1
-      if steps % 256 == 0 then m := { m with ram := flatten m.ram }
+      if steps % 256 == 0 then
+        let ram := m.ram
+        let arr : Array (BitVec 8) := Array.ofFn (n := B.ramSize) fun i => ram (BitVec.ofNat 32 (B.ramBase + i))
+        m := { m with ram := ramOf arr }
   IO.println s!"review replay: {steps} transitions ({instrs} instructions, {irqs} interrupts), {writes} device writes equal to QEMU's; every GPR/PC/CSR equal"
   return 0
