@@ -1,0 +1,142 @@
+{
+  "schema": "e5r.board.v1",
+  "id": "qemu-virt-rv32",
+  "name": "QEMU virt machine, 32-bit (RMK qemu-riscv-rynk target)",
+  "soc": "QEMU 8.2.2 hw/riscv/virt.c, -M virt -cpu rv32 -bios none",
+  "core": "QEMU generic rv32 CPU (one hart); the model implements RV32IMAC + Zicsr + Zifencei",
+  "sources": [
+    "QEMU 8.2.2 hw/riscv/virt.c (memory map: DRAM at 0x80000000, NS16550A UART0 at 0x10000000)",
+    "QEMU 8.2.2 hw/char/serial.c (16550 register file, byte registers at stride 1 for reg-shift 0)",
+    "RMK 71556128fa72881fc35f0bf6c292d5e28ad9568d examples/use_rust/qemu-riscv-rynk (memory.x, run.py, src/main.rs)",
+    "RISC-V Unprivileged ISA 20240411; RISC-V Privileged Architecture 20240411; RISC-V Semihosting 0.3"
+  ],
+  "isa": {
+    "xlen": 32,
+    "extensions": [
+      "I",
+      "M",
+      "A",
+      "C",
+      "Zicsr",
+      "Zifencei"
+    ],
+    "misaligned_access": "trap",
+    "notes": "QEMU's rv32 CPU implements more (F, D, and it emulates misaligned accesses in M-mode); the model treats every encoding outside RV32IMAC + Zicsr + Zifencei + MRET/WFI as an illegal-instruction trap and every misaligned access as a trap. Both are stricter than QEMU, so a no-fault theorem in the model still holds on QEMU."
+  },
+  "privilege": {
+    "modeled": [
+      "M"
+    ],
+    "csrs": {
+      "mstatus": "MIE, MPIE, MPP only; a write that sets any other field is unsupported",
+      "mie": "MSIE, MTIE, MEIE (other bits read as zero)",
+      "mtvec": "direct (mode 0) and vectored (mode 1); other modes unsupported",
+      "mscratch": "read/write",
+      "mepc": "read/write, bit 0 cleared",
+      "mcause": "read-only in the model; a write is unsupported",
+      "mip": "read returns environmental pending bits; writes have no effect",
+      "mhartid": "reads 0; a write is an illegal-instruction trap"
+    },
+    "u_mode": "MRET with MPP = U is unsupported"
+  },
+  "boot": {
+    "entry": "ELF e_entry; with -bios none QEMU loads the ELF's PT_LOAD segments into DRAM and starts the hart at e_entry in M-mode",
+    "assumptions": [
+      "The hart is in M-mode at the entry point with mstatus.MIE = 0 (QEMU reset state).",
+      "mstatus fields other than MIE, MPIE and MPP are zero (in particular MPRV = 0); no PMP entry restricts M-mode.",
+      "QEMU loaded every PT_LOAD of the image at p_vaddr = p_paddr; the read-only PT_LOADs (no W flag) hold exactly their file bytes followed by zeros up to p_memsz.",
+      "Only the one hart runs, and no debugger, DMA master or other bus master accesses memory or devices; -semihosting is given, but the model does not execute semihosting calls (see exclusions)."
+    ],
+    "arbitrary": [
+      "every general-purpose register",
+      "all writable RAM, from rwBase (the first byte after the image's read-only segments) to the end of DRAM, including the writable PT_LOADs' initial bytes unless a job adds them as an explicit assumption",
+      "mstatus.MPIE and mstatus.MPP (M or U)",
+      "mie (within its implemented bits), mtvec, mscratch, mepc, mcause",
+      "the LR reservation",
+      "every device register value"
+    ]
+  },
+  "image_placement": "ram",
+  "memory": [
+    {
+      "name": "dram",
+      "base": "0x80000000",
+      "size": "0x1000000",
+      "kind": "ram",
+      "perms": "rwx",
+      "notes": "16 MiB as RMK's memory.x uses (QEMU places the device tree near the top of larger RAM). The image's read-only PT_LOADs (.text, .rodata) are modeled as an immutable image: fetches and loads read their bytes, and a store or AMO into them is unsupported (fail closed). A no-fault theorem therefore also shows the program never writes its own code, which is what makes fetching from the image agree with QEMU, where this RAM is writable. Model RAM is [rwBase, 0x81000000); the image exporter refuses a layout with a writable segment below rwBase."
+    }
+  ],
+  "devices": [
+    {
+      "name": "uart0.rbr_thr_dll",
+      "addr": "0x10000000",
+      "width": 1,
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "uart0.ier_dlm",
+      "addr": "0x10000001",
+      "width": 1,
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "uart0.iir_fcr",
+      "addr": "0x10000002",
+      "width": 1,
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "uart0.lcr",
+      "addr": "0x10000003",
+      "width": 1,
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "uart0.mcr",
+      "addr": "0x10000004",
+      "width": 1,
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "uart0.lsr",
+      "addr": "0x10000005",
+      "width": 1,
+      "read": true,
+      "write": false
+    },
+    {
+      "name": "uart0.msr",
+      "addr": "0x10000006",
+      "width": 1,
+      "read": true,
+      "write": false
+    },
+    {
+      "name": "uart0.scr",
+      "addr": "0x10000007",
+      "width": 1,
+      "read": true,
+      "write": true
+    }
+  ],
+  "device_semantics": "Reads of a listed register return an arbitrary value of its width chosen by the environment, so read side effects (popping the receive FIFO, clearing line status) cannot change what a proof covers, and every byte sequence a host can send is covered. An accepted write is an observable event carrying the stored low bytes and has no other effect on the hart. Accesses must use the register's width (byte registers: lb/lbu/sb). An access to any unlisted address, including the CLINT, PLIC, virtio-mmio, RTC, flash, fw_cfg, the test finisher and PCI, is unsupported. LSR and MSR are listed read-only: the model refuses writes to them.",
+  "interrupts": {
+    "sources": {
+      "3": "machine software (CLINT msip) — not modeled as a device; the model's interrupt rules apply if the firmware enables it",
+      "7": "machine timer (CLINT) — the RMK example uses embassy-time's mock driver and never programs the CLINT",
+      "11": "machine external (PLIC) — the PLIC is not modeled"
+    },
+    "notes": "The firmware is expected never to set mstatus.MIE or mie bits; that is a proof obligation (a reachable enable makes the model's interrupt entry apply), not an assumption."
+  },
+  "exclusions": [
+    "Semihosting: the RISC-V semihosting sequence (slli x0,x0,0x1f; ebreak; srai x0,x0,7) is an ebreak, which the model treats as a breakpoint exception, not as a host call. QEMU with -semihosting performs the call instead. A theorem from the reset state therefore cannot cover code that reaches a semihosting call (RMK's startup println); properties for this board start after initialization, from a stated program point and state, and must not reach a semihosting call.",
+    "F, D and any other extension QEMU's rv32 CPU accepts beyond RV32IMAC + Zicsr + Zifencei: illegal in the model.",
+    "Devices other than UART0's eight byte registers, DMA, virtio, multiple harts, U-mode, PMP, the device tree contents."
+  ]
+}
