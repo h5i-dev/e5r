@@ -445,7 +445,7 @@ inductive Target where
   | ram
   | rom (v : Nat)
   | dev (d : DevReg)
-  deriving Repr
+  deriving Repr, DecidableEq
 
 def classify (cfg : Config) (a : Nat) (wd : Width) : Option Target :=
   if a % wd.bytes ≠ 0 then none
@@ -800,7 +800,7 @@ def nodeOk (cfg : Config) (cert : Cert) (n : Node) : Bool :=
     | some (.load wd signed rd rs1 off, _) =>
       if signed && wd != .w then none else
       match addC (s.get rs1) off.toNat with
-      | .vals [a] => some (rd.val, a, wd)
+      | .vals [a] => if classify cfg a wd == some .ram then some (rd.val, a, wd) else none
       | _ => none
     | _ => none
   let coveredE (t : AState) (e : Edge) : Bool :=
