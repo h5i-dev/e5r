@@ -2263,6 +2263,111 @@ theorem case_store {wd : Width} {rs1 rs2 : Reg} {off : Word}
       · exfalso; simp [absStore, hsv] at hst
     | _ => simp [absStore] at hst
 
+/-- The state after an instruction that may have changed RAM and a reservation,
+    written `rd` and fallen through. -/
+theorem holds_after {memF : List Cell} {ram' : Word → BitVec 8} {c : Core} {rd : Reg} {v : AV} {x : Word}
+    (hcg : ∀ r, c.get r = m.core.get r) (hctl : CtlHolds ρ s c) (hm : MemHolds ρ ram' memF)
+    (hv : v.gam ρ x) :
+    StateHolds ρ { ({ s with mem := memF } : AState).set rd v with pc := (s.pc + len.toNat) % M32 }
+      ⟨{ c.set rd x with pc := m.core.pc + len }, ram'⟩ := by
+  obtain ⟨e1, _⟩ := AState.set_other ({ s with mem := memF } : AState) rd v
+  refine holds_mk (pc_adv hs.pc) ?_ (by simp only; rw [e1]; exact hm)
+    (ctl_pc (ctl_setc (ctl_withPc (ctl_set (ctl_mem hctl memF) rd v) _) rd x) _)
+  intro q
+  rw [withPc_get, Core.get_withPc]
+  exact regs_set (s := { s with mem := memF }) hl (fun r => by rw [hcg]; exact hs.regs r) rd hv q
+
+theorem case_lr {rd rs1 : Reg} (hv : ValidImg cfg.img) (hsp : s.hnd = true → SpOk cfg (ρ 2).toNat)
+    (h : absExec cfg s len.toNat (.lr rd rs1) = some ts) :
+    StepOk cfg ρ ts o (exec m.core len (.lr rd rs1)) m.ram := by
+  simp only [absExec, Option.bind_eq_some_iff, Option.some.injEq] at h
+  obtain ⟨v, hld, rfl⟩ := h
+  have he : exec m.core len (.lr rd rs1) = .load .w (m.core.get rs1) true
+      (fun r => .done { ({ m.core with resv := true }.set rd r) with pc := m.core.pc + len }) := rfl
+  rw [he]
+  obtain ⟨r, i', hi, hr, _⟩ := absLoad_sound hld hv (hs.regs rs1) hsp hs.mem o 0 [] _
+  refine ⟨_, _, _, by rw [hi]; exact interp_done o _ _ _ _, by simp, _, List.mem_singleton_self _, ?_⟩
+  exact holds_after hs hl (c := { m.core with resv := true }) (fun _ => rfl) (ctl_resv (ctl_of_holds hs) true) hs.mem hr
+
+theorem case_sc {rd rs1 rs2 : Reg} (hv : ValidImg cfg.img)
+    (hram : cfg.board.ramBase + cfg.board.ramSize ≤ M32) (hwf : s.wf cfg = true)
+    (hsp : s.hnd = true → SpOk cfg (ρ 2).toNat)
+    (h : absExec cfg s len.toNat (.sc rd rs1 rs2) = some ts) :
+    StepOk cfg ρ ts o (exec m.core len (.sc rd rs1 rs2)) m.ram := by
+  simp only [absExec, Option.bind_eq_some_iff, Option.some.injEq] at h
+  obtain ⟨_, hld, memF, hst, rfl⟩ := h
+  let fail : Eff := .done { ({ m.core with resv := false }.set rd 1) with pc := m.core.pc + len }
+  have he : exec m.core len (.sc rd rs1 rs2) = .load .w (m.core.get rs1) true (fun _ =>
+      if ¬ m.core.resv then fail else .choose fun ok =>
+        if ok then .store .w (m.core.get rs1) (m.core.get rs2) true
+          (.done { ({ m.core with resv := false }.set rd 0) with pc := m.core.pc + len })
+        else fail) := rfl
+  rw [he]
+  obtain ⟨r, i', hi, _, _⟩ := absLoad_sound hld hv (hs.regs rs1) hsp hs.mem o 0 [] _
+  unfold StepOk; rw [hi]
+  have hfail : ∀ j, ∃ c ram' evs, interp cfg.board cfg.img o fail m.ram j [] = .ok c ram' evs ∧
+      (∀ ev ∈ evs, EvOk cfg ev) ∧
+      ∃ t ∈ [{ (s.set rd (.const 1)) with pc := (s.pc + len.toNat) % M32 },
+             { ({ s with mem := memF } : AState).set rd (.const 0) with pc := (s.pc + len.toNat) % M32 }],
+        StateHolds ρ t ⟨c, ram'⟩ :=
+    fun j => ⟨_, _, _, interp_done o _ _ _ _, by simp, _, List.mem_cons_self ..,
+      holds_after (memF := s.mem) hs hl (c := { m.core with resv := false }) (fun _ => rfl) (ctl_resv (ctl_of_holds hs) false) hs.mem
+        (const_sound' (by simp [M32]))⟩
+  by_cases hres : m.core.resv = true
+  · simp only [hres, not_true_eq_false, if_false, interp]
+    cases (o i').getLsbD 0
+    · exact hfail _
+    · simp only [if_true]
+      obtain ⟨ram', evs', hse, hsi, hm'⟩ :=
+        absStore_sound hst hram hwf (hs.regs rs1) (hs.regs rs2) hsp hs.mem o (i' + 1) [] _
+      refine ⟨_, _, _, by rw [hsi]; exact interp_done o _ _ _ _, ?_, _,
+        List.mem_cons_of_mem _ (List.mem_singleton_self _), ?_⟩
+      · intro ev hev
+        cases hse with
+        | ram => simp at hev
+        | dev hok => simp only [List.nil_append, List.mem_singleton] at hev; subst hev; exact hok
+      · exact holds_after hs hl (c := { m.core with resv := false }) (fun _ => rfl) (ctl_resv (ctl_of_holds hs) false) hm'
+          (const_sound' (by simp))
+  · simp only [hres, Bool.false_eq_true, not_false_eq_true, if_true]
+    exact hfail _
+
+theorem case_amo {op : AmoOp} {rd rs1 rs2 : Reg} (hv : ValidImg cfg.img)
+    (hram : cfg.board.ramBase + cfg.board.ramSize ≤ M32) (hwf : s.wf cfg = true)
+    (hsp : s.hnd = true → SpOk cfg (ρ 2).toNat)
+    (h : absExec cfg s len.toNat (.amo op rd rs1 rs2) = some ts) :
+    StepOk cfg ρ ts o (exec m.core len (.amo op rd rs1 rs2)) m.ram := by
+  simp only [absExec, Option.bind_eq_some_iff, Option.some.injEq] at h
+  obtain ⟨old, hld, memF, hst, rfl⟩ := h
+  have he : exec m.core len (.amo op rd rs1 rs2) = .load .w (m.core.get rs1) true (fun r =>
+      .store .w (m.core.get rs1) (amoOp op r (m.core.get rs2)) true
+        (.done { (m.core.set rd r) with pc := m.core.pc + len })) := rfl
+  rw [he]
+  obtain ⟨r, i', hi, hr, _⟩ := absLoad_sound hld hv (hs.regs rs1) hsp hs.mem o 0 [] _
+  unfold StepOk; rw [hi]
+  have finish : ∀ {new : AV}, new.gam ρ (amoOp op r (m.core.get rs2)) →
+      absStore cfg s (s.get rs1) .w new true = some memF →
+      StepOk cfg ρ [{ ({ s with mem := memF } : AState).set rd old with pc := (s.pc + len.toNat) % M32 }] o
+        (.store .w (m.core.get rs1) (amoOp op r (m.core.get rs2)) true
+          (.done { (m.core.set rd r) with pc := m.core.pc + len })) m.ram := by
+    intro new hn hst'
+    obtain ⟨ram', evs', hse, hsi, hm'⟩ :=
+      absStore_sound hst' hram hwf (hs.regs rs1) hn hsp hs.mem o 0 [] _
+    refine ⟨_, _, _, by rw [hsi]; exact interp_done o _ _ _ _, ?_, _, List.mem_singleton_self _,
+      holds_after hs hl (c := m.core) (fun _ => rfl) (ctl_of_holds hs) hm' hr⟩
+    intro ev hev
+    cases hse with
+    | ram => simp at hev
+    | dev hok => simp only [List.nil_append, List.mem_singleton] at hev; subst hev; exact hok
+  have hrun : ∀ i, interp cfg.board cfg.img o (.store .w (m.core.get rs1) (amoOp op r (m.core.get rs2)) true
+      (.done { (m.core.set rd r) with pc := m.core.pc + len })) m.ram i [] =
+      interp cfg.board cfg.img o (.store .w (m.core.get rs1) (amoOp op r (m.core.get rs2)) true
+      (.done { (m.core.set rd r) with pc := m.core.pc + len })) m.ram 0 [] := by
+    intro i; simp only [interp]
+  rw [hrun]
+  split at hst
+  · next _ _ y z hy => exact finish (lift2_sound hr (hy ▸ hs.regs rs2)) hst
+  · exact finish (new := .top) trivial hst
+
 end Cases
 
 end E5R.AI
