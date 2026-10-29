@@ -917,11 +917,12 @@ optional; direct and hybrid proofs are equally valid routes.
       the misaligned forward path, both reachable from the 488-byte deframer
       buffer. Deframer (`Projects/rmk/Deframer/Spec.lean` states the
       contracts against explicit `CopyContract` and `CobsReportContract`
-      hypotheses): `tail` is proved CONDITIONALLY, `tail_from_copy :
+      hypotheses): `tail` and `park_pending` are proved CONDITIONALLY
+      (`Deframer/Park.lean`, `park_from_copy : ParkFromCopy`), `tail_from_copy :
       CopyContract → TailContract tailStack` (`Deframer/TailCopy.lean`; the
       consumed = 0 path, `Deframer/TailNoCopy.lean` `nocopy`, needs no
       hypothesis). `CopyContract` itself is not proved: `contractB` does not
-      yet cover every call `tail` makes. `park_pending`, `unpark_pending`,
+      yet cover every call these make. `unpark_pending`,
       `next` and the panic controls are not proved, and there is no runner
       job for the deframer.
 - [ ] **R4. Toward the session.** Compose R3 with the surrounding session
