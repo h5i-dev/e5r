@@ -390,8 +390,12 @@ def csrWrite (c : Core) (addr : Nat) (v : Word) (fin : Core → Eff) : Eff :=
     else fin { c with mie_ := v.getLsbD 3, mpie := v.getLsbD 7, mpp := mpp }
   else if addr = csrMie then fin { c with mieReg := v &&& mieMask }
   else if addr = csrMtvec then
-    if v.extractLsb' 0 2 = 0 ∨ v.extractLsb' 0 2 = 1 then fin { c with mtvec := v }
-    else .unsupported "mtvec mode"
+    -- Vectored mode: SiFive cores form the vector by OR-ing the cause into
+    -- BASE, which equals adding only when BASE is aligned well beyond the
+    -- table. 128 bytes covers both the FE310 (64) and E31 (128) manuals.
+    if v.extractLsb' 0 2 = 0 then fin { c with mtvec := v }
+    else if v.extractLsb' 0 2 = 1 ∧ v.toNat % 128 = 1 then fin { c with mtvec := v }
+    else .unsupported "mtvec mode or vectored base alignment"
   else if addr = csrMscratch then fin { c with mscratch := v }
   else if addr = csrMepc then fin { c with mepc := v &&& ~~~1 }
   -- MSIP, MTIP and MEIP are read-only in mip; the other bits are not implemented.
@@ -451,17 +455,15 @@ def exec (c : Core) (len : Word) (i : Instr) : Eff :=
   | .sc rd rs1 rs2 =>
     -- With a reservation the SC may still fail (the spec permits spurious
     -- failure); without one it must fail. Either way the reservation ends.
-    -- A failing SC still raises on a misaligned or non-memory address
-    -- (Zalrsc: "If the address is not naturally aligned, an address-misaligned
-    -- exception or an access-fault exception will be generated."), so it
-    -- probes the address with an atomic load: the platform then applies the
-    -- same alignment and RAM checks as to a successful SC, and a RAM read
-    -- changes nothing.
-    let fail := .load .w (c.get rs1) true fun _ => adv ({ c with resv := false }.set rd 1)
-    if ¬ c.resv then fail else
-    .choose fun ok =>
-      if ok then .store .w (c.get rs1) (c.get rs2) true (adv ({ c with resv := false }.set rd 0))
-      else fail
+    -- The address is checked whether or not the SC succeeds: a misaligned
+    -- or non-RAM SC traps even when it would fail (Zalrsc). The atomic
+    -- probe load has no effect of its own.
+    let fail := adv ({ c with resv := false }.set rd 1)
+    .load .w (c.get rs1) true fun _ =>
+      if ¬ c.resv then fail else
+      .choose fun ok =>
+        if ok then .store .w (c.get rs1) (c.get rs2) true (adv ({ c with resv := false }.set rd 0))
+        else fail
   | .amo op rd rs1 rs2 =>
     .load .w (c.get rs1) true fun old =>
       .store .w (c.get rs1) (amoOp op old (c.get rs2)) true (adv (c.set rd old))

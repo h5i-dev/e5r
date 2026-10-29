@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.board/1",
+  "schema": "e5r.board.v1",
   "id": "hifive1-revb",
   "name": "SiFive HiFive1 Rev B",
   "soc": "SiFive FE310-G002",
@@ -12,12 +12,21 @@
   ],
   "isa": {
     "xlen": 32,
-    "extensions": ["I", "M", "A", "C", "Zicsr", "Zifencei"],
+    "extensions": [
+      "I",
+      "M",
+      "A",
+      "C",
+      "Zicsr",
+      "Zifencei"
+    ],
     "misaligned_access": "trap",
     "notes": "Every encoding outside RV32IMAC + Zicsr + Zifencei + MRET/WFI decodes to an illegal-instruction trap, as on the E31."
   },
   "privilege": {
-    "modeled": ["M"],
+    "modeled": [
+      "M"
+    ],
     "csrs": {
       "mstatus": "MIE, MPIE, MPP only; a write that sets any other field is unsupported",
       "mie": "MSIE, MTIE, MEIE (other bits read as zero)",
@@ -49,35 +58,146 @@
     ]
   },
   "memory": [
-    {"name": "dtim", "base": "0x80000000", "size": "0x4000", "kind": "ram",
-     "perms": "rw", "notes": "Executable on hardware; fetching from it is unsupported in the model."},
-    {"name": "flash", "base": "0x20000000", "size": "0x20000000", "kind": "image",
-     "perms": "rx", "notes": "Only bytes the ELF places here are modeled; any other flash address is unsupported. Fetch requires an executable segment."}
+    {
+      "name": "dtim",
+      "base": "0x80000000",
+      "size": "0x4000",
+      "kind": "ram",
+      "perms": "rw",
+      "notes": "Executable on hardware; fetching from it is unsupported in the model."
+    },
+    {
+      "name": "flash",
+      "base": "0x20010000",
+      "size": "0x3f0000",
+      "kind": "image",
+      "perms": "rx",
+      "notes": "The 4 MiB SPI flash after the 64 KiB bootloader (the XIP window aliases beyond it; those addresses are not modeled). Only bytes the ELF places here are modeled; any other address is unsupported. Fetch requires an executable segment."
+    }
   ],
   "devices": [
-    {"name": "clint.msip", "addr": "0x02000000", "read": true, "write": true},
-    {"name": "clint.mtimecmp_lo", "addr": "0x02004000", "read": true, "write": true},
-    {"name": "clint.mtimecmp_hi", "addr": "0x02004004", "read": true, "write": true},
-    {"name": "clint.mtime_lo", "addr": "0x0200bff8", "read": true, "write": false},
-    {"name": "clint.mtime_hi", "addr": "0x0200bffc", "read": true, "write": false},
-    {"name": "uart0.txdata", "addr": "0x10013000", "read": true, "write": true},
-    {"name": "uart0.rxdata", "addr": "0x10013004", "read": true, "write": false},
-    {"name": "uart0.txctrl", "addr": "0x10013008", "read": true, "write": true},
-    {"name": "uart0.rxctrl", "addr": "0x1001300c", "read": true, "write": true},
-    {"name": "uart0.ie", "addr": "0x10013010", "read": true, "write": true},
-    {"name": "uart0.ip", "addr": "0x10013014", "read": true, "write": false},
-    {"name": "uart0.div", "addr": "0x10013018", "read": true, "write": true},
-    {"name": "pwm0.pwmcfg", "addr": "0x10015000", "read": true, "write": true},
-    {"name": "pwm0.pwmcount", "addr": "0x10015008", "read": true, "write": true},
-    {"name": "pwm0.pwms", "addr": "0x10015010", "read": true, "write": false},
-    {"name": "pwm0.pwmcmp0", "addr": "0x10015020", "read": true, "write": true},
-    {"name": "pwm0.pwmcmp1", "addr": "0x10015024", "read": true, "write": true},
-    {"name": "pwm0.pwmcmp2", "addr": "0x10015028", "read": true, "write": true},
-    {"name": "pwm0.pwmcmp3", "addr": "0x1001502c", "read": true, "write": true}
+    {
+      "name": "clint.msip",
+      "addr": "0x02000000",
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "clint.mtimecmp_lo",
+      "addr": "0x02004000",
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "clint.mtimecmp_hi",
+      "addr": "0x02004004",
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "clint.mtime_lo",
+      "addr": "0x0200bff8",
+      "read": true,
+      "write": false
+    },
+    {
+      "name": "clint.mtime_hi",
+      "addr": "0x0200bffc",
+      "read": true,
+      "write": false
+    },
+    {
+      "name": "uart0.txdata",
+      "addr": "0x10013000",
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "uart0.rxdata",
+      "addr": "0x10013004",
+      "read": true,
+      "write": false
+    },
+    {
+      "name": "uart0.txctrl",
+      "addr": "0x10013008",
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "uart0.rxctrl",
+      "addr": "0x1001300c",
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "uart0.ie",
+      "addr": "0x10013010",
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "uart0.ip",
+      "addr": "0x10013014",
+      "read": true,
+      "write": false
+    },
+    {
+      "name": "uart0.div",
+      "addr": "0x10013018",
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "pwm0.pwmcfg",
+      "addr": "0x10015000",
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "pwm0.pwmcount",
+      "addr": "0x10015008",
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "pwm0.pwms",
+      "addr": "0x10015010",
+      "read": true,
+      "write": false
+    },
+    {
+      "name": "pwm0.pwmcmp0",
+      "addr": "0x10015020",
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "pwm0.pwmcmp1",
+      "addr": "0x10015024",
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "pwm0.pwmcmp2",
+      "addr": "0x10015028",
+      "read": true,
+      "write": true
+    },
+    {
+      "name": "pwm0.pwmcmp3",
+      "addr": "0x1001502c",
+      "read": true,
+      "write": true
+    }
   ],
   "device_semantics": "Reads of a listed register return an arbitrary word chosen by the environment, so any read side effect (such as popping the UART receive FIFO) cannot change what the proof covers. An accepted write is an observable event and has no other effect on the hart. Only aligned word accesses are modeled. An access to any unlisted address, including PRCI, AON, QSPI0, OTP, PLIC, GPIO, SPI, I2C, UART1 and PWM1/2, is unsupported: those devices can reset the chip, remap flash or change the clock.",
   "interrupts": {
-    "sources": {"3": "machine software (CLINT msip)", "7": "machine timer (CLINT)", "11": "machine external (PLIC)"},
+    "sources": {
+      "3": "machine software (CLINT msip)",
+      "7": "machine timer (CLINT)",
+      "11": "machine external (PLIC)"
+    },
     "model": "At every instruction boundary where mstatus.MIE = 1 and the cause's mie bit is set, the interrupt may be taken, whether or not the device would have it pending. This includes every behavior of the real timer, software and external sources and their priority order.",
     "nesting": "Entry clears mstatus.MIE; MRET restores it from MPIE."
   },

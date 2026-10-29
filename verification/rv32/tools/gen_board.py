@@ -46,14 +46,23 @@ def render(board):
 
 
 def main():
-    paths = sys.argv[1:] or sorted((VERIFY / 'boards').glob('*.json'))
+    args = sys.argv[1:]
+    check = '--check' in args
+    args = [a for a in args if a != '--check']
+    paths = args or sorted((VERIFY / 'boards').glob('*.json'))
     for p in map(Path, paths):
         board = json.loads(p.read_text())
-        if board.get('schema') != 'e5r.board/1':
+        if board.get('schema') != 'e5r.board.v1':
             raise SystemExit(f'{p}: unknown schema')
         out = VERIFY / 'Theories' / 'Board' / f'{camel(board["id"])}.lean'
-        out.write_text(render(board))
-        print(out.relative_to(VERIFY))
+        text = render(board)
+        if check:
+            # Refuse a committed Lean board that no longer matches its JSON.
+            if not out.exists() or out.read_text() != text:
+                raise SystemExit(f'{out.relative_to(VERIFY)} differs from {p.name}; run tools/gen_board.py')
+        else:
+            out.write_text(text)
+            print(out.relative_to(VERIFY))
 
 
 if __name__ == '__main__':

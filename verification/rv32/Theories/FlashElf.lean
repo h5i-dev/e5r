@@ -10,6 +10,9 @@
 -/
 import Theories.Platform
 
+-- The image-fidelity theorem is decided by the kernel.
+deriving instance DecidableEq for Except
+
 namespace E5R.FlashElf
 open E5R
 
