@@ -917,15 +917,23 @@ optional; direct and hybrid proofs are equally valid routes.
       the misaligned forward path, both reachable from the 488-byte deframer
       buffer. Deframer (`Projects/rmk/Deframer/Spec.lean` states the
       contracts against explicit `CopyContract` and `CobsReportContract`
-      hypotheses): `tail`, `park_pending` and `unpark_pending` are proved
-      CONDITIONALLY (`Deframer/Park.lean` `park_from_copy : ParkFromCopy`,
-      `Deframer/Unpark.lean` `unpark_from_copy : UnparkFromCopy`), `tail_from_copy :
-      CopyContract → TailContract tailStack` (`Deframer/TailCopy.lean`; the
-      consumed = 0 path, `Deframer/TailNoCopy.lean` `nocopy`, needs no
-      hypothesis). `CopyContract` itself is not proved: `contractB` does not
-      yet cover every call these make. `next` (which also needs
-      `CobsReportContract`, owned by the COBS worker) and the panic controls
-      are not proved, and there is no runner job for the deframer.
+      hypotheses): all four methods are proved CONDITIONALLY on those
+      hypotheses on the pinned bytes:
+      - `tail_from_copy : TailFromCopy` (`Deframer/TailCopy.lean`; the
+        consumed = 0 path, `TailNoCopy.lean` `nocopy`, needs no hypothesis);
+      - `park_from_copy : ParkFromCopy` (`Deframer/Park.lean`);
+      - `unpark_from_copy : UnparkFromCopy` (`Deframer/Unpark.lean`);
+      - `next_from_deps : NextFromDeps` (`Deframer/Next.lean`; the whole
+        frame loop for any buffer contents, including the decode_in_place
+        wrapper, the range check and memmove).
+
+      Seventeen modules rebuild from scratch in about 125 s, all pass
+      leanchecker, and use only the standard axioms. Neither hypothesis is
+      a theorem yet. `CopyContract` needs memmove for n ≥ 16 backward and
+      misaligned, which `contractB` does not cover; `CobsReportContract`
+      needs `decode_in_place_report`, which is the COBS worker's. Not done:
+      the panic controls, a runner job for the deframer, and the session
+      (`SessionSafe`, R4).
 - [ ] **R4. Toward the session.** Compose R3 with the surrounding session
       loop and interrupts (checker, direct regions or summaries). *Accepted:*
       a kernel-checked theorem about the whole `run_session` path for the

@@ -5,11 +5,12 @@
   STATUS: SPECIFICATION ONLY. Nothing here is proved; every definition below is a proof
   obligation, and the constants marked CANDIDATE are read from the disassembly of the pinned ELF
   (f39d833f..., review/rmk/deframer-contracts.md on the review branch) and must be confirmed by
-  the proof that uses them. No theorem in this file claims safety. Proved elsewhere so far:
-  `Deframer/TailNoCopy.lean` (`tail` with consumed = 0 meets `TailPost`) and
-  `Deframer/TailCopy.lean` (`tail_from_copy : TailFromCopy`, conditional on `CopyContract`).
+  the proof that uses them. No theorem in this file claims safety. Proved elsewhere, each
+  CONDITIONAL on the dependency hypotheses below (not proved): `TailFromCopy` (TailCopy.lean),
+  `ParkFromCopy` (Park.lean), `UnparkFromCopy` (Unpark.lean), `NextFromDeps` (Next.lean).
   Corrections made for those proofs: `CallEnv.selfAl/spAl`, `CopyEnv.spAl` (ABI alignment; the model
-  faults misaligned word access) and the method posts' `saved` (now the ABI frame, `callerSaved`).
+  faults misaligned word access), the method posts' `saved` (now the ABI frame, `callerSaved`),
+  `NextPost.val`, `CobsEnv.sep` and `CobsPost.ok` (next's exact Ok test).
 
   The property (R2), in words: whatever bytes a host sends on the UART, the deframer's state
   invariant `consumed ≤ filled ≤ len` holds whenever its methods return, and no method reaches
