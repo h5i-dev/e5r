@@ -3310,4 +3310,138 @@ theorem absExec_hnd {cfg : Config} {s : AState} {len : Nat} {i : Instr} {ts : Li
       | (split at h <;> (simp only [Option.some.injEq] at h; subst h; simp only [List.mem_singleton] at ht
                          subst ht; simp [AState.set_hnd]))
 
+/-! ### Return from the handler -/
+
+theorem ramRead_congr {r1 r2 : Word → BitVec 8} {a : Word} {wd : Width}
+    (h : ∀ k < wd.bytes, r1 (a + w k) = r2 (a + w k)) : ramRead r1 a wd = ramRead r2 a wd := by
+  have h0 : r1 a = r2 a := by simpa [w] using h 0 (by cases wd <;> decide)
+  cases wd
+  · simp only [ramRead, h0]
+  · have h1 := h 1 (by decide); rw [w1] at h1
+    simp only [ramRead, h0, h1]
+  · have h1 := h 1 (by decide); have h2 := h 2 (by decide); have h3 := h 3 (by decide)
+    rw [w1] at h1; rw [w2] at h2; rw [w3] at h3
+    simp only [ramRead, h0, h1, h2, h3]
+
+theorem interruptible_parts {cfg : Config} {cert : Cert} {s : AState} (h : interruptibleOk cfg cert s = true) :
+    staticOf cfg s.mem = cert.G ∧
+    (∃ sp, s.get 2 = .vals [sp] ∧ sp ∈ cert.sigma ∧ ∀ c ∈ s.mem, cfg.isStatic c.addr c.w.bytes = true ∨
+      (sp ≤ c.addr ∧ cfg.isStack c.addr c.w.bytes = true ∧ c.guard = none)) ∧
+    s.mpie.mayBe true = true ∧ 0 ∈ s.mpp ∧ s.mepc = .top ∧ s.mcause = .top := by
+  unfold interruptibleOk at h
+  simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at h
+  obtain ⟨⟨⟨⟨⟨hG, hsp⟩, hmp⟩, h0⟩, he⟩, hc⟩ := h
+  refine ⟨hG, ?_, hmp, h0, he, hc⟩
+  split at hsp
+  · next sp hg =>
+    simp only [Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true, Bool.or_eq_true,
+      Option.isNone_iff_eq_none] at hsp
+    exact ⟨sp, hg, hsp.1, fun c hc => by
+      rcases hsp.2 c hc with h | h
+      · exact .inl h
+      · exact .inr ⟨h.1.1, h.1.2, h.2⟩⟩
+  · simp at hsp
+
+theorem mret_parts {cfg : Config} {cert : Cert} {s : AState} (h : mretOk cfg cert s = true) :
+    s.regs = (List.range 31).map (fun i => .sym (i+1) 0) ∧ s.mepc = .sym 32 0 ∧ s.mpie = .yes ∧
+    s.mpp = [3] ∧ s.mieReg = .sym 33 0 ∧ s.mtvec = .sym 34 0 ∧ s.mscratch = .sym 35 0 ∧
+    ∀ c ∈ cert.G, Cell.leqIn s.mem c = true := by
+  unfold mretOk at h
+  simp only [Bool.and_eq_true, beq_iff_eq, List.all_eq_true] at h
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨_, hr⟩, he⟩, hp⟩, hpp⟩, hmi⟩, htv⟩, hsc⟩, _⟩, hG⟩, _⟩ := h
+  exact ⟨hr, he, hp, hpp, hmi, htv, hsc, hG⟩
+
+theorem noSym_cells {s : AState} (h : noSym s = true) : ∀ c ∈ s.mem, c.base = .abs ∧ c.v.hasSym = false := by
+  unfold noSym at h
+  simp only [Bool.and_eq_true, Bool.not_eq_true', List.all_eq_true, beq_iff_eq] at h
+  obtain ⟨⟨⟨⟨⟨⟨⟨_, _⟩, hm⟩, _⟩, _⟩, _⟩, _⟩, _⟩ := h
+  intro c hc
+  obtain ⟨hb, hs⟩ := hm c hc
+  exact ⟨hb, by simpa using hs⟩
+
+theorem static_byte {cfg : Config} {a n k : Nat} (hst : cfg.isStack a n = true) (hk : k < n)
+    (hlo : cfg.board.ramBase ≤ cfg.stackLow) : cfg.isStatic (a + k) 1 = false := by
+  unfold Config.isStack at hst; unfold Config.isStatic
+  simp only [Bool.and_eq_true, decide_eq_true_eq] at hst
+  simp only [Bool.or_eq_false_iff, Bool.and_eq_false_iff, decide_eq_false_iff_not, Nat.not_le]
+  omega
+
+/-- The handler's `mret`, from a state `mretOk` accepts, resumes the
+    interrupted machine in a state its own node describes. -/
+theorem mret_sound {cfg : Config} {cert : Cert} {n0 : Node} {sh : AState} {m0 m : Machine}
+    {ρ0 : Nat → Word} {len : Word}
+    (hs0 : StateHolds ρ0 n0.s m0) (hio : interruptibleOk cfg cert n0.s = true)
+    (hmie0 : n0.s.mie.mayBe true = true) (hns : noSym n0.s = true) (hpc0 : n0.s.pc % 2 = 0)
+    (hbase : cfg.board.ramBase ≤ cfg.stackLow) (hpin : cfg.pinLow ≤ M32)
+    (hsh : StateHolds (hEnv m0) sh m) (hmret : mretOk cfg cert sh = true)
+    (hkeep : Keep cfg (m0.core.get 2).toNat m0.ram m.ram) (o : Oracle) :
+    ∃ c, interp cfg.board cfg.img o (exec m.core len .mret) m.ram 0 [] = .ok c m.ram [] ∧
+      StateHolds ρ0 n0.s ⟨c, m.ram⟩ := by
+  obtain ⟨hregs, hepc, hmpie, hmpp, hmir, htv, hsc, hG⟩ := mret_parts hmret
+  obtain ⟨hstat, ⟨sp, hsp2, _, hcells⟩, hmpie0, hmpp0, hepc0, hca0⟩ := interruptible_parts hio
+  have hmpp' := hsh.mpp; rw [hmpp] at hmpp'
+  have hm3 : m.core.mpp = 3 := by
+    apply BitVec.eq_of_toNat_eq; simpa using hmpp'
+  have hmepc : m.core.mepc = m0.core.pc := by
+    have := hsh.mepc; rw [hepc] at this; simpa [AV.gam, hEnv] using this
+  have hmp : m.core.mpie = true := by
+    have := hsh.mpie; rw [hmpie] at this; simpa [Tri.mayBe] using this
+  have hgetr : ∀ r : Reg, m.core.get r = m0.core.get r := by
+    intro r
+    by_cases h0 : r.val = 0
+    · have : r = 0 := Fin.ext h0
+      subst this; rfl
+    · have := hsh.regs r
+      have hr := r.isLt
+      have h32 : r.val ≠ 32 := by omega
+      have h33 : r.val ≠ 33 := by omega
+      have h34 : r.val ≠ 34 := by omega
+      have h35 : r.val ≠ 35 := by omega
+      simp only [AState.get, if_neg h0, hregs, entry_regs r h0, AV.gam, hEnv, if_neg h32, if_neg h33,
+        if_neg h34, if_neg h35, dif_pos hr, BitVec.ofNat_eq_ofNat, BitVec.add_zero] at this
+      exact this
+  have hlsb : m0.core.pc.getLsbD 0 = false := by
+    rw [hs0.pc]; exact lsb_even (by simp only [w, BitVec.toNat_ofNat]; omega)
+  have hσ : (m0.core.get 2).toNat = sp := by
+    have := hs0.regs 2; rw [hsp2] at this; simpa [AV.gam] using this
+  refine ⟨{ { m.core with mie_ := m.core.mpie, mpie := true, mpp := 0 } with pc := m.core.mepc }, ?_, ?_⟩
+  · show interp _ _ _ (if m.core.mpp ≠ 3 then _ else _) _ _ _ = _
+    rw [if_neg (by rw [hm3]; simp)]
+    unfold jump; rw [if_neg (by rw [hmepc, hlsb]; simp)]; rfl
+  · refine ⟨by show m.core.mepc = _; rw [hmepc]; exact hs0.pc, fun r => ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    · show (n0.s.get r).gam ρ0 (m.core.get r); rw [hgetr]; exact hs0.regs r
+    · intro c hc
+      obtain ⟨hb, hsy⟩ := noSym_cells hns c hc
+      rcases hcells c hc with hst | ⟨hle, hstk, hgn⟩
+      · have hcG : c ∈ cert.G := by
+          rw [← hstat]; unfold staticOf
+          simp only [List.mem_filter, Bool.and_eq_true, beq_iff_eq]; exact ⟨hc, hb, hst⟩
+        exact holds_indep hb hsy (leqIn_sound hsh.mem (hG c hcG))
+      · have h0 := hs0.mem c hc
+        intro _
+        have hr0 := h0 (fun g hg => by rw [hgn] at hg; cases hg)
+        unfold Cell.at at hr0 ⊢; rw [hb] at hr0 ⊢
+        simp only at hr0 ⊢
+        have hpk : ∀ k < c.w.bytes, m.ram (w c.addr + w k) = m0.ram (w c.addr + w k) := by
+          intro k hk
+          have hstk' := hstk
+          unfold Config.isStack at hstk'; simp only [Bool.and_eq_true, decide_eq_true_eq] at hstk'
+          have e : (w c.addr + w k).toNat = c.addr + k := by
+            rw [toNat_add_small _ (by rw [w_toNat_of_lt (by omega)]; omega), w_toNat_of_lt (by omega)]
+          apply hkeep
+          · rw [e]; exact static_byte hstk hk hbase
+          · right; rw [e, hσ]; omega
+        rw [ramRead_congr hpk]; exact hr0
+    · simp [hmp, hmie0]
+    · simpa using hmpie0
+    · simpa using hmpp0
+    · have := hsh.mieReg; rw [hmir] at this; simp only [AV.gam, hEnv] at this; simp; rw [this]
+      simpa using hs0.mieReg
+    · have := hsh.mtvec; rw [htv] at this; simp only [AV.gam, hEnv] at this; simp; rw [this]
+      simpa using hs0.mtvec
+    · rw [hepc0]; trivial
+    · rw [hca0]; trivial
+    · have := hsh.mscratch; rw [hsc] at this; simp only [AV.gam, hEnv] at this; simp; rw [this]
+      simpa using hs0.mscratch
+
 end E5R.AI
