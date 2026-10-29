@@ -1,4 +1,3 @@
-proved 
 ok   baseline: the chain compiles
 ok   changed instruction in the image (c.bnez -> c.beqz at 0x80020fd4): REJECTED in Projects/rmk/MemmoveFetch.lean:382 (f80020fd4): Tactic `decide` proved that the proposition
 ok   false fetch claim (addi a2,a2,-2 at 0x80020fca): REJECTED in Projects/rmk/MemmoveFetch.lean:374 (f80020fca): Tactic `decide` proved that the proposition
@@ -8,5 +7,7 @@ ok   size bound relaxed to n < 17 (n = 16 takes the word path): REJECTED in Proj
 ok   destination may overlap the save slots: REJECTED in Projects/rmk/MemmoveSmall.lean:555 (finish): omega could not prove the goal:
 ok   n >= 16 with src, dst congruent only mod 2 (the misaligned path): REJECTED in Projects/rmk/MemmoveAligned.lean:249 (big_aligned): omega could not prove the goal:
 ok   word copy claimed to need no direction condition: REJECTED in Projects/rmk/Copy.lean:111 (words_eq_fwd): omega could not prove the goal:
+ok   merged word: byte k claimed from prev while k + o < 3 only (wrong shift split): REJECTED in Projects/rmk/Merge.lean:41 (merge_byte): omega could not prove the goal:
+ok   misaligned path claimed to leave its stack temporaries alone (temps region shrunk): REJECTED in Projects/rmk/MemmoveMis.lean:411 (big_mis): omega could not prove the goal:
 ok   infrastructure: a missing import (does not elaborate): ELAB in Projects/rmk/MemmoveLoops.lean:17 (None): object file '<scratch>/rv32/.lake/build/lib/lean/Projects/rmk/Copyy.olean' of m
 every control failed in the expected declaration for the expected reason
