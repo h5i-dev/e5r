@@ -322,6 +322,12 @@ def process (cfg : Config) (i : Nat) : M Unit := do
     if !mretOk cfg { nodes := [], G := (← get).G.getD [], sigma := [], handlers := [] } s then
       err s!"node {i}: mret does not restore the interrupted machine: {brief s}"
   | some (ins, len) =>
+    -- A registered summary that accepts the state replaces the instruction.
+    match cfg.sums.find? fun S => !s.hnd && S.pc == s.pc && S.accepts s && !(S.post s).hnd with
+    | some S =>
+      let e : Edge := { nodes := [← resolve cfg (← get).tags[i]! (S.post s)], split := none, pin := false }
+      modify fun st => { st with edges := st.edges.set! i [e] }
+    | none =>
     match absExec cfg s len ins with
     | none => err s!"node {i}: {reprStr ins} at {s.pc} may fault: {brief s}"
     | some ts =>
