@@ -739,6 +739,42 @@ designed before it gets coded, and the design lives in
       tutorial that takes a reader from a stripped binary to a named, typed,
       committed annotation log (`docs/tutorial.md`).
 
+## V0. Binary-level Lean firmware research (2026-10-28 authorization)
+
+The owner explicitly reopened the architecture-priority exclusion for this
+narrow research milestone. The new reason is a concrete binary-to-ISA-to-Lean
+verification experiment, using the existing ELF loader rather than trusting
+heuristic CFGs, IR or decompiled C. This does not reorder the general decoder
+or decompiler roadmap or authorize a firmware framework.
+
+- [x] Small real bare-metal RV32I ELF, loaded through e5r and exported with
+      original file bytes, initial mapped memory, permissions and file offsets.
+- [x] Lean decodes the original fetched instruction words; an independent Lean
+      ELF reader checks the exported memory against the original-byte literal.
+      The runner checks that literal against every input-file byte as well as
+      recording SHA-256 identities. A digest alone is not exporter fidelity.
+- [x] Strict instruction subset, wraparound, x0, signed immediates/branches,
+      permission/alignment/bounds faults and explicit unsupported/fuel failure.
+- [x] All byte inputs: successful bounded reachability, exact clamped output,
+      output bound and whole-memory frame; real Lean kernel checking and axiom
+      audit. No compiler, Rust, hardware or Embassy verification claim.
+- [x] Original `no_std` Rust fixture at O1 and O2 against the same binary spec,
+      with an explicit memory ABI and pinned compiler. QEMU differential edge
+      tests supplement, rather than prove, ISA model fidelity.
+- [ ] Generalize the compiled Rust range result beyond the finite byte-input
+      precondition, including ABI/representation abstraction, more compiler
+      layouts/optimization levels, symbolic proofs and stronger ISA validation.
+- [ ] Later: one Embassy executor with timer/channel, explicit interrupt,
+      MMIO/device, DMA and scheduling models. Firmware or microkernel semantics
+      replace Linux semantics; they do not remove semantic modeling obligations.
+      Privilege/CSR, RV32IMC, Cortex-M and temporal/deadline guarantees need
+      separate supported semantics and proof milestones.
+
+The supported subset, exact statements, build commands, assumptions, provenance
+and trusted computing base are together in
+[`verification-rv32.md`](verification-rv32.md). Implementation is isolated in
+`e5r-verify` and `verification/rv32`; no empty firmware crate or CI profile change.
+
 ## Quality gates
 
 Green before every merge to main. Each one is a command, not a judgment call.
@@ -976,6 +1012,8 @@ it was closed.
   to avoid.
 - **Exotic architectures ahead of depth:** x86-64 and AArch64 on ELF, PE and
   Mach-O get finished before anything else gets attention, SLEIGH breadth aside.
+  The owner-authorized V0 research experiment above is a bounded exception for
+  byte-level firmware verification, not a general architecture expansion.
 - **Reverse engineering the incumbents' internals:** Clean-room: public
   specifications, published papers, and the source of permissively licensed
   projects used within their licenses.

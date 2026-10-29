@@ -1,0 +1,8 @@
+*.olean
+*.ilean
+*.c
+.lake/
+Projects/*/Image.lean
+Oracle.lean
+Projects/rust_clamp/ImageO*.lean
+Audit.lean
