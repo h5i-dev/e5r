@@ -3,8 +3,9 @@
 sifive_e (HiFive1 Rev B) machine with a fixed UART input, trace every
 instruction and interrupt, and replay the trace in the Lean model
 (`lake exe replay`), comparing every register and modeled CSR after every
-transition. The PWM duty values the model computes are checked against the
-values the input implies.
+transition and the model's device traffic with QEMU's MMIO log. The PWM duty
+values are checked against the values the input implies, and the replay's
+negative controls (tools/test_replay_controls.py) run on the trace.
 
 Environment: QEMU_SYSTEM_RISCV32 (default qemu-system-riscv32), QEMU_DATA
 (directory with QEMU's firmware files, if not the default).
@@ -34,7 +35,7 @@ def main():
     log = WORK / 'qemu.log'
     args = [QEMU, '-M', 'sifive_e,revb=true', '-nographic', '-bios', 'none', '-kernel', ELF,
             '-accel', 'tcg,one-insn-per-tb=on', '-icount', 'shift=4', '-d', 'cpu,int,nochain',
-            '-D', log]
+            '-trace', 'memory_region_ops_read', '-trace', 'memory_region_ops_write', '-D', log]
     if 'QEMU_DATA' in os.environ:
         args += ['-L', os.environ['QEMU_DATA']]
     # Feed the input, then let the firmware run for two seconds of host time.
@@ -60,6 +61,7 @@ def main():
     if writes != want[:len(writes)] or not writes:
         sys.exit(f'duty writes {writes} do not match the input, expected a prefix of {want}')
     print(f'duty writes match the input: {writes}')
+    subprocess.run(['python3', VERIFY / 'tools/test_replay_controls.py', trace], check=True)
 
 
 if __name__ == '__main__':
