@@ -37,6 +37,16 @@ theorem asm_byte' (x y z : Word) (hx : x.toNat < 256) (hy : y.toNat < 256) (hz :
     byteOf ((y <<< 8) ||| (x ||| (z <<< 16))) 2 = byteOf z 0 := by
   rw [BitVec.or_comm x, ← BitVec.or_assoc]; exact asm_byte x y z hx hy hz
 
+theorem and1 (x : Word) : (x &&& 1#32).toNat = x.toNat % 2 := by
+  rw [BitVec.toNat_and, show (1#32 : Word).toNat = 2 ^ 1 - 1 from rfl, Nat.and_two_pow_sub_one_eq_mod]
+
+theorem asm2 (x y : Word) (hx : x.toNat < 256) (hy : y.toNat < 256) :
+    byteOf ((y <<< 8) ||| x) 0 = byteOf x 0 ∧ byteOf ((y <<< 8) ||| x) 1 = byteOf y 0 := by
+  have h := asm_byte x y 0 hx hy (by decide)
+  have e : (y <<< 8 ||| (0 : Word) <<< 16 ||| x) = (y <<< 8 ||| x) := by simp
+  rw [e] at h
+  exact ⟨h.1, h.2.1⟩
+
 /-- Misalignment 1: `a5` is the single source byte below `t0`. -/
 theorem bstart1 (g : Core) (R : Word → BitVec 8) (hpc : g.pc = 0x80020e00) (hq : Quiet g)
     (h6 : g.get 6 = BitVec.ofNat 32 1) (hsr : B.inRam (g.get 5 - BitVec.ofNat 32 1) 1 = true)
@@ -259,5 +269,470 @@ theorem bstart1 (g : Core) (R : Word → BitVec 8) (hpc : g.pc = 0x80020e00) (hq
     have h31 : r ≠ 31 := fun e => hr (by subst e; decide)
     simp [b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6,
       b5, b4, b3, b2, b1, Core.wr_get_ne, h8, h12, h13, h15, h28, h29, h30, h31]
+
+/-- Misalignment 2: `a5` is the two source bytes below `t0`, loaded directly. -/
+theorem bstart2 (g : Core) (R : Word → BitVec 8) (hpc : g.pc = 0x80020e00) (hq : Quiet g)
+    (h6 : g.get 6 = BitVec.ofNat 32 2) (h56 : (g.get 5).toNat % 4 = 2)
+    (hsr : B.inRam (g.get 5 - BitVec.ofNat 32 2) 2 = true)
+    (hT : B.inRam (g.get 2 + 0x1a#32) 4 = true)
+    (hsep : (g.get 5).toNat ≤ (g.get 2 + 0x1a#32).toNat ∨ (g.get 2 + 0x1a#32).toNat + 4 ≤ (g.get 5 - BitVec.ofNat 32 2).toNat)
+    (hs1 : 2 ≤ (g.get 5).toNat)
+    (hlp : (g.get 28 + 4#32).ult (g.get 7) = true) :
+    ∃ g' R', QRun B img 21 ⟨g, R⟩ ⟨g', R'⟩ ∧ AtBL g g' R R' 2 := by
+  have hTr := (B_ram _ _).mp hT
+  have T1a : B.inRam (g.get 2 + 0x1a#32) 1 = true := (B_ram _ _).mpr (by omega)
+  have T1c : B.inRam (g.get 2 + 0x1c#32) 1 = true := (B_ram _ _).mpr (by constructor <;> bv_omega)
+  let b1 := g.goto 0x80020e04
+  let b2 := b1.wr 30 (alu .sub (b1.get 5) (b1.get 6)) 0x80020e08
+  let bR1 := ramWrite R (b2.get 2 + 0x0000001c#32) (b2.get 0) .b
+  let b3 := b2.goto 0x80020e0c
+  let b4 := b3.wr 13 (alu .add (b3.get 0) 0x00000001#32) 0x80020e0e
+  let bR2 := ramWrite bR1 (b4.get 2 + 0x0000001a#32) (b4.get 0) .b
+  let b5 := b4.goto 0x80020e12
+  let b6 := b5.goto 0x80020ed2
+  let b7 := b6.wr 15 (extend .b false (ramRead bR2 (b6.get 30 + 0x00000000#32) .b)) 0x80020ed6
+  let b8 := b7.wr 31 (extend .b false (ramRead bR2 (b7.get 30 + 0x00000001#32) .b)) 0x80020eda
+  let b9 := b8.wr 13 (alu .and (b8.get 5) 0x00000001#32) 0x80020ede
+  let bR3 := ramWrite bR2 (b9.get 2 + 0x0000001c#32) (b9.get 15) .b
+  let b10 := b9.goto 0x80020ee2
+  let b11 := b10.goto 0x80020ee4
+  let b12 := b11.wr 29 (alu .sll (b11.get 6) 0x00000003#32) 0x80020ee8
+  let b13 := b12.wr 31 (alu .sll (b12.get 31) 0x00000008#32) 0x80020eea
+  let b14 := b13.wr 15 (alu .add (b13.get 0) (b13.get 15)) 0x80020eec
+  let b15 := b14.wr 28 (alu .add (b14.get 28) 0x00000004#32) 0x80020eee
+  let b16 := b15.wr 15 (alu .or (b15.get 31) (b15.get 15)) 0x80020ef2
+  let b17 := b16.goto 0x80021004
+  let b18 := b17.wr 13 (alu .sub (b17.get 0) (b17.get 29)) 0x80021008
+  let b19 := b18.wr 30 (alu .sub (b18.get 12) (b18.get 6)) 0x8002100c
+  let b20 := b19.wr 12 (alu .and (b19.get 13) 0x00000018#32) 0x80021010
+  let b21 := b20.wr 30 (alu .add (b20.get 30) (b20.get 11)) 0x80021012
+  have HBR_1 : taken .eq (g.get 6) (g.get 0) = false := by
+    rw [h6, Core.get_zero]; decide
+  have HIN_3 : B.inRam (b2.get 2 + 0x0000001c#32) 1 = true := by
+    rw [show b2.get 2 = g.get 2 by simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne]]; exact T1c
+  have HIN_5 : B.inRam (b4.get 2 + 0x0000001a#32) 1 = true := by
+    rw [show b4.get 2 = g.get 2 by simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne]]; exact T1a
+  have HBR_6 : taken .ne (b5.get 6) (b5.get 13) = true := by
+    rw [show b5.get 6 = g.get 6 by simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne], show b5.get 13 = 1 by simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu], h6]; decide
+  have HIN_7 : B.inRam (b6.get 30 + 0x00000000#32) 1 = true := by
+    rw [show b6.get 30 + 0x00000000#32 = g.get 5 - BitVec.ofNat 32 2 by simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu, h6]]
+    exact (B_ram _ _).mpr (by have := (B_ram _ _).mp hsr; omega)
+  have HIN_8 : B.inRam (b7.get 30 + 0x00000001#32) 1 = true := by
+    rw [show b7.get 30 + 0x00000001#32 = g.get 5 - BitVec.ofNat 32 2 + 1#32 by simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu, h6]]
+    exact (B_ram _ _).mpr (by have := (B_ram _ _).mp hsr; constructor <;> bv_omega)
+  have HIN_10 : B.inRam (b9.get 2 + 0x0000001c#32) 1 = true := by
+    rw [show b9.get 2 = g.get 2 by simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne]]; exact T1c
+  have HBR_11 : taken .ne (b10.get 13) (b10.get 0) = false := by
+    rw [show b10.get 13 = g.get 5 &&& 1#32 by simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu], Core.get_zero,
+      show g.get 5 &&& 1#32 = 0 by apply BitVec.eq_of_toNat_eq; rw [and1]; simp; omega]; decide
+  have HBR_17 : taken .ltu (b16.get 28) (b16.get 7) = true := by
+    rw [show b16.get 28 = g.get 28 + 4#32 by simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu],
+      show b16.get 7 = g.get 7 by simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne]]
+    exact hlp
+  have bs1 : DetStep B img ⟨g, R⟩ ⟨b1, R⟩ := by
+    refine detStep_of (by rw [hpc]; decide) (by rw [hpc]; exact f80020e00) fun o => ?_
+    rw [exec_branch, HBR_1, hpc]; rfl
+  have bs2 : DetStep B img ⟨b1, R⟩ ⟨b2, R⟩ := by
+    refine detStep_of (by show (0x80020e04 : Word).getLsbD 0 = false; decide) f80020e04 fun o => ?_
+    rw [exec_op]; rfl
+  have bs3 : DetStep B img ⟨b2, R⟩ ⟨b3, bR1⟩ := by
+    refine detStep_of (by show (0x80020e08 : Word).getLsbD 0 = false; decide) f80020e08 fun o => ?_
+    rw [exec_store, interp_store_ram (w := .b) o (by simp only [Width.bytes, Nat.mod_one]) HIN_3]; rfl
+  have bs4 : DetStep B img ⟨b3, bR1⟩ ⟨b4, bR1⟩ := by
+    refine detStep_of (by show (0x80020e0c : Word).getLsbD 0 = false; decide) f80020e0c fun o => ?_
+    rw [exec_opimm]; rfl
+  have bs5 : DetStep B img ⟨b4, bR1⟩ ⟨b5, bR2⟩ := by
+    refine detStep_of (by show (0x80020e0e : Word).getLsbD 0 = false; decide) f80020e0e fun o => ?_
+    rw [exec_store, interp_store_ram (w := .b) o (by simp only [Width.bytes, Nat.mod_one]) HIN_5]; rfl
+  have bs6 : DetStep B img ⟨b5, bR2⟩ ⟨b6, bR2⟩ := by
+    refine detStep_of (by show (0x80020e12 : Word).getLsbD 0 = false; decide) f80020e12 fun o => ?_
+    rw [exec_branch, HBR_6, if_pos rfl, show b5.pc + 0xc0#32 = 0x80020ed2 by rw [show b5.pc = 0x80020e12 from rfl]; decide, jump_ok _ _ (by decide)]; rfl
+  have bs7 : DetStep B img ⟨b6, bR2⟩ ⟨b7, bR2⟩ := by
+    refine detStep_of (by show (0x80020ed2 : Word).getLsbD 0 = false; decide) f80020ed2 fun o => ?_
+    rw [exec_load, interp_load_ram (w := .b) o (by simp only [Width.bytes, Nat.mod_one]) HIN_7]; rfl
+  have bs8 : DetStep B img ⟨b7, bR2⟩ ⟨b8, bR2⟩ := by
+    refine detStep_of (by show (0x80020ed6 : Word).getLsbD 0 = false; decide) f80020ed6 fun o => ?_
+    rw [exec_load, interp_load_ram (w := .b) o (by simp only [Width.bytes, Nat.mod_one]) HIN_8]; rfl
+  have bs9 : DetStep B img ⟨b8, bR2⟩ ⟨b9, bR2⟩ := by
+    refine detStep_of (by show (0x80020eda : Word).getLsbD 0 = false; decide) f80020eda fun o => ?_
+    rw [exec_opimm]; rfl
+  have bs10 : DetStep B img ⟨b9, bR2⟩ ⟨b10, bR3⟩ := by
+    refine detStep_of (by show (0x80020ede : Word).getLsbD 0 = false; decide) f80020ede fun o => ?_
+    rw [exec_store, interp_store_ram (w := .b) o (by simp only [Width.bytes, Nat.mod_one]) HIN_10]; rfl
+  have bs11 : DetStep B img ⟨b10, bR3⟩ ⟨b11, bR3⟩ := by
+    refine detStep_of (by show (0x80020ee2 : Word).getLsbD 0 = false; decide) f80020ee2 fun o => ?_
+    rw [exec_branch, HBR_11]; rfl
+  have bs12 : DetStep B img ⟨b11, bR3⟩ ⟨b12, bR3⟩ := by
+    refine detStep_of (by show (0x80020ee4 : Word).getLsbD 0 = false; decide) f80020ee4 fun o => ?_
+    rw [exec_opimm]; rfl
+  have bs13 : DetStep B img ⟨b12, bR3⟩ ⟨b13, bR3⟩ := by
+    refine detStep_of (by show (0x80020ee8 : Word).getLsbD 0 = false; decide) f80020ee8 fun o => ?_
+    rw [exec_opimm]; rfl
+  have bs14 : DetStep B img ⟨b13, bR3⟩ ⟨b14, bR3⟩ := by
+    refine detStep_of (by show (0x80020eea : Word).getLsbD 0 = false; decide) f80020eea fun o => ?_
+    rw [exec_op]; rfl
+  have bs15 : DetStep B img ⟨b14, bR3⟩ ⟨b15, bR3⟩ := by
+    refine detStep_of (by show (0x80020eec : Word).getLsbD 0 = false; decide) f80020eec fun o => ?_
+    rw [exec_opimm]; rfl
+  have bs16 : DetStep B img ⟨b15, bR3⟩ ⟨b16, bR3⟩ := by
+    refine detStep_of (by show (0x80020eee : Word).getLsbD 0 = false; decide) f80020eee fun o => ?_
+    rw [exec_op]; rfl
+  have bs17 : DetStep B img ⟨b16, bR3⟩ ⟨b17, bR3⟩ := by
+    refine detStep_of (by show (0x80020ef2 : Word).getLsbD 0 = false; decide) f80020ef2 fun o => ?_
+    rw [exec_branch, HBR_17, if_pos rfl, show b16.pc + 0x112#32 = 0x80021004 by rw [show b16.pc = 0x80020ef2 from rfl]; decide, jump_ok _ _ (by decide)]; rfl
+  have bs18 : DetStep B img ⟨b17, bR3⟩ ⟨b18, bR3⟩ := by
+    refine detStep_of (by show (0x80021004 : Word).getLsbD 0 = false; decide) f80021004 fun o => ?_
+    rw [exec_op]; rfl
+  have bs19 : DetStep B img ⟨b18, bR3⟩ ⟨b19, bR3⟩ := by
+    refine detStep_of (by show (0x80021008 : Word).getLsbD 0 = false; decide) f80021008 fun o => ?_
+    rw [exec_op]; rfl
+  have bs20 : DetStep B img ⟨b19, bR3⟩ ⟨b20, bR3⟩ := by
+    refine detStep_of (by show (0x8002100c : Word).getLsbD 0 = false; decide) f8002100c fun o => ?_
+    rw [exec_opimm]; rfl
+  have bs21 : DetStep B img ⟨b20, bR3⟩ ⟨b21, bR3⟩ := by
+    refine detStep_of (by show (0x80021010 : Word).getLsbD 0 = false; decide) f80021010 fun o => ?_
+    rw [exec_op]; rfl
+  have bk1 : b1.sameCsr g := (Core.sameCsr_goto _ _)
+  have bk2 : b2.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk1
+  have bk3 : b3.sameCsr g := (Core.sameCsr_goto _ _).trans bk2
+  have bk4 : b4.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk3
+  have bk5 : b5.sameCsr g := (Core.sameCsr_goto _ _).trans bk4
+  have bk6 : b6.sameCsr g := (Core.sameCsr_goto _ _).trans bk5
+  have bk7 : b7.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk6
+  have bk8 : b8.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk7
+  have bk9 : b9.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk8
+  have bk10 : b10.sameCsr g := (Core.sameCsr_goto _ _).trans bk9
+  have bk11 : b11.sameCsr g := (Core.sameCsr_goto _ _).trans bk10
+  have bk12 : b12.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk11
+  have bk13 : b13.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk12
+  have bk14 : b14.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk13
+  have bk15 : b15.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk14
+  have bk16 : b16.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk15
+  have bk17 : b17.sameCsr g := (Core.sameCsr_goto _ _).trans bk16
+  have bk18 : b18.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk17
+  have bk19 : b19.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk18
+  have bk20 : b20.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk19
+  have bk21 : b21.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk20
+  have brun : QRun B img 21 ⟨g, R⟩ ⟨b21, bR3⟩ :=
+    .step hq bs1 (.step (Quiet.of_sameCsr bk1 hq) bs2 (.step (Quiet.of_sameCsr bk2 hq) bs3 (.step (Quiet.of_sameCsr bk3 hq) bs4 (.step (Quiet.of_sameCsr bk4 hq) bs5 (.step (Quiet.of_sameCsr bk5 hq) bs6 (.step (Quiet.of_sameCsr bk6 hq) bs7 (.step (Quiet.of_sameCsr bk7 hq) bs8 (.step (Quiet.of_sameCsr bk8 hq) bs9 (.step (Quiet.of_sameCsr bk9 hq) bs10 (.step (Quiet.of_sameCsr bk10 hq) bs11 (.step (Quiet.of_sameCsr bk11 hq) bs12 (.step (Quiet.of_sameCsr bk12 hq) bs13 (.step (Quiet.of_sameCsr bk13 hq) bs14 (.step (Quiet.of_sameCsr bk14 hq) bs15 (.step (Quiet.of_sameCsr bk15 hq) bs16 (.step (Quiet.of_sameCsr bk16 hq) bs17 (.step (Quiet.of_sameCsr bk17 hq) bs18 (.step (Quiet.of_sameCsr bk18 hq) bs19 (.step (Quiet.of_sameCsr bk19 hq) bs20 (.single (Quiet.of_sameCsr bk20 hq) bs21))))))))))))))))))))
+  -- RAM
+  have hR1 : ∀ x, x ≠ g.get 2 + 0x1c#32 → bR1 x = R x := by
+    intro x hx; show ramWrite R (b2.get 2 + 0x0000001c#32) (b2.get 0) .b x = R x
+    rw [show b2.get 2 = g.get 2 by simp [b2, b1, Core.wr_get_ne]]; exact ramWrite_b_other _ _ _ _ hx
+  have hR2 : ∀ x, x ≠ g.get 2 + 0x1a#32 → bR2 x = bR1 x := by
+    intro x hx; show ramWrite bR1 (b4.get 2 + 0x0000001a#32) (b4.get 0) .b x = bR1 x
+    rw [show b4.get 2 = g.get 2 by simp [b4, b3, b2, b1, Core.wr_get_ne]]; exact ramWrite_b_other _ _ _ _ hx
+  have hR3 : ∀ x, x ≠ g.get 2 + 0x1c#32 → bR3 x = bR2 x := by
+    intro x hx; show ramWrite bR2 (b9.get 2 + 0x0000001c#32) (b9.get 15) .b x = bR2 x
+    rw [show b9.get 2 = g.get 2 by simp [b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne]]
+    exact ramWrite_b_other _ _ _ _ hx
+  have src : ∀ k, k < 2 → bR3 (g.get 5 - BitVec.ofNat 32 2 + BitVec.ofNat 32 k) =
+      R (g.get 5 - BitVec.ofNat 32 2 + BitVec.ofNat 32 k) ∧
+      bR2 (g.get 5 - BitVec.ofNat 32 2 + BitVec.ofNat 32 k) = R (g.get 5 - BitVec.ofNat 32 2 + BitVec.ofNat 32 k) := by
+    intro k hk
+    have n1 : g.get 5 - BitVec.ofNat 32 2 + BitVec.ofNat 32 k ≠ g.get 2 + 0x1a#32 := by bv_omega
+    have n2 : g.get 5 - BitVec.ofNat 32 2 + BitVec.ofNat 32 k ≠ g.get 2 + 0x1c#32 := by bv_omega
+    exact ⟨by rw [hR3 _ n2, hR2 _ n1, hR1 _ n2], by rw [hR2 _ n1, hR1 _ n2]⟩
+  refine ⟨b21, bR3, brun, ⟨rfl, bk21, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩⟩
+  · simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu, h6]
+  · simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu, h6]
+  · simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu]
+  · simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu, h6]
+  · intro k hk
+    have e15 : b21.get 15 = (extend .b false (ramRead bR2 (g.get 5 - BitVec.ofNat 32 2 + 1#32) .b) <<< 8) |||
+        extend .b false (ramRead bR2 (g.get 5 - BitVec.ofNat 32 2) .b) := by
+      simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu, h6]
+    have hb := asm2 (extend .b false (ramRead bR2 (g.get 5 - BitVec.ofNat 32 2) .b))
+      (extend .b false (ramRead bR2 (g.get 5 - BitVec.ofNat 32 2 + 1#32) .b)) (lbu_lt _ _) (lbu_lt _ _)
+    rw [e15]
+    rcases (by omega : k = 0 ∨ k = 1) with rfl | rfl
+    · rw [hb.1, lbu_byte, (src 0 (by decide)).1]; simpa using (src 0 (by decide)).2
+    · rw [hb.2, lbu_byte, (src 1 (by decide)).1]; simpa using (src 1 (by decide)).2
+  · intro x hx
+    have n1 : x ≠ g.get 2 + 0x1a#32 := by intro e; apply hx; subst e; constructor <;> bv_omega
+    have n2 : x ≠ g.get 2 + 0x1c#32 := by intro e; apply hx; subst e; constructor <;> bv_omega
+    rw [hR3 _ n2, hR2 _ n1, hR1 _ n2]
+  · intro r hr
+    have h8 : r ≠ 8 := fun e => hr (by subst e; decide)
+    have h12 : r ≠ 12 := fun e => hr (by subst e; decide)
+    have h13 : r ≠ 13 := fun e => hr (by subst e; decide)
+    have h15 : r ≠ 15 := fun e => hr (by subst e; decide)
+    have h28 : r ≠ 28 := fun e => hr (by subst e; decide)
+    have h29 : r ≠ 29 := fun e => hr (by subst e; decide)
+    have h30 : r ≠ 30 := fun e => hr (by subst e; decide)
+    have h31 : r ≠ 31 := fun e => hr (by subst e; decide)
+    simp [b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, h8, h12, h13, h15, h28, h29, h30, h31]
+
+/-- Misalignment 3: `a5` is the three source bytes below `t0`, the first
+    and third through the temporaries at sp+0x1c and sp+0x1a. -/
+theorem bstart3 (g : Core) (R : Word → BitVec 8) (hpc : g.pc = 0x80020e00) (hq : Quiet g)
+    (h6 : g.get 6 = BitVec.ofNat 32 3) (h56 : (g.get 5).toNat % 4 = 3)
+    (hsr : B.inRam (g.get 5 - BitVec.ofNat 32 3) 3 = true)
+    (hT : B.inRam (g.get 2 + 0x1a#32) 4 = true)
+    (hsep : (g.get 5).toNat ≤ (g.get 2 + 0x1a#32).toNat ∨ (g.get 2 + 0x1a#32).toNat + 4 ≤ (g.get 5 - BitVec.ofNat 32 3).toNat)
+    (hs1 : 3 ≤ (g.get 5).toNat)
+    (hlp : (g.get 28 + 4#32).ult (g.get 7) = true) :
+    ∃ g' R', QRun B img 29 ⟨g, R⟩ ⟨g', R'⟩ ∧ AtBL g g' R R' 3 := by
+  have hTr := (B_ram _ _).mp hT
+  have T1a : B.inRam (g.get 2 + 0x1a#32) 1 = true := (B_ram _ _).mpr (by omega)
+  have T1c : B.inRam (g.get 2 + 0x1c#32) 1 = true := (B_ram _ _).mpr (by constructor <;> bv_omega)
+  let b1 := g.goto 0x80020e04
+  let b2 := b1.wr 30 (alu .sub (b1.get 5) (b1.get 6)) 0x80020e08
+  let bR1 := ramWrite R (b2.get 2 + 0x0000001c#32) (b2.get 0) .b
+  let b3 := b2.goto 0x80020e0c
+  let b4 := b3.wr 13 (alu .add (b3.get 0) 0x00000001#32) 0x80020e0e
+  let bR2 := ramWrite bR1 (b4.get 2 + 0x0000001a#32) (b4.get 0) .b
+  let b5 := b4.goto 0x80020e12
+  let b6 := b5.goto 0x80020ed2
+  let b7 := b6.wr 15 (extend .b false (ramRead bR2 (b6.get 30 + 0x00000000#32) .b)) 0x80020ed6
+  let b8 := b7.wr 31 (extend .b false (ramRead bR2 (b7.get 30 + 0x00000001#32) .b)) 0x80020eda
+  let b9 := b8.wr 13 (alu .and (b8.get 5) 0x00000001#32) 0x80020ede
+  let bR3 := ramWrite bR2 (b9.get 2 + 0x0000001c#32) (b9.get 15) .b
+  let b10 := b9.goto 0x80020ee2
+  let b11 := b10.goto 0x80020fd8
+  let b12 := b11.wr 29 (alu .add (b11.get 2) 0x0000001a#32) 0x80020fdc
+  let b13 := b12.wr 15 (alu .add (b12.get 0) 0x00000002#32) 0x80020fde
+  let b14 := b13.wr 15 (alu .add (b13.get 15) (b13.get 30)) 0x80020fe0
+  let b15 := b14.wr 13 (extend .b false (ramRead bR3 (b14.get 15 + 0x00000000#32) .b)) 0x80020fe4
+  let bR4 := ramWrite bR3 (b15.get 29 + 0x00000000#32) (b15.get 13) .b
+  let b16 := b15.goto 0x80020fe8
+  let b17 := b16.wr 8 (extend .b false (ramRead bR4 (b16.get 2 + 0x0000001a#32) .b)) 0x80020fec
+  let b18 := b17.wr 15 (extend .b false (ramRead bR4 (b17.get 2 + 0x0000001c#32) .b)) 0x80020ff0
+  let b19 := b18.wr 8 (alu .sll (b18.get 8) 0x00000010#32) 0x80020ff2
+  let b20 := b19.wr 29 (alu .sll (b19.get 6) 0x00000003#32) 0x80020ff6
+  let b21 := b20.wr 31 (alu .sll (b20.get 31) 0x00000008#32) 0x80020ff8
+  let b22 := b21.wr 15 (alu .or (b21.get 15) (b21.get 8)) 0x80020ffa
+  let b23 := b22.wr 28 (alu .add (b22.get 28) 0x00000004#32) 0x80020ffc
+  let b24 := b23.wr 15 (alu .or (b23.get 31) (b23.get 15)) 0x80021000
+  let b25 := b24.goto 0x80021004
+  let b26 := b25.wr 13 (alu .sub (b25.get 0) (b25.get 29)) 0x80021008
+  let b27 := b26.wr 30 (alu .sub (b26.get 12) (b26.get 6)) 0x8002100c
+  let b28 := b27.wr 12 (alu .and (b27.get 13) 0x00000018#32) 0x80021010
+  let b29 := b28.wr 30 (alu .add (b28.get 30) (b28.get 11)) 0x80021012
+  have HBR_1 : taken .eq (g.get 6) (g.get 0) = false := by
+    rw [h6, Core.get_zero]; decide
+  have HIN_3 : B.inRam (b2.get 2 + 0x0000001c#32) 1 = true := by
+    rw [show b2.get 2 = g.get 2 by simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne]]; exact T1c
+  have HIN_5 : B.inRam (b4.get 2 + 0x0000001a#32) 1 = true := by
+    rw [show b4.get 2 = g.get 2 by simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne]]; exact T1a
+  have HBR_6 : taken .ne (b5.get 6) (b5.get 13) = true := by
+    rw [show b5.get 6 = g.get 6 by simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne], show b5.get 13 = 1 by simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu], h6]; decide
+  have HIN_7 : B.inRam (b6.get 30 + 0x00000000#32) 1 = true := by
+    rw [show b6.get 30 + 0x00000000#32 = g.get 5 - BitVec.ofNat 32 3 by simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu, h6]]
+    exact (B_ram _ _).mpr (by have := (B_ram _ _).mp hsr; omega)
+  have HIN_8 : B.inRam (b7.get 30 + 0x00000001#32) 1 = true := by
+    rw [show b7.get 30 + 0x00000001#32 = g.get 5 - BitVec.ofNat 32 3 + 1#32 by simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu, h6]]
+    exact (B_ram _ _).mpr (by have := (B_ram _ _).mp hsr; constructor <;> bv_omega)
+  have HIN_10 : B.inRam (b9.get 2 + 0x0000001c#32) 1 = true := by
+    rw [show b9.get 2 = g.get 2 by simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne]]; exact T1c
+  have HBR_11 : taken .ne (b10.get 13) (b10.get 0) = true := by
+    rw [show b10.get 13 = g.get 5 &&& 1#32 by simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu], Core.get_zero,
+      show g.get 5 &&& 1#32 = 1 by apply BitVec.eq_of_toNat_eq; rw [and1]; simp; omega]; decide
+  have HIN_15 : B.inRam (b14.get 15 + 0x00000000#32) 1 = true := by
+    rw [show b14.get 15 + 0x00000000#32 = g.get 5 - BitVec.ofNat 32 3 + 2#32 by simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu, h6]; bv_omega]
+    exact (B_ram _ _).mpr (by have := (B_ram _ _).mp hsr; constructor <;> bv_omega)
+  have HIN_16 : B.inRam (b15.get 29 + 0x00000000#32) 1 = true := by
+    rw [show b15.get 29 + 0x00000000#32 = g.get 2 + 0x1a#32 by simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu]]; exact T1a
+  have HIN_17 : B.inRam (b16.get 2 + 0x0000001a#32) 1 = true := by
+    rw [show b16.get 2 = g.get 2 by simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne]]; exact T1a
+  have HIN_18 : B.inRam (b17.get 2 + 0x0000001c#32) 1 = true := by
+    rw [show b17.get 2 = g.get 2 by simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne]]; exact T1c
+  have HBR_25 : taken .geu (b24.get 28) (b24.get 7) = false := by
+    rw [show b24.get 28 = g.get 28 + 4#32 by simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu],
+      show b24.get 7 = g.get 7 by simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne]]
+    simp only [taken, hlp, Bool.not_true]
+  have bs1 : DetStep B img ⟨g, R⟩ ⟨b1, R⟩ := by
+    refine detStep_of (by rw [hpc]; decide) (by rw [hpc]; exact f80020e00) fun o => ?_
+    rw [exec_branch, HBR_1, hpc]; rfl
+  have bs2 : DetStep B img ⟨b1, R⟩ ⟨b2, R⟩ := by
+    refine detStep_of (by show (0x80020e04 : Word).getLsbD 0 = false; decide) f80020e04 fun o => ?_
+    rw [exec_op]; rfl
+  have bs3 : DetStep B img ⟨b2, R⟩ ⟨b3, bR1⟩ := by
+    refine detStep_of (by show (0x80020e08 : Word).getLsbD 0 = false; decide) f80020e08 fun o => ?_
+    rw [exec_store, interp_store_ram (w := .b) o (by simp only [Width.bytes, Nat.mod_one]) HIN_3]; rfl
+  have bs4 : DetStep B img ⟨b3, bR1⟩ ⟨b4, bR1⟩ := by
+    refine detStep_of (by show (0x80020e0c : Word).getLsbD 0 = false; decide) f80020e0c fun o => ?_
+    rw [exec_opimm]; rfl
+  have bs5 : DetStep B img ⟨b4, bR1⟩ ⟨b5, bR2⟩ := by
+    refine detStep_of (by show (0x80020e0e : Word).getLsbD 0 = false; decide) f80020e0e fun o => ?_
+    rw [exec_store, interp_store_ram (w := .b) o (by simp only [Width.bytes, Nat.mod_one]) HIN_5]; rfl
+  have bs6 : DetStep B img ⟨b5, bR2⟩ ⟨b6, bR2⟩ := by
+    refine detStep_of (by show (0x80020e12 : Word).getLsbD 0 = false; decide) f80020e12 fun o => ?_
+    rw [exec_branch, HBR_6, if_pos rfl, show b5.pc + 0xc0#32 = 0x80020ed2 by rw [show b5.pc = 0x80020e12 from rfl]; decide, jump_ok _ _ (by decide)]; rfl
+  have bs7 : DetStep B img ⟨b6, bR2⟩ ⟨b7, bR2⟩ := by
+    refine detStep_of (by show (0x80020ed2 : Word).getLsbD 0 = false; decide) f80020ed2 fun o => ?_
+    rw [exec_load, interp_load_ram (w := .b) o (by simp only [Width.bytes, Nat.mod_one]) HIN_7]; rfl
+  have bs8 : DetStep B img ⟨b7, bR2⟩ ⟨b8, bR2⟩ := by
+    refine detStep_of (by show (0x80020ed6 : Word).getLsbD 0 = false; decide) f80020ed6 fun o => ?_
+    rw [exec_load, interp_load_ram (w := .b) o (by simp only [Width.bytes, Nat.mod_one]) HIN_8]; rfl
+  have bs9 : DetStep B img ⟨b8, bR2⟩ ⟨b9, bR2⟩ := by
+    refine detStep_of (by show (0x80020eda : Word).getLsbD 0 = false; decide) f80020eda fun o => ?_
+    rw [exec_opimm]; rfl
+  have bs10 : DetStep B img ⟨b9, bR2⟩ ⟨b10, bR3⟩ := by
+    refine detStep_of (by show (0x80020ede : Word).getLsbD 0 = false; decide) f80020ede fun o => ?_
+    rw [exec_store, interp_store_ram (w := .b) o (by simp only [Width.bytes, Nat.mod_one]) HIN_10]; rfl
+  have bs11 : DetStep B img ⟨b10, bR3⟩ ⟨b11, bR3⟩ := by
+    refine detStep_of (by show (0x80020ee2 : Word).getLsbD 0 = false; decide) f80020ee2 fun o => ?_
+    rw [exec_branch, HBR_11, if_pos rfl, show b10.pc + 0xf6#32 = 0x80020fd8 by rw [show b10.pc = 0x80020ee2 from rfl]; decide, jump_ok _ _ (by decide)]; rfl
+  have bs12 : DetStep B img ⟨b11, bR3⟩ ⟨b12, bR3⟩ := by
+    refine detStep_of (by show (0x80020fd8 : Word).getLsbD 0 = false; decide) f80020fd8 fun o => ?_
+    rw [exec_opimm]; rfl
+  have bs13 : DetStep B img ⟨b12, bR3⟩ ⟨b13, bR3⟩ := by
+    refine detStep_of (by show (0x80020fdc : Word).getLsbD 0 = false; decide) f80020fdc fun o => ?_
+    rw [exec_opimm]; rfl
+  have bs14 : DetStep B img ⟨b13, bR3⟩ ⟨b14, bR3⟩ := by
+    refine detStep_of (by show (0x80020fde : Word).getLsbD 0 = false; decide) f80020fde fun o => ?_
+    rw [exec_op]; rfl
+  have bs15 : DetStep B img ⟨b14, bR3⟩ ⟨b15, bR3⟩ := by
+    refine detStep_of (by show (0x80020fe0 : Word).getLsbD 0 = false; decide) f80020fe0 fun o => ?_
+    rw [exec_load, interp_load_ram (w := .b) o (by simp only [Width.bytes, Nat.mod_one]) HIN_15]; rfl
+  have bs16 : DetStep B img ⟨b15, bR3⟩ ⟨b16, bR4⟩ := by
+    refine detStep_of (by show (0x80020fe4 : Word).getLsbD 0 = false; decide) f80020fe4 fun o => ?_
+    rw [exec_store, interp_store_ram (w := .b) o (by simp only [Width.bytes, Nat.mod_one]) HIN_16]; rfl
+  have bs17 : DetStep B img ⟨b16, bR4⟩ ⟨b17, bR4⟩ := by
+    refine detStep_of (by show (0x80020fe8 : Word).getLsbD 0 = false; decide) f80020fe8 fun o => ?_
+    rw [exec_load, interp_load_ram (w := .b) o (by simp only [Width.bytes, Nat.mod_one]) HIN_17]; rfl
+  have bs18 : DetStep B img ⟨b17, bR4⟩ ⟨b18, bR4⟩ := by
+    refine detStep_of (by show (0x80020fec : Word).getLsbD 0 = false; decide) f80020fec fun o => ?_
+    rw [exec_load, interp_load_ram (w := .b) o (by simp only [Width.bytes, Nat.mod_one]) HIN_18]; rfl
+  have bs19 : DetStep B img ⟨b18, bR4⟩ ⟨b19, bR4⟩ := by
+    refine detStep_of (by show (0x80020ff0 : Word).getLsbD 0 = false; decide) f80020ff0 fun o => ?_
+    rw [exec_opimm]; rfl
+  have bs20 : DetStep B img ⟨b19, bR4⟩ ⟨b20, bR4⟩ := by
+    refine detStep_of (by show (0x80020ff2 : Word).getLsbD 0 = false; decide) f80020ff2 fun o => ?_
+    rw [exec_opimm]; rfl
+  have bs21 : DetStep B img ⟨b20, bR4⟩ ⟨b21, bR4⟩ := by
+    refine detStep_of (by show (0x80020ff6 : Word).getLsbD 0 = false; decide) f80020ff6 fun o => ?_
+    rw [exec_opimm]; rfl
+  have bs22 : DetStep B img ⟨b21, bR4⟩ ⟨b22, bR4⟩ := by
+    refine detStep_of (by show (0x80020ff8 : Word).getLsbD 0 = false; decide) f80020ff8 fun o => ?_
+    rw [exec_op]; rfl
+  have bs23 : DetStep B img ⟨b22, bR4⟩ ⟨b23, bR4⟩ := by
+    refine detStep_of (by show (0x80020ffa : Word).getLsbD 0 = false; decide) f80020ffa fun o => ?_
+    rw [exec_opimm]; rfl
+  have bs24 : DetStep B img ⟨b23, bR4⟩ ⟨b24, bR4⟩ := by
+    refine detStep_of (by show (0x80020ffc : Word).getLsbD 0 = false; decide) f80020ffc fun o => ?_
+    rw [exec_op]; rfl
+  have bs25 : DetStep B img ⟨b24, bR4⟩ ⟨b25, bR4⟩ := by
+    refine detStep_of (by show (0x80021000 : Word).getLsbD 0 = false; decide) f80021000 fun o => ?_
+    rw [exec_branch, HBR_25]; rfl
+  have bs26 : DetStep B img ⟨b25, bR4⟩ ⟨b26, bR4⟩ := by
+    refine detStep_of (by show (0x80021004 : Word).getLsbD 0 = false; decide) f80021004 fun o => ?_
+    rw [exec_op]; rfl
+  have bs27 : DetStep B img ⟨b26, bR4⟩ ⟨b27, bR4⟩ := by
+    refine detStep_of (by show (0x80021008 : Word).getLsbD 0 = false; decide) f80021008 fun o => ?_
+    rw [exec_op]; rfl
+  have bs28 : DetStep B img ⟨b27, bR4⟩ ⟨b28, bR4⟩ := by
+    refine detStep_of (by show (0x8002100c : Word).getLsbD 0 = false; decide) f8002100c fun o => ?_
+    rw [exec_opimm]; rfl
+  have bs29 : DetStep B img ⟨b28, bR4⟩ ⟨b29, bR4⟩ := by
+    refine detStep_of (by show (0x80021010 : Word).getLsbD 0 = false; decide) f80021010 fun o => ?_
+    rw [exec_op]; rfl
+  have bk1 : b1.sameCsr g := (Core.sameCsr_goto _ _)
+  have bk2 : b2.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk1
+  have bk3 : b3.sameCsr g := (Core.sameCsr_goto _ _).trans bk2
+  have bk4 : b4.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk3
+  have bk5 : b5.sameCsr g := (Core.sameCsr_goto _ _).trans bk4
+  have bk6 : b6.sameCsr g := (Core.sameCsr_goto _ _).trans bk5
+  have bk7 : b7.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk6
+  have bk8 : b8.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk7
+  have bk9 : b9.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk8
+  have bk10 : b10.sameCsr g := (Core.sameCsr_goto _ _).trans bk9
+  have bk11 : b11.sameCsr g := (Core.sameCsr_goto _ _).trans bk10
+  have bk12 : b12.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk11
+  have bk13 : b13.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk12
+  have bk14 : b14.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk13
+  have bk15 : b15.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk14
+  have bk16 : b16.sameCsr g := (Core.sameCsr_goto _ _).trans bk15
+  have bk17 : b17.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk16
+  have bk18 : b18.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk17
+  have bk19 : b19.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk18
+  have bk20 : b20.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk19
+  have bk21 : b21.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk20
+  have bk22 : b22.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk21
+  have bk23 : b23.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk22
+  have bk24 : b24.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk23
+  have bk25 : b25.sameCsr g := (Core.sameCsr_goto _ _).trans bk24
+  have bk26 : b26.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk25
+  have bk27 : b27.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk26
+  have bk28 : b28.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk27
+  have bk29 : b29.sameCsr g := (Core.sameCsr_wr _ _ _ _).trans bk28
+  have brun : QRun B img 29 ⟨g, R⟩ ⟨b29, bR4⟩ :=
+    .step hq bs1 (.step (Quiet.of_sameCsr bk1 hq) bs2 (.step (Quiet.of_sameCsr bk2 hq) bs3 (.step (Quiet.of_sameCsr bk3 hq) bs4 (.step (Quiet.of_sameCsr bk4 hq) bs5 (.step (Quiet.of_sameCsr bk5 hq) bs6 (.step (Quiet.of_sameCsr bk6 hq) bs7 (.step (Quiet.of_sameCsr bk7 hq) bs8 (.step (Quiet.of_sameCsr bk8 hq) bs9 (.step (Quiet.of_sameCsr bk9 hq) bs10 (.step (Quiet.of_sameCsr bk10 hq) bs11 (.step (Quiet.of_sameCsr bk11 hq) bs12 (.step (Quiet.of_sameCsr bk12 hq) bs13 (.step (Quiet.of_sameCsr bk13 hq) bs14 (.step (Quiet.of_sameCsr bk14 hq) bs15 (.step (Quiet.of_sameCsr bk15 hq) bs16 (.step (Quiet.of_sameCsr bk16 hq) bs17 (.step (Quiet.of_sameCsr bk17 hq) bs18 (.step (Quiet.of_sameCsr bk18 hq) bs19 (.step (Quiet.of_sameCsr bk19 hq) bs20 (.step (Quiet.of_sameCsr bk20 hq) bs21 (.step (Quiet.of_sameCsr bk21 hq) bs22 (.step (Quiet.of_sameCsr bk22 hq) bs23 (.step (Quiet.of_sameCsr bk23 hq) bs24 (.step (Quiet.of_sameCsr bk24 hq) bs25 (.step (Quiet.of_sameCsr bk25 hq) bs26 (.step (Quiet.of_sameCsr bk26 hq) bs27 (.step (Quiet.of_sameCsr bk27 hq) bs28 (.single (Quiet.of_sameCsr bk28 hq) bs29))))))))))))))))))))))))))))
+  -- RAM
+  have hR1 : ∀ x, x ≠ g.get 2 + 0x1c#32 → bR1 x = R x := by
+    intro x hx; show ramWrite R (b2.get 2 + 0x0000001c#32) (b2.get 0) .b x = R x
+    rw [show b2.get 2 = g.get 2 by simp [b2, b1, Core.wr_get_ne]]; exact ramWrite_b_other _ _ _ _ hx
+  have hR2 : ∀ x, x ≠ g.get 2 + 0x1a#32 → bR2 x = bR1 x := by
+    intro x hx; show ramWrite bR1 (b4.get 2 + 0x0000001a#32) (b4.get 0) .b x = bR1 x
+    rw [show b4.get 2 = g.get 2 by simp [b4, b3, b2, b1, Core.wr_get_ne]]; exact ramWrite_b_other _ _ _ _ hx
+  have a9 : b9.get 2 = g.get 2 := by simp [b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne]
+  have a15 : b15.get 29 + 0x00000000#32 = g.get 2 + 0x1a#32 := by
+    simp [b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu]
+  have a14 : b14.get 15 + 0x00000000#32 = g.get 5 - BitVec.ofNat 32 3 + 2#32 := by
+    simp [b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu, h6]
+    bv_omega
+  have a6 : b6.get 30 + 0x00000000#32 = g.get 5 - BitVec.ofNat 32 3 := by
+    simp [b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu, h6]
+  have hR3 : bR3 = ramPut bR2 (g.get 2 + 0x1c#32) (bR2 (g.get 5 - BitVec.ofNat 32 3)) := by
+    show ramWrite bR2 (b9.get 2 + 0x0000001c#32) (b9.get 15) .b = _
+    rw [a9, show b9.get 15 = extend .b false (ramRead bR2 (g.get 5 - BitVec.ofNat 32 3) .b) by
+      simp only [b9, b8, Core.wr_get_ne _ _ _ _ _ (show (15 : Reg) ≠ 13 by decide),
+        Core.wr_get_ne _ _ _ _ _ (show (15 : Reg) ≠ 31 by decide), b7, Core.wr_get_self _ (15 : Reg) _ _ (by decide)]
+      rw [a6], copyByte]
+  have hR4 : bR4 = ramPut bR3 (g.get 2 + 0x1a#32) (bR3 (g.get 5 - BitVec.ofNat 32 3 + 2#32)) := by
+    show ramWrite bR3 (b15.get 29 + 0x00000000#32) (b15.get 13) .b = _
+    rw [a15, show b15.get 13 = extend .b false (ramRead bR3 (g.get 5 - BitVec.ofNat 32 3 + 2#32) .b) by
+      simp only [b15, Core.wr_get_self _ (13 : Reg) _ _ (by decide)]; rw [a14], copyByte]
+  have srcs : ∀ k, k < 3 → (g.get 5 - BitVec.ofNat 32 3 + BitVec.ofNat 32 k ≠ g.get 2 + 0x1a#32 ∧
+      g.get 5 - BitVec.ofNat 32 3 + BitVec.ofNat 32 k ≠ g.get 2 + 0x1c#32) := by
+    intro k hk; constructor <;> bv_omega
+  have src : ∀ k, k < 3 → bR4 (g.get 5 - BitVec.ofNat 32 3 + BitVec.ofNat 32 k) =
+      R (g.get 5 - BitVec.ofNat 32 3 + BitVec.ofNat 32 k) ∧
+      bR2 (g.get 5 - BitVec.ofNat 32 3 + BitVec.ofNat 32 k) = R (g.get 5 - BitVec.ofNat 32 3 + BitVec.ofNat 32 k) ∧
+      bR3 (g.get 5 - BitVec.ofNat 32 3 + BitVec.ofNat 32 k) = R (g.get 5 - BitVec.ofNat 32 3 + BitVec.ofNat 32 k) := by
+    intro k hk
+    obtain ⟨n1, n2⟩ := srcs k hk
+    have e2 : bR2 (g.get 5 - BitVec.ofNat 32 3 + BitVec.ofNat 32 k) = R (g.get 5 - BitVec.ofNat 32 3 + BitVec.ofNat 32 k) := by
+      rw [hR2 _ n1, hR1 _ n2]
+    have e3 : bR3 (g.get 5 - BitVec.ofNat 32 3 + BitVec.ofNat 32 k) = R (g.get 5 - BitVec.ofNat 32 3 + BitVec.ofNat 32 k) := by
+      rw [hR3]; simp only [ramPut, if_neg n2]; exact e2
+    refine ⟨?_, e2, e3⟩
+    rw [hR4]; simp only [ramPut, if_neg n1]; exact e3
+  refine ⟨b29, bR4, brun, ⟨rfl, bk29, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩⟩
+  · simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu, h6]
+  · simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu, h6]
+  · simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu]
+  · simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu, h6]
+  · intro k hk
+    have e15 : b29.get 15 = (extend .b false (ramRead bR2 (g.get 5 - BitVec.ofNat 32 3 + 1#32) .b) <<< 8) |||
+        (extend .b false (ramRead bR4 (g.get 2 + 0x1c#32) .b) |||
+          (extend .b false (ramRead bR4 (g.get 2 + 0x1a#32) .b) <<< 16)) := by
+      simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, Core.wr_get_self, alu, h6]
+    have hb := asm_byte' (extend .b false (ramRead bR4 (g.get 2 + 0x1c#32) .b))
+      (extend .b false (ramRead bR2 (g.get 5 - BitVec.ofNat 32 3 + 1#32) .b))
+      (extend .b false (ramRead bR4 (g.get 2 + 0x1a#32) .b)) (lbu_lt _ _) (lbu_lt _ _) (lbu_lt _ _)
+    have ne : g.get 2 + 0x1c#32 ≠ g.get 2 + 0x1a#32 := by bv_omega
+    rw [e15]
+    rcases (by omega : k = 0 ∨ k = 1 ∨ k = 2) with rfl | rfl | rfl
+    · rw [hb.1, lbu_byte, (src 0 (by decide)).1, hR4]; simp only [ramPut, if_neg ne]
+      rw [hR3]; simp only [ramPut, if_pos rfl]; simpa using (src 0 (by decide)).2.1
+    · rw [hb.2.1, lbu_byte, (src 1 (by decide)).1]; simpa using (src 1 (by decide)).2.1
+    · rw [hb.2.2, lbu_byte, (src 2 (by decide)).1, hR4]; simp only [ramPut, if_pos rfl]
+      simpa using (src 2 (by decide)).2.2
+  · intro x hx
+    have n1 : x ≠ g.get 2 + 0x1a#32 := by intro e; apply hx; subst e; constructor <;> bv_omega
+    have n2 : x ≠ g.get 2 + 0x1c#32 := by intro e; apply hx; subst e; constructor <;> bv_omega
+    rw [hR4]; simp only [ramPut, if_neg n1]; rw [hR3]; simp only [ramPut, if_neg n2]; rw [hR2 _ n1, hR1 _ n2]
+  · intro r hr
+    have h8 : r ≠ 8 := fun e => hr (by subst e; decide)
+    have h12 : r ≠ 12 := fun e => hr (by subst e; decide)
+    have h13 : r ≠ 13 := fun e => hr (by subst e; decide)
+    have h15 : r ≠ 15 := fun e => hr (by subst e; decide)
+    have h28 : r ≠ 28 := fun e => hr (by subst e; decide)
+    have h29 : r ≠ 29 := fun e => hr (by subst e; decide)
+    have h30 : r ≠ 30 := fun e => hr (by subst e; decide)
+    have h31 : r ≠ 31 := fun e => hr (by subst e; decide)
+    simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, h8, h12, h13, h15, h28, h29, h30, h31]
 
 end E5R.Rmk
