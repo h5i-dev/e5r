@@ -1,0 +1,820 @@
+{
+  "schema": "e5r.rmk.review-check.v1",
+  "elf_sha256": "f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30",
+  "stages": [
+    {
+      "name": "lean Theories.Hart",
+      "seconds": 2.5
+    },
+    {
+      "name": "lean Theories.Platform",
+      "seconds": 1.7
+    },
+    {
+      "name": "lean Theories.Logic",
+      "seconds": 1.7
+    },
+    {
+      "name": "lean Projects.rmk.Run",
+      "seconds": 1.3
+    },
+    {
+      "name": "lean Projects.rmk.Copy",
+      "seconds": 3.2
+    },
+    {
+      "name": "lean Theories.RamElf",
+      "seconds": 1.5
+    },
+    {
+      "name": "lean Projects.rmk.Elf",
+      "seconds": 8.5
+    },
+    {
+      "name": "lean Theories.Board.QemuVirtRv32",
+      "seconds": 1.5
+    },
+    {
+      "name": "lean Projects.rmk.Fetch",
+      "seconds": 50.2
+    },
+    {
+      "name": "lean Projects.rmk.MemmoveFetch",
+      "seconds": 9.1
+    },
+    {
+      "name": "lean Projects.rmk.MemmoveLoops",
+      "seconds": 2.5
+    },
+    {
+      "name": "lean Theories.Absint",
+      "seconds": 3.3
+    },
+    {
+      "name": "lean Theories.AbsintSound",
+      "seconds": 16.5
+    },
+    {
+      "name": "lean Projects.rmk.MemmoveSmall",
+      "seconds": 4.7
+    },
+    {
+      "name": "leanchecker Theories.Hart",
+      "seconds": 4.5
+    },
+    {
+      "name": "leanchecker Theories.Platform",
+      "seconds": 1.8
+    },
+    {
+      "name": "leanchecker Theories.Logic",
+      "seconds": 1.9
+    },
+    {
+      "name": "leanchecker Projects.rmk.Run",
+      "seconds": 1.8
+    },
+    {
+      "name": "leanchecker Projects.rmk.Copy",
+      "seconds": 3.1
+    },
+    {
+      "name": "leanchecker Theories.RamElf",
+      "seconds": 1.8
+    },
+    {
+      "name": "leanchecker Projects.rmk.Elf",
+      "seconds": 1.8
+    },
+    {
+      "name": "leanchecker Theories.Board.QemuVirtRv32",
+      "seconds": 1.8
+    },
+    {
+      "name": "leanchecker Projects.rmk.Fetch",
+      "seconds": 49.6
+    },
+    {
+      "name": "leanchecker Projects.rmk.MemmoveFetch",
+      "seconds": 9.6
+    },
+    {
+      "name": "leanchecker Projects.rmk.MemmoveLoops",
+      "seconds": 2.9
+    },
+    {
+      "name": "leanchecker Theories.Absint",
+      "seconds": 1.9
+    },
+    {
+      "name": "leanchecker Theories.AbsintSound",
+      "seconds": 5.4
+    },
+    {
+      "name": "leanchecker Projects.rmk.MemmoveSmall",
+      "seconds": 3.7
+    },
+    {
+      "name": "axioms",
+      "seconds": 1.5
+    }
+  ],
+  "status": "proved",
+  "modules": [
+    "Theories.Hart",
+    "Theories.Platform",
+    "Theories.Logic",
+    "Projects.rmk.Run",
+    "Projects.rmk.Copy",
+    "Theories.RamElf",
+    "Projects.rmk.Elf",
+    "Theories.Board.QemuVirtRv32",
+    "Projects.rmk.Fetch",
+    "Projects.rmk.MemmoveFetch",
+    "Projects.rmk.MemmoveLoops",
+    "Theories.Absint",
+    "Theories.AbsintSound",
+    "Projects.rmk.MemmoveSmall"
+  ],
+  "sources": {
+    "Theories.Hart": "dde4a86db936c9ad60f58866c3ebb333fbc556ec0f94299da212d0ca08cfb82a",
+    "Theories.Platform": "37939dcb4318bcea8b8a45c25a36d9f3ae59b78656fedd7dcc60c66442d11528",
+    "Theories.Logic": "bed5eee4c9a12c2eee16a3e3b9523cca51c91f17380b97d81673151ff3cc4f48",
+    "Projects.rmk.Run": "908851c1f949ef1340ec6c49e2cb283be6d4a3b26861f92c2e2cf901acfefff8",
+    "Projects.rmk.Copy": "8f92e896a5441415e4dcfcad7c99d0617b8da567ccb0091c618c9c1e253edb3a",
+    "Theories.RamElf": "9a8cb07ac5d869fe5297d1934eaefef94b535e1c91d9e144a9daf74fc7ce832f",
+    "Projects.rmk.Elf": "5184a0249c16266ec995a0698fffe4231c5270a39bc59ebdb87154a4eb3146ab",
+    "Theories.Board.QemuVirtRv32": "d902dbaad9129b352fc736c62313615608ec2cabeb0667805653db9b9aff2a0f",
+    "Projects.rmk.Fetch": "d1a3378e024b89090305e3f5d81a9670b328348f68c85933bdf05c243b29307f",
+    "Projects.rmk.MemmoveFetch": "23f8b3ef28a5d1d6e080d5587ba9f2553b23041258e1d20bd6899579cf0668cc",
+    "Projects.rmk.MemmoveLoops": "230f0e1f9228fde5a37ba87a6e828d181e12c83c61b62e22e3c89804426d3bc9",
+    "Theories.Absint": "9cfc50adaf8612d4154dfca20bf77e7fe2573056c74e53cf947e3c58443db4f4",
+    "Theories.AbsintSound": "60d5622c822f7aad29a38f48d821892bd243414f1a03db6678a910b91d43a718",
+    "Projects.rmk.MemmoveSmall": "47b7e4cf8fd0a37db65fd0ca1ed8d4f2fe2884dc1da6a4c127f5b812a40a8663"
+  },
+  "theorems": [
+    {
+      "name": "E5R.Rmk.Quiet.of_sameCsr",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.QRun.trans",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.QRun.single",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.QRun.toDetSteps",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.copyByte",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.fwd_spec",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bwd_spec",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.unpackN_length",
+      "axioms": [
+        "propext"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.unpackN_get",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.go_length",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.go_get",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.slice_length",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.slice_get",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.roShape_ok",
+      "axioms": [
+        "propext"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.ro_eq",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.romByte_text",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.romRead_go",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.fetch_eq",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.fetchDecode_eq",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.fetchDecode_of",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020c1e",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020c22",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020d9e",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020da0",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020da2",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020da4",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020da6",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020daa",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020dae",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020db2",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020db4",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020db8",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80021092",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80021096",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f8002109a",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f8002109c",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f800210a0",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f800210a4",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f800210a8",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f800210aa",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f800210ac",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020e20",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020e22",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020e92",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020e94",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020e98",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020e9c",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020fc6",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020fca",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020fcc",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020fd0",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020fd2",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020fd4",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f80020fd6",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f800210b0",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f800210b2",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f800210b4",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f800210b6",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.MemmoveFetch.f800210b8",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.B_ram",
+      "axioms": [
+        "propext"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.inRam_byte",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.inRam_succ",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.inRam_pred",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.inRam_one",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.lsb_lit",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.fwdBody_get",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.fwdBody_sameCsr",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.fwd_body",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.fwd_loop",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bwdBody_sameCsr",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bwdBody_get",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bwd_body",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bwd_loop",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.and_not_one",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.epilogue",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.pro_sameCsr",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.pro_get",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.Slots.al'",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.Slots.in'",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.prologue",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.alu_add",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.alu_sub",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.pro_get2",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.pro_get13",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.fwd_path",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.bwd_path",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.touches_slot",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.saved_other",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.disj_slots",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.saved_read",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.ramRead_congr",
+      "axioms": [
+        "propext"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.finish",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.contract",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    }
+  ]
+}

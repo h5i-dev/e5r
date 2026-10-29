@@ -872,7 +872,13 @@ optional; direct and hybrid proofs are equally valid routes.
       *Status:* the release ELF built with Rust 1.98.1 `--locked` is pinned
       (sha256 `f39d833f…`) and runs on QEMU 8.2.2; builds from other
       checkout paths differ (paths are embedded in panic locations), so the
-      byte-identical criterion is open (path remapping needed).
+      byte-identical criterion is open for that pin. A canonical recipe
+      (`verification/rv32/rmk/build-canonical.sh`: fixed checkout path, all
+      paths remapped) rebuilds byte-identically (`5871dcee…`, receipt in
+      `verification/rv32/rmk/R0-receipt.md`); Cargo hashes the absolute path
+      of path dependencies into function order, so path independence is not
+      achieved. Current evidence stays on `f39d833f`; migrating to the
+      canonical pin is a separate step.
 - [x] **R1. Board model for QEMU `virt` (RV32).** *Accepted:* a board JSON
       (memory map, UART16550 registers, timer, boot state, how semihosting
       calls are treated: modeled, or a fail-closed exclusion) and the
@@ -899,6 +905,15 @@ optional; direct and hybrid proofs are equally valid routes.
       covered. *Accepted:* job `proved`, nonvacuity, mutation controls
       (changed instruction, false postcondition, weakened precondition),
       axioms audited.
+      *Status (partial, not accepted):* `jobs/rmk/rmk-memmove-small.json`
+      is proved on the pinned ELF `f39d833f`: `compiler_builtins` memmove
+      from its trampoline (0x80020c1e), for **n < 16 only**, both overlap
+      directions, a quiet deterministic run with no fault, event or enabled
+      interrupt, returning with memmove semantics on RAM and the stated
+      register/CSR frame; 7 negative controls. Not covered: n ≥ 16 (the
+      word and misaligned paths), which the 488-byte deframer buffer
+      needs, and the deframer itself (`Projects/rmk/Deframer/Spec.lean`
+      states its contracts; none is proved).
 - [ ] **R4. Toward the session.** Compose R3 with the surrounding session
       loop and interrupts (checker, direct regions or summaries). *Accepted:*
       a kernel-checked theorem about the whole `run_session` path for the
