@@ -588,4 +588,71 @@ theorem refineR_sound {ρ : Nat → Word} (c : BrCond) (t : Bool) {a : AV} {x : 
     (hk : k < M32) (ha : a.gam ρ x) (ht : taken c (w k) x = t) : (refineR c t k a).gam ρ x :=
   small_sound (refineRCore_sound c t hk (topRng_sound ha) ht)
 
+/-! ## Load extension -/
+
+/-- A loaded value fits its access width. -/
+def Fits (wd : Width) (x : Word) : Prop := x.toNat < 256 ^ wd.bytes
+
+theorem and_ff (x : Word) (h : x.toNat < 256) : x &&& 0xff = x := by
+  apply BitVec.eq_of_toNat_eq
+  rw [BitVec.toNat_and, show (0xff : Word).toNat = 2^8 - 1 from rfl, Nat.and_two_pow_sub_one_eq_mod]
+  omega
+
+theorem and_ffff (x : Word) (h : x.toNat < 65536) : x &&& 0xffff = x := by
+  apply BitVec.eq_of_toNat_eq
+  rw [BitVec.toNat_and, show (0xffff : Word).toNat = 2^16 - 1 from rfl, Nat.and_two_pow_sub_one_eq_mod]
+  omega
+
+theorem sext_small (x : Word) (n : Nat) (hn : 0 < n) (hn' : n < 32) (h : x.toNat < 2 ^ (n - 1)) :
+    (x.setWidth n).signExtend 32 = x := by
+  have hx : x.toNat < 2 ^ n := Nat.lt_of_lt_of_le h (Nat.pow_le_pow_right (by decide) (by omega))
+  rw [BitVec.signExtend_eq_setWidth_of_msb_false]
+  · apply BitVec.eq_of_toNat_eq
+    rw [BitVec.toNat_setWidth, BitVec.toNat_setWidth, Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt x.isLt]
+  · rw [BitVec.msb_eq_false_iff_two_mul_lt, BitVec.toNat_setWidth, Nat.mod_eq_of_lt hx]
+    have : 2 * 2 ^ (n - 1) = 2 ^ n := by
+      rw [← Nat.pow_succ']; congr 1; omega
+    omega
+
+/-- Extending a loaded value: unsigned loads are the raw value (it fits),
+    signed ones are exact on sets and unchanged on non-negative ranges. -/
+theorem extend_sound {ρ : Nat → Word} (wd : Width) (signed : Bool) {v : AV} {x : Word}
+    (hv : v.gam ρ x) (hf : Fits wd x) : (v.extend wd signed).gam ρ (E5R.extend wd signed x) := by
+  simp only [Fits, Width.bytes] at hf
+  cases wd <;> cases signed
+  · simp only [AV.extend, E5R.extend]; rw [and_ff x (by omega)]; exact hv
+  · simp only [AV.extend, E5R.extend]
+    split
+    · next l =>
+      apply mkVals_sound
+      refine ⟨((x.setWidth 8).signExtend 32).toNat, List.mem_map.mpr ⟨x.toNat, hv, ?_⟩, ?_⟩
+      · simp [E5R.extend, w_toNat]
+      · exact Nat.mod_eq_of_lt (BitVec.isLt _)
+    · next l h =>
+      simp only [AV.gam] at hv
+      by_cases hh : h < signedLimit .b
+      · rw [if_pos hh]; simp only [signedLimit] at hh
+        rw [sext_small x 8 (by decide) (by decide) (by simp; omega)]
+        exact hv
+      · rw [if_neg hh]; trivial
+    · trivial
+  · simp only [AV.extend, E5R.extend]; rw [and_ffff x (by omega)]; exact hv
+  · simp only [AV.extend, E5R.extend]
+    split
+    · next l =>
+      apply mkVals_sound
+      refine ⟨((x.setWidth 16).signExtend 32).toNat, List.mem_map.mpr ⟨x.toNat, hv, ?_⟩, ?_⟩
+      · simp [E5R.extend, w_toNat]
+      · exact Nat.mod_eq_of_lt (BitVec.isLt _)
+    · next l h =>
+      simp only [AV.gam] at hv
+      by_cases hh : h < signedLimit .h
+      · rw [if_pos hh]; simp only [signedLimit] at hh
+        rw [sext_small x 16 (by decide) (by decide) (by simp; omega)]
+        exact hv
+      · rw [if_neg hh]; trivial
+    · trivial
+  · simp only [AV.extend, E5R.extend]; exact hv
+  · simp only [AV.extend, E5R.extend]; exact hv
+
 end E5R.AI

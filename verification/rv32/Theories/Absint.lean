@@ -471,6 +471,12 @@ def absLoad (cfg : Config) (s : AState) (addr : AV) (wd : Width) (atomic : Bool)
     if s.hnd && off % wd.bytes = 0 then some (loadCell s.mem .rel off wd) else none
   | _ => none
 
+/-- Values below this are non-negative as signed `wd` values. -/
+def signedLimit : Width → Nat
+  | .b => 128
+  | .h => 32768
+  | .w => 2147483648
+
 /-- Extension of a loaded value. -/
 def AV.extend (wd : Width) (signed : Bool) (v : AV) : AV :=
   match wd, signed with
@@ -478,7 +484,7 @@ def AV.extend (wd : Width) (signed : Bool) (v : AV) : AV :=
   | _, false => v
   | _, true => match v with
     | .vals l => mkVals (l.map fun x => (E5R.extend wd true (w x)).toNat)
-    | .rng l h => if h < (if wd = .b then 128 else 32768) then .rng l h else .top
+    | .rng l h => if h < signedLimit wd then .rng l h else .top
     | _ => .top
 
 /-- The memory after a store, or `none` if some possible address could
