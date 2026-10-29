@@ -1910,6 +1910,78 @@ theorem rel_disj_static {cfg : Config} {ρ : Nat → Word} {c : Cell} {A : Word}
   apply disj_of_nat (by omega) (by omega)
   omega
 
+/-- Any abstract load that succeeds: the platform does not fault and hands
+    on a described value. -/
+theorem absLoad_sound {cfg : Config} {s : AState} {av : AV} {wd : Width} {atomic : Bool} {v : AV}
+    (h : absLoad cfg s av wd atomic = some v) (hv : ValidImg cfg.img) {ρ : Nat → Word}
+    {ram : Word → BitVec 8} {A : Word} (hA : av.gam ρ A) (hsp : s.hnd = true → SpOk cfg (ρ 2).toNat)
+    (hm : MemHolds ρ ram s.mem) (o : Oracle) (i : Nat) (evs : List Event) (k : Word → Eff) :
+    ∃ r i', interp cfg.board cfg.img o (.load wd A atomic k) ram i evs =
+      interp cfg.board cfg.img o (k r) ram i' evs ∧ v.gam ρ r ∧ Fits wd r := by
+  cases av with
+  | vals as => exact absLoad_vals_sound h hv hA hm o i evs k
+  | sym sv off =>
+    by_cases hsv : sv = 2
+    · subst hsv
+      have hnd : s.hnd = true := by
+        have := h; simp only [absLoad] at this
+        split at this
+        · next hc => simp only [Bool.and_eq_true] at hc; exact hc.1.1.1
+        · simp at this
+      simp only [AV.gam] at hA
+      obtain ⟨he, hr, hf⟩ := absLoad_rel_sound h (hsp hnd) hm o i evs k
+      exact ⟨_, i, by rw [hA]; exact he, hr, hf⟩
+    · exfalso; simp [absLoad, hsv] at h
+  | _ => simp [absLoad] at h
+
+/-- Any abstract store that succeeds, from a well-formed state. -/
+theorem absStore_sound {cfg : Config} {s : AState} {av : AV} {wd : Width} {V : AV} {atomic : Bool}
+    {memF : List Cell} (h : absStore cfg s av wd V atomic = some memF)
+    (hram : cfg.board.ramBase + cfg.board.ramSize ≤ M32) (hwf : s.wf cfg = true) {ρ : Nat → Word}
+    {ram : Word → BitVec 8} {A x : Word} (hA : av.gam ρ A) (hV : V.gam ρ x)
+    (hsp : s.hnd = true → SpOk cfg (ρ 2).toNat) (hm : MemHolds ρ ram s.mem)
+    (o : Oracle) (i : Nat) (evs : List Event) (k : Eff) :
+    ∃ ram' evs', StoreEffect cfg ram A x wd ram' evs' ∧
+      interp cfg.board cfg.img o (.store wd A x atomic k) ram i evs =
+        interp cfg.board cfg.img o k ram' i (evs ++ evs') ∧ MemHolds ρ ram' memF := by
+  obtain ⟨_, hcells, hrelH⟩ := wf_parts hwf
+  cases av with
+  | vals as =>
+    exact absStore_vals_sound h hram hA hV hm hcells hrelH
+      (fun c hc hb hstat => rel_disj_static (hsp (hrelH c hc hb)) (hcells c hc) hb hstat) o i evs k
+  | sym sv off =>
+    by_cases hsv : sv = 2
+    · subst hsv
+      have hnd : s.hnd = true := by
+        have := h; simp only [absStore] at this
+        split at this
+        · next hc => simp only [Bool.and_eq_true] at hc; exact hc.1.1.1
+        · simp at this
+      simp only [AV.gam] at hA
+      obtain ⟨hi, hm'⟩ := absStore_rel_sound h (hsp hnd) hV hm hwf hnd o i evs k
+      have e1 : ρ 2 + BitVec.ofNat 32 off = A := hA.symm
+      have e2 : ρ 2 + w off = A := hA.symm
+      rw [e1, e2] at hi; rw [e2] at hm'
+      exact ⟨_, [], .ram, by rw [hi]; simp, hm'⟩
+    · exfalso; simp [absStore, hsv] at h
+  | _ => simp [absStore] at h
+
+theorem ctl_resv {ρ : Nat → Word} {s : AState} {c : Core} (h : CtlHolds ρ s c) (b : Bool) :
+    CtlHolds ρ s { c with resv := b } :=
+  ⟨h.mie, h.mpie, h.mpp, h.mieReg, h.mtvec, h.mepc, h.mcause, h.mscratch⟩
+
+theorem ctl_setc {ρ : Nat → Word} {s : AState} {c : Core} (h : CtlHolds ρ s c) (r : Reg) (x : Word) :
+    CtlHolds ρ s (c.set r x) :=
+  ctl_same h (by unfold Core.sameCsr; rw [Core.set_ctl])
+
+theorem ctl_pc {ρ : Nat → Word} {s : AState} {c : Core} (h : CtlHolds ρ s c) (p : Word) :
+    CtlHolds ρ s { c with pc := p } :=
+  ⟨h.mie, h.mpie, h.mpp, h.mieReg, h.mtvec, h.mepc, h.mcause, h.mscratch⟩
+
+theorem ctl_mem {ρ : Nat → Word} {s : AState} {c : Core} (h : CtlHolds ρ s c) (mem : List Cell) :
+    CtlHolds ρ { s with mem := mem } c :=
+  ⟨h.mie, h.mpie, h.mpp, h.mieReg, h.mtvec, h.mepc, h.mcause, h.mscratch⟩
+
 /-! ### Instruction cases -/
 
 section Cases
