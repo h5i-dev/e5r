@@ -2636,4 +2636,89 @@ theorem absExec_sound {i : Instr} (hv : ValidImg cfg.img)
 
 end Cases
 
+/-! ### Covering successors -/
+
+theorem covered_sound {ρ : Nat → Word} {cert : Cert} {t : AState} {j : Nat} {m : Machine}
+    (h : covered cert t j = true) (hs : StateHolds ρ t m) :
+    ∃ n, cert.nodes[j]? = some n ∧ StateHolds ρ n.s m := by
+  unfold covered at h
+  split at h
+  · next n hn => exact ⟨n, hn, leq_state_sound h hs⟩
+  · simp at h
+
+theorem holds_with_mem {ρ : Nat → Word} {t : AState} {m : Machine} {mem : List Cell}
+    (hs : StateHolds ρ t m) (hm : MemHolds ρ m.ram mem) : StateHolds ρ { t with mem := mem } m :=
+  ⟨hs.pc, hs.regs, hm, hs.mie, hs.mpie, hs.mpp, hs.mieReg, hs.mtvec, hs.mepc, hs.mcause, hs.mscratch⟩
+
+theorem Core.set_get_same (c : Core) (r q : Reg) : (c.set r (c.get r)).get q = c.get q := by
+  rw [Core.get_set]
+  by_cases h0 : q.val = 0
+  · rw [if_pos h0]; have : q = 0 := Fin.ext h0
+    subst this; rfl
+  · rw [if_neg h0]
+    by_cases e : q = r
+    · rw [if_pos e, e]
+    · rw [if_neg e]
+
+/-- Narrowing a register to the value it has. -/
+theorem holds_split {ρ : Nat → Word} {t : AState} {m : Machine} (hs : StateHolds ρ t m)
+    (hl : t.regs.length = 31) (r : Reg) {v : Nat} (hv : v = (m.core.get r).toNat) :
+    StateHolds ρ (t.set r (.vals [v])) m := by
+  obtain ⟨e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, _⟩ := AState.set_other t r (.vals [v])
+  have hregs := regs_set hl hs.regs r (v := .vals [v]) (x := m.core.get r) (by simp [AV.gam, hv])
+  refine ⟨by rw [e10]; exact hs.pc, fun q => ?_, by rw [e1]; exact hs.mem, e2 ▸ hs.mie, e3 ▸ hs.mpie,
+    e4 ▸ hs.mpp, e5 ▸ hs.mieReg, e6 ▸ hs.mtvec, e7 ▸ hs.mepc, e8 ▸ hs.mcause, e9 ▸ hs.mscratch⟩
+  have := hregs q
+  rwa [Core.set_get_same] at this
+
+/-- A covered successor lands in a node. A pinning edge needs the loaded
+    word to equal the destination register, which the load establishes. -/
+theorem coveredE_sound {ρ : Nat → Word} {cert : Cert} {pin : Option (Nat × Nat × Width)} {t : AState}
+    {e : Edge} {m : Machine} (h : coveredE cert pin t e = true) (hs : StateHolds ρ t m)
+    (hl : t.regs.length = 31)
+    (hpin : e.pin = true → ∀ rd a wd, pin = some (rd, a, wd) → ∀ hr : rd < 32,
+      ramRead m.ram (w a) wd = m.core.get ⟨rd, hr⟩) :
+    ∃ j ∈ e.nodes, ∃ n, cert.nodes[j]? = some n ∧ StateHolds ρ n.s m := by
+  unfold coveredE at h
+  split at h
+  · simp only [Bool.and_eq_true, Bool.not_eq_true'] at h
+    obtain ⟨_, h⟩ := h
+    split at h
+    · next j hj => exact ⟨j, by rw [hj]; exact List.mem_singleton_self _, covered_sound h hs⟩
+    · simp at h
+  · next r _ =>
+    split at h
+    · next h0 =>
+      split at h
+      · next l hg =>
+        have hx := hs.regs ⟨r, h0.2⟩
+        rw [hg] at hx
+        have hv := List.all_eq_true.mp h _ hx
+        split at hv
+        · next t' hp =>
+          obtain ⟨j, hj, hc⟩ := List.any_eq_true.mp hv
+          have ht' : StateHolds ρ t' m := by
+            have hsp := holds_split hs hl ⟨r, h0.2⟩ (v := (m.core.get ⟨r, h0.2⟩).toNat) rfl
+            unfold pinned at hp
+            split at hp
+            · cases hp; exact hsp
+            · next hnp =>
+              simp only [Bool.not_eq_true', Bool.not_eq_false] at hnp
+              split at hp
+              · next _ rd a wd =>
+                split at hp
+                · next hrd =>
+                  cases hp
+                  subst hrd
+                  apply holds_with_mem hsp
+                  apply setPlain_sound hsp.mem
+                  simp only [AV.gam, List.mem_singleton]
+                  rw [hpin hnp rd a wd rfl h0.2]
+                · simp at hp
+              · simp at hp
+          exact ⟨j, hj, covered_sound hc ht'⟩
+        · simp at hv
+      · simp at h
+    · simp at h
+
 end E5R.AI
