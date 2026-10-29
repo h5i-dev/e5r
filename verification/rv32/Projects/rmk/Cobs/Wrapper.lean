@@ -139,4 +139,104 @@ theorem wcall (c : Core) (R : Word → BitVec 8) (h : WEnv ⟨c, R⟩) :
   exact .step h.quiet s1 (.step (q _ k1) s2 (.step (q _ k2) s3 (.step (q _ k3) s4 (.step (q _ k4) s5
     (.step (q _ k5) s6 (.single (q _ k6) s7))))))
 
+/-- The wrapper's epilogue core, from the inner call's return. -/
+def wEpi (d : Core) (M : Word → BitVec 8) : Core :=
+  let sp' := d.get 2
+  let t := ramRead M (sp' + 0xc#32) .w
+  let w4 := ramRead M (sp' + 0x10#32) .w
+  let w8 := ramRead M (sp' + 0x14#32) .w
+  let v := (t + 0xffffffff#32) ||| w4
+  let M2 := ramWrite (ramWrite M (d.get 8 + 0x0#32) v .w) (d.get 8 + 0x4#32) w8 .w
+  ((((((((d.wr 10 t 0x8001e01a).wr 11 w4 0x8001e01c).wr 12 w8 0x8001e01e).wr 10 (t + 0xffffffff#32)
+    0x8001e020).wr 10 v 0x8001e022).goto 0x8001e024).goto 0x8001e026).wr 1 (ramRead M2 (sp' + 0x1c#32) .w)
+    0x8001e028 |>.wr 8 (ramRead M2 (sp' + 0x18#32) .w) 0x8001e02a |>.wr 2 (sp' + 0x20#32) 0x8001e02c)
+    |>.goto (ramRead M2 (sp' + 0x1c#32) .w)
+
+/-- The wrapper's final RAM. -/
+def wEpiRam (d : Core) (M : Word → BitVec 8) : Word → BitVec 8 :=
+  let sp' := d.get 2
+  ramWrite (ramWrite M (d.get 8 + 0x0#32) ((ramRead M (sp' + 0xc#32) .w + 0xffffffff#32) |||
+    ramRead M (sp' + 0x10#32) .w) .w) (d.get 8 + 0x4#32) (ramRead M (sp' + 0x14#32) .w) .w
+
+theorem wepi (d : Core) (M : Word → BitVec 8) (hpc : d.pc = 0x8001e018) (hq : Quiet d)
+    (hs : ∀ off : Word, (off = 0xc#32 ∨ off = 0x10#32 ∨ off = 0x14#32 ∨ off = 0x18#32 ∨ off = 0x1c#32) →
+      (d.get 2 + off).toNat % 4 = 0 ∧ B.inRam (d.get 2 + off) 4 = true)
+    (ho : ∀ off : Word, (off = 0x0#32 ∨ off = 0x4#32) →
+      (d.get 8 + off).toNat % 4 = 0 ∧ B.inRam (d.get 8 + off) 4 = true)
+    (hra : (ramRead (wEpiRam d M) (d.get 2 + 0x1c#32) .w).getLsbD 0 = false) :
+    QRun B img 11 ⟨d, M⟩ ⟨wEpi d M, wEpiRam d M⟩ := by
+  let sp' := d.get 2
+  let t := ramRead M (sp' + 0xc#32) .w
+  let w4 := ramRead M (sp' + 0x10#32) .w
+  let w8 := ramRead M (sp' + 0x14#32) .w
+  let v := (t + 0xffffffff#32) ||| w4
+  let M1 := ramWrite M (d.get 8 + 0x0#32) v .w
+  let M2 := wEpiRam d M
+  let d1 := d.wr 10 t 0x8001e01a
+  let d2 := d1.wr 11 w4 0x8001e01c
+  let d3 := d2.wr 12 w8 0x8001e01e
+  let d4 := d3.wr 10 (t + 0xffffffff#32) 0x8001e020
+  let d5 := d4.wr 10 v 0x8001e022
+  let d6 := d5.goto 0x8001e024
+  let d7 := d6.goto 0x8001e026
+  let d8 := d7.wr 1 (ramRead M2 (sp' + 0x1c#32) .w) 0x8001e028
+  let d9 := d8.wr 8 (ramRead M2 (sp' + 0x18#32) .w) 0x8001e02a
+  let d10 := d9.wr 2 (sp' + 0x20#32) 0x8001e02c
+  have g2 : ∀ e : Core, (e = d1 ∨ e = d2 ∨ e = d3 ∨ e = d4 ∨ e = d5 ∨ e = d6 ∨ e = d7 ∨ e = d8 ∨ e = d9) →
+      e.get 2 = sp' := by
+    intro e he; rcases he with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+      simp [d9, d8, d7, d6, d5, d4, d3, d2, d1, Core.wr_get_ne, sp']
+  have g8 : ∀ e : Core, (e = d5 ∨ e = d6) → e.get 8 = d.get 8 := by
+    intro e he; rcases he with rfl | rfl <;> simp [d6, d5, d4, d3, d2, d1, Core.wr_get_ne]
+  have ld : ∀ (e e' : Core) (R : Word → BitVec 8) (p off : Word) (rd : Reg)
+      (hd : fetchDecode img p = some (Instr.load .w true rd 2 off, 2)) (hp : e.pc = p) (h2 : e.get 2 = sp')
+      (ho : off = 0xc#32 ∨ off = 0x10#32 ∨ off = 0x14#32 ∨ off = 0x18#32 ∨ off = 0x1c#32)
+      (he : e' = e.wr rd (ramRead R (sp' + off) .w) (p + 2)) (hal : p.getLsbD 0 = false),
+      DetStep B img ⟨e, R⟩ ⟨e', R⟩ := by
+    intro e e' R p off rd hd hp h2 ho he hal
+    obtain ⟨a, r⟩ := hs off ho
+    exact dstep_load hd hp (exec_load _ _ _ _ _ _ _) (by rw [h2]; exact a) (by rw [h2]; exact r)
+      (by rw [h2, hp, he, extend_w]) hal
+  have s1 : DetStep B img ⟨d, M⟩ ⟨d1, M⟩ := ld d d1 M _ _ 10 f8001e018 hpc rfl (by simp) rfl (by decide)
+  have s2 : DetStep B img ⟨d1, M⟩ ⟨d2, M⟩ := ld d1 d2 M _ _ 11 f8001e01a rfl (g2 d1 (by simp)) (by simp) rfl (by decide)
+  have s3 : DetStep B img ⟨d2, M⟩ ⟨d3, M⟩ := ld d2 d3 M _ _ 12 f8001e01c rfl (g2 d2 (by simp)) (by simp) rfl (by decide)
+  have s4 : DetStep B img ⟨d3, M⟩ ⟨d4, M⟩ := dstep f8001e01e rfl (by
+    rw [exec_opimm]; simp only [alu]; rw [show d3.get 10 = t by simp [d3, d2, d1, Core.wr_get_ne, Core.wr_get_self]]; rfl)
+  have s5 : DetStep B img ⟨d4, M⟩ ⟨d5, M⟩ := dstep f8001e020 rfl (by
+    rw [exec_op]; simp only [alu]
+    rw [show d4.get 10 = t + 0xffffffff#32 by simp [d4, Core.wr_get_self],
+      show d4.get 11 = w4 by simp [d4, d3, d2, Core.wr_get_ne, Core.wr_get_self]]; rfl)
+  have s6 : DetStep B img ⟨d5, M⟩ ⟨d6, M1⟩ := by
+    obtain ⟨a, r⟩ := ho 0x0#32 (by simp)
+    have := dstep_store (m := ⟨d5, M⟩) f8001e022 rfl (exec_store _ _ _ _ _ _)
+      (by rw [g8 d5 (by simp)]; exact a) (by rw [g8 d5 (by simp)]; exact r)
+    rwa [g8 d5 (by simp), show d5.get 10 = v by simp [d5, Core.wr_get_self]] at this
+  have s7 : DetStep B img ⟨d6, M1⟩ ⟨d7, M2⟩ := by
+    obtain ⟨a, r⟩ := ho 0x4#32 (by simp)
+    have := dstep_store (m := ⟨d6, M1⟩) f8001e024 rfl (exec_store _ _ _ _ _ _)
+      (by rw [g8 d6 (by simp)]; exact a) (by rw [g8 d6 (by simp)]; exact r)
+    rwa [g8 d6 (by simp), show d6.get 12 = w8 by simp [d6, d5, d4, d3, Core.wr_get_ne, Core.wr_get_self]] at this
+  have s8 : DetStep B img ⟨d7, M2⟩ ⟨d8, M2⟩ := ld d7 d8 M2 _ _ 1 f8001e026 rfl (g2 d7 (by simp)) (by simp) rfl (by decide)
+  have s9 : DetStep B img ⟨d8, M2⟩ ⟨d9, M2⟩ := ld d8 d9 M2 _ _ 8 f8001e028 rfl (g2 d8 (by simp)) (by simp) rfl (by decide)
+  have s10 : DetStep B img ⟨d9, M2⟩ ⟨d10, M2⟩ := dstep f8001e02a rfl (by rw [exec_opimm, g2 d9 (by simp)]; rfl)
+  have s11 : DetStep B img ⟨d10, M2⟩ ⟨wEpi d M, M2⟩ := by
+    have h1 : d10.get 1 = ramRead M2 (sp' + 0x1c#32) .w := by simp [d10, d9, d8, Core.wr_get_ne, Core.wr_get_self]
+    refine dstep f8001e02c rfl ?_
+    rw [exec_jalr, Core.set_zero, h1, BitVec.add_zero, clear0 _ hra, jump_ok _ _ hra]
+    rfl
+  have q := fun (x : Core) (hx : x.sameCsr d) => Quiet.of_sameCsr hx hq
+  have k1 : d1.sameCsr d := Core.sameCsr_wr _ _ _ _
+  have k2 : d2.sameCsr d := (Core.sameCsr_wr _ _ _ _).trans k1
+  have k3 : d3.sameCsr d := (Core.sameCsr_wr _ _ _ _).trans k2
+  have k4 : d4.sameCsr d := (Core.sameCsr_wr _ _ _ _).trans k3
+  have k5 : d5.sameCsr d := (Core.sameCsr_wr _ _ _ _).trans k4
+  have k6 : d6.sameCsr d := (Core.sameCsr_goto _ _).trans k5
+  have k7 : d7.sameCsr d := (Core.sameCsr_goto _ _).trans k6
+  have k8 : d8.sameCsr d := (Core.sameCsr_wr _ _ _ _).trans k7
+  have k9 : d9.sameCsr d := (Core.sameCsr_wr _ _ _ _).trans k8
+  have k10 : d10.sameCsr d := (Core.sameCsr_wr _ _ _ _).trans k9
+  exact .step hq s1 (.step (q _ k1) s2 (.step (q _ k2) s3 (.step (q _ k3) s4 (.step (q _ k4) s5
+    (.step (q _ k5) s6 (.step (q _ k6) s7 (.step (q _ k7) s8 (.step (q _ k8) s9 (.step (q _ k9) s10
+    (.single (q _ k10) s11))))))))))
+
 end E5R.Rmk.Cobs
