@@ -491,6 +491,11 @@ def AV.extend (wd : Width) (signed : Bool) (v : AV) : AV :=
     fault or write a disallowed device value. -/
 def absStore (cfg : Config) (s : AState) (addr : AV) (wd : Width) (v : AV) (atomic : Bool) :
     Option (List Cell) :=
+  -- Memory keeps only the stored width's low bits.
+  let v := match wd with
+    | .b => v.band (.const 0xff)
+    | .h => v.band (.const 0xffff)
+    | .w => v
   match addr with
   | .vals [a] =>
     match classify cfg a wd with
