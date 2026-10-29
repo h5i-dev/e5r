@@ -1,0 +1,11 @@
+{
+  "schema": "e5r.board.v1",
+  "id": "qemu-user-rv32",
+  "name": "QEMU user-mode test bench (not a board)",
+  "notes": "Only for instruction-level differential tests: text at 0x10000, .bss at 0x20000, no devices. Never a verification target.",
+  "memory": [
+    {"name": "bss", "base": "0x20000", "size": "0x10000", "kind": "ram", "perms": "rw"},
+    {"name": "text", "base": "0x10000", "size": "0x10000", "kind": "image", "perms": "rx"}
+  ],
+  "devices": []
+}

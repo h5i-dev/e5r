@@ -318,6 +318,30 @@ pub fn parse_axioms(out: &str) -> Result<BTreeMap<String, Vec<String>>, String> 
     Ok(map)
 }
 
+/// Fully qualified names of the theorems a module declares, following
+/// `namespace`/`end` (enough for this project's sources, which do not use
+/// `section` names or nested `namespace` blocks with the same name).
+pub fn declared_theorems(code: &str) -> Vec<String> {
+    let mut stack: Vec<String> = Vec::new();
+    let mut out = Vec::new();
+    for line in code.lines() {
+        let mut words = line.split_whitespace();
+        match (words.next(), words.next()) {
+            (Some("namespace"), Some(ns)) => stack.push(ns.to_string()),
+            (Some("end"), Some(ns)) if stack.last().is_some_and(|l| l == ns) => {
+                stack.pop();
+            }
+            (Some("theorem"), Some(name)) => {
+                let mut full = stack.clone();
+                full.push(name.to_string());
+                out.push(full.join("."));
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
 fn tool_version(argv: &[&str]) -> Option<String> {
     let out = Command::new(argv[0]).args(&argv[1..]).output().ok()?;
     let s = String::from_utf8_lossy(&out.stdout);
@@ -475,8 +499,29 @@ pub fn run(job_path: &Path) -> Value {
                 peak_rss_mib: rss,
             });
         }
-        // Audit every named theorem plus the image binding.
-        let mut names = job.theorems.clone();
+        // Audit every named theorem plus the image binding. `Ns.*` names
+        // every theorem the job's modules declare in namespace `Ns`.
+        let mut names = Vec::new();
+        for t in &job.theorems {
+            match t.strip_suffix(".*") {
+                Some(ns) => {
+                    let mut found = false;
+                    for m in &job.modules {
+                        let src = std::fs::read_to_string(paths.root.join(m)).map_err(err(m))?;
+                        for n in declared_theorems(&lean_code(&src)) {
+                            if n.starts_with(&format!("{ns}.")) {
+                                names.push(n);
+                                found = true;
+                            }
+                        }
+                    }
+                    if !found {
+                        return Err(Stop::Error(format!("no theorems in {ns}")));
+                    }
+                }
+                None => names.push(t.clone()),
+            }
+        }
         names.push(format!("{}.image_fidelity", job.image.namespace));
         let imports: Vec<String> = order
             .iter()
@@ -628,6 +673,13 @@ mod tests {
         assert!(m["C"].is_empty());
         assert!(parse_axioms("error: unknown constant 'X'").is_err());
         assert!(parse_axioms("'A' depends on axioms: [sorryAx]\nwarning: x").is_err());
+    }
+
+    #[test]
+    fn theorem_names_follow_namespaces() {
+        let src =
+            "namespace A.B\ntheorem x : True := trivial\nend A.B\ntheorem y : True := trivial\n";
+        assert_eq!(declared_theorems(src), ["A.B.x", "y"]);
     }
 
     #[test]
