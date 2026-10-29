@@ -1298,4 +1298,115 @@ theorem storeAt_written {cfg : Config} {s : AState} {mem mem' : List Cell} {a : 
       exact interp_store_dev o (by rw [hAa]; exact hal) hin (by simpa using hat) hd (by simpa using hdw) rfl
   · simp at h
 
+/-- Cells a weak store keeps sit where cells of its input sat. -/
+def SameShape (out inp : List Cell) : Prop :=
+  ∀ c ∈ out, ∃ d ∈ inp, c.base = d.base ∧ c.addr = d.addr ∧ c.w = d.w ∧ c.guard = d.guard
+
+theorem storeWeak_shape (mem : List Cell) (base : Base) (a : Nat) (wd : Width) (V : AV) :
+    SameShape (storeWeak mem base a wd V) mem := by
+  intro c hc
+  simp only [storeWeak, List.mem_filterMap] at hc
+  obtain ⟨d, hd, he⟩ := hc
+  split at he
+  · simp only [Option.some.injEq] at he; subst he; exact ⟨d, hd, rfl, rfl, rfl, rfl⟩
+  · split at he
+    · simp at he
+    · simp only [Option.some.injEq] at he; subst he; exact ⟨_, hd, rfl, rfl, rfl, rfl⟩
+
+theorem sameShape_trans {a b c : List Cell} (h1 : SameShape a b) (h2 : SameShape b c) : SameShape a c := by
+  intro x hx
+  obtain ⟨y, hy, e1, e2, e3, e4⟩ := h1 x hx
+  obtain ⟨z, hz, f1, f2, f3, f4⟩ := h2 y hy
+  exact ⟨z, hz, e1.trans f1, e2.trans f2, e3.trans f3, e4.trans f4⟩
+
+theorem sameShape_refl (a : List Cell) : SameShape a a := fun c hc => ⟨c, hc, rfl, rfl, rfl, rfl⟩
+
+theorem cell_wf_of_shape {cfg : Config} {c d : Cell} (h : c.base = d.base ∧ c.addr = d.addr ∧ c.w = d.w ∧ c.guard = d.guard)
+    (hd : d.wf cfg = true) : c.wf cfg = true := by
+  obtain ⟨e1, e2, e3, e4⟩ := h
+  unfold Cell.wf at *; rw [e1, e2, e3, e4]; exact hd
+
+theorem cell_at_of_shape {ρ : Nat → Word} {c d : Cell} (h : c.base = d.base ∧ c.addr = d.addr ∧ c.w = d.w ∧ c.guard = d.guard) :
+    c.at ρ = d.at ρ := by
+  obtain ⟨e1, e2, _, _⟩ := h
+  unfold Cell.at; rw [e1, e2]
+
+/-- A weak store step at an address that was not written only weakens. -/
+theorem storeAt_weak_weakens {cfg : Config} {s : AState} {mem mem' : List Cell} {a : Nat} {wd : Width}
+    {V : AV} {atomic : Bool} (h : storeAt cfg s mem a wd V atomic false = some mem')
+    {ρ : Nat → Word} {R : Word → BitVec 8} (hm : MemHolds ρ R mem) : MemHolds ρ R mem' ∧ SameShape mem' mem := by
+  unfold storeAt at h
+  split at h
+  · split at h
+    · simp at h
+    · simp only [Option.some.injEq, Bool.false_eq_true, if_false] at h; subst h
+      exact ⟨storeWeak_weakens hm, storeWeak_shape _ _ _ _ _⟩
+  · split at h
+    · simp at h
+    · simp only [Option.some.injEq] at h; subst h; exact ⟨hm, sameShape_refl _⟩
+  · simp at h
+
+theorem storeAt_weak_shape {cfg : Config} {s : AState} {mem mem' : List Cell} {a : Nat} {wd : Width}
+    {V : AV} {atomic : Bool} (h : storeAt cfg s mem a wd V atomic false = some mem') : SameShape mem' mem := by
+  unfold storeAt at h
+  split at h
+  · split at h
+    · simp at h
+    · simp only [Option.some.injEq, Bool.false_eq_true, if_false] at h; subst h; exact storeWeak_shape _ _ _ _ _
+  · split at h
+    · simp at h
+    · simp only [Option.some.injEq] at h; subst h; exact sameShape_refl _
+  · simp at h
+
+/-- A store to one of several candidates: the platform does not fault, and
+    whatever the write did, the abstract memory after the fold still holds. -/
+theorem absStore_fold_sound {cfg : Config} {s : AState} {wd : Width} {V : AV} {atomic : Bool}
+    {ρ : Nat → Word} {A x : Word} (hram : cfg.board.ramBase + cfg.board.ramSize ≤ M32)
+    (hV : V.gam ρ (stored wd x)) (hVw : V.gam ρ x ∨ wd ≠ .w) (o : Oracle) (i : Nat)
+    (evs : List Event) (k : Eff) :
+    ∀ (as : List Nat) (mem memF : List Cell) (ram : Word → BitVec 8),
+      as.foldlM (init := mem) (fun mem a => storeAt cfg s mem a wd V atomic false) = some memF →
+      (∀ c ∈ mem, c.wf cfg = true) →
+      (∀ c ∈ mem, c.base = .rel → Disj (c.at ρ) c.w A wd) →
+      -- Either the written address is still to come, and `mem` holds now ...
+      (A.toNat ∈ as ∧ MemHolds ρ ram mem ∨
+      -- ... or it was already processed, with this effect, and `mem` holds after it.
+       ∃ ram0 ram' evs', StoreEffect cfg ram0 A x wd ram' evs' ∧ ram = ram' ∧
+         interp cfg.board cfg.img o (.store wd A x atomic k) ram0 i evs =
+           interp cfg.board cfg.img o k ram' i (evs ++ evs') ∧ MemHolds ρ ram mem) →
+      ∃ ram0 ram' evs', StoreEffect cfg ram0 A x wd ram' evs' ∧
+        interp cfg.board cfg.img o (.store wd A x atomic k) ram0 i evs =
+          interp cfg.board cfg.img o k ram' i (evs ++ evs') ∧ MemHolds ρ ram' memF
+  | [], mem, memF, ram, h, _, _, hst => by
+    simp only [List.foldlM, pure, Option.some.injEq] at h; subst h
+    rcases hst with ⟨hA, _⟩ | ⟨ram0, ram', evs', he, hr, hi, hm⟩
+    · simp at hA
+    · exact ⟨ram0, ram', evs', he, hi, hr ▸ hm⟩
+  | a :: as, mem, memF, ram, h, hwf, hrel, hst => by
+    simp only [List.foldlM, bind, Option.bind] at h
+    cases hs : storeAt cfg s mem a wd V atomic false with
+    | none => rw [hs] at h; simp at h
+    | some mem1 =>
+      rw [hs] at h
+      have hshape := storeAt_weak_shape hs
+      have hwf1 : ∀ c ∈ mem1, c.wf cfg = true := fun c hc => by
+        obtain ⟨d, hd, e⟩ := hshape c hc; exact cell_wf_of_shape e (hwf d hd)
+      have hrel1 : ∀ c ∈ mem1, c.base = .rel → Disj (c.at ρ) c.w A wd := fun c hc hb => by
+        obtain ⟨d, hd, e⟩ := hshape c hc
+        rw [cell_at_of_shape e, e.2.2.1]; exact hrel d hd (e.1 ▸ hb)
+      have ih := @absStore_fold_sound cfg s wd V atomic ρ A x hram hV hVw o i evs k as mem1 memF
+      rcases hst with ⟨hA, hm⟩ | ⟨ram0, ram', evs', he, hr, hi, hm⟩
+      · by_cases ha : A.toNat = a
+        · -- This candidate is the address written.
+          have hsep : cfg.board.inRam (w a) wd.bytes = true → StoreSep ρ mem .abs a wd V := fun hin =>
+            storeSep_abs hram hwf (by rw [← ha]; exact toNat_lt A) hin
+              (fun c hc hb => by rw [show w a = A by rw [← ha]; exact w_toNat A]; exact hrel c hc hb)
+          obtain ⟨ram', evs', hi, he, hm'⟩ := storeAt_written hs ha hV hVw hm hsep o i evs k
+          exact ih ram' h hwf1 hrel1 (.inr ⟨ram, ram', evs', he, rfl, hi, hm'⟩)
+        · simp only [List.mem_cons] at hA
+          rcases hA with hA | hA
+          · exact absurd hA ha
+          · exact ih ram h hwf1 hrel1 (.inl ⟨hA, (storeAt_weak_weakens hs hm).1⟩)
+      · exact ih ram h hwf1 hrel1 (.inr ⟨ram0, ram', evs', he, hr, hi, (storeAt_weak_weakens hs hm).1⟩)
+
 end E5R.AI
