@@ -123,13 +123,15 @@ async fn actuator() {
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
+    // Spawn before the timer interrupt is enabled, so every task the
+    // interrupt handler can wake is already fully initialized.
+    spawner.spawn(sampler().unwrap());
+    spawner.spawn(actuator().unwrap());
     set_mtimecmp(u64::MAX);
     unsafe {
         riscv::register::mie::set_mtimer();
         riscv::interrupt::enable();
     }
-    spawner.spawn(sampler().unwrap());
-    spawner.spawn(actuator().unwrap());
 }
 
 #[panic_handler]
