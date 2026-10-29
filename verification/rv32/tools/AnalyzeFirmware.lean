@@ -18,10 +18,6 @@ def main (args : List String) : IO UInt32 := do
         | some .top => true
         | some _ => false
       IO.eprintln s!"lost {lost.length}: {(lost.map fun j => (j, st.nodes[j]!.pc, st.nodes[j]!.hnd)).take 400}"
-  -- Debug aid: `E5R_DUMP_PC=<pc>` prints every node at that pc.
-  if let some pcs ← IO.getEnv "E5R_DUMP_PC" then
-    if let some pc := pcs.toNat? then
-      for s in st.nodes.toList.filter (·.pc == pc) do IO.eprintln s!"dump: {brief s}"
   -- `--force` writes the certificate even with errors (it will not check),
   -- for measuring the checker.
   if !st.errors.isEmpty && !args.contains "--force" then return 1

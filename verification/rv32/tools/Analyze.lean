@@ -38,10 +38,12 @@ def joinCells (a b : List Cell) : List Cell :=
     !(joined.any fun d => d.base == c.base && d.addr == c.addr && d.w == c.w && d.guard == c.guard) &&
     Cell.leqIn a c
   -- A guarded fact whose value admits the guard's null is useless.
-  (joined ++ fromB).filter fun c => match c.guard, c.v with
+  let r := (joined ++ fromB).filter fun c => match c.guard, c.v with
     | some _, .vals l => !(0 ∈ l)
     | some _, _ => false
     | none, _ => true
+  -- `lookup` uses the first fact that applies, so guarded (sharper) facts go first.
+  r.filter (·.guard.isSome) ++ r.filter (·.guard.isNone)
 
 def ajoin (a b : AState) : AState :=
   { a with
@@ -78,13 +80,15 @@ def nullable (v : AV) : Bool :=
     discriminant). The next rounds keep only the proposals that hold. -/
 def proposeGuards (G : List Cell) : List Cell :=
   let cands := G.filter fun c => c.guard.isNone && nullable c.v
-  G ++ cands.flatMap fun x => (cands.filter fun y =>
+  let P := cands.flatMap fun x => (cands.filter fun y =>
       y.addr != x.addr && y.addr + 64 ≥ x.addr && y.addr ≤ x.addr + 64).filterMap fun y =>
     match x.v with
     | .vals l =>
       let c : Cell := { x with v := .vals (l.filter (· ≠ 0)), guard := some (y.addr, y.w, 0) }
       if G.contains c then none else some c
     | _ => none
+  -- Guarded facts first: `lookup` takes the first fact that applies.
+  P ++ G
 
 structure Setup where
   cfg : Config
@@ -300,6 +304,10 @@ partial def fixG (su : Setup) (G : Option (List Cell)) (round : Nat) (proposed :
     IO.eprintln s!"  G: {(st.G.getD []).map fun c => (c.addr, reprStr c.w, reprStr c.v, c.guard.isSome)}"
     let gs := (st.G.getD []).filter (·.guard.isSome)
     IO.eprintln s!"  guarded: {gs.map fun c => (c.addr, reprStr c.v, c.guard.map fun g => (g.1, reprStr g.2.1, g.2.2))}"
+  -- Debug aid: `E5R_DUMP_PC=<pc>` prints that pc's nodes after every round.
+  if let some pcs ← IO.getEnv "E5R_DUMP_PC" then
+    if let some pc := pcs.toNat? then
+      for s in st.nodes.toList.filter (·.pc == pc) do IO.eprintln s!"dump round {round}: {brief s}"
   if round ≥ 60 then return st
   if st.restart then fixG su st.G (round+1) proposed
   else if !proposed && st.errors.size > 0 then
