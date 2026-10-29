@@ -261,6 +261,7 @@ As checked on 2026-10-29 on the development host (Lean 4.35.0, rustc 1.98.1):
 | --- | --- | --- | --- |
 | `hifive1-duty` (`duty_contract`, `nonvacuous`, 30 model controls, image fidelity) | 50 | 40 s | 957 MiB |
 | `hifive1-clamp32` (`clamp_all`, `spec_toNat`, `wraps`, `nonvacuous`, image fidelity) | 15 | 20 s | 596 MiB |
+| `hifive1-checker` (`E5R.AI.check_sound`, image fidelity) | 2 | 138 s | 952 MiB |
 
 `duty_contract` is proved about the instructions rustc emitted for `duty()`
 in the checked image. From every state meeting the calling convention (`a0`
