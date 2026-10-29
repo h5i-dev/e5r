@@ -119,7 +119,7 @@ theorem body {c₀ ram p k c} (pre : B.ramBase ≤ p.toNat ∧ p.toNat + 8 ≤ B
   have hbyte : (extend .b false (ramRead ram (p + BitVec.ofNat 32 k) .b)).toNat =
       (ram (p + BitVec.ofNat 32 k)).toNat := by
     have := (ram (p + BitVec.ofNat 32 k)).isLt
-    simp only [extend, ramRead, BitVec.toNat_and, BitVec.toNat_setWidth]
+    simp only [extend, ramRead, BitVec.toNat_and, BitVec.toNat_ofNat]
     rw [show (0xff : Word).toNat = 2^8 - 1 from rfl, Nat.and_two_pow_sub_one_eq_mod]; omega
   generalize hbv : extend .b false (ramRead ram (p + BitVec.ofNat 32 k) .b) = byte at hbyte
   -- The machines along the iteration.

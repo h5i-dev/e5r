@@ -87,20 +87,25 @@ def romRead? (img : List Segment) (a n : Nat) (fetch : Bool) : Option Word :=
 def Board.inRam (B : Board) (a : Word) (n : Nat) : Bool :=
   B.ramBase ≤ a.toNat && a.toNat + n ≤ B.ramBase + B.ramSize
 
+/-- Little-endian bytes as a number. (Written arithmetically rather than with
+    shifts and ORs so that frame and read-after-write facts are linear.) -/
 def ramRead (ram : Word → BitVec 8) (a : Word) : Width → Word
-  | .b => (ram a).setWidth 32
-  | .h => ((ram (a+1)).setWidth 32 <<< 8) ||| (ram a).setWidth 32
-  | .w => ((ram (a+3)).setWidth 32 <<< 24) ||| ((ram (a+2)).setWidth 32 <<< 16) |||
-          ((ram (a+1)).setWidth 32 <<< 8) ||| (ram a).setWidth 32
+  | .b => BitVec.ofNat 32 (ram a).toNat
+  | .h => BitVec.ofNat 32 ((ram a).toNat + 256 * (ram (a+1)).toNat)
+  | .w => BitVec.ofNat 32 ((ram a).toNat + 256 * (ram (a+1)).toNat +
+            65536 * (ram (a+2)).toNat + 16777216 * (ram (a+3)).toNat)
 
 def ramPut (ram : Word → BitVec 8) (a : Word) (b : BitVec 8) : Word → BitVec 8 :=
   fun x => if x = a then b else ram x
 
+/-- Byte `k` of `v`. -/
+def byteOf (v : Word) (k : Nat) : BitVec 8 := BitVec.ofNat 8 (v.toNat / 256 ^ k)
+
 def ramWrite (ram : Word → BitVec 8) (a v : Word) : Width → (Word → BitVec 8)
-  | .b => ramPut ram a (v.extractLsb' 0 8)
-  | .h => ramPut (ramPut ram a (v.extractLsb' 0 8)) (a+1) (v.extractLsb' 8 8)
-  | .w => ramPut (ramPut (ramPut (ramPut ram a (v.extractLsb' 0 8)) (a+1) (v.extractLsb' 8 8))
-            (a+2) (v.extractLsb' 16 8)) (a+3) (v.extractLsb' 24 8)
+  | .b => ramPut ram a (byteOf v 0)
+  | .h => ramPut (ramPut ram a (byteOf v 0)) (a+1) (byteOf v 1)
+  | .w => ramPut (ramPut (ramPut (ramPut ram a (byteOf v 0)) (a+1) (byteOf v 1))
+            (a+2) (byteOf v 2)) (a+3) (byteOf v 3)
 
 def Board.device? (B : Board) (a : Word) : Option DevReg :=
   B.devices.find? (fun d => d.addr == a.toNat)

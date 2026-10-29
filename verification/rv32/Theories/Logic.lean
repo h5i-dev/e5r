@@ -131,6 +131,8 @@ theorem exec_op (c : Core) (len : Word) (op rd rs1 rs2) :
     exec c len (.op op rd rs1 rs2) = .done (c.wr rd (alu op (c.get rs1) (c.get rs2)) (c.pc + len)) := rfl
 theorem exec_lui (c : Core) (len : Word) (rd imm) :
     exec c len (.lui rd imm) = .done (c.wr rd imm (c.pc + len)) := rfl
+theorem exec_auipc (c : Core) (len : Word) (rd imm) :
+    exec c len (.auipc rd imm) = .done (c.wr rd (c.pc + imm) (c.pc + len)) := rfl
 theorem exec_load (c : Core) (len : Word) (w signed rd rs1 off) :
     exec c len (.load w signed rd rs1 off) =
       .load w (c.get rs1 + off) false (fun v => .done (c.wr rd (extend w signed v) (c.pc + len))) := rfl
@@ -205,5 +207,53 @@ theorem Board.inRam_iff (a : Word) (n : Nat) :
 theorem ramRead_b (ram : Word → BitVec 8) (a : Word) : (ramRead ram a .b).toNat = (ram a).toNat := by
   have := (ram a).isLt
   simp [ramRead]; omega
+
+/-! ## RAM frames -/
+
+theorem ramPut_ne {ram : Word → BitVec 8} {a x : Word} (b : BitVec 8) (h : x ≠ a) :
+    ramPut ram a b x = ram x := by simp [ramPut, h]
+
+@[simp] theorem ramPut_eq (ram : Word → BitVec 8) (a : Word) (b : BitVec 8) :
+    ramPut ram a b a = b := by simp [ramPut]
+
+/-- `a + i ≠ a + j` for distinct small offsets: the word's four bytes are
+    distinct addresses even where the address space wraps. -/
+theorem add_ne_add (a : Word) {i j : Nat} (hi : i < 4) (hj : j < 4) (h : i ≠ j) :
+    a + BitVec.ofNat 32 i ≠ a + BitVec.ofNat 32 j := by
+  intro e; have := congrArg BitVec.toNat e
+  simp [BitVec.toNat_add] at this; omega
+
+theorem ramWrite_w_other (ram : Word → BitVec 8) (a v x : Word)
+    (h : ∀ k < 4, x ≠ a + BitVec.ofNat 32 k) : ramWrite ram a v .w x = ram x := by
+  have h0 := h 0 (by decide); have h1 := h 1 (by decide)
+  have h2 := h 2 (by decide); have h3 := h 3 (by decide)
+  simp only [BitVec.add_zero] at h0 h1 h2 h3
+  simp [ramWrite, ramPut, h0, h1, h2, h3]
+
+theorem ramRead_ramWrite_w (ram : Word → BitVec 8) (a v : Word) :
+    ramRead (ramWrite ram a v .w) a .w = v := by
+  have ne : ∀ i j : Nat, i < 4 → j < 4 → i ≠ j → a + BitVec.ofNat 32 i ≠ a + BitVec.ofNat 32 j :=
+    fun i j hi hj h => add_ne_add a hi hj h
+  have d01 : a ≠ a + 1 := by simpa using ne 0 1 (by decide) (by decide) (by decide)
+  have d02 : a ≠ a + 2 := by simpa using ne 0 2 (by decide) (by decide) (by decide)
+  have d03 : a ≠ a + 3 := by simpa using ne 0 3 (by decide) (by decide) (by decide)
+  have d12 : a + 1 ≠ a + 2 := by simpa using ne 1 2 (by decide) (by decide) (by decide)
+  have d13 : a + 1 ≠ a + 3 := by simpa using ne 1 3 (by decide) (by decide) (by decide)
+  have d23 : a + 2 ≠ a + 3 := by simpa using ne 2 3 (by decide) (by decide) (by decide)
+  simp only [ramRead, ramWrite, ramPut, byteOf, d01, d02, d03, d12, d13, d23, Ne.symm d01,
+    Ne.symm d02, Ne.symm d03, Ne.symm d12, Ne.symm d13, Ne.symm d23, ite_true, ite_false]
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_ofNat]
+  have := v.isLt
+  omega
+
+/-- A word read only depends on the four bytes it covers. -/
+theorem ramRead_w_congr {ram ram' : Word → BitVec 8} (a : Word)
+    (h : ∀ k < 4, ram' (a + BitVec.ofNat 32 k) = ram (a + BitVec.ofNat 32 k)) :
+    ramRead ram' a .w = ramRead ram a .w := by
+  have h0 := h 0 (by decide); have h1 := h 1 (by decide)
+  have h2 := h 2 (by decide); have h3 := h 3 (by decide)
+  simp only [BitVec.add_zero] at h0 h1 h2 h3
+  simp [ramRead, h0, h1, h2, h3]
 
 end E5R

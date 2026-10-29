@@ -8,3 +8,4 @@ Projects/rust_clamp/ImageO*.lean
 Audit.lean
 build/
 Projects/hifive1/Image.lean
+Projects/hifive1/clamp/Image.lean
