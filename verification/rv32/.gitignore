@@ -13,3 +13,4 @@ Projects/hifive1/Image.lean
 Projects/*/Image.lean
 Projects/rust_clamp/ImageO*.lean
 Projects/rmk/*/Image.lean
+Projects/*/ImageFidelity.lean
