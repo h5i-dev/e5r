@@ -1,0 +1,16 @@
+ok changed memmove instruction against the pin: exit 13 | error ELF identity changed (09705af12acc4688189072edf56d96c9a6e8e66e3d0553d91913966261ebc610, job pins f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30); review the new bytes and update elf_sha256
+ok stale proof address: exit 13 | error no symbol containing "memmove" at 0x80020c20: the proof's addresses are stale
+ok image declared as flash on the RAM board: exit 13 | error board qemu-virt-rv32 places images in ram; this job's image.kind is flash
+ok false claim about the board: exit 10 | failed build/testjobs/MemmoveWrongBoard.lean: exited with exit status: 1
+build/testjobs/MemmoveWrongBoard.lean:2:105: error: unsolved goals
+⊢ Rmk.B = QemuVirtRv32.board (2147654600 + 4)
+ok changed memmove instruction, unpinned: the proof fails: exit 10 | failed Projects/rmk/MemmoveFetch.lean: exited with exit status: 1
+Projects/rmk/MemmoveFetch.lean:28:68: error: Tactic `decide` proved that the proposition
+  fetchT textByte 2147618214 = some (1085605555, 4)
+is false
+ok bundle with a changed packed word: exit 1 | Projects/rmk/Elf.lean: FAILED
+sha256sum: WARNING: 1 computed checksum did NOT match
+ok same, checksum forged: the packing check refuses: exit 1 | Traceback (most recent call last):
+  File "verification/rv32/build/testjobs/bundle-copy/check-packing.py", line 10, in <module>
+    assert data[:n] == elf and not any(data[
+all memmove job controls passed
