@@ -143,3 +143,67 @@ below sp at the wrapper's entry. The `decode_in_place` contract (0x8001e006,
 straight-line around this call) is not proved yet. It should give
 `[out] = 0xffffffff` on success, the error code otherwise, and
 `[out+4] = [res+8]`.
+
+## Negative controls, bundle and recheck (both contracts, runner image)
+
+Controls: `python3 -I scripts/test-rmk-cobs-job.py E5R_VERIFY`; transcript
+`verification/rv32/ram-image/rmk-qemu-riscv-rynk/cobs-job-controls.txt`.
+* **How proof mutations are run:** each edits copies of the Cobs modules (renamed into
+  `build/testjobs/cobsmut/`) and runs the job on them.
+* **What counts as a rejection:** `failed`, with the first Lean error located by
+  re-running Lean on the failing module, inside a theorem of the mutated chain, and not an
+  import or unknown-identifier error.
+
+| Mutation | Result |
+| --- | --- |
+| unmodified copies (control) | `proved` |
+| read guard: `Spec.block` invalid iff n ≤ src+code (was <) | rejected in Loop `block_small` |
+| result tag swapped in `Res` | rejected in `decode` |
+| decoded length + 1 in `Res` | rejected in `decode` |
+| `CobsEnv.bufFrame := True` (buffer may overlap the frame) | rejected in Loop `exit_from` (first use of the hypothesis) |
+| wrapper success word 0xfffffffe in `WRes` | rejected in `decode_in_place` |
+| `WEnv.outFrame := True` (result may overlap the frame) | rejected in `decode_in_place` |
+| opcode: 0x8001e0b2 `sb a5,0(s1)` → `sb a4,0(s1)` in the ELF (unpinned) | rejected at instruction fact `f8001e0b2` |
+| a job module that does not exist | `error` (a tool problem, not a rejection) |
+
+A rejected precondition mutation shows the proof needs that hypothesis. It does not show
+the weakened statement is false.
+
+Bundle: `e5r-verify bundle jobs/rmk/rmk-cobs-decode.json` (281 s), then `recheck.sh`
+(158 s).
+* The packing check passed: all 454,024 ELF bytes equal the Lean literal.
+* Every theorem rechecks with exactly the recorded axioms, the 10 in `axioms.expected`.
+* A separate `leanchecker` replay of the bundle's Cobs modules passes.
+* Receipts are in `ram-image/rmk-qemu-riscv-rynk/cobs-bundle/`.
+
+### Exact preconditions
+
+**`decode` (`CobsEnv`):**
+* pc = 0x8001e02e, and no interrupt enabled (`Quiet`);
+* the result slot [a0, a0+12) in model RAM, with a0 ≡ 0 mod 4;
+* the buffer [a1, a1+len) in model RAM, with len = a2 ≤ 488;
+* the frame [sp−16, sp) in model RAM, with sp ≡ 0 mod 4;
+* slot, buffer and frame pairwise disjoint;
+* ra even.
+
+**`decode_in_place` (`WEnv`):**
+* pc = 0x8001e006;
+* the result [a0, a0+8), the buffer, and the frame [sp−48, sp);
+* otherwise the same conditions as `CobsEnv`.
+
+"Model RAM" is [0x80029bc8, 0x81000000): `QemuVirtRv32.board rwBase`.
+
+### Assumptions that remain (not established here)
+
+* **ISA model:** the RV32 model (Theories/Hart, Platform) describes the hart. Main's QEMU
+  replay is evidence for this, not part of these theorems.
+* **Interrupts:** none is enabled during the call (`Quiet` is a premise).
+* **Where the data lives:** buffer, slot and frame are in model RAM. Below rwBase the model
+  treats the image as read-only, while on QEMU it is writable RAM. A caller with data there
+  is not covered.
+* **The binary:** the pinned ELF f39d833f, reproducible only at its original build path
+  (`rmk-r0-audit/`).
+* **The spec:** `Spec.run` transliterates the emitted loop. No claim is made that it equals
+  COBS as standardized.
+* **Scope:** these are function contracts. `next`'s composition (main) must establish
+  `WEnv` at its call site.
