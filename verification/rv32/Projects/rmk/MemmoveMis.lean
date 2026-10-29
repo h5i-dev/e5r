@@ -210,6 +210,9 @@ theorem end_any (g : Core) (R0 : Word → BitVec 8) (o : Nat) (ho : 0 < o ∧ o 
 /-- memmove's own stack frame below `sp`. -/
 def InFrame (sp x : Word) : Prop := sp.toNat - 48 ≤ x.toNat ∧ x.toNat < sp.toNat
 
+/-- The misaligned path's stack temporaries: sp' + 0xe .. sp' + 0x18 with sp' = sp - 48. -/
+def InTemps (sp x : Word) : Prop := sp.toNat - 34 ≤ x.toNat ∧ x.toNat < sp.toNat - 24
+
 /-- The RAM of the misaligned path, outside memmove's frame (abstract, small context). -/
 theorem mis_ram (R0 R2 Rt : Word → BitVec 8) (s d sp H W T : Word) (n j : Nat)
     (hsum : H.toNat + W.toNat + T.toNat = n) (hj : 4 * (j + 1) + 4 = W.toNat) (hH : H.toNat < 4)
@@ -220,20 +223,20 @@ theorem mis_ram (R0 R2 Rt : Word → BitVec 8) (s d sp H W T : Word) (n j : Nat)
     (hsepd : d.toNat + n + 48 ≤ sp.toNat ∨ sp.toNat ≤ d.toNat)
     (hseps : s.toNat + n + 48 ≤ sp.toNat ∨ sp.toNat ≤ s.toNat)
     (hal : (d + H).toNat % 4 = 0)
-    (hZ2 : ∀ y, ¬ InFrame sp y → R2 y = fwd R0 s d H.toNat y)
-    (hRt : ∀ y, ¬ InFrame sp y → Rt y = words R2 (s + H) (d + H) (j + 1) y) :
-    ∀ x, ¬ InFrame sp x →
+    (hZ2 : ∀ y, ¬ InTemps sp y → R2 y = fwd R0 s d H.toNat y)
+    (hRt : ∀ y, ¬ InTemps sp y → Rt y = words R2 (s + H) (d + H) (j + 1) y) :
+    ∀ x, ¬ InTemps sp x →
       fwd (ramWrite Rt (d + H + BitVec.ofNat 32 (4 * (j + 1)))
           (ramRead (words R2 (s + H) (d + H) (j + 1)) (s + H + BitVec.ofNat 32 (4 * (j + 1))) .w) .w)
         (s + H + W) (d + H + W) T.toNat x = fwd R0 s d n x := by
   intro x hx
-  let Z := InFrame sp
+  let Z := InTemps sp
   let R1 := fwd R0 s d H.toNat
   let F1 := fwd R1 (s + H) (d + H) (4 * (j + 1))
   have nZs : ∀ i, i < n - H.toNat → ¬ Z (s + H + BitVec.ofNat 32 i) := by
-    intro i hi hz; simp only [Z, InFrame] at hz; bv_omega
+    intro i hi hz; simp only [Z, InTemps] at hz; bv_omega
   have nZd : ∀ i, i < n - H.toNat → ¬ Z (d + H + BitVec.ofNat 32 i) := by
-    intro i hi hz; simp only [Z, InFrame] at hz; bv_omega
+    intro i hi hz; simp only [Z, InTemps] at hz; bv_omega
   have hloop : words R2 (s + H) (d + H) (j + 1) = fwd R2 (s + H) (d + H) (4 * (j + 1)) :=
     words_eq_fwd _ _ _ _ (by bv_omega) (by bv_omega) (by bv_omega)
   have hZl : ∀ y, ¬ Z y → words R2 (s + H) (d + H) (j + 1) y = F1 y := by
@@ -245,7 +248,7 @@ theorem mis_ram (R0 R2 Rt : Word → BitVec 8) (s d sp H W T : Word) (n j : Nat)
     intro y hy
     rw [word_spec2 _ _ _ _ _ (by bv_omega), fwd_spec _ _ _ _ _ (by bv_omega) (by bv_omega) (by bv_omega)]
     split
-    · exact hZl _ (by intro hz; simp only [Z, InFrame] at hz; bv_omega)
+    · exact hZl _ (by intro hz; simp only [Z, InTemps] at hz; bv_omega)
     · rw [hRt y hy]; exact hZl y hy
   have hF2 : fwd F1 (s + H + BitVec.ofNat 32 (4 * (j + 1))) (d + H + BitVec.ofNat 32 (4 * (j + 1))) 4 =
       fwd R1 (s + H) (d + H) (4 * (j + 1) + 4) := by rw [fwd_add]
@@ -272,7 +275,7 @@ theorem big_mis (c : Core) (R0 : Word → BitVec 8) (hq : Quiet c)
     (hseps : (c.get 11).toNat + (c.get 12).toNat + 48 ≤ (c.get 2).toNat ∨ (c.get 2).toNat ≤ (c.get 11).toNat) :
     ∃ k e Rf, QRun B img k ⟨Memmove.pro c, R0⟩ ⟨e, Rf⟩ ∧ e.pc = 0x800210b0 ∧
       Memmove.Frame c e [5, 7, 9, 11, 12, 13, 14, 15, 16, 17, 28, 29, 30] ∧
-      ∀ x, ¬ InFrame (c.get 2) x → Rf x = fwd R0 (c.get 11) (c.get 10) (c.get 12).toNat x := by
+      ∀ x, ¬ InTemps (c.get 2) x → Rf x = fwd R0 (c.get 11) (c.get 10) (c.get 12).toNat x := by
   have hdr := (B_ram _ _).mp hd
   have hsr := (B_ram _ _).mp hs
   have hHl := Memmove.headN_lt (c.get 10)
@@ -404,8 +407,8 @@ theorem big_mis (c : Core) (R0 : Word → BitVec 8) (hq : Quiet c)
     exact mis_ram R0 R2 Rt (c.get 11) (c.get 10) (c.get 2) (Memmove.headN (c.get 10)) W
       (c.get 12 - Memmove.headN (c.get 10) &&& 3#32) (c.get 12).toNat j
       (by rw [hT3']; omega) hj hHl hsr.2 hdr.2 hsr.1 hdr.1 hfr hdirN hsepd hseps hHa
-      (fun y hy => hl.ram y (by rw [h2]; intro ht'; apply hy; unfold InFrame; bv_omega))
-      (fun y hy => hRt y (by rw [g8_2]; intro e'; apply hy; subst e'; unfold InFrame; bv_omega)
-        (by rw [g8_2]; intro e'; apply hy; subst e'; unfold InFrame; bv_omega)) x hx
+      (fun y hy => hl.ram y (by rw [h2]; intro ht'; apply hy; unfold InTemps; bv_omega))
+      (fun y hy => hRt y (by rw [g8_2]; intro e'; apply hy; subst e'; unfold InTemps; bv_omega)
+        (by rw [g8_2]; intro e'; apply hy; subst e'; unfold InTemps; bv_omega)) x hx
 
 end E5R.Rmk
