@@ -140,6 +140,11 @@ theorem exit_from (c : Core) (R : Word → BitVec 8) (h : CobsEnv ⟨c, R⟩) (a
     rw [h10, ramWrite_w_out _ _ _ _ (by bv_omega) (by bv_omega)]
     exact hbytes j hj
 
+/-- A jump to `pc + off` from a core whose pc is the literal `pc`, landing at the literal `t`. -/
+theorem jump_lit (c : Core) (pc off t : Word) (hpc : c.pc = pc) (ht : pc + off = t) (h : t.getLsbD 0 = false) :
+    jump c (c.pc + off) = .done (c.goto t) := by
+  rw [hpc, ht]; exact jump_ok _ _ h
+
 /-! ## Comparisons of small indices -/
 
 theorem ult_small (a b : Nat) (ha : a < 2 ^ 32) (hb : b < 2 ^ 32) :
@@ -205,5 +210,136 @@ theorem G_exit (c : Core) (R : Word → BitVec 8) (h : CobsEnv ⟨c, R⟩) (n sr
       rw [g2 r this]; exact hi.keep r hr hr')
     (by rw [g2 7 (by decide)]; exact hi.t2)
   exact ⟨_, e, S', .step hq s1 (.step (Quiet.of_sameCsr ((Core.sameCsr_goto _ _).trans hi.csr) h.quiet) s2 hr), hx⟩
+
+/-- 0x8001e064 with src < n: falls through to the loop head 0x8001e068. -/
+theorem G_cont (c : Core) (R : Word → BitVec 8) (h : CobsEnv ⟨c, R⟩) (n src : Nat) (acc : List Nat)
+    (d : Core) (S : Word → BitVec 8) (hi : LInv c R n src acc d S) (hpc : d.pc = 0x8001e064) (hs : src < n) :
+    QRun B img 1 ⟨d, S⟩ ⟨d.goto 0x8001e068, S⟩ := by
+  have hl := h.len; have ord := hi.ord
+  have nt : ¬ (taken .geu (d.get 29) (d.get 14) = true) := by
+    simp only [taken, hi.t4, hi.a4, ult_small src n (by omega) (by omega)]; simp; omega
+  exact .single (Quiet.of_sameCsr hi.csr h.quiet) (dstep f8001e064 hpc (by rw [exec_branch, if_neg nt, hpc]; rfl))
+
+/-- 0x8001e116: li t4,1 ; li a1,1 ; j 0x8001e0f0 ; then the exit: invalid frame. -/
+theorem invalid_exit (c : Core) (R : Word → BitVec 8) (h : CobsEnv ⟨c, R⟩) (n src : Nat) (acc : List Nat)
+    (d : Core) (S : Word → BitVec 8) (hi : LInv c R n src acc d S) (hpc : d.pc = 0x8001e116) :
+    ∃ k e S', QRun B img k ⟨d, S⟩ ⟨e, S'⟩ ∧ ExitPrep c R 1 1 acc e S' := by
+  let d1 := d.wr 29 (alu .add (d.get 0) 0x1#32) 0x8001e118
+  let d2 := d1.wr 11 (alu .add (d1.get 0) 0x1#32) 0x8001e11a
+  let d3 := d2.goto 0x8001e0f0
+  have s1 : DetStep B img ⟨d, S⟩ ⟨d1, S⟩ := dstep f8001e116 hpc (by rw [exec_opimm, hpc]; rfl)
+  have s2 : DetStep B img ⟨d1, S⟩ ⟨d2, S⟩ := dstep f8001e118 rfl (by rw [exec_opimm]; rfl)
+  have s3 : DetStep B img ⟨d2, S⟩ ⟨d3, S⟩ := dstep f8001e11a rfl (by
+    rw [exec_jal, Core.set_zero]; exact jump_lit _ 0x8001e11a _ 0x8001e0f0 rfl (by decide) (by decide))
+  have k1 : d1.sameCsr c := (Core.sameCsr_wr _ _ _ _).trans hi.csr
+  have k2 : d2.sameCsr c := (Core.sameCsr_wr _ _ _ _).trans k1
+  have k3 : d3.sameCsr c := (Core.sameCsr_goto _ _).trans k2
+  have g3 : ∀ r : Reg, r ≠ 11 → r ≠ 29 → d3.get r = d.get r := fun r a b => by
+    simp [d3, d2, d1, Core.wr_get_ne, a, b]
+  obtain ⟨e, S', hr, hx⟩ := exit_from c R h acc d3 S rfl k3
+    (by rw [g3 10 (by decide) (by decide)]; exact hi.a0) (by rw [g3 2 (by decide) (by decide)]; exact hi.sp)
+    (by rw [g3 1 (by decide) (by decide)]; exact hi.ra) hi.bytes hi.outside 1 1
+    (by simp [d3, d2, Core.wr_get_self, alu]) (by simp [d3, d2, d1, Core.wr_get_ne, Core.wr_get_self, alu])
+    (fun r hr hr' => by
+      have a : r ≠ 11 := fun e => hr (by subst e; decide)
+      have b : r ≠ 29 := fun e => hr (by subst e; decide)
+      rw [g3 r a b]; exact hi.keep r hr hr')
+    (by rw [g3 7 (by decide) (by decide)]; exact hi.t2)
+  have q := fun (x : Core) (hx : x.sameCsr c) => Quiet.of_sameCsr hx h.quiet
+  exact ⟨_, e, S', .step (q _ hi.csr) s1 (.step (q _ k1) s2 (.step (q _ k2) s3 hr)), hx⟩
+
+/-- The tail 0x8001e0d8 with src < n: append a zero (dst < src) and go to the loop head. -/
+theorem tail_cont (c : Core) (R : Word → BitVec 8) (h : CobsEnv ⟨c, R⟩) (n src : Nat) (acc : List Nat)
+    (d : Core) (S : Word → BitVec 8) (hi : LInv c R n src acc d S) (hpc : d.pc = 0x8001e0d8)
+    (hs : src < n) (hd : acc.length < src) :
+    ∃ k e S', QRun B img k ⟨d, S⟩ ⟨e, S'⟩ ∧ e.pc = 0x8001e068 ∧ LInv c R n src (acc ++ [0]) e S' := by
+  have hl := h.len; have ord := hi.ord
+  have hb := h.buf; rw [B_ram] at hb; simp only at hb
+  have hb' : 0x80029bc8 ≤ (c.get 11).toNat ∧ (c.get 11).toNat + (c.get 12).toNat ≤ 0x81000000 := hb
+  let d1 := d.goto 0x8001e0dc
+  let d2 := d1.goto 0x8001e0e0
+  let d3 := d2.wr 13 (alu .add (d2.get 11) (d2.get 7)) 0x8001e0e4
+  let d4 := d3.goto 0x8001e0e8
+  let S1 := ramWrite S (d3.get 13 + 0x0#32) (d3.get 0) .b
+  let d5 := d4.wr 7 (alu .add (d4.get 7) 0x1#32) 0x8001e0ea
+  let d6 := d5.goto 0x8001e068
+  have nt1 : ¬ (taken .geu (d.get 29) (d.get 14) = true) := by
+    simp only [taken, hi.t4, hi.a4, ult_small src n (by omega) (by omega)]; simp; omega
+  have nt2 : ¬ (taken .geu (d1.get 7) (d1.get 12) = true) := by
+    simp only [taken, d1, Core.goto_get, hi.t2, hi.a2]
+    rw [← ofNat_toNat (c.get 12), ult_small _ _ (by omega) (by omega)]; simp; omega
+  have v3 : d3.get 13 = c.get 11 + BitVec.ofNat 32 acc.length := by
+    simp [d3, d2, d1, Core.wr_get_self, alu, hi.a1, hi.t2]
+  have hS1 : S1 = ramPut S (c.get 11 + BitVec.ofNat 32 acc.length) 0#8 := by
+    simp only [S1, ramWrite, v3, BitVec.add_zero, Core.get_zero]; rfl
+  have s1 : DetStep B img ⟨d, S⟩ ⟨d1, S⟩ := dstep f8001e0d8 hpc (by rw [exec_branch, if_neg nt1, hpc]; rfl)
+  have s2 : DetStep B img ⟨d1, S⟩ ⟨d2, S⟩ := dstep f8001e0dc rfl (by rw [exec_branch, if_neg nt2]; rfl)
+  have s3 : DetStep B img ⟨d2, S⟩ ⟨d3, S⟩ := dstep f8001e0e0 rfl (by rw [exec_op]; rfl)
+  have s4 : DetStep B img ⟨d3, S⟩ ⟨d4, S1⟩ :=
+    dstep_store f8001e0e4 rfl (exec_store _ _ _ _ _ _) (Nat.mod_one _)
+      (by show B.inRam _ 1 = true; rw [v3, BitVec.add_zero]; exact buf_inRam _ _ _ hb' (by omega))
+  have s5 : DetStep B img ⟨d4, S1⟩ ⟨d5, S1⟩ := dstep f8001e0e8 rfl (by rw [exec_opimm]; rfl)
+  have t6 : taken .ltu (d5.get 29) (d5.get 14) = true := by
+    simp only [taken, d5, d4, d3, d2, d1, Core.wr_get_ne _ _ _ _ _ (show (29 : Reg) ≠ 7 by decide),
+      Core.wr_get_ne _ _ _ _ _ (show (29 : Reg) ≠ 13 by decide),
+      Core.wr_get_ne _ _ _ _ _ (show (14 : Reg) ≠ 7 by decide),
+      Core.wr_get_ne _ _ _ _ _ (show (14 : Reg) ≠ 13 by decide), Core.goto_get, hi.t4, hi.a4,
+      ult_small src n (by omega) (by omega)]
+    simp; omega
+  have s6 : DetStep B img ⟨d5, S1⟩ ⟨d6, S1⟩ := dstep f8001e0ea rfl (by
+    rw [exec_branch, if_pos t6]; exact jump_lit _ 0x8001e0ea _ 0x8001e068 rfl (by decide) (by decide))
+  have k1 : d1.sameCsr c := (Core.sameCsr_goto _ _).trans hi.csr
+  have k2 : d2.sameCsr c := (Core.sameCsr_goto _ _).trans k1
+  have k3 : d3.sameCsr c := (Core.sameCsr_wr _ _ _ _).trans k2
+  have k4 : d4.sameCsr c := (Core.sameCsr_goto _ _).trans k3
+  have k5 : d5.sameCsr c := (Core.sameCsr_wr _ _ _ _).trans k4
+  have k6 : d6.sameCsr c := (Core.sameCsr_goto _ _).trans k5
+  have q := fun (x : Core) (hx : x.sameCsr c) => Quiet.of_sameCsr hx h.quiet
+  have g6 : ∀ r : Reg, r ≠ 7 → r ≠ 13 → d6.get r = d.get r := fun r a b => by
+    simp [d6, d5, d4, d3, d2, d1, Core.wr_get_ne, a, b]
+  refine ⟨_, d6, S1, .step (q _ hi.csr) s1 (.step (q _ k1) s2 (.step (q _ k2) s3 (.step (q _ k3) s4
+    (.step (q _ k4) s5 (.single (q _ k5) s6))))), rfl, ⟨k6, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
+    ?_, ?_, ?_⟩⟩
+  · rw [g6 10 (by decide) (by decide)]; exact hi.a0
+  · rw [g6 11 (by decide) (by decide)]; exact hi.a1
+  · rw [g6 12 (by decide) (by decide)]; exact hi.a2
+  · rw [g6 14 (by decide) (by decide)]; exact hi.a4
+  · rw [g6 29 (by decide) (by decide)]; exact hi.t4
+  · simp only [d6, d5, Core.goto_get, Core.wr_get_self _ (7 : Reg) _ _ (by decide), alu, List.length_append,
+      List.length_singleton]
+    rw [show d4.get 7 = d.get 7 by simp [d4, d3, d2, d1, Core.wr_get_ne], hi.t2]
+    apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_add, BitVec.toNat_ofNat]; omega
+  · rw [g6 17 (by decide) (by decide)]; exact hi.a7
+  · rw [g6 5 (by decide) (by decide)]; exact hi.t0
+  · rw [g6 6 (by decide) (by decide)]; exact hi.t1
+  · rw [g6 16 (by decide) (by decide)]; exact hi.a6
+  · rw [g6 2 (by decide) (by decide)]; exact hi.sp
+  · rw [g6 1 (by decide) (by decide)]; exact hi.ra
+  · intro r hr hr'
+    have a : r ≠ 7 := fun e => hr (by subst e; decide)
+    have b : r ≠ 13 := fun e => hr (by subst e; decide)
+    rw [g6 r a b]; exact hi.keep r hr hr'
+  · intro j hj
+    rw [hS1]
+    by_cases e : j = acc.length
+    · subst e; rw [put_same]; simp
+    · rw [put_other S _ _ _ j _ hb' (by omega) hj e, hi.bytes j hj]
+      by_cases hj' : j < acc.length
+      · rw [dif_pos hj', dif_pos (by simp; omega), List.getElem_append_left hj']
+      · rw [dif_neg hj', dif_neg (by simp; omega)]
+  · intro x hx; rw [hS1, put_outside S _ _ _ _ x hb' (by omega) hx]; exact hi.outside x hx
+  · simp only [List.length_append, List.length_singleton]; omega
+
+/-- The tail 0x8001e0d8 with src ≥ n: bgeu → 0x8001e064, then the success exit. -/
+theorem tail_exit (c : Core) (R : Word → BitVec 8) (h : CobsEnv ⟨c, R⟩) (n src : Nat) (acc : List Nat)
+    (d : Core) (S : Word → BitVec 8) (hi : LInv c R n src acc d S) (hpc : d.pc = 0x8001e0d8) (hs : n ≤ src) :
+    ∃ k e S', QRun B img k ⟨d, S⟩ ⟨e, S'⟩ ∧ ExitPrep c R 0 n acc e S' := by
+  have hl := h.len; have ord := hi.ord
+  have tk : taken .geu (d.get 29) (d.get 14) = true := by
+    simp only [taken, hi.t4, hi.a4, ult_small src n (by omega) (by omega)]; simp; omega
+  have s : DetStep B img ⟨d, S⟩ ⟨d.goto 0x8001e064, S⟩ := dstep f8001e0d8 hpc (by
+    rw [exec_branch, if_pos tk, hpc]; exact jump_ok _ _ (by show (0x8001e064 : Word).getLsbD 0 = false; decide))
+  obtain ⟨k, e, S', hr, hx⟩ := G_exit c R h n src acc _ S (hi.goto _) rfl hs
+  exact ⟨_, e, S', .step (Quiet.of_sameCsr hi.csr h.quiet) s hr, hx⟩
 
 end E5R.Rmk.Cobs
