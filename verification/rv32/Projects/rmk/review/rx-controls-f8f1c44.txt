@@ -1,0 +1,11 @@
+ok   baseline: the chain compiles
+ok   device read: register width check dropped (lbu from a non-byte register): REJECTED in Projects/rmk/DevRead.lean:42 (lands_lbu_dev): unsolved goals
+ok   device read: successors claimed only for the value 0 (oracle not quantified): REJECTED in Projects/rmk/DevRead.lean:52 (lands_lbu_dev): Type mismatch
+ok   trees: a non-quiet core's interrupt successor claimed to continue at the next instruction: REJECTED in Projects/rmk/review/RxAudit.lean:100 (irq_counter): Application type mismatch: The argument
+ok   rx: loop entered with cap = 0 allowed (cap ≥ 0, i ≤ cap): REJECTED in Projects/rmk/Deframer/Rx.lean:74 (rx_loop): omega could not prove the goal:
+ok   rx: assert_offset stack byte not required to be in RAM: REJECTED in Projects/rmk/Deframer/Rx.lean:98 (rx_loop): Type mismatch
+ok   rx: frame claim without the assert_offset stack byte: REJECTED in Projects/rmk/Deframer/Rx.lean:151 (rx_loop): Application type mismatch: The argument
+ok   rx: LSR address off by one (0x10000004, not a device register): REJECTED in Projects/rmk/Deframer/Rx.lean:85 (rx_loop): Application type mismatch: The argument
+ok   audit: the faulting machine against main's Lands (no-fault field present): REJECTED in Projects/rmk/review/RxAudit.lean:55 (weak_vacuous): Type mismatch
+ok   audit: non-vacuity witness with cap = 0: REJECTED in Projects/rmk/review/RxAudit.lean:79 (rx_witness): Tactic `decide` proved that the proposition
+every control failed in the expected declaration for the expected reason
