@@ -175,10 +175,18 @@ def main():
             # discharge (copy_contract, from the peer's PreM) must no longer check
             ("copy-dstsep", {"Spec": ("  dstSep : (m.core.get 10).toNat + (m.core.get 12).toNat ≤ (m.core.get 2).toNat - memmoveFrame\n",
                                       "  dstSep : (m.core.get 10).toNat + (m.core.get 12).toNat ≤ (m.core.get 2).toNat\n")}),
+            # CopyPost claims memmove leaves its register save slots [sp-12, sp) alone: false (it saves
+            # s0..s2 there), and only the discharge has to prove CopyPost
+            ("copy-post-slots", {"Spec": ("  ram : ∀ x, ¬ ((m₀.core.get 2).toNat - memmoveFrame ≤ x.toNat ∧ x.toNat < (m₀.core.get 2).toNat) →",
+                                          "  ram : ∀ x, ¬ ((m₀.core.get 2).toNat - memmoveFrame ≤ x.toNat ∧ x.toNat < (m₀.core.get 2).toNat - 12) →")}),
         ]
+    only = os.environ.get("ONLY")
+    if only:  # rerun selected cases only (comma-separated names), e.g. a control added later
+        cases = [c for c in cases if c[0] in only.split(",")]
     for name, edits in cases:
         write_chain(edits)
         expect(name, run(name), 10)
+    want = lambda n: not only or n in only.split(",")
     elf = bytearray(open(os.path.join(ROOT, JOB["elf"]), "rb").read())
     off = 0x1000 + (0x8001d58e - 0x80000000)
     w = int.from_bytes(elf[off:off + 4], "little")
@@ -186,13 +194,16 @@ def main():
     elf[off:off + 4] = (w ^ (1 << 12)).to_bytes(4, "little")  # funct3 110 (bltu) -> 111 (bgeu)
     open(os.path.join(T, "deframer-opcode.elf"), "wb").write(elf)
     write_chain({})
-    expect("opcode", run("opcode", elf="build/testjobs/deframer-opcode.elf"), 10)
-    if JOBID == "rmk-session-discharged":
-        # memmove's forward/backward dispatch 0x80020c3a bgeu a0,t5 -> bltu: the discharge must fail
+    if want("opcode"):
+        expect("opcode", run("opcode", elf="build/testjobs/deframer-opcode.elf"), 10)
+    if JOBID == "rmk-session-discharged" and want("memmove-opcode"):
+        # memmove's own direction check 0x80020daa bgeu a3,a2 (dst - src >= n: forward) -> bltu.
+        # (An earlier version flipped 0x80020c3a, which is compiler_builtins memcpy at 0x80020c26,
+        # never executed by this job: it rightly still proved. memmove proper starts at 0x80020d9e.)
         elf = bytearray(open(os.path.join(ROOT, JOB["elf"]), "rb").read())
-        off = 0x1000 + (0x80020c3a - 0x80000000)
+        off = 0x1000 + (0x80020daa - 0x80000000)
         w = int.from_bytes(elf[off:off + 4], "little")
-        assert w & 0x707f == 0x7063, hex(w)  # BRANCH, funct3 111 (bgeu)
+        assert w == 0x06c6fb63, hex(w)  # bgeu a3,a2,+0x76
         elf[off:off + 4] = (w ^ (1 << 12)).to_bytes(4, "little")  # -> 110 (bltu)
         open(os.path.join(T, "memmove-opcode.elf"), "wb").write(elf)
         write_chain({})
@@ -200,9 +211,11 @@ def main():
     i = SRC["Spec"].index("  ok : (ramRead m.ram (m₀.core.get 10) .w - 1)")
     j = SRC["Spec"].index("def CobsReportContract")
     write_chain({"Spec": (SRC["Spec"][i:j], "  ok : True\n\n")})
-    expect("probe: CobsPost.ok := True", run("probe"), 10, required=False)
+    if want("probe"):
+        expect("probe: CobsPost.ok := True", run("probe"), 10, required=False)
     write_chain({})
-    expect("tool-error: missing module", run("missing", modules="missing"), 13)
+    if want("missing"):
+        expect("tool-error: missing module", run("missing", modules="missing"), 13)
     print("all Deframer controls behaved as stated" if not failures else f"{failures} FAILED", flush=True)
     sys.exit(1 if failures else 0)
 
