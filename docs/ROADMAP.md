@@ -918,31 +918,24 @@ optional; direct and hybrid proofs are equally valid routes.
       buffer. The COBS decoder is proved (COBS worker,
       `Projects/rmk/Cobs/`: `decode_in_place_report` and the wrapper
       `decode_in_place`, job `jobs/rmk/rmk-cobs-decode.json`, 9/9 controls).
-      Deframer (`Projects/rmk/Deframer/Spec.lean`): all four methods are
-      proved on the pinned bytes, CONDITIONAL ONLY ON `CopyContract`
-      (memmove, a hypothesis):
-      - `tail_from_copy : TailFromCopy` (`Deframer/TailCopy.lean`; the
-        consumed = 0 path, `TailNoCopy.lean` `nocopy`, needs no hypothesis);
-      - `park_from_copy : ParkFromCopy` (`Deframer/Park.lean`);
-      - `unpark_from_copy : UnparkFromCopy` (`Deframer/Unpark.lean`);
-      - `next_from_copy : NextFromCopy` (`Deframer/CobsDischarge.lean`):
-        `next_from_deps` (`Deframer/Next.lean`, the whole frame loop for any
-        buffer contents) with `CobsReportContract` discharged by
-        `cobs_report`, from the COBS worker's `Cobs.decode` (the Ok test
-        holds only on the success path, whose decoded length is at most
-        the frame, `run_len`).
+      memmove is proved for every size, direction and alignment (peer:
+      `Memmove.contractAll`, Projects/rmk/MemmoveBwdAll.lean, 89ab0a6).
+      `Deframer/CopyDischarge.lean` proves `copy_contract : CopyContract` from
+      it, with an exact bridge and no weakening. So all four deframer methods
+      are proved UNCONDITIONALLY on the pinned bytes: `tail_contract`,
+      `park_contract`, `unpark_contract`, `next_contract`. With them come
+      `recv_step'` and `unpark_step'`. The COBS decoder is proved too (COBS
+      worker; `cobs_report`).
 
-      All modules rebuild from scratch, pass leanchecker and use only the
-      standard axioms. `CopyContract` is still open: it needs memmove for
-      n ≥ 16 backward and misaligned, which `contractB` does not cover
-      (peer). Not done: the panic controls, the deframer runner job (COBS
-      worker), and the session (`SessionSafe`, R4).
+      All 74 modules rebuild from source in 786 s and pass leanchecker, with
+      standard axioms only. Not done: the panic controls as runner jobs (COBS
+      worker owns the official jobs) and the session (R4).
 - [ ] **R4. Toward the session.** Compose R3 with the surrounding session
       loop and interrupts (checker, direct regions or summaries). *Accepted:*
       a kernel-checked theorem about the whole `run_session` path for the
       chosen property, or a documented, measured blocker.
-      *Status (partial, not accepted):* the receive step is proved,
-      CONDITIONAL on `CopyContract`. `Deframer/Session.lean` `recv_step`: from
+      *Status (partial, not accepted):* the receive step is proved
+      (`recv_step'`, unconditional since `copy_contract`). `Deframer/Session.lean` `recv_step`: from
       the session loop head 0x80003e1a with the deframer invariant, a quiet
       run, for any buffer contents, reaches one of two points:
       - `Some(k)`, 2 < k ≤ 488: 0x80003e70, after `park_pending` and

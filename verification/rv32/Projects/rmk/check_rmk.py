@@ -29,7 +29,7 @@ from pathlib import Path
 
 RV32 = Path(__file__).resolve().parents[2]
 PIN = 'f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30'
-ROOTS = ['Projects/rmk/MemmoveSmall.lean']
+ROOTS = ['Projects/rmk/MemmoveSmall.lean', 'Projects/rmk/MemmoveContract.lean', 'Projects/rmk/MemmoveFull.lean']
 ALLOWED = {'propext', 'Classical.choice', 'Quot.sound'}
 FORBIDDEN = ['sorry', 'admit', 'axiom', 'native_decide', 'ofReduceBool', 'implemented_by', 'extern',
              'unsafe', 'opaque', 'skipKernelTC', 'trustCompiler', 'run_cmd', 'run_elab', 'run_meta',

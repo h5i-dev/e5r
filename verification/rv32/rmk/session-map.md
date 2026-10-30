@@ -15,7 +15,8 @@ lives in the task future, a static whose bases are s6 = 0x8002a4bd and s7 = 0x80
 
 ## The loop and what is proved
 
-All of this is CONDITIONAL on `CopyContract` (memmove, still open).
+`CopyContract` (memmove) is a theorem: `Deframer.copy_contract`, from the peer's
+`Memmove.contractAll`. `recv_step'` and `unpark_step'` are the unconditional forms.
 
 | pc | Code | Status |
 | --- | --- | --- |

@@ -6,7 +6,8 @@
   obligation, and the constants marked CANDIDATE are read from the disassembly of the pinned ELF
   (f39d833f..., review/rmk/deframer-contracts.md on the review branch) and must be confirmed by
   the proof that uses them. No theorem in this file claims safety. Proved elsewhere, each
-  CONDITIONAL on `CopyContract` (memmove; not proved): `TailFromCopy` (TailCopy.lean),
+  conditional on `CopyContract`, which is a THEOREM (`copy_contract`, CopyDischarge.lean, from the
+  peer's Memmove.contractAll), so unconditional there: `TailFromCopy` (TailCopy.lean),
   `ParkFromCopy` (Park.lean), `UnparkFromCopy` (Unpark.lean), `NextFromCopy` (CobsDischarge.lean;
   `CobsReportContract` is a THEOREM there, `cobs_report`, from the COBS worker's Cobs.decode).
   Corrections made for those proofs: `CallEnv.selfAl/spAl`, `CopyEnv.spAl` (ABI alignment; the model
