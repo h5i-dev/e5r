@@ -61,7 +61,7 @@ def NW (c : Core) (M : Word → BitVec 8) (x : Word) : Prop :=
 /-- Where the None path may stop: the loop head again (with sp and RAM outside `NW` as at entry), or
     the read future's two boundaries. -/
 def NoneQ (c : Core) (M : Word → BitVec 8) (m : Machine) : Prop :=
-  (SessPre m ∧ m.core.get 2 = c.get 2 ∧ ∀ x, ¬ NW c M x → m.ram x = M x) ∨
+  (SessPre m ∧ m.core.get 2 = c.get 2 ∧ (∀ x, ¬ NW c M x → m.ram x = M x) ∧ m.core.get 26 = c.get 26) ∨
     m.core.pc = 0x80003ff2 ∨ m.core.pc = 0x80004428
 
 /-- The future-state stores touch only s6+0x2f3 .. s6+0x30c. -/
@@ -231,7 +231,7 @@ theorem none_step (m : Machine) (h : NoneAt m) : Lands B img (NoneQ m.core m.ram
   refine ⟨⟨rfl, Quiet.of_sameCsr (by
       unfold nCommitCore
       repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_)) xq,
-    ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_⟩
+    ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_⟩
   · show (nCommitCore x Mx).get 22 = s6v; simp [nCommitCore, Core.wr_get_ne, x22]
   · show (nCommitCore x Mx).get 23 = s7v; simp [nCommitCore, Core.wr_get_ne, x23]
   · show ((nCommitCore x Mx).get 2).toNat % 4 = 0; simp [nCommitCore, Core.wr_get_ne, x2]; exact hsa
@@ -250,5 +250,8 @@ theorem none_step (m : Machine) (h : NoneAt m) : Lands B img (NoneQ m.core m.ram
     have hyF : y ≠ F := fun e => n5 (by rw [e]; show ramRead Mx (x.get 2 + 0x00000024#32) .w = _; rw [x2, Fx])
     rw [show Mb y = Mx y from ramPut_ne _ hyF]
     exact MxM y (by omega) n4 (by omega)
+  · show (nCommitCore x Mx).get 26 = c.get 26
+    simp [nCommitCore, Core.wr_get_ne]
+    exact xs 26 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
 
 end E5R.Rmk.Deframer.NoneP

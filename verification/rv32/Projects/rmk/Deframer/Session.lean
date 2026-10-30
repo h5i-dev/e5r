@@ -88,6 +88,8 @@ structure RecvOut (m₀ m : Machine) : Prop where
           (m.core.get 25).toNat = discarding m.ram dfr ∧ (m.core.get 21).toNat ≤ (m.core.get 24).toNat ∧
           (m.core.get 24).toNat - (m.core.get 21).toNat = filled m.ram dfr ∧
           m.core.get 19 = ramRead m₀.ram 0x8002a784 .w)
+  /-- s10 (x26) is callee-saved in next, tail and park, and no segment writes it -/
+  s10 : m.core.get 26 = m₀.core.get 26
 
 theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
     ∃ k m, QRun B img k m₀ m ∧ RecvOut m₀ m := by
@@ -110,6 +112,7 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
   have K1_19 : K1.get 19 = 0x1e8#32 := by simp [K1, scallCore, Core.wr_get_ne, Core.wr_get_self, alu_add]
   have K1_22 : K1.get 22 = s6v := by simp [K1, scallCore, Core.wr_get_ne, h22]
   have K1_23 : K1.get 23 = s7v := by simp [K1, scallCore, Core.wr_get_ne, h23]
+  have K1_26 : K1.get 26 = c.get 26 := by simp [K1, scallCore, Core.wr_get_ne]
   have qK1 : Quiet K1 := Quiet.of_sameCsr csK1 h.quiet
   -- a call environment at this session's sp, for each method's frame
   have env : ∀ (K : Core) (pc : Nat) (frame : Nat), frame ≤ 0x70 → K.pc = BitVec.ofNat 32 pc → Quiet K →
@@ -156,6 +159,7 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
   have e1_22 : e1.get 22 = s6v := (NPs 22 (by decide)).trans K1_22
   have e1_23 : e1.get 23 = s7v := (NPs 23 (by decide)).trans K1_23
   have e1_2 : e1.get 2 = c.get 2 := NP.sp.trans K1_2
+  have e1_26 : e1.get 26 = c.get 26 := (NPs 26 (by decide)).trans K1_26
   have tag : (e1.get 10).toNat ≤ 1 := NP.tag
   have inv1 : Inv M1 dfr bufLen := by
     have := NP.inv
@@ -217,7 +221,7 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
         rw [show (⟨K2, M1⟩ : Machine).core.get 12 = 0x1e8#32 from K2_12]; rfl] at hret
     have dsc1 : discarding M1 dfr ≤ 1 := by
       have := NP.disc; rw [show (⟨K1, R0⟩ : Machine).core.get 10 = dfr from K1_10] at this; exact this
-    refine ⟨Quiet.of_sameCsr (cs3.trans TP.csr) qK2, ?_, ?_, ?_, ?_, .inr ⟨rfl, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩⟩
+    refine ⟨Quiet.of_sameCsr (cs3.trans TP.csr) qK2, ?_, ?_, ?_, ?_, .inr ⟨rfl, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_⟩
     · simp [stailCore, Core.wr_get_ne]; exact (TPs 22 (by decide)).trans K2_22
     · simp [stailCore, Core.wr_get_ne]; exact (TPs 23 (by decide)).trans K2_23
     · simp [stailCore, Core.wr_get_ne]; exact TP.sp.trans K2_2
@@ -268,6 +272,9 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
           show msgA.toNat = 0x8002a580 from rfl]
         have : bufLen = 488 := rfl
         omega)
+    · show (stailCore e2 M2).get 26 = c.get 26
+      rw [gS 26 (by decide) (by decide), TPs 26 (by decide)]
+      simp [K2, snoneCore, Core.wr_get_ne]; exact e1_26
   · -- Some: park, bounds check, the request decoder
     have a01 : (e1.get 10).toNat = 1 := by omega
     have val := NP.val a01
@@ -369,7 +376,7 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
     have gF : ∀ r : Reg, r ≠ 14 → r ≠ 15 → r ≠ 16 → Fc.get r = D.get r := fun r a b c' => by
       simp [Fc, sfromCore, Core.wr_get_ne, a, b, c']
     have csF : Fc.sameCsr D := by unfold Fc sfromCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
-    refine ⟨Quiet.of_sameCsr csF qD, ?_, ?_, ?_, ?_, .inl ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩⟩
+    refine ⟨Quiet.of_sameCsr csF qD, ?_, ?_, ?_, ?_, .inl ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_⟩
     · rw [gF 22 (by decide) (by decide) (by decide), gD 22 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]
       exact e3_22
     · rw [gF 23 (by decide) (by decide) (by decide), gD 23 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]
@@ -439,5 +446,9 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
       rw [w5 _ (by rw [show msgA.toNat = 0x8002a580 from rfl, show (dfr + 8 : Word).toNat = 0x8002a794 from rfl]; omega),
         w4 _ (by rw [show (dfr + 8 : Word).toNat = 0x8002a794 from rfl]; omega), hd3]
       exact dsc1
+    · show Fc.get 26 = c.get 26
+      rw [gF 26 (by decide) (by decide) (by decide), gD 26 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
+        PPs 26 (by decide)]
+      simp [K3, ssomeCore, Core.wr_get_ne]; exact e1_26
 
 end E5R.Rmk.Deframer.Session

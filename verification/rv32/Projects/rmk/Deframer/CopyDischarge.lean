@@ -44,6 +44,7 @@ theorem recv_step' (m₀ : Machine) (h : Session.SessPre m₀) : ∃ k m, QRun B
 /-- The session's unpark step (Deframer/SessionLoop.lean), without hypotheses. -/
 theorem unpark_step' (m₀ : Machine) (h : Session.UnparkAt m₀) :
     ∃ k m, QRun B img k m₀ m ∧ Session.SessPre m ∧ m.core.get 2 = m₀.core.get 2 ∧
+      m.core.get 26 = m₀.core.get 26 ∧
       filled m.ram Session.dfr = (ramRead m₀.ram 0x8002a798 .w).toNat ∧
       ∀ x, ¬ ((Session.dfr.toNat ≤ x.toNat ∧ x.toNat < Session.dfr.toNat + 12) ∨
               (Session.bufA.toNat ≤ x.toNat ∧ x.toNat < Session.bufA.toNat + bufLen) ∨
