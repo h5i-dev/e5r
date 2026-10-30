@@ -42,7 +42,28 @@ All of this is CONDITIONAL on `CopyContract` (memmove, still open).
 * `Session.unpark_step`: `UnparkAt` at 0x80003fd8 (parked ≤ 488, discarding ≤ 1) reaches
   `SessPre` at 0x80003e1a, at the same sp, with filled = parked.
 
+## Composition tools (proved)
+
+* `Projects/rmk/Reach.lean`:
+  * `reach_on_runs`: if every checkpoint starts a quiet deterministic run back to a checkpoint,
+    every machine reachable from the checkpoints is on such a run and has emitted no event.
+  * `reach_avoids`: the same, for an absorbing pc region with no checkpoint in it.
+* `Projects/rmk/PanicRegion.lean`:
+  * `panic_absorbing`: once in `slice_index_fail`, `panic_bounds_check`, `panic_fmt` or the `j .`
+    loop of `rust_begin_unwind`, a deterministic run never leaves.
+  * `reach_no_panic`: with checkpoints off the panic path, no reachable machine is at
+    0x8001fafc, 0x8001f83a or 0x8001e148.
+
+  This uses only the run endpoints, not their intermediate pcs.
+
 ## What closing the loop still needs (not assumed anywhere)
+
+* `reach_on_runs` covers only deterministic, event-free segments. Both gaps below do device I/O:
+  * UART writes emit events, so they are not `DetStep`;
+  * UART reads take their value from the environment.
+
+  The next composition step is a variant that allows deterministic steps emitting events
+  (writes), plus a branching argument over the read values (reads). Neither exists yet.
 
 * **Some gap.** From 0x80003e70 to 0x80003fd8 the code must:
   * keep s6, s7, sp and the stack bound;

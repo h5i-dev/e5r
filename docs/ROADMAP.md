@@ -955,7 +955,12 @@ optional; direct and hybrid proofs are equally valid routes.
       bytes, s6+0x2db and the 16-byte message. `Deframer/SessionLoop.lean`
       `unpark_step`: from the unpark call site 0x80003fd8 (parked ≤ 488,
       discarding ≤ 1) back to the loop head with `SessPre`. The map is
-      `verification/rv32/rmk/session-map.md`. Not proved: the dispatch from
+      `verification/rv32/rmk/session-map.md`. Composition tools, proved:
+      `Projects/rmk/Reach.lean` (`reach_on_runs`: quiet deterministic runs
+      between checkpoints cover every Reach-able machine) and
+      `Projects/rmk/PanicRegion.lean` (`panic_absorbing`, `reach_no_panic`).
+      These cover event-free deterministic segments only, and both session
+      gaps do UART I/O. Not proved: the dispatch from
       0x80003e70 to 0x80003fd8, the response write, `unpark_pending`'s call site, the UART read future and
       the executor between polls (other tasks, interrupts). `SessionSafe`
       ranges over all of these, so it is not proved.
