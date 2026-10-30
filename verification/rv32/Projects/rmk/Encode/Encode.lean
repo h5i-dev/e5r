@@ -155,9 +155,9 @@ theorem encTbl_ok : tblOK encTbl = true := by decide +kernel
 
 def encE : Env := ⟨0x8002a854, 0x81000000 - 0x148⟩
 
-def A40 : SE := mkLin (some 2, 0x40)
-def A44 : SE := mkLin (some 2, 0x44)
-def A140 : SE := mkLin (some 2, 0x140)
+def A40 : SE := mkLin (some 2, 0x00000040#32)
+def A44 : SE := mkLin (some 2, 0x00000044#32)
+def A140 : SE := mkLin (some 2, 0x00000140#32)
 
 /-- The response byte as the (only) initial cell of symbolic memory. -/
 def initW (r : Nat) : Wr := (A140, .b, .c (BitVec.ofNat 32 r))
