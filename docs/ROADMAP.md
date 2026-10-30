@@ -1006,7 +1006,14 @@ optional; direct and hybrid proofs are equally valid routes.
 
       Not proved:
       - that `SessInv` holds when the task first reaches the loop head
-        (initialization);
+        (initialization). Partly done: `Init/InitPath.lean` `init_round`
+        proves that from an explicit `InitAt` at 0x80003b38 (observed
+        argument, flag and UART-struct values; non-empty by
+        `InitWitness.initAt_real`) every behaviour reaches the loop head
+        with `SessInv`. `memset` is proved (`Init/Memset.memset_words`).
+        It assumes the NAMED, undischarged `TopicsNewContract`
+        (`TopicSubscribers::new`). That the first poll reaches `InitAt` is
+        open;
       - `DispatchContract` (`RynkService::dispatch` at 0x800001f2 is a
         12.6 KB async state machine) and `EncodeContract`;
       - the 0xff path and the send loop;

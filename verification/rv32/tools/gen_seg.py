@@ -21,7 +21,7 @@ def load_facts(path):
 
 def parse(instr):
     s = instr.replace('E5R.Instr.', '').replace('E5R.AluOp.', '').replace('E5R.Width.', '').replace(
-        'E5R.BrCond.', '').replace('(', '').replace(')', '')
+        'E5R.BrCond.', '').replace('E5R.MulOp.', '').replace('(', '').replace(')', '')
     return s.split()
 
 
@@ -96,6 +96,15 @@ class Seg:
                 rws = ['Core.get_zero' if int(rs1) == 0 else self.getfact(src, rs1)]
             expr = f"{src}.wr {rd} ({rhs}) 0x{npc:x}"
             proof = f"rw [exec_{kind}{''.join(', ' + r for r in rws)}]; rfl"
+            sc = 'Core.sameCsr_wr _ _ _ _'
+            self.regs[rd] = rhs
+        elif kind == 'muldiv':
+            # needs `exec_muldiv` (Projects/rmk/Init/MemsetFetch.lean) in scope
+            op, rd, rs1, rs2 = f[1], int(f[2]), f[3], f[4]
+            rhs = f"muldiv .{op} ({self.E(rs1)}) ({self.E(rs2)})"
+            rws = ['Core.get_zero' if r == 0 else self.getfact(src, r) for r in sorted({int(rs1), int(rs2)})]
+            expr = f"{src}.wr {rd} ({rhs}) 0x{npc:x}"
+            proof = f"rw [exec_muldiv{''.join(', ' + r for r in rws)}]; rfl"
             sc = 'Core.sameCsr_wr _ _ _ _'
             self.regs[rd] = rhs
         elif kind == 'lui':
