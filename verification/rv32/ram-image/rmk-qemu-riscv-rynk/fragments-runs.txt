@@ -1,3 +1,4 @@
 rmk-session-fragments run1 (fresh) exit=10 998s: MY wrapper error (ambiguous B/img), not a rejection of main's proofs
 rmk-session-fragments run2 (--resume on run1's from-source build, fixed wrapper 6cd37ce) exit=0 509s proved
 rmk-session-fragments @07a17e5 (SomeRound; wrapper 4ab7ba9) run1 FRESH (no --resume) exit=0 1604s proved; 32 theorems, axioms within propext/Classical.choice/Quot.sound. (094b8c6 receipt kept as rmk-session-fragments.094b8c6.result.json)
+VACUITY (2026-10-30): the 07a17e5 run above is a kernel-accepted IMPLICATION only. peer 3ecd81b proves not DispatchContract, not EncodeContract, not (both); some_round/some_pos/round_some have jointly false premises. NOT evidence the premises hold; NOT safety progress for the Some path.

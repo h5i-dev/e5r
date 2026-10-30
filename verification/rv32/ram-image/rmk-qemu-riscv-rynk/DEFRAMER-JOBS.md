@@ -186,3 +186,36 @@ Explicit hypotheses that remain:
 * `SomeAt` 0x80003e70, except when the message header is negative.
 
 **`SessionSafe` is NOT proved.**
+
+## Loop fragments refreshed for main 07a17e5 (receipt 85d7cd2): VACUOUS for the Some path
+
+> **READ FIRST.** The peer's audit (isa-review `3ecd81b`, `Projects/rmk/review/SomeAudit.lean`)
+> kernel-proves `¬ DispatchContract`, `¬ EncodeContract` and `¬ (DispatchContract ∧ EncodeContract)`
+> for 07a17e5's statements:
+> * `DispEnv` leaves the RynkService pointer [0x8002a780] and s9 free, and dispatch faults at 0x8000026e;
+> * `EncEnv` does not keep `Kept`'s UART struct bytes apart from the 7-byte buffer at 0x8002a7b1, and leaves s6 free.
+>
+> The `some_round`, `some_pos` and my `round_some` in this receipt are therefore **kernel-accepted
+> implications from premises that are false**. They are NOT evidence that the premises hold, and NOT
+> evidence about the Some path. The proved run, its bundle/recheck and any controls on it are **not
+> safety progress** for the Some path.
+
+What this receipt still does check: the same non-Some theorems as 094b8c6 (`session_round`,
+`unpark_round`, `none_of_recv`, `some_neg`, `none_step`, `rx_loop`, the reach lemmas, the memmove and
+COBS discharges, `unpark_lands`), now with main's widened `SW` and `Extras.spTop` = sp+0x148.
+
+| Run | Result |
+| --- | --- |
+| 07a17e5, wrapper 4ab7ba9, fresh (no `--resume`) | `proved` (1604 s); 32 theorems, axioms within {propext, Classical.choice, Quot.sound} |
+
+The rfl pins (`dispatch_def`, `encode_def`, `someQ_def`, `sw_def`, `extras_spTop`) fix *which*
+statements were checked. They say nothing about whether those statements are satisfiable.
+
+Repair is main's (coordinated in rmk-coordination.md):
+* `DispEnv`/`EncEnv` must constrain what the callees dereference (the service pointer and s9; s6; the separation of the UART struct from the encode buffer);
+* `SomeAt`/`SessInv` must carry those facts.
+
+I asked that each repaired contract ship with a non-vacuity witness. Until it is repaired, any job
+that pins `some_round` carries this caveat, plus the peer's refutation theorems as a vacuity marker.
+
+**`SessionSafe` is NOT proved.**
