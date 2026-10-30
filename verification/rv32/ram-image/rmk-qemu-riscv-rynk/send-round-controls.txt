@@ -1,0 +1,12 @@
+SendRound mutation controls (lean on copies of Projects/rmk/Uart/SendRound.lean against the job's from-source build;
+script verification/rv32/rmk-audit/send-mutations.py; main's files untouched). Baseline (unmodified copy): proved.
+
+control          | result                      | strength of evidence
+sp-sesspre       | rejected in slot_keep (omega) | SEMANTIC: with SessPre's sp >= 0x8002a808, send_bytes' frame [sp-0x50,sp) can reach the slots
+struct-in-slots  | rejected in env (omega)       | SEMANTIC: without selfSlots the loop's slot stores may overwrite the UART struct send_bytes reads
+len-zero         | rejected in ent (type mismatch at the len != 0 branch obligation) | relevant obligation (0x80004274 / panic 0x800042b4), but the failure is a direct proof-term mismatch
+outer-len        | rejected in ent (hout type mismatch) | WEAK: field passed directly; shows dependence, not why
+stride-2         | rejected in env (h.stride type mismatch) | WEAK: field passed directly to SendEnv (main's send_bytes needs stride 1)
+q-no-yield       | rejected in after (anonymous-constructor mismatch) | WEAK: shows the proof uses the yield disjunct, not that it is reachable
+
+None of these is a safety claim. SessionSafe is NOT proved.
