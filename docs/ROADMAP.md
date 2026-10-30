@@ -952,8 +952,11 @@ optional; direct and hybrid proofs are equally valid routes.
       - `None`: just after `tail`, with the invariant again.
 
       Along the way RAM writes stay in the deframer, the buffer, 0x70 stack
-      bytes, s6+0x2db and the 16-byte message. Not proved: the dispatch from
-      0x80003e70, the response write, `unpark_pending`'s call site, the UART read future and
+      bytes, s6+0x2db and the 16-byte message. `Deframer/SessionLoop.lean`
+      `unpark_step`: from the unpark call site 0x80003fd8 (parked ≤ 488,
+      discarding ≤ 1) back to the loop head with `SessPre`. The map is
+      `verification/rv32/rmk/session-map.md`. Not proved: the dispatch from
+      0x80003e70 to 0x80003fd8, the response write, `unpark_pending`'s call site, the UART read future and
       the executor between polls (other tasks, interrupts). `SessionSafe`
       ranges over all of these, so it is not proved.
 
