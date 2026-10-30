@@ -75,6 +75,18 @@ lives in the task future, a static whose bases are s6 = 0x8002a4bd and s7 = 0x80
     `Uart16550` struct in RAM; its contents are assumed, not proved), cap ≥ 1, the ranges in RAM,
     and the core quiet at entry.
 
+* `Projects/rmk/Deframer/NonePath.lean` `none_step`: from `recv_step`'s None point 0x80003f7c,
+  every behaviour, for every UART value, either
+  * returns to the loop head 0x80003e1a with `SessPre` (bytes read: filled += n ≤ 488), or
+  * stops at an EXPLICIT boundary: 0x80003ff2 (discarding / nothing pending) or 0x80004428 (buffer
+    full / no byte ready), where the read future and the executor take over. Those are not proved.
+
+  Explicit assumptions (`NoneAt`):
+  * the Uart16550 struct (base 0x10000000 at +0x1c, stride 1 at +0x20) lies outside the future's
+    state words;
+  * the task flag pointer at sp+0x24 points into RAM outside the deframer;
+  * there are 0x28 stack bytes above sp.
+
 ## What closing the loop still needs (not assumed anywhere)
 
 * `reach_on_runs` covers only deterministic, event-free segments. Both gaps below do device I/O:

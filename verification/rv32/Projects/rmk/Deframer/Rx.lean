@@ -51,7 +51,7 @@ structure RxAt (c0 : Core) (M0 : Word → BitVec 8) (e : Core) (M : Word → Bit
   ram : RxRam c0 M0 M i
 
 def RxOut (c0 : Core) (M0 : Word → BitVec 8) (m : Machine) : Prop :=
-  m.core.pc = 0x800043a8 ∧ (∀ r : Reg, r.val ∉ rxW → m.core.get r = c0.get r) ∧
+  m.core.pc = 0x800043a8 ∧ Quiet m.core ∧ (∀ r : Reg, r.val ∉ rxW → m.core.get r = c0.get r) ∧
     (m.core.get 9).toNat ≤ (c0.get 20).toNat ∧ RxRam c0 M0 m.ram (c0.get 20).toNat
 
 theorem rbr_none : romRead? img (0x10000000 : Word).toNat 1 false = none := rom_none _ (by decide)
@@ -137,7 +137,9 @@ theorem rx_loop (c0 : Core) (M0 : Word → BitVec 8) (E : RxEnv c0) :
     by_cases hz : alu .and (D.get 10) 0x00000001#32 = 0
     · -- no data: the exit
       have r3 := rxNo D M2 Dpc qD (by rw [hz]; rfl)
-      refine lands_of_qrun r3 ⟨rfl, ?_, ?_, ?_⟩
+      refine lands_of_qrun r3 ⟨rfl, Quiet.of_sameCsr (by
+        unfold rxNoCore
+        repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_)) qD, ?_, ?_, ?_⟩
       · intro r hr
         have hne : r ≠ 10 := fun e => by subst e; exact absurd hr (by decide)
         rw [show (rxNoCore D M2).get r = D.get r by
@@ -223,7 +225,9 @@ theorem rx_loop (c0 : Core) (M0 : Word → BitVec 8) (E : RxEnv c0) :
         have r5 := rxEnd U M3 Upc qU (Nat.mod_one _) hin (by
           rw [U20, U9, hi1]; simp only [taken, bne_eq_false_iff_eq]
           apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_ofNat]; omega)
-        refine lands_of_qrun r5 ⟨rfl, ?_, ?_, ramN _ (by omega)⟩
+        refine lands_of_qrun r5 ⟨rfl, Quiet.of_sameCsr (by
+          unfold rxEndCore
+          repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_)) qU, ?_, ?_, ramN _ (by omega)⟩
         · intro r hr
           have hne : r ≠ 9 := fun e => by subst e; exact absurd hr (by decide)
           rw [show (rxEndCore U M3).get r = U.get r by
