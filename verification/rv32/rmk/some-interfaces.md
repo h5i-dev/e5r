@@ -1,6 +1,9 @@
 # Some-path interfaces: repair proposal after the 07a17e5 audit (main, 2026-10-30)
 
-STATUS: PROPOSAL for agreement before shared-file edits. Until the repaired contracts are in place,
+STATUS (update): the dispatch side is IMPLEMENTED in main's files (Session RecvOut s9; SessionInv Extras
+svc/tx/txBase/txStride/fixNot, SomeAt.s9; SomeRound Kept +0x8002a200..0x8002a205, DispEnv svc/s9/msg/hdr,
+`DispatchContract W`, `WAt`; witnesses in Deframer/SomeWitness.lean). EncEnv still awaits the peer.
+Original status: PROPOSAL for agreement before shared-file edits. Until the repaired contracts are in place,
 `some_round` / `some_pos` (07a17e5, bf1723f) are VACUOUS. On 3ecd81b (verify/isa-review branch,
 review/SomeAudit.lean) the peer proved `dispatch_contract_false`, `encode_contract_false` and
 `some_hyps_false`. Treat no receipt that pins `some_round` as safety progress.

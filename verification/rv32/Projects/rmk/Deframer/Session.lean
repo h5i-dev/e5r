@@ -81,7 +81,8 @@ structure RecvOut (m₀ m : Machine) : Prop where
           3 ≤ (ramRead m.ram (msgA + 4) .w).toNat ∧ (ramRead m.ram (msgA + 4) .w).toNat ≤ bufLen ∧
           2 < (ramRead m.ram (msgA + 0xc) .w).toNat ∧ (ramRead m.ram (msgA + 0xc) .w).toNat ≤ bufLen ∧
           consumed m.ram dfr = 0 ∧ filled m.ram dfr = 0 ∧
-          (ramRead m.ram 0x8002a798 .w).toNat + 4 ≤ bufLen ∧ discarding m.ram dfr ≤ 1) ∨
+          (ramRead m.ram 0x8002a798 .w).toNat + 4 ≤ bufLen ∧ discarding m.ram dfr ≤ 1 ∧
+          m.core.get 9 = msgA) ∨
         (m.core.pc = 0x80003f7c ∧ Inv m.ram dfr bufLen ∧ consumed m.ram dfr = 0 ∧
           m.core.get 18 = bufA + BitVec.ofNat 32 (filled m.ram dfr) ∧
           (m.core.get 20).toNat = bufLen - filled m.ram dfr ∧ discarding m.ram dfr ≤ 1 ∧
@@ -376,7 +377,7 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
     have gF : ∀ r : Reg, r ≠ 14 → r ≠ 15 → r ≠ 16 → Fc.get r = D.get r := fun r a b c' => by
       simp [Fc, sfromCore, Core.wr_get_ne, a, b, c']
     have csF : Fc.sameCsr D := by unfold Fc sfromCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
-    refine ⟨Quiet.of_sameCsr csF qD, ?_, ?_, ?_, ?_, .inl ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_⟩
+    refine ⟨Quiet.of_sameCsr csF qD, ?_, ?_, ?_, ?_, .inl ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_⟩
     · rw [gF 22 (by decide) (by decide) (by decide), gD 22 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]
       exact e3_22
     · rw [gF 23 (by decide) (by decide) (by decide), gD 23 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]
@@ -446,6 +447,9 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
       rw [w5 _ (by rw [show msgA.toNat = 0x8002a580 from rfl, show (dfr + 8 : Word).toNat = 0x8002a794 from rfl]; omega),
         w4 _ (by rw [show (dfr + 8 : Word).toNat = 0x8002a794 from rfl]; omega), hd3]
       exact dsc1
+    · show Fc.get 9 = msgA
+      rw [gF 9 (by decide) (by decide) (by decide)]
+      simp [D, sdecCore, Core.wr_get_ne, Core.wr_get_self, alu_add, e3_23]; rfl
     · show Fc.get 26 = c.get 26
       rw [gF 26 (by decide) (by decide) (by decide), gD 26 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide),
         PPs 26 (by decide)]

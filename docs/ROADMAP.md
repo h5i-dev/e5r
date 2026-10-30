@@ -977,7 +977,15 @@ optional; direct and hybrid proofs are equally valid routes.
       negative message header jumps straight to the unpark site and
       returns to the loop head with `SessInv`. `Deframer/SomeRound.lean`
       `some_round` covers every header, but only against two NAMED
-      callee contracts. Both are hypotheses of the theorem and are proved
+      callee contracts. AUDIT: the peer refuted both 07a17e5 contracts
+      (3ecd81b, kernel-checked), so that `some_round` was VACUOUS. The
+      dispatch side is repaired: `DispEnv` now fixes the service pointer
+      0x8002a4c0, s9 = msgA and the message, and the contract takes an
+      explicit world predicate `W`. SomeWitness.lean shows the repaired
+      `SomeAt`/`DispEnv` are satisfiable at the observed layout. `EncEnv`
+      is not yet repaired (the peer owns encode_frame, see
+      verification/rv32/rmk/some-interfaces.md), so `some_round` is still
+      vacuous. Both are hypotheses of the theorem and are proved
       nowhere:
       - `DispatchContract`: polling `RynkService::dispatch`'s future
         returns;

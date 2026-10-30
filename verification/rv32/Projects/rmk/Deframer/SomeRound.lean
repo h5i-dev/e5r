@@ -6,6 +6,15 @@
 
   Original e5r code, Apache-2.0.
 
+  AUDIT CAVEAT (peer, 3ecd81b, review/SomeAudit.lean on 07a17e5): the 07a17e5 statements of both
+  contracts are FALSE (kernel-checked counterexample runs), so `some_round` as stated there was
+  vacuous. Repaired here: `DispEnv` now fixes the RynkService pointer, s9 = msgA, the message and
+  the header (the dispatch counterexample had service pointer 0), and `DispatchContract W` takes an
+  explicit world predicate `W` for what dispatch dereferences (open). `EncEnv` is NOT repaired yet:
+  its refutation (the `Kept` UART bytes may alias the output buffer) still applies, so `some_round`
+  remains vacuous until the repaired `EncEnv` agreed with the peer (rmk/some-interfaces.md) lands.
+  Non-vacuity of the repaired `SomeAt` / `DispEnv`: Deframer/SomeWitness.lean.
+
   Both contracts are `Lands` statements (every behaviour of the callee, any device values and any
   events, returns), with the ABI frame (sp and the callee-saved registers), `Quiet` on return, and a
   RAM frame stated as what the callee leaves alone: `Kept`, the session cells the caller reads
@@ -14,7 +23,7 @@
   `EncodeContract` also gives the result: tag byte at sp+0x40 is 1, or 0 with length (sp+0x44) ≤ 7,
   the capacity of the 7-byte frame buffer at 0x8002a7b1 that the caller passes.
 
-  PROVED here (conditional on `hD` and `hE`):
+  PROVED here (conditional on `hD : DispatchContract W`, `hE` and `WAt W m₀`):
   * `some_pos`: from `SomeAt` with a non-negative header, every behaviour reaches one of
     * the loop head 0x80003e1a with `SessInv`: the empty response (encode_frame's error, or length 0)
       sets the flag byte [s10] and goes to the unpark site, then `unpark_round`;
@@ -46,7 +55,8 @@ open E5R E5R.Rmk E5R.Rmk.Deframer.Tail E5R.Rmk.Deframer.Session E5R.Rmk.Deframer
 def Kept (m₀ : Machine) (x : Word) : Prop :=
   (0x8002a780 ≤ x.toNat ∧ x.toNat < 0x8002a7a8) ∨
   ((m₀.core.get 2).toNat + 0x24 ≤ x.toNat ∧ x.toNat < (m₀.core.get 2).toNat + 0x28) ∨
-  (∃ k < 5, x = ramRead m₀.ram uPtr .w + 0x0000001c#32 + BitVec.ofNat 32 k)
+  (∃ k < 5, x = ramRead m₀.ram uPtr .w + 0x0000001c#32 + BitVec.ofNat 32 k) ∨
+  (0x8002a200 ≤ x.toNat ∧ x.toNat < 0x8002a205)
 
 /-- A callee's return: at `ret`, quiet, the ABI frame, `Kept` unchanged. -/
 structure CallPost (ret : Word) (m₀ m : Machine) : Prop where
@@ -71,10 +81,21 @@ structure DispEnv (m : Machine) : Prop where
   futSvc : ramRead m.ram 0x8002a7b0 .w = ramRead m.ram 0x8002a780 .w
   futArg : ramRead m.ram 0x8002a7b4 .w = ramRead m.ram (m.core.get 2 + 0x00000020#32) .w
   futMsg : ramRead m.ram 0x8002a7b8 .w = m.core.get 9
+  /-- (repair after the 3ecd81b audit) the RynkService pointer, the message pointer, the message as
+      recv_step leaves it, and the non-negative header that selected this path -/
+  svc : ramRead m.ram 0x8002a780 .w = 0x8002a4c0
+  s9 : m.core.get 9 = msgA
+  msg : ramRead m.ram msgA .w = bufA ∧
+    3 ≤ (ramRead m.ram (msgA + 4) .w).toNat ∧ (ramRead m.ram (msgA + 4) .w).toNat ≤ bufLen ∧
+    2 < (ramRead m.ram (msgA + 0xc) .w).toNat ∧ (ramRead m.ram (msgA + 0xc) .w).toNat ≤ bufLen
+  hdr : (m.ram 0x8002a589).toNat < 0x80
 
-/-- NOT PROVED: polling `RynkService::dispatch`'s future returns, whatever it does. -/
-def DispatchContract : Prop :=
-  ∀ m₀, DispEnv m₀ → Lands B img (CallPost 0x80003e9e m₀) m₀
+/-- NOT PROVED: polling `RynkService::dispatch`'s future returns, whatever it does, from `DispEnv`
+and `W`. `W` is an explicit world predicate on RAM for everything dispatch dereferences beyond the
+cells `DispEnv` fixes (the service struct at 0x8002a4c0 and what it points to: keymap, the
+executor-stack object, .rodata tables). Which `W` makes this true is OPEN; no `W` is assumed here. -/
+def DispatchContract (W : (Word → BitVec 8) → Prop) : Prop :=
+  ∀ m₀, DispEnv m₀ → W m₀.ram → Lands B img (CallPost 0x80003e9e m₀) m₀
 
 /-- The call of `encode_frame` at 0x80003f1a: out = sp+0x40, the 7-byte buffer 0x8002a7b1, and the
     response byte at sp+0x140. -/
@@ -159,6 +180,10 @@ theorem wr_pw (sp x : Word) (hx : ¬ PW sp x) (M : Word → BitVec 8) (a v : Wor
   unfold PW at hx
   omega
 
+/-- `W` at the Some point, robust to the poll's own writes before the call (`PW`). -/
+def WAt (W : (Word → BitVec 8) → Prop) (m₀ : Machine) : Prop :=
+  ∀ M : Word → BitVec 8, (∀ x, ¬ PW (m₀.core.get 2) x → M x = m₀.ram x) → W M
+
 /-- The state carried along the Some path, relative to the Some point `m₀`. -/
 structure Ctx (m₀ m : Machine) : Prop where
   quiet : Quiet m.core
@@ -181,10 +206,11 @@ theorem kept_mono (m₀ m : Machine) (c : Ctx m₀ m) (x : Word) (hx : Kept m₀
 theorem kept_pw (m₀ : Machine) (h : SomeAt m₀) (x : Word) (hx : Kept m₀ x) : ¬ PW (m₀.core.get 2) x := by
   have h1 := h.sp
   have h2 := h.ext.spTop
-  rcases hx with hx | hx | ⟨k, hk, rfl⟩
+  rcases hx with hx | hx | ⟨k, hk, rfl⟩ | hx
   · unfold PW; omega
   · unfold PW; omega
   · intro hp; apply (h.ext.uSep k hk).1; unfold PW at hp; unfold SW; omega
+  · unfold PW; omega
 
 theorem ctx_call (m₀ m m' : Machine) {ret : Word} (c : Ctx m₀ m) (p : CallPost ret m m') : Ctx m₀ m' :=
   ⟨p.quiet, p.sp.trans c.sp, (p.saved 22 (by decide)).trans c.s6, (p.saved 23 (by decide)).trans c.s7,
@@ -210,14 +236,21 @@ theorem extras_ctx (m₀ x : Machine) (h : SomeAt m₀) (c : Ctx m₀ x) : Extra
     rw [spOff _ _ (by rw [spOff _ _ (by omega)]; omega), spOff _ _ (by omega)]; omega
   have st : ∀ k < 5, x.ram (ramRead m₀.ram uPtr .w + 0x0000001c#32 + BitVec.ofNat 32 k) =
       m₀.ram (ramRead m₀.ram uPtr .w + 0x0000001c#32 + BitVec.ofNat 32 k) :=
-    fun k hk' => hk _ (.inr (.inr ⟨k, hk', rfl⟩))
+    fun k hk' => hk _ (.inr (.inr (.inl ⟨k, hk', rfl⟩)))
   have s20 : ramRead m₀.ram uPtr .w + 0x00000020#32 = ramRead m₀.ram uPtr .w + 0x0000001c#32 + BitVec.ofNat 32 4 := by
     rw [BitVec.add_assoc]; rfl
   refine ⟨by rw [c.sp]; exact E.spTop, ?_, by rw [hU]; exact E.uBaseIn, ?_, by rw [hU]; exact E.uStrideIn,
     by rw [hU, hF, c.sp]; exact E.uSep, by rw [hF]; exact E.flagIn, by rw [hF]; exact E.flagSep,
-    by rw [hF, c.sp]; exact E.flagNot, c.s10⟩
+    by rw [hF, c.sp]; exact E.flagNot, c.s10, ?_, ?_, ?_, ?_, by rw [hF]; exact E.fixNot⟩
   · rw [hU, ← E.uBase]; exact ramRead_w_congr _ fun k hk' => st k (by omega)
   · rw [hU, s20, st 4 (by decide), ← s20]; exact E.uStride
+  · rw [← E.svc]; refine ramRead_w_congr _ fun k hk' => hk _ (.inl ?_)
+    bv_omega
+  · rw [← E.tx]; refine ramRead_w_congr _ fun k hk' => hk _ (.inl ?_)
+    bv_omega
+  · rw [← E.txBase]; refine ramRead_w_congr _ fun k hk' => hk _ (.inr (.inr (.inr ?_)))
+    bv_omega
+  · rw [hk _ (.inr (.inr (.inr (by decide))))]; exact E.txStride
 
 /-! ## After encode_frame -/
 
@@ -451,8 +484,8 @@ theorem wr_b_same (X : Word → BitVec 8) (a b v : Word) (h : a = b) : ramWrite 
   subst h; simp [ramWrite, ramPut]
 
 /-- **The Some path for a non-negative header**, against the two named contracts. -/
-theorem some_pos (hD : DispatchContract) (hE : EncodeContract) (m₀ : Machine) (h : SomeAt m₀)
-    (hpos : (m₀.ram 0x8002a589).toNat < 0x80) :
+theorem some_pos (W : (Word → BitVec 8) → Prop) (hD : DispatchContract W) (hE : EncodeContract)
+    (m₀ : Machine) (h : SomeAt m₀) (hW : WAt W m₀) (hpos : (m₀.ram 0x8002a589).toNat < 0x80) :
     Lands B img SomeQ m₀ := by
   have C0 : Ctx m₀ m₀ := ⟨h.quiet, rfl, h.s6, h.s7, h.ext.s10, fun _ _ => rfl⟩
   have h1 : 0x8002a798 + 0x70 ≤ (m₀.core.get 2).toNat ∧ (m₀.core.get 2).toNat ≤ 0x81000000 := h.sp
@@ -506,28 +539,40 @@ theorem some_pos (hD : DispatchContract) (hE : EncodeContract) (m₀ : Machine) 
   have fM : ramRead (sCallRam c M) 0x8002a7b8 .w = c.get 9 := by
     simp only [sCallRam, h22]
     simp (disch := decide) only [rd_wr_far, rd_wr_same]
+  have lowR : ∀ a : Word, a.toNat + 4 ≤ 0x8002a7a8 → ramRead (sCallRam c M) a .w = ramRead M a .w :=
+    fun a ha => ramRead_w_congr _ fun k hk => hRD _ (by
+      have : (a + BitVec.ofNat 32 k).toNat = a.toNat + k := by rw [BitVec.toNat_add, BitVec.toNat_ofNat]; omega
+      unfold PW; rw [this]; omega)
+  have hm := h.msg
   have env : DispEnv ⟨sCallCore c M, sCallRam c M⟩ :=
     ⟨pD, Quiet.of_sameCsr cs h.quiet, d1, d10, (gD 22 (by decide) (by decide)).trans h22,
       (gD 23 (by decide) (by decide)).trans h.s7, by show (_ : Word).toNat % 4 = 0; rw [d2]; exact hcA,
       by show _ ∧ _; rw [d2]; exact ⟨hc1, hc2⟩, fS, fV, by show _ = ramRead _ ((sCallCore c M).get 2 + _) .w; rw [d2]; exact fA,
-      by show _ = (sCallCore c M).get 9; rw [gD 9 (by decide) (by decide)]; exact fM⟩
+      by show _ = (sCallCore c M).get 9; rw [gD 9 (by decide) (by decide)]; exact fM,
+      by show ramRead (sCallRam c M) _ .w = _; rw [lowR _ (by decide)]; exact h.ext.svc,
+      by show (sCallCore c M).get 9 = _; rw [gD 9 (by decide) (by decide)]; exact h.s9,
+      by show ramRead (sCallRam c M) msgA .w = bufA ∧ _
+         rw [lowR msgA (by decide), lowR (msgA + 4) (by decide), lowR (msgA + 0xc) (by decide)]; exact hm,
+      by show (sCallRam c M 0x8002a589).toNat < 0x80
+         rw [hRD _ (by unfold PW; rw [show (0x8002a589 : Word).toNat = 0x8002a589 from rfl]; omega)]; exact hpos⟩
   generalize sCallCore c M = D at r cs gD env
   generalize sCallRam c M = RD at r hRD env
   have CD : Ctx ⟨c, M⟩ ⟨D, RD⟩ := ctx_seg ⟨c, M⟩ h c D M RD C0 (Quiet.of_sameCsr cs h.quiet)
     (gD 2 (by decide) (by decide)) (gD 22 (by decide) (by decide)) (gD 23 (by decide) (by decide))
     (gD 26 (by decide) (by decide)) hRD
-  refine lands_of_qrun_lands r (lands_seq ?_ (hD _ env))
+  refine lands_of_qrun_lands r (lands_seq ?_ (hD _ env (hW _ hRD)))
   rintro ⟨e', M'⟩ P
   exact post_disp hE ⟨c, M⟩ h e' M' P.pc (ctx_call _ _ _ CD P)
 
 /-- **The Some path, every header**: back to the loop head with `SessInv`, or one of the explicit
 boundaries (Pending to the executor, the 0xff path, the send loop). Conditional on the two named
 contracts. -/
-theorem some_round (hD : DispatchContract) (hE : EncodeContract) (m₀ : Machine) (h : SomeAt m₀) :
+theorem some_round (W : (Word → BitVec 8) → Prop) (hD : DispatchContract W) (hE : EncodeContract)
+    (m₀ : Machine) (h : SomeAt m₀) (hW : WAt W m₀) :
     Lands B img SomeQ m₀ := by
   by_cases hn : 0x80 ≤ (m₀.ram 0x8002a589).toNat
   · obtain ⟨k, m', r, hpc, hI⟩ := some_neg m₀ h hn
     exact lands_of_qrun r (.inl ⟨hpc, hI⟩)
-  · exact some_pos hD hE m₀ h (by omega)
+  · exact some_pos W hD hE m₀ h hW (by omega)
 
 end E5R.Rmk.Deframer.SomeP

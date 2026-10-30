@@ -71,6 +71,24 @@ structure Extras (m : Machine) : Prop where
   /-- s10 (x26) holds s6+0x333 = 0x8002a7f0, the address the Some path's empty response stores its
       flag byte to (set at 0x80003b38 before the loop; kept by every proved step) -/
   s10 : m.core.get 26 = 0x8002a7f0
+  /-- the RynkService pointer (s7+0xf1, stored at 0x80003da6; observed 0x8002a4c0) -/
+  svc : ramRead m.ram 0x8002a780 .w = 0x8002a4c0
+  /-- the TX Uart16550 pointer (stored at 0x80003dae) and that struct's base and stride, which
+      `Uart.SendEnv` needs on the send path -/
+  tx : ramRead m.ram 0x8002a788 .w = 0x8002a1e4
+  txBase : ramRead m.ram 0x8002a200 .w = 0x10000000
+  txStride : (m.ram 0x8002a204).toNat = 1
+  /-- the flag byte is none of those cells -/
+  fixNot : (∀ k < 12, ramRead m.ram (m.core.get 2 + 0x00000024#32) .w ≠ 0x8002a780 + BitVec.ofNat 32 k) ∧
+    ∀ k < 5, ramRead m.ram (m.core.get 2 + 0x00000024#32) .w ≠ 0x8002a200 + BitVec.ofNat 32 k
+
+/-- The fixed cells (service and TX pointers, TX struct base/stride) are outside `SW`. -/
+theorem fixed_not_sw (sp : Word) (hs : 0x8002a798 + 0x70 ≤ sp.toNat) (a : Word) (k : Nat)
+    (h : (0x8002a200 ≤ a.toNat ∧ a.toNat + k < 0x8002a205) ∨ (0x8002a780 ≤ a.toNat ∧ a.toNat + k < 0x8002a78c)) :
+    ¬ SW sp (a + BitVec.ofNat 32 k) := by
+  have : (a + BitVec.ofNat 32 k).toNat = a.toNat + k := by
+    rw [BitVec.toNat_add, BitVec.toNat_ofNat]; omega
+  unfold SW; rw [this]; omega
 
 def SessInv (m : Machine) : Prop := SessPre m ∧ Extras m
 
@@ -143,6 +161,8 @@ structure SomeAt (m : Machine) : Prop where
   emptied : consumed m.ram dfr = 0 ∧ filled m.ram dfr = 0
   parked : (ramRead m.ram 0x8002a798 .w).toNat + 4 ≤ bufLen
   disc : discarding m.ram dfr ≤ 1
+  /-- the message pointer, as recv_step leaves it (s7+0x1b1, set at 0x80003e5e) -/
+  s9 : m.core.get 9 = msgA
   ext : Extras m
 
 /-- Where one round may stop: the loop head with the invariant, or an explicit boundary. -/
@@ -185,9 +205,22 @@ theorem extras_keep (m₀ x : Machine) (E : Extras m₀)
     rw [BitVec.add_assoc]; rfl
   refine ⟨by rw [hsp]; exact E.spTop, ?_, by rw [hU]; exact E.uBaseIn, ?_, by rw [hU]; exact E.uStrideIn,
     by rw [hU, hF, hsp]; exact E.uSep, by rw [hF]; exact E.flagIn, by rw [hF]; exact E.flagSep,
-    by rw [hF, hsp]; exact E.flagNot, h26.trans E.s10⟩
+    by rw [hF, hsp]; exact E.flagNot, h26.trans E.s10, ?_, ?_, ?_, ?_, by rw [hF]; exact E.fixNot⟩
   · rw [hU, ← E.uBase]; exact ramRead_w_congr _ fun k hk => keep _ (uS k (by omega)).1 (uS k (by omega)).2
   · rw [hU, s20, keep _ (uS 4 (by decide)).1 (uS 4 (by decide)).2, ← s20]; exact E.uStride
+  · rw [← E.svc]; refine ramRead_w_congr _ fun k hk => keep _ (fixed_not_sw _ h1.1 _ _ (.inr (by
+      rw [show (0x8002a780 : Word).toNat = 0x8002a780 from rfl]; omega))) (fun e => E.fixNot.1 k (by omega) e.symm)
+  · rw [← E.tx]; refine ramRead_w_congr _ fun k hk => keep _ (fixed_not_sw _ h1.1 0x8002a780 (8 + k) (.inr (by
+      rw [show (0x8002a780 : Word).toNat = 0x8002a780 from rfl]; omega)) |> fun h => by
+        rwa [show (0x8002a780 : Word) + BitVec.ofNat 32 (8 + k) = 0x8002a788 + BitVec.ofNat 32 k by
+          rw [show (0x8002a788 : Word) = 0x8002a780 + 8 from rfl, BitVec.add_assoc]; congr 1; bv_omega] at h)
+      (fun e => E.fixNot.1 (8 + k) (by omega) (by
+        rw [← e, show (0x8002a780 : Word) + BitVec.ofNat 32 (8 + k) = 0x8002a788 + BitVec.ofNat 32 k by
+          rw [show (0x8002a788 : Word) = 0x8002a780 + 8 from rfl, BitVec.add_assoc]; congr 1; bv_omega]))
+  · rw [← E.txBase]; refine ramRead_w_congr _ fun k hk => keep _ (fixed_not_sw _ h1.1 _ _ (.inl (by
+      rw [show (0x8002a200 : Word).toNat = 0x8002a200 from rfl]; omega))) (fun e => E.fixNot.2 k (by omega) e.symm)
+  · rw [keep _ (by simpa using fixed_not_sw _ h1.1 0x8002a200 4 (.inl (by decide)))
+      (fun e => E.fixNot.2 4 (by decide) (by rw [← e]; rfl))]; exact E.txStride
 
 /-- **One round of the session loop.** -/
 theorem session_round (m₀ : Machine) (h : SessInv m₀) : Lands1 B img LoopQ m₀ := by
@@ -199,9 +232,9 @@ theorem session_round (m₀ : Machine) (h : SessInv m₀) : Lands1 B img LoopQ m
     rcases R.out with ⟨e, -⟩ | ⟨e, -⟩ <;> rw [hpc0] at e <;> exact absurd e (by decide)
   | succ j =>
     refine lands1_of_qrun_lands r ?_
-    rcases R.out with ⟨hpc, g1, g2, g3, g4, g5, c0, f0, pk, ds⟩ | hn
+    rcases R.out with ⟨hpc, g1, g2, g3, g4, g5, c0, f0, pk, ds, s9⟩ | hn
     · exact .done (.inr (.inr (.inr ⟨hpc, R.quiet, R.s6, R.s7, by rw [R.sp]; exact h.1.spAl,
-        by rw [R.sp]; exact h.1.sp, ⟨g1, g2, g3, g4, g5⟩, ⟨c0, f0⟩, pk, ds,
+        by rw [R.sp]; exact h.1.sp, ⟨g1, g2, g3, g4, g5⟩, ⟨c0, f0⟩, pk, ds, s9,
         extras_keep m₀ m h.2 h.1.sp R.sp R.s10 fun y hy _ => R.ram y fun h' => hy (recvW_SW _ _ h')⟩)))
     · have NA := none_of_recv m₀ m h R hn
       refine lands_seq ?_ (none_step m NA)
