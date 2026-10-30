@@ -10,7 +10,9 @@
   * the Uart16550 struct that the word at 0x8002a784 points to holds base 0x10000000 (+0x1c) and
     stride 1 (+0x20);
   * the task flag pointer at sp+0x24 points into RAM, outside the deframer;
-  * 0x28 stack bytes lie above sp.
+  * 0x148 stack bytes lie above sp;
+  * s10 (x26) = 0x8002a7f0, the empty-response flag byte address (kept by recv_step, none_step and
+    unpark_step: their posts now export x26).
 
   PROVED here:
   * `none_of_recv`: `SessInv` at the loop head and recv_step's None outcome give `NoneAt`;
@@ -66,6 +68,9 @@ structure Extras (m : Machine) : Prop where
   /-- the flag byte is neither the struct pointer word nor the flag pointer word -/
   flagNot : ∀ k < 4, ramRead m.ram (m.core.get 2 + 0x00000024#32) .w ≠ uPtr + BitVec.ofNat 32 k ∧
     ramRead m.ram (m.core.get 2 + 0x00000024#32) .w ≠ m.core.get 2 + 0x00000024#32 + BitVec.ofNat 32 k
+  /-- s10 (x26) holds s6+0x333 = 0x8002a7f0, the address the Some path's empty response stores its
+      flag byte to (set at 0x80003b38 before the loop; kept by every proved step) -/
+  s10 : m.core.get 26 = 0x8002a7f0
 
 def SessInv (m : Machine) : Prop := SessPre m ∧ Extras m
 
@@ -154,7 +159,7 @@ theorem lands1_of_qrun_lands {P : Machine → Prop} {k : Nat} {m m' : Machine}
 /-- The invariant's extras survive a round that writes only `SW` and the flag byte, at the same sp. -/
 theorem extras_keep (m₀ x : Machine) (E : Extras m₀)
     (hS0 : 0x8002a798 + 0x70 ≤ (m₀.core.get 2).toNat ∧ (m₀.core.get 2).toNat ≤ 0x81000000) (hsp : x.core.get 2 = m₀.core.get 2)
-    (keep : ∀ y, ¬ SW (m₀.core.get 2) y → y ≠ ramRead m₀.ram (m₀.core.get 2 + 0x00000024#32) .w →
+    (h26 : x.core.get 26 = m₀.core.get 26) (keep : ∀ y, ¬ SW (m₀.core.get 2) y → y ≠ ramRead m₀.ram (m₀.core.get 2 + 0x00000024#32) .w →
       x.ram y = m₀.ram y) : Extras x := by
   have h1 := hS0
   have h2 := E.spTop
@@ -180,7 +185,7 @@ theorem extras_keep (m₀ x : Machine) (E : Extras m₀)
     rw [BitVec.add_assoc]; rfl
   refine ⟨by rw [hsp]; exact E.spTop, ?_, by rw [hU]; exact E.uBaseIn, ?_, by rw [hU]; exact E.uStrideIn,
     by rw [hU, hF, hsp]; exact E.uSep, by rw [hF]; exact E.flagIn, by rw [hF]; exact E.flagSep,
-    by rw [hF, hsp]; exact E.flagNot⟩
+    by rw [hF, hsp]; exact E.flagNot, h26.trans E.s10⟩
   · rw [hU, ← E.uBase]; exact ramRead_w_congr _ fun k hk => keep _ (uS k (by omega)).1 (uS k (by omega)).2
   · rw [hU, s20, keep _ (uS 4 (by decide)).1 (uS 4 (by decide)).2, ← s20]; exact E.uStride
 
@@ -197,11 +202,11 @@ theorem session_round (m₀ : Machine) (h : SessInv m₀) : Lands1 B img LoopQ m
     rcases R.out with ⟨hpc, g1, g2, g3, g4, g5, c0, f0, pk, ds⟩ | hn
     · exact .done (.inr (.inr (.inr ⟨hpc, R.quiet, R.s6, R.s7, by rw [R.sp]; exact h.1.spAl,
         by rw [R.sp]; exact h.1.sp, ⟨g1, g2, g3, g4, g5⟩, ⟨c0, f0⟩, pk, ds,
-        extras_keep m₀ m h.2 h.1.sp R.sp fun y hy _ => R.ram y fun h' => hy (recvW_SW _ _ h')⟩)))
+        extras_keep m₀ m h.2 h.1.sp R.sp R.s10 fun y hy _ => R.ram y fun h' => hy (recvW_SW _ _ h')⟩)))
     · have NA := none_of_recv m₀ m h R hn
       refine lands_seq ?_ (none_step m NA)
-      rintro x (⟨hS, hxsp, hxram⟩ | hb | hb)
-      · refine .done (.inl ⟨hS.pc, hS, extras_keep m₀ x h.2 h.1.sp (hxsp.trans R.sp) ?_⟩)
+      rintro x (⟨hS, hxsp, hxram, hx26⟩ | hb | hb)
+      · refine .done (.inl ⟨hS.pc, hS, extras_keep m₀ x h.2 h.1.sp (hxsp.trans R.sp) (hx26.trans R.s10) ?_⟩)
         intro y hy hyF
         have hm : ∀ y, ¬ SW (m₀.core.get 2) y → m.ram y = m₀.ram y :=
           fun y hy' => R.ram y (fun h' => hy' (recvW_SW _ _ h'))
@@ -233,10 +238,10 @@ theorem session_round (m₀ : Machine) (h : SessInv m₀) : Lands1 B img LoopQ m
 head with `SessInv`. -/
 theorem unpark_round (m₀ : Machine) (h : UnparkAt m₀) (E : Extras m₀) :
     ∃ k m, QRun B img k m₀ m ∧ m.core.pc = 0x80003e1a ∧ SessInv m := by
-  obtain ⟨k, m, r, hS, hsp, -, hram⟩ := unpark_step' m₀ h
+  obtain ⟨k, m, r, hS, hsp, h26, -, hram⟩ := unpark_step' m₀ h
   have h1 := h.sp
   have h2 := E.spTop
-  refine ⟨k, m, r, hS.pc, hS, extras_keep m₀ m E h.sp hsp fun y hy _ => hram y fun hw => hy ?_⟩
+  refine ⟨k, m, r, hS.pc, hS, extras_keep m₀ m E h.sp hsp h26 fun y hy _ => hram y fun hw => hy ?_⟩
   unfold SW
   rcases hw with hw | hw | hw
   · exact .inl hw

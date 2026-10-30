@@ -1,0 +1,4 @@
+rmk-uart-send-bytes run1 (fresh) exit=10 466s: MY wrapper error (open named E5R.irqEnabled under E5R.Rmk), main proof not involved
+rmk-uart-send-bytes run2 (--resume on run1 from-source build, wrapper fixed) exit=0 373s proved; SendEnv/SendPost pinned (env_iff/post_iff); witnesses w0, w16 (decide)
+rmk-uart-send-round run1 (fresh, 79 modules) exit=10 1053s: MY errors in Uart/SendToLoop.lean (simp no progress; SW not unfolded for decide); main modules all checked
+rmk-uart-send-round run2 (--resume on run1 from-source build, SendToLoop fixed 3fd158c) exit=0 553s proved: send_round, send_to_loop, nonvacuous (joint witness), send_bytes, unpark_round, copy_contract, cobs_report; axioms within propext/Classical.choice/Quot.sound. Yield poll 0x8001e14a = explicit boundary (Lands through it is FALSE in the model: spurious SC). Not on DispatchContract/EncodeContract. SessionSafe NOT proved.

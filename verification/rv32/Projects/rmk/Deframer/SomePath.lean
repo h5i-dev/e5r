@@ -77,7 +77,7 @@ theorem some_neg (m : Machine) (h : SomeAt m) (hneg : 0x80 ≤ (m.ram 0x8002a589
     · show (R (dfr + 8)).toNat ≤ 1
       rw [hR, wr_h_other _ _ _ _ (by decide) (by decide)]
       exact h.disc
-  have E : Extras ⟨K, R⟩ := extras_keep ⟨c, M⟩ ⟨K, R⟩ h.ext h.sp hsp fun y hy _ => keep y hy
+  have E : Extras ⟨K, R⟩ := extras_keep ⟨c, M⟩ ⟨K, R⟩ h.ext h.sp hsp (gK 26 (by decide)) fun y hy _ => keep y hy
   obtain ⟨k, m', r2, hpc, hI⟩ := unpark_round ⟨K, R⟩ UA E
   exact ⟨_, m', r1.trans r2, hpc, hI⟩
 

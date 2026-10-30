@@ -984,9 +984,11 @@ optional; direct and hybrid proofs are equally valid routes.
       - `EncodeContract`: `encode_frame` returns error, or a length ≤ 7.
 
       Each is a `Lands` statement: the ABI frame, Quiet on return, and
-      the session cells it must leave alone (`Kept`). The theorem also
-      takes the hypothesis `h26`: s10 = 0x8002a7f0, which `SomeAt` does
-      not carry yet. Under these, every behaviour reaches one of:
+      the session cells it must leave alone (`Kept`). s10 = 0x8002a7f0
+      (the empty response's flag byte address) is part of `SessInv`'s
+      extras: recv_step, none_step and unpark_step export that x26 is
+      kept, so it is no longer a hypothesis of `some_round`. Under the two
+      contracts, every behaviour reaches one of:
       - the loop head with `SessInv`: an empty response, through the
         unpark site; the slice-check panic is shown not taken;
       - 0x80004204: dispatch is Pending, and the poll exits to the
@@ -998,7 +1000,7 @@ optional; direct and hybrid proofs are equally valid routes.
       - that `SessInv` holds when the task first reaches the loop head
         (initialization);
       - `DispatchContract` (`RynkService::dispatch` at 0x800001f2 is a
-        12.6 KB async state machine), `EncodeContract`, and `h26`;
+        12.6 KB async state machine) and `EncodeContract`;
       - the 0xff path and the send loop;
       - the UART read future and the executor between polls (other tasks,
         interrupts, Quiet across polls).
