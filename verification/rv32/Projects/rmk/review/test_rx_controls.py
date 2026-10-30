@@ -21,7 +21,7 @@ CHAIN = [f'{R}/Trees.lean', f'{R}/Fetch.lean', f'{R}/DevRead.lean', f'{R}/Defram
          f'{R}/Deframer/RxSegs.lean', f'{R}/Deframer/Rx.lean', f'{R}/review/RxAudit.lean']
 REJECT = re.compile(r'decide|omega could not|unsolved goals|rfl. failed|The rfl tactic|Type mismatch|'
                     r'type mismatch|bv_omega|Application type mismatch|failed to synthesize|rewrite. failed|'
-                    r'Did not find an occurrence|simp made no progress|linarith failed|contradiction')
+                    r'Did not find an occurrence|simp made no progress|linarith failed|contradiction|expected type `False`')
 ELAB = re.compile(r'unknown (identifier|constant|module|namespace)|unexpected token|object file|Unknown')
 
 
@@ -112,8 +112,9 @@ def main():
         for name, edits, efile, edecl in CONTROLS:
             saved = {}
             for path, f in edits:
-                saved[path] = (root / path).read_text()
-                (root / path).write_text(f(saved[path]))
+                if path not in saved:
+                    saved[path] = (root / path).read_text()
+                (root / path).write_text(f((root / path).read_text()))
             start = min(CHAIN.index(path) for path, _ in edits)
             err = compile_chain(root, start)
             for path, s in saved.items():

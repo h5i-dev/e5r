@@ -1,0 +1,10 @@
+ok   baseline: the chain compiles
+ok   frame: session writes claimed to stay within 0x40 bytes below sp (receive uses 0x70): REJECTED in Projects/rmk/Deframer/SessionInv.lean:72 (recvW_SW): omega could not prove the goal:
+ok   separation: task-flag byte allowed inside the deframer (flagSep dropped): REJECTED in Projects/rmk/Deframer/SessionInv.lean:115 (none_of_recv): Type mismatch
+ok   boundary: round claimed never to stop at the read future 0x80003ff2: REJECTED in Projects/rmk/Deframer/SessionInv.lean:225 (session_round): Application type mismatch: The argument
+ok   boundary: round claimed never to reach the Some point (SomeAt dropped): REJECTED in Projects/rmk/Deframer/SessionInv.lean:194 (session_round): Invalid `⟨...⟩` notation: The expected type `False` has no constructors
+ok   Some path: header high byte 0x7f (non-negative) claimed to take the unpark branch: REJECTED in Projects/rmk/Deframer/SomePath.lean:54 (some_neg): Application type mismatch: The argument
+ok   audit: UART struct placed in the receive buffer (base word at bufA) violates uSep: REJECTED in Projects/rmk/review/SessAudit.lean:87 (extras_of): Tactic `decide` proved that the proposition
+ok   audit: witness core with the timer interrupt enabled is not quiet: REJECTED in Projects/rmk/review/SessAudit.lean:71 (core_quiet): unsolved goals
+ok   audit: Some witness with header high byte 0x7f (some_neg must not apply): REJECTED in Projects/rmk/review/SessAudit.lean:117 (some_neg_hits): Tactic `decide` proved that the proposition
+every control failed in the expected declaration for the expected reason
