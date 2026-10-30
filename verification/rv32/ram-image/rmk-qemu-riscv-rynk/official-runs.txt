@@ -3,3 +3,5 @@ rmk-deframer-cobs-discharged exit=0 913s
 rmk-session-conditional exit=10 476s
 done
 rmk-session-conditional (rerun --resume after wrapper fix) exit=0 313s
+rmk-session-discharged run1 exit=13 1342s TOOL ERROR (axiom-output parser, names ending in ') -> fixed 75f0634
+rmk-session-discharged run2 (fresh, fixed runner) exit=0 1309s proved
