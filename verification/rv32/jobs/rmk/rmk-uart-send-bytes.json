@@ -1,0 +1,64 @@
+{
+  "schema": "e5r.verify.job.v1",
+  "root": "../..",
+  "board": "boards/qemu-virt-rv32.json",
+  "elf": "build/rmk-qemu-riscv-rynk.elf",
+  "elf_sha256": "f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30",
+  "image": {
+    "kind": "ram",
+    "module": "Projects.rmk.Elf",
+    "namespace": "E5R.Rmk.Image"
+  },
+  "id": "rmk-uart-send-bytes",
+  "modules": [
+    "Projects/rmk/Run.lean",
+    "Projects/rmk/Copy.lean",
+    "Projects/rmk/Fetch.lean",
+    "Projects/rmk/MemmoveFetch.lean",
+    "Projects/rmk/MemmoveLoops.lean",
+    "Projects/rmk/MemmoveBigLoops.lean",
+    "Theories/Absint.lean",
+    "Theories/AbsintSound.lean",
+    "Projects/rmk/MemmoveSmall.lean",
+    "Projects/rmk/MemmoveAligned.lean",
+    "Projects/rmk/MemmoveContract.lean",
+    "Projects/rmk/Deframer/Spec.lean",
+    "Projects/rmk/Deframer/TailFetch.lean",
+    "Projects/rmk/Deframer/TailNoCopy.lean",
+    "Projects/rmk/Deframer/NextFetch.lean",
+    "Projects/rmk/Deframer/NextParts.lean",
+    "Projects/rmk/Deframer/NextSegs.lean",
+    "Projects/rmk/Deframer/NextInv.lean",
+    "Projects/rmk/Deframer/NextRet.lean",
+    "Projects/rmk/Deframer/NextExit.lean",
+    "Projects/rmk/Deframer/NextBody1.lean",
+    "Projects/rmk/Deframer/Wrap.lean",
+    "Projects/rmk/Deframer/NextBody2.lean",
+    "Projects/rmk/Deframer/Next.lean",
+    "Projects/rmk/Deframer/TailCopy.lean",
+    "Projects/rmk/Deframer/ParkFetch.lean",
+    "Projects/rmk/Deframer/Park.lean",
+    "Projects/rmk/Deframer/Unpark.lean",
+    "Projects/ramimage/Deframer.lean",
+    "Projects/rmk/Uart/SendFetch.lean",
+    "Projects/rmk/Uart/SendSegs.lean",
+    "Projects/rmk/Reach.lean",
+    "Projects/rmk/Trees.lean",
+    "Projects/rmk/DevRead.lean",
+    "Projects/rmk/Uart/SendBytes.lean",
+    "Projects/ramimage/SendBytes.lean"
+  ],
+  "theorems": [
+    "E5R.RmkUart.*",
+    "E5R.Rmk.Uart.send_bytes",
+    "E5R.RmkDeframer.img_eq",
+    "E5R.RmkDeframer.board_eq"
+  ],
+  "symbols": {
+    "0x800098a6": "send_bytes"
+  },
+  "limits": {
+    "seconds": 9000,
+    "rss_mib": 10240
+  }
+}

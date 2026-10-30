@@ -1,0 +1,8 @@
+'E5R.Rmk.Cobs.cobs_report_contract' depends on axioms: [propext, Classical.choice, Quot.sound]
+'E5R.RmkDeframerCobs.conditional_copy' depends on axioms: [propext, Classical.choice, Quot.sound]
+'E5R.RmkDeframer.img_eq' depends on axioms: [propext]
+'E5R.RmkDeframer.board_eq' depends on axioms: [propext]
+'E5R.Rmk.Image.image_accepted' depends on axioms: [propext]
+'E5R.Rmk.Image.image_agrees' depends on axioms: [propext]
+'E5R.Rmk.Image.image_entry' depends on axioms: [propext]
+'E5R.Rmk.Image.image_rwBase' depends on axioms: [propext]

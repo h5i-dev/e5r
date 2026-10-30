@@ -377,22 +377,22 @@ pub fn escapes(code: &str) -> Vec<&'static str> {
 pub fn parse_axioms(out: &str) -> Result<BTreeMap<String, Vec<String>>, String> {
     let mut map = BTreeMap::new();
     for line in out.lines().filter(|l| !l.trim().is_empty()) {
+        // Split at the whole marker, not at the first quote: Lean names may
+        // end in apostrophes (`recv_step'`).
         if let Some(rest) = line.strip_prefix('\'') {
-            if let Some((name, tail)) = rest.split_once('\'') {
-                if tail == " does not depend on any axioms" {
-                    map.insert(name.to_string(), vec![]);
-                    continue;
-                }
-                if let Some(list) = tail
-                    .strip_prefix(" depends on axioms: [")
-                    .and_then(|t| t.strip_suffix(']'))
-                {
-                    map.insert(
-                        name.to_string(),
-                        list.split(", ").map(str::to_string).collect(),
-                    );
-                    continue;
-                }
+            if let Some(name) = rest.strip_suffix("' does not depend on any axioms") {
+                map.insert(name.to_string(), vec![]);
+                continue;
+            }
+            if let Some((name, list)) = rest
+                .split_once("' depends on axioms: [")
+                .and_then(|(n, t)| Some((n, t.strip_suffix(']')?)))
+            {
+                map.insert(
+                    name.to_string(),
+                    list.split(", ").map(str::to_string).collect(),
+                );
+                continue;
             }
         }
         return Err(format!("unexpected Lean output: {line}"));
@@ -1083,6 +1083,10 @@ mod tests {
         assert!(m["C"].is_empty());
         assert!(parse_axioms("error: unknown constant 'X'").is_err());
         assert!(parse_axioms("'A' depends on axioms: [sorryAx]\nwarning: x").is_err());
+        let primes = "'A.f'' depends on axioms: [propext]\n'A.g''' does not depend on any axioms\n";
+        let m = parse_axioms(primes).unwrap();
+        assert_eq!(m["A.f'"], ["propext"]);
+        assert!(m["A.g''"].is_empty());
     }
 
     #[test]
