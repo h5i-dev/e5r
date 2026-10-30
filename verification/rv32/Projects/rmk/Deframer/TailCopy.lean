@@ -322,7 +322,7 @@ theorem withCopy (hC : CopyContract) (frame : Nat) (hf : 0x50 ≤ frame) (m₀ :
     show (ramRead (tstore M (c.get 10) n) (c.get 10 + 4) .w).toNat = n.toNat
     exact congrArg BitVec.toNat (tstore_filled M (c.get 10) n)
   let T := tafter e (c.get 12) (c.get 11) n
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · show (tepi T (tstore M (c.get 10) n) (fp c)).pc = c.get 1
     exact (slot 0x1c (by decide)).trans (tsave_1c c R0 hs)
   · exact (tepi_sameCsr _ _ _).trans ((tafter_sameCsr _ _ _ _).trans (P.csr.trans (tcall_sameCsr c R0)))
@@ -379,6 +379,10 @@ theorem withCopy (hC : CopyContract) (frame : Nat) (hf : 0x50 ≤ frame) (m₀ :
     have h3 : ¬ ((c.get 2).toNat - frame ≤ x.toNat ∧ x.toNat < (c.get 2).toNat) := hx.2.2
     rw [keep x (by omega) (by omega) (by omega)]
     exact tsave_other c R0 hs x (by omega)
+  · show ((tstore M (c.get 10) n) (c.get 10 + 8)).toNat = (R0 (c.get 10 + 8)).toNat
+    have e8 : (c.get 10 + 8).toNat = (c.get 10).toNat + 8 := add_toNat _ 8 (by omega)
+    rw [keep (c.get 10 + 8) (by omega) (by omega) (by omega)]
+    exact congrArg BitVec.toNat (tsave_other c R0 hs (c.get 10 + 8) (.inl (by omega)))
 
 /-- `tail`'s contract with the 80-byte frame, given memmove's contract (the dependency is the
     hypothesis `CopyContract`; it is not proved here). -/

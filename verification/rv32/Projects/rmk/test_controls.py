@@ -26,7 +26,9 @@ RV32 = Path(__file__).resolve().parents[2]
 R = 'Projects/rmk'
 ELF = Path('/home/ht2673/.local/state/e5r-claude-isa-review-20261029T042314Z/rmk/rmk-qemu-riscv-f39d833f.elf')
 CHAIN = [f'{R}/Elf.lean', f'{R}/Fetch.lean', f'{R}/MemmoveFetch.lean', f'{R}/Run.lean', f'{R}/Copy.lean',
-         f'{R}/MemmoveLoops.lean', f'{R}/MemmoveSmall.lean']
+         f'{R}/MemmoveLoops.lean', f'{R}/MemmoveSmall.lean', f'{R}/MemmoveBigLoops.lean',
+         f'{R}/MemmoveAligned.lean', f'{R}/MemmoveContract.lean', f'{R}/Merge.lean', f'{R}/MemmoveMisLoop.lean',
+         f'{R}/MemmoveMisStart.lean', f'{R}/MemmoveMisEnd.lean', f'{R}/MemmoveMis.lean', f'{R}/MemmoveFull.lean']
 
 REJECT = re.compile(r'decide|evaluated to|omega could not|unsolved goals|rfl. failed|The rfl tactic|'
                     r'failed to reduce|Type mismatch|type mismatch|bv_omega')
@@ -80,6 +82,23 @@ CONTROLS = [
               '    (hdsep : (c.get 2).toNat ≤ (c.get 10).toNat ∨ (c.get 10).toNat + (c.get 12).toNat + 12 ≤ (c.get 2).toNat)\n    (hssep',
               '    (hdsep : True ∨ (c.get 10).toNat + (c.get 12).toNat + 12 ≤ (c.get 2).toNat)\n    (hssep')],
      f'{R}/MemmoveSmall.lean', 'finish', 'REJECTED'),
+    ('n >= 16 with src, dst congruent only mod 2 (the misaligned path)',
+     [replace(f'{R}/MemmoveAligned.lean',
+              '    (hcong : (c.get 11).toNat % 4 = (c.get 10).toNat % 4) :',
+              '    (hcong : (c.get 11).toNat % 2 = (c.get 10).toNat % 2) :')],
+     f'{R}/MemmoveAligned.lean', 'big_aligned', 'REJECTED'),
+    ('word copy claimed to need no direction condition',
+     [replace(f'{R}/Copy.lean', '    (d.toNat ≤ s.toNat ∨ s.toNat + 4 ≤ d.toNat) →\n    words ram s d j = fwd ram s d (4 * j)',
+              '    (d.toNat ≤ s.toNat ∨ True) →\n    words ram s d j = fwd ram s d (4 * j)')],
+     f'{R}/Copy.lean', 'words_eq_fwd', 'REJECTED'),
+    ('merged word: byte k claimed from prev while k + o < 3 only (wrong shift split)',
+     [replace(f'{R}/Merge.lean', '      if k + o < 4 then byteOf p (k + o) else byteOf q (k + o - 4) := by',
+              '      if k + o < 3 then byteOf p (k + o) else byteOf q (k + o - 4) := by')],
+     f'{R}/Merge.lean', 'merge_byte', 'REJECTED'),
+    ('misaligned path claimed to leave its stack temporaries alone (temps region shrunk)',
+     [replace(f'{R}/MemmoveMis.lean', 'def InTemps (sp x : Word) : Prop := sp.toNat - 34 ≤ x.toNat ∧ x.toNat < sp.toNat - 24',
+              'def InTemps (sp x : Word) : Prop := sp.toNat - 30 ≤ x.toNat ∧ x.toNat < sp.toNat - 24')],
+     f'{R}/MemmoveMis.lean', 'big_mis', 'REJECTED'),
     ('infrastructure: a missing import (does not elaborate)',
      [replace(f'{R}/MemmoveLoops.lean', 'import Projects.rmk.Copy\n', 'import Projects.rmk.Copyy\n')],
      f'{R}/MemmoveLoops.lean', None, 'ELAB'),

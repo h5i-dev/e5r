@@ -15,7 +15,8 @@ lives in the task future, a static whose bases are s6 = 0x8002a4bd and s7 = 0x80
 
 ## The loop and what is proved
 
-All of this is CONDITIONAL on `CopyContract` (memmove, still open).
+`CopyContract` (memmove) is a theorem: `Deframer.copy_contract`, from the peer's
+`Memmove.contractAll`. `recv_step'` and `unpark_step'` are the unconditional forms.
 
 | pc | Code | Status |
 | --- | --- | --- |
@@ -42,7 +43,46 @@ All of this is CONDITIONAL on `CopyContract` (memmove, still open).
 * `Session.unpark_step`: `UnparkAt` at 0x80003fd8 (parked ≤ 488, discarding ≤ 1) reaches
   `SessPre` at 0x80003e1a, at the same sp, with filled = parked.
 
+## Composition tools (proved)
+
+* `Projects/rmk/Reach.lean`:
+  * `reach_on_runs`: if every checkpoint starts a quiet deterministic run back to a checkpoint,
+    every machine reachable from the checkpoints is on such a run and has emitted no event.
+  * `reach_avoids`: the same, for an absorbing pc region with no checkpoint in it.
+* `Projects/rmk/PanicRegion.lean`:
+  * `panic_absorbing`: once in `slice_index_fail`, `panic_bounds_check`, `panic_fmt` or the `j .`
+    loop of `rust_begin_unwind`, a deterministic run never leaves.
+  * `reach_no_panic`: with checkpoints off the panic path, no reachable machine is at
+    0x8001fafc, 0x8001f83a or 0x8001e148.
+
+  This uses only the run endpoints, not their intermediate pcs.
+
+* `Projects/rmk/Trees.lean`. `Lands P m` says that every `Step` behaviour from m, for every
+  oracle (any device-read value) and with device writes as events, reaches a checkpoint. Each node
+  must be quiet and must not fault under any oracle; those obligations are proved, not assumed.
+  * `reach_lands`, `reach_no_escape`: from checkpoints rooted in such trees, no reachable machine
+    escapes.
+  * `PanicRegion.reach_no_panic_io`: none reaches a panic pc.
+* `Projects/rmk/DevRead.lean` `lands_lbu_dev`: a device `lbu` is a tree node, with one successor
+  per value the device may return.
+* `Projects/rmk/Deframer/Rx.lean` `rx_loop`: the UART receive poll 0x80004374..0x800043a8, for
+  every LSR/RBR value sequence.
+  * Every behaviour reaches 0x800043a8 with i ≤ cap.
+  * Registers outside ra/s0/s1/a0-a2 are kept.
+  * RAM changes only in buf[dst..dst+cap) and the one stack byte of `assert_offset`.
+  * NO CopyContract dependency.
+  * Explicit preconditions (`RxEnv`): s3/s5 = the UART RBR/LSR addresses (read from the
+    `Uart16550` struct in RAM; its contents are assumed, not proved), cap ≥ 1, the ranges in RAM,
+    and the core quiet at entry.
+
 ## What closing the loop still needs (not assumed anywhere)
+
+* `reach_on_runs` covers only deterministic, event-free segments. Both gaps below do device I/O:
+  * UART writes emit events, so they are not `DetStep`;
+  * UART reads take their value from the environment.
+
+  The next composition step is a variant that allows deterministic steps emitting events
+  (writes), plus a branching argument over the read values (reads). Neither exists yet.
 
 * **Some gap.** From 0x80003e70 to 0x80003fd8 the code must:
   * keep s6, s7, sp and the stack bound;

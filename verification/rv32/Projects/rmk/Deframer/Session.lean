@@ -80,7 +80,12 @@ structure RecvOut (m₀ m : Machine) : Prop where
           3 ≤ (ramRead m.ram (msgA + 4) .w).toNat ∧ (ramRead m.ram (msgA + 4) .w).toNat ≤ bufLen ∧
           2 < (ramRead m.ram (msgA + 0xc) .w).toNat ∧ (ramRead m.ram (msgA + 0xc) .w).toNat ≤ bufLen ∧
           consumed m.ram dfr = 0 ∧ filled m.ram dfr = 0) ∨
-        (m.core.pc = 0x80003f7c ∧ Inv m.ram dfr bufLen ∧ consumed m.ram dfr = 0)
+        (m.core.pc = 0x80003f7c ∧ Inv m.ram dfr bufLen ∧ consumed m.ram dfr = 0 ∧
+          m.core.get 18 = bufA + BitVec.ofNat 32 (filled m.ram dfr) ∧
+          (m.core.get 20).toNat = bufLen - filled m.ram dfr ∧ discarding m.ram dfr ≤ 1 ∧
+          (m.core.get 25).toNat = discarding m.ram dfr ∧ (m.core.get 21).toNat ≤ (m.core.get 24).toNat ∧
+          (m.core.get 24).toNat - (m.core.get 21).toNat = filled m.ram dfr ∧
+          m.core.get 19 = ramRead m₀.ram 0x8002a784 .w)
 
 theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
     ∃ k m, QRun B img k m₀ m ∧ RecvOut m₀ m := by
@@ -189,7 +194,28 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
     have r3 := stail e2 M2 (TP.pc.trans K2_1) (Quiet.of_sameCsr TP.csr qK2)
     refine ⟨_, _, (((r1.trans rn).trans r2).trans rt).trans r3, ?_⟩
     have cs3 : (stailCore e2 M2).sameCsr e2 := by unfold stailCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
-    refine ⟨Quiet.of_sameCsr (cs3.trans TP.csr) qK2, ?_, ?_, ?_, ?_, .inr ⟨rfl, ?_, ?_⟩⟩
+    -- what snone loaded before the call, kept by tail (callee-saved)
+    have K2_19 : K2.get 19 = ramRead M1 (s6v + 0x000002c7#32) .w := by
+      simp [K2, snoneCore, Core.wr_get_ne, Core.wr_get_self, e1_22]
+    have K2_21 : K2.get 21 = ramRead M1 (s6v + 0x000002cf#32) .w := by
+      simp [K2, snoneCore, Core.wr_get_ne, Core.wr_get_self, e1_22]
+    have K2_24 : K2.get 24 = ramRead M1 (s6v + 0x000002d3#32) .w := by
+      simp [K2, snoneCore, Core.wr_get_ne, Core.wr_get_self, e1_22]
+    have K2_25 : K2.get 25 = extend .b false (ramRead M1 (s6v + 0x000002d7#32) .b) := by
+      simp [K2, snoneCore, Core.wr_get_ne, Core.wr_get_self, e1_22]
+    have gS : ∀ r : Reg, r ≠ 18 → r ≠ 20 → (stailCore e2 M2).get r = e2.get r := fun r a b => by
+      simp [stailCore, Core.wr_get_ne, a, b]
+    have hcI : consumed M1 dfr ≤ filled M1 dfr := inv1.1
+    have hfl := TP.hfilled
+    have hds := TP.hdisc
+    have hret := TP.ret
+    rw [show (⟨K2, M1⟩ : Machine).core.get 10 = dfr from K2_10] at hfl hds hret
+    rw [show (⟨K2, M1⟩ : Machine).core.get 11 = bufA from K2_11,
+      show ((⟨K2, M1⟩ : Machine).core.get 12).toNat = bufLen from by
+        rw [show (⟨K2, M1⟩ : Machine).core.get 12 = 0x1e8#32 from K2_12]; rfl] at hret
+    have dsc1 : discarding M1 dfr ≤ 1 := by
+      have := NP.disc; rw [show (⟨K1, R0⟩ : Machine).core.get 10 = dfr from K1_10] at this; exact this
+    refine ⟨Quiet.of_sameCsr (cs3.trans TP.csr) qK2, ?_, ?_, ?_, ?_, .inr ⟨rfl, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩⟩
     · simp [stailCore, Core.wr_get_ne]; exact (TPs 22 (by decide)).trans K2_22
     · simp [stailCore, Core.wr_get_ne]; exact (TPs 23 (by decide)).trans K2_23
     · simp [stailCore, Core.wr_get_ne]; exact TP.sp.trans K2_2
@@ -211,6 +237,35 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
     · have := TP.hconsumed
       rw [show (⟨K2, M1⟩ : Machine).core.get 10 = dfr from K2_10] at this
       exact this
+    · show (stailCore e2 M2).get 18 = _
+      simp only [stailCore, Core.wr_get_ne _ _ _ _ _ (show (18 : Reg) ≠ 20 by decide),
+        Core.wr_get_self _ _ _ _ (show (18 : Reg).val ≠ 0 by decide), alu_add]
+      exact (BitVec.zero_add _).trans hret.1
+    · show ((stailCore e2 M2).get 20).toNat = _
+      simp only [stailCore, Core.wr_get_self _ _ _ _ (show (20 : Reg).val ≠ 0 by decide), alu_add]
+      exact (congrArg BitVec.toNat (BitVec.zero_add _)).trans hret.2
+    · show (M2 (dfr + 8)).toNat ≤ 1; rw [hds]; exact dsc1
+    · show ((stailCore e2 M2).get 25).toNat = (M2 (dfr + 8)).toNat
+      rw [gS 25 (by decide) (by decide), TPs 25 (by decide), K2_25, Next.lbu_val, hds]
+      simp only [BitVec.toNat_ofNat]
+      have := (M1 (dfr + 8)).isLt
+      rw [show s6v + 0x000002d7#32 = dfr + 8 from rfl]; omega
+    · show ((stailCore e2 M2).get 21).toNat ≤ ((stailCore e2 M2).get 24).toNat
+      rw [gS 21 (by decide) (by decide), gS 24 (by decide) (by decide), TPs 21 (by decide), TPs 24 (by decide),
+        K2_21, K2_24]
+      exact hcI
+    · show ((stailCore e2 M2).get 24).toNat - ((stailCore e2 M2).get 21).toNat = filled M2 dfr
+      rw [gS 21 (by decide) (by decide), gS 24 (by decide) (by decide), TPs 21 (by decide), TPs 24 (by decide),
+        K2_21, K2_24, hfl]
+      rfl
+    · show (stailCore e2 M2).get 19 = ramRead R0 0x8002a784 .w
+      rw [gS 19 (by decide) (by decide), TPs 19 (by decide), K2_19]
+      exact rd_congr _ (by decide) fun x h1 h2 => ram1 x (by
+        rw [show (s6v + 0x000002c7#32).toNat = 0x8002a784 from rfl] at h1 h2
+        unfold RecvW; rw [show dfr.toNat = 0x8002a78c from rfl, show bufA.toNat = 0x8002a590 from rfl,
+          show msgA.toNat = 0x8002a580 from rfl]
+        have : bufLen = 488 := rfl
+        omega)
   · -- Some: park, bounds check, the request decoder
     have a01 : (e1.get 10).toNat = 1 := by omega
     have val := NP.val a01

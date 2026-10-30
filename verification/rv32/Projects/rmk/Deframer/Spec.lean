@@ -6,7 +6,8 @@
   obligation, and the constants marked CANDIDATE are read from the disassembly of the pinned ELF
   (f39d833f..., review/rmk/deframer-contracts.md on the review branch) and must be confirmed by
   the proof that uses them. No theorem in this file claims safety. Proved elsewhere, each
-  CONDITIONAL on `CopyContract` (memmove; not proved): `TailFromCopy` (TailCopy.lean),
+  conditional on `CopyContract`, which is a THEOREM (`copy_contract`, CopyDischarge.lean, from the
+  peer's Memmove.contractAll), so unconditional there: `TailFromCopy` (TailCopy.lean),
   `ParkFromCopy` (Park.lean), `UnparkFromCopy` (Unpark.lean), `NextFromCopy` (CobsDischarge.lean;
   `CobsReportContract` is a THEOREM there, `cobs_report`, from the COBS worker's Cobs.decode).
   Corrections made for those proofs: `CallEnv.selfAl/spAl`, `CopyEnv.spAl` (ABI alignment; the model
@@ -137,6 +138,8 @@ structure TailPost (frame : Nat) (m₀ m : Machine) : Prop where
       m₀.ram (m₀.core.get 11 + BitVec.ofNat 32 (consumed m₀.ram (m₀.core.get 10) + k))
   inv : Inv m.ram (m₀.core.get 10) (m₀.core.get 12).toNat
   ram : KeepsRam frame m₀ m
+  /-- The discarding flag is not written (added: the session loop needs it again). -/
+  hdisc : (m.ram (m₀.core.get 10 + 8)).toNat = (m₀.ram (m₀.core.get 10 + 8)).toNat
 
 /-- The obligation (not proved): `tail` returns, satisfying its postcondition. -/
 def TailContract (frame : Nat) : Prop :=

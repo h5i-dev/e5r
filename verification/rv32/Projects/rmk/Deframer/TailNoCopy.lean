@@ -417,7 +417,7 @@ theorem nocopy (frame : Nat) (hf : 0x20 ≤ frame) (m₀ : Machine) (h : TailPre
   have hv : filled R (c.get 10) = v.toNat := rfl
   have mg : ∀ r : Reg, r ≠ 10 → r ≠ 11 → (tmid c R0).get r = (tpro c R0).get r := fun r h10 h11 => by
     simp [tmid, Core.wr_get_ne, h10, h11]
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · simp only [tepi, Core.goto_pc]; exact tsave_1c c R0 hs
   · exact (tepi_sameCsr _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans
       ((Core.sameCsr_goto _ _).trans (tpro_sameCsr c R0))))
@@ -461,5 +461,8 @@ theorem nocopy (frame : Nat) (hf : 0x20 ≤ frame) (m₀ : Machine) (h : TailPre
     show R x = R0 x
     have h3 : ¬ ((c.get 2).toNat - frame ≤ x.toNat ∧ x.toNat < (c.get 2).toNat) := hx.2.2
     exact tsave_other c R0 hs x (by omega)
+  · show (R (c.get 10 + 8)).toNat = (R0 (c.get 10 + 8)).toNat
+    have e8 : (c.get 10 + 8).toNat = (c.get 10).toNat + 8 := add_toNat _ 8 (by omega)
+    exact congrArg BitVec.toNat (tsave_other c R0 hs _ (.inl (by omega)))
 
 end E5R.Rmk.Deframer.Tail
