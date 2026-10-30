@@ -959,8 +959,11 @@ optional; direct and hybrid proofs are equally valid routes.
       `Projects/rmk/Reach.lean` (`reach_on_runs`: quiet deterministic runs
       between checkpoints cover every Reach-able machine) and
       `Projects/rmk/PanicRegion.lean` (`panic_absorbing`, `reach_no_panic`).
-      These cover event-free deterministic segments only, and both session
-      gaps do UART I/O. Not proved: the dispatch from
+      Event-aware trees (`Trees.lean`: `Lands`, `reach_lands`,
+      `reach_no_escape`, `reach_no_panic_io`) cover device reads (every
+      value) and writes (events). With them, `Deframer/Rx.lean` `rx_loop` (the
+      UART receive poll, unconditional) is proved for every LSR/RBR value
+      sequence, given the stated `RxEnv`. Not proved: the dispatch from
       0x80003e70 to 0x80003fd8, the response write, `unpark_pending`'s call site, the UART read future and
       the executor between polls (other tasks, interrupts). `SessionSafe`
       ranges over all of these, so it is not proved.

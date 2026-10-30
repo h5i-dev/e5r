@@ -56,6 +56,24 @@ All of this is CONDITIONAL on `CopyContract` (memmove, still open).
 
   This uses only the run endpoints, not their intermediate pcs.
 
+* `Projects/rmk/Trees.lean`. `Lands P m` says that every `Step` behaviour from m, for every
+  oracle (any device-read value) and with device writes as events, reaches a checkpoint. Each node
+  must be quiet and must not fault under any oracle; those obligations are proved, not assumed.
+  * `reach_lands`, `reach_no_escape`: from checkpoints rooted in such trees, no reachable machine
+    escapes.
+  * `PanicRegion.reach_no_panic_io`: none reaches a panic pc.
+* `Projects/rmk/DevRead.lean` `lands_lbu_dev`: a device `lbu` is a tree node, with one successor
+  per value the device may return.
+* `Projects/rmk/Deframer/Rx.lean` `rx_loop`: the UART receive poll 0x80004374..0x800043a8, for
+  every LSR/RBR value sequence.
+  * Every behaviour reaches 0x800043a8 with i ≤ cap.
+  * Registers outside ra/s0/s1/a0-a2 are kept.
+  * RAM changes only in buf[dst..dst+cap) and the one stack byte of `assert_offset`.
+  * NO CopyContract dependency.
+  * Explicit preconditions (`RxEnv`): s3/s5 = the UART RBR/LSR addresses (read from the
+    `Uart16550` struct in RAM; its contents are assumed, not proved), cap ≥ 1, the ranges in RAM,
+    and the core quiet at entry.
+
 ## What closing the loop still needs (not assumed anywhere)
 
 * `reach_on_runs` covers only deterministic, event-free segments. Both gaps below do device I/O:
