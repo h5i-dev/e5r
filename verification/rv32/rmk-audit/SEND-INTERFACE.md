@@ -56,3 +56,13 @@ A concrete witness, `w_sendAt` (by `decide`), ships in the same module, so `Send
 - the outer length slot.
 
 Then `some_round`'s send boundary 0x8000429e is closed except for the yield.
+
+## Why the yield poll stays a boundary
+
+Through the yield poll, `Lands` is not merely unproved: it is FALSE in this model.
+
+- The first yield poll calls `wake_by_ref`.
+- That goes through the vtable to embassy's run-queue push at 0x8001e174, which retries with lr/sc.
+- The model lets every SC fail spuriously (`Theories/Hart.lean`: `.sc` takes an oracle `choose` even while a reservation is held). So that loop has an infinite execution, and no finite `Lands` tree exists.
+
+The executor side therefore needs a safety (Reach/checkpoint-style) invariant, not a termination statement, or an explicit fairness assumption on SC, stated as such.
