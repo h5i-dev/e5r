@@ -44,8 +44,7 @@ theorem send_to_loop (m₀ : Machine) (h : SendAt m₀) (E : Extras m₀)
         fun y hy _ => K.ram y fun hw => hy (sendW_SW hw)
       obtain ⟨k, m', r, hpc, hs⟩ := unpark_round m U Ex
       exact lands_of_qrun r (.inl ⟨hpc, hs⟩)
-    · rw [ramRead_w_congr (ram := m₀.ram) _ fun k hk => K.ram _ (nW _ (by
-        rw [BitVec.toNat_add, BitVec.toNat_ofNat]; simp only [BitVec.toNat_ofNat]; omega))]
+    · rw [ramRead_w_congr (ram := m₀.ram) _ fun k hk => K.ram _ (nW _ (by bv_omega))]
       exact hpk
     · show (m.ram (dfr + 8)).toNat ≤ 1
       rw [K.ram _ (nW _ (by decide))]; exact hdc
@@ -54,7 +53,7 @@ theorem send_to_loop (m₀ : Machine) (h : SendAt m₀) (E : Extras m₀)
 /-- The send entry, the session extras and the unpark facts hold together (`wCore`/`wRam`). -/
 theorem w_sendLoop : SendAt ⟨wCore, wRam⟩ ∧ Extras ⟨wCore, wRam⟩ ∧
     (ramRead wRam 0x8002a798 .w).toNat ≤ bufLen ∧ discarding wRam dfr ≤ 1 :=
-  ⟨w_sendAt, ⟨by decide, by decide, ⟨by decide, by decide⟩, by decide, by decide, by decide, by decide, by decide,
-    by decide, by decide⟩, by decide, by decide⟩
+  ⟨w_sendAt, ⟨by decide, by decide, ⟨by decide, by decide⟩, by decide, by decide, by simp only [SW]; decide,
+    by decide, by decide, by decide, by decide⟩, by decide, by decide⟩
 
 end E5R.Rmk.Uart
