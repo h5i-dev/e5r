@@ -138,6 +138,8 @@ structure TailPost (frame : Nat) (m₀ m : Machine) : Prop where
       m₀.ram (m₀.core.get 11 + BitVec.ofNat 32 (consumed m₀.ram (m₀.core.get 10) + k))
   inv : Inv m.ram (m₀.core.get 10) (m₀.core.get 12).toNat
   ram : KeepsRam frame m₀ m
+  /-- The discarding flag is not written (added: the session loop needs it again). -/
+  hdisc : (m.ram (m₀.core.get 10 + 8)).toNat = (m₀.ram (m₀.core.get 10 + 8)).toNat
 
 /-- The obligation (not proved): `tail` returns, satisfying its postcondition. -/
 def TailContract (frame : Nat) : Prop :=
