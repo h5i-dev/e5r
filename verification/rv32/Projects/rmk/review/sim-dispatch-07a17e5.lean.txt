@@ -1,0 +1,49 @@
+-- UNTRUSTED simulation (#eval of the model's stepInstr on the pinned image), review of 07a17e5, G7.
+-- Run: cd verification/rv32 && lake env lean <this file renamed .lean>.  Output recorded at the end.
+import Projects.rmk.Fetch
+open E5R E5R.Rmk
+def memT (t : List (Nat × Nat)) (a : Word) : BitVec 8 :=
+  match t.find? (fun p => p.1 == a.toNat) with
+  | some p => BitVec.ofNat 8 p.2
+  | none => 0
+def mkCore (pc : Word) (rs : List (Nat × Word)) : Core where
+  pc := pc
+  x := fun r => match rs.find? (fun p => p.1 == r.val) with | some p => p.2 | none => 0
+  mie_ := false
+  mpie := false
+  mpp := 3
+  mieReg := 0
+  mtvec := 0x800000f8
+  mepc := 0
+  mcause := 0
+  mscratch := 0
+  resv := false
+partial def sim (m : Machine) (n : Nat) (acc : List String) : List String :=
+  if n = 0 then ("FUEL" :: acc).reverse else
+  match fetchDecode img m.core.pc with
+  | none => (s!"NOFETCH {m.core.pc.toNat}" :: acc).reverse
+  | some (i, len) =>
+    let e := exec m.core len i
+    let note := match e with
+      | .load w a _ _ => if B.inRam a w.bytes then "" else s!" ROM {a.toNat} {w.bytes}"
+      | _ => ""
+    let acc := s!"{m.core.pc.toNat}{note}" :: acc
+    match stepInstr B img m (fun _ => 0) with
+    | .fault f => (s!"FAULT {repr f}" :: acc).reverse
+    | .ok c r _ => sim ⟨c, r⟩ (n - 1) acc
+def svc : List (Nat × Nat) := [(0x8002a780,0xc0),(0x8002a781,0xa4),(0x8002a782,2),(0x8002a783,0x80),(0x8002a7b0,0xc0),(0x8002a7b1,0xa4),(0x8002a7b2,2),(0x8002a7b3,0x80)]
+def mk (kind : Nat) : Machine := ⟨mkCore 0x800001f2 [(1,0x80003e9e),(2,0x80fffe10),(9,0x8002a580),(10,0x8002a7b0),(22,0x8002a4bd),(23,0x8002a3cf)],
+     memT (svc ++ [(0x8002a588,kind % 256),(0x8002a589,kind / 256),(0x8002a7b8,0x80),(0x8002a7b9,0xa5),(0x8002a7ba,2),(0x8002a7bb,0x80),
+       (0x8002a580,0x90),(0x8002a581,0xa5),(0x8002a582,2),(0x8002a583,0x80),(0x8002a584,3),(0x8002a58c,3)])⟩
+#eval do
+  for k in [0x0202, 0x0101, 0x0102, 0x0004, 0x0302] do
+    let l := sim (mk k) 20000 []
+    IO.println s!"kind {k}: {l.length} steps, tail: {l.drop (l.length - 4)}"
+
+/- output:
+kind 514: 446 steps, tail: [0x8001693c, 0x8001693e, 0x800098d4 ROM 32 1, FAULT E5R.Fault.unsupported "load from an unmodeled address"]
+kind 257: 410 steps, tail: [0x8001693c, 0x8001693e, 0x800098d4 ROM 32 1, FAULT E5R.Fault.unsupported "load from an unmodeled address"]
+kind 258: 442 steps, tail: [0x8001693c, 0x8001693e, 0x800098d4 ROM 32 1, FAULT E5R.Fault.unsupported "load from an unmodeled address"]
+kind 4: 35 steps, tail: [0x800020ee, 0x800020f0, 0x80002490 ROM 30 1, FAULT E5R.Fault.unsupported "load from an unmodeled address"]
+kind 770: 410 steps, tail: [0x8001693c, 0x8001693e, 0x800098d4 ROM 32 1, FAULT E5R.Fault.unsupported "load from an unmodeled address"]
+-/
