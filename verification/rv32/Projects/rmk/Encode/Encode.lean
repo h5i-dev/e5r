@@ -71,6 +71,8 @@ structure EncPre (m : Machine) : Prop where
 structure EncPost (m₀ m : Machine) : Prop where
   pc : m.core.pc = 0x80003f1e
   quiet : Quiet m.core
+  /-- ra is restored too (the caller's `CallPost` treats it as preserved) -/
+  ra : m.core.get 1 = 0x80003f1e
   saved : ∀ r : Reg, r.val ∈ calleeSaved → m.core.get r = m₀.core.get r
   frame : ∀ x, ¬ EncW (m₀.core.get 2) x → m.ram x = m₀.ram x
   res : EncRes m₀ m
@@ -192,7 +194,7 @@ def savedOK (s : AS) : Bool :=
   calleeSaved.all fun q => if h : q < 32 then s.get ⟨q, h⟩ == .reg q else false
 
 def leafE (r : Nat) (s : AS) : Bool :=
-  s.pc == 0x80003f1e && savedOK s && s.mem.getLast? == some (initW r) &&
+  s.pc == 0x80003f1e && s.get 1 == .c 0x80003f1e && savedOK s && s.mem.getLast? == some (initW r) &&
     s.mem.dropLast.all (fun p => inW encE p.1 p.2.1) && resOK encE s.mem
 
 /-- The response values the contract admits. -/

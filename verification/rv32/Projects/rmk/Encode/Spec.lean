@@ -105,9 +105,10 @@ theorem leaf_sound (m₀ : Machine) (h : EncPre m₀) (r : Nat)
     ∀ s m, leafE r s = true → Rel (valR m₀) m₀.ram m₀.core s m → EncPost m₀ m := by
   intro s m hl hR
   simp only [leafE, Bool.and_eq_true, beq_iff_eq] at hl
-  obtain ⟨⟨⟨⟨hpc, hsv⟩, hlast⟩, hin⟩, hres⟩ := hl
+  obtain ⟨⟨⟨⟨⟨hpc, hra⟩, hsv⟩, hlast⟩, hin⟩, hres⟩ := hl
   have hs := spIn m₀ h
-  refine ⟨by rw [hR.pc, hpc], Quiet.of_sameCsr hR.csr h.quiet, fun q hq => ?_, fun x hx => ?_, ?_⟩
+  refine ⟨by rw [hR.pc, hpc], Quiet.of_sameCsr hR.csr h.quiet, by rw [hR.regs, hra]; rfl,
+    fun q hq => ?_, fun x hx => ?_, ?_⟩
   · have := List.all_eq_true.mp hsv q.val hq
     simp only [q.isLt, dite_true, beq_iff_eq] at this
     rw [hR.regs, this, SE.eval, valR_reg]
