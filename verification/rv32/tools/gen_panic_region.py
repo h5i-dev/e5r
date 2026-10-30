@@ -26,28 +26,39 @@ out.append("""
 /-- Inside the panic path: at one of its pcs, or at one of its calls with ra as its `auipc` set. -/
 def PanicRg (m : Machine) : Prop :=
   m.core.pc ∈ panicS ∨ ∃ q ∈ panicJ, m.core.pc = q.1 ∧ m.core.get 1 = q.2
+""")
 
-theorem rg_step (m m₁ : Machine) (h : PanicRg m) (hd : DetStep B img m m₁) : PanicRg m₁ := by
-  rcases h with hS | ⟨q, hq, hpc, hra⟩
-  · simp only [panicS, List.mem_cons, List.not_mem_nil, or_false] at hS
-    rcases hS with """ + " | ".join("h" for _ in S))
-for pc in S:
-    f = G.parse(facts[pc][0]); k = f[0]
-    pre = f"(by rw [h]; decide) (by rw [h]; exact f{pc:x}) hd"
-    if k in ('op', 'opimm', 'lui', 'store'):
-        out.append(f"    · have e := PanicPc.pc_{k} {pre}; left; rw [e, h]; decide")
-    elif k == 'auipc':
-        j = pc + facts[pc][1]
-        out.append(f"    · obtain ⟨e1, e2⟩ := PanicPc.pc_auipc {pre}; right")
-        out.append(f"      exact ⟨(0x{j:x}, 0x{J[j]:x}), by decide, by rw [e1, h]; decide, by rw [e2, h]; decide⟩")
-    elif k == 'branch':
-        out.append(f"    · rcases PanicPc.pc_branch {pre} with e | e <;> (left; rw [e, h]; decide)")
-    elif k == 'jal':
-        out.append(f"    · have e := PanicPc.pc_jal {pre}; left; rw [e, h]; decide")
-    else:
-        raise SystemExit(f'kind {k} at {pc:x}')
-out.append("  · simp only [panicJ, List.mem_cons, List.not_mem_nil, or_false] at hq")
-out.append("    rcases hq with " + " | ".join("rfl" for _ in J))
-for pc in J:
-    out.append(f"    · have e := PanicPc.pc_jalr (by rw [hpc]; decide) (by rw [hpc]; exact f{pc:x}) hd; left; rw [e, hra]; decide")
+
+def body(name, sig, show, sfx, hyp):
+    out.append(f"theorem {name} {sig} := by")
+    if show:
+        out.append("  " + show)
+    out.append("  rcases h with hS | ⟨q, hq, hpc, hra⟩")
+    out.append("  · simp only [panicS, List.mem_cons, List.not_mem_nil, or_false] at hS")
+    out.append("    rcases hS with " + " | ".join("h" for _ in S))
+    for pc in S:
+        f = G.parse(facts[pc][0]); k = f[0]
+        pre = f"(by rw [h]; decide) (by rw [h]; exact f{pc:x}) {hyp}"
+        if k in ('op', 'opimm', 'lui', 'store'):
+            out.append(f"    · have e := PanicPc.pc_{k}{sfx} {pre}; left; rw [e, h]; decide")
+        elif k == 'auipc':
+            j = pc + facts[pc][1]
+            out.append(f"    · obtain ⟨e1, e2⟩ := PanicPc.pc_auipc{sfx} {pre}; right")
+            out.append(f"      exact ⟨(0x{j:x}, 0x{J[j]:x}), by decide, by rw [e1, h]; decide, by rw [e2, h]; decide⟩")
+        elif k == 'branch':
+            out.append(f"    · rcases PanicPc.pc_branch{sfx} {pre} with e | e <;> (left; rw [e, h]; decide)")
+        elif k == 'jal':
+            out.append(f"    · have e := PanicPc.pc_jal{sfx} {pre}; left; rw [e, h]; decide")
+        else:
+            raise SystemExit(f'kind {k} at {pc:x}')
+    out.append("  · simp only [panicJ, List.mem_cons, List.not_mem_nil, or_false] at hq")
+    out.append("    rcases hq with " + " | ".join("rfl" for _ in J))
+    for pc in J:
+        out.append(f"    · have e := PanicPc.pc_jalr{sfx} (by rw [hpc]; decide) (by rw [hpc]; exact f{pc:x}) {hyp}; left; rw [e, hra]; decide")
+    out.append("")
+
+
+body("rg_step", "(m m₁ : Machine) (h : PanicRg m) (hd : DetStep B img m m₁) : PanicRg m₁", None, "", "hd")
+body("rg_ok", "(m : Machine) (o : Oracle) (c : Core) (ram : Word → BitVec 8) (evs : List Event) (h : PanicRg m)\n    (ho : stepInstr B img m o = .ok c ram evs) : PanicRg ⟨c, ram⟩",
+     "show c.pc ∈ panicS ∨ ∃ q ∈ panicJ, c.pc = q.1 ∧ c.get 1 = q.2", "'", "ho")
 print("\n".join(out))

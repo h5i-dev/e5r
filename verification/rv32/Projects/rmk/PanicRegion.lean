@@ -12,7 +12,7 @@
   "no reachable machine is at a panic pc", without knowing the intermediate pcs of the runs.
 -/
 import Projects.rmk.PanicFetch
-import Projects.rmk.Reach
+import Projects.rmk.Trees
 
 set_option maxRecDepth 100000
 
@@ -95,6 +95,52 @@ theorem pc_jalr {rd rs1 off} (hal : m.core.pc.getLsbD 0 = false)
     m₁.core.pc = (m.core.get rs1 + off) &&& ~~~1 := by
   have := hd (fun _ => 0); rw [stepInstr_of hal hf, exec_jalr] at this
   rw [jump_core this]
+
+variable {o : Oracle} {cc : Core} {rr : Word → BitVec 8} {ee : List Event}
+
+theorem pc_op' {op rd rs1 rs2} (hal : m.core.pc.getLsbD 0 = false)
+    (hf : fetchDecode img m.core.pc = some (.op op rd rs1 rs2, len)) (h : stepInstr B img m o = .ok cc rr ee) :
+    cc.pc = m.core.pc + len := by
+  rw [stepInstr_of hal hf, exec_op] at h; rw [ok_core h]; rfl
+
+theorem pc_opimm' {op rd rs1 imm} (hal : m.core.pc.getLsbD 0 = false)
+    (hf : fetchDecode img m.core.pc = some (.opimm op rd rs1 imm, len)) (h : stepInstr B img m o = .ok cc rr ee) :
+    cc.pc = m.core.pc + len := by
+  rw [stepInstr_of hal hf, exec_opimm] at h; rw [ok_core h]; rfl
+
+theorem pc_lui' {rd imm} (hal : m.core.pc.getLsbD 0 = false)
+    (hf : fetchDecode img m.core.pc = some (.lui rd imm, len)) (h : stepInstr B img m o = .ok cc rr ee) :
+    cc.pc = m.core.pc + len := by
+  rw [stepInstr_of hal hf, exec_lui] at h; rw [ok_core h]; rfl
+
+theorem pc_auipc' {imm} (hal : m.core.pc.getLsbD 0 = false)
+    (hf : fetchDecode img m.core.pc = some (.auipc 1 imm, len)) (h : stepInstr B img m o = .ok cc rr ee) :
+    cc.pc = m.core.pc + len ∧ cc.get 1 = m.core.pc + imm := by
+  rw [stepInstr_of hal hf, exec_auipc] at h; rw [ok_core h]
+  exact ⟨rfl, Core.wr_get_self _ _ _ _ (by decide)⟩
+
+theorem pc_store' {w rs1 rs2 off} (hal : m.core.pc.getLsbD 0 = false)
+    (hf : fetchDecode img m.core.pc = some (.store w rs1 rs2 off, len)) (h : stepInstr B img m o = .ok cc rr ee) :
+    cc.pc = m.core.pc + len := by
+  rw [stepInstr_of hal hf, exec_store] at h; rw [store_core h]; rfl
+
+theorem pc_branch' {cond rs1 rs2 off} (hal : m.core.pc.getLsbD 0 = false)
+    (hf : fetchDecode img m.core.pc = some (.branch cond rs1 rs2 off, len)) (h : stepInstr B img m o = .ok cc rr ee) :
+    cc.pc = m.core.pc + len ∨ cc.pc = m.core.pc + off := by
+  rw [stepInstr_of hal hf, exec_branch] at h
+  split at h
+  · exact .inr (jump_core h)
+  · simp only [interp] at h; injection h with h1; rw [← h1]; exact .inl rfl
+
+theorem pc_jal' {rd off} (hal : m.core.pc.getLsbD 0 = false)
+    (hf : fetchDecode img m.core.pc = some (.jal rd off, len)) (h : stepInstr B img m o = .ok cc rr ee) :
+    cc.pc = m.core.pc + off := by
+  rw [stepInstr_of hal hf, exec_jal] at h; exact jump_core h
+
+theorem pc_jalr' {rd rs1 off} (hal : m.core.pc.getLsbD 0 = false)
+    (hf : fetchDecode img m.core.pc = some (.jalr rd rs1 off, len)) (h : stepInstr B img m o = .ok cc rr ee) :
+    cc.pc = (m.core.get rs1 + off) &&& ~~~1 := by
+  rw [stepInstr_of hal hf, exec_jalr] at h; rw [jump_core h]
 
 end E5R.Rmk.PanicPc
 
@@ -212,6 +258,111 @@ theorem rg_step (m m₁ : Machine) (h : PanicRg m) (hd : DetStep B img m m₁) :
     · have e := PanicPc.pc_jalr (by rw [hpc]; decide) (by rw [hpc]; exact f8001fb88) hd; left; rw [e, hra]; decide
     · have e := PanicPc.pc_jalr (by rw [hpc]; decide) (by rw [hpc]; exact f8001fbc6) hd; left; rw [e, hra]; decide
 
+theorem rg_ok (m : Machine) (o : Oracle) (c : Core) (ram : Word → BitVec 8) (evs : List Event) (h : PanicRg m)
+    (ho : stepInstr B img m o = .ok c ram evs) : PanicRg ⟨c, ram⟩ := by
+  show c.pc ∈ panicS ∨ ∃ q ∈ panicJ, c.pc = q.1 ∧ c.get 1 = q.2
+  rcases h with hS | ⟨q, hq, hpc, hra⟩
+  · simp only [panicS, List.mem_cons, List.not_mem_nil, or_false] at hS
+    rcases hS with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    · have e := PanicPc.pc_jal' (by rw [h]; decide) (by rw [h]; exact f8001e148) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001f83a) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001f83c) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001f83e) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001f840) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001f842) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001f846) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001f848) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001f84a) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_lui' (by rw [h]; decide) (by rw [h]; exact f8001f84e) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001f852) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001f856) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001f85a) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001f85c) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001f85e) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001f860) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_lui' (by rw [h]; decide) (by rw [h]; exact f8001f862) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001f866) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001f86a) ho; left; rw [e, h]; decide
+    · obtain ⟨e1, e2⟩ := PanicPc.pc_auipc' (by rw [h]; decide) (by rw [h]; exact f8001f86e) ho; right
+      exact ⟨(0x8001f872, 0x8001f86e), by decide, by rw [e1, h]; decide, by rw [e2, h]; decide⟩
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001f956) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001f958) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001f95a) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001f95c) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001f95e) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001f962) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001f966) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001f96a) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001f96c) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001f970) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001f974) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001f978) ho; left; rw [e, h]; decide
+    · obtain ⟨e1, e2⟩ := PanicPc.pc_auipc' (by rw [h]; decide) (by rw [h]; exact f8001f97c) ho; right
+      exact ⟨(0x8001f980, 0x8001d97c), by decide, by rw [e1, h]; decide, by rw [e2, h]; decide⟩
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fafc) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fafe) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fb00) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fb02) ho; left; rw [e, h]; decide
+    · rcases PanicPc.pc_branch' (by rw [h]; decide) (by rw [h]; exact f8001fb04) ho with e | e <;> (left; rw [e, h]; decide)
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fb08) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fb0c) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fb10) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_lui' (by rw [h]; decide) (by rw [h]; exact f8001fb14) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fb18) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fb1c) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fb20) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fb24) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fb28) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fb2c) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_lui' (by rw [h]; decide) (by rw [h]; exact f8001fb30) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fb34) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fb38) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_op' (by rw [h]; decide) (by rw [h]; exact f8001fb3c) ho; left; rw [e, h]; decide
+    · obtain ⟨e1, e2⟩ := PanicPc.pc_auipc' (by rw [h]; decide) (by rw [h]; exact f8001fb3e) ho; right
+      exact ⟨(0x8001fb42, 0x8001fb3e), by decide, by rw [e1, h]; decide, by rw [e2, h]; decide⟩
+    · rcases PanicPc.pc_branch' (by rw [h]; decide) (by rw [h]; exact f8001fb46) ho with e | e <;> (left; rw [e, h]; decide)
+    · rcases PanicPc.pc_branch' (by rw [h]; decide) (by rw [h]; exact f8001fb4a) ho with e | e <;> (left; rw [e, h]; decide)
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fb4e) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fb52) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fb56) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_lui' (by rw [h]; decide) (by rw [h]; exact f8001fb5a) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fb5e) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fb62) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fb66) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fb6a) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fb6e) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fb72) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_lui' (by rw [h]; decide) (by rw [h]; exact f8001fb76) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fb7a) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fb7e) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_op' (by rw [h]; decide) (by rw [h]; exact f8001fb82) ho; left; rw [e, h]; decide
+    · obtain ⟨e1, e2⟩ := PanicPc.pc_auipc' (by rw [h]; decide) (by rw [h]; exact f8001fb84) ho; right
+      exact ⟨(0x8001fb88, 0x8001fb84), by decide, by rw [e1, h]; decide, by rw [e2, h]; decide⟩
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fb8c) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fb90) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fb94) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_lui' (by rw [h]; decide) (by rw [h]; exact f8001fb98) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fb9c) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fba0) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fba4) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fba8) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fbac) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_store' (by rw [h]; decide) (by rw [h]; exact f8001fbb0) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_lui' (by rw [h]; decide) (by rw [h]; exact f8001fbb4) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fbb8) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_opimm' (by rw [h]; decide) (by rw [h]; exact f8001fbbc) ho; left; rw [e, h]; decide
+    · have e := PanicPc.pc_op' (by rw [h]; decide) (by rw [h]; exact f8001fbc0) ho; left; rw [e, h]; decide
+    · obtain ⟨e1, e2⟩ := PanicPc.pc_auipc' (by rw [h]; decide) (by rw [h]; exact f8001fbc2) ho; right
+      exact ⟨(0x8001fbc6, 0x8001fbc2), by decide, by rw [e1, h]; decide, by rw [e2, h]; decide⟩
+  · simp only [panicJ, List.mem_cons, List.not_mem_nil, or_false] at hq
+    rcases hq with rfl | rfl | rfl | rfl | rfl
+    · have e := PanicPc.pc_jalr' (by rw [hpc]; decide) (by rw [hpc]; exact f8001f872) ho; left; rw [e, hra]; decide
+    · have e := PanicPc.pc_jalr' (by rw [hpc]; decide) (by rw [hpc]; exact f8001f980) ho; left; rw [e, hra]; decide
+    · have e := PanicPc.pc_jalr' (by rw [hpc]; decide) (by rw [hpc]; exact f8001fb42) ho; left; rw [e, hra]; decide
+    · have e := PanicPc.pc_jalr' (by rw [hpc]; decide) (by rw [hpc]; exact f8001fb88) ho; left; rw [e, hra]; decide
+    · have e := PanicPc.pc_jalr' (by rw [hpc]; decide) (by rw [hpc]; exact f8001fbc6) ho; left; rw [e, hra]; decide
+
+
 theorem panic_absorbing : ∀ k (m m' : Machine), PanicRg m → QRun B img k m m' → PanicRg m' := by
   intro k m m' h hr
   induction hr with
@@ -231,6 +382,30 @@ theorem reach_no_panic (P : Machine → Prop) (hrun : ∀ m₀, P m₀ → ∃ k
   intro m evs hr
   obtain ⟨-, k, m', hrun', hp⟩ := reach_on_runs P hrun m evs hr
   have hn : ¬ PanicRg m := fun hm => hP m' hp (panic_absorbing k m m' hm hrun')
+  exact ⟨fun e => hn (panicPc_in m (.inl e)), fun e => hn (panicPc_in m (.inr (.inl e))),
+    fun e => hn (panicPc_in m (.inr (.inr e)))⟩
+
+/-- A tree rooted on the panic path lands only on checkpoints on the panic path: every step from
+    it is successful under some oracle (it faults under none), and stays on the path. -/
+theorem lands_panic {P : Machine → Prop} : ∀ {m}, Lands B img P m → PanicRg m → ∃ m', P m' ∧ PanicRg m' := by
+  intro m h hr
+  induction h with
+  | done hp => exact ⟨_, hp, hr⟩
+  | @step m hq hf _ ih =>
+    cases e : stepInstr B img m (fun _ => 0) with
+    | fault f => exact absurd e (hf _ f)
+    | ok c ram evs => exact ih ⟨c, ram⟩ evs (.instr _ e) (rg_ok m _ c ram evs hr e)
+
+/-- With device I/O: no machine reachable from checkpoints rooted in trees (`Lands1`), none of them
+    on the panic path, is ever at `slice_index_fail`, `panic_bounds_check` or `rust_begin_unwind`. -/
+theorem reach_no_panic_io (P : Machine → Prop) (hck : ∀ m, P m → Lands1 B img P m)
+    (hP : ∀ m, P m → ¬ PanicRg m) :
+    ∀ m evs, Reach B img P m evs →
+      m.core.pc ≠ 0x8001fafc ∧ m.core.pc ≠ 0x8001f83a ∧ m.core.pc ≠ 0x8001e148 := by
+  intro m evs hr
+  have hn : ¬ PanicRg m := fun hm => by
+    obtain ⟨m', hp, hm'⟩ := lands_panic (reach_lands P hck m evs hr) hm
+    exact hP m' hp hm'
   exact ⟨fun e => hn (panicPc_in m (.inl e)), fun e => hn (panicPc_in m (.inr (.inl e))),
     fun e => hn (panicPc_in m (.inr (.inr e)))⟩
 
