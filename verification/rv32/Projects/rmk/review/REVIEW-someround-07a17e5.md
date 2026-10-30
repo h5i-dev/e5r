@@ -90,13 +90,16 @@ The consequence goes beyond the contracts. `SomeAt` itself admits states that re
 
 ### G4. Frame sufficiency, given the contracts
 
-`Kept` is exactly what the post-call code needs: no part of it can be dropped. The controls show this:
-- dropping the stride byte (k < 4) is rejected in `extras_ctx`;
-- dropping the top byte of the flag-pointer word is rejected in `extras_ctx`;
-- letting the callee change s10 is rejected in `ctx_call`;
-- allowing `encode_frame` length 8 is rejected in `slice_ok`. With length 8, the 7-byte slice check would branch to the panic at 0x80004210.
+The controls are in `some-controls-07a17e5.txt`: 10 of 12 behaved as designed. The following are rejected in the expected declaration:
+- dropping the top byte of the flag-pointer word from `Kept` (`extras_ctx`);
+- allowing `encode_frame` length 8 (`slice_ok`). With length 8, the 7-byte slice check would branch to the panic at 0x80004210.
+- reverting the `SW` widening (`kept_pw`). This shows the poll's own Some-path writes (`PW`) lie inside the widened `SW`.
 
-The poll's own Some-path writes (`PW`) lie inside the widened `SW`. Reverting the widening is rejected in `kept_pw`.
+Two controls were mis-designed and count as no evidence:
+- **Stride byte.** Dropping it via `k < 4` is rejected only by a type-index mismatch in `kept_pw`.
+- **s10 ABI.** The edit changes the arity of `saved`, so it fails at elaboration.
+
+The necessity of s10 is still shown by the h26 control (G6).
 
 ### G5. Boundaries
 
