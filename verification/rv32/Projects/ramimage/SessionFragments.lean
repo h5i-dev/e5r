@@ -21,7 +21,8 @@ import Projects.ramimage.Deframer
 import Projects.rmk.Deframer.SomePath
 
 namespace E5R.RmkFragments
-open E5R E5R.Rmk E5R.Rmk.Deframer E5R.Rmk.Deframer.Session E5R.Rmk.Deframer.SessionI
+open E5R E5R.Rmk.Deframer E5R.Rmk.Deframer.Session E5R.Rmk.Deframer.SessionI
+open E5R.Rmk (Lands Lands1 QRun Quiet reach_no_escape)
 
 /-- One round from the loop head: every behaviour (every UART value) lands at the loop head
     with `SessInv` again or at an explicit boundary. -/
