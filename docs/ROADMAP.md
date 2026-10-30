@@ -916,11 +916,24 @@ optional; direct and hybrid proofs are equally valid routes.
       the integrated tree: 430 s, 6.3 GB). Not covered: n ≥ 16 backward and
       the misaligned forward path, both reachable from the 488-byte deframer
       buffer. Deframer (`Projects/rmk/Deframer/Spec.lean` states the
-      contracts against an explicit `CopyContract` hypothesis): only `tail`
-      with consumed = 0 is proved (`Deframer/TailNoCopy.lean`, `nocopy`: that
-      path makes no call, so it does not depend on `CopyContract`). The
-      consumed ≠ 0 path, `park_pending`, `unpark_pending`, `next` and the
-      panic controls are not proved, and there is no runner job for them.
+      contracts against explicit `CopyContract` and `CobsReportContract`
+      hypotheses): all four methods are proved CONDITIONALLY on those
+      hypotheses on the pinned bytes:
+      - `tail_from_copy : TailFromCopy` (`Deframer/TailCopy.lean`; the
+        consumed = 0 path, `TailNoCopy.lean` `nocopy`, needs no hypothesis);
+      - `park_from_copy : ParkFromCopy` (`Deframer/Park.lean`);
+      - `unpark_from_copy : UnparkFromCopy` (`Deframer/Unpark.lean`);
+      - `next_from_deps : NextFromDeps` (`Deframer/Next.lean`; the whole
+        frame loop for any buffer contents, including the decode_in_place
+        wrapper, the range check and memmove).
+
+      Seventeen modules rebuild from scratch in about 125 s, all pass
+      leanchecker, and use only the standard axioms. Neither hypothesis is
+      a theorem yet. `CopyContract` needs memmove for n ≥ 16 backward and
+      misaligned, which `contractB` does not cover; `CobsReportContract`
+      needs `decode_in_place_report`, which is the COBS worker's. Not done:
+      the panic controls, a runner job for the deframer, and the session
+      (`SessionSafe`, R4).
 - [ ] **R4. Toward the session.** Compose R3 with the surrounding session
       loop and interrupts (checker, direct regions or summaries). *Accepted:*
       a kernel-checked theorem about the whole `run_session` path for the
