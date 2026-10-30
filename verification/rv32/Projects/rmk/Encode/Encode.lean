@@ -203,7 +203,41 @@ def respVals : List Nat := [0, 1, 2, 3, 4, 5, 6, 7, 8, 0xff]
 /-- **The kernel run**: from every admitted response value, every symbolic path of encode_frame
     returns to 0x80003f1e within the frame, with the callee-saved registers restored and the
     result in range. -/
-theorem enc_check : respVals.all (fun r => check encE encTbl encRom (leafE r) 600 (init r)) = true := by
+-- Keep each kernel reduction in a separate declaration so its temporary evaluation
+-- state can be released before checking the next response. No result is assumed.
+theorem enc_check_0 : check encE encTbl encRom (leafE 0) 600 (init 0) = true := by
   decide +kernel
+
+theorem enc_check_1 : check encE encTbl encRom (leafE 1) 600 (init 1) = true := by
+  decide +kernel
+
+theorem enc_check_2 : check encE encTbl encRom (leafE 2) 600 (init 2) = true := by
+  decide +kernel
+
+theorem enc_check_3 : check encE encTbl encRom (leafE 3) 600 (init 3) = true := by
+  decide +kernel
+
+theorem enc_check_4 : check encE encTbl encRom (leafE 4) 600 (init 4) = true := by
+  decide +kernel
+
+theorem enc_check_5 : check encE encTbl encRom (leafE 5) 600 (init 5) = true := by
+  decide +kernel
+
+theorem enc_check_6 : check encE encTbl encRom (leafE 6) 600 (init 6) = true := by
+  decide +kernel
+
+theorem enc_check_7 : check encE encTbl encRom (leafE 7) 600 (init 7) = true := by
+  decide +kernel
+
+theorem enc_check_8 : check encE encTbl encRom (leafE 8) 600 (init 8) = true := by
+  decide +kernel
+
+theorem enc_check_9 : check encE encTbl encRom (leafE 0xff) 600 (init 0xff) = true := by
+  decide +kernel
+
+theorem enc_check : respVals.all (fun r => check encE encTbl encRom (leafE r) 600 (init r)) = true := by
+  simp only [respVals, List.all_cons, List.all_nil,
+    enc_check_0, enc_check_1, enc_check_2, enc_check_3, enc_check_4,
+    enc_check_5, enc_check_6, enc_check_7, enc_check_8, enc_check_9, Bool.and_self]
 
 end E5R.Rmk.Encode

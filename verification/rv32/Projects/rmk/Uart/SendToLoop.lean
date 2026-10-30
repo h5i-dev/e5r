@@ -54,6 +54,6 @@ theorem send_to_loop (m₀ : Machine) (h : SendAt m₀) (E : Extras m₀)
 theorem w_sendLoop : SendAt ⟨wCore, wRam⟩ ∧ Extras ⟨wCore, wRam⟩ ∧
     (ramRead wRam 0x8002a798 .w).toNat ≤ bufLen ∧ discarding wRam dfr ≤ 1 :=
   ⟨w_sendAt, ⟨by decide, by decide, ⟨by decide, by decide⟩, by decide, by decide, by simp only [SW]; decide,
-    by decide, by decide, by decide, by decide⟩, by decide, by decide⟩
+    by decide, by decide, by decide, by decide, by decide, by decide, by decide, by decide, by decide⟩, by decide, by decide⟩
 
 end E5R.Rmk.Uart

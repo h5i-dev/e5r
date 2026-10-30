@@ -56,7 +56,7 @@ Owner: the review/encode worker (branch `verify/isa-review-20261029t042314z`). M
 
 **`Table.lean`** holds the 390 instructions reached on every input class. It is generated from the model's own decoder, and `encTbl_ok` checks it against the packed ELF in the kernel.
 
-**`Encode.lean`** has the contract, the rodata jump table (`encRom_ok`, kernel-checked) and `enc_check`. `enc_check` is one kernel evaluation for the 10 admitted response values; each data branch (zero or non-zero header and third bytes) is explored both ways. It takes about 340 s.
+**`Encode.lean`** has the contract, the rodata jump table (`encRom_ok`, kernel-checked) and `enc_check`. `enc_check` combines ten separately kernel-checked evaluations for the admitted response values; each data branch (zero or non-zero header and third bytes) is explored both ways. The historical monolithic check took about 340 s; the integrated checkpoint splits it to bound temporary kernel evaluation memory.
 
 **`Spec.lean`** has the entry relation (`rel_init`), the leaf test's soundness (`leaf_sound`), `encode_spec` and the non-vacuity results.
 

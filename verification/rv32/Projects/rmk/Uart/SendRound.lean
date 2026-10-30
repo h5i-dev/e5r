@@ -469,11 +469,16 @@ def wCore : Core where
 /-- RAM: [0x8002a7c4] = 0x80090000 (the send's struct pointer), [0x8002a7cc] = 7 (the outer length), the
     struct with base 0x10000000 at +0x1c and stride 1 at +0x20; for the session's `Extras` (SendToLoop):
     [0x8002a784] = 0x80090000 (the reader's struct pointer, the same struct) and the task flag pointer
-    [sp+0x24] = 0x80090100. -/
+    [sp+0x24] = 0x80090100. Service/TX cells match SessionInv.Extras. -/
 def wRam (a : Word) : BitVec 8 :=
   if a = 0x8002a7c6 then 0x09 else if a = 0x8002a7c7 then 0x80 else if a = 0x8002a7cc then 7
   else if a = 0x8009001f then 0x10 else if a = 0x80090020 then 1
   else if a = 0x8002a786 then 0x09 else if a = 0x8002a787 then 0x80
+  else if a = 0x8002a780 then 0xc0 else if a = 0x8002a781 then 0xa4
+  else if a = 0x8002a782 then 0x02 else if a = 0x8002a783 then 0x80
+  else if a = 0x8002a788 then 0xe4 else if a = 0x8002a789 then 0xa1
+  else if a = 0x8002a78a then 0x02 else if a = 0x8002a78b then 0x80
+  else if a = 0x8002a203 then 0x10 else if a = 0x8002a204 then 1
   else if a = 0x80100025 then 0x01 else if a = 0x80100026 then 0x09 else if a = 0x80100027 then 0x80 else 0
 
 theorem w_sendAt : SendAt ⟨wCore, wRam⟩ := by
