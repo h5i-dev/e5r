@@ -82,11 +82,16 @@ def visit(m, stack=()):
     order.append(m)
 visit("Projects.ramimage.SessionDischarged")
 
+# every theorem the bridge file itself declares (main's discharged contracts), fully qualified
+bsrc = open(os.path.join(ROOT, mod.replace(".", "/") + ".lean"), encoding="utf-8").read()
+bns = re.search(r"^namespace (\S+)", bsrc, re.M)
+bthms = [f"{bns.group(1)}.{n}" if bns else n for n in re.findall(r"^theorem (\S+)", bsrc, re.M)]
+
 base = json.load(open(os.path.join(ROOT, "jobs/rmk/rmk-session-conditional.json")))
 job = dict(base)
 job["id"] = "rmk-session-discharged"
 job["modules"] = [m.replace(".", "/") + ".lean" for m in order]
-job["theorems"] = [thm, "E5R.RmkSessionDischarged.*", "E5R.Rmk.Deframer.Session.recv_step",
+job["theorems"] = list(dict.fromkeys([thm] + bthms)) + ["E5R.RmkSessionDischarged.*", "E5R.Rmk.Deframer.Session.recv_step",
                    "E5R.Rmk.Deframer.Session.unpark_step", "E5R.Rmk.Deframer.cobs_report",
                    "E5R.RmkDeframer.img_eq", "E5R.RmkDeframer.board_eq"]
 job["symbols"] = dict(base["symbols"], **{"0x80020c1e": "memmove"})
