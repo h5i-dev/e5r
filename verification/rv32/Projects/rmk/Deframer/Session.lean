@@ -8,12 +8,15 @@
   `recv_step`: from every machine at the session loop head with the deframer invariant
   (`SessPre`: the session's s6/s7 bases, a stack below which the deframer and buffer lie), a quiet
   run (so: no panic on the way, whatever bytes the buffer holds) reaches
-  * `Some(k)`: the request decoder's call 0x8001c3c6 with a1 = buffer, a3 = k, 2 < k ≤ 488, the
-    deframer emptied and its pending bytes parked (bounds check 0x80003e5a not taken); or
+  * `Some(k)`: 0x80003e70, back from `RynkMessage::from_decoded` (0x8001c3c6, whose length check,
+    len = 488 - parked ≥ 3, is not taken: next's `k < consumed` gives parked ≤ 484), with the
+    message at 0x8002a580 = (buffer, 488 - parked, header, k), 2 < k ≤ 488, the deframer emptied
+    and its pending bytes parked (bounds check 0x80003e5a not taken); or
   * `None`: 0x80003f7c after `tail`, with the invariant again and consumed = 0;
-  writing RAM only in the deframer, the buffer, 0x70 stack bytes and the session word s6+0x2db.
+  writing RAM only in the deframer, the buffer, 0x70 stack bytes, the session word s6+0x2db and the
+  16-byte message.
 
-  NOT proved: what follows either point (the request decoder and dispatch, the response, unpark,
+  NOT proved: what follows either point (the message dispatch from 0x80003e70, the response, unpark,
   the UART read future and the executor between polls), so this is a step toward `SessionSafe`, not
   `SessionSafe`.
 -/
@@ -21,6 +24,7 @@ import Projects.rmk.Deframer.CobsDischarge
 import Projects.rmk.Deframer.TailCopy
 import Projects.rmk.Deframer.Unpark
 import Projects.rmk.Deframer.SessionSegs
+import Projects.rmk.Deframer.FromDecodedSeg
 
 set_option maxRecDepth 100000
 
@@ -32,6 +36,23 @@ def s6v : Word := 0x8002a4bd
 def s7v : Word := 0x8002a3cf
 def dfr : Word := 0x8002a78c
 def bufA : Word := 0x8002a590
+/-- The `RynkMessage` that `from_decoded` fills (s7 + 0x1b1), just below the buffer. -/
+def msgA : Word := 0x8002a580
+
+/-- A word read is unaffected by a store of any width that does not overlap it. -/
+theorem rd_wr_far (ram : Word → BitVec 8) (a v b : Word) (wd : Width) (ha : a.toNat + 4 ≤ 2 ^ 32)
+    (hb : b.toNat + 4 ≤ 2 ^ 32) (h : b.toNat + 4 ≤ a.toNat ∨ a.toNat + 4 ≤ b.toNat) :
+    ramRead (ramWrite ram a v wd) b .w = ramRead ram b .w := by
+  cases wd with
+  | w => exact rd_wr_other ram a v b ha hb h
+  | b =>
+    apply rd_congr b hb; intro x h1 h2
+    exact ramPut_ne _ (fun e => by subst e; omega)
+  | h =>
+    apply rd_congr b hb; intro x h1 h2
+    have e1 : (a + 1).toNat = a.toNat + 1 := by bv_omega
+    simp only [ramWrite]
+    rw [ramPut_ne _ (fun e => by subst e; omega), ramPut_ne _ (fun e => by subst e; omega)]
 
 structure SessPre (m : Machine) : Prop where
   pc : m.core.pc = 0x80003e1a
@@ -46,7 +67,8 @@ structure SessPre (m : Machine) : Prop where
 /-- RAM the receive step may write. -/
 def RecvW (sp : Word) (x : Word) : Prop :=
   (dfr.toNat ≤ x.toNat ∧ x.toNat < dfr.toNat + 12) ∨ (bufA.toNat ≤ x.toNat ∧ x.toNat < bufA.toNat + bufLen) ∨
-  (sp.toNat - 0x70 ≤ x.toNat ∧ x.toNat < sp.toNat) ∨ (0x8002a798 ≤ x.toNat ∧ x.toNat < 0x8002a798 + 4)
+  (sp.toNat - 0x70 ≤ x.toNat ∧ x.toNat < sp.toNat) ∨ (0x8002a798 ≤ x.toNat ∧ x.toNat < 0x8002a798 + 4) ∨
+  (msgA.toNat ≤ x.toNat ∧ x.toNat < msgA.toNat + 16)
 
 structure RecvOut (m₀ m : Machine) : Prop where
   quiet : Quiet m.core
@@ -54,8 +76,10 @@ structure RecvOut (m₀ m : Machine) : Prop where
   s7 : m.core.get 23 = s7v
   sp : m.core.get 2 = m₀.core.get 2
   ram : ∀ x, ¬ RecvW (m₀.core.get 2) x → m.ram x = m₀.ram x
-  out : (m.core.pc = 0x8001c3c6 ∧ m.core.get 11 = bufA ∧ 2 < (m.core.get 13).toNat ∧
-          (m.core.get 13).toNat ≤ bufLen ∧ consumed m.ram dfr = 0 ∧ filled m.ram dfr = 0) ∨
+  out : (m.core.pc = 0x80003e70 ∧ ramRead m.ram msgA .w = bufA ∧
+          3 ≤ (ramRead m.ram (msgA + 4) .w).toNat ∧ (ramRead m.ram (msgA + 4) .w).toNat ≤ bufLen ∧
+          2 < (ramRead m.ram (msgA + 0xc) .w).toNat ∧ (ramRead m.ram (msgA + 0xc) .w).toNat ≤ bufLen ∧
+          consumed m.ram dfr = 0 ∧ filled m.ram dfr = 0) ∨
         (m.core.pc = 0x80003f7c ∧ Inv m.ram dfr bufLen ∧ consumed m.ram dfr = 0)
 
 theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
@@ -226,55 +250,121 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
           refine decide_eq_true ?_
           show ((0x1e8#32 : Word) - e3.get 10).toNat < (0 + 0x1e9#32 : Word).toNat
           rw [show (0 + 0x1e9#32 : Word).toNat = 0x1e9 from rfl]; bv_omega)
-    refine ⟨_, _, (((r1.trans rn).trans r2).trans rp).trans r3, ?_⟩
     let D := sdecCore e3 M3
+    let R4 := sdecRam e3 M3
     have csD : D.sameCsr e3 := by unfold D sdecCore; csr_chain
+    have qD : Quiet D := Quiet.of_sameCsr csD qe3
     have gD : ∀ r : Reg, r ≠ 1 → r ≠ 9 → r ≠ 10 → r ≠ 11 → r ≠ 12 → r ≠ 13 → D.get r = e3.get r := fun r a b c' d' f' g' => by
       simp [D, sdecCore, Core.wr_get_ne, a, b, c', d', f', g']
-    have M4 : sdecRam e3 M3 = ramWrite M3 (e3.get 22 + 0x000002db#32) (e3.get 10) .w := rfl
-    have w4 : ∀ x : Word, ¬ (0x8002a798 ≤ x.toNat ∧ x.toNat < 0x8002a798 + 4) → sdecRam e3 M3 x = M3 x := by
+    have e3_23 : e3.get 23 = s7v := (PPs 23 (by decide)).trans K3_23
+    have D10 : D.get 10 = msgA := by simp [D, sdecCore, Core.wr_get_ne, Core.wr_get_self, alu_add, e3_23]; rfl
+    have D11 : D.get 11 = bufA := by
+      simp [D, sdecCore, Core.wr_get_ne, Core.wr_get_self, alu_add]; exact (PPs 8 (by decide)).trans K3_8
+    have D12 : D.get 12 = 0x1e8#32 - e3.get 10 := by
+      simp [D, sdecCore, Core.wr_get_ne, Core.wr_get_self, alu_sub, e3_19]
+    have D13 : D.get 13 = e1.get 11 := by
+      simp [D, sdecCore, Core.wr_get_ne, Core.wr_get_self, alu_add]; exact (PPs 18 (by decide)).trans K3_18
+    have D1 : D.get 1 = 0x80003e70 := by simp [D, sdecCore, Core.wr_get_self]
+    -- parked <= 484: the Some frame's bytes were consumed
+    have hk := val.2.2
+    rw [show (⟨K1, R0⟩ : Machine).core.get 10 = dfr from K1_10] at hk
+    have hk' : (e1.get 11).toNat < consumed M1 dfr := hk
+    have hpk : (e3.get 10).toNat + 4 ≤ 0x1e8 := by
+      have eq : (e3.get 10).toNat = filled M1 dfr - consumed M1 dfr := by
+        have := PP.ret; rw [show (⟨K3, M1⟩ : Machine).core.get 10 = dfr from K3_10] at this; exact this
+      have hf : filled M1 dfr ≤ bufLen := inv1.2
+      have : bufLen = 0x1e8 := rfl
+      have v1 : 2 < (e1.get 11).toNat := val.1
+      omega
+    have hl : (D.get 12).toNat = 0x1e8 - (e3.get 10).toNat := by rw [D12]; exact sub_toNat _ _ (by
+      rw [show (0x1e8#32 : Word).toNat = 0x1e8 from rfl]; omega)
+    have r4 := sfrom D R4 rfl qD
+      (by show taken .ltu (D.get 12) (alu .add 0 0x00000003#32) = false
+          simp only [taken, BitVec.ult, decide_eq_false_iff_not]
+          show ¬ ((D.get 12).toNat < (alu .add 0 0x00000003#32 : Word).toNat)
+          rw [show (alu .add 0 0x00000003#32 : Word).toNat = 3 from rfl]; omega)
+      (by rw [D11]; decide) (by rw [D11]; decide) (by rw [D11]; decide) (by rw [D11]; decide)
+      (by rw [D11]; decide) (by rw [D11]; decide)
+      (by rw [D10]; decide) (by rw [D10]; decide) (by rw [D10]; decide) (by rw [D10]; decide)
+      (by rw [D10]; decide) (by rw [D10]; decide) (by rw [D10]; decide) (by rw [D10]; decide)
+      (by rw [D10]; decide) (by rw [D10]; decide) (by rw [D1]; decide)
+    refine ⟨_, _, ((((r1.trans rn).trans r2).trans rp).trans r3).trans r4, ?_⟩
+    have M4 : R4 = ramWrite M3 (e3.get 22 + 0x000002db#32) (e3.get 10) .w := rfl
+    have w4 : ∀ x : Word, ¬ (0x8002a798 ≤ x.toNat ∧ x.toNat < 0x8002a798 + 4) → R4 x = M3 x := by
       intro x hx; rw [M4, e3_22]; exact wr_byte_other _ _ _ _ (by decide) (by
         rw [show (s6v + 0x000002db#32).toNat = 0x8002a798 from rfl]; omega)
+    -- from_decoded writes only the 16-byte message
+    have w5 : ∀ x : Word, ¬ (msgA.toNat ≤ x.toNat ∧ x.toNat < msgA.toNat + 16) → sfromRam D R4 x = R4 x := by
+      intro x hx
+      have hx' : x.toNat < 0x8002a580 ∨ 0x8002a590 ≤ x.toNat := by
+        rw [show msgA.toNat = 0x8002a580 from rfl] at hx; omega
+      simp only [sfromRam, D10]
+      rw [wr_byte_other _ _ _ _ (by decide) (by rw [show (msgA + 0x0000000c#32).toNat = 0x8002a58c from rfl]; omega)]
+      rw [ramWrite, ramPut_ne _ (fun e => by subst e; rw [show (msgA + 0x0000000a#32).toNat = 0x8002a58a from rfl] at hx'; omega)]
+      rw [ramWrite, ramPut_ne _ (fun e => by subst e; rw [show (msgA + 0x00000008#32 + 1).toNat = 0x8002a589 from rfl] at hx'; omega),
+        ramPut_ne _ (fun e => by subst e; rw [show (msgA + 0x00000008#32).toNat = 0x8002a588 from rfl] at hx'; omega)]
+      rw [wr_byte_other _ _ _ _ (by decide) (by rw [show (msgA + 0x00000004#32).toNat = 0x8002a584 from rfl]; omega),
+        wr_byte_other _ _ _ _ (by decide) (by rw [show msgA.toNat = 0x8002a580 from rfl]; omega)]
     have hp3 := PP.hconsumed
     have hf3 := PP.hfilled
     rw [show (⟨K3, M1⟩ : Machine).core.get 10 = dfr from K3_10] at hp3 hf3
-    refine ⟨Quiet.of_sameCsr csD qe3, ?_, ?_, ?_, ?_, .inl ⟨rfl, ?_, ?_, ?_, ?_, ?_⟩⟩
-    · rw [gD 22 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]; exact e3_22
-    · rw [gD 23 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]
-      exact (PPs 23 (by decide)).trans K3_23
-    · rw [gD 2 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]
+    let Fc := sfromCore D R4
+    have gF : ∀ r : Reg, r ≠ 14 → r ≠ 15 → r ≠ 16 → Fc.get r = D.get r := fun r a b c' => by
+      simp [Fc, sfromCore, Core.wr_get_ne, a, b, c']
+    have csF : Fc.sameCsr D := by unfold Fc sfromCore; csr_chain
+    refine ⟨Quiet.of_sameCsr csF qD, ?_, ?_, ?_, ?_, .inl ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩⟩
+    · rw [gF 22 (by decide) (by decide) (by decide), gD 22 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]
+      exact e3_22
+    · rw [gF 23 (by decide) (by decide) (by decide), gD 23 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]
+      exact e3_23
+    · rw [gF 2 (by decide) (by decide) (by decide), gD 2 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]
       exact PP.sp.trans K3_2
     · intro x hx
       have hx : ¬ RecvW (c.get 2) x := hx
-      show sdecRam e3 M3 x = R0 x
-      rw [w4 x (fun h' => hx (.inr (.inr (.inr h'))))]
+      show sfromRam D R4 x = R0 x
+      rw [w5 x (fun h' => hx (.inr (.inr (.inr (.inr h'))))), w4 x (fun h' => hx (.inr (.inr (.inr (.inl h')))))]
       refine (PP.ram x ⟨?_, ?_, ?_⟩).trans (ram1 x hx)
       · show ¬ ((K3.get 10).toNat ≤ x.toNat ∧ x.toNat < (K3.get 10).toNat + 12); rw [K3_10]; exact fun h' => hx (.inl h')
       · show ¬ ((K3.get 11).toNat ≤ x.toNat ∧ x.toNat < (K3.get 11).toNat + (K3.get 12).toNat)
         rw [K3_11, K3_12]; exact fun h' => hx (.inr (.inl h'))
       · show ¬ ((K3.get 2).toNat - parkStack ≤ x.toNat ∧ x.toNat < (K3.get 2).toNat)
         rw [K3_2, show parkStack = 0x40 from rfl]; exact fun h' => hx (.inr (.inr (.inl ⟨by have := h'.1; omega, h'.2⟩)))
-    · simp [D, sdecCore, Core.wr_get_ne, Core.wr_get_self, alu_add]
-      exact (PPs 8 (by decide)).trans K3_8
-    · have : D.get 13 = e1.get 11 := by
-        simp [D, sdecCore, Core.wr_get_ne, Core.wr_get_self, alu_add]
-        exact (PPs 18 (by decide)).trans K3_18
-      rw [this]; exact val.1
-    · have : D.get 13 = e1.get 11 := by
-        simp [D, sdecCore, Core.wr_get_ne, Core.wr_get_self, alu_add]
-        exact (PPs 18 (by decide)).trans K3_18
-      rw [this]
+    · show Fc.pc = 0x80003e70
+      simp only [Fc, sfromCore, Core.goto_pc]; exact D1
+    · show ramRead (sfromRam D R4) msgA .w = bufA
+      simp only [sfromRam, D10, D11]
+      rw [rd_wr_far _ _ _ _ _ (by decide) (by decide) (by decide), rd_wr_far _ _ _ _ _ (by decide) (by decide) (by decide),
+        rd_wr_far _ _ _ _ _ (by decide) (by decide) (by decide), rd_wr_far _ _ _ _ _ (by decide) (by decide) (by decide),
+        ramRead_ramWrite_w]
+    · show 3 ≤ (ramRead (sfromRam D R4) (msgA + 4) .w).toNat
+      simp only [sfromRam, D10]
+      rw [rd_wr_far _ _ _ _ _ (by decide) (by decide) (by decide), rd_wr_far _ _ _ _ _ (by decide) (by decide) (by decide),
+        rd_wr_far _ _ _ _ _ (by decide) (by decide) (by decide), show (msgA + 4 : Word) = msgA + 0x00000004#32 from rfl,
+        ramRead_ramWrite_w, hl]; omega
+    · show (ramRead (sfromRam D R4) (msgA + 4) .w).toNat ≤ bufLen
+      simp only [sfromRam, D10]
+      rw [rd_wr_far _ _ _ _ _ (by decide) (by decide) (by decide), rd_wr_far _ _ _ _ _ (by decide) (by decide) (by decide),
+        rd_wr_far _ _ _ _ _ (by decide) (by decide) (by decide), show (msgA + 4 : Word) = msgA + 0x00000004#32 from rfl,
+        ramRead_ramWrite_w, hl]; have : bufLen = 0x1e8 := rfl; omega
+    · show 2 < (ramRead (sfromRam D R4) (msgA + 0xc) .w).toNat
+      simp only [sfromRam, D10]
+      rw [show (msgA + 0xc : Word) = msgA + 0x0000000c#32 from rfl, ramRead_ramWrite_w, D13]; exact val.1
+    · show (ramRead (sfromRam D R4) (msgA + 0xc) .w).toNat ≤ bufLen
+      simp only [sfromRam, D10]
+      rw [show (msgA + 0xc : Word) = msgA + 0x0000000c#32 from rfl, ramRead_ramWrite_w, D13]
       have := val.2.1
       rw [show ((⟨K1, R0⟩ : Machine).core.get 12).toNat = bufLen from by
         rw [show (⟨K1, R0⟩ : Machine).core.get 12 = 0x1e8#32 from K1_12]; rfl] at this
       exact this
-    · show (ramRead (sdecRam e3 M3) dfr .w).toNat = 0
-      rw [rd_congr dfr (by decide) (ram' := sdecRam e3 M3) (ram := M3) fun x h1 h2 => w4 x (by
-        rw [show dfr.toNat = 0x8002a78c from rfl] at h1 h2; omega)]
+    · show (ramRead (sfromRam D R4) dfr .w).toNat = 0
+      rw [rd_congr dfr (by decide) (ram' := sfromRam D R4) (ram := M3) fun x h1 h2 => by
+        rw [show dfr.toNat = 0x8002a78c from rfl] at h1 h2
+        rw [w5 x (by rw [show msgA.toNat = 0x8002a580 from rfl]; omega), w4 x (by omega)]]
       exact hp3
-    · show (ramRead (sdecRam e3 M3) (dfr + 4) .w).toNat = 0
-      rw [rd_congr (dfr + 4) (by decide) (ram' := sdecRam e3 M3) (ram := M3) fun x h1 h2 => w4 x (by
-        rw [show (dfr + 4).toNat = 0x8002a790 from rfl] at h1 h2; omega)]
+    · show (ramRead (sfromRam D R4) (dfr + 4) .w).toNat = 0
+      rw [rd_congr (dfr + 4) (by decide) (ram' := sfromRam D R4) (ram := M3) fun x h1 h2 => by
+        rw [show (dfr + 4).toNat = 0x8002a790 from rfl] at h1 h2
+        rw [w5 x (by rw [show msgA.toNat = 0x8002a580 from rfl]; omega), w4 x (by omega)]]
       exact hf3
 
 end E5R.Rmk.Deframer.Session

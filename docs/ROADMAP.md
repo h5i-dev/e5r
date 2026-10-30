@@ -945,13 +945,15 @@ optional; direct and hybrid proofs are equally valid routes.
       CONDITIONAL on `CopyContract`. `Deframer/Session.lean` `recv_step`: from
       the session loop head 0x80003e1a with the deframer invariant, a quiet
       run, for any buffer contents, reaches one of two points:
-      - `Some(k)`, 2 < k ≤ 488: the request decoder call 0x8001c3c6, after
-        `park_pending`, with the bounds check 0x80003e5a not taken;
+      - `Some(k)`, 2 < k ≤ 488: 0x80003e70, after `park_pending` and
+        `RynkMessage::from_decoded`. Neither the bounds check 0x80003e5a nor
+        from_decoded's length panic is taken, because `next` now also
+        guarantees k < consumed. The message at 0x8002a580 is filled;
       - `None`: just after `tail`, with the invariant again.
 
       Along the way RAM writes stay in the deframer, the buffer, 0x70 stack
-      bytes and s6+0x2db. Not proved: the request decoder and dispatch, the
-      response write, `unpark_pending`'s call site, the UART read future and
+      bytes, s6+0x2db and the 16-byte message. Not proved: the dispatch from
+      0x80003e70, the response write, `unpark_pending`'s call site, the UART read future and
       the executor between polls (other tasks, interrupts). `SessionSafe`
       ranges over all of these, so it is not proved.
 
