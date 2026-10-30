@@ -264,7 +264,7 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
         simp [D, sdecCore, Core.wr_get_ne, Core.wr_get_self, alu_add]
         exact (PPs 18 (by decide)).trans K3_18
       rw [this]
-      have := val.2
+      have := val.2.1
       rw [show ((⟨K1, R0⟩ : Machine).core.get 12).toNat = bufLen from by
         rw [show (⟨K1, R0⟩ : Machine).core.get 12 = 0x1e8#32 from K1_12]; rfl] at this
       exact this

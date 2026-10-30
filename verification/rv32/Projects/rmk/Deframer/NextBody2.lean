@@ -249,7 +249,12 @@ theorem call_case (hC : CopyContract) (hR : CobsReportContract) (c : Core) (R0 :
           have eo' : (ng c + BitVec.ofNat 32 o).toNat = (ng c).toNat + o := add_toNat _ _ (by omega)
           exact rd_congr _ (by omega) fun x h1 h2 => (mo x (by omega) (by omega)).trans (slot2 x (by omega) (by omega))
         · rw [t']; decide
-        · intro _; rw [v']; omega
+        · intro _; rw [v']
+          refine ⟨by omega, by omega, ?_⟩
+          show w1.toNat < (ramRead M' (c.get 10) .w).toNat
+          rw [rd_congr (c.get 10) (by omega) (ram' := M') (ram := M2) fun x h1 h2 => mo x (by omega) (by omega),
+            fcur2, hs11]
+          omega
         · show (ramRead M' (c.get 10) .w).toNat ≤ (ramRead M' (c.get 10 + 4) .w).toNat ∧
             (ramRead M' (c.get 10 + 4) .w).toNat ≤ (c.get 12).toNat
           rw [rd_congr (c.get 10) (by omega) (ram' := M') (ram := M2) fun x h1 h2 => mo x (by omega) (by omega),

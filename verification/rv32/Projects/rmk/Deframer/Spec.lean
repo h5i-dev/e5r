@@ -231,9 +231,11 @@ structure NextPost (m₀ m : Machine) : Prop where
   /-- The ABI frame (corrected from "s0-s11", which left out ra, gp, tp). -/
   saved : ∀ r : Reg, r.val ∉ callerSaved → m.core.get r = m₀.core.get r
   tag : (m.core.get 10).toNat ≤ 1
-  /-- `Some(k)`: the frame the caller then slices, `buf[..k]`, lies in the buffer (added: the
-      session needs it to show its own slice does not panic). -/
-  val : (m.core.get 10).toNat = 1 → 2 < (m.core.get 11).toNat ∧ (m.core.get 11).toNat ≤ (m₀.core.get 12).toNat
+  /-- `Some(k)`: the frame the caller then slices, `buf[..k]`, lies in the buffer, and the
+      frame's encoded bytes and delimiter were consumed, so k < consumed (added: the session needs
+      both, for its own slice and for `from_decoded`'s length check after `park_pending`). -/
+  val : (m.core.get 10).toNat = 1 → 2 < (m.core.get 11).toNat ∧ (m.core.get 11).toNat ≤ (m₀.core.get 12).toNat ∧
+    (m.core.get 11).toNat < consumed m.ram (m₀.core.get 10)
   inv : Inv m.ram (m₀.core.get 10) (m₀.core.get 12).toNat
   disc : discarding m.ram (m₀.core.get 10) ≤ 1
   ram : KeepsRam nextStack m₀ m
