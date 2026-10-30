@@ -69,7 +69,6 @@ theorem xstore_disc (M : Word → BitVec 8) (p f : Word) :
     (xstore M p f (p + 8)).toNat = 1 := by
   unfold xstore; rw [ramWrite, show (p + 8 : Word) = p + 0x00000008#32 from rfl, ramPut_eq]; rfl
 
-macro "csr_chain" : tactic => `(tactic| repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
 
 /-- `RetAt` from an exit: a0 = 0 (None), everything else as at the exit test, up to the
     deframer stores. -/
@@ -149,7 +148,7 @@ theorem exit_post (c : Core) (R0 : Word → BitVec 8) (E : CallEnv nextPc nextSt
   by_cases h1 : e.get 23 = 1
   · have w : taken .ne (alu .and (e.get 23) 0x00000001#32) 0 = true := by rw [and1 _ hs7, h1]; rfl
     have r := nx1 e M h.pc h.quiet w al19 in19 al8 in8
-    obtain ⟨k, m, r2, post⟩ := ret_post c R0 E _ _ (disc_exit (nx1Core e M) rfl (by unfold nx1Core; csr_chain)
+    obtain ⟨k, m, r2, post⟩ := ret_post c R0 E _ _ (disc_exit (nx1Core e M) rfl (by unfold nx1Core; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_)))
       (by simp [nx1Core, Core.wr_get_ne]) (kept_of _ fun r a b => by simp [nx1Core, Core.wr_get_ne, a, b])
       (by simp [nx1Core, Core.wr_get_ne, Core.wr_get_self, alu_add]))
     exact ⟨_, m, r.trans r2, post⟩
@@ -163,19 +162,19 @@ theorem exit_post (c : Core) (R0 : Word → BitVec 8) (E : CallEnv nextPc nextSt
       by_cases h3 : e.get 9 = 0
       · have w3 : taken .ne (e.get 9) 0 = false := by simp [taken, h3]
         have r := nx4 e M h.pc h.quiet w w2 w3 al19 in19 al8 in8
-        obtain ⟨k, m, r2, post⟩ := ret_post c R0 E _ _ (disc_exit (nx4Core e M) rfl (by unfold nx4Core; csr_chain)
+        obtain ⟨k, m, r2, post⟩ := ret_post c R0 E _ _ (disc_exit (nx4Core e M) rfl (by unfold nx4Core; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_)))
           (by simp [nx4Core, Core.wr_get_ne]) (kept_of _ fun r a b => by simp [nx4Core, Core.wr_get_ne, a, b])
           (by simp [nx4Core, Core.wr_get_ne, Core.wr_get_self, alu_add]))
         exact ⟨_, m, r.trans r2, post⟩
       · have w3 : taken .ne (e.get 9) 0 = true := by simp only [taken, bne_iff_ne, ne_eq]; exact h3
         have r := nx3 e M h.pc h.quiet w w2 w3
-        obtain ⟨k, m, r2, post⟩ := ret_post c R0 E _ _ (keep_exit (nx3Core e M) rfl (by unfold nx3Core; csr_chain)
+        obtain ⟨k, m, r2, post⟩ := ret_post c R0 E _ _ (keep_exit (nx3Core e M) rfl (by unfold nx3Core; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_)))
           (by simp [nx3Core, Core.wr_get_ne]) (kept_of _ fun r a b => by simp [nx3Core, Core.wr_get_ne, a, b])
           (by simp [nx3Core, Core.wr_get_ne, Core.wr_get_self]; exact a0z))
         exact ⟨_, m, r.trans r2, post⟩
     · have w2 : taken .ne (e.get 8) (e.get 18) = true := by simp [taken, h2]
       have r := nx2 e M h.pc h.quiet w w2
-      obtain ⟨k, m, r2, post⟩ := ret_post c R0 E _ _ (keep_exit (nx2Core e M) rfl (by unfold nx2Core; csr_chain)
+      obtain ⟨k, m, r2, post⟩ := ret_post c R0 E _ _ (keep_exit (nx2Core e M) rfl (by unfold nx2Core; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_)))
         (by simp [nx2Core, Core.wr_get_ne]) (kept_of _ fun r a b => by simp [nx2Core, Core.wr_get_ne, a, b])
         (by simp [nx2Core, Core.wr_get_ne, Core.wr_get_self]; exact a0z))
       exact ⟨_, m, r.trans r2, post⟩

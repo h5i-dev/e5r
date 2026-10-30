@@ -82,7 +82,7 @@ theorem end_case (c : Core) (R0 : Word → BitVec 8) (E : CallEnv nextPc nextSta
   have r := nend d M h.pc h.quiet (by simp [taken, heq])
   have gs : ∀ r : Reg, r ≠ 9 → (nendCore d M).get r = d.get r := fun r hr => by
     simp [nendCore, Core.wr_get_ne, hr]
-  have cs : (nendCore d M).sameCsr d := by unfold nendCore; csr_chain
+  have cs : (nendCore d M).sameCsr d := by unfold nendCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
   obtain ⟨k, m, r2, post⟩ := exit_post c R0 E (nendCore d M) M
     ⟨rfl, Quiet.of_sameCsr cs h.quiet, cs.trans h.csr, (gs 2 (by decide)).trans h.sp,
       fun r hr => (gs r (fun e => by subst e; exact absurd hr (by decide))).trans (h.kept r hr), h.slots,
@@ -115,7 +115,7 @@ theorem scan_case (c : Core) (R0 : Word → BitVec 8) (E : CallEnv nextPc nextSt
   have hfl := h.fle
   have r1 := nhead d M h.pc h.quiet (by simp only [taken, beq_eq_false_iff_ne]; exact hne)
   let e0 := nheadCore d M
-  have cs0 : e0.sameCsr d := by unfold e0 nheadCore; csr_chain
+  have cs0 : e0.sameCsr d := by unfold e0 nheadCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
   have g0 : ∀ r : Reg, r ≠ 11 → r ≠ 12 → r ≠ 13 → r ≠ 14 → e0.get r = d.get r := fun r a b c' d' => by
     simp [e0, nheadCore, Core.wr_get_ne, a, b, c', d']
   let n := (d.get 8 - d.get 9).toNat
@@ -187,7 +187,7 @@ theorem disc_case (c : Core) (R0 : Word → BitVec 8) (E : CallEnv nextPc nextSt
   let s11 := alu .add (alu .sub (d.get 9) (0 - BitVec.ofNat 32 j)) 0x00000001#32
   let d' := ndiscCore e M
   let M' := ndiscRam e M
-  have cs : d'.sameCsr e := by unfold d' ndiscCore; csr_chain
+  have cs : d'.sameCsr e := by unfold d' ndiscCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
   have gd : ∀ r : Reg, r ≠ 9 → r ≠ 10 → r ≠ 21 → r ≠ 23 → r ≠ 27 → d'.get r = e.get r := fun r a b c' d'' f' => by
     simp [d', ndiscCore, Core.wr_get_ne, a, b, c', d'', f']
   have d9 : d'.get 9 = s11 := by

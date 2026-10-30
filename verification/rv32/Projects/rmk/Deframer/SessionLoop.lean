@@ -72,7 +72,7 @@ theorem unpark_step (hC : CopyContract) (m₀ : Machine) (h : UnparkAt m₀) :
   have hdc : (R0 (dfr + 8)).toNat ≤ 1 := h.disc
   have r1 := sunpk c R0 h.pc h.quiet (by rw [h22]; decide) (by rw [h22]; decide)
   let K := sunpkCore c R0
-  have csK : K.sameCsr c := by unfold K sunpkCore; csr_chain
+  have csK : K.sameCsr c := by unfold K sunpkCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
   have qK : Quiet K := Quiet.of_sameCsr csK h.quiet
   have K10 : K.get 10 = dfr := by simp [K, sunpkCore, Core.wr_get_ne, Core.wr_get_self, alu_add, h23]; rfl
   have K11 : K.get 11 = bufA := by simp [K, sunpkCore, Core.wr_get_ne, Core.wr_get_self, alu_add, h23]; rfl
