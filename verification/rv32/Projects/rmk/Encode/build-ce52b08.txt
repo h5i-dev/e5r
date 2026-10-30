@@ -1,0 +1,16 @@
+ok Theories.Hart 7s
+ok Theories.Platform 4s
+ok Theories.RamElf 4s
+ok Projects.rmk.Elf 11s
+ok Theories.Board.QemuVirtRv32 4s
+ok Theories.Logic 4s
+ok Projects.rmk.Fetch 57s
+ok Projects.rmk.Run 3s
+ok Projects.rmk.Reach 3s
+ok Projects.rmk.Trees 5s
+ok Projects.rmk.Encode.Sym 8s
+ok Projects.rmk.Encode.Table 4s
+ok Projects.rmk.Encode.Encode 340s
+ok Projects.rmk.Encode.Spec 4s
+BUILD-DONE
+build-exit=0
