@@ -107,7 +107,7 @@ def run(name, elf=None, modules=None):
 
 
 def full_errors(msg):
-    m = re.search(r"(build/testjobs/defmut/\w+\.lean): exited with", msg or "")
+    m = re.search(r"((?:build/testjobs/defmut|Projects/rmk)/\w+\.lean): exited with", msg or "")
     if not m:
         return msg
     r = subprocess.run(["lean", "-j1", m.group(1)], cwd=ROOT, capture_output=True, text=True,
@@ -116,7 +116,7 @@ def full_errors(msg):
 
 
 def first_error(msg):
-    m = re.search(r"(build/testjobs/defmut/\w+\.lean):(\d+):\d+: error[^\n]*", msg or "")
+    m = re.search(r"((?:build/testjobs/defmut|Projects/rmk)/\w+\.lean):(\d+):\d+: error[^\n]*", msg or "")
     if not m:
         return None, None, None
     text = open(os.path.join(ROOT, m.group(1)), encoding="utf-8").read().splitlines()
@@ -169,6 +169,13 @@ def main():
             ("unpark-parked", {"SessionLoop": ("  parked : (ramRead m.ram 0x8002a798 .w).toNat ≤ bufLen\n",
                                                "  parked : (ramRead m.ram 0x8002a798 .w).toNat ≤ bufLen + 1\n")}),
         ]
+    if JOBID == "rmk-session-discharged":
+        cases += [
+            # the deframer's calls may pass a destination reaching into memmove's frame: the
+            # discharge (copy_contract, from the peer's PreM) must no longer check
+            ("copy-dstsep", {"Spec": ("  dstSep : (m.core.get 10).toNat + (m.core.get 12).toNat ≤ (m.core.get 2).toNat - memmoveFrame\n",
+                                      "  dstSep : (m.core.get 10).toNat + (m.core.get 12).toNat ≤ (m.core.get 2).toNat\n")}),
+        ]
     for name, edits in cases:
         write_chain(edits)
         expect(name, run(name), 10)
@@ -180,6 +187,16 @@ def main():
     open(os.path.join(T, "deframer-opcode.elf"), "wb").write(elf)
     write_chain({})
     expect("opcode", run("opcode", elf="build/testjobs/deframer-opcode.elf"), 10)
+    if JOBID == "rmk-session-discharged":
+        # memmove's forward/backward dispatch 0x80020c3a bgeu a0,t5 -> bltu: the discharge must fail
+        elf = bytearray(open(os.path.join(ROOT, JOB["elf"]), "rb").read())
+        off = 0x1000 + (0x80020c3a - 0x80000000)
+        w = int.from_bytes(elf[off:off + 4], "little")
+        assert w & 0x707f == 0x7063, hex(w)  # BRANCH, funct3 111 (bgeu)
+        elf[off:off + 4] = (w ^ (1 << 12)).to_bytes(4, "little")  # -> 110 (bltu)
+        open(os.path.join(T, "memmove-opcode.elf"), "wb").write(elf)
+        write_chain({})
+        expect("memmove-opcode", run("memmove-opcode", elf="build/testjobs/memmove-opcode.elf"), 10)
     i = SRC["Spec"].index("  ok : (ramRead m.ram (m₀.core.get 10) .w - 1)")
     j = SRC["Spec"].index("def CobsReportContract")
     write_chain({"Spec": (SRC["Spec"][i:j], "  ok : True\n\n")})
