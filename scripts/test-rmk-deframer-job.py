@@ -3,7 +3,12 @@
 (jobs/rmk/rmk-deframer-conditional.json: tail/park/unpark from CopyContract, next from
 CopyContract and CobsReportContract; main's proofs, my runner wrapper).
 
-Usage: python3 -I scripts/test-rmk-deframer-job.py E5R_VERIFY
+Usage: python3 -I scripts/test-rmk-deframer-job.py E5R_VERIFY [JOB_ID] [--copies|--official]
+
+JOB_ID defaults to rmk-deframer-conditional; rmk-session-conditional (main's recv_step and
+unpark_step, CopyContract explicit) adds the session cases below. --official (default once
+main's files contain no `macro`) runs the controls on UNEXPANDED copies; --copies expands
+`csr_chain` (a stopgap while main's files still define it).
 
 Every run uses COPIES of Projects/rmk/Deframer/*.lean and Projects/ramimage/Deframer.lean in
 verification/rv32/build/testjobs/defmut/ (imports renamed; main's files are not touched), with
@@ -34,24 +39,42 @@ import sys
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "verification", "rv32")
 T = os.path.join(ROOT, "build", "testjobs")
 MUT = os.path.join(T, "defmut")
-JOB = json.load(open(os.path.join(ROOT, "jobs", "rmk", "rmk-deframer-conditional.json")))
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+JOBID = ARGS[1] if len(ARGS) > 1 else "rmk-deframer-conditional"
+JOB = json.load(open(os.path.join(ROOT, "jobs", "rmk", JOBID + ".json")))
 CHAIN = [m.split("/")[-1][:-5] for m in JOB["modules"] if m.startswith("Projects/rmk/Deframer/")]
 SRC = {m: open(os.path.join(ROOT, "Projects/rmk/Deframer", m + ".lean"), encoding="utf-8").read() for m in CHAIN}
-WRAP = open(os.path.join(ROOT, "Projects/ramimage/Deframer.lean"), encoding="utf-8").read()
+# runner wrappers that import the chain: Projects/ramimage/X.lean -> defmut/WrapX.lean
+WRAPS = [m.split("/")[-1][:-5] for m in JOB["modules"] if m.startswith("Projects/ramimage/")]
+WRAP = {w: open(os.path.join(ROOT, "Projects/ramimage", w + ".lean"), encoding="utf-8").read() for w in WRAPS}
+# other job modules that import the chain (e.g. Cobs/Bridge imports Deframer.Spec): copied too, as
+# defmut/ExtX.lean, so no module sees both the original and the mutated chain
+EXT = {m: open(os.path.join(ROOT, m), encoding="utf-8").read() for m in JOB["modules"]
+       if not m.startswith(("Projects/rmk/Deframer/", "Projects/ramimage/"))
+       and "import Projects.rmk.Deframer." in open(os.path.join(ROOT, m), encoding="utf-8").read()}
+EXTN = {m: "Ext" + m.split("/")[-1][:-5] for m in EXT}
 MACRO = re.compile(r'^macro "csr_chain" : tactic => `\(tactic\| (.*)\)\s*$', re.M)
-EXP = MACRO.search(SRC["NextExit"]).group(1)
+HAS_MACRO = any(re.search(r"^\s*(macro|syntax|macro_rules|elab)\b", t, re.M) for t in SRC.values())
+EXPAND = "--copies" in sys.argv or ("--official" not in sys.argv and HAS_MACRO)
+EXP = next((MACRO.search(t).group(1) for t in SRC.values() if MACRO.search(t)), None)
+assert not EXPAND or EXP, "--copies but no csr_chain macro to expand"
 failures = 0
 
 
 def write_chain(edits):
     shutil.rmtree(MUT, ignore_errors=True)
     os.makedirs(MUT)
-    files = dict(SRC, DeframerWrap=WRAP)
+    files = dict(SRC, **{"Wrap" + w: t for w, t in WRAP.items()}, **{EXTN[m]: t for m, t in EXT.items()})
     for m, s in files.items():
-        s = MACRO.sub("", s)
-        s = re.sub(r"\bcsr_chain\b", f"({EXP})", s)
+        if EXPAND:
+            s = MACRO.sub("", s)
+            s = re.sub(r"\bcsr_chain\b", f"({EXP})", s)
         for o in CHAIN:
             s = s.replace(f"import Projects.rmk.Deframer.{o}\n", f"import build.testjobs.defmut.{o}\n")
+        for w in WRAPS:
+            s = s.replace(f"import Projects.ramimage.{w}\n", f"import build.testjobs.defmut.Wrap{w}\n")
+        for e, n in EXTN.items():
+            s = s.replace(f"import {e[:-5].replace('/', '.')}\n", f"import build.testjobs.defmut.{n}\n")
         if m in edits:
             old, new = edits[m]
             assert s.count(old) == 1, (m, old)
@@ -66,15 +89,17 @@ def run(name, elf=None, modules=None):
     for m in j["modules"]:
         if m.startswith("Projects/rmk/Deframer/"):
             mods.append("build/testjobs/defmut/" + m.split("/")[-1])
-        elif m == "Projects/ramimage/Deframer.lean":
-            mods.append("build/testjobs/defmut/DeframerWrap.lean")
+        elif m in EXTN:
+            mods.append(f"build/testjobs/defmut/{EXTN[m]}.lean")
+        elif m.startswith("Projects/ramimage/"):
+            mods.append("build/testjobs/defmut/Wrap" + m.split("/")[-1])
         else:
             mods.append(m)
     j["modules"] = mods[:-1] + ["build/testjobs/Nope.lean"] if modules == "missing" else mods
     if elf:
         j["elf"] = elf
         j.pop("elf_sha256")
-    path = os.path.join(T, f"deframer-{name}.json")
+    path = os.path.join(T, f"{JOBID}-{name}.json")
     json.dump(j, open(path, "w"), indent=1)
     r = subprocess.run([TOOL, "check", "--resume", path], capture_output=True, text=True, cwd=ROOT)
     doc = json.loads(r.stdout) if r.stdout.strip().startswith("{") else {}
@@ -121,10 +146,11 @@ def expect(name, got, code, required=True):
 
 def main():
     global TOOL
-    TOOL = os.path.abspath(sys.argv[1])
+    TOOL = os.path.abspath(ARGS[0])
     os.makedirs(T, exist_ok=True)
+    print(f"job {JOBID}; copies {'with csr_chain EXPANDED (stopgap)' if EXPAND else 'unexpanded (main files as committed)'}", flush=True)
     write_chain({})
-    expect("control: expanded copies", run("control"), 0)
+    expect("control: copies, no mutation", run("control"), 0)
     cases = [
         ("frame", {"Spec": ("def tailStack : Nat := 0x20 + memmoveFrame", "def tailStack : Nat := 0x20 + 12")}),
         ("panic-bound", {"Spec": ("  consumed ram p ≤ filled ram p ∧ filled ram p ≤ len\n",
@@ -134,6 +160,15 @@ def main():
         ("next-result", {"Spec": ("val : (m.core.get 10).toNat = 1 → 2 < (m.core.get 11).toNat",
                                   "val : (m.core.get 10).toNat = 1 → 3 < (m.core.get 11).toNat")}),
     ]
+    if JOBID == "rmk-session-conditional":
+        cases += [
+            ("recv-msg-len", {"Session": ("          3 ≤ (ramRead m.ram (msgA + 4) .w).toNat ∧",
+                                          "          4 ≤ (ramRead m.ram (msgA + 4) .w).toNat ∧")}),
+            ("recv-frame", {"Session": ("(sp.toNat - 0x70 ≤ x.toNat ∧ x.toNat < sp.toNat)",
+                                        "(sp.toNat - 0x6c ≤ x.toNat ∧ x.toNat < sp.toNat)")}),
+            ("unpark-parked", {"SessionLoop": ("  parked : (ramRead m.ram 0x8002a798 .w).toNat ≤ bufLen\n",
+                                               "  parked : (ramRead m.ram 0x8002a798 .w).toNat ≤ bufLen + 1\n")}),
+        ]
     for name, edits in cases:
         write_chain(edits)
         expect(name, run(name), 10)
