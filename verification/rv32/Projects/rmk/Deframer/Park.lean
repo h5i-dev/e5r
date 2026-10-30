@@ -479,7 +479,7 @@ theorem park_from_copy : ParkFromCopy := by
     show (ramRead (pstore M (c.get 10)) (c.get 10 + 4) .w).toNat = 0
     exact congrArg BitVec.toNat (pstore_filled M (c.get 10))
   let T := pfin e (pstore M (c.get 10)) (pfp c) n
-  refine ⟨?_, ?_, ?_, ?_, hcons, hfill, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, hcons, hfill, ?_, ?_, ?_, ?_⟩
   · show T.pc = c.get 1
     exact (slot 0xc (by decide)).trans (psave_c c R0 hs)
   · exact (pfin_sameCsr _ _ _ _).trans (P.csr.trans (pcall_sameCsr c R0))
@@ -526,5 +526,10 @@ theorem park_from_copy : ParkFromCopy := by
     have h3 : ¬ ((c.get 2).toNat - 0x40 ≤ x.toNat ∧ x.toNat < (c.get 2).toNat) := hx.2.2
     rw [keep x (by omega) (by omega) (by rw [hdst]; omega)]
     exact psave_other c R0 hs x (by omega)
+  · refine congrArg BitVec.toNat ?_
+    show pstore M (c.get 10) (c.get 10 + 8) = R0 (c.get 10 + 8)
+    have e8 : (c.get 10 + 8 : Word).toNat = (c.get 10).toNat + 8 := add_toNat _ 8 (by omega)
+    rw [keep _ (by omega) (by omega) (by rw [hdst]; omega)]
+    exact psave_other c R0 hs _ (.inl (by omega))
 
 end E5R.Rmk.Deframer.Park
