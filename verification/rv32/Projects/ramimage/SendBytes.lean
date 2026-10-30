@@ -22,7 +22,7 @@ import Projects.rmk.Uart.SendBytes
 
 namespace E5R.RmkUart
 open E5R E5R.Rmk.Deframer
-open E5R.Rmk (Lands Quiet irqEnabled)
+open E5R.Rmk (Lands Quiet)
 open E5R.Rmk.Uart (SendEnv SendPost)
 
 theorem send_bytes (m₀ : Machine) (E : SendEnv m₀) : Lands B img (SendPost m₀) m₀ :=
