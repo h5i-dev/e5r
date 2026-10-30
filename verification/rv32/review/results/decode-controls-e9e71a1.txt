@@ -1,0 +1,6 @@
+ok   c.addi4spn nzuimm=0 accepted: exit 1 16-bit WRONG         8; -- 16-bit WRONG examples:
+ok   load funct3=6 accepted (lwu, RV64 only): exit 1 32-bit WRONG         745; -- 32-bit WRONG examples:
+ok   srai accepts any funct7 >= 0x20: exit 1 32-bit WRONG         497; -- 32-bit WRONG examples:
+ok   jal immediate bit 11 misplaced: exit 1 32-bit WRONG         6054; -- 32-bit WRONG examples:
+ok   c.srli with shamt[5]=1 accepted: exit 1 16-bit WRONG         256; -- 16-bit WRONG examples:
+every decoder mutant was caught

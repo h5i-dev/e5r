@@ -4,23 +4,23 @@
   "stages": [
     {
       "name": "lean Theories.Hart",
-      "seconds": 2.4
+      "seconds": 2.5
     },
     {
       "name": "lean Theories.Platform",
-      "seconds": 1.5
+      "seconds": 1.7
     },
     {
       "name": "lean Theories.Logic",
-      "seconds": 1.8
+      "seconds": 1.9
     },
     {
       "name": "lean Projects.rmk.Run",
-      "seconds": 1.1
+      "seconds": 1.3
     },
     {
       "name": "lean Projects.rmk.Copy",
-      "seconds": 4.7
+      "seconds": 6.1
     },
     {
       "name": "lean Theories.RamElf",
@@ -28,7 +28,7 @@
     },
     {
       "name": "lean Projects.rmk.Elf",
-      "seconds": 8.7
+      "seconds": 9.3
     },
     {
       "name": "lean Theories.Board.QemuVirtRv32",
@@ -36,39 +36,39 @@
     },
     {
       "name": "lean Projects.rmk.Fetch",
-      "seconds": 56.1
+      "seconds": 56.0
     },
     {
       "name": "lean Projects.rmk.MemmoveFetch",
-      "seconds": 54.5
+      "seconds": 55.0
     },
     {
       "name": "lean Projects.rmk.MemmoveLoops",
-      "seconds": 2.5
+      "seconds": 2.4
     },
     {
       "name": "lean Theories.Absint",
-      "seconds": 2.9
+      "seconds": 3.2
     },
     {
       "name": "lean Theories.AbsintSound",
-      "seconds": 16.6
+      "seconds": 16.8
     },
     {
       "name": "lean Projects.rmk.MemmoveSmall",
-      "seconds": 4.7
+      "seconds": 4.9
     },
     {
       "name": "lean Projects.rmk.MemmoveBigLoops",
-      "seconds": 2.7
+      "seconds": 2.6
     },
     {
       "name": "lean Projects.rmk.MemmoveAligned",
-      "seconds": 12.1
+      "seconds": 11.5
     },
     {
       "name": "lean Projects.rmk.MemmoveContract",
-      "seconds": 3.2
+      "seconds": 3.1
     },
     {
       "name": "lean Projects.rmk.Merge",
@@ -76,27 +76,55 @@
     },
     {
       "name": "lean Projects.rmk.MemmoveMisLoop",
-      "seconds": 4.4
+      "seconds": 4.3
     },
     {
       "name": "lean Projects.rmk.MemmoveMisStart",
-      "seconds": 16.3
+      "seconds": 16.2
     },
     {
       "name": "lean Projects.rmk.MemmoveMisEnd",
-      "seconds": 7.4
+      "seconds": 7.2
     },
     {
       "name": "lean Projects.rmk.MemmoveMis",
-      "seconds": 152.0
+      "seconds": 141.4
     },
     {
       "name": "lean Projects.rmk.MemmoveFull",
-      "seconds": 4.6
+      "seconds": 4.2
+    },
+    {
+      "name": "lean Projects.rmk.MemmoveBwdMisLoop",
+      "seconds": 4.0
+    },
+    {
+      "name": "lean Projects.rmk.MemmoveBwdMisStart",
+      "seconds": 6.7
+    },
+    {
+      "name": "lean Projects.rmk.MemmoveBwdMisEnd",
+      "seconds": 12.7
+    },
+    {
+      "name": "lean Projects.rmk.MemmoveBwdLoops",
+      "seconds": 3.3
+    },
+    {
+      "name": "lean Projects.rmk.MemmoveBwd",
+      "seconds": 15.6
+    },
+    {
+      "name": "lean Projects.rmk.MemmoveBwdMis",
+      "seconds": 59.5
+    },
+    {
+      "name": "lean Projects.rmk.MemmoveBwdAll",
+      "seconds": 5.1
     },
     {
       "name": "leanchecker Theories.Hart",
-      "seconds": 4.6
+      "seconds": 4.5
     },
     {
       "name": "leanchecker Theories.Platform",
@@ -104,19 +132,19 @@
     },
     {
       "name": "leanchecker Theories.Logic",
-      "seconds": 1.9
+      "seconds": 2.1
     },
     {
       "name": "leanchecker Projects.rmk.Run",
-      "seconds": 3.2
+      "seconds": 1.7
     },
     {
       "name": "leanchecker Projects.rmk.Copy",
-      "seconds": 4.0
+      "seconds": 4.9
     },
     {
       "name": "leanchecker Theories.RamElf",
-      "seconds": 4.5
+      "seconds": 1.7
     },
     {
       "name": "leanchecker Projects.rmk.Elf",
@@ -128,11 +156,11 @@
     },
     {
       "name": "leanchecker Projects.rmk.Fetch",
-      "seconds": 59.5
+      "seconds": 49.6
     },
     {
       "name": "leanchecker Projects.rmk.MemmoveFetch",
-      "seconds": 43.0
+      "seconds": 41.0
     },
     {
       "name": "leanchecker Projects.rmk.MemmoveLoops",
@@ -140,7 +168,7 @@
     },
     {
       "name": "leanchecker Theories.Absint",
-      "seconds": 1.8
+      "seconds": 1.9
     },
     {
       "name": "leanchecker Theories.AbsintSound",
@@ -148,47 +176,75 @@
     },
     {
       "name": "leanchecker Projects.rmk.MemmoveSmall",
-      "seconds": 3.7
+      "seconds": 4.0
     },
     {
       "name": "leanchecker Projects.rmk.MemmoveBigLoops",
-      "seconds": 2.5
+      "seconds": 2.6
     },
     {
       "name": "leanchecker Projects.rmk.MemmoveAligned",
-      "seconds": 6.1
+      "seconds": 6.2
     },
     {
       "name": "leanchecker Projects.rmk.MemmoveContract",
-      "seconds": 5.3
+      "seconds": 5.4
     },
     {
       "name": "leanchecker Projects.rmk.Merge",
-      "seconds": 3.2
+      "seconds": 3.0
     },
     {
       "name": "leanchecker Projects.rmk.MemmoveMisLoop",
-      "seconds": 3.5
-    },
-    {
-      "name": "leanchecker Projects.rmk.MemmoveMisStart",
-      "seconds": 7.6
-    },
-    {
-      "name": "leanchecker Projects.rmk.MemmoveMisEnd",
-      "seconds": 3.1
-    },
-    {
-      "name": "leanchecker Projects.rmk.MemmoveMis",
-      "seconds": 21.9
-    },
-    {
-      "name": "leanchecker Projects.rmk.MemmoveFull",
       "seconds": 3.3
     },
     {
+      "name": "leanchecker Projects.rmk.MemmoveMisStart",
+      "seconds": 7.7
+    },
+    {
+      "name": "leanchecker Projects.rmk.MemmoveMisEnd",
+      "seconds": 3.4
+    },
+    {
+      "name": "leanchecker Projects.rmk.MemmoveMis",
+      "seconds": 23.4
+    },
+    {
+      "name": "leanchecker Projects.rmk.MemmoveFull",
+      "seconds": 3.4
+    },
+    {
+      "name": "leanchecker Projects.rmk.MemmoveBwdMisLoop",
+      "seconds": 3.1
+    },
+    {
+      "name": "leanchecker Projects.rmk.MemmoveBwdMisStart",
+      "seconds": 3.5
+    },
+    {
+      "name": "leanchecker Projects.rmk.MemmoveBwdMisEnd",
+      "seconds": 5.6
+    },
+    {
+      "name": "leanchecker Projects.rmk.MemmoveBwdLoops",
+      "seconds": 5.6
+    },
+    {
+      "name": "leanchecker Projects.rmk.MemmoveBwd",
+      "seconds": 9.3
+    },
+    {
+      "name": "leanchecker Projects.rmk.MemmoveBwdMis",
+      "seconds": 19.2
+    },
+    {
+      "name": "leanchecker Projects.rmk.MemmoveBwdAll",
+      "seconds": 3.4
+    },
+    {
       "name": "axioms",
-      "seconds": 1.3
+      "seconds": 1.4
     }
   ],
   "status": "proved",
@@ -215,14 +271,21 @@
     "Projects.rmk.MemmoveMisStart",
     "Projects.rmk.MemmoveMisEnd",
     "Projects.rmk.MemmoveMis",
-    "Projects.rmk.MemmoveFull"
+    "Projects.rmk.MemmoveFull",
+    "Projects.rmk.MemmoveBwdMisLoop",
+    "Projects.rmk.MemmoveBwdMisStart",
+    "Projects.rmk.MemmoveBwdMisEnd",
+    "Projects.rmk.MemmoveBwdLoops",
+    "Projects.rmk.MemmoveBwd",
+    "Projects.rmk.MemmoveBwdMis",
+    "Projects.rmk.MemmoveBwdAll"
   ],
   "sources": {
     "Theories.Hart": "dde4a86db936c9ad60f58866c3ebb333fbc556ec0f94299da212d0ca08cfb82a",
     "Theories.Platform": "37939dcb4318bcea8b8a45c25a36d9f3ae59b78656fedd7dcc60c66442d11528",
     "Theories.Logic": "bed5eee4c9a12c2eee16a3e3b9523cca51c91f17380b97d81673151ff3cc4f48",
     "Projects.rmk.Run": "908851c1f949ef1340ec6c49e2cb283be6d4a3b26861f92c2e2cf901acfefff8",
-    "Projects.rmk.Copy": "4765ef1c0b82aafd9ae8b3ff515b126e4f175dd04990e5906cba9c399f3a6631",
+    "Projects.rmk.Copy": "566d4e7ba1023c234c2861a3b188812576b9888e431c8e36cc17b07d71f424fd",
     "Theories.RamElf": "9a8cb07ac5d869fe5297d1934eaefef94b535e1c91d9e144a9daf74fc7ce832f",
     "Projects.rmk.Elf": "5184a0249c16266ec995a0698fffe4231c5270a39bc59ebdb87154a4eb3146ab",
     "Theories.Board.QemuVirtRv32": "d902dbaad9129b352fc736c62313615608ec2cabeb0667805653db9b9aff2a0f",
@@ -240,7 +303,14 @@
     "Projects.rmk.MemmoveMisStart": "08454b31e5b281bff10c531d2cd9ced0648b89ea1622b75bb6eb2e4e2fa0b3f7",
     "Projects.rmk.MemmoveMisEnd": "59ce7f476bb4edad6ee81385c1ce51abf8bc1e0b5bec3e7e6cd540f10d8cf3b2",
     "Projects.rmk.MemmoveMis": "2cb24af8761c5057c9a753441535faf0ff5a72cd2af86952db6dd190ed41dd89",
-    "Projects.rmk.MemmoveFull": "862fc058fdfd4f0d7ab7c083bb38f10d2df60b9e57576c1df47ab17697e6f589"
+    "Projects.rmk.MemmoveFull": "16bf683961c6cb71b6230a41d95f845fda34ab74a64a0729cd1da2bb75b0e8c6",
+    "Projects.rmk.MemmoveBwdMisLoop": "cf8a6366a6afc7bdbefa2e98bbeefaaea95246b718fefe6f32c92efa51d573b7",
+    "Projects.rmk.MemmoveBwdMisStart": "b15397f7d35f16ed89045af0a9a3cf43927023682f5d3e18642bd907c2f89826",
+    "Projects.rmk.MemmoveBwdMisEnd": "b5625cb770fe299d8db2efbfb5827c0be3230738e9cb990d02f98fff6c20f758",
+    "Projects.rmk.MemmoveBwdLoops": "82808b223b3800ecffab4e14633284fcc0b33a92dc0c6271f5abb510d5b70706",
+    "Projects.rmk.MemmoveBwd": "f45abf7198f7158009ef58d009c422063886b9d8ffac8b0a8ff32109c5d98fad",
+    "Projects.rmk.MemmoveBwdMis": "745cf825863909b61a554a5f8a4594607b9c516b7319492d65f79cd4ccee5520",
+    "Projects.rmk.MemmoveBwdAll": "a06d6372e6fe1460798fa06f4bae42f31b049ea2b8ce8810772e64cf128f6e93"
   },
   "theorems": [
     {
@@ -319,6 +389,21 @@
     },
     {
       "name": "E5R.Rmk.words_eq_fwd",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bwd_add",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.wordsB_eq_bwd",
       "axioms": [
         "propext",
         "Classical.choice",
@@ -2896,6 +2981,14 @@
       ]
     },
     {
+      "name": "E5R.Rmk.Memmove.finishZ",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
       "name": "E5R.Rmk.Memmove.finishC",
       "axioms": [
         "propext",
@@ -2905,6 +2998,402 @@
     },
     {
       "name": "E5R.Rmk.Memmove.contractF",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bmisBody_sameCsr",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bmisBody_get",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bmis_body",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bmisVal_eq",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bm_arith",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bmis_loop",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.ramWrite_b_other",
+      "axioms": [
+        "propext"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.asm_byte'",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.and1",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.asm2",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bstart1",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bstart2",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bstart3",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bendVal",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.ramWrite_h_bytes",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bend1",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bend2",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bend3",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bheadBody_sameCsr",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bheadBody_get",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bhead_body",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bhead_loop",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bwordBody_sameCsr",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bwordBody_get",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bword_body",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bword_loop",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.btail",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.bwd_entry",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.bwd_mid",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.bwd_congr",
+      "axioms": []
+    },
+    {
+      "name": "E5R.Rmk.Memmove.bwd_arith",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.bwd_aligned",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.bwd_moved",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.contractG",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bwd_frame",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.word_bwd",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.ramWrite_off",
+      "axioms": []
+    },
+    {
+      "name": "E5R.Rmk.bmis_ram",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bstart_any",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bend_any",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bvi1",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bvi2",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bvi3",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bvL1",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bvL2",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bvL3",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bvi4",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bvi5",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bvi6",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.bmis_arith",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.btail_arith",
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.inTB_of",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.bwd_mis",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ]
+    },
+    {
+      "name": "E5R.Rmk.Memmove.contractAll",
       "axioms": [
         "propext",
         "Classical.choice",

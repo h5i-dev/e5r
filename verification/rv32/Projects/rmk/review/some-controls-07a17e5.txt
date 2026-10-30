@@ -1,0 +1,20 @@
+# test_some_controls.py on a fresh 07a17e5 build (+ SessAudit, SomeAudit), 2026-10-30T14:08:55Z
+# 10/12 as designed. The two FAILs are control-DESIGN defects (not evidence either way):
+#  - Kept k<4: rejected in kept_pw by a type-index mismatch against uSep's k<5, not in extras_ctx's semantic use;
+#  - s10 ABI: 'r.val ≠ 26 →' changes saved's arity, so ctx_call fails at elaboration (OTHER).
+# REVIEW G4 cites only the stride/flag/len/SW results that passed; the s10 and stride claims rest on the h26 control.
+ok   baseline: the chain compiles
+FAIL frame: Kept omits the Uart16550 stride byte (k < 4): REJECTED in Projects/rmk/Deframer/SomeRound.lean:187 (kept_pw): Application type mismatch: The argument
+ok   frame: Kept omits the top byte of the flag-pointer word sp+0x24: REJECTED in Projects/rmk/Deframer/SomeRound.lean:210 (extras_ctx): omega could not prove the goal:
+FAIL ABI: callee may change s10 (x26): OTHER in Projects/rmk/Deframer/SomeRound.lean:190 (ctx_call): Invalid field `trans`: The environment does not contain `Function.trans`, so it is not possible to p
+ok   result: encode_frame length up to 8 (the 7-byte slice check): REJECTED in Projects/rmk/Deframer/SomeRound.lean:140 (slice_ok): omega could not prove the goal:
+ok   boundary: Some path claimed never to stop at Pending 0x80004204: REJECTED in Projects/rmk/Deframer/SomeRound.lean:420 (post_disp): Application type mismatch: The argument
+ok   boundary: Some path claimed never to stop at the 0xff path 0x80003fa6: REJECTED in Projects/rmk/Deframer/SomeRound.lean:426 (post_disp): Application type mismatch: The argument
+ok   boundary: Some path claimed never to reach the send loop 0x8000429e: REJECTED in Projects/rmk/Deframer/SomeRound.lean:277 (post_enc): Application type mismatch: The argument
+ok   h26: s10 = 0x8002a7f4 (the empty-response flag store leaves the poll write set PW): REJECTED in Projects/rmk/Deframer/SomeRound.lean:288 (post_enc): Tactic `decide` proved that the proposition
+ok   SW: the widening reverted (0x8002a7b0..0x8002a7ca), PW no longer inside SW: REJECTED in Projects/rmk/Deframer/SomeRound.lean:187 (kept_pw): omega could not prove the goal:
+ok   audit: dispatch jump-table word misstated (0x8000023c), the rodata check must reject it: REJECTED in Projects/rmk/review/SomeAudit.lean:514 (dispatch_contract_false): Tactic `decide` proved that the proposition
+ok   audit: first dispatch instruction misstated (addi sp,-0x3f0), the fetch check must reject it: REJECTED in Projects/rmk/review/SomeAudit.lean:514 (dispatch_contract_false): Tactic `decide` proved that the proposition
+ok   audit: encode refutation with the real UART struct pointer (no alias with the buffer): REJECTED in Projects/rmk/review/SomeAudit.lean:573 (kept_E): Tactic `decide` proved that the proposition
+2 control(s) failed: ['frame: Kept omits the Uart16550 stride byte (k < 4)', 'ABI: callee may change s10 (x26)']
+controls-exit=1

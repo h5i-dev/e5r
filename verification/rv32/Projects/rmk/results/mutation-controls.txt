@@ -9,5 +9,8 @@ ok   n >= 16 with src, dst congruent only mod 2 (the misaligned path): REJECTED 
 ok   word copy claimed to need no direction condition: REJECTED in Projects/rmk/Copy.lean:111 (words_eq_fwd): omega could not prove the goal:
 ok   merged word: byte k claimed from prev while k + o < 3 only (wrong shift split): REJECTED in Projects/rmk/Merge.lean:41 (merge_byte): omega could not prove the goal:
 ok   misaligned path claimed to leave its stack temporaries alone (temps region shrunk): REJECTED in Projects/rmk/MemmoveMis.lean:411 (big_mis): omega could not prove the goal:
+ok   backward temporaries claimed to start 4 bytes higher (start temps at sp+0x1a left out): REJECTED in Projects/rmk/MemmoveBwdAll.lean:39 (inTB_of): omega could not prove the goal:
+ok   backward merged word: low part shifted one byte too far: REJECTED in Projects/rmk/MemmoveBwdMisLoop.lean:127 (bmisVal_eq): unsolved goals
+ok   backward word path with src, dst congruent only mod 2: REJECTED in Projects/rmk/MemmoveBwd.lean:466 (bwd_arith): omega could not prove the goal:
 ok   infrastructure: a missing import (does not elaborate): ELAB in Projects/rmk/MemmoveLoops.lean:17 (None): object file '<scratch>/rv32/.lake/build/lib/lean/Projects/rmk/Copyy.olean' of m
 every control failed in the expected declaration for the expected reason

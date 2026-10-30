@@ -28,7 +28,10 @@ ELF = Path('/home/ht2673/.local/state/e5r-claude-isa-review-20261029T042314Z/rmk
 CHAIN = [f'{R}/Elf.lean', f'{R}/Fetch.lean', f'{R}/MemmoveFetch.lean', f'{R}/Run.lean', f'{R}/Copy.lean',
          f'{R}/MemmoveLoops.lean', f'{R}/MemmoveSmall.lean', f'{R}/MemmoveBigLoops.lean',
          f'{R}/MemmoveAligned.lean', f'{R}/MemmoveContract.lean', f'{R}/Merge.lean', f'{R}/MemmoveMisLoop.lean',
-         f'{R}/MemmoveMisStart.lean', f'{R}/MemmoveMisEnd.lean', f'{R}/MemmoveMis.lean', f'{R}/MemmoveFull.lean']
+         f'{R}/MemmoveMisStart.lean', f'{R}/MemmoveMisEnd.lean', f'{R}/MemmoveMis.lean', f'{R}/MemmoveFull.lean',
+         f'{R}/MemmoveBwdLoops.lean', f'{R}/MemmoveBwd.lean', f'{R}/MemmoveBwdMisLoop.lean',
+         f'{R}/MemmoveBwdMisStart.lean', f'{R}/MemmoveBwdMisEnd.lean', f'{R}/MemmoveBwdMis.lean',
+         f'{R}/MemmoveBwdAll.lean']
 
 REJECT = re.compile(r'decide|evaluated to|omega could not|unsolved goals|rfl. failed|The rfl tactic|'
                     r'failed to reduce|Type mismatch|type mismatch|bv_omega')
@@ -99,6 +102,20 @@ CONTROLS = [
      [replace(f'{R}/MemmoveMis.lean', 'def InTemps (sp x : Word) : Prop := sp.toNat - 34 ≤ x.toNat ∧ x.toNat < sp.toNat - 24',
               'def InTemps (sp x : Word) : Prop := sp.toNat - 30 ≤ x.toNat ∧ x.toNat < sp.toNat - 24')],
      f'{R}/MemmoveMis.lean', 'big_mis', 'REJECTED'),
+    ('backward temporaries claimed to start 4 bytes higher (start temps at sp+0x1a left out)',
+     [replace(f'{R}/MemmoveBwdMis.lean', 'def InTB (sp x : Word) : Prop := sp.toNat - 22 ≤ x.toNat',
+              'def InTB (sp x : Word) : Prop := sp.toNat - 18 ≤ x.toNat')],
+     f'{R}/MemmoveBwdAll.lean', 'inTB_of', 'REJECTED'),
+    ('backward merged word: low part shifted one byte too far',
+     [replace(f'{R}/MemmoveBwdMisLoop.lean',
+              '      (ramRead ram (c.get 30 + c.get 18 + 0xfffffffc#32) .w >>> (8 * o)) ||| (c.get 15 <<< (32 - 8 * o)) := by',
+              '      (ramRead ram (c.get 30 + c.get 18 + 0xfffffffc#32) .w >>> (8 * o + 8)) ||| (c.get 15 <<< (32 - 8 * o)) := by')],
+     f'{R}/MemmoveBwdMisLoop.lean', 'bmisVal_eq', 'REJECTED'),
+    ('backward word path with src, dst congruent only mod 2',
+     [replace(f'{R}/MemmoveBwd.lean',
+              '    (hn : 16 ≤ n.toNat) (hle : s.toNat ≤ d.toNat) (hcong : s.toNat % 4 = d.toNat % 4)\n    (hH : H.toNat = (d + n).toNat % 4) (hA : A.toNat = (d + n).toNat - (d + n).toNat % 4)\n    (hW : W.toNat = (n - H).toNat - (n - H).toNat % 4) (hT : T.toNat = (n - H).toNat % 4) :\n    BArith',
+              '    (hn : 16 ≤ n.toNat) (hle : s.toNat ≤ d.toNat) (hcong : s.toNat % 2 = d.toNat % 2)\n    (hH : H.toNat = (d + n).toNat % 4) (hA : A.toNat = (d + n).toNat - (d + n).toNat % 4)\n    (hW : W.toNat = (n - H).toNat - (n - H).toNat % 4) (hT : T.toNat = (n - H).toNat % 4) :\n    BArith')],
+     f'{R}/MemmoveBwd.lean', 'bwd_arith', 'REJECTED'),
     ('infrastructure: a missing import (does not elaborate)',
      [replace(f'{R}/MemmoveLoops.lean', 'import Projects.rmk.Copy\n', 'import Projects.rmk.Copyy\n')],
      f'{R}/MemmoveLoops.lean', None, 'ELAB'),
@@ -116,8 +133,8 @@ def decl_at(src, line):
     return name
 
 
-def compile_chain(root, start):
-    for f in CHAIN[start:]:
+def compile_chain(root, start, stop=None):
+    for f in CHAIN[start:stop]:
         olean = root / '.lake/build/lib/lean' / (f[:-5] + '.olean')
         olean.parent.mkdir(parents=True, exist_ok=True)
         p = subprocess.run(['lake', 'env', 'lean', f, '-o', str(olean)], cwd=root,
@@ -170,7 +187,9 @@ def main():
                 print(f'{"ok  " if ok else "FAIL"} {name}: {got} in {file}:{line} ({decl}): {msg.splitlines()[0][:100]}')
                 if not ok:
                     failures.append(name)
-            compile_chain(root, start)
+            # only CHAIN[start .. failing file] were rebuilt from the mutated sources
+            stop = len(CHAIN) if err is None or err[0] not in CHAIN else CHAIN.index(err[0]) + 1
+            compile_chain(root, start, stop)
     finally:
         if not keep:
             shutil.rmtree(scratch, ignore_errors=True)
