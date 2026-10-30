@@ -41,12 +41,12 @@ A concrete witness, `w_sendAt` (by `decide`), ships in the same module, so `Send
 
 ## Status (branch verify/rmk-uart-20261029t174012z)
 
-**PROVED** (lean-checked locally; runner job `rmk-uart-send-round` in progress):
+**Status of each theorem.** `send_round`, `send_loop` and `w_sendAt` were lean-checked locally (axioms propext, Classical.choice, Quot.sound). `send_to_loop` and `w_sendLoop` are NOT YET CHECKED; their first check is the runner job `rmk-uart-send-round`, which is running.
 - `E5R.Rmk.Uart.send_round : SendAt m₀ → Lands B img (SendQ m₀) m₀`:
   - strong induction on len − sent;
   - each `send_bytes` call goes through main's theorem;
   - neither slice panic (0x800042b4 when sent = 0 at done, 0x800042d0 when sent > remaining) is reachable.
-- `E5R.Rmk.Uart.send_to_loop : SendAt m₀ → Extras m₀ → parked ≤ 488 → discarding ≤ 1 → Lands B img (SendLoopQ m₀) m₀`. `SendLoopQ` = the loop head 0x80003e1a with `SessInv`, or the yield boundary.
+- (pending check) `E5R.Rmk.Uart.send_to_loop : SendAt m₀ → Extras m₀ → parked ≤ 488 → discarding ≤ 1 → Lands B img (SendLoopQ m₀) m₀`. `SendLoopQ` = the loop head 0x80003e1a with `SessInv`, or the yield boundary.
 - `w_sendAt` and `w_sendLoop`: the hypotheses hold on one concrete machine (by `decide`).
 
 **For main, to compose with the Some path:** produce `SendAt` at 0x8000429e from your Some-path state, i.e. carry:
