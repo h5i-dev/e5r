@@ -956,7 +956,12 @@ optional; direct and hybrid proofs are equally valid routes.
       `reach_no_escape`, `reach_no_panic_io`) cover device reads (every
       value) and writes (events). With them, `Deframer/Rx.lean` `rx_loop` (the
       UART receive poll, unconditional) is proved for every LSR/RBR value
-      sequence, given the stated `RxEnv`. Not proved: the dispatch from
+      sequence, given the stated `RxEnv`. `Deframer/NonePath.lean`
+      `none_step`: from the None point, every behaviour returns to the loop
+      head with `SessPre`, or stops at an explicit read-future boundary
+      (0x80003ff2 or 0x80004428). Its assumptions about the Uart16550
+      struct and the task flag pointer are explicit. Not proved: the
+      dispatch from
       0x80003e70 to 0x80003fd8, the response write, `unpark_pending`'s call site, the UART read future and
       the executor between polls (other tasks, interrupts). `SessionSafe`
       ranges over all of these, so it is not proved.
