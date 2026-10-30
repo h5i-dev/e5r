@@ -17,7 +17,8 @@ import Projects.rmk.Deframer.SessionLoop
 import Projects.rmk.Cobs.Bridge
 
 namespace E5R.RmkSession
-open E5R E5R.Rmk E5R.Rmk.Deframer E5R.Rmk.Deframer.Session
+open E5R E5R.Rmk.Deframer E5R.Rmk.Deframer.Session
+open E5R.Rmk (QRun QRun.trans)
 
 /-- **CONDITIONAL on `CopyContract`**: the receive step from the loop head. -/
 theorem recv_conditional :
