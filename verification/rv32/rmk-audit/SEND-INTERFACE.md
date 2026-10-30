@@ -38,3 +38,21 @@ The home quota is full, so rmk-coordination.md could not be appended. This note 
 | u := [0x8002a7c4] (s6+0x307): base 0x10000000 at u+0x1c, stride 1 at u+0x20, u+0x1c aligned, u..u+0x21 in RAM, clear of [sp-0x50, sp) and of the slots | u is copied at 0x80003f40 from **[0x8002a788]**: the WRITER's Uart16550 pointer. `Extras` describes the reader's [0x8002a784]. |
 
 A concrete witness, `w_sendAt` (by `decide`), ships in the same module, so `SendAt` is satisfiable.
+
+## Status (branch verify/rmk-uart-20261029t174012z)
+
+**PROVED** (lean-checked locally; runner job `rmk-uart-send-round` in progress):
+- `E5R.Rmk.Uart.send_round : SendAt m₀ → Lands B img (SendQ m₀) m₀`:
+  - strong induction on len − sent;
+  - each `send_bytes` call goes through main's theorem;
+  - neither slice panic (0x800042b4 when sent = 0 at done, 0x800042d0 when sent > remaining) is reachable.
+- `E5R.Rmk.Uart.send_to_loop : SendAt m₀ → Extras m₀ → parked ≤ 488 → discarding ≤ 1 → Lands B img (SendLoopQ m₀) m₀`. `SendLoopQ` = the loop head 0x80003e1a with `SessInv`, or the yield boundary.
+- `w_sendAt` and `w_sendLoop`: the hypotheses hold on one concrete machine (by `decide`).
+
+**For main, to compose with the Some path:** produce `SendAt` at 0x8000429e from your Some-path state, i.e. carry:
+- x27 = 0x8002a7ed;
+- sp ≥ 0x8002a844;
+- the writer's struct facts for [0x8002a788];
+- the outer length slot.
+
+Then `some_round`'s send boundary 0x8000429e is closed except for the yield.
