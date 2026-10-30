@@ -12,10 +12,37 @@ MEM = {'al': H, 'in': H}
 T, F = {'taken': True, 'why': H}, {'taken': False, 'why': H}
 
 
+def csr_term(body):
+    k = len(body) - len(body.lstrip('('))
+    first = body[k:].split(' ', 1)[0].split('.', 1)[1]
+    ops = [first]
+    # the operation after each closing of a leading paren, innermost (last leading paren) first
+    opens = list(range(k))
+    for o in reversed(opens):
+        depth, i = 0, o
+        while True:
+            if body[i] == '(':
+                depth += 1
+            elif body[i] == ')':
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+        ops.append(body[i + 2:].split(' ', 1)[0])
+    lem = {'wr': 'Core.sameCsr_wr _ _ _ _', 'goto': 'Core.sameCsr_goto _ _'}
+    term = f'({lem[ops[0]]})'
+    for op in ops[1:]:
+        term = f'(({lem[op]}).trans {term})'
+    return term
+
+
 def seg(name, start, stop, specs, prefix):
     G.BASE = 'e'
-    print(G.emit(facts, name, '(e : Core) (M : Word → BitVec 8)', f'(hpc : e.pc = 0x{start:x}) (hq : Quiet e)',
-                 start, stop, specs, {}, ram0='M', prefix=prefix))
+    out = G.emit(facts, name, '(e : Core) (M : Word → BitVec 8)', f'(hpc : e.pc = 0x{start:x}) (hq : Quiet e)',
+                 start, stop, specs, {}, ram0='M', prefix=prefix)
+    print(out)
+    body = out.split(f'def {name}Core (e : Core) (M : Word → BitVec 8) : Core :=\n  ', 1)[1].split('\n', 1)[0]
+    print(f'theorem {name}Csr (e : Core) (M : Word → BitVec 8) : ({name}Core e M).sameCsr e :=\n  {csr_term(body)}\n')
 
 
 print('''/-
@@ -36,4 +63,27 @@ open E5R E5R.Rmk.SomeFetch E5R.Rmk.Deframer.Tail
 ''')
 # header halfword at s6+0xcb (the message's first field) negative: straight to the unpark call site
 seg('sNeg', 0x80003e70, 0x80003fd8, {0x80003e70: MEM, 0x80003e74: MEM, 0x80003e78: T}, 'sn')
+# header >= 0: build the dispatch future at s6+0x2f3 and poll RynkService::dispatch's closure
+CALLSET = {pc: MEM for pc in (0x80003e7c, 0x80003e80, 0x80003e84, 0x80003e86, 0x80003e8a, 0x80003e8e)}
+seg('sCall', 0x80003e70, 0x800001f2, {0x80003e70: MEM, 0x80003e74: MEM, 0x80003e78: F, **CALLSET,
+                                      0x80003e9a: {'target': 0x800001f2}}, 'sc')
+# back from dispatch: Pending (0xfe), 0xff, or encode the response
+seg('sPend', 0x80003e9e, 0x80004204, {0x80003ea6: T}, 'sp')
+HDR = {0x80003ea6: F, 0x80003eaa: MEM, 0x80003eae: MEM, 0x80003ebe: MEM}
+seg('sFF', 0x80003e9e, 0x80003fa6, {**HDR, 0x80003ec2: T}, 'sf')
+seg('sHdr', 0x80003e9e, 0x80003ec6, {**HDR, 0x80003ec2: F}, 'sh')
+# the response byte (8 if dispatch gave 3 with bytes parked, else dispatch's byte), the frame buffer
+seg('sEncA', 0x80003ec6, 0x80003ee0, {0x80003ec6: MEM, 0x80003eca: MEM, 0x80003edc: T}, 'sea')
+seg('sEncB', 0x80003ec6, 0x80003ee0, {0x80003ec6: MEM, 0x80003eca: MEM, 0x80003edc: F}, 'seb')
+seg('sEnc1', 0x80003ee0, 0x80003ef0, {0x80003ee4: MEM, 0x80003ee8: MEM, 0x80003eec: MEM}, 'se1')
+seg('sEnc2', 0x80003ef0, 0x80008d5c, {**{pc: MEM for pc in (0x80003ef0, 0x80003ef4, 0x80003ef8, 0x80003efc,
+                                                            0x80003f00, 0x80003f04, 0x80003f08)},
+                                      0x80003f1a: {'target': 0x80008d5c}}, 'se2')
+# back from encode_frame: the slice check, the send state; empty response or send
+seg('sPost', 0x80003f1e, 0x80003f2c, {0x80003f1e: MEM, 0x80003f22: MEM, 0x80003f28: F}, 'so')
+seg('sPanic', 0x80003f1e, 0x80004210, {0x80003f1e: MEM, 0x80003f22: MEM, 0x80003f28: T}, 'sx')
+seg('sState', 0x80003f2c, 0x80003f4c, {pc: MEM for pc in (0x80003f2c, 0x80003f30, 0x80003f34, 0x80003f38,
+                                                          0x80003f3c, 0x80003f40, 0x80003f44, 0x80003f48)}, 'st')
+seg('sEmpty', 0x80003f4c, 0x80003fd8, {0x80003f4c: F, 0x80003f52: MEM}, 'se')
+seg('sSend', 0x80003f4c, 0x8000429e, {0x80003f4c: T}, 'ss')
 print('end E5R.Rmk.Deframer.SomeP')

@@ -29,7 +29,11 @@ lives in the task future, a static whose bases are s6 = 0x8002a4bd and s7 = 0x80
 | 0x80003e5e | Call `RynkMessage::from_decoded(msg, buf, 488 − parked, k)` (0x8001c3c6). Its length panic (len < 3) is never taken, since `next` gives k < consumed and so parked ≤ 484 | `recv_step` |
 | 0x80003e70 | Return from `from_decoded` | `recv_step` (Some outcome) |
 | 0x80003e70 → 0x80003fd8 | Header halfword at s6+0xcb (msg+8) negative as i16: straight to the unpark call site | `SomePath.some_neg` (then `unpark_round`) |
-| 0x80003e70..0x80003fd4 | Otherwise: read the header halfword at s6+0xcb; `RynkService::dispatch` (0x80003e9a); `encode_frame` (0x80003f1a); slice checks (panics at 0x80004210, 0x80004220…); the response send (`Uart16550::send_bytes` at 0x800042f8 via 0x8000429e); `yield_now` (0x80004320); 0x80003fa6 (header 0xff) → 0x80003fc6 … | **NOT proved** (dispatch and response) |
+| 0x80003e70 → 0x800001f2 → 0x80003e9e | Header ≥ 0: future at s6+0x2f3 (state byte 0), poll of the dispatch closure | `SomeRound.some_pos`, against `DispatchContract` (NOT proved) |
+| 0x80003e9e → 0x80004204 / 0x80003fa6 | Result 0xfe (Pending: poll exits to the executor) / 0xff | boundaries of `some_pos` (not proved beyond) |
+| 0x80003e9e → 0x80008d5c → 0x80003f1e | Response byte, 7-byte frame buffer 0x8002a7b1, `encode_frame` | `some_pos`, against `EncodeContract` (NOT proved) |
+| 0x80003f1e → 0x80003fd8 / 0x8000429e | Slice check (panic 0x80004210 not taken), send state; empty response → flag [s10] := 1, unpark site / send loop | `some_pos` (empty: back to the loop head; send: boundary) |
+| 0x80003e70..0x80003fd4 (summary) | Read the header halfword at s6+0xcb; `RynkService::dispatch` (0x80003e9a); `encode_frame` (0x80003f1a); slice checks (panics at 0x80004210, 0x80004220…); the response send (`Uart16550::send_bytes` at 0x800042f8 via 0x8000429e); `yield_now` (0x80004320); 0x80003fa6 (header 0xff) → 0x80003fc6 … | **NOT proved** (dispatch and response) |
 | 0x80003fd8 | Load parked from s6+0x2db; call `unpark_pending(deframer, buffer, 488, parked)` | `unpark_step` |
 | 0x80003ff0 | `j 0x80003e1a` | `unpark_step` (ends at the loop head with `SessPre`) |
 | 0x80003ff2.. | None with discarding or nothing pending: UART read future setup, `poll` of the read (0x80004018); `assert_offset` MMIO loops (0x8000437c…); executor | **NOT proved** |
