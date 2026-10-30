@@ -4,8 +4,7 @@
 
   `CobsReportContract` (main's interface) is a theorem here: `E5R.Rmk.Cobs.cobs_report_contract`,
   proved from the machine-code contract of `decode_in_place_report` (Projects/rmk/Cobs). STILL NOT
-  a safety claim: every method is conditional on `CopyContract` (memmove's backward and misaligned
-  paths are open). Image and board: the runner's (`E5R.RmkDeframer.img_eq`, `board_eq`).
+  a safety claim: every method is conditional on `CopyContract` (discharged in SessionDischarged.lean). Image and board: the runner's (`E5R.RmkDeframer.img_eq`, `board_eq`).
 -/
 import Projects.ramimage.Deframer
 import Projects.rmk.Cobs.Bridge

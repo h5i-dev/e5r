@@ -4,7 +4,7 @@
   Original e5r code, Apache-2.0.
 
   NOT a safety claim and NOT `SessionSafe`. Every statement takes memmove's `CopyContract` as an
-  explicit hypothesis (open: memmove's backward/misaligned paths are not proved). The COBS
+  explicit hypothesis (discharged separately by `CopyDischarge.copy_contract`). The COBS
   dependency is discharged (main's `cobs_report`; also `E5R.Rmk.Cobs.cobs_report_contract`).
   Not covered at all: the path 0x80003e70 -> 0x80003fd8 (dispatch, encode, UART send, yields),
   the path 0x80003f7c -> loop head (UART read future, executor), interrupts (`Quiet` is assumed
@@ -30,7 +30,7 @@ theorem unpark_conditional :
     CopyContract → ∀ m₀, UnparkAt m₀ → ∃ k m, QRun B img k m₀ m ∧ SessPre m ∧
       m.core.get 2 = m₀.core.get 2 ∧ filled m.ram dfr = (ramRead m₀.ram 0x8002a798 .w).toNat :=
   fun hC m₀ h => by
-    obtain ⟨k, m, hr, hs, hsp, hf, -⟩ := unpark_step hC m₀ h
+    obtain ⟨k, m, hr, hs, hsp, -, hf, -⟩ := unpark_step hC m₀ h
     exact ⟨k, m, hr, hs, hsp, hf⟩
 
 /-- **CONDITIONAL on `CopyContract`**: the two proved steps compose. From the unpark call site,
@@ -40,7 +40,7 @@ theorem unpark_conditional :
     invariant. -/
 theorem unpark_then_recv (hC : CopyContract) (m₀ : Machine) (h : UnparkAt m₀) :
     ∃ k m₁ m, QRun B img k m₀ m ∧ SessPre m₁ ∧ RecvOut m₁ m ∧ m.core.get 2 = m₀.core.get 2 := by
-  obtain ⟨k₁, m₁, h₁, hs, hsp, -, -⟩ := unpark_step hC m₀ h
+  obtain ⟨k₁, m₁, h₁, hs, hsp, -, -, -⟩ := unpark_step hC m₀ h
   obtain ⟨k₂, m, h₂, ho⟩ := recv_step hC m₁ hs
   exact ⟨k₁ + k₂, m₁, m, QRun.trans h₁ h₂, hs, ho, ho.sp.trans hsp⟩
 

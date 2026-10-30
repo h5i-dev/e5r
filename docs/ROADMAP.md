@@ -853,6 +853,9 @@ Each item is checked only when its acceptance criterion has been run.
 
 ## R. RMK on RISC-V (2026-10-29 owner authorization)
 
+Integrated checkpoint and replay instructions: [RMK checkpoint](rmk-checkpoint.md).
+This preserves partial results; `SessionSafe` and reproducible R0 remain open.
+
 The next product target is upstream [RMK](https://github.com/rmk-rs/rmk),
 RISC-V only, pinned at `71556128fa72881fc35f0bf6c292d5e28ad9568d`. The first
 acceptance target is its existing example `examples/use_rust/qemu-riscv-rynk`
@@ -1016,9 +1019,20 @@ optional; direct and hybrid proofs are equally valid routes.
         open;
       - `DispatchContract` (`RynkService::dispatch` at 0x800001f2 is a
         12.6 KB async state machine) and `EncodeContract`;
-      - the 0xff path and the send loop;
+      - the 0xff path and the connection from Some to the send loop;
       - the UART read future and the executor between polls (other tasks,
         interrupts, Quiet across polls).
+
+      Independently, `Encode/Spec.lean` proves `encode_spec` from `EncPre`, with
+      a concrete witness and a reachable return. `Encode/Bridge.lean` exposes
+      `CallPost`/`EncRes` when the caller proves write-set separation. This does
+      not discharge the refuted universal `EncodeContract` above.
+      `Uart/SendBytes.lean` proves `send_bytes`; `Uart/SendRound.lean` and
+      `SendToLoop.lean` extend it to the loop head or the explicit yield-poll
+      boundary 0x8001e14a, with satisfiable entry assumptions. Connecting the
+      Some path, and proving the executor/yield protocol, remain open. The
+      LR/SC model permits spurious SC failure, so unconditional yield-loop
+      termination cannot be inferred without a suitable progress assumption.
 
       `SessionSafe` ranges over all of these, so it is not proved.
 

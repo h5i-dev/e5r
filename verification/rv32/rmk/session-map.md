@@ -92,24 +92,26 @@ lives in the task future, a static whose bases are s6 = 0x8002a4bd and s7 = 0x80
   * the task flag pointer at sp+0x24 points into RAM outside the deframer;
   * there are 0x28 stack bytes above sp.
 
-## What closing the loop still needs (not assumed anywhere)
+## Integrated checkpoint (2026-10-30)
 
-* `reach_on_runs` covers only deterministic, event-free segments. Both gaps below do device I/O:
-  * UART writes emit events, so they are not `DetStep`;
-  * UART reads take their value from the environment.
+The table above records the original decomposition. The authoritative current status and
+commands are in [docs/rmk-checkpoint.md](../../../docs/rmk-checkpoint.md).
 
-  The next composition step is a variant that allows deterministic steps emitting events
-  (writes), plus a branching argument over the read values (reads). Neither exists yet.
+* Event-aware composition exists in `Trees.lean`; UART read values are universally quantified.
+* `SomeRound.some_round` is a conditional implication with a refuted `EncodeContract` premise.
+  It is vacuous and is **not** session safety evidence. Dispatch now requires an explicit world
+  invariant. See `some-interfaces.md` and `Projects/rmk/review/SomeAudit.lean`.
+* `Encode.encode_spec` independently proves the actual encode routine from `EncPre`, including
+  a concrete satisfying entry and reachable return. The bridge additionally needs caller
+  write-set separation; it has not been connected to SomeRound's old contract.
+* `Uart.send_bytes`, `send_round` and `send_to_loop` are proved from explicit entry assumptions.
+  The latter stops at either the session loop head or the yield poll 0x8001e14a. Concrete
+  witnesses establish non-vacuity. The Some caller has not been shown to establish `SendAt`.
+* `Init.init_round` reaches `SessInv` from `InitAt` **conditional on TopicsNewContract**.
+  `initAt_real` establishes satisfiability, not reachability from boot.
 
-* **Some gap.** From 0x80003e70 to 0x80003fd8 the code must:
-  * keep s6, s7, sp and the stack bound;
-  * keep the parked count ≤ 488 at s6+0x2db, and discarding ≤ 1;
-  * not reach a panic.
-
-  It runs dispatch, the response encoding and the UART writes. It yields to the executor at
-  `yield_now`, where other tasks run between polls, so a single quiet run of one task cannot
-  express it. It needs a `Reach`-style statement over the executor.
-* **None gap.** From 0x80003f7c through the UART read future back to 0x80003e1a. The read bytes
-  come from the device oracle: MMIO reads are not `DetStep`.
-* **Interrupts.** In the 300,000-state replay mstatus.MIE = mie = 0 and there were no interrupts.
-  `SessPre` assumes `Quiet`; that is an assumption about the run, not a theorem.
+Closing the session still needs a repaired encode caller contract, dispatch/world invariants,
+the 0xff path, read futures, scheduler and other tasks, and interrupt preservation. The LR/SC
+model admits spurious SC failure, so yield termination needs a progress assumption or a
+safety-only formulation. `Quiet` and entry invariants remain explicit assumptions.
+`SessionSafe` is not proved.
