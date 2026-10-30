@@ -28,6 +28,20 @@ first error inside a theorem of the copied chain, not an import/unknown-identifi
   opcode        ELF 0x8001d58e bltu s2,s1 -> bgeu s2,s1 (tail's bound check)   -> rejected at its fact
   probe         CobsPost.ok := True (next not told the decoded length <= n)    -> reported either way
   tool-error    a job module that does not exist                               -> error
+
+rmk-session-discharged adds two cases that change only CopyPost (a NEW field, which no consumer
+constructs or reads) and the one place that constructs it, copy_contract, so the first error can
+only be in CopyDischarge:
+  copy-post-below  field: RAM below memmove's 48-byte frame is `moved` (true; same proof term) -> proved
+  copy-post-top    field: sp-4..sp-1 is `moved`, i.e. unchanged (FALSE: memmove's first store,
+                   0x80020da0 sw s0,0x2c(sp-48), writes it on every path)                      -> rejected
+
+rmk-session-fragments (main 07a17e5, SomeRound) adds:
+  some-boundary  SomeQ without the send-loop boundary 0x8000429e                      -> rejected
+  encode-len     EncodeContract result length <= 8 (buffer is 7: the slice check could panic) -> rejected
+  dispatch-kept  Kept leaves out the UART struct's stride byte (+0x20)                   -> rejected
+  sptop-old      Extras.spTop back to sp+0x28 (encode_frame's argument byte is at sp+0x140) -> rejected
+  sw-narrow      SW back to 0x8002a7b0..0x8002a7ca (before the widening for the Some path) -> rejected
 """
 import json
 import os
@@ -180,12 +194,31 @@ def main():
             ("copy-post-slots", {"Spec": ("  ram : ∀ x, ¬ ((m₀.core.get 2).toNat - memmoveFrame ≤ x.toNat ∧ x.toNat < (m₀.core.get 2).toNat) →",
                                           "  ram : ∀ x, ¬ ((m₀.core.get 2).toNat - memmoveFrame ≤ x.toNat ∧ x.toNat < (m₀.core.get 2).toNat - 12) →")}),
         ]
+    COPYPOST = "    m.ram x = Memmove.moved m₀.ram (m₀.core.get 10) (m₀.core.get 11) (m₀.core.get 12).toNat x\n\n/-- The dependency"
+    MOVED = "m.ram x = Memmove.moved m₀.ram (m₀.core.get 10) (m₀.core.get 11) (m₀.core.get 12).toNat x"
+    BRIDGE = ("  exact ⟨k, m, r, P.pc, P.regs, P.csr, P.ram⟩\n",
+              "  exact ⟨k, m, r, P.pc, P.regs, P.csr, P.ram, fun x hx => P.ram x (by unfold E5R.Rmk.InFrame; omega)⟩\n")
+    if JOBID == "rmk-session-discharged":
+        cases += [
+            ("copy-post-below", {"Spec": (COPYPOST, COPYPOST.replace("\n\n", f"\n  below : ∀ x, x.toNat + 48 ≤ (m₀.core.get 2).toNat → {MOVED}\n\n")),
+                                 "CopyDischarge": BRIDGE}, 0),
+            ("copy-post-top", {"Spec": (COPYPOST, COPYPOST.replace("\n\n", f"\n  top : ∀ x, (m₀.core.get 2).toNat - 4 ≤ x.toNat ∧ x.toNat < (m₀.core.get 2).toNat → {MOVED}\n\n")),
+                               "CopyDischarge": BRIDGE}),
+        ]
+    if JOBID == "rmk-session-fragments":
+        cases += [
+            ("some-boundary", {"SomeRound": ("m.core.pc = 0x80003fa6 ∨\n    m.core.pc = 0x8000429e\n", "m.core.pc = 0x80003fa6\n")}),
+            ("encode-len", {"SomeRound": (".toNat ≤ 7)\n\n/-- NOT PROVED", ".toNat ≤ 8)\n\n/-- NOT PROVED")}),
+            ("dispatch-kept", {"SomeRound": ("  (∃ k < 5, x = ramRead m₀.ram uPtr", "  (∃ k < 4, x = ramRead m₀.ram uPtr")}),
+            ("sptop-old", {"SessionInv": ("  spTop : (m.core.get 2).toNat + 0x148 ≤ 0x81000000", "  spTop : (m.core.get 2).toNat + 0x28 ≤ 0x81000000")}),
+            ("sw-narrow", {"SessionInv": ("(0x8002a7b0 ≤ x.toNat ∧ x.toNat < 0x8002a7f4)", "(0x8002a7b0 ≤ x.toNat ∧ x.toNat < 0x8002a7ca)")}),
+        ]
     only = os.environ.get("ONLY")
     if only:  # rerun selected cases only (comma-separated names), e.g. a control added later
         cases = [c for c in cases if c[0] in only.split(",")]
-    for name, edits in cases:
+    for name, edits, *code in cases:
         write_chain(edits)
-        expect(name, run(name), 10)
+        expect(name, run(name), code[0] if code else 10)
     want = lambda n: not only or n in only.split(",")
     elf = bytearray(open(os.path.join(ROOT, JOB["elf"]), "rb").read())
     off = 0x1000 + (0x8001d58e - 0x80000000)
