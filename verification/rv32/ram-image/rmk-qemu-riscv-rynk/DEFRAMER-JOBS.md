@@ -94,6 +94,26 @@ Theorems, each with axioms within {propext, Classical.choice, Quot.sound}:
 * mine: `E5R.RmkSessionDischarged.{copy, deframer, recv, unpark, unpark_then_recv}`;
 * `img_eq`, `board_eq`, and the image fidelity theorems.
 
+### Negative controls for the discharged job (unexpanded copies of main's files)
+
+Transcripts: `session-discharged-controls-run1.txt` and `-run2.txt`.
+
+| Control | Result | What it shows |
+| --- | --- | --- |
+| no mutation | proved | baseline |
+| frame / panic-bound / tail-result / next-result | rejected in `tail_from_copy` / `TailNoCopy.nocopy` ×2 / `NextRet.ret_post` | as for the conditional job |
+| deframer opcode 0x8001d58e | rejected at `f8001d58e` | tail is bound to its bytes |
+| memmove opcode 0x80020daa (memmove's direction branch, `bgeu`→`bltu`) | rejected at `f80020daa` (peer's MemmoveFetch) | the discharge is bound to memmove's bytes |
+| missing module | `error` (tool) | |
+| probe: `CobsPost.ok := True` | `Wrap.wrap` fails | next needs the COBS length bound |
+| `copy-dstsep` (CopyEnv without memmove's frame) | rejected, but first at a `show` in `NextBody2.call_case` | NOT evidence about `copy_contract` (proof-script pattern) |
+| `copy-post-slots` (CopyPost: save slots unchanged; false: 0x80020da0 `sw s0,0x2c(sp)` after `addi sp,sp,-48`) | rejected, but first in a consumer (`NextBody2.call_case`) | does NOT isolate the discharge: the runner stops at the first failing module, and `CopyDischarge` comes later |
+
+Run 1 contained a FAILED control of my own making: the first `memmove-opcode` flipped
+0x80020c3a. That address is in `compiler_builtins::mem::memcpy` (0x80020c26), which this job never
+runs, so the job rightly still proved. The control was retargeted to 0x80020daa
+(memmove starts at 0x80020d9e).
+
 ### What is discharged, and what remains
 
 **Function-contract hypotheses, now theorems (DISCHARGED):**
