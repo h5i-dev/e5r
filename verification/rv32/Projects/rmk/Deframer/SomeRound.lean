@@ -14,7 +14,7 @@
   `EncodeContract` also gives the result: tag byte at sp+0x40 is 1, or 0 with length (sp+0x44) ≤ 7,
   the capacity of the 7-byte frame buffer at 0x8002a7b1 that the caller passes.
 
-  PROVED here (conditional on `hD`, `hE` and `h26`, see below):
+  PROVED here (conditional on `hD` and `hE`):
   * `some_pos`: from `SomeAt` with a non-negative header, every behaviour reaches one of
     * the loop head 0x80003e1a with `SessInv`: the empty response (encode_frame's error, or length 0)
       sets the flag byte [s10] and goes to the unpark site, then `unpark_round`;
@@ -29,9 +29,9 @@
   The poll's own writes on this path (`PW`) are inside `SessionI.SW`, which was widened for it
   (0x8002a7b0..0x8002a7f4 and sp+0x140..sp+0x148), and `Extras.spTop` now covers sp+0x148.
 
-  `h26 : x26 = 0x8002a7f0` (s10 = s6+0x333, set at 0x80003b38 before the loop): an explicit
-  hypothesis at the Some point; `SomeAt` does not carry it yet, so it is an open obligation of the
-  composition, not a fact.
+  s10 = 0x8002a7f0 (the flag byte address, x26 = s6+0x333, set at 0x80003b38 before the loop) comes
+  from `Extras.s10`, which every proved step keeps (x26 is callee-saved and no segment writes it).
+  Whether it holds when the task first reaches the loop head is part of the open initialization.
 -/
 import Projects.rmk.Deframer.SomePath
 
@@ -215,7 +215,7 @@ theorem extras_ctx (m₀ x : Machine) (h : SomeAt m₀) (c : Ctx m₀ x) : Extra
     rw [BitVec.add_assoc]; rfl
   refine ⟨by rw [c.sp]; exact E.spTop, ?_, by rw [hU]; exact E.uBaseIn, ?_, by rw [hU]; exact E.uStrideIn,
     by rw [hU, hF, c.sp]; exact E.uSep, by rw [hF]; exact E.flagIn, by rw [hF]; exact E.flagSep,
-    by rw [hF, c.sp]; exact E.flagNot⟩
+    by rw [hF, c.sp]; exact E.flagNot, c.s10⟩
   · rw [hU, ← E.uBase]; exact ramRead_w_congr _ fun k hk' => st k (by omega)
   · rw [hU, s20, st 4 (by decide), ← s20]; exact E.uStride
 
@@ -452,9 +452,9 @@ theorem wr_b_same (X : Word → BitVec 8) (a b v : Word) (h : a = b) : ramWrite 
 
 /-- **The Some path for a non-negative header**, against the two named contracts. -/
 theorem some_pos (hD : DispatchContract) (hE : EncodeContract) (m₀ : Machine) (h : SomeAt m₀)
-    (h26 : m₀.core.get 26 = 0x8002a7f0) (hpos : (m₀.ram 0x8002a589).toNat < 0x80) :
+    (hpos : (m₀.ram 0x8002a589).toNat < 0x80) :
     Lands B img SomeQ m₀ := by
-  have C0 : Ctx m₀ m₀ := ⟨h.quiet, rfl, h.s6, h.s7, h26, fun _ _ => rfl⟩
+  have C0 : Ctx m₀ m₀ := ⟨h.quiet, rfl, h.s6, h.s7, h.ext.s10, fun _ _ => rfl⟩
   have h1 : 0x8002a798 + 0x70 ≤ (m₀.core.get 2).toNat ∧ (m₀.core.get 2).toNat ≤ 0x81000000 := h.sp
   have h2 : (m₀.core.get 2).toNat + 0x148 ≤ 0x81000000 := h.ext.spTop
   have spA : (m₀.core.get 2).toNat % 4 = 0 := h.spAl
@@ -522,12 +522,12 @@ theorem some_pos (hD : DispatchContract) (hE : EncodeContract) (m₀ : Machine) 
 
 /-- **The Some path, every header**: back to the loop head with `SessInv`, or one of the explicit
 boundaries (Pending to the executor, the 0xff path, the send loop). Conditional on the two named
-contracts and on `h26`. -/
-theorem some_round (hD : DispatchContract) (hE : EncodeContract) (m₀ : Machine) (h : SomeAt m₀)
-    (h26 : m₀.core.get 26 = 0x8002a7f0) : Lands B img SomeQ m₀ := by
+contracts. -/
+theorem some_round (hD : DispatchContract) (hE : EncodeContract) (m₀ : Machine) (h : SomeAt m₀) :
+    Lands B img SomeQ m₀ := by
   by_cases hn : 0x80 ≤ (m₀.ram 0x8002a589).toNat
   · obtain ⟨k, m', r, hpc, hI⟩ := some_neg m₀ h hn
     exact lands_of_qrun r (.inl ⟨hpc, hI⟩)
-  · exact some_pos hD hE m₀ h h26 (by omega)
+  · exact some_pos hD hE m₀ h (by omega)
 
 end E5R.Rmk.Deframer.SomeP

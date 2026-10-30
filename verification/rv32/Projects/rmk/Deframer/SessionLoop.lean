@@ -57,7 +57,7 @@ structure UnparkAt (m : Machine) : Prop where
   disc : discarding m.ram dfr ≤ 1
 
 theorem unpark_step (hC : CopyContract) (m₀ : Machine) (h : UnparkAt m₀) :
-    ∃ k m, QRun B img k m₀ m ∧ SessPre m ∧ m.core.get 2 = m₀.core.get 2 ∧
+    ∃ k m, QRun B img k m₀ m ∧ SessPre m ∧ m.core.get 2 = m₀.core.get 2 ∧ m.core.get 26 = m₀.core.get 26 ∧
       filled m.ram dfr = (ramRead m₀.ram 0x8002a798 .w).toNat ∧
       ∀ x, ¬ ((dfr.toNat ≤ x.toNat ∧ x.toNat < dfr.toNat + 12) ∨
               (bufA.toNat ≤ x.toNat ∧ x.toNat < bufA.toNat + bufLen) ∨
@@ -90,7 +90,7 @@ theorem unpark_step (hC : CopyContract) (m₀ : Machine) (h : UnparkAt m₀) :
   have UPs : ∀ r : Reg, r.val ∉ callerSaved → e.get r = K.get r := UP.saved
   have qe : Quiet e := Quiet.of_sameCsr UP.csr qK
   have r2 := sback e M (UP.pc.trans K1) qe
-  refine ⟨_, _, (r1.trans ru).trans r2, ?_, ?_, ?_, ?_⟩
+  refine ⟨_, _, (r1.trans ru).trans r2, ?_, ?_, ?_, ?_, ?_⟩
   · have hc := UP.hconsumed
     have hf := UP.hfilled
     have hd := UP.hdisc
@@ -104,6 +104,8 @@ theorem unpark_step (hC : CopyContract) (m₀ : Machine) (h : UnparkAt m₀) :
     · show consumed M dfr ≤ filled M dfr ∧ filled M dfr ≤ bufLen; rw [hc, hf]; omega
     · show (M (dfr + 8)).toNat ≤ 1; rw [hd]; exact hdc
   · show e.get 2 = c.get 2; rw [UP.sp, K2]
+  · show e.get 26 = c.get 26
+    exact (UPs 26 (by decide)).trans (by simp [K, sunpkCore, Core.wr_get_ne])
   · have hf := UP.hfilled
     rw [show (⟨K, R0⟩ : Machine).core.get 10 = dfr from K10,
       show (⟨K, R0⟩ : Machine).core.get 13 = ramRead R0 0x8002a798 .w from K13] at hf
