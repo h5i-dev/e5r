@@ -960,11 +960,25 @@ optional; direct and hybrid proofs are equally valid routes.
       `none_step`: from the None point, every behaviour returns to the loop
       head with `SessPre`, or stops at an explicit read-future boundary
       (0x80003ff2 or 0x80004428). Its assumptions about the Uart16550
-      struct and the task flag pointer are explicit. Not proved: the
-      dispatch from
-      0x80003e70 to 0x80003fd8, the response write, `unpark_pending`'s call site, the UART read future and
-      the executor between polls (other tasks, interrupts). `SessionSafe`
-      ranges over all of these, so it is not proved.
+      struct and the task flag pointer are explicit. `Deframer/SessionInv.lean`
+      composes these steps for one loop round. `SessInv` is `SessPre` plus those
+      Uart16550/flag/stack facts, placed outside every proved write.
+      `none_of_recv` derives `NoneAt` from it. `session_round` says that from the
+      loop head with `SessInv`, every behaviour takes at least one step, with no
+      fault or interrupt, and reaches one of these:
+      - the loop head with `SessInv` again;
+      - the read-future boundary 0x80003ff2 or 0x80004428;
+      - the Some point 0x80003e70.
+
+      `unpark_round`: from the unpark call site 0x80003fd8 with the same
+      extras, back to the loop head with `SessInv`. Not proved:
+      - that `SessInv` holds when the task first reaches the loop head
+        (initialization);
+      - the dispatch and response path from 0x80003e70 to 0x80003fd8;
+      - the UART read future and the executor between polls (other tasks,
+        interrupts, Quiet across polls).
+
+      `SessionSafe` ranges over all of these, so it is not proved.
 
 Not in this scope, and not to be described as done: Cortex-M, multiple harts,
 DMA, U-mode/PMP, microkernels, timing or deadline guarantees, other boards,
