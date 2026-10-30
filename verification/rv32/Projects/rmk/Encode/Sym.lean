@@ -34,6 +34,8 @@ inductive SE where
   | ld (w : Width) (a : SE)
   | alu (op : AluOp) (a b : SE)
   | ext (w : Width) (s : Bool) (a : SE)
+  /-- `acc + (b mod 256) * 256^k`: a word assembled from bytes -/
+  | cat (acc b : SE) (k : Nat)
   deriving DecidableEq
 
 /-- Value under the entry registers `R` and entry RAM `M`. -/
@@ -43,6 +45,7 @@ def SE.eval (R : Nat → Word) (M : Word → BitVec 8) : SE → Word
   | .ld w a => ramRead M (a.eval R M) w
   | .alu op a b => E5R.alu op (a.eval R M) (b.eval R M)
   | .ext w s a => extend w s (a.eval R M)
+  | .cat acc b k => BitVec.ofNat 32 ((acc.eval R M).toNat + (b.eval R M).toNat % 256 * 256 ^ k)
 
 /-- `base + off`, base absent (`none`) or an entry register. -/
 def SE.lin : SE → Option (Option Nat × Word)
@@ -69,6 +72,7 @@ theorem lin_sound (R : Nat → Word) (M : Word → BitVec 8) :
              obtain ⟨rfl, rfl⟩ := h; simp [SE.eval, baseVal]
   | ld w a _ => intro q o h; simp [SE.lin] at h
   | ext w s a _ => intro q o h; simp [SE.lin] at h
+  | cat acc b k _ _ => intro q o h; simp [SE.lin] at h
   | alu op a b iha ihb =>
     intro q o h
     cases op <;> simp only [SE.lin, reduceCtorEq] at h
@@ -361,13 +365,204 @@ theorem ramRead_ramWrite_same (X : Word → BitVec 8) (a v : Word) (w : Width) (
   | h => show _ = (extS .h false e).eval R M; rw [extS_eval, he, ramRead_ramWrite_h]
   | w => show _ = e.eval R M; rw [he, ramRead_ramWrite_w]
 
-/-- A load from symbolic memory: the newest write if it is exactly the same cell, the entry RAM if
-    every write is disjoint; `none` on a partial overlap. -/
+/-! ### Reads inside a constant write -/
+
+def rsum (X : Word → BitVec 8) (A : Word) : Nat → Nat
+  | 0 => 0
+  | n+1 => rsum X A n + (X (A + BitVec.ofNat 32 n)).toNat * 256 ^ n
+
+theorem ramRead_sum (X : Word → BitVec 8) (A : Word) (w : Width) :
+    ramRead X A w = BitVec.ofNat 32 (rsum X A w.bytes) := by
+  cases w <;> simp [ramRead, rsum, Width.bytes] <;> congr 1 <;> omega
+
+theorem ramWrite_byte (X : Word → BitVec 8) (B v : Word) (w : Width) (j : Nat) (hj : j < w.bytes) :
+    ramWrite X B v w (B + BitVec.ofNat 32 j) = byteOf v j := by
+  have ne : ∀ i k : Nat, i < 4 → k < 4 → i ≠ k → B + BitVec.ofNat 32 i ≠ B + BitVec.ofNat 32 k :=
+    fun i k hi hk h => add_ne_add B hi hk h
+  have n01 := ne 0 1 (by decide) (by decide) (by decide)
+  have n02 := ne 0 2 (by decide) (by decide) (by decide)
+  have n03 := ne 0 3 (by decide) (by decide) (by decide)
+  have n12 := ne 1 2 (by decide) (by decide) (by decide)
+  have n13 := ne 1 3 (by decide) (by decide) (by decide)
+  have n23 := ne 2 3 (by decide) (by decide) (by decide)
+  simp only [BitVec.add_zero] at n01 n02 n03
+  cases w <;> simp only [Width.bytes] at hj
+  · obtain rfl : j = 0 := by omega
+    simp [ramWrite, ramPut]
+  · rcases (by omega : j = 0 ∨ j = 1) with rfl | rfl
+    · simp [ramWrite, ramPut, n01]
+    · simp [ramWrite, ramPut]
+  · rcases (by omega : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3) with rfl | rfl | rfl | rfl
+    · simp [ramWrite, ramPut, n01, n02, n03]
+    · simp [ramWrite, ramPut, n12, n13, Ne.symm n01]
+    · simp [ramWrite, ramPut, n23, Ne.symm n02, Ne.symm n12]
+    · simp [ramWrite, ramPut, Ne.symm n03, Ne.symm n13, Ne.symm n23]
+
+def bsum (x : Word) (d : Nat) : Nat → Nat
+  | 0 => 0
+  | n+1 => bsum x d n + (byteOf x (d + n)).toNat * 256 ^ n
+
+theorem rsum_bsum (X : Word → BitVec 8) (A x : Word) (d : Nat) :
+    ∀ n, (∀ k < n, X (A + BitVec.ofNat 32 k) = byteOf x (d + k)) → rsum X A n = bsum x d n := by
+  intro n
+  induction n with
+  | zero => intro _; rfl
+  | succ n ih =>
+    intro h
+    simp only [rsum, bsum]
+    rw [ih fun k hk => h k (by omega), h n (by omega)]
+
+/-- The offset of a read inside a write of the same base. -/
+def subOff (E : Env) (b : SE) (w' : Width) (a : SE) (w : Width) : Option Nat :=
+  match nform E b w'.bytes, nform E a w.bytes with
+  | some (s1, kb), some (s2, ka) =>
+    if s1 = s2 ∧ kb ≤ ka ∧ ka + w.bytes ≤ kb + w'.bytes then some (ka - kb).toNat else none
+  | _, _ => none
+
+theorem subOff_sound {E : Env} {R : Nat → Word} {M : Word → BitVec 8} (hE : SpIn E R) {b a : SE}
+    {w' w : Width} {d : Nat} (h : subOff E b w' a w = some d) :
+    d + w.bytes ≤ w'.bytes ∧ ∀ k < w.bytes,
+      a.eval R M + BitVec.ofNat 32 k = b.eval R M + BitVec.ofNat 32 (d + k) := by
+  unfold subOff at h
+  split at h
+  · rename_i s1 kb s2 ka hb ha
+    split at h
+    · rename_i hc
+      simp only [Option.some.injEq] at h
+      subst h
+      obtain ⟨rfl, h1, h2⟩ := hc
+      refine ⟨by omega, fun k hk => ?_⟩
+      have ea := nform_sound (M := M) hE ha k hk
+      have eb := nform_sound (M := M) hE hb ((ka - kb).toNat + k) (by omega)
+      have hd : (((ka - kb).toNat : Nat) : Int) = ka - kb := Int.toNat_of_nonneg (by omega)
+      apply BitVec.eq_of_toNat_eq
+      push_cast at eb
+      cases s1 <;> simp only [Bool.false_eq_true, ite_true, ite_false] at ea eb <;> omega
+    · simp at h
+  · simp at h
+
+/-! ### Byte-assembled reads -/
+
+def catS (acc b : SE) (k : Nat) : SE :=
+  match acc, b with
+  | .c x, .c y => .c (BitVec.ofNat 32 (x.toNat + y.toNat % 256 * 256 ^ k))
+  | _, _ => .cat acc b k
+
+theorem catS_eval (R : Nat → Word) (M : Word → BitVec 8) (acc b : SE) (k : Nat) :
+    (catS acc b k).eval R M = BitVec.ofNat 32 ((acc.eval R M).toNat + (b.eval R M).toNat % 256 * 256 ^ k) := by
+  unfold catS; split <;> rfl
+
+/-- The byte at `a + k`, as a value whose low 8 bits are that byte. -/
+def rdByte (E : Env) : List Wr → SE → Nat → Option SE
+  | [], a, k => some (.ld .b (aluS .add a (.c (BitVec.ofNat 32 k))))
+  | (b, w', v) :: ws, a, k =>
+    match subOff E b w' (aluS .add a (.c (BitVec.ofNat 32 k))) .b with
+    | some d =>
+      match v with
+      | .c x => some (.c (BitVec.ofNat 32 (byteOf x d).toNat))
+      | _ => some (if d = 0 then v else aluS .srl v (.c (BitVec.ofNat 32 (8 * d))))
+    | none =>
+      if disj E b w'.bytes (aluS .add a (.c (BitVec.ofNat 32 k))) 1 then rdByte E ws a k else none
+
+theorem byteOf_toNat (v : Word) (d : Nat) : (byteOf v d).toNat = v.toNat / 256 ^ d % 256 := by
+  simp [byteOf, BitVec.toNat_ofNat]
+
+theorem rdByte_sound {E : Env} {R : Nat → Word} {M : Word → BitVec 8} (hE : SpIn E R) :
+    ∀ (ws : List Wr) (a : SE) (k : Nat) (e : SE), rdByte E ws a k = some e →
+      (applyW R M ws (a.eval R M + BitVec.ofNat 32 k)).toNat = (e.eval R M).toNat % 256 := by
+  intro ws
+  induction ws with
+  | nil =>
+    intro a k e h
+    simp only [rdByte, Option.some.injEq] at h; subst h
+    simp only [SE.eval, ramRead, aluS_eval, E5R.alu, applyW, BitVec.toNat_ofNat]
+    have := (M (a.eval R M + BitVec.ofNat 32 k)).isLt
+    omega
+  | cons hd ws ih =>
+    obtain ⟨b, w', u⟩ := hd
+    intro a k e h
+    simp only [rdByte] at h
+    have ea : a.eval R M + BitVec.ofNat 32 k = (aluS .add a (.c (BitVec.ofNat 32 k))).eval R M := by
+      rw [aluS_eval]; rfl
+    split at h
+    · rename_i d hd
+      obtain ⟨hdw, hk⟩ := subOff_sound (M := M) hE hd
+      have hk0 := hk 0 (by decide)
+      simp only [BitVec.add_zero, Nat.add_zero] at hk0
+      have h1 : Width.b.bytes = 1 := rfl
+      rw [h1] at hdw
+      have hdl : d < w'.bytes := by omega
+      have hd4 : d < 4 := by cases w' <;> simp only [Width.bytes] at hdl <;> omega
+      rw [applyW, ea, hk0, ramWrite_byte _ _ _ _ _ hdl, byteOf_toNat]
+      split at h
+      · rename_i _ x
+        simp only [Option.some.injEq] at h; subst h
+        simp only [SE.eval, BitVec.toNat_ofNat, byteOf_toNat]
+        omega
+      · simp only [Option.some.injEq] at h; subst h
+        split
+        · rename_i h0; subst h0; simp
+        · rw [aluS_eval]
+          simp only [SE.eval, E5R.alu, BitVec.toNat_ushiftRight, BitVec.toNat_ofNat, Nat.shiftRight_eq_div_pow]
+          have : 8 * d % 2 ^ 32 % 32 = 8 * d := by omega
+          rw [this, Nat.pow_mul]
+    · split at h
+      · rename_i hd
+        rw [applyW, ramWrite_other _ _ _ _ _ fun j hj e' =>
+          disj_sound (M := M) hE hd j hj 0 (by decide) (by rw [BitVec.add_zero, ← ea]; exact e'.symm)]
+        exact ih a k e h
+      · simp at h
+
+/-- A word read assembled from its `n` bytes. -/
+def rdCat (E : Env) (ws : List Wr) (a : SE) : Nat → Option SE
+  | 0 => some (.c 0)
+  | k+1 =>
+    match rdCat E ws a k, rdByte E ws a k with
+    | some acc, some b => some (catS acc b k)
+    | _, _ => none
+
+theorem rsum_lt (X : Word → BitVec 8) (A : Word) : ∀ n, rsum X A n < 256 ^ n := by
+  intro n
+  induction n with
+  | zero => simp [rsum]
+  | succ n ih =>
+    simp only [rsum, Nat.pow_succ]
+    have := (X (A + BitVec.ofNat 32 n)).isLt
+    have h8 : (X (A + BitVec.ofNat 32 n)).toNat ≤ 255 := by omega
+    have := Nat.mul_le_mul_right (256 ^ n) h8
+    omega
+
+theorem rdCat_sound {E : Env} {R : Nat → Word} {M : Word → BitVec 8} (hE : SpIn E R) (ws : List Wr) (a : SE) :
+    ∀ n e, n ≤ 4 → rdCat E ws a n = some e → (e.eval R M).toNat = rsum (applyW R M ws) (a.eval R M) n := by
+  intro n
+  induction n with
+  | zero => intro e _ h; simp only [rdCat, Option.some.injEq] at h; subst h; rfl
+  | succ n ih =>
+    intro e hn h
+    simp only [rdCat] at h
+    split at h
+    · rename_i acc b hacc hb
+      simp only [Option.some.injEq] at h; subst h
+      rw [catS_eval, BitVec.toNat_ofNat, ih acc (by omega) hacc, rsum, ← rdByte_sound hE ws a n b hb]
+      have := rsum_lt (applyW R M ws) (a.eval R M) n
+      have := (applyW R M ws (a.eval R M + BitVec.ofNat 32 n)).isLt
+      have h8 : (applyW R M ws (a.eval R M + BitVec.ofNat 32 n)).toNat ≤ 255 := by omega
+      have := Nat.mul_le_mul_right (256 ^ n) h8
+      have : 256 ^ (n + 1) ≤ 2 ^ 32 := by
+        rcases (by omega : n = 0 ∨ n = 1 ∨ n = 2 ∨ n = 3) with rfl | rfl | rfl | rfl <;> decide
+      rw [Nat.pow_succ] at this
+      apply Nat.mod_eq_of_lt
+      omega
+    · simp at h
+
+/-- A load from symbolic memory: the newest write if it is exactly the same cell, the older writes
+    if the newest is disjoint, and otherwise the value assembled byte by byte. -/
 def rdW (E : Env) : List Wr → SE → Width → Option SE
   | [], a, w => some (.ld w a)
   | (b, w', v) :: ws, a, w =>
     if b = a ∧ w' = w then some (trunc w v)
-    else if disj E b w'.bytes a w.bytes then rdW E ws a w else none
+    else if disj E b w'.bytes a w.bytes then rdW E ws a w
+    else rdCat E ((b, w', v) :: ws) a w.bytes
 
 theorem rdW_sound {E : Env} {R : Nat → Word} {M : Word → BitVec 8} (hE : SpIn E R) :
     ∀ (ws : List Wr) (a : SE) (w : Width) (v : SE), rdW E ws a w = some v →
@@ -389,7 +584,13 @@ theorem rdW_sound {E : Env} {R : Nat → Word} {M : Word → BitVec 8} (hE : SpI
         rw [applyW, ramRead_congr _ _ (Y := applyW R M ws) fun k hk =>
           ramWrite_other _ _ _ _ _ fun j hj e => disj_sound hE hd j hj k hk e.symm]
         exact ih a w v h
-      · simp at h
+      · have := rdCat_sound (M := M) hE _ a w.bytes v (by cases w <;> decide) h
+        rw [ramRead_sum]
+        apply BitVec.eq_of_toNat_eq
+        rw [this, BitVec.toNat_ofNat]
+        apply Nat.mod_eq_of_lt
+        have := rsum_lt (applyW R M ((b, w', u) :: ws)) (a.eval R M) w.bytes
+        cases w <;> simp only [Width.bytes] at this ⊢ <;> omega
 
 /-! ## Symbolic states -/
 
