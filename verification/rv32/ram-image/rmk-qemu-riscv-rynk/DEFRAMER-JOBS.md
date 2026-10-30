@@ -154,3 +154,35 @@ wrapper applies main's bridge (`theorem copy : CopyContract := BRIDGE_THEOREM`) 
 the four Deframer contracts, `recv`, `unpark` and `unpark_then_recv` with no hypothesis. The
 job's module list is the wrapper's import closure in dependency order, so it includes the peer's
 memmove chain. The conditional jobs and receipts above stay unchanged.
+
+## Loop fragments: `jobs/rmk/rmk-session-fragments.json` (main 094b8c6)
+
+74 modules: the discharged chain plus main's `Trees`, `DevRead`, `Rx*`, `None*`, `SessionInv`
+and `Some*`. Receipts are `rmk-session-fragments.result.json` and `fragments-runs.txt`.
+
+| Run | Result |
+| --- | --- |
+| 1 (fresh) | `failed` (998 s), in MY wrapper (`B`/`img` ambiguous after `open E5R.Rmk`), not in main's proofs |
+| 2 (`--resume` on run 1's from-source build, wrapper fixed) | `proved` (509 s) |
+
+All theorems have axioms within {propext, Classical.choice, Quot.sound}:
+* main's `session_round`, `unpark_round`, `none_of_recv`, `some_neg`, `none_step`, `rx_loop`,
+  `reach_lands`, `reach_no_escape`, plus `copy_contract`, `contractAll` and `cobs_report`;
+* my wrapper `E5R.RmkFragments.*`:
+  * the restatements pin the types of `session_round` (`SessInv → Lands1 LoopQ`),
+    `unpark_round`, `some_neg`, `none_step` and `reach_no_escape`, so an interface change
+    fails the job;
+  * new, `unpark_lands`: from `UnparkAt` and `Extras`, every behaviour lands in `LoopQ`.
+
+Explicit hypotheses that remain:
+* `SessPre`: pc, `Quiet`, the s6/s7 bases, the stack bounds, the deframer invariant and
+  discarding ≤ 1;
+* `Extras`: the Uart16550 struct through the word at 0x8002a784 (base 0x10000000, stride 1,
+  separated from every written range), the task-flag pointer at sp+0x24, and 0x28 bytes of
+  stack above sp.
+
+`LoopQ` still contains boundaries with no proof beyond them:
+* the read future at 0x80003ff2 and 0x80004428;
+* `SomeAt` 0x80003e70, except when the message header is negative.
+
+**`SessionSafe` is NOT proved.**
