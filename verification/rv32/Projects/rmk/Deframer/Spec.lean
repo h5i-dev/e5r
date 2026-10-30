@@ -173,6 +173,8 @@ structure ParkPost (m₀ m : Machine) : Prop where
     m.ram (m₀.core.get 11 + BitVec.ofNat 32 ((m₀.core.get 12).toNat - (m.core.get 10).toNat + j)) =
       m₀.ram (m₀.core.get 11 + BitVec.ofNat 32 (consumed m₀.ram (m₀.core.get 10) + j))
   ram : KeepsRam parkStack m₀ m
+  /-- The discarding flag is not written (added: the Some path's unpark needs it again). -/
+  hdisc : (m.ram (m₀.core.get 10 + 8)).toNat = (m₀.ram (m₀.core.get 10 + 8)).toNat
 
 def ParkContract : Prop :=
   ∀ m₀, CallEnv parkPc parkStack m₀ → Inv m₀.ram (m₀.core.get 10) (m₀.core.get 12).toNat →

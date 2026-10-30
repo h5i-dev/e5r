@@ -18,7 +18,8 @@
     takes an interrupt (per-step obligations of `Lands`), and every behaviour reaches either the
     loop head with `SessInv`, or one of three boundaries, each not proved:
     * 0x80003ff2 / 0x80004428: the read future, which yields to the executor;
-    * 0x80003e70: the Some point, where the dispatch and response gap begins;
+    * 0x80003e70 with `SomeAt` (the message, parked ≤ 484, discarding ≤ 1, the extras): the Some
+      point, where the dispatch and response gap begins;
   * `unpark_round`: from the unpark call site (`UnparkAt` and the same extras), back to the loop
     head with `SessInv`. This is the end of the Some gap.
 
@@ -39,7 +40,7 @@ open E5R E5R.Rmk E5R.Rmk.Deframer.Tail E5R.Rmk.Deframer.Session E5R.Rmk.Deframer
 /-- Everything the proved session steps may write, for a session at sp. -/
 def SW (sp : Word) (x : Word) : Prop :=
   (0x8002a78c ≤ x.toNat ∧ x.toNat < 0x8002a798) ∨ (0x8002a590 ≤ x.toNat ∧ x.toNat < 0x8002a778) ∨
-  (sp.toNat - 0x70 ≤ x.toNat ∧ x.toNat < sp.toNat) ∨ (0x8002a798 ≤ x.toNat ∧ x.toNat < 0x8002a79c) ∨
+  (sp.toNat - 0x70 ≤ x.toNat ∧ x.toNat < sp.toNat) ∨ (0x8002a798 ≤ x.toNat ∧ x.toNat < 0x8002a7b0) ∨
   (0x8002a580 ≤ x.toNat ∧ x.toNat < 0x8002a590) ∨ (0x8002a7b0 ≤ x.toNat ∧ x.toNat < 0x8002a7ca)
 
 /-- The Uart16550 struct pointer word. -/
@@ -118,10 +119,26 @@ theorem none_of_recv (m₀ m : Machine) (h : SessInv m₀) (hr : RecvOut m₀ m)
   refine ⟨fut _ (uS k (by omega)).1, ?_⟩
   rw [s20]; exact fut _ (uS 4 (by decide)).1
 
+/-- The Some point 0x80003e70 (back from `RynkMessage::from_decoded`), with what `recv_step`
+proves there and the invariant's extras. -/
+structure SomeAt (m : Machine) : Prop where
+  pc : m.core.pc = 0x80003e70
+  quiet : Quiet m.core
+  s6 : m.core.get 22 = s6v
+  s7 : m.core.get 23 = s7v
+  spAl : (m.core.get 2).toNat % 4 = 0
+  sp : 0x8002a798 + 0x70 ≤ (m.core.get 2).toNat ∧ (m.core.get 2).toNat ≤ 0x81000000
+  msg : ramRead m.ram msgA .w = bufA ∧
+    3 ≤ (ramRead m.ram (msgA + 4) .w).toNat ∧ (ramRead m.ram (msgA + 4) .w).toNat ≤ bufLen ∧
+    2 < (ramRead m.ram (msgA + 0xc) .w).toNat ∧ (ramRead m.ram (msgA + 0xc) .w).toNat ≤ bufLen
+  emptied : consumed m.ram dfr = 0 ∧ filled m.ram dfr = 0
+  parked : (ramRead m.ram 0x8002a798 .w).toNat + 4 ≤ bufLen
+  disc : discarding m.ram dfr ≤ 1
+  ext : Extras m
+
 /-- Where one round may stop: the loop head with the invariant, or an explicit boundary. -/
 def LoopQ (m : Machine) : Prop :=
-  (m.core.pc = 0x80003e1a ∧ SessInv m) ∨ m.core.pc = 0x80003ff2 ∨ m.core.pc = 0x80004428 ∨
-    m.core.pc = 0x80003e70
+  (m.core.pc = 0x80003e1a ∧ SessInv m) ∨ m.core.pc = 0x80003ff2 ∨ m.core.pc = 0x80004428 ∨ SomeAt m
 
 theorem lands1_of_qrun_lands {P : Machine → Prop} {k : Nat} {m m' : Machine}
     (h : QRun B img (k + 1) m m') (hl : Lands B img P m') : Lands1 B img P m := by
@@ -173,8 +190,10 @@ theorem session_round (m₀ : Machine) (h : SessInv m₀) : Lands1 B img LoopQ m
     rcases R.out with ⟨e, -⟩ | ⟨e, -⟩ <;> rw [hpc0] at e <;> exact absurd e (by decide)
   | succ j =>
     refine lands1_of_qrun_lands r ?_
-    rcases R.out with ⟨hsome, -⟩ | hn
-    · exact .done (.inr (.inr (.inr hsome)))
+    rcases R.out with ⟨hpc, g1, g2, g3, g4, g5, c0, f0, pk, ds⟩ | hn
+    · exact .done (.inr (.inr (.inr ⟨hpc, R.quiet, R.s6, R.s7, by rw [R.sp]; exact h.1.spAl,
+        by rw [R.sp]; exact h.1.sp, ⟨g1, g2, g3, g4, g5⟩, ⟨c0, f0⟩, pk, ds,
+        extras_keep m₀ m h.2 h.1.sp R.sp fun y hy _ => R.ram y fun h' => hy (recvW_SW _ _ h')⟩)))
     · have NA := none_of_recv m₀ m h R hn
       refine lands_seq ?_ (none_step m NA)
       rintro x (⟨hS, hxsp, hxram⟩ | hb | hb)
