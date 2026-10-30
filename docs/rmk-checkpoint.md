@@ -86,4 +86,5 @@ It preserves backward-memmove checks during conflict resolution, updates stale
 session wrappers to current signatures, and provides the aggregate job above.
 No PTX implementation or claim of whole-session correctness is introduced.
 
-Fresh integration validation is recorded in `rmk-checkpoint-validation.md`.
+Fresh integration validation and the source/kernel replay receipt are linked
+from [the validation record](rmk-checkpoint-validation.md).
