@@ -7,5 +7,5 @@ ok   rx: assert_offset stack byte not required to be in RAM: REJECTED in Project
 ok   rx: frame claim without the assert_offset stack byte: REJECTED in Projects/rmk/Deframer/Rx.lean:151 (rx_loop): Application type mismatch: The argument
 ok   rx: LSR address off by one (0x10000004, not a device register): REJECTED in Projects/rmk/Deframer/Rx.lean:85 (rx_loop): Application type mismatch: The argument
 ok   audit: the faulting machine against main's Lands (no-fault field present): REJECTED in Projects/rmk/review/RxAudit.lean:55 (weak_vacuous): Type mismatch
-ok   audit: non-vacuity witness with cap = 0: REJECTED in Projects/rmk/review/RxAudit.lean:79 (rx_witness): Tactic `decide` proved that the proposition
+ok   audit: non-vacuity witness with cap = 0: REJECTED in Projects/rmk/review/RxAudit.lean:78 (rx_witness): Tactic `decide` proved that the proposition
 every control failed in the expected declaration for the expected reason
