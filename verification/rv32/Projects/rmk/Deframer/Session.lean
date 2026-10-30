@@ -11,7 +11,8 @@
   * `Some(k)`: 0x80003e70, back from `RynkMessage::from_decoded` (0x8001c3c6, whose length check,
     len = 488 - parked ≥ 3, is not taken: next's `k < consumed` gives parked ≤ 484), with the
     message at 0x8002a580 = (buffer, 488 - parked, header, k), 2 < k ≤ 488, the deframer emptied
-    and its pending bytes parked (bounds check 0x80003e5a not taken); or
+    and its pending bytes parked (bounds check 0x80003e5a not taken), parked ≤ 484 in the word
+    0x8002a798 and discarding ≤ 1; or
   * `None`: 0x80003f7c after `tail`, with the invariant again and consumed = 0;
   writing RAM only in the deframer, the buffer, 0x70 stack bytes, the session word s6+0x2db and the
   16-byte message.
@@ -79,7 +80,8 @@ structure RecvOut (m₀ m : Machine) : Prop where
   out : (m.core.pc = 0x80003e70 ∧ ramRead m.ram msgA .w = bufA ∧
           3 ≤ (ramRead m.ram (msgA + 4) .w).toNat ∧ (ramRead m.ram (msgA + 4) .w).toNat ≤ bufLen ∧
           2 < (ramRead m.ram (msgA + 0xc) .w).toNat ∧ (ramRead m.ram (msgA + 0xc) .w).toNat ≤ bufLen ∧
-          consumed m.ram dfr = 0 ∧ filled m.ram dfr = 0) ∨
+          consumed m.ram dfr = 0 ∧ filled m.ram dfr = 0 ∧
+          (ramRead m.ram 0x8002a798 .w).toNat + 4 ≤ bufLen ∧ discarding m.ram dfr ≤ 1) ∨
         (m.core.pc = 0x80003f7c ∧ Inv m.ram dfr bufLen ∧ consumed m.ram dfr = 0 ∧
           m.core.get 18 = bufA + BitVec.ofNat 32 (filled m.ram dfr) ∧
           (m.core.get 20).toNat = bufLen - filled m.ram dfr ∧ discarding m.ram dfr ≤ 1 ∧
@@ -367,7 +369,7 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
     have gF : ∀ r : Reg, r ≠ 14 → r ≠ 15 → r ≠ 16 → Fc.get r = D.get r := fun r a b c' => by
       simp [Fc, sfromCore, Core.wr_get_ne, a, b, c']
     have csF : Fc.sameCsr D := by unfold Fc sfromCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
-    refine ⟨Quiet.of_sameCsr csF qD, ?_, ?_, ?_, ?_, .inl ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩⟩
+    refine ⟨Quiet.of_sameCsr csF qD, ?_, ?_, ?_, ?_, .inl ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩⟩
     · rw [gF 22 (by decide) (by decide) (by decide), gD 22 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]
       exact e3_22
     · rw [gF 23 (by decide) (by decide) (by decide), gD 23 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]
@@ -421,5 +423,21 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
         rw [show (dfr + 4).toNat = 0x8002a790 from rfl] at h1 h2
         rw [w5 x (by rw [show msgA.toNat = 0x8002a580 from rfl]; omega), w4 x (by omega)]]
       exact hf3
+    · show (ramRead (sfromRam D R4) 0x8002a798 .w).toNat + 4 ≤ bufLen
+      rw [rd_congr (0x8002a798 : Word) (by decide) (ram' := sfromRam D R4) (ram := R4) fun x h1 h2 => by
+        rw [show (0x8002a798 : Word).toNat = 0x8002a798 from rfl] at h1 h2
+        exact w5 x (by rw [show msgA.toNat = 0x8002a580 from rfl]; omega)]
+      rw [M4, e3_22, show s6v + 0x000002db#32 = (0x8002a798 : Word) from rfl, ramRead_ramWrite_w]
+      have : bufLen = 0x1e8 := rfl
+      omega
+    · have dsc1 : (M1 (dfr + 8)).toNat ≤ 1 := by
+        have := NP.disc; rw [show (⟨K1, R0⟩ : Machine).core.get 10 = dfr from K1_10] at this; exact this
+      have hd3 : (M3 (dfr + 8)).toNat = (M1 (dfr + 8)).toNat := by
+        have := PP.hdisc; rw [show (⟨K3, M1⟩ : Machine).core.get 10 = dfr from K3_10] at this; exact this
+      show discarding (sfromRam D R4) dfr ≤ 1
+      unfold discarding
+      rw [w5 _ (by rw [show msgA.toNat = 0x8002a580 from rfl, show (dfr + 8 : Word).toNat = 0x8002a794 from rfl]; omega),
+        w4 _ (by rw [show (dfr + 8 : Word).toNat = 0x8002a794 from rfl]; omega), hd3]
+      exact dsc1
 
 end E5R.Rmk.Deframer.Session
