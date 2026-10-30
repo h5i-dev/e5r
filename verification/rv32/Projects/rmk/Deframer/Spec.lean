@@ -6,8 +6,9 @@
   obligation, and the constants marked CANDIDATE are read from the disassembly of the pinned ELF
   (f39d833f..., review/rmk/deframer-contracts.md on the review branch) and must be confirmed by
   the proof that uses them. No theorem in this file claims safety. Proved elsewhere, each
-  CONDITIONAL on the dependency hypotheses below (not proved): `TailFromCopy` (TailCopy.lean),
-  `ParkFromCopy` (Park.lean), `UnparkFromCopy` (Unpark.lean), `NextFromDeps` (Next.lean).
+  CONDITIONAL on `CopyContract` (memmove; not proved): `TailFromCopy` (TailCopy.lean),
+  `ParkFromCopy` (Park.lean), `UnparkFromCopy` (Unpark.lean), `NextFromCopy` (CobsDischarge.lean;
+  `CobsReportContract` is a THEOREM there, `cobs_report`, from the COBS worker's Cobs.decode).
   Corrections made for those proofs: `CallEnv.selfAl/spAl`, `CopyEnv.spAl` (ABI alignment; the model
   faults misaligned word access), the method posts' `saved` (now the ABI frame, `callerSaved`),
   `NextPost.val`, `CobsEnv.sep` and `CobsPost.ok` (next's exact Ok test).
@@ -279,7 +280,7 @@ structure CopyPost (m₀ m : Machine) : Prop where
 /-- The dependency: memmove does what it should for every deframer call. -/
 def CopyContract : Prop := ∀ m₀, CopyEnv m₀ → ∃ k m, QRun B img k m₀ m ∧ CopyPost m₀ m
 
-/-! ## The COBS contract `next` needs (DEPENDENCY, not proved; owned by the COBS worker)
+/-! ## The COBS contract `next` needs (proved: `cobs_report` in Deframer/CobsDischarge.lean, from the COBS worker's Cobs.decode)
 
 INTERFACE CANDIDATE read from the bytes: the wrapper at 0x8001e006 calls the report function with
 a0 = a 12-byte report slot (r0, r1, r2), a1 = data, a2 = n; it returns `(r0 - 1) | r1` and `r2`,
@@ -325,6 +326,8 @@ def TailFromCopy : Prop := CopyContract → TailContract tailStack
 def ParkFromCopy : Prop := CopyContract → ParkContract
 def UnparkFromCopy : Prop := CopyContract → UnparkContract
 def NextFromDeps : Prop := CopyContract → CobsReportContract → NextContract
+/-- `next` given memmove's contract alone (COBS discharged in Deframer/CobsDischarge.lean). -/
+def NextFromCopy : Prop := CopyContract → NextContract
 
 /-! ## The session-level target (R2 acceptance; not proved) -/
 
