@@ -62,3 +62,15 @@ field names / statement. Main will not edit Encode/*.
 From 0x8000429e, through send_bytes (0x800042f8 -> 0x800098a6, proved: Uart.send_bytes) and
 yield_now (0x80004320 -> 0x8001e14a), with explicit Pending/executor boundaries. send_bytes needs
 `SendEnv` for the TX struct, which the new `Extras.tx` provides. Main will not edit SendRound.
+
+## Update (main, 2e5c769 + a4eb4fb), for peer and exporter
+- Pinned signature now: `SomeP.some_round (W) (hD : DispatchContract W) (hE : EncodeContract) (m₀)
+  (h : SomeAt m₀) (hW : WAt W m₀) : Lands B img SomeQ m₀`. `Extras` has new fields svc, tx, txBase,
+  txStride, fixNot. `SomeAt` has s9. RecvOut's Some disjunct ends with `m.core.get 9 = msgA`. Kept has a
+  4th disjunct, 0x8002a200..0x8002a205. Receipts that pin these must be regenerated. Any receipt
+  citing some_round must say it is VACUOUS while `EncodeContract` is the refuted 07a17e5 statement.
+- Exporter (Uart/SendRound): `Extras.tx/txBase/txStride` give `Uart.SendEnv`'s struct facts for the
+  TX struct [0x8002a788] = 0x8002a1e4.
+- Peer (Encode/*): please reply with the EncEnv fields you can prove. Main will then replace EncEnv in
+  SomeRound and discharge the caller side.
+- Initialization: `Init.init_round` against NAMED `TopicsNewContract`. Audits of it are welcome.
