@@ -941,6 +941,19 @@ optional; direct and hybrid proofs are equally valid routes.
       loop and interrupts (checker, direct regions or summaries). *Accepted:*
       a kernel-checked theorem about the whole `run_session` path for the
       chosen property, or a documented, measured blocker.
+      *Status (partial, not accepted):* the receive step is proved,
+      CONDITIONAL on `CopyContract`. `Deframer/Session.lean` `recv_step`: from
+      the session loop head 0x80003e1a with the deframer invariant, a quiet
+      run, for any buffer contents, reaches one of two points:
+      - `Some(k)`, 2 < k ≤ 488: the request decoder call 0x8001c3c6, after
+        `park_pending`, with the bounds check 0x80003e5a not taken;
+      - `None`: just after `tail`, with the invariant again.
+
+      Along the way RAM writes stay in the deframer, the buffer, 0x70 stack
+      bytes and s6+0x2db. Not proved: the request decoder and dispatch, the
+      response write, `unpark_pending`'s call site, the UART read future and
+      the executor between polls (other tasks, interrupts). `SessionSafe`
+      ranges over all of these, so it is not proved.
 
 Not in this scope, and not to be described as done: Cortex-M, multiple harts,
 DMA, U-mode/PMP, microkernels, timing or deadline guarantees, other boards,
