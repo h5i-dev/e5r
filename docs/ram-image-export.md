@@ -239,3 +239,98 @@ a RAM job on a flash board, a flash job on a RAM board, an unknown kind, a
 missing ELF or proof module, a forbidden command (`error`), and a proof that
 does not check (`failed`). The transcript and the RMK job's result are in
 `verification/rv32/ram-image/rmk-qemu-riscv-rynk/`.
+
+## The RMK memmove job (`jobs/rmk/rmk-memmove-small.json`)
+
+This job checks the peer's proof of the emitted `memmove` for copies of fewer
+than 16 bytes (`Projects/rmk/MemmoveSmall.lean`, `E5R.Rmk.Memmove.contract`)
+against the image the runner generates. Its `image.module` is
+`Projects.rmk.Elf` in namespace `E5R.Rmk.Image`, which is the module the
+proofs already import (`Projects/rmk/Fetch.lean`). So the runner's packed file
+is the only image input. `Projects/rmk/gen_elf.py`, which wrote that module by
+hand, is not used, and a run replaces any `Elf.lean` it left (the file is
+gitignored).
+
+`Projects/ramimage/Memmove.lean` connects the proofs to the runner's binding.
+`img_eq : E5R.Rmk.img = E5R.Rmk.Image.image.ro` holds by `rfl`, and
+`board_eq : E5R.Rmk.B = QemuVirtRv32.board E5R.Rmk.Image.image.rwBase` follows
+from `image_rwBase`. `E5R.RmkMemmove.contract` restates the contract over that
+image and board: from every machine meeting `Memmove.Pre` (pc at the trampoline
+0x80020c1e, a quiet core, n < 16, dst and src in model RAM, aligned save slots
+in RAM and separate from dst and src, an even return address), a quiet,
+deterministic run reaches `Memmove.Post` (at `ra`, callee-saved registers and sp
+restored, CSRs unchanged, RAM outside the save slots equal to the memmove of
+the entry RAM, overlap in both directions). It covers this function, nothing
+more about RMK. The job's `symbols` pin both proof addresses (0x80020c1e,
+0x80020d9e) to the ELF's `memmove` symbols.
+
+Result (`verification/rv32/ram-image/rmk-qemu-riscv-rynk/rmk-memmove-small.result.json`):
+`proved` in 237 s. It checks eight theorems (the contract, the restated
+contract, the two equalities and the four image bindings), with the axioms
+`propext`, `Classical.choice` and `Quot.sound`. Every module is replayed by
+`leanchecker`. `e5r-verify bundle` plus `recheck.sh` recheck it offline in
+137 s.
+
+Limits. The runner enforces `rss_mib` by sampling resident memory and passes
+`-M (rss_mib − 512)` to Lean. It never sets an address-space limit:
+Lean reserves far more virtual memory than it touches, so `ulimit -v` at
+24–40 GB makes it fail with "failed to create thread" even though RSS stays
+below 1 GB for most modules. One module is heavy: `Projects/rmk/Fetch.lean`
+peaks at 6.5 GB RSS for 50 s, in the proof and again in its `leanchecker`
+replay. With `rss_mib` 6144 (Lean `-M 5632`) it fails with "(kernel) excessive
+memory consumption", so the job sets 10240.
+
+Controls (`python3 -I scripts/test-rmk-memmove-job.py E5R_VERIFY [BUNDLE]`,
+transcript `memmove-job-controls.txt`):
+- One instruction of memmove changed (0x80020da6 `sub a3,a0,a1` → `sub a5,a0,a1`):
+  - with the pin, this is an `error`;
+  - without it, the image exports and the reader accepts it, but the
+    instruction fact for 0x80020da6 fails (`failed`).
+- A stale proof address is an `error`.
+- The image declared as flash is an `error`.
+- A claim that model RAM starts 4 bytes later is `failed`.
+- In a bundle, one changed word of the packed file fails at the checksums. With
+  the checksum forged as well, it fails at `check-packing.py`.
+
+## The RMK memmove contractB job (`jobs/rmk/rmk-memmove-contractB.json`)
+
+This job checks the peer's `E5R.Rmk.Memmove.contractB`
+(`Projects/rmk/MemmoveContract.lean`, peer commit `60d2f96`) on the runner's
+image. It is **bounded, not full memmove**. `PreB` admits n < 16 in either
+direction, or n ≥ 16 copied forward ((dst − src) ≥ n, unsigned) with
+src ≡ dst (mod 4). The n ≥ 16 backward path and the misaligned forward path are
+not covered. The other conditions are as the peer states them:
+- pc at the trampoline 0x80020c1e and a quiet core;
+- dst and src in model RAM;
+- aligned save slots in RAM, with the stack separated from dst and src;
+- an even return address.
+
+`PostB` is the ABI frame (all registers but t0–t6 and a1–a7 preserved), with
+CSRs unchanged and RAM outside the save slots equal to the memmove of the entry
+RAM.
+
+`Projects/ramimage/MemmoveB.lean` restates it over the runner's image and board
+(`E5R.RmkMemmoveB.contractB`), reusing `img_eq` and `board_eq`. The job audits
+both contracts, the two equalities and the four image bindings: `proved` in
+377 s, peak 6.5 GB RSS (in `Fetch.lean`), standard axioms only. Its bundle
+rechecks offline in 220 s, including the packing check. After merging the
+peer's larger `MemmoveFetch.lean` (259 instruction facts), the n < 16 job still
+proves (`rmk-memmove-small.result.json`).
+
+Mutations (`python3 -I scripts/test-rmk-memmoveB-job.py E5R_VERIFY`, transcript
+`memmoveB-mutations.txt`). Each proof mutation edits a copy of the peer's
+module, never the module itself. "Rejected" means status `failed`, with the
+first Lean error in the named theorem:
+
+| Mutation | Result |
+| --- | --- |
+| unmodified copy (control) | `proved` |
+| `PreB` without src ≡ dst (mod 4) | rejected in `contractB` |
+| `PreB` without "forward" | rejected in `contractB` |
+| `PreB.dstSep` weakened to `True` | rejected in `contractB` |
+| `PostB` claiming a1 preserved | rejected in `finishB` |
+| word-loop `sw a2,0(t5)` → `sw a3,0(t5)` in the ELF, unpinned | rejected at instruction fact `f80020ec4` |
+| a job module that does not exist | `error` (a tool or job problem, not a rejection) |
+
+A rejected mutation shows that the proof needs that condition. It does not show
+that the weakened statement is false.

@@ -869,16 +869,19 @@ optional; direct and hybrid proofs are equally valid routes.
       plain cargo, byte-identical across two clean builds and checkout paths;
       its sha256 recorded with the symbols of the Rynk session and frame
       handling; the example runs on the pinned QEMU.
-      *Status:* the release ELF built with Rust 1.98.1 `--locked` is pinned
-      (sha256 `f39d833f…`) and runs on QEMU 8.2.2; builds from other
-      checkout paths differ (paths are embedded in panic locations), so the
-      byte-identical criterion is open for that pin. A canonical recipe
-      (`verification/rv32/rmk/build-canonical.sh`: fixed checkout path, all
-      paths remapped) rebuilds byte-identically (`5871dcee…`, receipt in
-      `verification/rv32/rmk/R0-receipt.md`); Cargo hashes the absolute path
-      of path dependencies into function order, so path independence is not
-      achieved. Current evidence stays on `f39d833f`; migrating to the
-      canonical pin is a separate step.
+      *Status:* not accepted. Evidence pin: `f39d833f…` (built inside the
+      review worker's scratch tree, no remapping); it is not cleanly
+      reproduced: the third worker found an in-place rebuild there with the
+      same bytes, not a fresh-checkout, fresh-cache build, and no other path
+      can give it. Canonical recipe (`verification/rv32/rmk/build-canonical.sh`):
+      reproducible byte for byte (`5871dcee…`, three times, two independent
+      scripts, `verification/rv32/rmk-r0-audit/AUDIT.md`) ONLY at its fixed
+      checkout path on this machine. The checkout path changes code, not only
+      layout (66,551 `.text` bytes between two remapped paths), through
+      Cargo's metadata of the path crates. Another machine, rustup home or
+      user is untested. All evidence stays on `f39d833f`; migration to
+      `5871dcee` (rwBase 0x80029590; memmove and deframer bytes keep their
+      addresses) is not done and not implied.
 - [x] **R1. Board model for QEMU `virt` (RV32).** *Accepted:* a board JSON
       (memory map, UART16550 registers, timer, boot state, how semihosting
       calls are treated: modeled, or a fail-closed exclusion) and the
@@ -905,10 +908,104 @@ optional; direct and hybrid proofs are equally valid routes.
       covered. *Accepted:* job `proved`, nonvacuity, mutation controls
       (changed instruction, false postcondition, weakened precondition),
       axioms audited.
+      *Status (partial, not accepted):* `jobs/rmk/rmk-memmove-small.json`
+      is proved on `f39d833f` (memmove n < 16, both directions; 7 negative
+      controls). `jobs/rmk/rmk-memmove-contractB.json` is proved on
+      `f39d833f` (`E5R.Rmk.Memmove.contractB`: n < 16 either direction, or
+      n ≥ 16 forward with src ≡ dst mod 4; 7 mutation controls; re-run on
+      the integrated tree: 430 s, 6.3 GB). Not covered: n ≥ 16 backward and
+      the misaligned forward path, both reachable from the 488-byte deframer
+      buffer. The COBS decoder is proved (COBS worker,
+      `Projects/rmk/Cobs/`: `decode_in_place_report` and the wrapper
+      `decode_in_place`, job `jobs/rmk/rmk-cobs-decode.json`, 9/9 controls).
+      memmove is proved for every size, direction and alignment (peer:
+      `Memmove.contractAll`, Projects/rmk/MemmoveBwdAll.lean, 89ab0a6).
+      `Deframer/CopyDischarge.lean` proves `copy_contract : CopyContract` from
+      it, with an exact bridge and no weakening. So all four deframer methods
+      are proved UNCONDITIONALLY on the pinned bytes: `tail_contract`,
+      `park_contract`, `unpark_contract`, `next_contract`. With them come
+      `recv_step'` and `unpark_step'`. The COBS decoder is proved too (COBS
+      worker; `cobs_report`).
+
+      All 74 modules rebuild from source in 786 s and pass leanchecker, with
+      standard axioms only. Not done: the panic controls as runner jobs (COBS
+      worker owns the official jobs) and the session (R4).
 - [ ] **R4. Toward the session.** Compose R3 with the surrounding session
       loop and interrupts (checker, direct regions or summaries). *Accepted:*
       a kernel-checked theorem about the whole `run_session` path for the
       chosen property, or a documented, measured blocker.
+      *Status (partial, not accepted):* the receive step is proved
+      (`recv_step'`, unconditional since `copy_contract`). `Deframer/Session.lean` `recv_step`: from
+      the session loop head 0x80003e1a with the deframer invariant, a quiet
+      run, for any buffer contents, reaches one of two points:
+      - `Some(k)`, 2 < k ≤ 488: 0x80003e70, after `park_pending` and
+        `RynkMessage::from_decoded`. Neither the bounds check 0x80003e5a nor
+        from_decoded's length panic is taken, because `next` now also
+        guarantees k < consumed. The message at 0x8002a580 is filled;
+      - `None`: just after `tail`, with the invariant again.
+
+      Along the way RAM writes stay in the deframer, the buffer, 0x70 stack
+      bytes, s6+0x2db and the 16-byte message. `Deframer/SessionLoop.lean`
+      `unpark_step`: from the unpark call site 0x80003fd8 (parked ≤ 488,
+      discarding ≤ 1) back to the loop head with `SessPre`. The map is
+      `verification/rv32/rmk/session-map.md`. Composition tools, proved:
+      `Projects/rmk/Reach.lean` (`reach_on_runs`: quiet deterministic runs
+      between checkpoints cover every Reach-able machine) and
+      `Projects/rmk/PanicRegion.lean` (`panic_absorbing`, `reach_no_panic`).
+      Event-aware trees (`Trees.lean`: `Lands`, `reach_lands`,
+      `reach_no_escape`, `reach_no_panic_io`) cover device reads (every
+      value) and writes (events). With them, `Deframer/Rx.lean` `rx_loop` (the
+      UART receive poll, unconditional) is proved for every LSR/RBR value
+      sequence, given the stated `RxEnv`. `Deframer/NonePath.lean`
+      `none_step`: from the None point, every behaviour returns to the loop
+      head with `SessPre`, or stops at an explicit read-future boundary
+      (0x80003ff2 or 0x80004428). Its assumptions about the Uart16550
+      struct and the task flag pointer are explicit. `Deframer/SessionInv.lean`
+      composes these steps for one loop round. `SessInv` is `SessPre` plus those
+      Uart16550/flag/stack facts, placed outside every proved write.
+      `none_of_recv` derives `NoneAt` from it. `session_round` says that from the
+      loop head with `SessInv`, every behaviour takes at least one step, with no
+      fault or interrupt, and reaches one of these:
+      - the loop head with `SessInv` again;
+      - the read-future boundary 0x80003ff2 or 0x80004428;
+      - the Some point 0x80003e70.
+
+      `unpark_round`: from the unpark call site 0x80003fd8 with the same
+      extras, back to the loop head with `SessInv`. The Some boundary
+      carries `SomeAt`: the message, parked ≤ 484, discarding ≤ 1 and the
+      extras. `Deframer/SomePath.lean` `some_neg` proves one branch: a
+      negative message header jumps straight to the unpark site and
+      returns to the loop head with `SessInv`. `Deframer/SomeRound.lean`
+      `some_round` covers every header, but only against two NAMED
+      callee contracts. Both are hypotheses of the theorem and are proved
+      nowhere:
+      - `DispatchContract`: polling `RynkService::dispatch`'s future
+        returns;
+      - `EncodeContract`: `encode_frame` returns error, or a length ≤ 7.
+
+      Each is a `Lands` statement: the ABI frame, Quiet on return, and
+      the session cells it must leave alone (`Kept`). s10 = 0x8002a7f0
+      (the empty response's flag byte address) is part of `SessInv`'s
+      extras: recv_step, none_step and unpark_step export that x26 is
+      kept, so it is no longer a hypothesis of `some_round`. Under the two
+      contracts, every behaviour reaches one of:
+      - the loop head with `SessInv`: an empty response, through the
+        unpark site; the slice-check panic is shown not taken;
+      - 0x80004204: dispatch is Pending, and the poll exits to the
+        executor;
+      - 0x80003fa6: dispatch returned 0xff; not proved;
+      - 0x8000429e: the UART send loop; not proved.
+
+      Not proved:
+      - that `SessInv` holds when the task first reaches the loop head
+        (initialization);
+      - `DispatchContract` (`RynkService::dispatch` at 0x800001f2 is a
+        12.6 KB async state machine) and `EncodeContract`;
+      - the 0xff path and the send loop;
+      - the UART read future and the executor between polls (other tasks,
+        interrupts, Quiet across polls).
+
+      `SessionSafe` ranges over all of these, so it is not proved.
 
 Not in this scope, and not to be described as done: Cortex-M, multiple harts,
 DMA, U-mode/PMP, microkernels, timing or deadline guarantees, other boards,

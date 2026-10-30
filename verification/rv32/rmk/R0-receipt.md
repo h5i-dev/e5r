@@ -32,3 +32,13 @@ Status:
   Dependency: the review worker can rebuild it there to confirm.
 * Migration to `5871dcee…` is a separate step: addresses move (.rodata shrinks, .text layout differs),
   so the image job, the replay and every direct proof must be re-run or re-derived on it. Not done.
+
+## Correction (after the independent audit, verification/rv32/rmk-r0-audit/AUDIT.md)
+
+* "functions are placed in a different order" was incomplete: the checkout path changes code, not only
+  layout (66,551 `.text` bytes between two remapped paths; e.g. `<Fork as Serialize>::serialize` is 0x106
+  vs 0xd6 bytes), through Cargo's `-C metadata` of the six path crates (registry crates keep theirs).
+* The canonical recipe is reproducible only at its fixed path on this machine; another machine, rustup
+  home or user is untested.
+* f39d833f: the audit found an in-place rebuild at its original path with the same bytes (not a clean
+  rebuild). It stays the evidence pin; nothing is migrated.

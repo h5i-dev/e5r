@@ -14,3 +14,4 @@ Projects/*/Image.lean
 Projects/rust_clamp/ImageO*.lean
 Projects/rmk/*/Image.lean
 Projects/*/ImageFidelity.lean
+Projects/rmk/ElfFidelity.lean
