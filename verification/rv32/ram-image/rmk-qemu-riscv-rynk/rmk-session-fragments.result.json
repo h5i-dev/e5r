@@ -28,11 +28,11 @@
         "sha256": "dec6babff7b3451871fc3cdcc77a040308f8c1859fd01acfa3b37ffce9c526a9"
       }
     },
-    "job_sha256": "650a71cf8a36378b3af9efab9310cd33b127c9a8663bb935b7a91a2db8949925",
+    "job_sha256": "9e2ae0c18b2dd54f1b41bcf22894d78d86fadfe08277dc26ad34185b011b99c1",
     "lean": "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release)",
     "sources": {
       "Projects/ramimage/Deframer.lean": "85deb56fbefb423ad37cd48a905ab81d9530916f510f269e0065809c09d53874",
-      "Projects/ramimage/SessionFragments.lean": "7a55ba6fb0e85b9a57b69a52428746e079d21e9e2924c6daa1513e44e888cccf",
+      "Projects/ramimage/SessionFragments.lean": "22f6e9a08d1857156bbcc3220047595c3a1afd5a13d8c3327dce91cf30eb016d",
       "Projects/rmk/Cobs/Basic.lean": "1108d70dc6685d8959394ad9be29c1ea05ef778739dbfaf2ac0f38415ca26329",
       "Projects/rmk/Cobs/Copy.lean": "0ed6ed79d597ead58671af4c3e2a1d9d94a940a0aaeab9034ddf09ad37e15f0f",
       "Projects/rmk/Cobs/Decode.lean": "ebe0109d8e121658a3416405ba3b5a9ac4fd25123fdfdf5d30e34d283d118190",
@@ -65,12 +65,13 @@
       "Projects/rmk/Deframer/RxSegs.lean": "92e71ab157830478eb05778055fcd53ec7c4a1d5a513db7f38b034b6a4871cd7",
       "Projects/rmk/Deframer/Session.lean": "6d416385d089faf64c57c1da241fde885feaaa2abdc97c9933356d14b9a43e3f",
       "Projects/rmk/Deframer/SessionFetch.lean": "0c0465b0ad4955bd1fa71bc98f4bb4c324fbd76b8d38b503805f36c9bb088825",
-      "Projects/rmk/Deframer/SessionInv.lean": "37968fda6413794eefcc134bcf42de921c703f430f7efb9413a3784750b8a29a",
+      "Projects/rmk/Deframer/SessionInv.lean": "a762bff92aebd13d8541469ab1aac232cb297df392ca461232b39f6eebe047d4",
       "Projects/rmk/Deframer/SessionLoop.lean": "3e71cc8493cc1406b37485f8e8553758a3573684fb8a609d5bad80064dc1fe16",
       "Projects/rmk/Deframer/SessionSegs.lean": "5e000f8d1491675318b1fcd1b3d87c70e6ebfa284f6ad23910ceee9b1d5abe86",
       "Projects/rmk/Deframer/SomeFetch.lean": "d85e9b9884b1349d62d09df6941bb66c94e22007a0980f1872af2dd17490dabc",
       "Projects/rmk/Deframer/SomePath.lean": "e3a8e491836f24386d01d9a2f77e67b586c71499849c12a2c3ac14a4980d9e64",
-      "Projects/rmk/Deframer/SomeSegs.lean": "ae16ee65d46023c8f553875099d0c170ccce23bf2378fc458775ad538c54e6af",
+      "Projects/rmk/Deframer/SomeRound.lean": "6f5b6f9d526582945eaf3fdddbbb9f57537f0d85e42d0de44cf8d665b6ec722f",
+      "Projects/rmk/Deframer/SomeSegs.lean": "98e54452b3da9f738a7f1af86e2969cb2e058cc98260571f4eae358213e1b63c",
       "Projects/rmk/Deframer/Spec.lean": "42ce7616fe4c0c3bc6ce286b608316b487803441b6bc0ab7bd82c413bae0f71c",
       "Projects/rmk/Deframer/TailCopy.lean": "798184b92eedda0fef1058be2b5245664c3851e667a3a5d4adb7fb7ea4faa576",
       "Projects/rmk/Deframer/TailFetch.lean": "9425e181d9453dc4748379b9a7d23cba43467a518b262e25d20c3ecdc2779343",
@@ -198,508 +199,842 @@
     "Projects/rmk/Deframer/SomeFetch.lean",
     "Projects/rmk/Deframer/SomeSegs.lean",
     "Projects/rmk/Deframer/SomePath.lean",
+    "Projects/rmk/Deframer/SomeRound.lean",
     "Projects/ramimage/SessionFragments.lean"
   ],
-  "resumed": [
-    "Theories/Hart.lean",
-    "Theories/Platform.lean",
-    "Theories/Logic.lean",
-    "Theories/FlashElf.lean",
-    "Theories/RamElf.lean",
-    "Theories/Board/QemuVirtRv32.lean",
-    "Projects/rmk/Elf.lean",
-    "Projects/rmk/ElfFidelity.lean",
-    "Projects/rmk/Run.lean",
-    "Projects/rmk/Copy.lean",
-    "Projects/rmk/Fetch.lean",
-    "Projects/rmk/MemmoveFetch.lean",
-    "Projects/rmk/MemmoveLoops.lean",
-    "Projects/rmk/MemmoveBigLoops.lean",
-    "Theories/Absint.lean",
-    "Theories/AbsintSound.lean",
-    "Projects/rmk/MemmoveSmall.lean",
-    "Projects/rmk/MemmoveAligned.lean",
-    "Projects/rmk/MemmoveContract.lean",
-    "Projects/rmk/Deframer/Spec.lean",
-    "Projects/rmk/Deframer/TailFetch.lean",
-    "Projects/rmk/Deframer/TailNoCopy.lean",
-    "Projects/rmk/Deframer/NextFetch.lean",
-    "Projects/rmk/Deframer/NextParts.lean",
-    "Projects/rmk/Deframer/NextSegs.lean",
-    "Projects/rmk/Deframer/NextInv.lean",
-    "Projects/rmk/Deframer/NextRet.lean",
-    "Projects/rmk/Deframer/NextExit.lean",
-    "Projects/rmk/Deframer/NextBody1.lean",
-    "Projects/rmk/Deframer/Wrap.lean",
-    "Projects/rmk/Deframer/NextBody2.lean",
-    "Projects/rmk/Deframer/Next.lean",
-    "Projects/rmk/Deframer/TailCopy.lean",
-    "Projects/rmk/Deframer/ParkFetch.lean",
-    "Projects/rmk/Deframer/Park.lean",
-    "Projects/rmk/Deframer/Unpark.lean",
-    "Projects/ramimage/Deframer.lean",
-    "Projects/rmk/Reach.lean",
-    "Projects/rmk/Trees.lean",
-    "Projects/rmk/DevRead.lean",
-    "Projects/rmk/Deframer/RxFetch.lean",
-    "Projects/rmk/Deframer/RxSegs.lean",
-    "Projects/rmk/Deframer/Rx.lean",
-    "Projects/rmk/Deframer/NoneFetch.lean",
-    "Projects/rmk/Deframer/NoneSegs.lean",
-    "Projects/rmk/Cobs/Fetch.lean",
-    "Projects/rmk/Cobs/Basic.lean",
-    "Projects/rmk/Cobs/Scan.lean",
-    "Projects/rmk/Cobs/Copy.lean",
-    "Projects/rmk/Cobs/Spec.lean",
-    "Projects/rmk/Cobs/Loop.lean",
-    "Projects/rmk/Cobs/Empty.lean",
-    "Projects/rmk/Cobs/Decode.lean",
-    "Projects/rmk/Deframer/CobsDischarge.lean",
-    "Projects/rmk/Deframer/SessionFetch.lean",
-    "Projects/rmk/Deframer/SessionSegs.lean",
-    "Projects/rmk/Deframer/FromDecodedFetch.lean",
-    "Projects/rmk/Deframer/FromDecodedSeg.lean",
-    "Projects/rmk/Deframer/Session.lean",
-    "Projects/rmk/Deframer/NonePath.lean",
-    "Projects/rmk/Deframer/UnparkSiteFetch.lean",
-    "Projects/rmk/Deframer/UnparkSiteSegs.lean",
-    "Projects/rmk/Deframer/SessionLoop.lean",
-    "Projects/rmk/Merge.lean",
-    "Projects/rmk/MemmoveMisLoop.lean",
-    "Projects/rmk/MemmoveBwdMisLoop.lean",
-    "Projects/rmk/MemmoveMisStart.lean",
-    "Projects/rmk/MemmoveBwdMisStart.lean",
-    "Projects/rmk/MemmoveBwdMisEnd.lean",
-    "Projects/rmk/MemmoveBwdLoops.lean",
-    "Projects/rmk/MemmoveMisEnd.lean",
-    "Projects/rmk/MemmoveMis.lean",
-    "Projects/rmk/MemmoveFull.lean",
-    "Projects/rmk/MemmoveBwd.lean",
-    "Projects/rmk/MemmoveBwdMis.lean",
-    "Projects/rmk/MemmoveBwdAll.lean",
-    "Projects/rmk/Deframer/CopyDischarge.lean",
-    "Projects/rmk/Deframer/SessionInv.lean",
-    "Projects/rmk/Deframer/SomeFetch.lean",
-    "Projects/rmk/Deframer/SomeSegs.lean",
-    "Projects/rmk/Deframer/SomePath.lean"
-  ],
+  "resumed": [],
   "schema": "e5r.verify.result.v1",
-  "seconds": 509.578516662,
+  "seconds": 1603.755424143,
   "stages": [
     {
+      "name": "lean Theories/Hart.lean",
+      "peak_rss_mib": 510,
+      "seconds": 4.9139906490000005
+    },
+    {
+      "name": "lean Theories/Platform.lean",
+      "peak_rss_mib": 490,
+      "seconds": 2.5079333310000003
+    },
+    {
+      "name": "lean Theories/Logic.lean",
+      "peak_rss_mib": 511,
+      "seconds": 3.007956351
+    },
+    {
+      "name": "lean Theories/FlashElf.lean",
+      "peak_rss_mib": 476,
+      "seconds": 1.805935311
+    },
+    {
+      "name": "lean Theories/RamElf.lean",
+      "peak_rss_mib": 493,
+      "seconds": 1.907429555
+    },
+    {
+      "name": "lean Theories/Board/QemuVirtRv32.lean",
+      "peak_rss_mib": 462,
+      "seconds": 1.506430891
+    },
+    {
+      "name": "lean Projects/rmk/Elf.lean",
+      "peak_rss_mib": 721,
+      "seconds": 9.628937318
+    },
+    {
+      "name": "lean Projects/rmk/ElfFidelity.lean",
+      "peak_rss_mib": 558,
+      "seconds": 4.21442657
+    },
+    {
+      "name": "lean Projects/rmk/Run.lean",
+      "peak_rss_mib": 467,
+      "seconds": 1.305156885
+    },
+    {
+      "name": "lean Projects/rmk/Copy.lean",
+      "peak_rss_mib": 649,
+      "seconds": 12.53304892
+    },
+    {
+      "name": "lean Projects/rmk/Fetch.lean",
+      "peak_rss_mib": 6519,
+      "seconds": 71.85916265
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveFetch.lean",
+      "peak_rss_mib": 924,
+      "seconds": 60.644391622
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveLoops.lean",
+      "peak_rss_mib": 542,
+      "seconds": 4.11020551
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveBigLoops.lean",
+      "peak_rss_mib": 531,
+      "seconds": 4.110596619
+    },
+    {
+      "name": "lean Theories/Absint.lean",
+      "peak_rss_mib": 535,
+      "seconds": 3.909940799
+    },
+    {
+      "name": "lean Theories/AbsintSound.lean",
+      "peak_rss_mib": 810,
+      "seconds": 29.875146917
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveSmall.lean",
+      "peak_rss_mib": 630,
+      "seconds": 7.319209837
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveAligned.lean",
+      "peak_rss_mib": 882,
+      "seconds": 18.444182707
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveContract.lean",
+      "peak_rss_mib": 608,
+      "seconds": 4.812557442
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/Spec.lean",
+      "peak_rss_mib": 505,
+      "seconds": 2.107307168
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/TailFetch.lean",
+      "peak_rss_mib": 591,
+      "seconds": 10.726097458
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/TailNoCopy.lean",
+      "peak_rss_mib": 648,
+      "seconds": 7.015422815
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/NextFetch.lean",
+      "peak_rss_mib": 726,
+      "seconds": 27.462887272
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/NextParts.lean",
+      "peak_rss_mib": 647,
+      "seconds": 7.618390656
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/NextSegs.lean",
+      "peak_rss_mib": 687,
+      "seconds": 11.226818643
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/NextInv.lean",
+      "peak_rss_mib": 610,
+      "seconds": 8.520949492
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/NextRet.lean",
+      "peak_rss_mib": 578,
+      "seconds": 5.115004534
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/NextExit.lean",
+      "peak_rss_mib": 544,
+      "seconds": 2.707946831
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/NextBody1.lean",
+      "peak_rss_mib": 563,
+      "seconds": 3.711492583
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/Wrap.lean",
+      "peak_rss_mib": 877,
+      "seconds": 11.327960728
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/NextBody2.lean",
+      "peak_rss_mib": 1025,
+      "seconds": 21.349548015
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/Next.lean",
+      "peak_rss_mib": 508,
+      "seconds": 1.504949981
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/TailCopy.lean",
+      "peak_rss_mib": 771,
+      "seconds": 11.126441722
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/ParkFetch.lean",
+      "peak_rss_mib": 591,
+      "seconds": 12.731143393
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/Park.lean",
+      "peak_rss_mib": 877,
+      "seconds": 16.83851709
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/Unpark.lean",
+      "peak_rss_mib": 691,
+      "seconds": 7.518369174
+    },
+    {
+      "name": "lean Projects/ramimage/Deframer.lean",
+      "peak_rss_mib": 590,
+      "seconds": 1.80551887
+    },
+    {
+      "name": "lean Projects/rmk/Reach.lean",
+      "peak_rss_mib": 459,
+      "seconds": 1.405296944
+    },
+    {
+      "name": "lean Projects/rmk/Trees.lean",
+      "peak_rss_mib": 467,
+      "seconds": 1.405044045
+    },
+    {
+      "name": "lean Projects/rmk/DevRead.lean",
+      "peak_rss_mib": 6441,
+      "seconds": 49.018469266
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/RxFetch.lean",
+      "peak_rss_mib": 527,
+      "seconds": 3.610389614
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/RxSegs.lean",
+      "peak_rss_mib": 617,
+      "seconds": 4.111803797
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/Rx.lean",
+      "peak_rss_mib": 621,
+      "seconds": 5.514761651
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/NoneFetch.lean",
+      "peak_rss_mib": 521,
+      "seconds": 2.908272438
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/NoneSegs.lean",
+      "peak_rss_mib": 621,
+      "seconds": 12.63167068
+    },
+    {
+      "name": "lean Projects/rmk/Cobs/Fetch.lean",
+      "peak_rss_mib": 690,
+      "seconds": 24.354104963
+    },
+    {
+      "name": "lean Projects/rmk/Cobs/Basic.lean",
+      "peak_rss_mib": 661,
+      "seconds": 11.727122271
+    },
+    {
+      "name": "lean Projects/rmk/Cobs/Scan.lean",
+      "peak_rss_mib": 501,
+      "seconds": 2.607806825
+    },
+    {
+      "name": "lean Projects/rmk/Cobs/Copy.lean",
+      "peak_rss_mib": 542,
+      "seconds": 3.910213717
+    },
+    {
+      "name": "lean Projects/rmk/Cobs/Spec.lean",
+      "peak_rss_mib": 473,
+      "seconds": 1.905394554
+    },
+    {
+      "name": "lean Projects/rmk/Cobs/Loop.lean",
+      "peak_rss_mib": 733,
+      "seconds": 11.325384182
+    },
+    {
+      "name": "lean Projects/rmk/Cobs/Empty.lean",
+      "peak_rss_mib": 477,
+      "seconds": 2.005752967
+    },
+    {
+      "name": "lean Projects/rmk/Cobs/Decode.lean",
+      "peak_rss_mib": 555,
+      "seconds": 3.810873653
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/CobsDischarge.lean",
+      "peak_rss_mib": 594,
+      "seconds": 2.4071145290000002
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/SessionFetch.lean",
+      "peak_rss_mib": 531,
+      "seconds": 3.709639813
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/SessionSegs.lean",
+      "peak_rss_mib": 623,
+      "seconds": 4.914455043
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/FromDecodedFetch.lean",
+      "peak_rss_mib": 522,
+      "seconds": 3.911794653
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/FromDecodedSeg.lean",
+      "peak_rss_mib": 590,
+      "seconds": 2.5065239310000003
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/Session.lean",
+      "peak_rss_mib": 657,
+      "seconds": 7.219694224
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/NonePath.lean",
+      "peak_rss_mib": 698,
+      "seconds": 12.432690964
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/UnparkSiteFetch.lean",
+      "peak_rss_mib": 481,
+      "seconds": 1.805541978
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/UnparkSiteSegs.lean",
+      "peak_rss_mib": 590,
+      "seconds": 2.407444623
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/SessionLoop.lean",
+      "peak_rss_mib": 551,
+      "seconds": 2.308474492
+    },
+    {
+      "name": "lean Projects/rmk/Merge.lean",
+      "peak_rss_mib": 518,
+      "seconds": 4.211923032
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveMisLoop.lean",
+      "peak_rss_mib": 575,
+      "seconds": 6.317010409
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveBwdMisLoop.lean",
+      "peak_rss_mib": 615,
+      "seconds": 6.117789318
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveMisStart.lean",
+      "peak_rss_mib": 902,
+      "seconds": 36.609881864
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveBwdMisStart.lean",
+      "peak_rss_mib": 699,
+      "seconds": 13.431570926
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveBwdMisEnd.lean",
+      "peak_rss_mib": 762,
+      "seconds": 20.468799371
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveBwdLoops.lean",
+      "peak_rss_mib": 565,
+      "seconds": 4.914755062
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveMisEnd.lean",
+      "peak_rss_mib": 674,
+      "seconds": 14.435085382
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveMis.lean",
+      "peak_rss_mib": 7803,
+      "seconds": 174.627854212
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveFull.lean",
+      "peak_rss_mib": 649,
+      "seconds": 6.917274983
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveBwd.lean",
+      "peak_rss_mib": 1238,
+      "seconds": 24.457977096
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveBwdMis.lean",
+      "peak_rss_mib": 3761,
+      "seconds": 77.096139475
+    },
+    {
+      "name": "lean Projects/rmk/MemmoveBwdAll.lean",
+      "peak_rss_mib": 700,
+      "seconds": 7.116479729
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/CopyDischarge.lean",
+      "peak_rss_mib": 622,
+      "seconds": 1.907474343
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/SessionInv.lean",
+      "peak_rss_mib": 663,
+      "seconds": 3.510823294
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/SomeFetch.lean",
+      "peak_rss_mib": 642,
+      "seconds": 7.919969447
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/SomeSegs.lean",
+      "peak_rss_mib": 694,
+      "seconds": 17.84295763
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/SomePath.lean",
+      "peak_rss_mib": 567,
+      "seconds": 7.117857296
+    },
+    {
+      "name": "lean Projects/rmk/Deframer/SomeRound.lean",
+      "peak_rss_mib": 722,
+      "seconds": 11.131858288
+    },
+    {
       "name": "lean Projects/ramimage/SessionFragments.lean",
-      "peak_rss_mib": 559,
-      "seconds": 1.404394298
+      "peak_rss_mib": 555,
+      "seconds": 1.5055246389999999
     },
     {
       "name": "leanchecker Theories/Hart.lean",
-      "peak_rss_mib": 443,
-      "seconds": 4.110243402
+      "peak_rss_mib": 441,
+      "seconds": 4.711734212
     },
     {
       "name": "leanchecker Theories/Platform.lean",
       "peak_rss_mib": 441,
-      "seconds": 1.906077651
+      "seconds": 2.106264788
     },
     {
       "name": "leanchecker Theories/Logic.lean",
       "peak_rss_mib": 453,
-      "seconds": 1.9056991939999999
+      "seconds": 2.005970856
     },
     {
       "name": "leanchecker Theories/FlashElf.lean",
-      "peak_rss_mib": 400,
-      "seconds": 1.9054936059999998
+      "peak_rss_mib": 442,
+      "seconds": 1.805865334
     },
     {
       "name": "leanchecker Theories/RamElf.lean",
-      "peak_rss_mib": 400,
-      "seconds": 2.005947548
+      "peak_rss_mib": 282,
+      "seconds": 2.005766947
     },
     {
       "name": "leanchecker Theories/Board/QemuVirtRv32.lean",
-      "peak_rss_mib": 328,
-      "seconds": 2.005754709
+      "peak_rss_mib": 383,
+      "seconds": 1.905516824
     },
     {
       "name": "leanchecker Projects/rmk/Elf.lean",
-      "peak_rss_mib": 341,
-      "seconds": 2.006227615
+      "peak_rss_mib": 451,
+      "seconds": 1.905467174
     },
     {
       "name": "leanchecker Projects/rmk/ElfFidelity.lean",
       "peak_rss_mib": 516,
-      "seconds": 3.20864659
+      "seconds": 3.308365812
     },
     {
       "name": "leanchecker Projects/rmk/Run.lean",
-      "peak_rss_mib": 244,
-      "seconds": 1.905496707
+      "peak_rss_mib": 442,
+      "seconds": 1.805157911
     },
     {
       "name": "leanchecker Projects/rmk/Copy.lean",
       "peak_rss_mib": 470,
-      "seconds": 4.812876851
+      "seconds": 4.911847586
     },
     {
       "name": "leanchecker Projects/rmk/Fetch.lean",
-      "peak_rss_mib": 6474,
-      "seconds": 54.425762404
+      "peak_rss_mib": 6473,
+      "seconds": 54.932996349
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveFetch.lean",
-      "peak_rss_mib": 496,
-      "seconds": 40.405922533
+      "peak_rss_mib": 495,
+      "seconds": 39.913394695
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveLoops.lean",
-      "peak_rss_mib": 474,
-      "seconds": 2.510180838
+      "peak_rss_mib": 469,
+      "seconds": 2.80927518
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveBigLoops.lean",
       "peak_rss_mib": 470,
-      "seconds": 2.6113734539999998
+      "seconds": 2.709844842
     },
     {
       "name": "leanchecker Theories/Absint.lean",
       "peak_rss_mib": 443,
-      "seconds": 1.807382241
+      "seconds": 2.007846604
     },
     {
       "name": "leanchecker Theories/AbsintSound.lean",
-      "peak_rss_mib": 476,
-      "seconds": 5.3163816950000005
+      "peak_rss_mib": 475,
+      "seconds": 5.418049211
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveSmall.lean",
       "peak_rss_mib": 485,
-      "seconds": 3.809394238
+      "seconds": 3.91325243
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveAligned.lean",
-      "peak_rss_mib": 506,
-      "seconds": 6.618926689
+      "peak_rss_mib": 500,
+      "seconds": 7.5215806
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveContract.lean",
       "peak_rss_mib": 492,
-      "seconds": 5.214923043
+      "seconds": 6.316392041
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/Spec.lean",
       "peak_rss_mib": 469,
-      "seconds": 1.8056116370000002
+      "seconds": 2.006545799
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/TailFetch.lean",
-      "peak_rss_mib": 482,
-      "seconds": 8.522348671
+      "peak_rss_mib": 483,
+      "seconds": 8.925607005
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/TailNoCopy.lean",
       "peak_rss_mib": 543,
-      "seconds": 4.510923687
+      "seconds": 4.51204142
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/NextFetch.lean",
       "peak_rss_mib": 491,
-      "seconds": 18.040941346
+      "seconds": 18.23885341
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/NextParts.lean",
       "peak_rss_mib": 580,
-      "seconds": 4.51086684
+      "seconds": 4.411102302
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/NextSegs.lean",
-      "peak_rss_mib": 579,
-      "seconds": 8.621054834
+      "peak_rss_mib": 578,
+      "seconds": 8.227860251
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/NextInv.lean",
-      "peak_rss_mib": 485,
-      "seconds": 4.111058817
+      "peak_rss_mib": 486,
+      "seconds": 4.211341752
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/NextRet.lean",
-      "peak_rss_mib": 500,
-      "seconds": 3.408942204
+      "peak_rss_mib": 505,
+      "seconds": 3.008430714
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/NextExit.lean",
       "peak_rss_mib": 483,
-      "seconds": 2.406572915
+      "seconds": 2.406845107
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/NextBody1.lean",
-      "peak_rss_mib": 487,
-      "seconds": 4.7117528669999995
+      "peak_rss_mib": 488,
+      "seconds": 4.510469137
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/Wrap.lean",
-      "peak_rss_mib": 579,
-      "seconds": 4.111013739
+      "peak_rss_mib": 578,
+      "seconds": 4.412977119
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/NextBody2.lean",
       "peak_rss_mib": 513,
-      "seconds": 8.420798599
+      "seconds": 8.522313246
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/Next.lean",
       "peak_rss_mib": 486,
-      "seconds": 1.806685051
+      "seconds": 2.106324214
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/TailCopy.lean",
       "peak_rss_mib": 547,
-      "seconds": 5.412707701
+      "seconds": 5.514339953
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/ParkFetch.lean",
-      "peak_rss_mib": 482,
-      "seconds": 9.92321923
+      "peak_rss_mib": 483,
+      "seconds": 9.524450288
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/Park.lean",
       "peak_rss_mib": 582,
-      "seconds": 7.519601281
+      "seconds": 7.621699664
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/Unpark.lean",
       "peak_rss_mib": 551,
-      "seconds": 4.312234534
+      "seconds": 4.61198091
     },
     {
       "name": "leanchecker Projects/ramimage/Deframer.lean",
-      "peak_rss_mib": 568,
-      "seconds": 2.206749765
+      "peak_rss_mib": 564,
+      "seconds": 2.5074991349999998
     },
     {
       "name": "leanchecker Projects/rmk/Reach.lean",
-      "peak_rss_mib": 244,
-      "seconds": 1.805966457
+      "peak_rss_mib": 276,
+      "seconds": 2.1065043980000002
     },
     {
       "name": "leanchecker Projects/rmk/Trees.lean",
-      "peak_rss_mib": 371,
-      "seconds": 1.805635171
+      "peak_rss_mib": 414,
+      "seconds": 2.10640012
     },
     {
       "name": "leanchecker Projects/rmk/DevRead.lean",
-      "peak_rss_mib": 6413,
-      "seconds": 53.419104477
+      "peak_rss_mib": 6412,
+      "seconds": 70.964964432
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/RxFetch.lean",
       "peak_rss_mib": 477,
-      "seconds": 5.813276259
+      "seconds": 3.007564941
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/RxSegs.lean",
       "peak_rss_mib": 575,
-      "seconds": 4.109696228
+      "seconds": 6.719057912
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/Rx.lean",
-      "peak_rss_mib": 552,
-      "seconds": 3.609652298
+      "peak_rss_mib": 554,
+      "seconds": 3.7099468460000002
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/NoneFetch.lean",
       "peak_rss_mib": 451,
-      "seconds": 2.5076021490000002
+      "seconds": 2.607636604
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/NoneSegs.lean",
       "peak_rss_mib": 578,
-      "seconds": 4.411942028
+      "seconds": 4.511177772
     },
     {
       "name": "leanchecker Projects/rmk/Cobs/Fetch.lean",
-      "peak_rss_mib": 487,
-      "seconds": 16.437291566
+      "peak_rss_mib": 492,
+      "seconds": 16.645634433
     },
     {
       "name": "leanchecker Projects/rmk/Cobs/Basic.lean",
       "peak_rss_mib": 470,
-      "seconds": 4.71543736
+      "seconds": 5.014983709
     },
     {
       "name": "leanchecker Projects/rmk/Cobs/Scan.lean",
       "peak_rss_mib": 462,
-      "seconds": 2.106994671
+      "seconds": 2.306856284
     },
     {
       "name": "leanchecker Projects/rmk/Cobs/Copy.lean",
       "peak_rss_mib": 465,
-      "seconds": 2.70784281
+      "seconds": 2.609852867
     },
     {
       "name": "leanchecker Projects/rmk/Cobs/Spec.lean",
-      "peak_rss_mib": 440,
-      "seconds": 1.706484151
+      "peak_rss_mib": 439,
+      "seconds": 2.00598241
     },
     {
       "name": "leanchecker Projects/rmk/Cobs/Loop.lean",
-      "peak_rss_mib": 482,
-      "seconds": 5.11225968
+      "peak_rss_mib": 481,
+      "seconds": 5.114872781
     },
     {
       "name": "leanchecker Projects/rmk/Cobs/Empty.lean",
-      "peak_rss_mib": 451,
-      "seconds": 1.9053957019999999
+      "peak_rss_mib": 448,
+      "seconds": 2.509819705
     },
     {
       "name": "leanchecker Projects/rmk/Cobs/Decode.lean",
-      "peak_rss_mib": 474,
-      "seconds": 2.306554487
+      "peak_rss_mib": 476,
+      "seconds": 2.306471426
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/CobsDischarge.lean",
-      "peak_rss_mib": 565,
-      "seconds": 2.206286883
+      "peak_rss_mib": 566,
+      "seconds": 2.506647901
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/SessionFetch.lean",
-      "peak_rss_mib": 459,
-      "seconds": 2.606763743
+      "peak_rss_mib": 458,
+      "seconds": 2.607675487
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/SessionSegs.lean",
-      "peak_rss_mib": 544,
-      "seconds": 6.917006272
+      "peak_rss_mib": 543,
+      "seconds": 6.115863843
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/FromDecodedFetch.lean",
       "peak_rss_mib": 483,
-      "seconds": 3.411137368
+      "seconds": 3.510072363
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/FromDecodedSeg.lean",
       "peak_rss_mib": 545,
-      "seconds": 2.306817095
+      "seconds": 2.508235755
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/Session.lean",
-      "peak_rss_mib": 523,
-      "seconds": 2.808460093
+      "peak_rss_mib": 526,
+      "seconds": 2.910016092
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/NonePath.lean",
-      "peak_rss_mib": 595,
-      "seconds": 3.609461864
+      "peak_rss_mib": 592,
+      "seconds": 3.911139728
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/UnparkSiteFetch.lean",
-      "peak_rss_mib": 452,
-      "seconds": 1.905877398
+      "peak_rss_mib": 450,
+      "seconds": 2.2072522709999998
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/UnparkSiteSegs.lean",
-      "peak_rss_mib": 545,
-      "seconds": 2.507108226
+      "peak_rss_mib": 543,
+      "seconds": 3.40982195
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/SessionLoop.lean",
-      "peak_rss_mib": 519,
-      "seconds": 2.206685331
+      "peak_rss_mib": 518,
+      "seconds": 2.306621467
     },
     {
       "name": "leanchecker Projects/rmk/Merge.lean",
       "peak_rss_mib": 463,
-      "seconds": 3.008886802
+      "seconds": 3.9119701449999997
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveMisLoop.lean",
       "peak_rss_mib": 480,
-      "seconds": 3.3089884290000002
+      "seconds": 3.711054306
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveBwdMisLoop.lean",
-      "peak_rss_mib": 480,
-      "seconds": 4.4111033
+      "peak_rss_mib": 478,
+      "seconds": 3.60983886
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveMisStart.lean",
       "peak_rss_mib": 492,
-      "seconds": 7.720016151
+      "seconds": 7.918348717
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveBwdMisStart.lean",
       "peak_rss_mib": 485,
-      "seconds": 3.41237344
+      "seconds": 3.609326617
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveBwdMisEnd.lean",
       "peak_rss_mib": 489,
-      "seconds": 5.513504709
+      "seconds": 5.612624216
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveBwdLoops.lean",
-      "peak_rss_mib": 476,
-      "seconds": 3.107958647
+      "peak_rss_mib": 477,
+      "seconds": 3.107262778
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveMisEnd.lean",
       "peak_rss_mib": 480,
-      "seconds": 3.10880874
+      "seconds": 3.407856511
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveMis.lean",
-      "peak_rss_mib": 616,
-      "seconds": 21.55936764
+      "peak_rss_mib": 614,
+      "seconds": 24.356630744
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveFull.lean",
-      "peak_rss_mib": 513,
-      "seconds": 6.519733024
+      "peak_rss_mib": 512,
+      "seconds": 3.509250468
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveBwd.lean",
-      "peak_rss_mib": 522,
-      "seconds": 9.731510099
+      "peak_rss_mib": 523,
+      "seconds": 10.222413849
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveBwdMis.lean",
       "peak_rss_mib": 563,
-      "seconds": 18.84833504
+      "seconds": 19.040946595
     },
     {
       "name": "leanchecker Projects/rmk/MemmoveBwdAll.lean",
       "peak_rss_mib": 521,
-      "seconds": 3.409799394
+      "seconds": 3.709587558
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/CopyDischarge.lean",
-      "peak_rss_mib": 601,
-      "seconds": 2.207448837
+      "peak_rss_mib": 602,
+      "seconds": 5.21273614
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/SessionInv.lean",
       "peak_rss_mib": 608,
-      "seconds": 2.7086067590000003
+      "seconds": 3.108457358
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/SomeFetch.lean",
-      "peak_rss_mib": 463,
-      "seconds": 4.114164023
+      "peak_rss_mib": 462,
+      "seconds": 4.411189076
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/SomeSegs.lean",
-      "peak_rss_mib": 545,
-      "seconds": 2.208649028
+      "peak_rss_mib": 576,
+      "seconds": 7.218874994
     },
     {
       "name": "leanchecker Projects/rmk/Deframer/SomePath.lean",
-      "peak_rss_mib": 537,
-      "seconds": 1.9053288560000001
+      "peak_rss_mib": 540,
+      "seconds": 2.104064216
+    },
+    {
+      "name": "leanchecker Projects/rmk/Deframer/SomeRound.lean",
+      "peak_rss_mib": 644,
+      "seconds": 5.714168892
     },
     {
       "name": "leanchecker Projects/ramimage/SessionFragments.lean",
-      "peak_rss_mib": 536,
-      "seconds": 1.8052675200000001
+      "peak_rss_mib": 396,
+      "seconds": 2.106683747
     }
   ],
   "status": "proved",
@@ -754,6 +1089,53 @@
     {
       "axioms": [
         "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.RmkFragments.dispatch_def"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.RmkFragments.encode_def"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.RmkFragments.someQ_def"
+    },
+    {
+      "axioms": [],
+      "name": "E5R.RmkFragments.sw_def"
+    },
+    {
+      "axioms": [
+        "propext"
+      ],
+      "name": "E5R.RmkFragments.extras_spTop"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "E5R.RmkFragments.some_round"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "E5R.RmkFragments.round_some"
+    },
+    {
+      "axioms": [
+        "propext",
         "Classical.choice",
         "Quot.sound"
       ],
@@ -782,6 +1164,22 @@
         "Quot.sound"
       ],
       "name": "E5R.Rmk.Deframer.SomeP.some_neg"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "E5R.Rmk.Deframer.SomeP.some_pos"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "E5R.Rmk.Deframer.SomeP.some_round"
     },
     {
       "axioms": [
