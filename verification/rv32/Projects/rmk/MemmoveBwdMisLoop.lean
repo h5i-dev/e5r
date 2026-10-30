@@ -197,6 +197,7 @@ theorem bmis_loop (o : Nat) (ho : 0 < o ∧ o < 4) : ∀ (j : Nat) (c : Core) (r
       (∀ k, k < o → byteOf (c'.get 15) k =
         wordsB ram (c.get 30 + c.get 18 + 0xfffffffc#32 + BitVec.ofNat 32 o) (c.get 9 + c.get 18) (j + 1)
           (c'.get 30 + c.get 18 + BitVec.ofNat 32 k)) ∧
+      c'.get 11 = c'.get 9 + c.get 18 ∧
       ∀ r : Reg, r ≠ 9 → r ≠ 11 → r ≠ 13 → r ≠ 15 → r ≠ 30 → c'.get r = c.get r := by
   intro j
   induction j with
@@ -225,7 +226,8 @@ theorem bmis_loop (o : Nat) (ho : 0 < o ∧ o < 4) : ∀ (j : Nat) (c : Core) (r
       simp [c11, bmisBody, Core.wr_get_ne, Core.wr_get_self]
     have g9 : (c11.goto 0x8002103a).get 9 = c.get 9 + 0xfffffffc#32 := by
       simp [c11, bmisBody, Core.wr_get_ne, Core.wr_get_self]
-    refine ⟨12, c11.goto 0x8002103a, ?_, rfl, (Core.sameCsr_goto _ _).trans (bmisBody_sameCsr c ram), ?_, ?_, ?_, ?_⟩
+    refine ⟨12, c11.goto 0x8002103a, ?_, rfl, (Core.sameCsr_goto _ _).trans (bmisBody_sameCsr c ram), ?_, ?_, ?_,
+      ?_, ?_⟩
     · have := hb.trans (.single q11 s11)
       simp only [wordsB]; rw [← hw]
       exact this
@@ -239,6 +241,7 @@ theorem bmis_loop (o : Nat) (ho : 0 < o ∧ o < 4) : ∀ (j : Nat) (c : Core) (r
       rw [← hw]
       show ram _ = ramWrite ram (c.get 9 + c.get 18 + 0xfffffffc#32) (bmisVal c ram) .w _
       rw [ramWrite_w_other _ _ _ _ (ar.dj k hk), ar.g k]
+    · rw [g9]; simp [c11, bmisBody, Core.wr_get_ne, Core.wr_get_self]
     · intro r a b d e f; simp only [Core.goto_get]; exact bmisBody_get c ram r a b d e f
   | succ j ih =>
     intro c ram hpc hq h29 h12 hD hdl hlo hA hT hdir hprev hs hd
@@ -281,7 +284,7 @@ theorem bmis_loop (o : Nat) (ho : 0 < o ∧ o < 4) : ∀ (j : Nat) (c : Core) (r
       rw [g15, g30, g18, byte_read_k _ _ _ (by omega)]
       show ram _ = ramWrite ram (c.get 9 + c.get 18 + 0xfffffffc#32) (bmisVal c ram) .w _
       rw [ramWrite_w_other _ _ _ _ (ar.dj k hk), ar.g k]
-    obtain ⟨n, c', hr, hpc', hcs, h30', h9', hpv, hfr⟩ := ih (c11.goto 0x80021012) R1 rfl q12
+    obtain ⟨n, c', hr, hpc', hcs, h30', h9', hpv, h11', hfr⟩ := ih (c11.goto 0x80021012) R1 rfl q12
       (by rw [g29, h29]) (by rw [g12, h12]) (by rw [g9, g18, g28]; exact ar.i1)
       (by rw [g28]; exact ar.i2 (Nat.succ_pos j)) (by rw [g30, g18]; exact ar.i3)
       (by rw [g30, g18]; exact ar.i4) (by rw [g28]; exact hT)
@@ -293,11 +296,12 @@ theorem bmis_loop (o : Nat) (ho : 0 < o ∧ o < 4) : ∀ (j : Nat) (c : Core) (r
         wordsB R1 ((c11.goto 0x80021012).get 30 + (c11.goto 0x80021012).get 18 + 0xfffffffc#32 + BitVec.ofNat 32 o)
           ((c11.goto 0x80021012).get 9 + (c11.goto 0x80021012).get 18) (j + 1) := by
       simp only [wordsB]; rw [← hw, g30, g9, g18, ar.w1, ar.w2]
-    refine ⟨11 + 1 + n, c', ?_, hpc', hcs.trans ((Core.sameCsr_goto _ _).trans cs11), ?_, ?_, ?_, ?_⟩
+    refine ⟨11 + 1 + n, c', ?_, hpc', hcs.trans ((Core.sameCsr_goto _ _).trans cs11), ?_, ?_, ?_, ?_, ?_⟩
     · rw [hwords]; exact (hb.trans (.single q11 s11)).trans hr
     · rw [h30', g30, ar.r30]
     · rw [h9', g9, ar.r9]
     · intro k hk; rw [hwords]; have := hpv k hk; rw [g18] at this; exact this
+    · rw [h11', g18]
     · intro r a b d e f
       rw [hfr r a b d e f, Core.goto_get]; exact bmisBody_get c ram r a b d e f
 

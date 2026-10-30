@@ -39,14 +39,16 @@ structure PostF (m₀ m : Machine) : Prop where
   ram : ∀ x, ¬ InFrame (m₀.core.get 2) x →
     m.ram x = moved m₀.ram (m₀.core.get 10) (m₀.core.get 11) (m₀.core.get 12).toNat x
 
-theorem finishC (c : Core) (ram R : Word → BitVec 8) (e : Core) (w : List Nat) (hq : Quiet c)
+theorem finishZ (Z : Word → Word → Prop) (hZs : ∀ sp x, InSlots sp x → ¬ Z sp x)
+    (hZf : ∀ sp x, ¬ InFrame sp x → ¬ Z sp x)
+    (c : Core) (ram R : Word → BitVec 8) (e : Core) (w : List Nat) (hq : Quiet c)
     (hd : B.inRam (c.get 10) (c.get 12).toNat = true)
     (hs : B.inRam (c.get 11) (c.get 12).toNat = true) (hsl : Slots (c.get 2)) (hfr : 0x80029bc8 + 48 ≤ (c.get 2).toNat)
     (hdsep : (c.get 2).toNat ≤ (c.get 10).toNat ∨ (c.get 10).toNat + (c.get 12).toNat + 12 ≤ (c.get 2).toNat)
     (hssep : (c.get 2).toNat ≤ (c.get 11).toNat ∨ (c.get 11).toNat + (c.get 12).toNat + 12 ≤ (c.get 2).toNat)
     (hra : (c.get 1).getLsbD 0 = false) (he : e.pc = 0x800210b0) (hfr : Frame c e w)
     (hw : ∀ r : Reg, r.val ∈ w → r.val ∈ [8, 9, 18, 5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 28, 29, 30, 31])
-    (hR : ∀ x, ¬ InTemps (c.get 2) x → R x = moved (saved c ram) (c.get 10) (c.get 11) (c.get 12).toNat x) :
+    (hR : ∀ x, ¬ Z (c.get 2) x → R x = moved (saved c ram) (c.get 10) (c.get 11) (c.get 12).toNat x) :
     ∃ m, QRun B img 5 ⟨e, R⟩ m ∧ PostF ⟨c, ram⟩ m := by
   obtain ⟨hcs, hsp, hfr⟩ := hfr
   have hdr := (B_ram _ _).mp hd
@@ -64,7 +66,7 @@ theorem finishC (c : Core) (ram R : Word → BitVec 8) (e : Core) (w : List Nat)
     (hsl.in' 0x2c (by decide)) (hsl.in' 0x28 (by decide)) (hsl.in' 0x24 (by decide))
   -- RAM outside the destination is the saved RAM, in particular at the slots.
   have hRout : ∀ x, ¬ ((c.get 10).toNat ≤ x.toNat ∧ x.toNat < (c.get 10).toNat + (c.get 12).toNat) →
-      ¬ InTemps (c.get 2) x → R x = saved c ram x := by
+      ¬ Z (c.get 2) x → R x = saved c ram x := by
     intro x hx ht; rw [hR x ht, moved, if_neg hx]
   have slot : ∀ k, (k = 0x2c ∨ k = 0x28 ∨ k = 0x24) →
       ramRead R (c.get 2 + 0xffffffd0#32 + BitVec.ofNat 32 k) .w =
@@ -74,7 +76,7 @@ theorem finishC (c : Core) (ram R : Word → BitVec 8) (e : Core) (w : List Nat)
     intro j hj
     apply hRout
     · rcases hk with rfl | rfl | rfl <;> bv_omega
-    · unfold InTemps; rcases hk with rfl | rfl | rfl <;> bv_omega
+    · exact hZs _ _ (by unfold InSlots; rcases hk with rfl | rfl | rfl <;> bv_omega)
   obtain ⟨r8, r9, r18⟩ := saved_read c ram
   refine ⟨⟨epi e R (c.get 2 + 0xffffffd0#32), R⟩, hep, ?_, ?_, ?_, ?_⟩
   · show (epi e R _).pc = c.get 1; simp [epi, e1]
@@ -115,12 +117,25 @@ theorem finishC (c : Core) (ram R : Word → BitVec 8) (e : Core) (w : List Nat)
       ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans hcs))))
   · intro x hx
     show R x = _
-    rw [hR x (by unfold InFrame at hx; unfold InTemps; bv_omega)]; unfold moved; unfold InFrame at hx
+    rw [hR x (hZf _ _ hx)]; unfold moved; unfold InFrame at hx
     by_cases hin : (c.get 10).toNat ≤ x.toNat ∧ x.toNat < (c.get 10).toNat + (c.get 12).toNat
     · rw [if_pos hin, if_pos hin]
       exact saved_other c ram hsl _ (by unfold InSlots; bv_omega)
     · rw [if_neg hin, if_neg hin]
       exact saved_other c ram hsl _ (by unfold InSlots; bv_omega)
+
+theorem finishC (c : Core) (ram R : Word → BitVec 8) (e : Core) (w : List Nat) (hq : Quiet c)
+    (hd : B.inRam (c.get 10) (c.get 12).toNat = true)
+    (hs : B.inRam (c.get 11) (c.get 12).toNat = true) (hsl : Slots (c.get 2)) (hst : 0x80029bc8 + 48 ≤ (c.get 2).toNat)
+    (hdsep : (c.get 2).toNat ≤ (c.get 10).toNat ∨ (c.get 10).toNat + (c.get 12).toNat + 12 ≤ (c.get 2).toNat)
+    (hssep : (c.get 2).toNat ≤ (c.get 11).toNat ∨ (c.get 11).toNat + (c.get 12).toNat + 12 ≤ (c.get 2).toNat)
+    (hra : (c.get 1).getLsbD 0 = false) (he : e.pc = 0x800210b0) (hfr : Frame c e w)
+    (hw : ∀ r : Reg, r.val ∈ w → r.val ∈ [8, 9, 18, 5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 28, 29, 30, 31])
+    (hR : ∀ x, ¬ InTemps (c.get 2) x → R x = moved (saved c ram) (c.get 10) (c.get 11) (c.get 12).toNat x) :
+    ∃ m, QRun B img 5 ⟨e, R⟩ m ∧ PostF ⟨c, ram⟩ m :=
+  finishZ InTemps (fun sp x h1 h2 => by unfold InSlots at h1; unfold InTemps at h2; omega)
+    (fun sp x h1 h2 => h1 (by unfold InFrame; unfold InTemps at h2; omega))
+    c ram R e w hq hd hs hsl hst hdsep hssep hra he hfr hw hR
 
 /-- **memmove, forward and small copies.** -/
 theorem contractF (m₀ : Machine) (h : PreF m₀) : ∃ k m, QRun B img k m₀ m ∧ PostF m₀ m := by

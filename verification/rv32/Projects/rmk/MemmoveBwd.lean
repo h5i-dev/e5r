@@ -138,6 +138,7 @@ structure AtB (c g : Core) : Prop where
   r18 : g.get 18 = 0 - bH c
   sp : g.get 2 = c.get 2 + 0xffffffd0#32
   frame : ∀ r : Reg, r.val ∉ [2, 6, 7, 8, 9, 13, 14, 15, 16, 17, 18] → g.get r = c.get r
+  r9 : g.get 9 = c.get 10 + c.get 12
 
 theorem bwd_entry (c : Core) (R0 : Word → BitVec 8) (hq : Quiet c)
     (hn : 16 ≤ (c.get 12).toNat) (hdir : (c.get 10 - c.get 11).ult (c.get 12) = true)
@@ -265,7 +266,8 @@ theorem bwd_entry (c : Core) (R0 : Word → BitVec 8) (hq : Quiet c)
       by rw [Core.goto_get]; exact e8_16, by rw [Core.goto_get]; exact e8_17,
       by rw [Core.goto_get]; exact e8_18, by rw [Core.goto_get]; exact e8sp,
       fun r hr => by rw [Core.goto_get]; exact f8 r (fun h => hr (by
-        simp only [List.mem_cons, List.not_mem_nil, or_false] at h ⊢; omega))⟩⟩
+        simp only [List.mem_cons, List.not_mem_nil, or_false] at h ⊢; omega)),
+      by rw [Core.goto_get]; exact e8_9⟩⟩
     rw [hz]; exact hpre.trans (.single q8 s8)
   · let e9 := e8.goto 0x80020dcc
     let e10 := e9.wr 15 (alu .add (c.get 11) (c.get 12)) 0x80020dd0
@@ -316,7 +318,8 @@ theorem bwd_entry (c : Core) (R0 : Word → BitVec 8) (hq : Quiet c)
       by rw [ge 16 (by decide) (by decide) (by decide) (by decide), e8_16],
       by rw [ge 17 (by decide) (by decide) (by decide) (by decide), e8_17],
       by rw [ge 18 (by decide) (by decide) (by decide) (by decide), e8_18],
-      by rw [ge 2 (by decide) (by decide) (by decide) (by decide), e8sp], ?_⟩⟩
+      by rw [ge 2 (by decide) (by decide) (by decide) (by decide), e8sp], ?_,
+      by rw [ge 9 (by decide) (by decide) (by decide) (by decide), e8_9]⟩⟩
     · rw [l15, l13, hk] at hr
       exact (hpre.trans (.step q8 s8 (.step r9 s9 (.step r10 s10 (.single r11 s11))))).trans hr
     · intro r hr
@@ -348,6 +351,7 @@ structure AtB2 (c g : Core) : Prop where
   r28 : g.get 28 = bA c - bW c
   sp : g.get 2 = c.get 2 + 0xffffffd0#32
   frame : ∀ r : Reg, r.val ∉ [2, 5, 6, 7, 8, 9, 13, 14, 15, 16, 17, 18, 28] → g.get r = c.get r
+  r9 : g.get 9 = c.get 10 + c.get 12
 
 theorem bwd_mid (c g : Core) (R : Word → BitVec 8) (hq : Quiet c) (h : AtB c g) :
     ∃ g', QRun B img 6 ⟨g, R⟩ ⟨g', R⟩ ∧ AtB2 c g' := by
@@ -400,7 +404,8 @@ theorem bwd_mid (c g : Core) (R : Word → BitVec 8) (hq : Quiet c) (h : AtB c g
     by simp [g6, g5, g4, g3, g2, Core.wr_get_ne, Core.wr_get_self, alu_sub],
     by rw [fr 18 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide), h.r18],
     by simp [g6, Core.wr_get_self, alu_sub],
-    by rw [fr 2 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide), h.sp], ?_⟩
+    by rw [fr 2 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide), h.sp], ?_,
+    by rw [fr 9 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide), h.r9]⟩
   intro r hr
   rw [fr r (fun e => hr (by subst e; decide)) (fun e => hr (by subst e; decide)) (fun e => hr (by subst e; decide))
     (fun e => hr (by subst e; decide)) (fun e => hr (by subst e; decide)) (fun e => hr (by subst e; decide))]
