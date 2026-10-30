@@ -1,4 +1,4 @@
-ok control: expanded copies: exit 0 proved | 
+ok control: expanded copies: exit 0 proved |
 ok frame: exit 10 failed first error in build/testjobs/defmut/TailCopy.lean (tail_from_copy) | build/testjobs/defmut/TailCopy.lean:388:36: error: Tactic `decide` proved that the proposition
 ok panic-bound: exit 10 failed first error in build/testjobs/defmut/TailNoCopy.lean (nocopy) | build/testjobs/defmut/TailNoCopy.lean:390:103: error: Type mismatch
 ok tail-result: exit 10 failed first error in build/testjobs/defmut/TailNoCopy.lean (nocopy) | build/testjobs/defmut/TailNoCopy.lean:443:54: error: Tactic `rfl` failed: The left-hand side

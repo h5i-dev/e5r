@@ -1,4 +1,4 @@
-ok control: unmodified copies: exit 0 proved | 
+ok control: unmodified copies: exit 0 proved |
 ok read-guard: exit 10 failed first error in build/testjobs/cobsmut/Loop.lean (block_small) | build/testjobs/cobsmut/Loop.lean:442:42: error: omega could not prove the goal:
 ok tag: exit 10 failed first error in build/testjobs/cobsmut/Decode.lean (decode) | build/testjobs/cobsmut/Decode.lean:245:64: error: Tactic `rfl` failed: The left-hand side
 ok length: exit 10 failed first error in build/testjobs/cobsmut/Decode.lean (decode) | build/testjobs/cobsmut/Decode.lean:244:20: error: Application type mismatch: The argument

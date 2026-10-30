@@ -1,4 +1,4 @@
-ok control: unmodified copy: exit 0 proved | 
+ok control: unmodified copy: exit 0 proved |
 ok no-residue: exit 10 failed, first error in contractB | build/testjobs/MutContract.lean:149:30: error: Tactic `cases` failed with a nested error:
 ok no-direction: exit 10 failed, first error in contractB | build/testjobs/MutContract.lean:149:30: error: Tactic `cases` failed with a nested error:
 ok no-stack-sep: exit 10 failed, first error in contractB | build/testjobs/MutContract.lean:145:38: error: Application type mismatch: The argument

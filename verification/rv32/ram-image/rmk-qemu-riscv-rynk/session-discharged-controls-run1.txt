@@ -1,12 +1,12 @@
 job rmk-session-discharged; copies unexpanded (main files as committed)
-ok control: copies, no mutation: exit 0 proved | 
+ok control: copies, no mutation: exit 0 proved |
 ok frame: exit 10 failed first error in build/testjobs/defmut/TailCopy.lean (tail_from_copy) | build/testjobs/defmut/TailCopy.lean:392:36: error: Tactic `decide` proved that the proposition
 ok panic-bound: exit 10 failed first error in build/testjobs/defmut/TailNoCopy.lean (nocopy) | build/testjobs/defmut/TailNoCopy.lean:390:103: error: Type mismatch
 ok tail-result: exit 10 failed first error in build/testjobs/defmut/TailNoCopy.lean (nocopy) | build/testjobs/defmut/TailNoCopy.lean:443:54: error: Tactic `rfl` failed: The left-hand side
 ok next-result: exit 10 failed first error in build/testjobs/defmut/NextRet.lean (ret_post) | build/testjobs/defmut/NextRet.lean:105:4: error: 'show' tactic failed, pattern
 ok copy-dstsep: exit 10 failed first error in build/testjobs/defmut/NextBody2.lean (call_case) | build/testjobs/defmut/NextBody2.lean:333:12: error: 'show' tactic failed, pattern
 ok opcode: exit 10 failed first error in build/testjobs/defmut/TailFetch.lean (f8001d58e) | build/testjobs/defmut/TailFetch.lean:40:67: error: Tactic `decide` proved that the proposition
-FAIL memmove-opcode: exit 0 proved | 
+FAIL memmove-opcode: exit 0 proved |
 probe probe: CobsPost.ok := True: exit 10 failed first error in build/testjobs/defmut/Wrap.lean (wrap) | build/testjobs/defmut/Wrap.lean:393:4: error: `simp` made no progress
 ok tool-error: missing module: exit 13 error | build/testjobs/Nope.lean: No such file or directory (os error 2)
 1 FAILED
