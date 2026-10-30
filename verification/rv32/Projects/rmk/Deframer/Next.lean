@@ -3,8 +3,8 @@
 
   Original e5r code, Apache-2.0.
 
-  PROVED here, CONDITIONAL ON `CopyContract` AND `CobsReportContract` (hypotheses, not axioms, not
-  proved here): `next_from_deps : NextFromDeps`, i.e. `CopyContract → CobsReportContract →
+  PROVED here, CONDITIONAL ON `CopyContract` AND `CobsReportContract` (hypotheses here;
+  CobsReportContract is discharged in CobsDischarge.lean, `next_from_copy`): `next_from_deps : NextFromDeps`, i.e. `CopyContract → CobsReportContract →
   NextContract`: from every machine at `next` meeting `CallEnv nextPc nextStack`, the deframer
   invariant and discarding ≤ 1, whatever bytes the buffer holds, a quiet run reaches a machine
   meeting `NextPost` (returned to ra, ABI frame, None or Some(k) with 2 < k ≤ len, the invariant

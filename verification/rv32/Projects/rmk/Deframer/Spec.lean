@@ -6,8 +6,9 @@
   obligation, and the constants marked CANDIDATE are read from the disassembly of the pinned ELF
   (f39d833f..., review/rmk/deframer-contracts.md on the review branch) and must be confirmed by
   the proof that uses them. No theorem in this file claims safety. Proved elsewhere, each
-  CONDITIONAL on the dependency hypotheses below (not proved): `TailFromCopy` (TailCopy.lean),
-  `ParkFromCopy` (Park.lean), `UnparkFromCopy` (Unpark.lean), `NextFromDeps` (Next.lean).
+  CONDITIONAL on `CopyContract` (memmove; not proved): `TailFromCopy` (TailCopy.lean),
+  `ParkFromCopy` (Park.lean), `UnparkFromCopy` (Unpark.lean), `NextFromCopy` (CobsDischarge.lean;
+  `CobsReportContract` is a THEOREM there, `cobs_report`, from the COBS worker's Cobs.decode).
   Corrections made for those proofs: `CallEnv.selfAl/spAl`, `CopyEnv.spAl` (ABI alignment; the model
   faults misaligned word access), the method posts' `saved` (now the ABI frame, `callerSaved`),
   `NextPost.val`, `CobsEnv.sep` and `CobsPost.ok` (next's exact Ok test).
@@ -192,6 +193,8 @@ structure UnparkPost (m₀ m : Machine) : Prop where
     m.ram (m₀.core.get 11 + BitVec.ofNat 32 j) =
       m₀.ram (m₀.core.get 11 + BitVec.ofNat 32 ((m₀.core.get 12).toNat - (m₀.core.get 13).toNat + j))
   ram : KeepsRam parkStack m₀ m
+  /-- The discarding flag is not written (added: the session loop needs it again). -/
+  hdisc : (m.ram (m₀.core.get 10 + 8)).toNat = (m₀.ram (m₀.core.get 10 + 8)).toNat
 
 def UnparkContract : Prop :=
   ∀ m₀, CallEnv unparkPc parkStack m₀ → (m₀.core.get 13).toNat ≤ bufLen →
@@ -230,9 +233,11 @@ structure NextPost (m₀ m : Machine) : Prop where
   /-- The ABI frame (corrected from "s0-s11", which left out ra, gp, tp). -/
   saved : ∀ r : Reg, r.val ∉ callerSaved → m.core.get r = m₀.core.get r
   tag : (m.core.get 10).toNat ≤ 1
-  /-- `Some(k)`: the frame the caller then slices, `buf[..k]`, lies in the buffer (added: the
-      session needs it to show its own slice does not panic). -/
-  val : (m.core.get 10).toNat = 1 → 2 < (m.core.get 11).toNat ∧ (m.core.get 11).toNat ≤ (m₀.core.get 12).toNat
+  /-- `Some(k)`: the frame the caller then slices, `buf[..k]`, lies in the buffer, and the
+      frame's encoded bytes and delimiter were consumed, so k < consumed (added: the session needs
+      both, for its own slice and for `from_decoded`'s length check after `park_pending`). -/
+  val : (m.core.get 10).toNat = 1 → 2 < (m.core.get 11).toNat ∧ (m.core.get 11).toNat ≤ (m₀.core.get 12).toNat ∧
+    (m.core.get 11).toNat < consumed m.ram (m₀.core.get 10)
   inv : Inv m.ram (m₀.core.get 10) (m₀.core.get 12).toNat
   disc : discarding m.ram (m₀.core.get 10) ≤ 1
   ram : KeepsRam nextStack m₀ m
@@ -279,7 +284,7 @@ structure CopyPost (m₀ m : Machine) : Prop where
 /-- The dependency: memmove does what it should for every deframer call. -/
 def CopyContract : Prop := ∀ m₀, CopyEnv m₀ → ∃ k m, QRun B img k m₀ m ∧ CopyPost m₀ m
 
-/-! ## The COBS contract `next` needs (DEPENDENCY, not proved; owned by the COBS worker)
+/-! ## The COBS contract `next` needs (proved: `cobs_report` in Deframer/CobsDischarge.lean, from the COBS worker's Cobs.decode)
 
 INTERFACE CANDIDATE read from the bytes: the wrapper at 0x8001e006 calls the report function with
 a0 = a 12-byte report slot (r0, r1, r2), a1 = data, a2 = n; it returns `(r0 - 1) | r1` and `r2`,
@@ -325,6 +330,8 @@ def TailFromCopy : Prop := CopyContract → TailContract tailStack
 def ParkFromCopy : Prop := CopyContract → ParkContract
 def UnparkFromCopy : Prop := CopyContract → UnparkContract
 def NextFromDeps : Prop := CopyContract → CobsReportContract → NextContract
+/-- `next` given memmove's contract alone (COBS discharged in Deframer/CobsDischarge.lean). -/
+def NextFromCopy : Prop := CopyContract → NextContract
 
 /-! ## The session-level target (R2 acceptance; not proved) -/
 

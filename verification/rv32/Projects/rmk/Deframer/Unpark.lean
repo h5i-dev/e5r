@@ -332,7 +332,7 @@ theorem unpark_from_copy : UnparkFromCopy := by
     show (ramRead (tstore M (c.get 10) (c.get 13)) (c.get 10 + 4) .w).toNat = (c.get 13).toNat
     exact congrArg BitVec.toNat (tstore_filled M (c.get 10) (c.get 13))
   let T := ufin e (tstore M (c.get 10) (c.get 13)) (pfp c)
-  refine ⟨?_, ?_, ?_, ?_, hcons, hfill, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, hcons, hfill, ?_, ?_, ?_⟩
   · show T.pc = c.get 1
     exact (slot 0xc (by decide)).trans (psave_c c R0 hs)
   · exact (ufin_sameCsr _ _ _).trans (P.csr.trans (ucall_sameCsr c))
@@ -374,5 +374,9 @@ theorem unpark_from_copy : UnparkFromCopy := by
     have h3 : ¬ ((c.get 2).toNat - 0x40 ≤ x.toNat ∧ x.toNat < (c.get 2).toNat) := hx.2.2
     rw [keep x (by omega) (by omega) (by omega)]
     exact psave_other c R0 hs x (by omega)
+  · show (tstore M (c.get 10) (c.get 13) (c.get 10 + 8)).toNat = (R0 (c.get 10 + 8)).toNat
+    have e8 : (c.get 10 + 8).toNat = (c.get 10).toNat + 8 := add_toNat _ 8 (by omega)
+    rw [keep (c.get 10 + 8) (by omega) (by omega) (by omega)]
+    exact congrArg BitVec.toNat (psave_other c R0 hs (c.get 10 + 8) (.inl (by omega)))
 
 end E5R.Rmk.Deframer.Unpark

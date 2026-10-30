@@ -23,7 +23,8 @@ structure RetAt (c : Core) (R0 : Word → BitVec 8) (e : Core) (M : Word → Bit
   kept : ∀ r : Reg, r.val ∈ nkept → e.get r = c.get r
   slots : NSlots c M
   tag : (e.get 10).toNat ≤ 1
-  val : (e.get 10).toNat = 1 → 2 < (e.get 22).toNat ∧ (e.get 22).toNat ≤ (c.get 12).toNat
+  val : (e.get 10).toNat = 1 → 2 < (e.get 22).toNat ∧ (e.get 22).toNat ≤ (c.get 12).toNat ∧
+    (e.get 22).toNat < consumed M (c.get 10)
   inv : Inv M (c.get 10) (c.get 12).toNat
   disc : discarding M (c.get 10) ≤ 1
   ram : ∀ x, Outside (c.get 10) (c.get 11) (c.get 12).toNat (c.get 2) nextStack x → M x = R0 x
@@ -101,7 +102,9 @@ theorem ret_post (c : Core) (R0 : Word → BitVec 8) (E : CallEnv nextPc nextSta
     simp [nepiCore, Core.wr_get_ne]; exact htag
   · intro h1
     have h1' : (e.get 10).toNat = 1 := by simpa [nepiCore, Core.wr_get_ne] using h1
-    show 2 < ((nepiCore e M).get 11).toNat ∧ ((nepiCore e M).get 11).toNat ≤ (c.get 12).toNat
-    simp [nepiCore, Core.wr_get_ne, Core.wr_get_self, alu_add]; exact hval h1'
+    show 2 < ((nepiCore e M).get 11).toNat ∧ ((nepiCore e M).get 11).toNat ≤ (c.get 12).toNat ∧
+      ((nepiCore e M).get 11).toNat < consumed M (c.get 10)
+    have e11 : (nepiCore e M).get 11 = e.get 22 := by simp [nepiCore, Core.wr_get_ne, Core.wr_get_self, alu_add]
+    rw [e11]; exact hval h1'
 
 end E5R.Rmk.Deframer.Next

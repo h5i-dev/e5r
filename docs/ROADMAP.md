@@ -915,29 +915,50 @@ optional; direct and hybrid proofs are equally valid routes.
       n ≥ 16 forward with src ≡ dst mod 4; 7 mutation controls; re-run on
       the integrated tree: 430 s, 6.3 GB). Not covered: n ≥ 16 backward and
       the misaligned forward path, both reachable from the 488-byte deframer
-      buffer. Deframer (`Projects/rmk/Deframer/Spec.lean` states the
-      contracts against explicit `CopyContract` and `CobsReportContract`
-      hypotheses): all four methods are proved CONDITIONALLY on those
-      hypotheses on the pinned bytes:
+      buffer. The COBS decoder is proved (COBS worker,
+      `Projects/rmk/Cobs/`: `decode_in_place_report` and the wrapper
+      `decode_in_place`, job `jobs/rmk/rmk-cobs-decode.json`, 9/9 controls).
+      Deframer (`Projects/rmk/Deframer/Spec.lean`): all four methods are
+      proved on the pinned bytes, CONDITIONAL ONLY ON `CopyContract`
+      (memmove, a hypothesis):
       - `tail_from_copy : TailFromCopy` (`Deframer/TailCopy.lean`; the
         consumed = 0 path, `TailNoCopy.lean` `nocopy`, needs no hypothesis);
       - `park_from_copy : ParkFromCopy` (`Deframer/Park.lean`);
       - `unpark_from_copy : UnparkFromCopy` (`Deframer/Unpark.lean`);
-      - `next_from_deps : NextFromDeps` (`Deframer/Next.lean`; the whole
-        frame loop for any buffer contents, including the decode_in_place
-        wrapper, the range check and memmove).
+      - `next_from_copy : NextFromCopy` (`Deframer/CobsDischarge.lean`):
+        `next_from_deps` (`Deframer/Next.lean`, the whole frame loop for any
+        buffer contents) with `CobsReportContract` discharged by
+        `cobs_report`, from the COBS worker's `Cobs.decode` (the Ok test
+        holds only on the success path, whose decoded length is at most
+        the frame, `run_len`).
 
-      Seventeen modules rebuild from scratch in about 125 s, all pass
-      leanchecker, and use only the standard axioms. Neither hypothesis is
-      a theorem yet. `CopyContract` needs memmove for n ≥ 16 backward and
-      misaligned, which `contractB` does not cover; `CobsReportContract`
-      needs `decode_in_place_report`, which is the COBS worker's. Not done:
-      the panic controls, a runner job for the deframer, and the session
-      (`SessionSafe`, R4).
+      All modules rebuild from scratch, pass leanchecker and use only the
+      standard axioms. `CopyContract` is still open: it needs memmove for
+      n ≥ 16 backward and misaligned, which `contractB` does not cover
+      (peer). Not done: the panic controls, the deframer runner job (COBS
+      worker), and the session (`SessionSafe`, R4).
 - [ ] **R4. Toward the session.** Compose R3 with the surrounding session
       loop and interrupts (checker, direct regions or summaries). *Accepted:*
       a kernel-checked theorem about the whole `run_session` path for the
       chosen property, or a documented, measured blocker.
+      *Status (partial, not accepted):* the receive step is proved,
+      CONDITIONAL on `CopyContract`. `Deframer/Session.lean` `recv_step`: from
+      the session loop head 0x80003e1a with the deframer invariant, a quiet
+      run, for any buffer contents, reaches one of two points:
+      - `Some(k)`, 2 < k ≤ 488: 0x80003e70, after `park_pending` and
+        `RynkMessage::from_decoded`. Neither the bounds check 0x80003e5a nor
+        from_decoded's length panic is taken, because `next` now also
+        guarantees k < consumed. The message at 0x8002a580 is filled;
+      - `None`: just after `tail`, with the invariant again.
+
+      Along the way RAM writes stay in the deframer, the buffer, 0x70 stack
+      bytes, s6+0x2db and the 16-byte message. `Deframer/SessionLoop.lean`
+      `unpark_step`: from the unpark call site 0x80003fd8 (parked ≤ 488,
+      discarding ≤ 1) back to the loop head with `SessPre`. The map is
+      `verification/rv32/rmk/session-map.md`. Not proved: the dispatch from
+      0x80003e70 to 0x80003fd8, the response write, `unpark_pending`'s call site, the UART read future and
+      the executor between polls (other tasks, interrupts). `SessionSafe`
+      ranges over all of these, so it is not proved.
 
 Not in this scope, and not to be described as done: Cortex-M, multiple harts,
 DMA, U-mode/PMP, microkernels, timing or deadline guarantees, other boards,

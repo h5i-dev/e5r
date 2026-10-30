@@ -4,7 +4,8 @@
 
   Original e5r code, Apache-2.0.
 
-  PROVED here, CONDITIONAL ON `CobsReportContract` (a hypothesis, not an axiom, not proved here;
+  PROVED here, CONDITIONAL ON `CobsReportContract` (a hypothesis here, discharged in
+  CobsDischarge.lean by `cobs_report`;
   the decoder `decode_in_place_report` at 0x8001e02e is the COBS worker's): `wrap`: from every
   machine meeting `WrapEnv` (the calling environment `next` sets up), a quiet run reaches a machine
   meeting `WrapPost`: back at ra, ABI frame, writes confined to the data, the 8-byte result and 0x30
