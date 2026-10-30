@@ -51,8 +51,18 @@ structure NoneAt (m : Machine) : Prop where
   flagSep : (ramRead m.ram (m.core.get 2 + 0x00000024#32) .w).toNat < dfr.toNat ∨
     dfr.toNat + 12 ≤ (ramRead m.ram (m.core.get 2 + 0x00000024#32) .w).toNat
 
-/-- Where the None path may stop: the loop head again, or the read future's two boundaries. -/
-def NoneQ (m : Machine) : Prop := SessPre m ∨ m.core.pc = 0x80003ff2 ∨ m.core.pc = 0x80004428
+/-- Bytes the None path may write, from its entry core c and RAM M: the deframer, the buffer, the
+    read future's state words, `assert_offset`'s stack byte and the task flag byte. -/
+def NW (c : Core) (M : Word → BitVec 8) (x : Word) : Prop :=
+  (0x8002a78c ≤ x.toNat ∧ x.toNat < 0x8002a798) ∨ (0x8002a590 ≤ x.toNat ∧ x.toNat < 0x8002a778) ∨
+  (0x8002a7b0 ≤ x.toNat ∧ x.toNat < 0x8002a7ca) ∨ x = c.get 2 + 0xffffffe0#32 + 0x0000000f#32 ∨
+  x = ramRead M (c.get 2 + 0x00000024#32) .w
+
+/-- Where the None path may stop: the loop head again (with sp and RAM outside `NW` as at entry), or
+    the read future's two boundaries. -/
+def NoneQ (c : Core) (M : Word → BitVec 8) (m : Machine) : Prop :=
+  (SessPre m ∧ m.core.get 2 = c.get 2 ∧ ∀ x, ¬ NW c M x → m.ram x = M x) ∨
+    m.core.pc = 0x80003ff2 ∨ m.core.pc = 0x80004428
 
 /-- The future-state stores touch only s6+0x2f3 .. s6+0x30c. -/
 theorem nGo1_other (e : Core) (M : Word → BitVec 8) (h22 : e.get 22 = s6v) (x : Word)
@@ -66,7 +76,7 @@ theorem nGo1_other (e : Core) (M : Word → BitVec 8) (h22 : e.get 22 = s6v) (x 
     wr_byte_other _ _ _ _ (by decide) (by rw [show (s6v + 0x000002ff#32).toNat = 0x8002a7bc from rfl]; omega),
     wr_byte_other _ _ _ _ (by decide) (by rw [show (s6v + 0x000002fb#32).toNat = 0x8002a7b8 from rfl]; omega)]
 
-theorem none_step (m : Machine) (h : NoneAt m) : Lands B img NoneQ m := by
+theorem none_step (m : Machine) (h : NoneAt m) : Lands B img (NoneQ m.core m.ram) m := by
   obtain ⟨c, M⟩ := m
   have h22 : c.get 22 = s6v := h.s6
   have h23 : c.get 23 = s7v := h.s7
@@ -218,10 +228,10 @@ theorem none_step (m : Machine) (h : NoneAt m) : Lands B img NoneQ m := by
       (alu .add (ramRead Mb (x.get 22 + 0x000002d3#32) .w) (x.get 9)) .w) (dfr + 4) .w).toNat = _
     rw [x22, show s6v + 0x000002d3#32 = dfr + 4 from rfl, ramRead_ramWrite_w, alu_add, eq_fl, BitVec.toNat_add, fM]
     omega
-  refine ⟨rfl, Quiet.of_sameCsr (by
+  refine ⟨⟨rfl, Quiet.of_sameCsr (by
       unfold nCommitCore
       repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_)) xq,
-    ?_, ?_, ?_, ?_, ?_, ?_⟩
+    ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_⟩
   · show (nCommitCore x Mx).get 22 = s6v; simp [nCommitCore, Core.wr_get_ne, x22]
   · show (nCommitCore x Mx).get 23 = s7v; simp [nCommitCore, Core.wr_get_ne, x23]
   · show ((nCommitCore x Mx).get 2).toNat % 4 = 0; simp [nCommitCore, Core.wr_get_ne, x2]; exact hsa
@@ -231,5 +241,14 @@ theorem none_step (m : Machine) (h : NoneAt m) : Lands B img NoneQ m := by
     have : consumed (nCommitRam x Mx) dfr = consumed M dfr := congrArg BitVec.toNat eq_cr
     rw [this, eq_f]; omega
   · show (nCommitRam x Mx (dfr + 8)).toNat ≤ 1; rw [eq_d]; exact hdsc
+  · show (nCommitCore x Mx).get 2 = c.get 2; simp [nCommitCore, Core.wr_get_ne, x2]
+  · intro y hy
+    simp only [NW, not_or] at hy
+    obtain ⟨n1, n2, n3, n4, n5⟩ := hy
+    show ramWrite Mb (x.get 22 + 0x000002d3#32) _ .w y = M y
+    rw [x22, wr_byte_other _ _ _ _ (by decide) (by rw [show (s6v + 0x000002d3#32).toNat = 0x8002a790 from rfl]; omega)]
+    have hyF : y ≠ F := fun e => n5 (by rw [e]; show ramRead Mx (x.get 2 + 0x00000024#32) .w = _; rw [x2, Fx])
+    rw [show Mb y = Mx y from ramPut_ne _ hyF]
+    exact MxM y (by omega) n4 (by omega)
 
 end E5R.Rmk.Deframer.NoneP
