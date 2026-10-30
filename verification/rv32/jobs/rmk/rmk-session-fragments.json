@@ -84,6 +84,7 @@
     "Projects/rmk/Deframer/SomeFetch.lean",
     "Projects/rmk/Deframer/SomeSegs.lean",
     "Projects/rmk/Deframer/SomePath.lean",
+    "Projects/rmk/Deframer/SomeRound.lean",
     "Projects/ramimage/SessionFragments.lean"
   ],
   "theorems": [
@@ -92,6 +93,8 @@
     "E5R.Rmk.Deframer.SessionI.unpark_round",
     "E5R.Rmk.Deframer.SessionI.none_of_recv",
     "E5R.Rmk.Deframer.SomeP.some_neg",
+    "E5R.Rmk.Deframer.SomeP.some_pos",
+    "E5R.Rmk.Deframer.SomeP.some_round",
     "E5R.Rmk.Deframer.NoneP.none_step",
     "E5R.Rmk.Deframer.Rx.rx_loop",
     "E5R.Rmk.reach_lands",
