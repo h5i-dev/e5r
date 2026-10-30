@@ -17,6 +17,7 @@ read with the model's own decoder (`rmk-audit/Dis.lean`; listings quoted below).
 | `Session.unpark_step` | ∃ `QRun` from `UnparkAt` (0x80003fd8) to `SessPre` | `CopyContract` |
 | `RmkSession.unpark_then_recv` (mine) | their composition, one `QRun` | `CopyContract` |
 | `Closure.qrun_only`, `reach_closed`, `closed_of_anchored`, `reach_anchored` (mine, `Projects/rmk/Closure.lean`) | generic: a `QRun` is the only behaviour of `Step`; a closed set covers `Reach` | none |
+| `reach_on_runs`, `reach_avoids`, `quiet_step` (main 5661ea9, `Projects/rmk/Reach.lean`) | generic, `QRun` checkpoints only (same content as `reach_anchored`, independently proved) | none |
 
 A `QRun` is a sequence of `DetStep`s from `Quiet` machines. `Closure.qrun_only` proves that such
 a step is the *only* `Step` from its machine (no other successor, no event, no interrupt), so a
@@ -98,6 +99,8 @@ theorem closed_of_anchored (hA : Anchored B img A) : Closed B img A ev (OnSeg B 
   board, so every event is at one of the eight UART0 registers; `ev` can restrict further
   (e.g. only THR/IER/FCR/LCR/MCR writes, with values), like `EvOk` with `Config.allow`.
 * `quiet` makes interrupts an obligation of the region instead of an assumption of each run.
+* What `Closed` adds over main's `reach_on_runs`: segments with device reads (all oracles),
+  device writes (events under `ev`), and `¬ Escapes` as a conclusion.
 * `closed_of_anchored`: proved `QRun` segments between anchors (`recv_step`, `unpark_step`)
   are a `Closed` set without anything more. Mixing is by union: `R := OnSeg ∨ R_gap`, where a
   `QRun`'s end must lie in `R_gap`'s entry and `R_gap`'s exits in an anchor.

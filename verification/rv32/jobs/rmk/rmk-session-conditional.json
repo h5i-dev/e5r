@@ -16,6 +16,7 @@
     "Projects/rmk/Copy.lean",
     "Projects/rmk/Run.lean",
     "Projects/rmk/Closure.lean",
+    "Projects/rmk/Reach.lean",
     "Projects/rmk/Fetch.lean",
     "Projects/rmk/MemmoveFetch.lean",
     "Projects/rmk/MemmoveLoops.lean",
@@ -63,6 +64,8 @@
   ],
   "theorems": [
     "E5R.Rmk.Closure.*",
+    "E5R.Rmk.reach_on_runs",
+    "E5R.Rmk.reach_avoids",
     "E5R.Rmk.Deframer.Tail.tail_from_copy",
     "E5R.Rmk.Deframer.Park.park_from_copy",
     "E5R.Rmk.Deframer.Unpark.unpark_from_copy",
