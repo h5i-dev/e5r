@@ -37,17 +37,21 @@ set_option maxRecDepth 100000
 namespace E5R.Rmk.Deframer.SessionI
 open E5R E5R.Rmk E5R.Rmk.Deframer.Tail E5R.Rmk.Deframer.Session E5R.Rmk.Deframer.NoneP
 
-/-- Everything the proved session steps may write, for a session at sp. -/
+/-- Everything the proved session steps may write, for a session at sp (the poll's own segments;
+    the dispatch and encode_frame calls are covered by their contracts' `Kept`, not by `SW`). -/
 def SW (sp : Word) (x : Word) : Prop :=
   (0x8002a78c ≤ x.toNat ∧ x.toNat < 0x8002a798) ∨ (0x8002a590 ≤ x.toNat ∧ x.toNat < 0x8002a778) ∨
   (sp.toNat - 0x70 ≤ x.toNat ∧ x.toNat < sp.toNat) ∨ (0x8002a798 ≤ x.toNat ∧ x.toNat < 0x8002a7b0) ∨
-  (0x8002a580 ≤ x.toNat ∧ x.toNat < 0x8002a590) ∨ (0x8002a7b0 ≤ x.toNat ∧ x.toNat < 0x8002a7ca)
+  (0x8002a580 ≤ x.toNat ∧ x.toNat < 0x8002a590) ∨ (0x8002a7b0 ≤ x.toNat ∧ x.toNat < 0x8002a7f4) ∨
+  (sp.toNat + 0x140 ≤ x.toNat ∧ x.toNat < sp.toNat + 0x148)
 
 /-- The Uart16550 struct pointer word. -/
 def uPtr : Word := 0x8002a784
 
 structure Extras (m : Machine) : Prop where
-  spTop : (m.core.get 2).toNat + 0x28 ≤ 0x81000000
+  /-- the poll frame up to sp+0x148 (the flag pointer at sp+0x24, encode_frame's argument byte at
+      sp+0x140) is RAM -/
+  spTop : (m.core.get 2).toNat + 0x148 ≤ 0x81000000
   uBase : ramRead m.ram (ramRead m.ram uPtr .w + 0x0000001c#32) .w = 0x10000000
   uBaseIn : (ramRead m.ram uPtr .w + 0x0000001c#32).toNat % 4 = 0 ∧
     B.inRam (ramRead m.ram uPtr .w + 0x0000001c#32) 4 = true
@@ -110,7 +114,7 @@ theorem none_of_recv (m₀ m : Machine) (h : SessInv m₀) (hr : RecvOut m₀ m)
     rw [hs3', s20]; exact keep _ (uS 4 (by decide)).1
   have fut : ∀ y : Word, ¬ SW (m₀.core.get 2) y → (y.toNat < 0x8002a7b0 ∨ 0x8002a7ca ≤ y.toNat) := by
     intro y hy; unfold SW at hy; omega
-  refine ⟨hpc, hr.quiet, hr.s6, hr.s7, by rw [hsp]; exact hP.spAl, by rw [hsp]; exact ⟨hP.sp.1, E.spTop⟩,
+  refine ⟨hpc, hr.quiet, hr.s6, hr.s7, by rw [hsp]; exact hP.spAl, by rw [hsp]; exact ⟨hP.sp.1, by have := E.spTop; omega⟩,
     hinv, hc0, hs2, hs4, hdisc, hs9, ⟨hs58a, hs58b⟩, by rw [hB]; exact E.uBase,
     by rw [hs3']; exact E.uBaseIn, by rw [hS]; exact E.uStride, by rw [hs3']; exact E.uStrideIn, ?_,
     by rw [hF]; exact E.flagIn, by rw [hF]; exact E.flagSep⟩
@@ -217,7 +221,7 @@ theorem session_round (m₀ : Machine) (h : SessInv m₀) : Lands1 B img LoopQ m
         rcases hw with hw | hw | hw | hw | hw
         · exact hy (.inl hw)
         · exact hy (.inr (.inl hw))
-        · exact hy (.inr (.inr (.inr (.inr (.inr hw)))))
+        · exact hy (.inr (.inr (.inr (.inr (.inr (.inl ⟨hw.1, by have := hw.2; omega⟩))))))
         · apply hy; refine .inr (.inr (.inl ?_)); rw [hw]
           have h1 := h.1.sp
           constructor <;> bv_omega

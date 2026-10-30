@@ -975,12 +975,31 @@ optional; direct and hybrid proofs are equally valid routes.
       carries `SomeAt`: the message, parked ≤ 484, discarding ≤ 1 and the
       extras. `Deframer/SomePath.lean` `some_neg` proves one branch: a
       negative message header jumps straight to the unpark site and
-      returns to the loop head with `SessInv`. Not proved:
+      returns to the loop head with `SessInv`. `Deframer/SomeRound.lean`
+      `some_round` covers every header, but only against two NAMED
+      callee contracts. Both are hypotheses of the theorem and are proved
+      nowhere:
+      - `DispatchContract`: polling `RynkService::dispatch`'s future
+        returns;
+      - `EncodeContract`: `encode_frame` returns error, or a length ≤ 7.
+
+      Each is a `Lands` statement: the ABI frame, Quiet on return, and
+      the session cells it must leave alone (`Kept`). The theorem also
+      takes the hypothesis `h26`: s10 = 0x8002a7f0, which `SomeAt` does
+      not carry yet. Under these, every behaviour reaches one of:
+      - the loop head with `SessInv`: an empty response, through the
+        unpark site; the slice-check panic is shown not taken;
+      - 0x80004204: dispatch is Pending, and the poll exits to the
+        executor;
+      - 0x80003fa6: dispatch returned 0xff; not proved;
+      - 0x8000429e: the UART send loop; not proved.
+
+      Not proved:
       - that `SessInv` holds when the task first reaches the loop head
         (initialization);
-      - the other headers' dispatch and response path from 0x80003e70 to
-        0x80003fd8 (`RynkService::dispatch` at 0x800001f2 is a 12.6 KB
-        async state machine);
+      - `DispatchContract` (`RynkService::dispatch` at 0x800001f2 is a
+        12.6 KB async state machine), `EncodeContract`, and `h26`;
+      - the 0xff path and the send loop;
       - the UART read future and the executor between polls (other tasks,
         interrupts, Quiet across polls).
 
