@@ -1,0 +1,2 @@
+rmk-uart-send-bytes run1 (fresh) exit=10 466s: MY wrapper error (open named E5R.irqEnabled under E5R.Rmk), main proof not involved
+rmk-uart-send-bytes run2 (--resume on run1 from-source build, wrapper fixed) exit=0 373s proved; SendEnv/SendPost pinned (env_iff/post_iff); witnesses w0, w16 (decide)
