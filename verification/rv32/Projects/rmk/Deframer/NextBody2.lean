@@ -70,7 +70,7 @@ theorem call_case (hC : CopyContract) (hR : CobsReportContract) (c : Core) (R0 :
         rw [show alu .sub (d.get 9) (0 - BitVec.ofNat 32 j) = s5 from rfl, hs5]; omega)
   let K := ncallCore e M
   let M1 := ncallRam e M
-  have csK : K.sameCsr e := by unfold K ncallCore; csr_chain
+  have csK : K.sameCsr e := by unfold K ncallCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
   have gK : ∀ r : Reg, r ≠ 1 → r ≠ 10 → r ≠ 12 → r ≠ 21 → r ≠ 27 → K.get r = e.get r := fun r a b c' d' f' => by
     simp [K, ncallCore, Core.wr_get_ne, a, b, c', d', f']
   have K10 : K.get 10 = ng c + 0x00000004#32 := by
@@ -201,7 +201,7 @@ theorem call_case (hC : CopyContract) (hR : CobsReportContract) (c : Core) (R0 :
     · -- a frame of at most 2 bytes: dropped
       have r3 := nshort e2' M2 pc2 q2 hal4 hin4 t4ca hal8 hin8
         (by rw [f26]; simp only [taken, BitVec.ult, decide_eq_false_iff_not]; show ¬ (2 < w1.toNat); omega) geu
-      obtain ⟨li, me⟩ := back (nshortCore e2' M2) rfl (by unfold nshortCore; csr_chain)
+      obtain ⟨li, me⟩ := back (nshortCore e2' M2) rfl (by unfold nshortCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_)))
         (fun r a b c' => by simp [nshortCore, Core.wr_get_ne, a, b, c'])
         (by simp [nshortCore, Core.wr_get_ne, Core.wr_get_self, alu_add, f27])
         (by simp [nshortCore, Core.wr_get_ne, Core.wr_get_self, alu_add])
@@ -210,7 +210,7 @@ theorem call_case (hC : CopyContract) (hR : CobsReportContract) (c : Core) (R0 :
       have r3 := nsome e2' M2 pc2 q2 hal4 hin4 t4ca hal8 hin8
         (by rw [f26]; simp only [taken, BitVec.ult, decide_eq_true_eq]; show 2 < w1.toNat; omega)
       let e3 := nsomeCore e2' M2
-      have cs3 : e3.sameCsr e2' := by unfold e3 nsomeCore; csr_chain
+      have cs3 : e3.sameCsr e2' := by unfold e3 nsomeCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
       have g3 : ∀ r : Reg, r ≠ 10 → r ≠ 22 → e3.get r = e2'.get r := fun r a b => by
         simp [e3, nsomeCore, Core.wr_get_ne, a, b]
       have e3_22 : e3.get 22 = w1 := by simp [e3, nsomeCore, Core.wr_get_ne, Core.wr_get_self, w1]
@@ -274,7 +274,7 @@ theorem call_case (hC : CopyContract) (hR : CobsReportContract) (c : Core) (R0 :
         have r4 := nfront e3 M2 rfl q3 (by simp [taken, hc0])
         left
         obtain ⟨k, m, r5, post⟩ := ret_post c R0 E (nfrontCore e3 M2) M2
-          (some_ret _ _ rfl (by unfold nfrontCore; csr_chain)
+          (some_ret _ _ rfl (by unfold nfrontCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_)))
             (fun r hr => by
               have n10 : r ≠ 10 := fun he => by subst he; exact absurd hr (by decide)
               simp [nfrontCore, Core.wr_get_ne, n10])
@@ -285,7 +285,7 @@ theorem call_case (hC : CopyContract) (hR : CobsReportContract) (c : Core) (R0 :
         have e3_9 : e3.get 9 = d.get 9 := (g3 9 (by decide) (by decide)).trans f9
         have r4 := nmove1 e3 M2 rfl q3 (by simp only [taken, beq_eq_false_iff_ne]; exact hc0)
         let e5 := nmove1Core e3 M2
-        have cs5 : e5.sameCsr e3 := by unfold e5 nmove1Core; csr_chain
+        have cs5 : e5.sameCsr e3 := by unfold e5 nmove1Core; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
         have e5_10 : e5.get 10 = d.get 9 := by simp [e5, nmove1Core, Core.wr_get_ne, Core.wr_get_self, alu_add, e3_9]
         have e5_11 : e5.get 11 = w1 + d.get 9 := by
           simp [e5, nmove1Core, Core.wr_get_ne, Core.wr_get_self, alu_add, e3_22, e3_9]
@@ -301,12 +301,12 @@ theorem call_case (hC : CopyContract) (hR : CobsReportContract) (c : Core) (R0 :
           (by rw [e5_11, e5_10]; simp only [taken, BitVec.ult, decide_eq_false_iff_not]; rw [ew]; omega)
           (by rw [e5_1]; decide)
         let e6 := nmove2Core e5 M2
-        have cs6 : e6.sameCsr e5 := by unfold e6 nmove2Core; csr_chain
+        have cs6 : e6.sameCsr e5 := by unfold e6 nmove2Core; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
         have g6 : ∀ r : Reg, e6.get r = e5.get r := fun r => by simp [e6, nmove2Core]
         have q6 : Quiet e6 := Quiet.of_sameCsr cs6 q5
         have r6 := nmove3 e6 M2 (by simp [e6, nmove2Core, e5_1]) q6
         let K2 := nmove3Core e6 M2
-        have csK2 : K2.sameCsr e6 := by unfold K2 nmove3Core; csr_chain
+        have csK2 : K2.sameCsr e6 := by unfold K2 nmove3Core; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
         have K2_10 : K2.get 10 = c.get 11 := by
           simp [K2, nmove3Core, Core.wr_get_ne, Core.wr_get_self, alu_add, g6, g5 20 (by decide) (by decide)
             (by decide) (by decide) (by decide), g3 20 (by decide) (by decide), f20]
@@ -352,7 +352,7 @@ theorem call_case (hC : CopyContract) (hR : CobsReportContract) (c : Core) (R0 :
           rw [K2_10, K2_11, K2_12, Memmove.moved, if_neg (by omega)]
         left
         have cs8 : (nmovedCore e7 M3).sameCsr e3 :=
-          ((by unfold nmovedCore; csr_chain : (nmovedCore e7 M3).sameCsr e7).trans CP.csr).trans
+          ((by unfold nmovedCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_)) : (nmovedCore e7 M3).sameCsr e7).trans CP.csr).trans
             (csK2.trans (cs6.trans cs5))
         have gk8 : ∀ r : Reg, r.val ∈ nkept → (nmovedCore e7 M3).get r = e3.get r := by
           intro r hr
@@ -372,7 +372,7 @@ theorem call_case (hC : CopyContract) (hR : CobsReportContract) (c : Core) (R0 :
         exact ⟨_, m, ((((((((r1.trans rw2).trans r3).trans r4).trans r5).trans r6).trans r7).trans r8).trans r9), post⟩
   · -- a decode error: dropped
     have r3 := nerr e2' M2 pc2 q2 hal4 hin4 (by simp only [taken, bne_iff_ne, ne_eq]; exact hok) geu
-    obtain ⟨li, me⟩ := back (nerrCore e2' M2) rfl (by unfold nerrCore; csr_chain)
+    obtain ⟨li, me⟩ := back (nerrCore e2' M2) rfl (by unfold nerrCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_)))
       (fun r a b c' => by simp [nerrCore, Core.wr_get_ne, a, b])
       (by simp [nerrCore, Core.wr_get_ne, Core.wr_get_self, alu_add, f27])
       (by simp [nerrCore, Core.wr_get_ne, Core.wr_get_self, alu_add])

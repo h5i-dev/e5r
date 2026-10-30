@@ -4,7 +4,7 @@
 
   Original e5r code, Apache-2.0.
 
-  PROVED here, CONDITIONAL ON `CopyContract` (a hypothesis, not an axiom, not proved here):
+  PROVED here, CONDITIONAL ON `CopyContract` (a hypothesis of each theorem, not proved here):
   `unpark_from_copy : UnparkFromCopy`, i.e. `CopyContract → UnparkContract`: from every machine at
   `unpark_pending` meeting `CallEnv unparkPc parkStack` with `parked ≤ len`, a quiet run reaches
   `UnparkPost` (the parked bytes at the buffer's end moved to its front, consumed := 0,

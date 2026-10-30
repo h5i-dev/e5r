@@ -4,7 +4,7 @@
 
   Original e5r code, Apache-2.0.
 
-  PROVED here, CONDITIONAL ON `CopyContract` (memmove; a hypothesis, not an axiom, not proved):
+  PROVED here, CONDITIONAL ON `CopyContract` (memmove; a hypothesis, not proved):
   `recv_step`: from every machine at the session loop head with the deframer invariant
   (`SessPre`: the session's s6/s7 bases, a stack below which the deframer and buffer lie), a quiet
   run (so: no panic on the way, whatever bytes the buffer holds) reaches
@@ -92,7 +92,7 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
   -- the call of next
   have r1 := scall c R0 h.pc h.quiet
   let K1 := scallCore c R0
-  have csK1 : K1.sameCsr c := by unfold K1 scallCore; csr_chain
+  have csK1 : K1.sameCsr c := by unfold K1 scallCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
   have K1_10 : K1.get 10 = dfr := by simp [K1, scallCore, Core.wr_get_ne, Core.wr_get_self, alu_add, h22]; rfl
   have K1_11 : K1.get 11 = bufA := by simp [K1, scallCore, Core.wr_get_ne, Core.wr_get_self, alu_add, h23]; rfl
   have K1_12 : K1.get 12 = 0x1e8#32 := by simp [K1, scallCore, Core.wr_get_ne, Core.wr_get_self, alu_add]
@@ -172,7 +172,7 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
       (by rw [e1_22]; decide) (by rw [e1_22]; decide) (by rw [e1_22]; decide) (by rw [e1_22]; decide)
       (by rw [e1_22]; decide) (by rw [e1_22]; decide) (by rw [e1_22]; decide) (by rw [e1_22]; decide)
     let K2 := snoneCore e1 M1
-    have csK2 : K2.sameCsr e1 := by unfold K2 snoneCore; csr_chain
+    have csK2 : K2.sameCsr e1 := by unfold K2 snoneCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
     have qK2 : Quiet K2 := Quiet.of_sameCsr csK2 qe1
     have K2_10 : K2.get 10 = dfr := by simp [K2, snoneCore, Core.wr_get_ne, Core.wr_get_self, alu_add, e1_9]
     have K2_11 : K2.get 11 = bufA := by simp [K2, snoneCore, Core.wr_get_ne, Core.wr_get_self, alu_add, e1_8]
@@ -188,7 +188,7 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
     have TPs : ∀ r : Reg, r.val ∉ callerSaved → e2.get r = K2.get r := TP.saved
     have r3 := stail e2 M2 (TP.pc.trans K2_1) (Quiet.of_sameCsr TP.csr qK2)
     refine ⟨_, _, (((r1.trans rn).trans r2).trans rt).trans r3, ?_⟩
-    have cs3 : (stailCore e2 M2).sameCsr e2 := by unfold stailCore; csr_chain
+    have cs3 : (stailCore e2 M2).sameCsr e2 := by unfold stailCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
     refine ⟨Quiet.of_sameCsr (cs3.trans TP.csr) qK2, ?_, ?_, ?_, ?_, .inr ⟨rfl, ?_, ?_⟩⟩
     · simp [stailCore, Core.wr_get_ne]; exact (TPs 22 (by decide)).trans K2_22
     · simp [stailCore, Core.wr_get_ne]; exact (TPs 23 (by decide)).trans K2_23
@@ -217,7 +217,7 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
     have a0o : e1.get 10 = 1 := BitVec.eq_of_toNat_eq a01
     have r2 := ssome e1 M1 e1pc qe1 (by rw [a0o]; rfl)
     let K3 := ssomeCore e1 M1
-    have csK3 : K3.sameCsr e1 := by unfold K3 ssomeCore; csr_chain
+    have csK3 : K3.sameCsr e1 := by unfold K3 ssomeCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
     have qK3 : Quiet K3 := Quiet.of_sameCsr csK3 qe1
     have K3_10 : K3.get 10 = dfr := by simp [K3, ssomeCore, Core.wr_get_ne, Core.wr_get_self, alu_add, e1_9]
     have K3_11 : K3.get 11 = bufA := by simp [K3, ssomeCore, Core.wr_get_ne, Core.wr_get_self, alu_add, e1_8]
@@ -252,7 +252,7 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
           rw [show (0 + 0x1e9#32 : Word).toNat = 0x1e9 from rfl]; bv_omega)
     let D := sdecCore e3 M3
     let R4 := sdecRam e3 M3
-    have csD : D.sameCsr e3 := by unfold D sdecCore; csr_chain
+    have csD : D.sameCsr e3 := by unfold D sdecCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
     have qD : Quiet D := Quiet.of_sameCsr csD qe3
     have gD : ∀ r : Reg, r ≠ 1 → r ≠ 9 → r ≠ 10 → r ≠ 11 → r ≠ 12 → r ≠ 13 → D.get r = e3.get r := fun r a b c' d' f' g' => by
       simp [D, sdecCore, Core.wr_get_ne, a, b, c', d', f', g']
@@ -311,7 +311,7 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
     let Fc := sfromCore D R4
     have gF : ∀ r : Reg, r ≠ 14 → r ≠ 15 → r ≠ 16 → Fc.get r = D.get r := fun r a b c' => by
       simp [Fc, sfromCore, Core.wr_get_ne, a, b, c']
-    have csF : Fc.sameCsr D := by unfold Fc sfromCore; csr_chain
+    have csF : Fc.sameCsr D := by unfold Fc sfromCore; (repeat (first | exact Core.sameCsr_wr _ _ _ _ | exact Core.sameCsr_goto _ _ | refine (Core.sameCsr_wr _ _ _ _).trans ?_ | refine (Core.sameCsr_goto _ _).trans ?_))
     refine ⟨Quiet.of_sameCsr csF qD, ?_, ?_, ?_, ?_, .inl ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩⟩
     · rw [gF 22 (by decide) (by decide) (by decide), gD 22 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]
       exact e3_22

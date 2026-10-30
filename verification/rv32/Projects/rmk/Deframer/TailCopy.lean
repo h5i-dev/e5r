@@ -4,7 +4,7 @@
 
   Original e5r code, Apache-2.0.
 
-  PROVED here, CONDITIONAL ON `CopyContract` (a hypothesis of every theorem below, not an axiom,
+  PROVED here, CONDITIONAL ON `CopyContract` (a hypothesis of every theorem below,
   not proved here; the peer's memmove proofs discharge it only for the cases `Memmove.PreB` allows,
   which do not yet cover every deframer call):
   * `withCopy`: from `TailPre frame` (frame ≥ 0x50: tail's 0x20 bytes and memmove's 0x30) with
