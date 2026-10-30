@@ -971,10 +971,16 @@ optional; direct and hybrid proofs are equally valid routes.
       - the Some point 0x80003e70.
 
       `unpark_round`: from the unpark call site 0x80003fd8 with the same
-      extras, back to the loop head with `SessInv`. Not proved:
+      extras, back to the loop head with `SessInv`. The Some boundary
+      carries `SomeAt`: the message, parked ≤ 484, discarding ≤ 1 and the
+      extras. `Deframer/SomePath.lean` `some_neg` proves one branch: a
+      negative message header jumps straight to the unpark site and
+      returns to the loop head with `SessInv`. Not proved:
       - that `SessInv` holds when the task first reaches the loop head
         (initialization);
-      - the dispatch and response path from 0x80003e70 to 0x80003fd8;
+      - the other headers' dispatch and response path from 0x80003e70 to
+        0x80003fd8 (`RynkService::dispatch` at 0x800001f2 is a 12.6 KB
+        async state machine);
       - the UART read future and the executor between polls (other tasks,
         interrupts, Quiet across polls).
 
