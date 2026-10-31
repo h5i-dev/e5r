@@ -1,0 +1,36 @@
+// out[0] = a[0] + ... + a[n-1] (mod 2^32), one thread, a counted loop.
+// Written directly in PTX. Launched as a single thread (see Examples/Sum.lean).
+.version 8.0
+.target sm_80
+.address_size 64
+
+.visible .entry sum(
+	.param .u64 sum_a,
+	.param .u64 sum_out,
+	.param .u32 sum_n
+)
+{
+	.reg .pred 	%p<2>;
+	.reg .b32 	%r<5>;
+	.reg .b64 	%rd<5>;
+
+	ld.param.u64 	%rd1, [sum_a];
+	ld.param.u64 	%rd2, [sum_out];
+	ld.param.u32 	%r1, [sum_n];
+	cvta.to.global.u64 	%rd1, %rd1;
+	cvta.to.global.u64 	%rd2, %rd2;
+	mov.u32 	%r2, 0;
+	mov.u32 	%r3, 0;
+$L_loop:
+	setp.ge.u32 	%p1, %r3, %r1;
+	@%p1 bra 	$L_done;
+	mul.wide.u32 	%rd3, %r3, 4;
+	add.s64 	%rd4, %rd1, %rd3;
+	ld.global.u32 	%r4, [%rd4];
+	add.u32 	%r2, %r2, %r4;
+	add.u32 	%r3, %r3, 1;
+	bra.uni 	$L_loop;
+$L_done:
+	st.global.u32 	[%rd2], %r2;
+	ret;
+}

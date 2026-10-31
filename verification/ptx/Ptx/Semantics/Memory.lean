@@ -1,4 +1,3 @@
-import Std.Tactic.BVDecide
 /-
 Byte-addressed global memory.
 
@@ -64,7 +63,29 @@ def Region.holds (r : Region) (a : Addr) (n : Nat) : Bool :=
 def accessOk (al : List Region) (a : Addr) (sz : Size) : Bool :=
   a.toNat % sz.bytes == 0 && al.any (·.holds a sz.bytes)
 
-/-! ## Locality and frame -/
+/-! ## Locality and frame
+
+Byte-assembly identities are proved bit by bit (`bytes32`, `bytes64`), not
+with `bv_decide`: its certificates are checked by native evaluation, which
+would add `Lean.ofReduceBool` to every theorem that uses them. -/
+
+theorem bytes32 (v : Val) :
+    (v >>> 24).setWidth 8 ++ (v >>> 16).setWidth 8 ++ (v >>> 8).setWidth 8 ++ v.setWidth 8 =
+      v.setWidth 32 := by
+  ext i hi
+  simp only [BitVec.getElem_append, BitVec.getElem_setWidth, BitVec.getLsbD_ushiftRight]
+  repeat' split
+  all_goals (first | rfl | (congr 1; omega))
+
+theorem bytes64 (v : Val) :
+    (v >>> 56).setWidth 8 ++ (v >>> 48).setWidth 8 ++ (v >>> 40).setWidth 8 ++ (v >>> 32).setWidth 8 ++
+      ((v >>> 24).setWidth 8 ++ (v >>> 16).setWidth 8 ++ (v >>> 8).setWidth 8 ++ v.setWidth 8) =
+      v := by
+  ext i hi
+  simp only [BitVec.getElem_append, BitVec.getElem_setWidth, BitVec.getLsbD_ushiftRight]
+  repeat' split
+  all_goals (try simp only [BitVec.getElem_eq_testBit_toNat, BitVec.getLsbD])
+  all_goals (first | rfl | (congr 1; omega))
 
 theorem add_sub_left (a k : Addr) : a + k - a = k := by bv_omega
 
@@ -102,12 +123,12 @@ theorem rd_wr_same (m : Mem) (a : Addr) (sz : Size) (v : Val) :
   | b4 =>
     simp only [rd, rd32, wr, BitVec.sub_self, add_sub_left, Size.bytes_b4]
     simp
-    bv_decide
+    rw [bytes32]
   | b8 =>
     simp only [rd, rd64, rd32, wr, BitVec.sub_self, BitVec.add_assoc, add_sub_left,
       Size.bytes_b8]
     simp
-    bv_decide
+    exact bytes64 v
 
 /-- A load from bytes a store did not touch sees the old memory. -/
 theorem rd_wr_disjoint {m : Mem} {a b : Addr} {sz sz' : Size} {v : Val}

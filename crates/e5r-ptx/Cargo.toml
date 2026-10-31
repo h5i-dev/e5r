@@ -1,0 +1,11 @@
+[package]
+name = "e5r-ptx"
+description = "e5r — strict parser and Lean exporter for a subset of NVIDIA PTX."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]

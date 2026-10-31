@@ -37,6 +37,7 @@ e5r-diff = { path = "crates/e5r-diff", version = "0.1.0" }
 e5r-ir = { path = "crates/e5r-ir", version = "0.1.0" }
 e5r-decomp = { path = "crates/e5r-decomp", version = "0.1.0" }
 e5r-api = { path = "crates/e5r-api", version = "0.1.0" }
+e5r-ptx = { path = "crates/e5r-ptx", version = "0.1.0" }
 
 # Kept deliberately short. Loaders and decoders are written here rather than
 # pulled in, because provenance tagging and hostile-input behaviour are the

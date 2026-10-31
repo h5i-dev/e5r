@@ -4,3 +4,7 @@ import Ptx.Semantics.Instruction
 import Ptx.Semantics.SIMT
 import Ptx.Logic.Hoare
 import Ptx.Logic.RaceFreedom
+import Ptx.Logic.Regions
+import Ptx.Tactics.Eval
+import Ptx.Examples.VectorAdd
+import Ptx.Logic.Launch1D

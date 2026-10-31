@@ -64,6 +64,9 @@ theorem upd_other {α} (f : String → α) {k x : String} (v : α) (h : x ≠ k)
 def lo32 (v : Val) : BitVec 32 := v.setWidth 32
 def ext32 (v : BitVec 32) : Val := v.setWidth 64
 
+@[simp] theorem lo32_ext32 (v : BitVec 32) : lo32 (ext32 v) = v := by
+  simp [lo32, ext32]
+
 /-- Write register `d` and fall through. -/
 def TState.set (s : TState) (d : String) (v : Val) : TState :=
   { s with r := upd s.r d v, pc := s.pc + 1 }
@@ -91,7 +94,7 @@ def shiftBy (w : Width) (f : (n : Nat) → BitVec n → Nat → BitVec n) (a b :
   | .w64 => f 64 a (lo32 b).toNat
 
 /-- `setp.c.t a b`. Ordered comparisons on `.b` types are not PTX (`none`). -/
-def compare (c : CmpOp) (t : Ty) (a b : Val) : Option Bool :=
+def cmpVal (c : CmpOp) (t : Ty) (a b : Val) : Option Bool :=
   let go {n : Nat} (x y : BitVec n) : Option Bool :=
     match c, t.signed, t with
     | .eq, _, _ => some (x == y)
@@ -162,7 +165,7 @@ def exec (K : Kernel) (c : Ctx) (s : TState) : Instr → Action
     else .next (s.set d (shiftBy t.width (fun _ x n => x >>> n) (opVal c s a) (opVal c s b)))
   | .mov t d a => .next (s.set d (fit t (opVal c s a)))
   | .setp op t p a b =>
-    match compare op t (opVal c s a) (opVal c s b) with
+    match cmpVal op t (opVal c s a) (opVal c s b) with
     | some v => .next (s.setp p v)
     | none => .fault
   | .selp t d a b p => .next (s.set d (fit t (if s.p p then opVal c s a else opVal c s b)))

@@ -66,6 +66,47 @@ def wp (cut : Nat → Bool) (Q : TState → Mem → Prop) : Nat → TState → M
     | .done => Q s m
     | .fault => False
 
+/-- `wp` after the action is known. Kept separate so `simp` only unfolds the
+next step once the action has been computed to a constructor. -/
+def wpAct (cut : Nat → Bool) (Q : TState → Mem → Prop) (f : Nat) (act : Action) (s : TState) (m : Mem) :
+    Prop :=
+  match act with
+  | .next s' => if cut s'.pc then Q s' m else wp K al c R W cut Q f s' m
+  | .load a sz k =>
+    accessOk al a sz = true ∧ InFoot R W (a, sz, false) ∧
+      (if cut (k (rd m a sz)).pc then Q (k (rd m a sz)) m else wp K al c R W cut Q f (k (rd m a sz)) m)
+  | .store a sz v s' =>
+    accessOk al a sz = true ∧ InFoot R W (a, sz, true) ∧
+      (if cut s'.pc then Q s' (wr m a sz v) else wp K al c R W cut Q f s' (wr m a sz v))
+  | .done => Q s m
+  | .fault => False
+
+theorem wp_succ (cut Q f s m) :
+    wp K al c R W cut Q (f + 1) s m = wpAct K al c R W cut Q f (action K c s) s m := by
+  simp only [wp, wpAct]
+
+end
+
+section
+variable {K : Kernel} {al : List Region} {c : Ctx} {R W : Addr → Prop} {cut : Nat → Bool}
+  {Q : TState → Mem → Prop} {f : Nat} {s : TState} {m : Mem}
+
+@[simp] theorem wpAct_next {s'} : wpAct K al c R W cut Q f (.next s') s m =
+    if cut s'.pc then Q s' m else wp K al c R W cut Q f s' m := rfl
+@[simp] theorem wpAct_load {a sz k} : wpAct K al c R W cut Q f (.load a sz k) s m =
+    (accessOk al a sz = true ∧ InFoot R W (a, sz, false) ∧
+      (if cut (k (rd m a sz)).pc then Q (k (rd m a sz)) m else wp K al c R W cut Q f (k (rd m a sz)) m)) := rfl
+@[simp] theorem wpAct_store {a sz v s'} : wpAct K al c R W cut Q f (.store a sz v s') s m =
+    (accessOk al a sz = true ∧ InFoot R W (a, sz, true) ∧
+      (if cut s'.pc then Q s' (wr m a sz v) else wp K al c R W cut Q f s' (wr m a sz v))) := rfl
+@[simp] theorem wpAct_done : wpAct K al c R W cut Q f .done s m = Q s m := rfl
+@[simp] theorem wpAct_fault : wpAct K al c R W cut Q f .fault s m = False := rfl
+@[simp] theorem wpAct_ite {p : Prop} [Decidable p] {a b : Action} :
+    wpAct K al c R W cut Q f (if p then a else b) s m =
+      if p then wpAct K al c R W cut Q f a s m else wpAct K al c R W cut Q f b s m := by
+  split <;> rfl
+@[simp] theorem wp_zero : wp K al c R W cut Q 0 s m = False := rfl
+
 end
 
 variable {K : Kernel} {al : List Region} {c : Ctx} {R W : Addr → Prop}
