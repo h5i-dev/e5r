@@ -8,3 +8,4 @@ import Ptx.Logic.Regions
 import Ptx.Tactics.Eval
 import Ptx.Examples.VectorAdd
 import Ptx.Logic.Launch1D
+import Ptx.Examples.Sum

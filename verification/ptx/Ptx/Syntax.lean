@@ -125,7 +125,10 @@ structure Module where
   kernels : List Kernel
   deriving Repr, Inhabited
 
-def Kernel.label? (k : Kernel) (l : String) : Option Nat :=
-  (k.labels.find? (·.1 == l)).map (·.2)
+def lookupLabel : List (String × Nat) → String → Option Nat
+  | [], _ => none
+  | (k, v) :: t, l => if k = l then some v else lookupLabel t l
+
+def Kernel.label? (k : Kernel) (l : String) : Option Nat := lookupLabel k.labels l
 
 end Ptx

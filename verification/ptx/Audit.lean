@@ -5,3 +5,4 @@ import Ptx
 #print axioms Ptx.Safe.solo
 #print axioms Ptx.Safe.loop
 #print axioms Ptx.Examples.VectorAdd.vadd_correct
+#print axioms Ptx.Examples.Sum.sum_correct
