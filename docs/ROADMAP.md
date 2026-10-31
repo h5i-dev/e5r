@@ -739,6 +739,307 @@ designed before it gets coded, and the design lives in
       tutorial that takes a reader from a stripped binary to a named, typed,
       committed annotation log (`docs/tutorial.md`).
 
+## V0. Binary-level Lean firmware research (2026-10-28 authorization)
+
+The owner explicitly reopened the architecture-priority exclusion for this
+narrow research milestone. The new reason is a concrete binary-to-ISA-to-Lean
+verification experiment, using the existing ELF loader rather than trusting
+heuristic CFGs, IR or decompiled C. This does not reorder the general decoder
+or decompiler roadmap or authorize a firmware framework.
+
+- [x] Small real bare-metal RV32I ELF, loaded through e5r and exported with
+      original file bytes, initial mapped memory, permissions and file offsets.
+- [x] Lean decodes the original fetched instruction words; an independent Lean
+      ELF reader checks the exported memory against the original-byte literal.
+      The runner checks that literal against every input-file byte as well as
+      recording SHA-256 identities. A digest alone is not exporter fidelity.
+- [x] Strict instruction subset, wraparound, x0, signed immediates/branches,
+      permission/alignment/bounds faults and explicit unsupported/fuel failure.
+- [x] All byte inputs: successful bounded reachability, exact clamped output,
+      output bound and whole-memory frame; real Lean kernel checking and axiom
+      audit. No compiler, Rust, hardware or Embassy verification claim.
+- [x] Original `no_std` Rust fixture at O1 and O2 against the same binary spec,
+      with an explicit memory ABI and pinned compiler. QEMU differential edge
+      tests supplement, rather than prove, ISA model fidelity.
+- [x] Superseded by F below: the owner's second authorization (2026-10-28)
+      turns this research result into a staged, scoped product.
+
+The supported subset, exact statements, build commands, assumptions, provenance
+and trusted computing base are together in
+[`verification-rv32.md`](verification-rv32.md). Implementation is isolated in
+`e5r-verify` and `verification/rv32`; no empty firmware crate or CI profile change.
+
+## F. Scoped firmware verification (2026-10-28 owner authorization)
+
+The owner expanded V0 into a production tool for one scope: a binary-level,
+Lean-kernel-checked safety guarantee for firmware on one RISC-V board. This is
+the only architecture exception; it does not reorder M1-M12 or the decoder
+priorities, and nothing in it trusts e5r's decompiler, CFG recovery or IR.
+Product documentation is [`firmware-verification.md`](firmware-verification.md).
+Each item is checked only when its acceptance criterion has been run.
+
+- [x] **F1. Stable baseline.** V0 committed as inherited, its fixture-corpus
+      regression fixed, re-checked from a clean clone. *Accepted:* V0 checker
+      exits 0 from a fresh clone with identical image hashes; the workspace
+      failures that remain are the corpus-gated tests that need
+      `scripts/build-fixtures.sh` prerequisites absent on the dev host.
+- [x] **F2. One supported scope.** SiFive HiFive1 Rev B (FE310-G002, E31
+      RV32IMAC), M-mode only, boot at `0x20010000`, 16 KiB DTIM, CLINT timer.
+      *Accepted:* `boards/hifive1-revb.json` is the single source of the memory
+      map, device registers, boot assumptions and exclusions; the Lean board is
+      generated from it and the checker refuses a stale copy; the product doc
+      states guarantees and exclusions in the same terms. (Accepted
+      2026-10-29.)
+- [x] **F3. Semantics for real compiler output.** RV32IMAC + Zicsr + Zifencei
+      + MRET/WFI, machine-mode CSRs, interrupt entry, aligned RAM, flash image,
+      device registers; unsupported behavior fails closed. *Accepted:* QEMU
+      `sifive_e` whole-firmware trace replay agrees on every register after
+      every transition; instruction-level differential cases cover every
+      supported opcode class; negative controls show each fault class.
+      (Accepted 2026-10-29: 62,773-transition firmware replay with 170
+      interrupts; ~30k random instructions over all 84 kinds; 30 controls.)
+- [x] **F4. Symbolic and compositional proofs.** *Accepted:* the clamp
+      binaries are proved for all 2^32 inputs including the wrapping case; a
+      loop over a buffer is proved by an invariant, not unrolling; function
+      contracts state pre/postconditions and frames; at least one successful
+      execution is exhibited (nonvacuity); the axiom audit shows only
+      `propext`, `Quot.sound` and `Classical.choice`. (Accepted 2026-10-29:
+      `clamp_all`, `duty_contract`, both `nonvacuous`.)
+- [ ] **F5. General workflow.** *Accepted:* `e5r-verify check` takes a job
+      file (ELF, board, property, entry/boot model) and returns structured JSON
+      with one of `proved`, `counterexample`, `unknown`, `unsupported`,
+      `resource_exhausted`, `error`; resource limits and resumable runs; a new
+      target needs a job file, not a new runner; a counterexample is reported
+      only after it replays in the model. *Done:* job files, the statuses
+      (a failed proof is never a counterexample), limits, `--resume`,
+      stale-result detection, a new target needs a job file plus its proof
+      module. *Open:* automatic proofs (the F7 checker) and a counterexample
+      producer with replay, so `counterexample` is still never emitted.
+- [x] **F6. Environment model for the board.** *Accepted:* boot state, CSRs,
+      interrupt entry/return, CLINT/UART/PWM registers and environmental
+      nondeterminism are explicit and documented; replay against QEMU covers
+      interrupts and device traffic. (Accepted 2026-10-29.)
+- [ ] **F7. Embassy firmware proof.** One executor, timer interrupt, channel,
+      built with plain cargo. *Accepted:* a kernel-checked theorem that, from
+      every boot state the board allows and under every environment behavior
+      the model allows, the emitted binary never leaves the modeled envelope
+      and every PWM duty write is at most 100; plus a concrete execution that
+      reaches such a write. *Status:* not proved. The checker
+      (`Theories/Absint.lean`) is proved sound (`check_sound`, and
+      `check_sound_hybrid` with directly proved regions and summaries),
+      kernel-replayed, standard axioms only. With per-partition interrupt
+      invariants (e41afad) and the proved ring-head summary, the analyzer
+      found a certificate with no possible-fault report (65,845 nodes,
+      2026-10-29). It is **resource-limited, not accepted**: its 29 MB source
+      does not elaborate within 24 GB (aborted after 593 s at 13.8 GB
+      resident), and the checker's list-indexed node lookup would make kernel
+      evaluation quadratic. Open: an O(log n) node index and a compact
+      certificate encoding, fewer nodes (the review worker's channel-tail
+      summary), and the checking job. See `firmware-verification.md`.
+- [ ] **F8. Packaging.** *Accepted:* pinned toolchains, one command that
+      rebuilds and rechecks from source, proof bound to ELF bytes, board,
+      property, model and toolchain hashes with stale results refused, CI job,
+      malformed-input tests, schema/version policy, tutorial, residual TCB,
+      and an independent review recorded (or recorded as not obtained).
+      *Done:* pinned toolchains, `scripts/check-firmware-verification.sh`,
+      result binding and staleness, CI job (not yet run on a runner),
+      malformed-input and runner controls, schema names, docs, an
+      installation guide (`firmware-verification-install.md`), Lean-only
+      offline recheck bundles (`e5r-verify bundle`), kernel replay of every
+      module (`leanchecker`), and an independent review by a separate
+      reviewer agent session (findings fixed and recorded in
+      `firmware-verification.md`). *Open:* a review by a human RISC-V or
+      Lean expert, and a first green CI run on a GitHub runner.
+
+## R. RMK on RISC-V (2026-10-29 owner authorization)
+
+Integrated checkpoint and replay instructions: [RMK checkpoint](rmk-checkpoint.md).
+This preserves partial results; `SessionSafe` and reproducible R0 remain open.
+
+The next product target is upstream [RMK](https://github.com/rmk-rs/rmk),
+RISC-V only, pinned at `71556128fa72881fc35f0bf6c292d5e28ad9568d`. The first
+acceptance target is its existing example `examples/use_rust/qemu-riscv-rynk`
+(`riscv32imac-unknown-none-elf`, Embassy executor, mock time, a UART16550 at
+`0x10000000`, semihosting, the Rynk host protocol through
+`HostService::run_session`, `LockConfig { insecure: true }`). It is not a
+replacement toy, and nothing here claims RMK as a whole is verified. The
+HiFive1 board model is not reused for it: QEMU `virt` is a different machine.
+ESP32-C3/C6 BLE examples are a later phase. Abstract interpretation stays
+optional; direct and hybrid proofs are equally valid routes.
+
+- [ ] **R0. Pinned, reproducible target.** *Accepted:* source pin, toolchain,
+      features and `Cargo.lock` recorded; one command rebuilds the ELF with
+      plain cargo, byte-identical across two clean builds and checkout paths;
+      its sha256 recorded with the symbols of the Rynk session and frame
+      handling; the example runs on the pinned QEMU.
+      *Status:* not accepted. Evidence pin: `f39d833f…` (built inside the
+      review worker's scratch tree, no remapping); it is not cleanly
+      reproduced: the third worker found an in-place rebuild there with the
+      same bytes, not a fresh-checkout, fresh-cache build, and no other path
+      can give it. Canonical recipe (`verification/rv32/rmk/build-canonical.sh`):
+      reproducible byte for byte (`5871dcee…`, three times, two independent
+      scripts, `verification/rv32/rmk-r0-audit/AUDIT.md`) ONLY at its fixed
+      checkout path on this machine. The checkout path changes code, not only
+      layout (66,551 `.text` bytes between two remapped paths), through
+      Cargo's metadata of the path crates. Another machine, rustup home or
+      user is untested. All evidence stays on `f39d833f`; migration to
+      `5871dcee` (rwBase 0x80029590; memmove and deframer bytes keep their
+      addresses) is not done and not implied.
+- [x] **R1. Board model for QEMU `virt` (RV32).** *Accepted:* a board JSON
+      (memory map, UART16550 registers, timer, boot state, how semihosting
+      calls are treated: modeled, or a fail-closed exclusion) and the
+      generated Lean board; whole-program replay of the R0 ELF against QEMU
+      agrees on registers and device traffic, with negative controls; every
+      environment assumption listed. (Accepted 2026-10-29:
+      `boards/qemu-virt-rv32.json` with the read-only image carve-out and
+      byte-wide UART registers; image = `RamElf.imageOf` of the packed ELF,
+      reader acceptance kernel-checked; `tools/run_rmk_replay.py` replays
+      299,999 transitions from the entry with 13 UART input bytes consumed,
+      441 UART reads and 24 writes equal to QEMU's MMIO log, 3 semihosting
+      calls taken from QEMU under stated restrictions; 8 negative controls in
+      `tools/test_rmk_replay_controls.py` rejected for the expected reason.)
+- [ ] **R2. Property chosen after code inspection.** Candidates: malformed
+      host input (any byte sequence on the UART) never makes the emitted code
+      fault or access memory outside its buffers; state mutations happen only
+      through accepted, authorized commands (with `insecure: true` stated as
+      an assumption, not hidden). *Accepted:* the property written as a job
+      (ELF, board, entry/boot model, property) with the inspected code paths
+      and why each is in or out of scope.
+- [ ] **R3. First proof on emitted RMK code.** The smallest useful region,
+      e.g. the Rynk frame decoder or command dispatch, proved on the emitted
+      instructions for every input, every intermediate step, fault and event
+      covered. *Accepted:* job `proved`, nonvacuity, mutation controls
+      (changed instruction, false postcondition, weakened precondition),
+      axioms audited.
+      *Status (partial, not accepted):* `jobs/rmk/rmk-memmove-small.json`
+      is proved on `f39d833f` (memmove n < 16, both directions; 7 negative
+      controls). `jobs/rmk/rmk-memmove-contractB.json` is proved on
+      `f39d833f` (`E5R.Rmk.Memmove.contractB`: n < 16 either direction, or
+      n ≥ 16 forward with src ≡ dst mod 4; 7 mutation controls; re-run on
+      the integrated tree: 430 s, 6.3 GB). Not covered: n ≥ 16 backward and
+      the misaligned forward path, both reachable from the 488-byte deframer
+      buffer. The COBS decoder is proved (COBS worker,
+      `Projects/rmk/Cobs/`: `decode_in_place_report` and the wrapper
+      `decode_in_place`, job `jobs/rmk/rmk-cobs-decode.json`, 9/9 controls).
+      memmove is proved for every size, direction and alignment (peer:
+      `Memmove.contractAll`, Projects/rmk/MemmoveBwdAll.lean, 89ab0a6).
+      `Deframer/CopyDischarge.lean` proves `copy_contract : CopyContract` from
+      it, with an exact bridge and no weakening. So all four deframer methods
+      are proved UNCONDITIONALLY on the pinned bytes: `tail_contract`,
+      `park_contract`, `unpark_contract`, `next_contract`. With them come
+      `recv_step'` and `unpark_step'`. The COBS decoder is proved too (COBS
+      worker; `cobs_report`).
+
+      All 74 modules rebuild from source in 786 s and pass leanchecker, with
+      standard axioms only. Not done: the panic controls as runner jobs (COBS
+      worker owns the official jobs) and the session (R4).
+- [ ] **R4. Toward the session.** Compose R3 with the surrounding session
+      loop and interrupts (checker, direct regions or summaries). *Accepted:*
+      a kernel-checked theorem about the whole `run_session` path for the
+      chosen property, or a documented, measured blocker.
+      *Status (partial, not accepted):* the receive step is proved
+      (`recv_step'`, unconditional since `copy_contract`). `Deframer/Session.lean` `recv_step`: from
+      the session loop head 0x80003e1a with the deframer invariant, a quiet
+      run, for any buffer contents, reaches one of two points:
+      - `Some(k)`, 2 < k ≤ 488: 0x80003e70, after `park_pending` and
+        `RynkMessage::from_decoded`. Neither the bounds check 0x80003e5a nor
+        from_decoded's length panic is taken, because `next` now also
+        guarantees k < consumed. The message at 0x8002a580 is filled;
+      - `None`: just after `tail`, with the invariant again.
+
+      Along the way RAM writes stay in the deframer, the buffer, 0x70 stack
+      bytes, s6+0x2db and the 16-byte message. `Deframer/SessionLoop.lean`
+      `unpark_step`: from the unpark call site 0x80003fd8 (parked ≤ 488,
+      discarding ≤ 1) back to the loop head with `SessPre`. The map is
+      `verification/rv32/rmk/session-map.md`. Composition tools, proved:
+      `Projects/rmk/Reach.lean` (`reach_on_runs`: quiet deterministic runs
+      between checkpoints cover every Reach-able machine) and
+      `Projects/rmk/PanicRegion.lean` (`panic_absorbing`, `reach_no_panic`).
+      Event-aware trees (`Trees.lean`: `Lands`, `reach_lands`,
+      `reach_no_escape`, `reach_no_panic_io`) cover device reads (every
+      value) and writes (events). With them, `Deframer/Rx.lean` `rx_loop` (the
+      UART receive poll, unconditional) is proved for every LSR/RBR value
+      sequence, given the stated `RxEnv`. `Deframer/NonePath.lean`
+      `none_step`: from the None point, every behaviour returns to the loop
+      head with `SessPre`, or stops at an explicit read-future boundary
+      (0x80003ff2 or 0x80004428). Its assumptions about the Uart16550
+      struct and the task flag pointer are explicit. `Deframer/SessionInv.lean`
+      composes these steps for one loop round. `SessInv` is `SessPre` plus those
+      Uart16550/flag/stack facts, placed outside every proved write.
+      `none_of_recv` derives `NoneAt` from it. `session_round` says that from the
+      loop head with `SessInv`, every behaviour takes at least one step, with no
+      fault or interrupt, and reaches one of these:
+      - the loop head with `SessInv` again;
+      - the read-future boundary 0x80003ff2 or 0x80004428;
+      - the Some point 0x80003e70.
+
+      `unpark_round`: from the unpark call site 0x80003fd8 with the same
+      extras, back to the loop head with `SessInv`. The Some boundary
+      carries `SomeAt`: the message, parked ≤ 484, discarding ≤ 1 and the
+      extras. `Deframer/SomePath.lean` `some_neg` proves one branch: a
+      negative message header jumps straight to the unpark site and
+      returns to the loop head with `SessInv`. `Deframer/SomeRound.lean`
+      `some_round` covers every header, but only against two NAMED
+      callee contracts. AUDIT: the peer refuted both 07a17e5 contracts
+      (3ecd81b, kernel-checked), so that `some_round` was VACUOUS. The
+      dispatch side is repaired: `DispEnv` now fixes the service pointer
+      0x8002a4c0, s9 = msgA and the message, and the contract takes an
+      explicit world predicate `W`. SomeWitness.lean shows the repaired
+      `SomeAt`/`DispEnv` are satisfiable at the observed layout. `EncEnv`
+      is not yet repaired (the peer owns encode_frame, see
+      verification/rv32/rmk/some-interfaces.md), so `some_round` is still
+      vacuous. Both are hypotheses of the theorem and are proved
+      nowhere:
+      - `DispatchContract`: polling `RynkService::dispatch`'s future
+        returns;
+      - `EncodeContract`: `encode_frame` returns error, or a length ≤ 7.
+
+      Each is a `Lands` statement: the ABI frame, Quiet on return, and
+      the session cells it must leave alone (`Kept`). s10 = 0x8002a7f0
+      (the empty response's flag byte address) is part of `SessInv`'s
+      extras: recv_step, none_step and unpark_step export that x26 is
+      kept, so it is no longer a hypothesis of `some_round`. Under the two
+      contracts, every behaviour reaches one of:
+      - the loop head with `SessInv`: an empty response, through the
+        unpark site; the slice-check panic is shown not taken;
+      - 0x80004204: dispatch is Pending, and the poll exits to the
+        executor;
+      - 0x80003fa6: dispatch returned 0xff; not proved;
+      - 0x8000429e: the UART send loop; not proved.
+
+      Not proved:
+      - that `SessInv` holds when the task first reaches the loop head
+        (initialization). Partly done: `Init/InitPath.lean` `init_round`
+        proves that from an explicit `InitAt` at 0x80003b38 (observed
+        argument, flag and UART-struct values; non-empty by
+        `InitWitness.initAt_real`) every behaviour reaches the loop head
+        with `SessInv`. `memset` is proved (`Init/Memset.memset_words`).
+        It assumes the NAMED, undischarged `TopicsNewContract`
+        (`TopicSubscribers::new`). That the first poll reaches `InitAt` is
+        open;
+      - `DispatchContract` (`RynkService::dispatch` at 0x800001f2 is a
+        12.6 KB async state machine) and `EncodeContract`;
+      - the 0xff path and the connection from Some to the send loop;
+      - the UART read future and the executor between polls (other tasks,
+        interrupts, Quiet across polls).
+
+      Independently, `Encode/Spec.lean` proves `encode_spec` from `EncPre`, with
+      a concrete witness and a reachable return. `Encode/Bridge.lean` exposes
+      `CallPost`/`EncRes` when the caller proves write-set separation. This does
+      not discharge the refuted universal `EncodeContract` above.
+      `Uart/SendBytes.lean` proves `send_bytes`; `Uart/SendRound.lean` and
+      `SendToLoop.lean` extend it to the loop head or the explicit yield-poll
+      boundary 0x8001e14a, with satisfiable entry assumptions. Connecting the
+      Some path, and proving the executor/yield protocol, remain open. The
+      LR/SC model permits spurious SC failure, so unconditional yield-loop
+      termination cannot be inferred without a suitable progress assumption.
+
+      `SessionSafe` ranges over all of these, so it is not proved.
+
+Not in this scope, and not to be described as done: Cortex-M, multiple harts,
+DMA, U-mode/PMP, microkernels, timing or deadline guarantees, other boards,
+verified Rust, verified compilers, or all of Embassy.
+
 ## Quality gates
 
 Green before every merge to main. Each one is a command, not a judgment call.
@@ -976,6 +1277,9 @@ it was closed.
   to avoid.
 - **Exotic architectures ahead of depth:** x86-64 and AArch64 on ELF, PE and
   Mach-O get finished before anything else gets attention, SLEIGH breadth aside.
+  The owner-authorized V0 research experiment and the F firmware-verification
+  scope above are the only exception: one RISC-V board for binary-level
+  proofs, not a general architecture expansion.
 - **Reverse engineering the incumbents' internals:** Clean-room: public
   specifications, published papers, and the source of permissively licensed
   projects used within their licenses.

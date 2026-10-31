@@ -1,0 +1,9 @@
+ok control: unmodified copy: exit 0 proved |
+ok no-residue: exit 10 failed, first error in contractB | build/testjobs/MutContract.lean:149:30: error: Tactic `cases` failed with a nested error:
+ok no-direction: exit 10 failed, first error in contractB | build/testjobs/MutContract.lean:149:30: error: Tactic `cases` failed with a nested error:
+ok no-stack-sep: exit 10 failed, first error in contractB | build/testjobs/MutContract.lean:145:38: error: Application type mismatch: The argument
+ok wrong-post: exit 10 failed, first error in finishB | build/testjobs/MutContract.lean:114:6: error: omega could not prove the goal:
+ok loop-insn: exit 10 failed, first error in f80020ec4 | Projects/rmk/MemmoveFetch.lean:208:66: error: Tactic `decide` proved that the proposition
+ok tool-error: missing module: exit 13 error | build/testjobs/Nope.lean: No such file or directory (os error 2)
+all contractB mutations behaved as stated
+exit=0

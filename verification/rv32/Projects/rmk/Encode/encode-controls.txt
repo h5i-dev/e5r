@@ -1,0 +1,12 @@
+# test_encode_controls.py on the fresh ce52b08 build, 2026-10-30T15:21:55Z
+ok   baseline: the chain compiles
+ok   contract: response byte 9 admitted (RynkError has 9 variants; 9 jumps through unrelated rodata): REJECTED in Projects/rmk/Encode/Encode.lean:205 (enc_check): (kernel) application type mismatch
+ok   frame: callee stack claimed to stay within sp-0x50 (serialize goes to sp-0x60): REJECTED in Projects/rmk/Encode/Encode.lean:205 (enc_check): Tactic `decide` proved that the proposition
+ok   headroom: SomeAt's old sp bound 0x8002a808 (callee frame may overlap the frame buffer): REJECTED in Projects/rmk/Encode/Encode.lean:205 (enc_check): Tactic `decide` proved that the proposition
+ok   ABI: a0 (caller-saved, holds the result pointer) claimed preserved: REJECTED in Projects/rmk/Encode/Encode.lean:205 (enc_check): Tactic `decide` proved that the proposition
+ok   image: RynkError jump-table word for discriminant 0 misstated: REJECTED in Projects/rmk/Encode/Encode.lean:130 (encRom_ok): Tactic `decide` proved that the proposition
+ok   image: encode_frame entry instruction misstated (addi sp,-0x40): REJECTED in Projects/rmk/Encode/Encode.lean:152 (encTbl_ok): Tactic `decide` proved that the proposition
+ok   executor: older writes read through a non-disjoint newer write: REJECTED in Projects/rmk/Encode/Sym.lean:585 (rdW_sound): Application type mismatch: The argument
+ok   executor: an undecided branch followed only on its taken side: REJECTED in Projects/rmk/Encode/Sym.lean:767 (astepI_sound): unsolved goals
+every control failed in the expected declaration for the expected reason
+controls-exit=0

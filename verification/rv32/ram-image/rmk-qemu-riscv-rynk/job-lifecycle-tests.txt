@@ -1,0 +1,20 @@
+ok proved RAM-image job: exit 0 proved | {
+ok result is current: exit 0  | verification/rv32/build/testjobs/positive.result.json: current
+ok fidelity copy checks unmodified: exit 0  | x
+ok fidelity with a wrong entry does not check: exit 1  | verification/rv32/build/testjobs/BadFidelity.lean:16:39: error: Tactic `decide` proved that
+ok fidelity with a wrong rwBase does not check: exit 1  | verification/rv32/build/testjobs/BadFidelity.lean:16:39: error: Tactic `decide` proved that
+ok fidelity with a wrong exec bit does not check: exit 1  | verification/rv32/build/testjobs/BadFidelity.lean:16:39: error: Tactic `decide` proved that
+ok edited packed module makes the result stale: exit 1  | e5r-verify: verification/rv32/build/testjobs/positive.result.json: stale: generated image
+ok edited manifest makes the result stale: exit 1  | e5r-verify: verification/rv32/build/testjobs/positive.result.json: stale: generated image
+ok restored files are current again: exit 0  | verification/rv32/build/testjobs/positive.result.json: current
+ok changed ELF against its pin: exit 13 error | ELF identity changed (aaa89442189eea054b3d71f55b0ae3d502f0f7929819eb6bae00e9beb27a166a, job pins f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6
+ok exporter refusal is unsupported: exit 11 unsupported | PT_LOAD 1: p_paddr 0x800220dc != p_vaddr 0x800210dc; only the paddr=vaddr mapping policy is supported{
+ok no stale packed module left after a refusal: exit 0  | x
+ok RAM job on a flash board: exit 13 error | board hifive1-revb does not place images in RAM; this job's image.kind is ram{
+ok flash job on a RAM board: exit 13 error | board qemu-virt-rv32 places images in ram; this job's image.kind is flash{
+ok unknown image kind: exit 13 error | job: unknown variant `rom`, expected `flash` or `ram` at line 8 column 15{
+ok missing ELF: exit 13 error | elf: No such file or directory (os error 2){
+ok missing proof module: exit 13 error | build/testjobs/Missing.lean: No such file or directory (os error 2){
+ok forbidden command: exit 13 error | build/testjobs/Sorry.lean: forbidden sorry{
+ok proof that does not check is failed: exit 10 failed | build/testjobs/False.lean: exited with exit status: 1
+all RAM-image job tests passed

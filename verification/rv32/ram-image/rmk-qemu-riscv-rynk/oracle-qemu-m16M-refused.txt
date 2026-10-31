@@ -1,0 +1,4 @@
+MISMATCH: QEMU exited: er it has been built to load to the correct addresses.
+The following two regions overlap (in the memory address space):
+  rmk-qemu-riscv ELF program header segment 3 (addresses 0x0000000080029bd0 - 0x0000000081000000)
+  fdt (addresses 0x0000000080e00000 - 0x0000000080e010fa)

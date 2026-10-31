@@ -1,0 +1,23 @@
+old 48aefe786b47aea76da66e6c352426deb058b504b410ec1d81436e33b25ae9c1 452760 B
+new 8a57bf625572d1240c30fbf37ad81fa87eb33c2aaa4f503c3a86f5ec171265ff 452416 B
+entry 0x80000000 / 0x80000000
+section        old addr  old size   new addr  new size  diff
+.text        0x80000000   0x210c4 0x80000000   0x210c4  66551
+.text.dummy  0x80000000       0x0 0x80000000       0x0  same
+.init.rust   0x800210c4      0x16 0x800210c4      0x16  2
+.rodata      0x800210dc    0x78e8 0x800210dc    0x78e8  328
+.eh_frame    0x800289c4     0xbcc 0x800289c4     0xbcc  same
+.data        0x80029590       0x5 0x80029590       0x5  same
+.bss         0x80029598     0xfd1 0x80029598     0xfd1  same
+.heap        0x8002a56c       0x0 0x8002a56c       0x0  same
+.uninit      0x8002a56c       0x0 0x8002a56c       0x0  same
+.stack       0x8002a56c  0xfd5a94 0x8002a56c  0xfd5a94  same
+functions: {'same-bytes': 285, 'same-up-to-imm': 165, 'different': 3, 'only-or-count-differs': 3}; moved: 173
+focus memmove: old 0x80020c1e+0x8 new 0x80020c1e+0x8 same-bytes
+focus compiler_builtins::mem::memmove: old 0x80020d9e+0x31c new 0x80020d9e+0x31c same-bytes
+focus compiler_builtins::mem::memcpy: old 0x80020c26+0x178 new 0x80020c26+0x178 same-bytes
+focus <rmk_types::protocol::rynk::deframer::Deframer>::tail: old 0x8001d576+0x92 new 0x8001d576+0x92 same-bytes
+focus <rmk_types::protocol::rynk::deframer::Deframer>::next: old 0x8001d43a+0x13c new 0x8001d43a+0x13c same-bytes
+focus <rmk_types::protocol::rynk::deframer::Deframer>::park_pending: old 0x8001d388+0x6a new 0x8001d388+0x6a same-bytes
+focus <rmk_types::protocol::rynk::deframer::Deframer>::unpark_pending: old 0x8001d3f2+0x48 new 0x8001d3f2+0x48 same-bytes
+focus core::slice::index::slice_index_fail: old 0x8001fafc+0xce new 0x8001fafc+0xce same-bytes

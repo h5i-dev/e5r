@@ -1,0 +1,10 @@
+ok   baseline compiles
+ok   handler successors may leave the partition: REJECTED in Theories/AbsintSound.lean:3620: Type mismatch
+ok   interrupt may enter a handler node of another partition: REJECTED in Theories/AbsintSound.lean:3889: Application type mismatch: The argument
+ok   mret checked against partition 0 (G) instead of the node's own: REJECTED in Theories/AbsintSound.lean:3616: Application type mismatch: The argument
+ok   interruptible node checked against partition 0 (G): REJECTED in Theories/AbsintSound.lean:3876: Application type mismatch: The argument
+NOTE extra invariants Gs not well-formed-checked: soundness proof still compiles (condition not needed by the proof)
+
+real	2m53.629s
+user	4m59.537s
+sys	0m28.626s

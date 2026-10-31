@@ -1,0 +1,6 @@
+{"version": "1.3.0",
+ "packagesDir": ".lake/packages",
+ "packages": [],
+ "name": "rv32",
+ "lakeDir": ".lake",
+ "fixedToolchain": false}

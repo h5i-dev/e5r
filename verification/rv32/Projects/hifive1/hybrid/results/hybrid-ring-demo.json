@@ -1,0 +1,363 @@
+{
+  "inputs": {
+    "allowed_axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ],
+    "board_sha256": "cc5a2fd97f25787952548216d65ba63f2018ba58713b46a573feb276bc2b4607",
+    "e5r_verify": "0.1.0",
+    "e5r_verify_sha256": "e2843e44b1993056b5b3a3029cdd94afbe468c3a490d8a051b3c113deb3496e6",
+    "elf": {
+      "bytes": 4552,
+      "path": "build/hybrid-ring-O2.elf",
+      "sha256": "2f43781c32abc76efe17175ca0d3d83412f5c57d0b24859351ecd73553870596"
+    },
+    "job_sha256": "0cd2e7136e713a39efb8e01c4d008009a12e6ec0a763ee1c595d48c9e7db06ec",
+    "lean": "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release)",
+    "sources": {
+      "Projects/hifive1/hybrid/demo/Cert.lean": "506ccd3a29bc2a738c732c65e4335eb18ef8814486c815507e650624e05d32b5",
+      "Projects/hifive1/hybrid/demo/Config.lean": "6db5024de350e5c6c533cabbf2cdc64f56bb027e8373d89947dc7868c7d1fca1",
+      "Projects/hifive1/hybrid/demo/Proof.lean": "e619f797ae8ae592d1c6b31bec6e2afece727d42d17adb90b24f503d272b420f",
+      "Theories/Absint.lean": "c582fed3bac0276fca7de94bd4e08987c17ab30badf74138e74fccc7f6dd312e",
+      "Theories/AbsintSound.lean": "111a64a831bfe1fafc3ba0616fd4d7342ed24624a87119139bb2a3996d729818",
+      "Theories/Board/Hifive1Revb.lean": "9c4d1786b02048ff815849c8b73375d1651ea5cdf9c47d6062db8c170c2db92f",
+      "Theories/FlashElf.lean": "b3a5dd6e56e6e9444b88f05de6f020e326377f55af777b380249fc53cc0111a6",
+      "Theories/Hart.lean": "dde4a86db936c9ad60f58866c3ebb333fbc556ec0f94299da212d0ca08cfb82a",
+      "Theories/Hybrid/Basic.lean": "80aac8422f21a9558e1840992750790c4febfa3275e47627b3cdbdb3551a2a00",
+      "Theories/Hybrid/Wrap.lean": "9127d8afa2c52eca7b57c4bc8f131194a8305435da1d65b7577f010f3d86dcf9",
+      "Theories/Logic.lean": "2abb6fb82fc72308a5e7da7d482b94784b1490896634d7ea9d38c9b7b9460bf5",
+      "Theories/Platform.lean": "ffe57260ae4046ebd1bebbe687287edd049b87f3993d48a78495b2c61acde261",
+      "tools/gen_board.py": "72d35cd62bc43f7713e4711da44f26ff51a7e41d4ce58366de4eb33d3df7d764"
+    }
+  },
+  "job": "hybrid-ring-demo",
+  "job_file": "Projects/hifive1/hybrid/jobs/hybrid-ring-demo.json",
+  "modules": [
+    "Theories/Hart.lean",
+    "Theories/Platform.lean",
+    "Theories/Logic.lean",
+    "Theories/FlashElf.lean",
+    "Theories/Board/Hifive1Revb.lean",
+    "Projects/hifive1/hybrid/demo/Image.lean",
+    "Projects/hifive1/hybrid/demo/ImageFidelity.lean",
+    "Theories/Hybrid/Basic.lean",
+    "Theories/Hybrid/Wrap.lean",
+    "Theories/Absint.lean",
+    "Theories/AbsintSound.lean",
+    "Projects/hifive1/hybrid/demo/Config.lean",
+    "Projects/hifive1/hybrid/demo/Cert.lean",
+    "Projects/hifive1/hybrid/demo/Proof.lean"
+  ],
+  "resumed": [],
+  "schema": "e5r.verify.result.v1",
+  "seconds": 89.72021351,
+  "stages": [
+    {
+      "name": "build mkdir -p build",
+      "peak_rss_mib": 0,
+      "seconds": 0.10116924
+    },
+    {
+      "name": "build rustup run 1.98.1 rustc --target riscv32imac-unknown-none-elf --crate-type bin --edition 2024 -C opt-level=2 -C panic=abort -C relocation-model=static -C link-arg=-Tlink.ld -C strip=none -o ../../../../build/hybrid-ring-O2.elf ring.rs",
+      "peak_rss_mib": 94,
+      "seconds": 0.201838576
+    },
+    {
+      "name": "lean Theories/Hart.lean",
+      "peak_rss_mib": 511,
+      "seconds": 3.208809095
+    },
+    {
+      "name": "lean Theories/Platform.lean",
+      "peak_rss_mib": 488,
+      "seconds": 2.005558486
+    },
+    {
+      "name": "lean Theories/Logic.lean",
+      "peak_rss_mib": 500,
+      "seconds": 2.606564091
+    },
+    {
+      "name": "lean Theories/FlashElf.lean",
+      "peak_rss_mib": 467,
+      "seconds": 1.604895542
+    },
+    {
+      "name": "lean Theories/Board/Hifive1Revb.lean",
+      "peak_rss_mib": 455,
+      "seconds": 1.304036715
+    },
+    {
+      "name": "lean Projects/hifive1/hybrid/demo/Image.lean",
+      "peak_rss_mib": 595,
+      "seconds": 4.209688888
+    },
+    {
+      "name": "lean Projects/hifive1/hybrid/demo/ImageFidelity.lean",
+      "peak_rss_mib": 540,
+      "seconds": 1.905624413
+    },
+    {
+      "name": "lean Theories/Hybrid/Basic.lean",
+      "peak_rss_mib": 469,
+      "seconds": 1.504411503
+    },
+    {
+      "name": "lean Theories/Hybrid/Wrap.lean",
+      "peak_rss_mib": 457,
+      "seconds": 1.5044982
+    },
+    {
+      "name": "lean Theories/Absint.lean",
+      "peak_rss_mib": 523,
+      "seconds": 3.8100938749999997
+    },
+    {
+      "name": "lean Theories/AbsintSound.lean",
+      "peak_rss_mib": 792,
+      "seconds": 23.159135548
+    },
+    {
+      "name": "lean Projects/hifive1/hybrid/demo/Config.lean",
+      "peak_rss_mib": 452,
+      "seconds": 1.404859593
+    },
+    {
+      "name": "lean Projects/hifive1/hybrid/demo/Cert.lean",
+      "peak_rss_mib": 474,
+      "seconds": 2.207113203
+    },
+    {
+      "name": "lean Projects/hifive1/hybrid/demo/Proof.lean",
+      "peak_rss_mib": 556,
+      "seconds": 3.210199536
+    },
+    {
+      "name": "leanchecker Theories/Hart.lean",
+      "peak_rss_mib": 433,
+      "seconds": 5.216140398
+    },
+    {
+      "name": "leanchecker Theories/Platform.lean",
+      "peak_rss_mib": 360,
+      "seconds": 1.7056993820000002
+    },
+    {
+      "name": "leanchecker Theories/Logic.lean",
+      "peak_rss_mib": 444,
+      "seconds": 2.006039327
+    },
+    {
+      "name": "leanchecker Theories/FlashElf.lean",
+      "peak_rss_mib": 423,
+      "seconds": 1.905567536
+    },
+    {
+      "name": "leanchecker Theories/Board/Hifive1Revb.lean",
+      "peak_rss_mib": 433,
+      "seconds": 1.805541182
+    },
+    {
+      "name": "leanchecker Projects/hifive1/hybrid/demo/Image.lean",
+      "peak_rss_mib": 436,
+      "seconds": 1.80533739
+    },
+    {
+      "name": "leanchecker Projects/hifive1/hybrid/demo/ImageFidelity.lean",
+      "peak_rss_mib": 520,
+      "seconds": 2.30715699
+    },
+    {
+      "name": "leanchecker Theories/Hybrid/Basic.lean",
+      "peak_rss_mib": 434,
+      "seconds": 1.80593688
+    },
+    {
+      "name": "leanchecker Theories/Hybrid/Wrap.lean",
+      "peak_rss_mib": 402,
+      "seconds": 1.906885096
+    },
+    {
+      "name": "leanchecker Theories/Absint.lean",
+      "peak_rss_mib": 435,
+      "seconds": 2.006229057
+    },
+    {
+      "name": "leanchecker Theories/AbsintSound.lean",
+      "peak_rss_mib": 464,
+      "seconds": 5.413186132
+    },
+    {
+      "name": "leanchecker Projects/hifive1/hybrid/demo/Config.lean",
+      "peak_rss_mib": 437,
+      "seconds": 1.8053517019999998
+    },
+    {
+      "name": "leanchecker Projects/hifive1/hybrid/demo/Cert.lean",
+      "peak_rss_mib": 226,
+      "seconds": 2.005737779
+    },
+    {
+      "name": "leanchecker Projects/hifive1/hybrid/demo/Proof.lean",
+      "peak_rss_mib": 492,
+      "seconds": 2.307734702
+    }
+  ],
+  "status": "proved",
+  "theorems": [
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.i0"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.i1"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.i2"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.i3"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.i4"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.i5"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.i6"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.i7"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.i8"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.i9"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.i10"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.i11"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.i12"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.i13"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.i14"
+    },
+    {
+      "axioms": [
+        "propext"
+      ],
+      "name": "E5R.HybridDemo.Proof.handover_get"
+    },
+    {
+      "axioms": [
+        "propext"
+      ],
+      "name": "E5R.HybridDemo.Proof.sameCsr_parts"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.region"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.ai_check"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.ai_safe"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "E5R.HybridDemo.Proof.demo_safe"
+    },
+    {
+      "axioms": [
+        "propext"
+      ],
+      "name": "E5R.HybridDemo.image_fidelity"
+    }
+  ]
+}

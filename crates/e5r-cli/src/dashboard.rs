@@ -386,9 +386,15 @@ fn serve_inner(
             // Fonts ship inside the binary: the workspace stays offline and the CSP stays 'self'.
             let font: Option<&'static [u8]> = match path.as_str() {
                 "/fonts/archivo.woff2" => Some(include_bytes!("dashboard/fonts/archivo.woff2")),
-                "/fonts/plex-mono-400.woff2" => Some(include_bytes!("dashboard/fonts/plex-mono-400.woff2")),
-                "/fonts/plex-mono-500.woff2" => Some(include_bytes!("dashboard/fonts/plex-mono-500.woff2")),
-                "/fonts/plex-mono-600.woff2" => Some(include_bytes!("dashboard/fonts/plex-mono-600.woff2")),
+                "/fonts/plex-mono-400.woff2" => {
+                    Some(include_bytes!("dashboard/fonts/plex-mono-400.woff2"))
+                }
+                "/fonts/plex-mono-500.woff2" => {
+                    Some(include_bytes!("dashboard/fonts/plex-mono-500.woff2"))
+                }
+                "/fonts/plex-mono-600.woff2" => {
+                    Some(include_bytes!("dashboard/fonts/plex-mono-600.woff2"))
+                }
                 _ => None,
             };
             if let Some(body) = font {

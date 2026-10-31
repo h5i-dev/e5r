@@ -1,0 +1,17 @@
+{
+ "arch": "rv32imac_zicsr_zifencei",
+ "seed": 1,
+ "samples": 1000000,
+ "counts": {
+  "16-bit agree": 28823,
+  "16-bit both-illegal": 18792,
+  "16-bit rv32-shamt5": 1536,
+  "16-bit rvc-reserved": 1,
+  "32-bit agree": 431157,
+  "32-bit both-illegal": 558696,
+  "32-bit e31-illegal": 38,
+  "32-bit rv32-shamt5": 176,
+  "32-bit spec-fence": 14285
+ },
+ "examples": {}
+}

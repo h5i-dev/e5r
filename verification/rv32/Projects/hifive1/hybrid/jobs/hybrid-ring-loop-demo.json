@@ -1,0 +1,69 @@
+{
+  "schema": "e5r.verify.job.v1",
+  "id": "hybrid-ring-loop-demo",
+  "root": "../../../..",
+  "board": "boards/hifive1-revb.json",
+  "build": [
+    {
+      "cwd": ".",
+      "argv": [
+        "mkdir",
+        "-p",
+        "build"
+      ]
+    },
+    {
+      "cwd": "Projects/hifive1/hybrid/demo",
+      "argv": [
+        "rustup",
+        "run",
+        "1.98.1",
+        "rustc",
+        "--target",
+        "riscv32imac-unknown-none-elf",
+        "--crate-type",
+        "bin",
+        "--edition",
+        "2024",
+        "-C",
+        "opt-level=2",
+        "-C",
+        "panic=abort",
+        "-C",
+        "relocation-model=static",
+        "-C",
+        "link-arg=-Tlink.ld",
+        "-C",
+        "strip=none",
+        "-o",
+        "../../../../build/hybrid-ring-loop-O2.elf",
+        "ring_loop.rs"
+      ]
+    }
+  ],
+  "elf": "build/hybrid-ring-loop-O2.elf",
+  "elf_sha256": "bb337c3f5ea9f75801159b9ace2bdd6271a504ff493ad5959fcdc4bb2f54a4f0",
+  "image": {
+    "module": "Projects.hifive1.hybrid.demo.LoopImage",
+    "namespace": "E5R.HybridLoop"
+  },
+  "modules": [
+    "Theories/Hybrid/Basic.lean",
+    "Theories/Hybrid/Wrap.lean",
+    "Theories/Absint.lean",
+    "Theories/AbsintSound.lean",
+    "Theories/Hybrid/AIBridge.lean",
+    "Projects/hifive1/hybrid/demo/LoopConfig.lean",
+    "Projects/hifive1/hybrid/demo/LoopCert.lean",
+    "Projects/hifive1/hybrid/demo/LoopProof.lean",
+    "Projects/hifive1/hybrid/demo/LoopControls.lean"
+  ],
+  "theorems": [
+    "E5R.HybridLoop.Proof.*",
+    "E5R.HybridLoop.Controls.*"
+  ],
+  "limits": {
+    "seconds": 1800,
+    "rss_mib": 5120
+  }
+}

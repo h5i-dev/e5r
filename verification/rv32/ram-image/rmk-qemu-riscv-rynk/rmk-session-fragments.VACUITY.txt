@@ -1,0 +1,11 @@
+rmk-session-fragments.result.json (main 07a17e5, wrapper 4ab7ba9, receipt commit 85d7cd2): VACUOUS FOR THE SOME PATH.
+
+The kernel accepted `some_round`, `some_pos` and `E5R.RmkFragments.{some_round, round_some}`. These are
+implications whose hypotheses `DispatchContract` and `EncodeContract` are REFUTED by the peer audit
+isa-review 3ecd81b (Projects/rmk/review/SomeAudit.lean), with kernel-checked theorems:
+  dispatch_contract_false : ¬ DispatchContract      (DispEnv leaves the RynkService ptr [0x8002a780] and s9 free; fault 0x8000026e)
+  encode_contract_false   : ¬ EncodeContract        (EncEnv lets Kept's UART struct overlap buffer 0x8002a7b1; s6 free)
+  some_hyps_false         : ¬ (DispatchContract ∧ EncodeContract)
+This receipt is NOT evidence that these assumptions hold. Its bundle, recheck and controls are NOT safety progress.
+Non-Some theorems in the receipt (session_round, unpark_round, none_of_recv, some_neg, none_step, rx_loop, reach lemmas,
+copy_contract, contractAll, cobs_report, unpark_lands) are unaffected. SessionSafe is NOT proved.

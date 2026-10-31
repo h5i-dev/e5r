@@ -1,0 +1,25 @@
+== review fwreplay neg-reg
+step 4999 (pc 200100a0): [x10 model 00000008 qemu 00000009]
+exit=1
+== review fwreplay neg-dropw
+step 1145 (pc 2001070c): device writes model [(10015024, 0000000f)] qemu []
+exit=1
+== review fwreplay neg-pwmval
+step 1145 (pc 2001070c): device writes model [(10015024, 0000000f)] qemu [(10015024, 00000065)]
+exit=1
+== review fwreplay neg-epc
+step 2345: QEMU interrupt epc 20010298, model at 20010296
+exit=1
+== review fwreplay neg-dropirq
+step 2345 (pc 20010292): [pc model 20010296 qemu 20010094, mstatus model 00000088 qemu 00001880]
+exit=1
+== production replay main-neg-reg
+step 5000 (pc 200100a4): [x10 model 00000008 qemu 00000009]
+exit=1
+== production replay, device-write-value mutant
+replayed 19999 transitions, 50 interrupts, 313 device writes; model and QEMU agree
+pwm0.pwmcmp1 writes: [16, 16, 48, 59, 75, 76, 90]
+exit=0
+== review fwreplay, device-write-value mutant
+step 294 (pc 2001075e): device writes model [(02004004, 00000000)] qemu [(02004004, ffffffff)]
+exit=1

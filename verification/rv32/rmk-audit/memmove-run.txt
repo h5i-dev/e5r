@@ -1,0 +1,26 @@
+rwBase 2147654600, reader accepts: true
+small n=10 forward (contractB): returned after 79 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): []; ABI registers preserved: true
+aligned n=40 forward, src≡dst (contractB): returned after 82 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): []; ABI registers preserved: true
+misaligned o=1 n=40 forward: returned after 168 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+misaligned o=2 n=40 forward: returned after 161 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+misaligned o=3 n=40 forward: returned after 184 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+misaligned o=1 n=40 forward, overlap dst = src-1: returned after 168 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+backward n=40 overlap dst = src+5: returned after 208 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-22, -20, -16, -15, -14, -13]; ABI registers preserved: true
+backward n=40 overlap dst = src+4: returned after 98 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): []; ABI registers preserved: true
+misaligned o=1, sp = rwBase+12 (PreB's Slots lower bound): fault at pc 0x80020e68#32 after 22 steps: E5R.Fault.unsupported "store to an unmodeled address"
+aligned n=40, sp = rwBase+12: returned after 82 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): []; ABI registers preserved: true
+aligned n=40 ending at the last RAM byte: returned after 82 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): []; ABI registers preserved: true
+dst over the stack temps (PreB dstSep holds): returned after 118 steps; dst bytes wrong: 2; save-slot bytes changed: 12; other bytes changed (offset from caller sp): []; ABI registers preserved: true
+src over the stack temps (PreB srcSep holds): returned after 118 steps; dst bytes wrong: 4; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+bounds o=1: source starts at RAM start: returned after 175 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+bounds o=1: source ends at RAM end: returned after 173 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+bounds o=1: destination starts at RAM start: returned after 190 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+bounds o=1: destination ends at RAM end: returned after 176 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+bounds o=2: source starts at RAM start: returned after 168 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+bounds o=2: source ends at RAM end: returned after 173 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+bounds o=2: destination starts at RAM start: returned after 185 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+bounds o=2: destination ends at RAM end: returned after 187 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+bounds o=3: source starts at RAM start: returned after 173 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+bounds o=3: source ends at RAM end: returned after 173 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+bounds o=3: destination starts at RAM start: returned after 177 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): [-34, -32, -28, -27, -26, -25]; ABI registers preserved: true
+bounds o=3: destination ends at RAM end: returned after 87 steps; dst bytes wrong: 0; save-slot bytes changed: 12; other bytes changed (offset from caller sp): []; ABI registers preserved: true

@@ -1,0 +1,30 @@
+{
+  "schema": "e5r.verify.job.v1",
+  "id": "hybrid-ring-demo",
+  "root": "../../../..",
+  "board": "boards/hifive1-revb.json",
+  "build": [
+    { "cwd": ".", "argv": ["mkdir", "-p", "build"] },
+    {
+      "cwd": "Projects/hifive1/hybrid/demo",
+      "argv": ["rustup", "run", "1.98.1", "rustc", "--target", "riscv32imac-unknown-none-elf",
+               "--crate-type", "bin", "--edition", "2024", "-C", "opt-level=2", "-C", "panic=abort",
+               "-C", "relocation-model=static", "-C", "link-arg=-Tlink.ld", "-C", "strip=none",
+               "-o", "../../../../build/hybrid-ring-O2.elf", "ring.rs"]
+    }
+  ],
+  "elf": "build/hybrid-ring-O2.elf",
+  "elf_sha256": "2f43781c32abc76efe17175ca0d3d83412f5c57d0b24859351ecd73553870596",
+  "image": { "module": "Projects.hifive1.hybrid.demo.Image", "namespace": "E5R.HybridDemo" },
+  "modules": [
+    "Theories/Hybrid/Basic.lean",
+    "Theories/Hybrid/Wrap.lean",
+    "Theories/Absint.lean",
+    "Theories/AbsintSound.lean",
+    "Projects/hifive1/hybrid/demo/Config.lean",
+    "Projects/hifive1/hybrid/demo/Cert.lean",
+    "Projects/hifive1/hybrid/demo/Proof.lean"
+  ],
+  "theorems": ["E5R.HybridDemo.Proof.*"],
+  "limits": { "seconds": 1800, "rss_mib": 5120 }
+}

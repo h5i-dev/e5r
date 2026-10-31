@@ -1,0 +1,42 @@
+{
+  "schema": "e5r.verify.job.v1",
+  "id": "hybrid-ringhead-firmware",
+  "root": "../../../..",
+  "board": "boards/hifive1-revb.json",
+  "build": [
+    {
+      "cwd": "firmware/hifive1-embassy",
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "build",
+        "--release",
+        "--locked"
+      ]
+    }
+  ],
+  "elf": "firmware/hifive1-embassy/target/riscv32imac-unknown-none-elf/release/hifive1-embassy",
+  "elf_sha256": "1d8e45ce50c5a4c0abc9ae76321b0da6fad42b64236c1c836d62bfbf17eace2a",
+  "image": {
+    "module": "Projects.hifive1.Image",
+    "namespace": "E5R.Firmware"
+  },
+  "modules": [
+    "Theories/Hybrid/Basic.lean",
+    "Theories/Hybrid/Wrap.lean",
+    "Projects/hifive1/hybrid/Ring.lean",
+    "Theories/Absint.lean",
+    "Theories/AbsintSound.lean",
+    "Theories/Hybrid/AIBridge.lean",
+    "Projects/hifive1/Config.lean",
+    "Projects/hifive1/hybrid/RingAI.lean"
+  ],
+  "theorems": [
+    "E5R.Hifive1.Hybrid.Ring.*",
+    "E5R.Hifive1.Hybrid.RingAI.*"
+  ],
+  "limits": {
+    "seconds": 1800,
+    "rss_mib": 5120
+  }
+}

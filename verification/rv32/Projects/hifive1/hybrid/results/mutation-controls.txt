@@ -1,0 +1,23 @@
+ok   baseline: loop chain from LoopConfig compiles
+ok   baseline: tail chain from Tail compiles
+ok   changed instruction in the demo image (c.and -> c.or at 0x20010024): REJECTED in Projects/hifive1/hybrid/demo/LoopProof.lean:47 (i4): Tactic `decide` proved that the proposition
+ok   changed instruction in the firmware image (c.and -> c.or at 0x200106ac): REJECTED in Projects/hifive1/hybrid/Ring.lean:52 (i6): Tactic `decide` proved that the proposition
+ok   false postcondition: the summary claims the new head is in 0..2: REJECTED in Projects/hifive1/hybrid/demo/LoopProof.lean:185 (adapter): omega could not prove the goal:
+ok   false wrap: next h claimed to be h + 2: REJECTED in Theories/Hybrid/Wrap.lean:19 (next_lt): omega could not prove the goal:
+ok   invalid precondition: the entry node may hold head 4: REJECTED in Projects/hifive1/hybrid/demo/LoopProof.lean:159 (adapter): omega could not prove the goal:
+ok   interrupt obligation: the entry node may have MIE set: REJECTED in Projects/hifive1/hybrid/demo/LoopProof.lean:160 (adapter): unsolved goals
+ok   tampered certificate: the delegation removed: REJECTED in Projects/hifive1/hybrid/demo/LoopProof.lean:218 (ai_check): Tactic `decide` proved that the proposition
+ok   tampered certificate: the PWM values widened past 100: REJECTED in Projects/hifive1/hybrid/demo/LoopProof.lean:218 (ai_check): Tactic `decide` proved that the proposition
+ok   changed instruction in the firmware image (c.and -> c.or at 0x20010494, tail wrap): REJECTED in Projects/hifive1/hybrid/Tail.lean:52 (i6): Tactic `decide` proved that the proposition
+ok   tail: false postcondition, the new tail claimed in 0..2: REJECTED in Projects/hifive1/hybrid/TailAI.lean:152 (adapter): omega could not prove the goal:
+ok   tail: invalid precondition, the tail word fact may be 4: REJECTED in Projects/hifive1/hybrid/TailAI.lean:111 (adapter): Type mismatch
+ok   tail: unknown tail word accepted: REJECTED in Projects/hifive1/hybrid/TailAI.lean:113 (adapter): unsolved goals
+ok   tail: interrupt obligation, the entry node may have MIE set: REJECTED in Projects/hifive1/hybrid/TailAI.lean:123 (adapter): unsolved goals
+ok   tail: buffer facts invalidated for one byte only: REJECTED in Projects/hifive1/hybrid/TailAI.lean:70 (forget_holds): Application type mismatch: The argument
+ok   infrastructure: masked runs without the masking premise (does not elaborate): ELAB in Theories/Hybrid/Basic.lean:49 (MRun.trans): Too many variable names provided at alternative `step`: 4 provided, but 3 expected
+ok   infrastructure: a missing import: ELAB in Projects/hifive1/hybrid/demo/LoopProof.lean:28 (None): object file '/dev/shm/hybrid-controls-55bcr6bs/rv32/.lake/build/lib/lean/Theories/Hybrid/Wrapp.olean' of modul
+every control failed in the expected declaration for the expected reason
+
+real	7m37.453s
+user	3m25.445s
+sys	2m9.039s

@@ -1,0 +1,122 @@
+{
+  "arch_attribute": "rv32i2p1_m2p0_a2p1_c2p0_zmmul1p0_zaamo1p0_zalrsc1p0_zca1p0",
+  "assumptions": [
+    "A1 initial-ram: for every segment, RAM[file.start, file.end) equals the blob bytes and RAM[zero.start, zero.end) is zero; RAM outside all segments is unconstrained (QEMU puts its device tree there)",
+    "A2 fetch-coherence: segment permissions are ELF metadata only (QEMU virt RAM is writable and executable, no PMP under -bios none); a model fetching from this image is exact only if no store or AMO ever writes an executable segment's range",
+    "A3 entry: QEMU starts the hart in M-mode at its reset ROM (0x1000), which jumps to `entry` with a0 = mhartid, a1 = device-tree address, a2 = 0x1028, t0 = entry; other registers and CSRs are not described here",
+    "A4 loader: QEMU's ELF loader places p_filesz bytes at p_paddr (= p_vaddr here) and zero-fills to p_memsz; not checked by the exporter",
+    "A5 machine RAM: the window given to the exporter must lie inside the machine's RAM and no other loaded blob (device tree, firmware) may overlap a segment; QEMU's own RAM size (-m) is not checked by the exporter"
+  ],
+  "budgets": {
+    "max_file": 1048576,
+    "max_file_bytes": 524288
+  },
+  "e_flags": 1,
+  "elf": {
+    "lean_file": {
+      "len": 454024,
+      "order": "little-endian",
+      "word_bytes": 64,
+      "words": 7095
+    },
+    "sha256": "f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30",
+    "size": 454024
+  },
+  "entry": 2147483648,
+  "mapping": "paddr=vaddr",
+  "ram": {
+    "base": 2147483648,
+    "size": 16777216
+  },
+  "rw_base": 2147654600,
+  "schema": "e5r.ram-image.v1",
+  "segments": [
+    {
+      "blob": "seg-0.bin",
+      "file": {
+        "end": 2147619034,
+        "start": 2147483648
+      },
+      "file_sha256": "6327ee65f6d15f1d968ca2dab4da23a132f84faf7e9cb4b8551417547e4b1b3b",
+      "index": 0,
+      "p_align": 4096,
+      "p_filesz": 135386,
+      "p_memsz": 135386,
+      "p_offset": 4096,
+      "p_paddr": 2147483648,
+      "p_vaddr": 2147483648,
+      "r": true,
+      "w": false,
+      "x": true,
+      "zero": null
+    },
+    {
+      "blob": "seg-1.bin",
+      "file": {
+        "end": 2147654600,
+        "start": 2147619036
+      },
+      "file_sha256": "8bcc02e1e8b9254ed68d9f61f3711bc108c2262ceb2523693666d095ebaf449a",
+      "index": 1,
+      "p_align": 4096,
+      "p_filesz": 35564,
+      "p_memsz": 35564,
+      "p_offset": 139484,
+      "p_paddr": 2147619036,
+      "p_vaddr": 2147619036,
+      "r": true,
+      "w": false,
+      "x": false,
+      "zero": null
+    },
+    {
+      "blob": "seg-2.bin",
+      "file": {
+        "end": 2147654605,
+        "start": 2147654600
+      },
+      "file_sha256": "0bd288cecce2dfc6c9b9245ab747a10870f84c16e986e61b259603b59cf1f3b9",
+      "index": 2,
+      "p_align": 4096,
+      "p_filesz": 5,
+      "p_memsz": 5,
+      "p_offset": 175048,
+      "p_paddr": 2147654600,
+      "p_vaddr": 2147654600,
+      "r": true,
+      "w": true,
+      "x": false,
+      "zero": null
+    },
+    {
+      "blob": "seg-3.bin",
+      "file": {
+        "end": 2147654608,
+        "start": 2147654608
+      },
+      "file_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "index": 3,
+      "p_align": 4096,
+      "p_filesz": 0,
+      "p_memsz": 16606256,
+      "p_offset": 175056,
+      "p_paddr": 2147654608,
+      "p_vaddr": 2147654608,
+      "r": true,
+      "w": true,
+      "x": false,
+      "zero": {
+        "end": 2164260864,
+        "start": 2147654608
+      }
+    }
+  ],
+  "tool": {
+    "name": "e5r-verify ram-image",
+    "version": "0.1.0"
+  },
+  "totals": {
+    "file_bytes": 170955,
+    "zero_bytes": 16606256
+  }
+}

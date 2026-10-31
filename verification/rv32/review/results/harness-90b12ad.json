@@ -1,0 +1,85 @@
+{
+ "cases": 1725,
+ "stats": {
+  "rv32i-op": {
+   "AGREE": 454
+  },
+  "x0": {
+   "AGREE": 28
+  },
+  "rv32i-imm": {
+   "AGREE": 256
+  },
+  "illegal": {
+   "AGREE-TRAP": 27,
+   "MISMATCH": 1
+  },
+  "rv32m": {
+   "AGREE": 520
+  },
+  "branch": {
+   "AGREE": 73
+  },
+  "jump": {
+   "AGREE": 14
+  },
+  "load": {
+   "AGREE": 38,
+   "MISMATCH": 17,
+   "DECLINE": 2
+  },
+  "store": {
+   "AGREE": 18,
+   "MISMATCH": 9,
+   "DECLINE": 2
+  },
+  "device": {
+   "AGREE": 2,
+   "DECLINE": 1
+  },
+  "amo": {
+   "AGREE": 72,
+   "AGREE-TRAP": 9,
+   "DECLINE": 1
+  },
+  "lrsc": {
+   "AGREE": 4,
+   "AGREE-TRAP": 1,
+   "MISMATCH": 2,
+   "DECLINE": 1
+  },
+  "rvc": {
+   "AGREE": 52,
+   "AGREE-TRAP": 1
+  },
+  "rvc-illegal": {
+   "AGREE-TRAP": 22
+  },
+  "rvc-hint": {
+   "AGREE": 9
+  },
+  "rvc-jump": {
+   "AGREE": 16
+  },
+  "system": {
+   "AGREE-TRAP": 2,
+   "AGREE": 6
+  },
+  "csr": {
+   "AGREE": 38,
+   "MISMATCH": 3,
+   "DECLINE": 9,
+   "AGREE-TRAP": 3
+  },
+  "mret": {
+   "AGREE": 5
+  },
+  "irq": {
+   "AGREE-IRQ": 6,
+   "AGREE": 1
+  }
+ },
+ "unexpected": [],
+ "setup_problems": [],
+ "expect_problems": []
+}

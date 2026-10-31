@@ -1,0 +1,4 @@
+This bundle (fragments job @ main 07a17e5; bundle 1574 s, recheck.sh 1090 s OK, wrapper sha 22f6e9a = receipt) reproduces a
+kernel-accepted IMPLICATION. some_round / some_pos / round_some have premises DispatchContract and EncodeContract that peer
+isa-review 3ecd81b REFUTES (kernel-checked). A successful bundle and recheck are NOT evidence that those premises hold,
+and NOT safety progress for the Some path. See ../rmk-session-fragments.VACUITY.txt. SessionSafe is NOT proved.

@@ -1,0 +1,4 @@
+# Explicit license policy for the roadmap's cargo-deny gate. The dependency
+# graph uses these permissive licenses (Unicode-3.0 for unicode-ident).
+[licenses]
+allow = ["Apache-2.0", "MIT", "Unicode-3.0"]

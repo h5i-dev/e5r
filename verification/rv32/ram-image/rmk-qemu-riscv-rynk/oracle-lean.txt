@@ -1,0 +1,5 @@
+ok image.lean unpacks to all 454024 ELF bytes (7095 words), sha256 f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30
+ok image module Rmk.QemuRiscvRynk elaborates: 8.6 s, 728 MB
+ok kernel: accepts = true and check = manifest (entry 0x80000000, 4 PT_LOADs, rwBase 0x80029bc8): 2.2 s, 547 MB
+lean toolchain leanprover/lean4:v4.35.0
+RamElf.lean from support-lean4 d96ca4557cd0eb35dd7dc1bddbf6a59114d70e1e

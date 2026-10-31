@@ -1,0 +1,39 @@
+class                                           runs  changed frame bytes (offset from caller sp)
+n<16 src≡dst bwd-overlap-far                      28  -12..-1
+n<16 src≡dst bwd-overlap-near                     44  -12..-1
+n<16 src≡dst disjoint-above                       64  -12..-1
+n<16 src≡dst disjoint-below                       64  -12..-1
+n<16 src≡dst fwd-overlap-far                      28  -12..-1
+n<16 src≡dst fwd-overlap-near                     44  -12..-1
+n<16 src≡dst same                                 64  -12..-1
+n<16 src≢dst bwd-overlap-far                     108  -12..-1
+n<16 src≢dst bwd-overlap-near                    156  -12..-1
+n<16 src≢dst disjoint-above                      192  -12..-1
+n<16 src≢dst disjoint-below                      192  -12..-1
+n<16 src≢dst fwd-overlap-far                     108  -12..-1
+n<16 src≢dst fwd-overlap-near                    156  -12..-1
+n>=16 src≡dst bwd-overlap-far                   1892  -12..-1
+n>=16 src≡dst bwd-overlap-near                  1892  -12..-1
+n>=16 src≡dst disjoint-above                    1892  -12..-1
+n>=16 src≡dst disjoint-below                    1892  -12..-1
+n>=16 src≡dst fwd-overlap-far                   1892  -12..-1
+n>=16 src≡dst fwd-overlap-near                  1892  -12..-1
+n>=16 src≡dst same                              1892  -12..-1
+n>=16 src≢dst bwd-overlap-far                   5676  -22, -20, -16..-1 | -22, -16..-1 | -20, -16..-1
+n>=16 src≢dst bwd-overlap-near                  5676  -22, -20, -16..-1 | -22, -16..-1 | -20, -16..-1
+n>=16 src≢dst disjoint-above                    5676  -34, -32, -28..-25, -12..-1 | -34, -28..-25, -12..-1 | -32, -28..-25, -12..-1
+n>=16 src≢dst disjoint-below                    5676  -34, -32, -28..-25, -12..-1 | -34, -28..-25, -12..-1 | -32, -28..-25, -12..-1
+n>=16 src≢dst fwd-overlap-far                   5676  -34, -32, -28..-25, -12..-1 | -34, -28..-25, -12..-1 | -32, -28..-25, -12..-1
+n>=16 src≢dst fwd-overlap-near                  5676  -34, -32, -28..-25, -12..-1 | -34, -28..-25, -12..-1 | -32, -28..-25, -12..-1
+
+main matrix: 48548 runs, 0 failures, 30900622 model steps
+bounds: not completed
+
+control reference shifted by one source byte (misaligned, n=40): detected: dst wrong 40, stray changes [], regs []
+control reference shifted by one source byte (aligned, n=200): detected: dst wrong 200, stray changes [], regs []
+control M3: dst over the stack temporaries (misaligned, n=20): detected: dst wrong 2, stray changes [], regs []
+control M3: src over the stack temporaries (misaligned, n=20): detected: dst wrong 4, stray changes [], regs []
+control sp expected 4 lower at return (register check): detected: dst wrong 0, stray changes [], regs [2]
+control M2: misaligned with sp = rwBase+12: detected: fault at pc 2147618408 after 22 steps: E5R.Fault.unsupported "store to an unmodeled address"
+
+failures: 0
