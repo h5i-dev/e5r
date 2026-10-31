@@ -20,6 +20,12 @@ if [ -z "${E5R_VERIFY:-}" ]; then
 fi
 export E5R_VERIFY
 
+# CI's workspace RUSTFLAGS (-D warnings) override the firmware's target
+# rustflags, dropping -Tmemory.x and -Tlink.x. Build the pinned ELF with its
+# checked-in Cargo configuration; encoded flags take precedence as well.
+# Keep this after the host verifier build so that still uses CI's flags.
+unset RUSTFLAGS CARGO_ENCODED_RUSTFLAGS
+
 python3 "$verify/tools/gen_board.py" --check
 python3 "$verify/tools/gen_board.py" --check "$verify/boards/test/qemu-user-rv32.json"
 
