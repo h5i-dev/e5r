@@ -7,3 +7,6 @@ import Ptx
 #print axioms Ptx.Examples.VectorAdd.vadd_correct
 #print axioms Ptx.Examples.Sum.sum_correct
 #print axioms Ptx.Examples.Map.saxpy_correct
+#print axioms Ptx.Examples.Buggy.nobound_faults
+#print axioms Ptx.Examples.Buggy.tid_races
+#print axioms Ptx.Examples.Buggy.sub_wrong

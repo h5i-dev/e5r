@@ -10,3 +10,5 @@ import Ptx.Examples.VectorAdd
 import Ptx.Logic.Launch1D
 import Ptx.Examples.Sum
 import Ptx.Examples.Map
+import Ptx.Logic.Refute
+import Ptx.Examples.Buggy
