@@ -1040,6 +1040,72 @@ Not in this scope, and not to be described as done: Cortex-M, multiple harts,
 DMA, U-mode/PMP, microkernels, timing or deadline guarantees, other boards,
 verified Rust, verified compilers, or all of Embassy.
 
+## P. PTX kernel verification (2026-10-31 owner authorization)
+
+The owner authorized a second verification subject: NVIDIA PTX written
+directly by an AI (or emitted by a compiler), checked in Lean 4 for memory
+safety, data-race freedom and functional correctness against a Lean
+specification. No CUDA C++, Triton or Rust translation, no reference kernel and
+no equivalence check is part of the proof. The question the scope answers:
+can these properties of LLM-generated PTX be proved automatically in Lean 4
+without trusting the LLM or a high-level compiler? Design, theorem statements,
+assumptions and the trusted base are in
+[`verification-ptx.md`](verification-ptx.md). The Lean project is
+`verification/ptx` (core Lean v4.35.0, no Mathlib); the parser and exporter are
+`crates/e5r-ptx`, reached through `e5r-verify ptx`. It does not reorder M1-M12
+and adds nothing to e5r's disassembler, lifter or decompiler. Each item is
+checked only when its acceptance criterion has been run.
+
+- [x] **P0. Prior work studied.** `facebookresearch/lean_kernel_verify`,
+      `alinamiretai/trident` and `verse-lab/velvet` read at source level, with
+      what is reused and what is not recorded. *Accepted:* the study section
+      of `verification-ptx.md`. (Accepted 2026-10-31.)
+- [x] **P1 (M1). PTX semantics and sequential proofs.** *Accepted:* Lean
+      semantics for the integer/global subset (`add sub mul.lo mul.wide mad.lo
+      and or xor not shl shr mov setp selp cvt cvta.to.global ld.param ld.global
+      st.global bra ret exit`, predication, `%tid %ntid %ctaid %nctaid`) with
+      wrapping arithmetic, alignment and allocation faults; a strict parser
+      whose output is checked by a token-level round trip; a single-thread loop
+      (`sum`) proved for every `n` by a loop invariant; axiom audit shows only
+      `propext`, `Quot.sound`, `Classical.choice`. (Accepted 2026-10-31:
+      `sum_correct`.)
+- [x] **P2 (M2). SIMT and data-race freedom.** *Accepted:* interleaved grid
+      semantics; one generic theorem from per-thread footprint proofs to
+      no fault, bounded termination, race freedom and the final memory under
+      every interleaving; vector add and a map proved for arbitrary input length
+      over the legal launch range; negative controls refuted by kernel-checked
+      counterexamples. The transfer from the sequentially consistent model to
+      PTX's weaker memory model is a recorded assumption, not a theorem. (Accepted 2026-10-31: `grid_sound`; `vadd_correct` on
+      nvcc 13.2's own PTX, for `G·B ≤ 2^31` threads covering `n < 2^31`;
+      `saxpy_correct` with a grid-stride loop, for every `G`, `B`, `n`;
+      `nobound_faults`, `tid_races`, `sub_wrong`. `scripts/check-lean-ptx.sh`:
+      6 generated modules current, all benchmarks assemble with ptxas 13.2, 10
+      theorems audited, about 30 s.)
+- [ ] **P3 (M3). Proof automation.** *Accepted:* a model writes PTX and the
+      invariants, and a tactic proves the per-thread and grid obligations
+      without a hand-written proof; wrong PTX yields a replayed counterexample
+      where one exists. *Status:* not started beyond the base: `simp only
+      [ptx_eval, K]` evaluates straight-line segments and loop bodies to their
+      verification conditions; disjointness and arithmetic are closed by
+      `omega`; the per-kernel proofs and the refutation inputs are still
+      written by hand.
+- [ ] **P4 (M4). Shared memory, barriers, reductions.** *Accepted:* `.shared`,
+      `bar.sync`, atomics in the model with the synchronization rules they
+      need; a parallel reduction and a scan proved. *Status:* not started; the
+      parser refuses all of them.
+- [ ] **P5 (M5). AI-generated PTX at scale.** *Accepted:* specification to PTX
+      to Lean to GPU benchmark, reported as the share of generated kernels
+      proved, bugs found, proof time per kernel and speed against a CUDA or
+      Triton baseline. *Status:* not started. Also open: differential testing
+      of the instruction semantics against a GPU (an A10G is available on the
+      development machine), which would supplement, not replace, the
+      semantics' review.
+
+Not in this scope, and not to be described as done: SASS, the ptxas or driver
+translation from PTX to SASS, floating point, the PTX memory model beyond the
+data-race-free fragment, warp-level instructions, tensor cores, texture or
+surface memory, or any kernel beyond the ones the theorems name.
+
 ## Quality gates
 
 Green before every merge to main. Each one is a command, not a judgment call.
@@ -1277,9 +1343,11 @@ it was closed.
   to avoid.
 - **Exotic architectures ahead of depth:** x86-64 and AArch64 on ELF, PE and
   Mach-O get finished before anything else gets attention, SLEIGH breadth aside.
-  The owner-authorized V0 research experiment and the F firmware-verification
-  scope above are the only exception: one RISC-V board for binary-level
-  proofs, not a general architecture expansion.
+  The owner-authorized scopes above are the only exceptions: V0, F and R
+  (binary-level proofs of RISC-V firmware: one board, then RMK on QEMU `virt`)
+  and P (NVIDIA PTX kernels as a Lean verification subject, 2026-10-31).
+  Neither is a general architecture expansion: P adds no PTX or SASS
+  disassembly, lifting or decompilation to e5r's analysis.
 - **Reverse engineering the incumbents' internals:** Clean-room: public
   specifications, published papers, and the source of permissively licensed
   projects used within their licenses.

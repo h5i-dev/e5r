@@ -149,6 +149,7 @@ cargo test --release --workspace
 - [docs/firmware-verification.md](docs/firmware-verification.md): binary-level Lean firmware verification for the HiFive1 Rev B (scope, guarantees, assumptions, TCB)
 - [docs/rmk-checkpoint.md](docs/rmk-checkpoint.md): RMK machine-code proof checkpoint, replay commands and open boundaries
 - [docs/verification-rv32.md](docs/verification-rv32.md): the bounded V0 RV32I Lean research proofs it grew from
+- [docs/verification-ptx.md](docs/verification-ptx.md): Lean proofs of memory safety, race freedom and correctness for NVIDIA PTX kernels (scope P)
 - [docs/design/](docs/design/): one document per subsystem, and why it is shaped that way
 - [docs/scorecard.md](docs/scorecard.md): every measured number, including the bad ones
 - [CONTRIBUTING.md](CONTRIBUTING.md): what a change has to measure, and the clean-room rule

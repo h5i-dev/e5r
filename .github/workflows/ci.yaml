@@ -202,3 +202,25 @@ jobs:
         with:
           name: firmware-verification-results
           path: verification/rv32/build/results/
+
+  # Scope P (docs/verification-ptx.md): regenerate every PTX kernel module and
+  # refuse a stale one, build the Lean project from scratch and audit the
+  # axioms. No GPU or CUDA here: the ptxas assembly check is skipped and says
+  # so. e5r-verify is the dev profile, like the rest of this workflow.
+  ptx-verification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Lean (elan; the version comes from verification/ptx/lean-toolchain)
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/v4.1.2/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - run: cargo build -p e5r-verify
+      - name: Every PTX proof, refutation and the axiom audit
+        env:
+          E5R_VERIFY: target/debug/e5r-verify
+        run: ./scripts/check-lean-ptx.sh

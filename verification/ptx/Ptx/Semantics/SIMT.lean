@@ -8,13 +8,13 @@ granularity. Warps are not scheduled in lockstep and no fairness is assumed:
 this is a superset of the schedules a GPU can produce for the subset (no
 barriers, atomics, shared memory or warp-level instructions).
 
-The interleaving model is sequentially consistent. PTX's memory model is
-weaker, but for programs without data races (no two conflicting accesses from
-different threads that are not ordered by synchronization) the PTX model
-gives sequentially consistent results, so race freedom proved here is what
-licenses reading the remaining results in this model. That transfer is an
-assumption about NVIDIA's model, recorded in docs/verification-ptx.md, not a
-theorem of this development.
+The interleaving model is sequentially consistent and PTX's memory model is
+weaker. What licenses reading results in this model is the strong form of
+race freedom proved here: no two different threads ever make conflicting
+accesses, so every byte two threads share is only read. That under the PTX
+axioms such a load returns the initial value or the thread's own last store
+is an assumption about NVIDIA's model (PTX ISA §8), recorded in
+docs/verification-ptx.md, not a theorem of this development.
 -/
 import Ptx.Semantics.Instruction
 
@@ -121,9 +121,10 @@ def Conflict (x y : Addr × Size × Bool) : Prop :=
   (x.2.2 = true ∨ y.2.2 = true) ∧ ∃ b, covers x.1 x.2.1.bytes b ∧ covers y.1 y.2.1.bytes b
 
 /-- No access any thread makes in any execution conflicts with an access of a
-different thread in any execution. There is no synchronization in the subset,
-so this is data-race freedom (and stronger than requiring the two accesses to
-be simultaneously enabled in one execution). -/
+different thread in any execution. This implies PTX's data-race freedom (ISA
+§8.7.1: conflicting accesses neither ordered by causality nor morally strong)
+and is stronger than requiring the two accesses to be simultaneously enabled
+in one execution. -/
 def RaceFree (c₀ : Cfg) : Prop :=
   ∀ c₁ c₂, Reach K L c₀ c₁ → Reach K L c₀ c₂ → ∀ t ∈ L.threads, ∀ u ∈ L.threads, t ≠ u →
     ∀ x y, c₁.pending K L t = some x → c₂.pending K L u = some y → ¬ Conflict x y
