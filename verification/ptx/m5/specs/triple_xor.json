@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "triple_xor",
+  "class": "map32",
+  "arrays": [
+    "triple_xor_x",
+    "triple_xor_y"
+  ],
+  "output": "triple_xor_y",
+  "length": "triple_xor_n",
+  "scalars": [],
+  "element": "triple_xor_x ^ (triple_xor_x << 1) ^ (triple_xor_x << 2)",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

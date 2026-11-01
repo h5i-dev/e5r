@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "dot2",
+  "class": "map32",
+  "arrays": [
+    "dot2_a",
+    "dot2_b",
+    "dot2_c"
+  ],
+  "output": "dot2_c",
+  "length": "dot2_n",
+  "scalars": [],
+  "element": "dot2_a * dot2_a + dot2_b * dot2_b",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

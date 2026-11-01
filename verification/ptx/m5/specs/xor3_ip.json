@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "xor3_ip",
+  "class": "map32",
+  "arrays": [
+    "xor3_ip_x",
+    "xor3_ip_y",
+    "xor3_ip_z"
+  ],
+  "output": "xor3_ip_z",
+  "length": "xor3_ip_n",
+  "scalars": [],
+  "element": "xor3_ip_z ^ xor3_ip_x ^ xor3_ip_y",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

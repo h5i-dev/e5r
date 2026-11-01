@@ -23,6 +23,10 @@ for path in sys.argv[1:]:
         t = {"name": name, "task": task, "arrays": arrays.split(","), "output": output,
              "length": length, "scalars": [s for s in scalars.split(",") if s], "element": element,
              "schedule": sched, "batch": os.path.basename(path)}
+        if task.startswith("SEEDED: "):
+            # written with a deliberate defect, or deliberately outside the
+            # subset, to test detection; not a natural mistake
+            t["seeded"] = task[len("SEEDED: "):].split(";")[0]
         assert name not in names, name
         names.add(name)
         tasks.append(t)

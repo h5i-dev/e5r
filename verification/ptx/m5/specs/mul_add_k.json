@@ -1,0 +1,19 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "mul_add_k",
+  "class": "map32",
+  "arrays": [
+    "mul_add_k_x",
+    "mul_add_k_y"
+  ],
+  "output": "mul_add_k_y",
+  "length": "mul_add_k_n",
+  "scalars": [
+    "mul_add_k_k"
+  ],
+  "element": "mul_add_k_x * mul_add_k_x + mul_add_k_k",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

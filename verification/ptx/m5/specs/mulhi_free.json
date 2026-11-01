@@ -1,0 +1,19 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "mulhi_free",
+  "class": "map32",
+  "arrays": [
+    "mulhi_free_x",
+    "mulhi_free_y"
+  ],
+  "output": "mulhi_free_y",
+  "length": "mulhi_free_n",
+  "scalars": [
+    "mulhi_free_k"
+  ],
+  "element": "mulhi_free_x * mulhi_free_k + mulhi_free_x",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

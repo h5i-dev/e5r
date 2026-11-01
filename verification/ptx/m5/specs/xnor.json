@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "xnor",
+  "class": "map32",
+  "arrays": [
+    "xnor_a",
+    "xnor_b",
+    "xnor_c"
+  ],
+  "output": "xnor_c",
+  "length": "xnor_n",
+  "scalars": [],
+  "element": "~(xnor_a ^ xnor_b)",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

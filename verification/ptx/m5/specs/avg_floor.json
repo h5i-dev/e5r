@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "avg_floor",
+  "class": "map32",
+  "arrays": [
+    "avg_floor_a",
+    "avg_floor_b",
+    "avg_floor_c"
+  ],
+  "output": "avg_floor_c",
+  "length": "avg_floor_n",
+  "scalars": [],
+  "element": "(avg_floor_a + avg_floor_b) >> 1",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

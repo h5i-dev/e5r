@@ -1,0 +1,29 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_avg",
+  "class": "map32",
+  "arrays": [
+    "gs_avg_a",
+    "gs_avg_b",
+    "gs_avg_c"
+  ],
+  "output": "gs_avg_c",
+  "length": "gs_avg_n",
+  "scalars": [],
+  "element": "(gs_avg_a + gs_avg_b) >> 1",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_avg_a",
+        "%rd2": "base gs_avg_b",
+        "%rd3": "base gs_avg_c",
+        "%rd4": "index64",
+        "%rd6": "stride64",
+        "%rd7": "length"
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "ret_early",
+  "class": "map32",
+  "arrays": [
+    "ret_early_x",
+    "ret_early_y"
+  ],
+  "output": "ret_early_y",
+  "length": "ret_early_n",
+  "scalars": [],
+  "element": "3 * ret_early_x + 1",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

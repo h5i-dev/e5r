@@ -205,13 +205,42 @@ def timeit(gpu, f, spec, params, n=1 << 24, reps=20):
     return float(np.median(ts)) * 1e6
 
 
+def gpu_one(name, out):
+    """GPU half of one task, in its own process: a kernel that faults leaves
+    the CUDA context unusable, so each task gets a fresh one."""
+    ptx = open(os.path.join(HERE, "kernels", name + ".ptx")).read()
+    spec = json.load(open(os.path.join(HERE, "specs", name + ".json")))
+    params = params_of(ptx)
+    gpu = Gpu()
+    rng = np.random.default_rng(abs(hash(name)) % 2**32)
+    row = {"gpu": gpu.name}
+    try:
+        f = gpu.function(gpu.module(ptx), name)
+        row["gpu_mismatch"] = gpu_test(gpu, f, spec, params, rng)
+        row["ptx_us"] = timeit(gpu, f, spec, params) if row["gpu_mismatch"] is None else None
+    except RuntimeError as e:
+        row["gpu_error"] = str(e)
+    try:
+        gpu = Gpu()
+        cuf = os.path.join(out, name + "_base.cu")
+        open(cuf, "w").write(baseline_cu(spec, params))
+        subprocess.run([f"{CUDA}/bin/nvcc", "-O3", "-arch=sm_86", "--ptx", cuf, "-o", cuf + ".ptx"],
+                       check=True, capture_output=True)
+        bf = gpu.function(gpu.module(open(cuf + ".ptx").read()), name + "_base")
+        row["baseline_mismatch"] = gpu_test(gpu, bf, spec, params, rng)
+        row["baseline_us"] = timeit(gpu, bf, spec, params)
+    except (RuntimeError, subprocess.CalledProcessError) as e:
+        row["baseline_error"] = str(e)
+    print(json.dumps(row))
+
+
 def main():
+    if sys.argv[1] == "--gpu-one":
+        return gpu_one(sys.argv[2], sys.argv[3])
     exe, out = sys.argv[1], sys.argv[2]
     only = set(sys.argv[3:])
     os.makedirs(out, exist_ok=True)
     tasks = json.load(open(os.path.join(HERE, "tasks.json")))
-    gpu = Gpu()
-    rng = np.random.default_rng(20261101)
     rows = []
     for t in tasks:
         k = t["name"]
@@ -233,31 +262,18 @@ def main():
                    lean_seconds=d.get("lean", {}).get("proof_seconds"),
                    counterexample=cx.get("kind"), replayed=cx.get("replayed_in_lean"),
                    reasons=[r[:200] for r in d.get("reasons", [])])
-        params = params_of(ptx)
+        g = subprocess.run([sys.executable, __file__, "--gpu-one", k, out], capture_output=True, text=True)
         try:
-            f = gpu.function(gpu.module(ptx), k)
-            row["gpu_mismatch"] = gpu_test(gpu, f, spec, params, rng)
-            row["ptx_us"] = timeit(gpu, f, spec, params)
-            cu_src = baseline_cu(spec, params)
-            cuf = os.path.join(out, k + "_base.cu")
-            open(cuf, "w").write(cu_src)
-            subprocess.run([f"{CUDA}/bin/nvcc", "-O3", "-arch=sm_86", "--ptx", cuf, "-o", cuf + ".ptx"],
-                           check=True, capture_output=True)
-            bf = gpu.function(gpu.module(open(cuf + ".ptx").read()), k + "_base")
-            row["baseline_mismatch"] = gpu_test(gpu, bf, spec, params, rng)
-            row["baseline_us"] = timeit(gpu, bf, spec, params)
-        except RuntimeError as e:
-            row["gpu_error"] = str(e)
-            # a sticky launch error poisons the context; start a fresh one
-            cu.cuDevicePrimaryCtxReset(gpu.dev)
-            gpu = Gpu()
+            row.update(json.loads(g.stdout.strip().splitlines()[-1]))
+        except (IndexError, json.JSONDecodeError):
+            row["gpu_error"] = (g.stderr or g.stdout)[-300:]
         rows.append(row)
         sp = (row.get("ptx_us"), row.get("baseline_us"))
         ratio = f"{sp[1] / sp[0]:.2f}x" if all(sp) else "-"
         print(f"{k:14} {row['verdict']:11} {str(row['counterexample']):12} "
               f"gpu {'ok' if row.get('gpu_mismatch') is None and 'gpu_error' not in row else 'MISMATCH'} "
               f"lean {row['lean_seconds']}s  speed vs nvcc {ratio}", flush=True)
-    json.dump({"gpu": gpu.name, "rows": rows}, open(os.path.join(out, "results.json"), "w"), indent=1)
+    json.dump({"gpu": rows[0].get("gpu") if rows else None, "rows": rows}, open(os.path.join(out, "results.json"), "w"), indent=1)
     by = lambda v: sum(r["verdict"] == v for r in rows)
     print(f"tasks {len(rows)}: proved {by('proved')}, refuted {by('refuted')}, unknown {by('unknown')}, "
           f"unsupported {by('unsupported')}, error {by('error')}")

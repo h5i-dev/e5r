@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "ldg_nc",
+  "class": "map32",
+  "arrays": [
+    "ldg_nc_x",
+    "ldg_nc_y"
+  ],
+  "output": "ldg_nc_y",
+  "length": "ldg_nc_n",
+  "scalars": [],
+  "element": "ldg_nc_x * ldg_nc_x",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

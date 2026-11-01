@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "add_const_big",
+  "class": "map32",
+  "arrays": [
+    "add_const_big_x",
+    "add_const_big_y"
+  ],
+  "output": "add_const_big_y",
+  "length": "add_const_big_n",
+  "scalars": [],
+  "element": "add_const_big_x + 0x9E3779B9",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

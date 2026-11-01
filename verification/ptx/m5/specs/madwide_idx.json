@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "madwide_idx",
+  "class": "map32",
+  "arrays": [
+    "madwide_idx_a",
+    "madwide_idx_b",
+    "madwide_idx_c"
+  ],
+  "output": "madwide_idx_c",
+  "length": "madwide_idx_n",
+  "scalars": [],
+  "element": "madwide_idx_a + madwide_idx_b",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

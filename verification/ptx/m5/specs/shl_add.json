@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "shl_add",
+  "class": "map32",
+  "arrays": [
+    "shl_add_a",
+    "shl_add_b",
+    "shl_add_c"
+  ],
+  "output": "shl_add_c",
+  "length": "shl_add_n",
+  "scalars": [],
+  "element": "(shl_add_a << 4) + shl_add_b",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs32_copy",
+  "class": "map32",
+  "arrays": [
+    "gs32_copy_x",
+    "gs32_copy_y"
+  ],
+  "output": "gs32_copy_y",
+  "length": "gs32_copy_n",
+  "scalars": [],
+  "element": "gs32_copy_x",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^32",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs32_copy_x",
+        "%rd2": "base gs32_copy_y",
+        "%r1": "length",
+        "%r5": "index32",
+        "%r7": "stride32"
+      }
+    }
+  }
+}

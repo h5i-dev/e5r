@@ -1,0 +1,29 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs32_wrap",
+  "class": "map32",
+  "arrays": [
+    "gs32_wrap_a",
+    "gs32_wrap_b",
+    "gs32_wrap_c"
+  ],
+  "output": "gs32_wrap_c",
+  "length": "gs32_wrap_n",
+  "scalars": [],
+  "element": "gs32_wrap_a + gs32_wrap_b",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^33",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs32_wrap_a",
+        "%rd2": "base gs32_wrap_b",
+        "%rd3": "base gs32_wrap_c",
+        "%r1": "length",
+        "%r5": "index32",
+        "%r7": "stride32"
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "sub3",
+  "class": "map32",
+  "arrays": [
+    "sub3_a",
+    "sub3_b",
+    "sub3_c",
+    "sub3_d"
+  ],
+  "output": "sub3_d",
+  "length": "sub3_n",
+  "scalars": [],
+  "element": "sub3_a - sub3_b - sub3_c",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

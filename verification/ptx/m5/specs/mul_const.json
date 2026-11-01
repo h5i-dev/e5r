@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "mul_const",
+  "class": "map32",
+  "arrays": [
+    "mul_const_x",
+    "mul_const_y"
+  ],
+  "output": "mul_const_y",
+  "length": "mul_const_n",
+  "scalars": [],
+  "element": "mul_const_x * 1664525 + 1013904223",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

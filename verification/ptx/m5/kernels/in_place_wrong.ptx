@@ -1,0 +1,26 @@
+.version 8.0
+.target sm_86
+.address_size 64
+
+.visible .entry in_place_wrong(.param .u64 in_place_wrong_x, .param .u32 in_place_wrong_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<9>;
+	.reg .b64 %rd<4>;
+	ld.param.u64 %rd1, [in_place_wrong_x];
+	ld.param.u32 %r1, [in_place_wrong_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd2, %r5, 4;
+	add.u64 %rd3, %rd1, %rd2;
+	ld.global.u32 %r6, [%rd3];
+	ld.global.u32 %r7, [%rd3+4];
+	add.u32 %r8, %r6, %r7;
+	st.global.u32 [%rd3], %r8;
+DONE:
+	ret;
+}

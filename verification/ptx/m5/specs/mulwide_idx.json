@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "mulwide_idx",
+  "class": "map32",
+  "arrays": [
+    "mulwide_idx_x",
+    "mulwide_idx_y"
+  ],
+  "output": "mulwide_idx_y",
+  "length": "mulwide_idx_n",
+  "scalars": [],
+  "element": "mulwide_idx_x ^ 0x55555555",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

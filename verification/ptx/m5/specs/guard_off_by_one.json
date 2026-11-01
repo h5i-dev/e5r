@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "guard_off_by_one",
+  "class": "map32",
+  "arrays": [
+    "guard_off_by_one_x",
+    "guard_off_by_one_y"
+  ],
+  "output": "guard_off_by_one_y",
+  "length": "guard_off_by_one_n",
+  "scalars": [],
+  "element": "guard_off_by_one_x + 1",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

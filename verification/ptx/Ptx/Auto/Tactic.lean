@@ -155,7 +155,8 @@ macro "ptx_cond_simp" h:ident : tactic => `(tactic|
     decide_eq_true_eq, decide_eq_false_iff_not, Bool.not_eq_true', Ptx.Auto.toNat_lo32,
     Ptx.Auto.toNat_ext32, BitVec.toNat_add, BitVec.toNat_mul, BitVec.toNat_setWidth,
     BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod, beq_iff_eq, Bool.false_eq_true,
-    not_false_eq_true, Bool.true_eq_false, not_true_eq_false, Decidable.not_not] at $h:ident)
+    not_false_eq_true, Bool.true_eq_false, not_true_eq_false, Decidable.not_not,
+    BitVec.reduceOfInt, BitVec.reduceToNat, Nat.reduceEqDiff] at $h:ident)
 
 /-- Split every branch the symbolic run could not decide. -/
 macro "ptx_branches" : tactic => `(tactic|
@@ -206,6 +207,10 @@ macro "ptx_guarded" K:ident fuel:num " [" bs:term,* "]" : tactic => `(tactic| (
   obtain ⟨⟨hcx, htx, hcy, hcz, hty, htz⟩, hg⟩ := Ptx.Auto.thread_facts ht
   have hsch := hpre.2.2.2
   simp only [ptx_spec, Ptx.Auto.MapSpec.SchedOk] at hsch
+  have hGB := Ptx.Auto.mul32_le A.G A.B
+  have hcB := Ptx.Auto.mul32_le t.ctaid.x A.B
+  have hBc : A.B.toNat * t.ctaid.x.toNat = t.ctaid.x.toNat * A.B.toNat := Nat.mul_comm _ _
+  have hBG : A.B.toNat * A.G.toNat = A.G.toNat * A.B.toNat := Nat.mul_comm _ _
   refine (wp_sound (f := $fuel) (cut := fun _ => false) ?_).weaken
     fun s m h => ⟨h.2.resolve_left (by simp), h.1⟩
   simp only [ptx_eval, $K:ident]
@@ -230,6 +235,9 @@ macro "ptx_launch_facts" : tactic => `(tactic| (
   simp only [ptx_spec, Ptx.Auto.MapSpec.SchedOk] at hsch
   have hGB := Ptx.Auto.mul32_le A.G A.B
   have hcB := Ptx.Auto.mul32_le t.ctaid.x A.B
+  -- either order of the products a kernel may compute
+  have hBc : A.B.toNat * t.ctaid.x.toNat = t.ctaid.x.toNat * A.B.toNat := Nat.mul_comm _ _
+  have hBG : A.B.toNat * A.G.toNat = A.G.toNat * A.B.toNat := Nat.mul_comm _ _
   unfold gid at *))
 
 set_option hygiene false in

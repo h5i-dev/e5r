@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "hash1",
+  "class": "map32",
+  "arrays": [
+    "hash1_x",
+    "hash1_y"
+  ],
+  "output": "hash1_y",
+  "length": "hash1_n",
+  "scalars": [],
+  "element": "(hash1_x ^ (hash1_x >> 16)) * 0x45d9f3b",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

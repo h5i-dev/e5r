@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "u64_elems",
+  "class": "map32",
+  "arrays": [
+    "u64_elems_x",
+    "u64_elems_y"
+  ],
+  "output": "u64_elems_y",
+  "length": "u64_elems_n",
+  "scalars": [],
+  "element": "u64_elems_x + 1",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}
