@@ -211,6 +211,53 @@ Otherwise, or if that fails, the barrier-aware search runs. With no proof
 and no replayed counterexample the verdict is `unknown` inside the shape and
 `unsupported` outside it.
 
+### Supplied proofs (`--proof`)
+
+For a kernel the automation cannot handle, `check --proof PROOF.lean` checks
+a proof someone else wrote. The tool, not the author, writes the theorem
+statement:
+
+1. It generates module `E5rSpec` from the PTX and the spec: the kernel as
+   exported, the spec definition, and `E5rSpec.statement : Prop`, the same
+   class statement the automation would prove (`spec.Correct K` for `map32`,
+   `Reduce32.Correct`, `Reduce32.Atomic.Correct` or `Scan32.Correct` for the
+   block classes). Only the statement-level checks apply (parameter names and
+   types); the class's proof shape (barrier count, roles, shared array) does
+   not.
+2. The supplied file must be module `E5rProof`, contain a manifest
+   `/- e5r-proof ptx=<sha256> spec=<sha256> toolchain=<lean-toolchain> -/`
+   naming the exact inputs it was written for, and prove
+   `theorem E5rProof.correct : E5rSpec.statement`. A manifest that does not
+   match the PTX, the spec or the project's toolchain is refused.
+3. Both modules are compiled under the caps. Then the separate checker
+   `proofcheck` (`Checker/ProofCheck.lean`, a `lake` executable) loads the
+   compiled environment and: refuses imports other than `E5rSpec`, `Ptx.*`,
+   `Init`, `Std`, `Lean`; refuses any `axiom` the proof declares; sends every
+   declaration of the proof module to the kernel again
+   (`Kernel.Environment.replay`) on an environment with only its imports, so
+   `set_option debug.skipKernelTC` or a metaprogram that adds an unchecked
+   declaration does not get through; requires `E5rProof.correct` to be a
+   theorem whose type is the constant `E5rSpec.statement`; and requires its
+   transitive axioms to be among `propext`, `Quot.sound`, `Classical.choice`.
+
+Only then is the verdict `proved`, with `"theorem": {"generated": false,
+...}` and `"proof": {"supplied": true, "sha256", "manifest", "check"}` in the
+result. A refused proof is `unknown` (exit 3) with the reason; with
+`--proof` no proof is generated and no counterexample is searched.
+
+`proofs/controls.sh` (part of the recheck) checks the two supplied proofs
+and ten refusals: a proof of `True`, a proof of a different statement,
+`sorry`, a declared axiom, an unchecked declaration added with
+`debug.skipKernelTC`, `native_decide` (it does not compile in this setting;
+its `Lean.ofReduceBool` axiom would be refused by the audit if it did), a
+forbidden import, a spec edited after the proof was written, a different
+toolchain, and a missing manifest.
+
+| Kernel | Why the automation does not apply | Supplied proof | Statement |
+| --- | --- | --- | --- |
+| `m5/m4/kernels/a_direct.ptx` | no shared array, no barrier: one `atom.global.add.u32` per element | `proofs/a_direct.lean`, one phase of `phase_sound` per thread with `*out` the accumulator cell | `Reduce32.Atomic.Correct` |
+| `m5/m4/kernels/s_pingpong.ptx` | two shared buffers and one barrier per round, `scan32` expects three in place | `proofs/s_pingpong.lean`, `R + 2` phases; buffer `(k+1) % 2` holds `Scan32.V (k+1)` after round `k` | `Scan32.Correct` |
+
 ## What is proved
 
 ### The class theorem (M3)

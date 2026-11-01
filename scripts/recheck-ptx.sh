@@ -8,6 +8,8 @@
 #   3. `e5r-verify ptx check` on every benchmark, against the verdict in
 #      benchmarks/expected.txt;
 #   4. the mutation controls (mutants/run.py): no mutant may be proved;
+#   4b. the supplied-proof route (proofs/controls.sh): two supplied proofs
+#      accepted, every negative control refused;
 #   5. the GPU differential test (scripts/check-ptx-difftest.sh), skipped
 #      with a note when there is no GPU.
 #
@@ -43,6 +45,9 @@ done <"$root/benchmarks/expected.txt"
 
 echo "== mutation controls"
 python3 $root/mutants/run.py "$E5R_VERIFY" "$out/mutants" | tail -1
+
+echo "== supplied proofs and their negative controls"
+$root/proofs/controls.sh "$E5R_VERIFY" | tail -1
 
 echo "== GPU differential test"
 set +e
