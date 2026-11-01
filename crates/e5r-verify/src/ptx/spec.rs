@@ -215,6 +215,26 @@ pub fn parse(text: &str) -> Result<Spec, SpecError> {
 /// Everything about the kernel the class needs, checked before any Lean
 /// runs. A failure here is `unsupported`, never a guess.
 pub fn validate(sp: &Spec, k: &Kernel) -> Result<(), String> {
+    use e5r_ptx::ast::{Instr, Space};
+    if !k.shared.is_empty() {
+        return Err("map32: the kernel declares .shared memory (outside the class)".into());
+    }
+    if let Some(st) = k.body.iter().find(|st| {
+        matches!(
+            st.instr,
+            Instr::Atom(..)
+                | Instr::Cas(..)
+                | Instr::Red(..)
+                | Instr::Bar
+                | Instr::Ld(Space::Shared, ..)
+                | Instr::St(Space::Shared, ..)
+        )
+    }) {
+        return Err(format!(
+            "map32: {} is outside the class (no shared memory, atomics or barriers)",
+            e5r_ptx::print::instr(&st.instr)
+        ));
+    }
     let mut names: Vec<&String> = sp.arrays.iter().chain(&sp.scalars).collect();
     names.push(&sp.length);
     let mut seen = std::collections::HashSet::new();

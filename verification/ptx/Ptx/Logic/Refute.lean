@@ -12,10 +12,10 @@ import Ptx.Logic.RaceFreedom
 
 namespace Ptx
 
-/-- Thread `t` run alone for `j` steps from configuration `c`. -/
+/-- Thread `t` run alone for `j` global-only steps from configuration `c`. -/
 def Cfg.advance (K : Kernel) (L : Launch) (c : Cfg) (t : Tid) (j : Nat) : Cfg :=
   let r := trace K L.alloc (L.ctx t) j (c.ts t) c.mem
-  { ts := updT c.ts t r.1, mem := r.2 }
+  { c with ts := updT c.ts t r.1, mem := r.2 }
 
 theorem updT_same (f : Tid → TState) (t : Tid) (s : TState) : updT f t s t = s := by simp [updT]
 
@@ -41,9 +41,10 @@ theorem reach_thread {K : Kernel} {L : Launch} {c : Cfg} {t : Tid} (ht : t ∈ L
     intro h
     have hr := ih fun i hi => h i (by omega)
     obtain ⟨s', m', hs⟩ := h j (by omega)
-    refine .tail hr ⟨t, ht, s', m', ?_, ?_⟩
-    · simp only [Cfg.res, Cfg.advance, updT_same]; exact hs
-    · simp only [Cfg.advance, trace_succ_back hs, updT_updT]
+    refine .tail hr (.inl ⟨t, ht, s', ⟨m', c.sh t.ctaid⟩, ?_, ?_⟩)
+    · exact res_of_stepMem (c := c.advance K L t j) (by simp only [Cfg.advance, updT_same]; exact hs)
+    · simp only [Cfg.advance, Cfg.write, trace_succ_back hs, updT_updT]
+      congr; funext d; by_cases h : d = t.ctaid <;> simp [updC, h]
 
 theorem Reach.trans {K L} {c₁ c₂ c₃ : Cfg} (h₁ : Reach K L c₁ c₂) (h₂ : Reach K L c₂ c₃) :
     Reach K L c₁ c₃ := by

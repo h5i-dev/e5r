@@ -119,7 +119,7 @@ pub fn proof(k: &Kernel, sp: &Spec, header: &str) -> String {
             writeln!(
                 s,
                 "theorem thread : spec.GuardedOk {kn} := by\n  ptx_guarded {kn} {fuel} [{}]\n\n\
-                 theorem correct : spec.Correct {kn} :=\n  correct_of_threadOk (threadOk_of_guardedOk spec_sched thread)\n",
+                 theorem correct : spec.Correct {kn} :=\n  correct_of_threadOk rfl (threadOk_of_guardedOk spec_sched thread)\n",
                 bases(sp)
             )
             .unwrap();
@@ -130,7 +130,7 @@ pub fn proof(k: &Kernel, sp: &Spec, header: &str) -> String {
                 s,
                 "theorem entry : spec.EntryOk loop {kn} := by\n  ptx_stride_entry {kn} {pc} {fuel}\n\n\
                  theorem body : spec.BodyOk loop {kn} := by\n  ptx_stride_body {kn} {pc} {fuel} [{}]\n\n\
-                 theorem correct : spec.Correct {kn} :=\n  correct_of_threadOk (threadOk_of_stride entry body)\n",
+                 theorem correct : spec.Correct {kn} :=\n  correct_of_threadOk rfl (threadOk_of_stride entry body)\n",
                 bases(sp)
             )
             .unwrap();
@@ -151,9 +151,10 @@ fn tid(t: (u32, u32)) -> String {
 /// What `simp` needs to run the kernel on the concrete world.
 fn eval_set(kn: &str) -> String {
     format!(
-        "okSteps, stepMem, ptx_eval, {kn}, L₀, MapSpec.launch, MapSpec.params, A₀, ptx_spec, c₀, \
-         Cfg.init, tid, accessOk, Region.holds, lo32, ext32, m₀, rd, rd32, wr, Cfg.advance, Cfg.res, \
-         trace, updT, Cfg.pending, Action.acc, List.mem_cons, List.not_mem_nil, elem"
+        "okSteps, stepMem, tstep, Cfg.heap, Heap.at, Launch.allocs, ptx_eval, {kn}, L₀, \
+         MapSpec.launch, MapSpec.params, A₀, ptx_spec, c₀, Cfg.init, tid, accessOk, Region.holds, \
+         lo32, ext32, m₀, rd, rd32, wr, Cfg.advance, Cfg.res, trace, updT, Cfg.pending, Action.acc, \
+         List.mem_cons, List.not_mem_nil, elem"
     )
 }
 
@@ -186,7 +187,7 @@ pub fn refutation(k: &Kernel, sp: &Spec, header: &str, w: &World, wit: &Witness)
         "def A₀ : Args where\n  G := {}\n  B := {}\n  n := {}\n  base := fun a => {base}\n  sc := fun a => {sc}\n\n\
          def m₀ : Mem := fun x => {mem}\n\n\
          abbrev L₀ : Launch := spec.launch A₀\n\
-         def c₀ : Cfg := Cfg.init (fun _ _ => 0) (fun _ _ => false) m₀\n\
+         def c₀ : Cfg := Cfg.init (fun _ _ => 0) (fun _ _ => false) m₀ (fun _ _ => 0)\n\
          def tid (c t : BitVec 32) : Tid := ⟨⟨c, 0, 0⟩, ⟨t, 0, 0⟩⟩\n\n\
          theorem pre : spec.Pre A₀ := by\n  simp [MapSpec.Pre, MapSpec.SchedOk, MapSpec.Sep, Fits, ptx_spec, A₀]\n",
         bv(w.g as u128, 32),
@@ -204,13 +205,13 @@ pub fn refutation(k: &Kernel, sp: &Spec, header: &str, w: &World, wit: &Witness)
     };
     s.push_str("theorem refuted : ¬ spec.Correct ");
     s.push_str(&kn);
-    s.push_str(" := by\n  intro h\n  obtain ⟨hnf, -, -, hrf, -, hfin⟩ := h A₀ m₀ (fun _ _ => 0) (fun _ _ => false) pre\n");
+    s.push_str(" := by\n  intro h\n  obtain ⟨hnf, -, -, hrf, -, hfin⟩ := h.2 A₀ m₀ (fun _ _ => 0) (fun _ _ => 0) (fun _ _ => false) pre\n");
     match wit {
         Witness::Fault { t, steps, .. } => {
             s.push_str(&mem_t(*t));
             writeln!(
                 s,
-                "  exact hnf _ (reach_thread' (j := {steps}) h{0}_{1} (by simp [{ev}]))\n    ⟨{2}, h{0}_{1}, by simp [{ev}]⟩",
+                "  exact hnf _ (reach_thread' (j := {steps}) h{0}_{1} (by simp [{ev}]))\n    (.inl ⟨{2}, h{0}_{1}, by simp [{ev}]⟩)",
                 t.0,
                 t.1,
                 tid(*t)
@@ -230,8 +231,13 @@ pub fn refutation(k: &Kernel, sp: &Spec, header: &str, w: &World, wit: &Witness)
             if u != t {
                 s.push_str(&mem_t(*u));
             }
-            let acc = |a: &(u64, u32, bool)| {
-                format!("some ({}, .b{}, {})", bv(a.0 as u128, 64), a.1, a.2)
+            let acc = |a: &e5r_ptx::interp::Access| {
+                let kind = match a.kind {
+                    e5r_ptx::interp::Kind::Read => ".read",
+                    e5r_ptx::interp::Kind::Write => ".write",
+                    e5r_ptx::interp::Kind::Atomic => ".atomic",
+                };
+                format!("some ⟨.global, {}, .b{}, {kind}⟩", bv(a.addr as u128, 64), a.size)
             };
             let (ht, hu) = (format!("h{}_{}", t.0, t.1), format!("h{}_{}", u.0, u.1));
             writeln!(
@@ -241,12 +247,19 @@ pub fn refutation(k: &Kernel, sp: &Spec, header: &str, w: &World, wit: &Witness)
                  \x20 have r₂ : Reach {kn} L₀ c₀ c₂ := reach_thread' {hu} (by simp [{ev}])\n\
                  \x20 have p₁ : c₁.pending {kn} L₀ {t1} = {ax} := by simp [c₁, {ev}]\n\
                  \x20 have p₂ : c₂.pending {kn} L₀ {u1} = {ay} := by simp [c₂, {ev}]\n\
-                 \x20 exact hrf c₁ c₂ r₁ r₂ _ {ht} _ {hu} (by decide) _ _ p₁ p₂ ⟨{w}, {byte}, by decide, by decide⟩",
+                 \x20 rcases hrf c₁ c₂ r₁ r₂ _ {ht} _ {hu} (by decide) _ _ p₁ p₂\n\
+                 \x20   ⟨rfl, nofun, {w}, {byte}, by decide, by decide⟩ with ⟨h, -⟩ | ⟨-, h⟩\n\
+                 \x20 · cases h\n\
+                 \x20 · exact h rfl",
                 t1 = tid(*t),
                 u1 = tid(*u),
                 ax = acc(x),
                 ay = acc(y),
-                w = if x.2 { ".inl rfl" } else { ".inr rfl" },
+                w = if x.kind != e5r_ptx::interp::Kind::Read {
+                    ".inl nofun"
+                } else {
+                    ".inr nofun"
+                },
                 byte = bv(*byte as u128, 64)
             )
             .unwrap();

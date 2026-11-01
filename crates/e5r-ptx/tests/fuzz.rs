@@ -100,6 +100,16 @@ const VOCAB: &[&str] = &[
     "mul.wide.s32",
     "%r<4>",
     "1U",
+    ".shared",
+    ".align",
+    ".b8",
+    "sm",
+    "bar.sync",
+    "atom.global.add.u32",
+    "atom.shared.cas.b32",
+    "red.shared.max.s32",
+    "ld.shared.u32",
+    "st.shared.u32",
 ];
 
 #[test]
@@ -140,7 +150,20 @@ fn kernel(r: &mut Rng) -> String {
     };
     let n = 1 + r.below(30);
     for _ in 0..n {
-        let s = match r.below(16) {
+        let s = match r.below(22) {
+            16 => format!("ld.shared.u32 \t{}, [{}+{}]", reg32(r), reg32(r), 4 * r.below(9)),
+            17 => format!("st.shared.u32 \t[sm+{}], {}", 4 * r.below(16), reg32(r)),
+            18 => format!(
+                "atom.{}.{}.u32 \t{}, [{}], {}",
+                r.pick(&["global", "shared"]),
+                r.pick(&["add", "min", "max"]),
+                reg32(r),
+                "%rd1",
+                reg32(r)
+            ),
+            19 => format!("red.shared.xor.b32 \t[sm], {}", imm(r)),
+            20 => format!("atom.shared.cas.b32 \t{}, [sm+4], {}, {}", reg32(r), reg32(r), imm(r)),
+            21 => "bar.sync \t0".to_string(),
             0 => format!(
                 "add.{} \t{}, {}, {}",
                 r.pick(&t32),
@@ -230,11 +253,15 @@ fn kernel(r: &mut Rng) -> String {
             1 => format!("@!%p{} ", r.below(3)),
             _ => String::new(),
         };
-        let g = if s.starts_with('@') { String::new() } else { g };
+        let g = if s.starts_with('@') || s.starts_with("bar") {
+            String::new()
+        } else {
+            g
+        };
         body.push(format!("{g}{s};"));
     }
     let mut out = String::from(
-        ".version 8.0\n.target sm_86\n.address_size 64\n\n.visible .entry k(\n\t.param .u64 k_p,\n\t.param .u32 k_n\n)\n{\n\t.reg .pred \t%p<3>;\n\t.reg .b32 \t%r<8>;\n\t.reg .b64 \t%rd<8>;\n\n",
+        ".version 8.0\n.target sm_86\n.address_size 64\n\n.visible .entry k(\n\t.param .u64 k_p,\n\t.param .u32 k_n\n)\n{\n\t.reg .pred \t%p<3>;\n\t.reg .b32 \t%r<8>;\n\t.reg .b64 \t%rd<8>;\n\t.shared .align 4 .b8 \tsm[64];\n\n",
     );
     let mut labels: Vec<usize> = (0..3).map(|_| r.below(body.len() + 1)).collect();
     labels.sort();

@@ -28,6 +28,7 @@ fn operand(o: &Operand) -> String {
         Operand::Reg(r) => r.clone(),
         Operand::Imm(v) => v.to_string(),
         Operand::Sreg(s) => sreg(*s),
+        Operand::Sym(n) => n.clone(),
     }
 }
 
@@ -67,7 +68,39 @@ pub fn instr(i: &Instr) -> String {
         Instr::Bra(true, l) => format!("bra.uni \t{l}"),
         Instr::Ret => "ret".into(),
         Instr::Exit => "exit".into(),
+        Instr::Atom(sp, op, t, d, a, b) => format!(
+            "atom.{}.{}.{} \t{d}, {}, {}",
+            sp.name(),
+            op.name(),
+            t.name(),
+            address(a),
+            o(b)
+        ),
+        Instr::Cas(sp, t, d, a, b, c) => format!(
+            "atom.{}.cas.{} \t{d}, {}, {}, {}",
+            sp.name(),
+            t.name(),
+            address(a),
+            o(b),
+            o(c)
+        ),
+        Instr::Red(sp, op, t, a, b) => format!(
+            "red.{}.{}.{} \t{}, {}",
+            sp.name(),
+            op.name(),
+            t.name(),
+            address(a),
+            o(b)
+        ),
+        Instr::Bar => "bar.sync \t0".into(),
     }
+}
+
+/// `.shared {.align a} .t name{[n]};`
+pub fn shared_decl(d: &SharedDecl) -> String {
+    let al = d.align.map_or(String::new(), |a| format!(".align {a} "));
+    let n = d.count.map_or(String::new(), |n| format!("[{n}]"));
+    format!(".shared {al}.{} {}{n};", d.elem, d.name)
 }
 
 /// The whole module.
@@ -85,10 +118,18 @@ pub fn module(m: &Module) -> String {
             writeln!(s, "\t.param .{} {n}{sep}", t.name()).unwrap();
         }
         s.push_str(")\n{\n");
-        for r in &k.regs {
-            match r.count {
-                Some(n) => writeln!(s, "\t.reg .{} \t{}<{n}>;", r.ty.name(), r.name).unwrap(),
-                None => writeln!(s, "\t.reg .{} \t{};", r.ty.name(), r.name).unwrap(),
+        for d in &k.decls {
+            match *d {
+                Decl::Reg(i) => {
+                    let r = &k.regs[i];
+                    match r.count {
+                        Some(n) => {
+                            writeln!(s, "\t.reg .{} \t{}<{n}>;", r.ty.name(), r.name).unwrap()
+                        }
+                        None => writeln!(s, "\t.reg .{} \t{};", r.ty.name(), r.name).unwrap(),
+                    }
+                }
+                Decl::Shared(i) => writeln!(s, "\t{}", shared_decl(&k.shared[i])).unwrap(),
             }
         }
         s.push('\n');

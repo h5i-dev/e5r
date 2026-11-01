@@ -74,7 +74,7 @@ theorem step (fa : Fits a n.toNat) (aa : a.toNat % 4 = 0) (ao : out.toNat % 4 = 
       simp only [BitVec.ule, toNat_ofNat32 hn32, Nat.le_refl, decide_true]
     simp only [ptx_eval, K, Ptx.Kernels.Sum.sum, launch, params, h2, hn, h3, h4, hb, hz,
       BitVec.add_zero, bne_iff_ne, ne_eq, Bool.true_eq_false, not_false_eq_true]
-    refine ⟨?_, fun x hx => .inl hx, .inr ⟨trivial, ?_, fun x hx => wr_outside hx⟩⟩
+    refine ⟨?_, ⟨rfl, nofun, fun x hx => .inl hx⟩, .inr ⟨trivial, ?_, fun x hx => wr_outside hx⟩⟩
     · simp [accessOk, Region.holds, ao]
     · rw [rd32_wr_same]; simp [lo32, ext32]
   · have hlt : k < n.toNat := by omega
@@ -85,7 +85,7 @@ theorem step (fa : Fits a n.toNat) (aa : a.toNat % 4 = 0) (ao : out.toNat % 4 = 
     simp only [ptx_eval, K, Ptx.Kernels.Sum.sum, launch, params, h1, h2, hn, h3, h4, hb, hz,
       bne_self_eq_false, mulWide4u (by omega : k < 2 ^ 32), BitVec.add_zero, elem_def, lo32_rd_b4,
       one]
-    refine ⟨?_, fun x hx => .inr ⟨rfl, k, hlt, hx⟩, .inl ⟨n.toNat - (k + 1), by omega,
+    refine ⟨?_, ⟨rfl, nofun, fun x hx => .inr ⟨rfl, k, hlt, hx⟩⟩, .inl ⟨n.toNat - (k + 1), by omega,
       k + 1, by omega, rfl, rfl, rfl, ?_, ?_, ?_, ?_, ?_⟩⟩
     · simp [accessOk, aligned_elem fa hlt aa, holds_elem fa hlt]
     all_goals simp only [upd, String.reduceEq, ↓reduceIte, h1, h2, hn]
@@ -109,11 +109,11 @@ theorem thread (fa : Fits a n.toNat) (aa : a.toNat % 4 = 0) (ao : out.toNat % 4 
 
 end
 
-theorem sum_correct (n : BitVec 32) (a out : Addr) (m₀ : Mem)
+theorem sum_correct (n : BitVec 32) (a out : Addr) (m₀ : Mem) (s₀ : Dim3 → Mem)
     (r₀ : Tid → String → Val) (p₀ : Tid → String → Bool)
     (fa : Fits a n.toNat) (aa : a.toNat % 4 = 0) (ao : out.toNat % 4 = 0) :
     let L := launch a out n
-    let c₀ := Cfg.init r₀ p₀ m₀
+    let c₀ := Cfg.init r₀ p₀ m₀ s₀
     (∀ cfg, Reach K L c₀ cfg → ¬ Faults K L cfg) ∧
     (∀ cfg, Reach K L c₀ cfg → Done K L cfg ∨ ∃ cfg', Step K L cfg cfg') ∧
     (∃ bound, ∀ j cfg, Steps K L j c₀ cfg → j ≤ bound) ∧
@@ -132,7 +132,7 @@ theorem sum_correct (n : BitVec 32) (a out : Addr) (m₀ : Mem)
       W out x → ¬ R a n.toNat x ∧ ¬ W out x := by
     intro t ht u hu htu
     exact absurd (h1.gid_inj ht hu (by have := h1.gid_lt ht; have := h1.gid_lt hu; simp at *; omega)) htu
-  obtain ⟨bound, g⟩ := grid_sound (R := fun _ => R a n.toNat) (W := fun _ => W out) (P := P) hsolo hdisj
+  obtain ⟨bound, g⟩ := grid_sound (R := fun _ => R a n.toNat) (W := fun _ => W out) (P := P) hsolo hdisj s₀
   refine ⟨g.noFault, g.progress, ⟨bound, g.bounded⟩, g.raceFree, g.exists_done, ?_⟩
   intro cfg hr hd
   obtain ⟨hown, hrest⟩ := g.final cfg hr hd

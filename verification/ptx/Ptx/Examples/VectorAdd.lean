@@ -86,14 +86,14 @@ theorem thread {G B n : BitVec 32} {a b c : Addr} {t : Tid} (m : Mem) (r : Strin
     have hi : gid B t < n.toNat := by omega
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
     · simp [accessOk, aligned_elem fb hi ab, holds_elem fb hi]
-    · intro x hx; exact .inr ⟨rfl, hi, .inr hx⟩
+    · refine ⟨rfl, nofun, fun x hx => ?_⟩; exact .inr ⟨rfl, hi, .inr hx⟩
     · simp [accessOk, aligned_elem fa hi aa, holds_elem fa hi]
-    · intro x hx; exact .inr ⟨rfl, hi, .inl hx⟩
+    · refine ⟨rfl, nofun, fun x hx => ?_⟩; exact .inr ⟨rfl, hi, .inl hx⟩
     · simp [accessOk, aligned_elem fc hi ac, holds_elem fc hi]
-    · intro x hx; exact .inl ⟨hi, hx⟩
+    · refine ⟨rfl, nofun, fun x hx => ?_⟩; exact .inl ⟨hi, hx⟩
     · intro _; rw [rd32_wr_same]; simp [lo32, ext32, BitVec.add_comm]
 
-theorem vadd_correct (G B n : BitVec 32) (a b c : Addr) (m₀ : Mem)
+theorem vadd_correct (G B n : BitVec 32) (a b c : Addr) (m₀ : Mem) (s₀ : Dim3 → Mem)
     (r₀ : Tid → String → Val) (p₀ : Tid → String → Bool)
     (hGB : G.toNat * B.toNat ≤ 2 ^ 31) (hcov : n.toNat ≤ G.toNat * B.toNat) (hn : n.toNat < 2 ^ 31)
     (fa : Fits a n.toNat) (fb : Fits b n.toNat) (fc : Fits c n.toNat)
@@ -101,7 +101,7 @@ theorem vadd_correct (G B n : BitVec 32) (a b c : Addr) (m₀ : Mem)
     (sa : c.toNat + 4 * n.toNat ≤ a.toNat ∨ a.toNat + 4 * n.toNat ≤ c.toNat)
     (sb : c.toNat + 4 * n.toNat ≤ b.toNat ∨ b.toNat + 4 * n.toNat ≤ c.toNat) :
     let L := launch G B a b c n
-    let c₀ := Cfg.init r₀ p₀ m₀
+    let c₀ := Cfg.init r₀ p₀ m₀ s₀
     (∀ cfg, Reach K L c₀ cfg → ¬ Faults K L cfg) ∧
     (∀ cfg, Reach K L c₀ cfg → Done K L cfg ∨ ∃ cfg', Step K L cfg cfg') ∧
     (∃ bound, ∀ j cfg, Steps K L j c₀ cfg → j ≤ bound) ∧
@@ -125,7 +125,7 @@ theorem vadd_correct (G B n : BitVec 32) (a b c : Addr) (m₀ : Mem)
       · exact elem_disjoint₂ fc fa sa hit hiu hx hr
       · exact elem_disjoint₂ fc fb sb hit hiu hx hr
     · exact elem_disjoint fc hit hiu (fun h => htu (h1.gid_inj ht hu h)) hx hw
-  obtain ⟨bound, g⟩ := grid_sound (P := Post B a b c n.toNat m₀) hsolo hdisj
+  obtain ⟨bound, g⟩ := grid_sound (P := Post B a b c n.toNat m₀) hsolo hdisj s₀
   refine ⟨g.noFault, g.progress, ⟨bound, g.bounded⟩, g.raceFree, g.exists_done, ?_⟩
   intro cfg hr hd
   obtain ⟨hown, hrest⟩ := g.final cfg hr hd

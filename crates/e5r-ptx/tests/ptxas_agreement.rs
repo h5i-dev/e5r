@@ -21,7 +21,7 @@ fn ptxas() -> Option<String> {
 
 fn kernel(body: &str) -> String {
     format!(
-        ".version 8.0\n.target sm_86\n.address_size 64\n.visible .entry k(\n\t.param .u64 k_p,\n\t.param .u32 k_n\n)\n{{\n\t.reg .pred %p<3>;\n\t.reg .b32 %r<9>;\n\t.reg .b64 %rd<9>;\nL:\n\t{body};\n\tret;\n}}\n"
+        ".version 8.0\n.target sm_86\n.address_size 64\n.visible .entry k(\n\t.param .u64 k_p,\n\t.param .u32 k_n\n)\n{{\n\t.reg .pred %p<3>;\n\t.reg .b32 %r<9>;\n\t.reg .b64 %rd<9>;\n\t.shared .align 8 .b8 sm[64];\nL:\n\t{body};\n\tret;\n}}\n"
     )
 }
 
@@ -106,6 +106,36 @@ fn forms() -> Vec<String> {
         v.push(format!("mul.wide.{t} %rd1, %r2, 4"));
         v.push(format!("mul.wide.{t} %rd1, %r2, -1"));
     }
+    // M4: shared memory, atomics, barriers
+    for t in TYS {
+        let (d, a, b) = (reg(t, 1), reg(t, 2), reg(t, 3));
+        for addr in ["[%r5]", "[%rd5]", "[sm]", "[sm+8]", "[%r5+-4]"] {
+            v.push(format!("ld.shared.{t} {d}, {addr}"));
+            v.push(format!("st.shared.{t} {addr}, {a}"));
+        }
+        v.push(format!("st.shared.{t} [sm], 3"));
+        for sp in ["global", "shared"] {
+            let addr = if sp == "global" { "[%rd5]" } else { "[%r5]" };
+            for op in ["add", "min", "max", "exch", "and", "or", "xor", "inc"] {
+                v.push(format!("atom.{sp}.{op}.{t} {d}, {addr}, {b}"));
+                v.push(format!("atom.{sp}.{op}.{t} {d}, {addr}, 1"));
+                v.push(format!("red.{sp}.{op}.{t} {addr}, {b}"));
+            }
+            v.push(format!("atom.{sp}.cas.{t} {d}, {addr}, {a}, {b}"));
+            v.push(format!("atom.{sp}.cas.{t} {d}, {addr}, 0, 1"));
+        }
+        v.push(format!("atom.add.{t} {d}, [%rd5], {b}"));
+        v.push(format!("atom.global.add.{t} {d}, [%rd5+4], {b}"));
+    }
+    for t in ["u32", "b32", "u64", "b64", "s32", "s64"] {
+        v.push(format!("mov.{t} {}, sm", reg(t, 1)));
+    }
+    v.push("add.u32 %r1, sm, 4".into());
+    v.push("ld.global.u32 %r1, [sm]".into());
+    for b in ["bar.sync 0", "bar.sync 1", "bar.sync 0, 32", "barrier.sync 0", "bar.cta.sync 0"] {
+        v.push(b.into());
+    }
+    v.push("@%p1 bar.sync 0".into());
     v.push("cvta.to.global.u64 %rd1, %rd2".into());
     v.push("cvta.to.global.u64 %rd1, %r2".into());
     for g in ["", "@%p1 ", "@!%p1 "] {

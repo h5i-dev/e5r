@@ -1,25 +1,30 @@
 /-
-From per-thread proofs to the whole grid.
+From per-thread proofs to the whole grid, for kernels that use only global
+memory (no `.shared`, atomics or barriers): the M1-M3 theorems.
 
-`grid_sound` is proved once, for every kernel of the subset. Its hypotheses
-are per thread: thread `t`, run alone from the initial memory, halts after
-legal steps whose loads stay in `R t ∪ W t` and whose stores stay in `W t`
+`grid_sound` is proved once, for every such kernel. Its hypotheses are per
+thread: thread `t`, run alone from the initial memory, halts after legal
+global steps whose loads stay in `R t ∪ W t` and whose stores stay in `W t`
 (`Solo`), ending in a memory with property `P t`; and no thread writes a byte
 another thread reads or writes (`hdisj`). Reads may overlap.
 
-Its conclusion is about every interleaving of the grid (`Reach`/`Steps`):
+Its conclusion is about every execution of the grid (`Reach`/`Steps`, with
+barrier steps and shared memory, which such a run never uses):
 
-* no reachable configuration faults (bounds, alignment, unsupported forms);
+* no reachable configuration faults (bounds, alignment, unsupported forms,
+  a diverged barrier);
 * every reachable configuration has finished or can step, and no execution is
   longer than the sum of the per-thread step counts, so every execution
   terminates and ends with every thread finished;
-* no two threads ever make conflicting accesses (`RaceFree`);
+* no two threads ever make conflicting accesses (`RaceFree`, in its
+  strongest form: no conflict at all);
 * when all threads have finished, each byte a thread owns holds what that
   thread's solo run left there, and every byte no thread owns is unchanged.
 
 The proof keeps, for each reachable configuration, how far each thread has
-come along its solo trace, and shows the shared memory agrees with that
-thread's solo memory on everything it can touch.
+come along its solo trace, and shows global memory agrees with that thread's
+solo memory on everything it can touch. Kernels with barriers go through the
+phase theorem instead (Ptx/Logic/Phases.lean).
 -/
 import Ptx.Logic.Hoare
 
@@ -70,9 +75,9 @@ theorem Solo.frame {R W : Addr → Prop} {s₀ m₀ n} (hs : Solo K al c R W s�
     · next a sz v s'' hA =>
       split
       · intro h; cases h
-        have hf := hs.foot k (by omega) (a, sz, true) (by simp [hA, Action.acc])
+        have hf := hs.foot k (by omega) ⟨.global, a, sz, .write⟩ (by simp [hA, Action.acc])
         have : ¬ covers a sz.bytes x := fun hc => by
-          rcases hf x hc with h | ⟨h, _⟩
+          rcases hf.bytes x hc with h | ⟨h, _⟩
           · exact hx h
           · simp at h
         show wr _ a sz v x = m₀ x
@@ -109,7 +114,7 @@ section
 variable (K : Kernel) (L : Launch) (r0 : Tid → String → Val) (p0 : Tid → String → Bool) (m0 : Mem)
 variable (R W : Tid → Addr → Prop) (n : Tid → Nat)
 
-abbrev s0 (t : Tid) : TState := (Cfg.init r0 p0 m0).ts t
+abbrev s0 (t : Tid) : TState := (Cfg.init r0 p0 m0 (fun _ _ => 0)).ts t
 
 abbrev soloAt (t : Tid) (k : Nat) : TState × Mem := trace K L.alloc (L.ctx t) k (s0 r0 p0 m0 t) m0
 
@@ -131,17 +136,16 @@ theorem inv_halted {k c t} (hI : Inv K L r0 p0 m0 W n k c) (ht : t ∈ L.threads
     c.res K L t = .halted := by
   have := hsolo.halt
   rw [← heq] at this
-  unfold Cfg.res; rw [hI.ts t ht]
-  exact stepMem_halted_of_done (stepMem_halted this)
+  unfold Cfg.res tstep; rw [hI.ts t ht, stepMem_halted this]
 
 theorem inv_step {k c t}
     (hI : Inv K L r0 p0 m0 W n k c) (ht : t ∈ L.threads)
     (hsolo : ∀ t ∈ L.threads, Solo K L.alloc (L.ctx t) (R t) (W t) (s0 r0 p0 m0 t) m0 (n t))
     (hdisj : ∀ t ∈ L.threads, ∀ u ∈ L.threads, t ≠ u → ∀ x, W t x → ¬ R u x ∧ ¬ W u x)
     (hlt : k t < n t) :
-    ∃ s' m', c.res K L t = .ok s' m' ∧
+    ∃ s' m', stepMem K L.alloc (L.ctx t) (c.ts t) c.mem = .ok s' m' ∧
       Inv K L r0 p0 m0 W n (fun u => if u = t then k t + 1 else k u)
-        { ts := updT c.ts t s', mem := m' } := by
+        (c.write t s' ⟨m', c.sh t.ctaid⟩) := by
   have hs := hsolo t ht
   obtain ⟨S', M', hst⟩ := hs.ok (k t) hlt
   have htr := trace_succ_back hst
@@ -171,7 +175,7 @@ theorem inv_step {k c t}
       (∀ x, (∀ u ∈ L.threads, ¬ W u x) → m' x = c.mem x) →
       (∀ x, W t x → m' x = M' x) →
       Inv K L r0 p0 m0 W n (fun u => if u = t then k t + 1 else k u)
-        { ts := updT c.ts t S', mem := m' } := by
+        { c with ts := updT c.ts t S', mem := m', sh := updC c.sh t.ctaid (c.sh t.ctaid) } := by
     intro m' hoth hrest hmine
     refine ⟨?_, ?_, ?_, ?_⟩
     · intro u hu; by_cases h : u = t
@@ -184,7 +188,7 @@ theorem inv_step {k c t}
       · subst h; simp [htr]; exact hmine x hx
       · simp [h]; rw [hoth x u hu h hx]; exact hI.own u hu x hx
     · intro x hx; show m' x = m0 x; rw [hrest x hx]; exact hI.rest x hx
-  unfold Cfg.res; rw [hts]
+  rw [hts]
   revert hfoot hst
   unfold stepMem
   split
@@ -195,9 +199,9 @@ theorem inv_step {k c t}
     split
     · next hok =>
       intro hfoot hst; injection hst with h1 h2; subst h1 h2
-      have hf := hfoot (a, sz, false) (by simp [hA, Action.acc])
+      have hf := hfoot ⟨.global, a, sz, .read⟩ (by simp [hA, Action.acc])
       have hrd : rd c.mem a sz = rd M a sz := rd_congr fun x hx => by
-        apply hagree; rcases hf x hx with h | ⟨_, h⟩
+        apply hagree; rcases hf.bytes x hx with h | ⟨_, h⟩
         · exact .inl h
         · exact .inr h
       refine ⟨_, _, rfl, ?_⟩
@@ -207,12 +211,12 @@ theorem inv_step {k c t}
     split
     · next hok =>
       intro hfoot hst; injection hst with h1 h2; subst h1 h2
-      have hf := hfoot (a, sz, true) (by simp [hA, Action.acc])
+      have hf := hfoot ⟨.global, a, sz, .write⟩ (by simp [hA, Action.acc])
       have hcov : ∀ x, covers a sz.bytes x → W t x := fun x hx => by
-        rcases hf x hx with h | ⟨h, _⟩
+        rcases hf.bytes x hx with h | ⟨h, _⟩
         · exact h
         · simp at h
-      refine ⟨_, _, rfl, finish _ ?_ ?_ ?_⟩
+      refine ⟨_, _, rfl, finish (wr c.mem a sz v) ?_ ?_ ?_⟩
       · intro x u hu hut hwu
         apply wr_outside; intro hx
         exact (hdisj t ht u hu (Ne.symm hut) x (hcov x hx)).2 hwu
@@ -236,13 +240,19 @@ structure GridOk (K : Kernel) (L : Launch) (c₀ : Cfg) (W : Tid → Addr → Pr
     (∀ t ∈ L.threads, ∃ M, P t M ∧ ∀ x, W t x → c.mem x = M x) ∧
     (∀ x, (∀ t ∈ L.threads, ¬ W t x) → c.mem x = c₀.mem x)
 
+theorem res_of_stepMem {c : Cfg} {t : Tid} {s' : TState} {m' : Mem}
+    (h : stepMem K L.alloc (L.ctx t) (c.ts t) c.mem = .ok s' m') :
+    c.res K L t = .ok s' ⟨m', c.sh t.ctaid⟩ :=
+  tstep_of_stepMem (al := L.allocs K) h
+
 theorem inv_reach
     (hsolo : ∀ t ∈ L.threads, Solo K L.alloc (L.ctx t) (R t) (W t) (s0 r0 p0 m0 t) m0 (n t))
-    (hdisj : ∀ t ∈ L.threads, ∀ u ∈ L.threads, t ≠ u → ∀ x, W t x → ¬ R u x ∧ ¬ W u x) :
-    ∀ j c, Steps K L j (Cfg.init r0 p0 m0) c → ∃ k, Inv K L r0 p0 m0 W n k c ∧
+    (hdisj : ∀ t ∈ L.threads, ∀ u ∈ L.threads, t ≠ u → ∀ x, W t x → ¬ R u x ∧ ¬ W u x)
+    (sh0 : Dim3 → Mem) :
+    ∀ j c, Steps K L j (Cfg.init r0 p0 m0 sh0) c → ∃ k, Inv K L r0 p0 m0 W n k c ∧
       j + (L.threads.map fun t => n t - k t).sum ≤ (L.threads.map n).sum := by
   intro j c h
-  generalize hc0 : Cfg.init r0 p0 m0 = c0 at h
+  generalize hc0 : Cfg.init r0 p0 m0 sh0 = c0 at h
   induction h with
   | refl =>
     subst hc0
@@ -251,25 +261,34 @@ theorem inv_reach
     simp
   | @tail j c₁ c₂ c₃ _ hstep ih =>
     obtain ⟨k, hI, hsum⟩ := ih hc0
-    obtain ⟨t, ht, s', m', hres, rfl⟩ := hstep
-    have hlt : k t < n t := by
+    -- no thread of a global-only run ever waits, so no barrier is released
+    have nowait : ∀ t ∈ L.threads, c₂.res K L t ≠ .wait := by
+      intro t ht hw
       rcases Nat.lt_or_ge (k t) (n t) with h | h
-      · exact h
-      · have := inv_halted hI ht (hsolo t ht) (Nat.le_antisymm (hI.le t ht) h)
-        rw [hres] at this; cases this
-    obtain ⟨s'', m'', hres', hI'⟩ := inv_step hI ht hsolo hdisj hlt
-    rw [hres] at hres'; cases hres'
-    refine ⟨_, hI', ?_⟩
-    have := sum_lt_of_dec (l := L.threads) (f := fun u => n u - k u)
-      (g := fun u => n u - (if u = t then k t + 1 else k u)) ht (by simp; omega)
-      (by intro u _; by_cases h : u = t <;> simp [h]; omega)
-    omega
+      · obtain ⟨_, _, hr, _⟩ := inv_step hI ht hsolo hdisj h
+        rw [res_of_stepMem hr] at hw; cases hw
+      · rw [inv_halted hI ht (hsolo t ht) (Nat.le_antisymm (hI.le t ht) h)] at hw; cases hw
+    rcases hstep with ⟨t, ht, s', h', hres, rfl⟩ | ⟨b, ⟨⟨t, ht, rfl⟩, _, hall⟩, -⟩
+    · have hlt : k t < n t := by
+        rcases Nat.lt_or_ge (k t) (n t) with h | h
+        · exact h
+        · have := inv_halted hI ht (hsolo t ht) (Nat.le_antisymm (hI.le t ht) h)
+          rw [hres] at this; cases this
+      obtain ⟨s'', m'', hres', hI'⟩ := inv_step hI ht hsolo hdisj hlt
+      rw [res_of_stepMem hres'] at hres; cases hres
+      refine ⟨_, hI', ?_⟩
+      have := sum_lt_of_dec (l := L.threads) (f := fun u => n u - k u)
+        (g := fun u => n u - (if u = t then k t + 1 else k u)) ht (by simp; omega)
+        (by intro u _; by_cases h : u = t <;> simp [h]; omega)
+      omega
+    · exact absurd (hall t ht rfl).1 (nowait t ht)
 
 theorem grid_sound {P : Tid → Mem → Prop}
     (hsolo : ∀ t ∈ L.threads, ∃ n, Solo K L.alloc (L.ctx t) (R t) (W t) (s0 r0 p0 m0 t) m0 n ∧
       P t (trace K L.alloc (L.ctx t) n (s0 r0 p0 m0 t) m0).2)
-    (hdisj : ∀ t ∈ L.threads, ∀ u ∈ L.threads, t ≠ u → ∀ x, W t x → ¬ R u x ∧ ¬ W u x) :
-    ∃ bound, GridOk K L (Cfg.init r0 p0 m0) W P bound := by
+    (hdisj : ∀ t ∈ L.threads, ∀ u ∈ L.threads, t ≠ u → ∀ x, W t x → ¬ R u x ∧ ¬ W u x)
+    (sh0 : Dim3 → Mem) :
+    ∃ bound, GridOk K L (Cfg.init r0 p0 m0 sh0) W P bound := by
   classical
   let n : Tid → Nat := fun t => if h : t ∈ L.threads then Classical.choose (hsolo t h) else 0
   have hn : ∀ t (h : t ∈ L.threads), n t = Classical.choose (hsolo t h) := fun t h => by simp [n, h]
@@ -277,24 +296,29 @@ theorem grid_sound {P : Tid → Mem → Prop}
     fun t h => by rw [hn t h]; exact (Classical.choose_spec (hsolo t h)).1
   have hP : ∀ t ∈ L.threads, P t (soloAt K L r0 p0 m0 t (n t)).2 :=
     fun t h => by rw [hn t h]; exact (Classical.choose_spec (hsolo t h)).2
-  have reachInv : ∀ c, Reach K L (Cfg.init r0 p0 m0) c → ∃ k, Inv K L r0 p0 m0 W n k c := by
+  have reachInv : ∀ c, Reach K L (Cfg.init r0 p0 m0 sh0) c → ∃ k, Inv K L r0 p0 m0 W n k c := by
     intro c hc
     obtain ⟨j, hj⟩ := hc.steps
-    obtain ⟨k, hk, _⟩ := inv_reach hS hdisj j c hj
+    obtain ⟨k, hk, _⟩ := inv_reach hS hdisj sh0 j c hj
     exact ⟨k, hk⟩
   -- every thread is either finished (at the end of its trace) or can step
   have status : ∀ k c, Inv K L r0 p0 m0 W n k c → ∀ t ∈ L.threads,
-      (k t = n t ∧ c.res K L t = .halted) ∨ (k t < n t ∧ ∃ s' m', c.res K L t = .ok s' m') := by
+      (k t = n t ∧ c.res K L t = .halted) ∨ (k t < n t ∧ ∃ s' h', c.res K L t = .ok s' h') := by
     intro k c hI t ht
     rcases Nat.lt_or_ge (k t) (n t) with h | h
     · obtain ⟨s', m', hr, _⟩ := inv_step hI ht hS hdisj h
-      exact .inr ⟨h, s', m', hr⟩
+      exact .inr ⟨h, s', _, res_of_stepMem hr⟩
     · have heq := Nat.le_antisymm (hI.le t ht) h
       exact .inl ⟨heq, inv_halted hI ht (hS t ht) heq⟩
+  have nowait : ∀ k c, Inv K L r0 p0 m0 W n k c → ∀ t ∈ L.threads, c.res K L t ≠ .wait := by
+    intro k c hI t ht hw
+    rcases status k c hI t ht with ⟨_, h⟩ | ⟨_, s', h', h⟩ <;> rw [h] at hw <;> cases hw
   refine ⟨(L.threads.map n).sum, ⟨?_, ?_, ?_, ?_, ?_⟩⟩
-  · intro c hc ⟨t, ht, hf⟩
+  · intro c hc hf
     obtain ⟨k, hI⟩ := reachInv c hc
-    rcases status k c hI t ht with ⟨_, h⟩ | ⟨_, s', m', h⟩ <;> rw [h] at hf <;> cases hf
+    rcases hf with ⟨t, ht, hf⟩ | ⟨t, ht, _, _, _, hw, _⟩
+    · rcases status k c hI t ht with ⟨_, h⟩ | ⟨_, s', h', h⟩ <;> rw [h] at hf <;> cases hf
+    · exact nowait k c hI t ht hw
   · intro c hc
     obtain ⟨k, hI⟩ := reachInv c hc
     by_cases hd : Done K L c
@@ -304,13 +328,14 @@ theorem grid_sound {P : Tid → Mem → Prop}
         Classical.byContradiction fun h' => hd fun t ht =>
           Classical.byContradiction fun h'' => h' ⟨t, ht, h''⟩
       obtain ⟨t, ht, hnh⟩ := this
-      rcases status k c hI t ht with ⟨_, h⟩ | ⟨_, s', m', h⟩
+      rcases status k c hI t ht with ⟨_, h⟩ | ⟨_, s', h', h⟩
       · exact absurd h hnh
-      · exact ⟨_, t, ht, s', m', h, rfl⟩
+      · exact ⟨_, .inl ⟨t, ht, s', h', h, rfl⟩⟩
   · intro j c hj
-    obtain ⟨k, _, hsum⟩ := inv_reach hS hdisj j c hj
+    obtain ⟨k, _, hsum⟩ := inv_reach hS hdisj sh0 j c hj
     omega
-  · intro c₁ c₂ h₁ h₂ t ht u hu htu x y hx hy ⟨hw, b, hbx, hby⟩
+  · intro c₁ c₂ h₁ h₂ t ht u hu htu x y hx hy ⟨_, _, hw, b, hbx, hby⟩
+    exfalso
     obtain ⟨k₁, hI₁⟩ := reachInv c₁ h₁
     obtain ⟨k₂, hI₂⟩ := reachInv c₂ h₂
     have footOf : ∀ k c, Inv K L r0 p0 m0 W n k c → ∀ v ∈ L.threads, ∀ z,
@@ -324,15 +349,15 @@ theorem grid_sound {P : Tid → Mem → Prop}
         have := stepMem_halted (hS v hv).halt
         rw [← heq] at this
         simp only [soloAt] at hz; rw [this] at hz; simp [Action.acc] at hz
-    have fx := footOf k₁ c₁ hI₁ t ht x hx b hbx
-    have fy := footOf k₂ c₂ hI₂ u hu y hy b hby
+    have fx := (footOf k₁ c₁ hI₁ t ht x hx).bytes b hbx
+    have fy := (footOf k₂ c₂ hI₂ u hu y hy).bytes b hby
     rcases hw with hw | hw
-    · have hWt : W t b := by rcases fx with h | ⟨h, _⟩; exact h; rw [hw] at h; cases h
+    · have hWt : W t b := by rcases fx with h | ⟨h, _⟩; exact h; exact absurd h hw
       have := hdisj t ht u hu htu b hWt
       rcases fy with h | ⟨_, h⟩
       · exact this.2 h
       · exact this.1 h
-    · have hWu : W u b := by rcases fy with h | ⟨h, _⟩; exact h; rw [hw] at h; cases h
+    · have hWu : W u b := by rcases fy with h | ⟨h, _⟩; exact h; exact absurd h hw
       have := hdisj u hu t ht (Ne.symm htu) b hWu
       rcases fx with h | ⟨_, h⟩
       · exact this.2 h
@@ -340,7 +365,7 @@ theorem grid_sound {P : Tid → Mem → Prop}
   · intro c hc hd
     obtain ⟨k, hI⟩ := reachInv c hc
     have hk : ∀ t ∈ L.threads, k t = n t := fun t ht => by
-      rcases status k c hI t ht with ⟨h, _⟩ | ⟨_, s', m', h⟩
+      rcases status k c hI t ht with ⟨h, _⟩ | ⟨_, s', h', h⟩
       · exact h
       · have := hd t ht; rw [h] at this; cases this
     refine ⟨fun t ht => ⟨_, hP t ht, fun x hx => by rw [hI.own t ht x hx, hk t ht]⟩, ?_⟩

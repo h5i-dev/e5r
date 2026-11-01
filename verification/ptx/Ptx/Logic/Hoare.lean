@@ -17,9 +17,13 @@ import Ptx.Semantics.SIMT
 
 namespace Ptx
 
-/-- An access stays in the footprint: stores only in `W`, loads in `R ∪ W`. -/
-def InFoot (R W : Addr → Prop) (acc : Addr × Size × Bool) : Prop :=
-  ∀ x, covers acc.1 acc.2.1.bytes x → W x ∨ (acc.2.2 = false ∧ R x)
+/-- An access stays in the footprint: a global load or store, stores only in
+`W`, loads in `R ∪ W`. Shared-memory accesses and atomics are never in a
+footprint of this global-only logic (Ptx/Logic/Phases.lean has the full one). -/
+structure InFoot (R W : Addr → Prop) (acc : Acc) : Prop where
+  global : acc.sp = .global
+  plain : acc.kind ≠ .atomic
+  bytes : ∀ x, covers acc.a acc.sz.bytes x → W x ∨ (acc.kind = .read ∧ R x)
 
 section
 variable (K : Kernel) (al : List Region) (c : Ctx)
@@ -45,10 +49,10 @@ variable (R W : Addr → Prop)
 inductive Safe (J : TState → Mem → Prop) : TState → Mem → Prop
   | stop {s m} : J s m → Safe J s m
   | next {s s' m} : action K c s = .next s' → Safe J s' m → Safe J s m
-  | load {s m a sz k} : action K c s = .load a sz k → accessOk al a sz = true →
-      InFoot R W (a, sz, false) → Safe J (k (rd m a sz)) m → Safe J s m
-  | store {s m a sz v s'} : action K c s = .store a sz v s' → accessOk al a sz = true →
-      InFoot R W (a, sz, true) → Safe J s' (wr m a sz v) → Safe J s m
+  | load {s m a sz k} : action K c s = .load .global a sz k → accessOk al a sz = true →
+      InFoot R W ⟨.global, a, sz, .read⟩ → Safe J (k (rd m a sz)) m → Safe J s m
+  | store {s m a sz v s'} : action K c s = .store .global a sz v s' → accessOk al a sz = true →
+      InFoot R W ⟨.global, a, sz, .write⟩ → Safe J s' (wr m a sz v) → Safe J s m
 
 /-- The weakest precondition, up to the next cut point or `done`, by running
 the instruction table with `fuel` steps. -/
@@ -57,14 +61,14 @@ def wp (cut : Nat → Bool) (Q : TState → Mem → Prop) : Nat → TState → M
   | f + 1, s, m =>
     match action K c s with
     | .next s' => if cut s'.pc then Q s' m else wp cut Q f s' m
-    | .load a sz k =>
-      accessOk al a sz = true ∧ InFoot R W (a, sz, false) ∧
+    | .load .global a sz k =>
+      accessOk al a sz = true ∧ InFoot R W ⟨.global, a, sz, .read⟩ ∧
         (if cut (k (rd m a sz)).pc then Q (k (rd m a sz)) m else wp cut Q f (k (rd m a sz)) m)
-    | .store a sz v s' =>
-      accessOk al a sz = true ∧ InFoot R W (a, sz, true) ∧
+    | .store .global a sz v s' =>
+      accessOk al a sz = true ∧ InFoot R W ⟨.global, a, sz, .write⟩ ∧
         (if cut s'.pc then Q s' (wr m a sz v) else wp cut Q f s' (wr m a sz v))
     | .done => Q s m
-    | .fault => False
+    | _ => False
 
 /-- `wp` after the action is known. Kept separate so `simp` only unfolds the
 next step once the action has been computed to a constructor. -/
@@ -72,14 +76,14 @@ def wpAct (cut : Nat → Bool) (Q : TState → Mem → Prop) (f : Nat) (act : Ac
     Prop :=
   match act with
   | .next s' => if cut s'.pc then Q s' m else wp K al c R W cut Q f s' m
-  | .load a sz k =>
-    accessOk al a sz = true ∧ InFoot R W (a, sz, false) ∧
+  | .load .global a sz k =>
+    accessOk al a sz = true ∧ InFoot R W ⟨.global, a, sz, .read⟩ ∧
       (if cut (k (rd m a sz)).pc then Q (k (rd m a sz)) m else wp K al c R W cut Q f (k (rd m a sz)) m)
-  | .store a sz v s' =>
-    accessOk al a sz = true ∧ InFoot R W (a, sz, true) ∧
+  | .store .global a sz v s' =>
+    accessOk al a sz = true ∧ InFoot R W ⟨.global, a, sz, .write⟩ ∧
       (if cut s'.pc then Q s' (wr m a sz v) else wp K al c R W cut Q f s' (wr m a sz v))
   | .done => Q s m
-  | .fault => False
+  | _ => False
 
 theorem wp_succ (cut Q f s m) :
     wp K al c R W cut Q (f + 1) s m = wpAct K al c R W cut Q f (action K c s) s m := by
@@ -93,14 +97,19 @@ variable {K : Kernel} {al : List Region} {c : Ctx} {R W : Addr → Prop} {cut : 
 
 @[simp] theorem wpAct_next {s'} : wpAct K al c R W cut Q f (.next s') s m =
     if cut s'.pc then Q s' m else wp K al c R W cut Q f s' m := rfl
-@[simp] theorem wpAct_load {a sz k} : wpAct K al c R W cut Q f (.load a sz k) s m =
-    (accessOk al a sz = true ∧ InFoot R W (a, sz, false) ∧
+@[simp] theorem wpAct_load {a sz k} : wpAct K al c R W cut Q f (.load .global a sz k) s m =
+    (accessOk al a sz = true ∧ InFoot R W ⟨.global, a, sz, .read⟩ ∧
       (if cut (k (rd m a sz)).pc then Q (k (rd m a sz)) m else wp K al c R W cut Q f (k (rd m a sz)) m)) := rfl
-@[simp] theorem wpAct_store {a sz v s'} : wpAct K al c R W cut Q f (.store a sz v s') s m =
-    (accessOk al a sz = true ∧ InFoot R W (a, sz, true) ∧
+@[simp] theorem wpAct_store {a sz v s'} : wpAct K al c R W cut Q f (.store .global a sz v s') s m =
+    (accessOk al a sz = true ∧ InFoot R W ⟨.global, a, sz, .write⟩ ∧
       (if cut s'.pc then Q s' (wr m a sz v) else wp K al c R W cut Q f s' (wr m a sz v))) := rfl
 @[simp] theorem wpAct_done : wpAct K al c R W cut Q f .done s m = Q s m := rfl
 @[simp] theorem wpAct_fault : wpAct K al c R W cut Q f .fault s m = False := rfl
+@[simp] theorem wpAct_bar : wpAct K al c R W cut Q f .bar s m = False := rfl
+@[simp] theorem wpAct_atom {sp a sz g k} : wpAct K al c R W cut Q f (.atom sp a sz g k) s m = False := rfl
+@[simp] theorem wpAct_load_shared {a sz k} : wpAct K al c R W cut Q f (.load .shared a sz k) s m = False := rfl
+@[simp] theorem wpAct_store_shared {a sz v s'} :
+    wpAct K al c R W cut Q f (.store .shared a sz v s') s m = False := rfl
 @[simp] theorem wpAct_ite {p : Prop} [Decidable p] {a b : Action} :
     wpAct K al c R W cut Q f (if p then a else b) s m =
       if p then wpAct K al c R W cut Q f a s m else wpAct K al c R W cut Q f b s m := by
@@ -169,11 +178,11 @@ theorem trace_succ {k s m s' m'} (h : stepMem K al c s m = .ok s' m') :
 theorem stepMem_next {s s' m} (h : action K c s = .next s') : stepMem K al c s m = .ok s' m := by
   simp [stepMem, h]
 
-theorem stepMem_load {s m a sz k} (h : action K c s = .load a sz k) (hok : accessOk al a sz = true) :
+theorem stepMem_load {s m a sz k} (h : action K c s = .load .global a sz k) (hok : accessOk al a sz = true) :
     stepMem K al c s m = .ok (k (rd m a sz)) m := by
   simp [stepMem, h, hok]
 
-theorem stepMem_store {s m a sz v s'} (h : action K c s = .store a sz v s')
+theorem stepMem_store {s m a sz v s'} (h : action K c s = .store .global a sz v s')
     (hok : accessOk al a sz = true) : stepMem K al c s m = .ok s' (wr m a sz v) := by
   simp [stepMem, h, hok]
 

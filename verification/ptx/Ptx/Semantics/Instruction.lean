@@ -2,16 +2,23 @@
 Single-thread instruction semantics.
 
 `action K c s` is what thread state `s` does next, as one of: an internal step,
-a load (with a continuation that receives the bytes read), a store, `done`
-(the thread executed `ret` or `exit`), or `fault`. Memory never appears here:
-every interaction with global memory is a visible `load` or `store` with its
-address and size, so locality and race freedom can be stated over actions
-without re-deriving them from the instruction table.
+a load (with a continuation that receives the bytes read), a store, an atomic
+read-modify-write, a wait at `bar.sync`, `done` (the thread executed `ret` or
+`exit`), or `fault`. Memory never appears here: every interaction with global
+or shared memory is a visible action with its space, address and size, so
+locality and race freedom can be stated over actions without re-deriving them
+from the instruction table.
 
 Registers are 64 bits wide in the model. A 32-bit operation reads the low 32
 bits of its operands and writes its result zero-extended; for a well-typed
 kernel (32-bit registers are only used at 32-bit types) this is exactly PTX's
 `.b32` register file. Arithmetic wraps (`add.u32 a b = (a + b) mod 2^32`).
+
+A shared-memory address is the value of its register (plus offset), as for
+global memory. A 32-bit address register written by the kernel is
+zero-extended, so this is its value; one with stray upper bits (never
+written) points outside every shared variable and faults, where hardware
+would use the low 32 bits. The model is stricter there, never more lenient.
 
 Initial register contents are not fixed by this file: the launch takes them as
 parameters, and the theorems quantify over all of them, so a kernel that reads
@@ -31,14 +38,16 @@ structure Dim3 where
 def Dim3.get (v : Dim3) : Dim → BitVec 32
   | .x => v.x | .y => v.y | .z => v.z
 
-/-- What one thread can observe of its launch: its indices, the launch shape
-and the raw bits of the kernel parameters (`.u32` parameters zero-extended). -/
+/-- What one thread can observe of its launch: its indices, the launch shape,
+the raw bits of the kernel parameters (`.u32` parameters zero-extended), and
+the addresses of the kernel's `.shared` variables in the CTA's shared window. -/
 structure Ctx where
   tid : Dim3
   ntid : Dim3
   ctaid : Dim3
   nctaid : Dim3
   params : String → Val
+  sym : String → Val := fun _ => 0
 
 def Ctx.sreg (c : Ctx) : Sreg → BitVec 32
   | .tid d => c.tid.get d
@@ -81,6 +90,7 @@ def opVal (c : Ctx) (s : TState) : Operand → Val
   | .reg r => s.r r
   | .imm v => BitVec.ofInt 64 v
   | .sreg x => ext32 (c.sreg x)
+  | .sym n => c.sym n
 
 /-- Result of a width-polymorphic operation, zero-extended into a register. -/
 def atWidth (w : Width) (f : (n : Nat) → BitVec n → BitVec n → BitVec n) (a b : Val) : Val :=
@@ -135,16 +145,77 @@ def fit (t : Ty) (v : Val) : Val :=
   | .w32 => ext32 (lo32 v)
   | .w64 => v
 
+/-- The new value an `atom`/`red` stores, from the old value and the operand,
+at the instruction's width (`min`/`max` signed for `.s` types). -/
+def atomVal (op : AtomOp) (t : Ty) (old b : Val) : Val :=
+  match op with
+  | .add => atWidth t.width (fun _ x y => x + y) old b
+  | .and => atWidth t.width (fun _ x y => x &&& y) old b
+  | .or => atWidth t.width (fun _ x y => x ||| y) old b
+  | .xor => atWidth t.width (fun _ x y => x ^^^ y) old b
+  | .exch => fit t b
+  | .min => atWidth t.width (fun _ x y => if (if t.signed then x.sle y else x.ule y) then x else y) old b
+  | .max => atWidth t.width (fun _ x y => if (if t.signed then y.sle x else y.ule x) then x else y) old b
+
+/-- The two data spaces a thread accesses. -/
+inductive Sp where
+  | global | shared
+  deriving Repr, DecidableEq, Inhabited
+
+/-- What one thread sees: global memory and its CTA's shared memory. -/
+structure Heap where
+  g : Mem
+  s : Mem
+
+def Heap.at (h : Heap) : Sp → Mem
+  | .global => h.g
+  | .shared => h.s
+
+def Heap.set (h : Heap) : Sp → Mem → Heap
+  | .global, m => { h with g := m }
+  | .shared, m => { h with s := m }
+
+@[simp] theorem Heap.at_global (h : Heap) : h.at .global = h.g := rfl
+@[simp] theorem Heap.at_shared (h : Heap) : h.at .shared = h.s := rfl
+@[simp] theorem Heap.set_global (h : Heap) (m : Mem) : h.set .global m = { h with g := m } := rfl
+@[simp] theorem Heap.set_shared (h : Heap) (m : Mem) : h.set .shared m = { h with s := m } := rfl
+
+/-- The next thing a thread does. `atom sp a sz f k` reads the `sz` bytes at
+`a`, stores `f old` there and continues with `k old`, as one indivisible
+step. `bar` waits at `bar.sync` (the grid releases a whole CTA at once). -/
 inductive Action where
   | next (s : TState)
-  | load (a : Addr) (sz : Size) (k : Val → TState)
-  | store (a : Addr) (sz : Size) (v : Val) (s : TState)
+  | load (sp : Sp) (a : Addr) (sz : Size) (k : Val → TState)
+  | store (sp : Sp) (a : Addr) (sz : Size) (v : Val) (s : TState)
+  | atom (sp : Sp) (a : Addr) (sz : Size) (f : Val → Val) (k : Val → TState)
+  | bar
   | done
   | fault
 
 def jump (K : Kernel) (s : TState) (l : String) : Action :=
   match K.label? l with
   | some pc => .next { s with pc := pc }
+  | none => .fault
+
+/-- The address of a data access: a register plus offset, or a shared
+variable plus offset. A named address in global memory is not in the
+subset. -/
+def dataAddr (c : Ctx) (s : TState) (sp : Space) : Address → Option (Sp × Addr)
+  | .reg r off =>
+    match sp with
+    | .global => some (.global, s.r r + BitVec.ofInt 64 off)
+    | .shared => some (.shared, s.r r + BitVec.ofInt 64 off)
+    | .param => none
+  | .param n off =>
+    match sp with
+    | .shared => some (.shared, c.sym n + BitVec.ofInt 64 off)
+    | _ => none
+
+/-- An `atom`/`cas`/`red`: the access, the stored value and the result. -/
+def atomic (c : Ctx) (s : TState) (sp : Space) (t : Ty) (a : Address) (f : Val → Val)
+    (k : Val → TState) : Action :=
+  match dataAddr c s sp a with
+  | some (sp', x) => .atom sp' x t.size f k
   | none => .fault
 
 /-- The effect of one (unguarded) instruction. -/
@@ -177,11 +248,22 @@ def exec (K : Kernel) (c : Ctx) (s : TState) : Instr → Action
   | .cvt dt st d a => .next (s.set d (convert dt st (opVal c s a)))
   | .cvtaGlobal d a => .next (s.set d (opVal c s a))
   | .ld .param t d (.param n 0) => .next (s.set d (fit t (c.params n)))
-  | .ld .global t d (.reg r off) =>
-    .load (s.r r + BitVec.ofInt 64 off) t.size (fun v => s.set d v)
-  | .st .global t (.reg r off) v =>
-    .store (s.r r + BitVec.ofInt 64 off) t.size (opVal c s v) s.skip
-  | .ld .. | .st .. => .fault
+  | .ld .param .. | .st .param .. => .fault
+  | .ld sp t d a =>
+    match dataAddr c s sp a with
+    | some (sp', x) => .load sp' x t.size (fun v => s.set d v)
+    | none => .fault
+  | .st sp t a v =>
+    match dataAddr c s sp a with
+    | some (sp', x) => .store sp' x t.size (opVal c s v) s.skip
+    | none => .fault
+  | .atom sp op t d a b =>
+    atomic c s sp t a (fun old => atomVal op t old (opVal c s b)) (fun old => s.set d (fit t old))
+  | .cas sp t d a b e =>
+    atomic c s sp t a (fun old => if fit t old = fit t (opVal c s b) then opVal c s e else old)
+      (fun old => s.set d (fit t old))
+  | .red sp op t a b => atomic c s sp t a (fun old => atomVal op t old (opVal c s b)) (fun _ => s.skip)
+  | .bar => .bar
   | .bra _ l => jump K s l
   | .ret | .exit => .done
 
@@ -196,25 +278,88 @@ def action (K : Kernel) (c : Ctx) (s : TState) : Action :=
   | none => .fault
   | some st => if guardHolds s st.guard then exec K c s st.instr else .next s.skip
 
-/-- The memory access an action is about to make: address, size, is-write. -/
-def Action.acc : Action → Option (Addr × Size × Bool)
-  | .load a sz _ => some (a, sz, false)
-  | .store a sz _ _ => some (a, sz, true)
+inductive AccKind where
+  | read | write | atomic
+  deriving Repr, DecidableEq, Inhabited
+
+/-- A memory access: space, address, size, and whether it reads, writes, or
+is an atomic read-modify-write. -/
+structure Acc where
+  sp : Sp
+  a : Addr
+  sz : Size
+  kind : AccKind
+  deriving Repr, DecidableEq, Inhabited
+
+/-- The memory access an action is about to make. -/
+def Action.acc : Action → Option Acc
+  | .load sp a sz _ => some ⟨sp, a, sz, .read⟩
+  | .store sp a sz _ _ => some ⟨sp, a, sz, .write⟩
+  | .atom sp a sz _ _ => some ⟨sp, a, sz, .atomic⟩
   | _ => none
 
-/-- Outcome of one step of a thread against memory. -/
+/-- Outcome of one step of a thread: it moved, it waits at a barrier, it has
+finished, or it faulted. -/
+inductive TRes where
+  | ok (s : TState) (h : Heap)
+  | wait
+  | halted
+  | fault
+
+/-- One step of a thread against what it sees, with the allocations of each
+space. -/
+def tstep (K : Kernel) (al : Sp → List Region) (c : Ctx) (s : TState) (h : Heap) : TRes :=
+  match action K c s with
+  | .next s' => .ok s' h
+  | .load sp a sz k => if accessOk (al sp) a sz then .ok (k (rd (h.at sp) a sz)) h else .fault
+  | .store sp a sz v s' =>
+    if accessOk (al sp) a sz then .ok s' (h.set sp (wr (h.at sp) a sz v)) else .fault
+  | .atom sp a sz f k =>
+    if accessOk (al sp) a sz then
+      .ok (k (rd (h.at sp) a sz)) (h.set sp (wr (h.at sp) a sz (f (rd (h.at sp) a sz))))
+    else .fault
+  | .bar => .wait
+  | .done => .halted
+  | .fault => .fault
+
+/-- Outcome of one step of a thread that only uses global memory. -/
 inductive Res where
   | ok (s : TState) (m : Mem)
   | halted
   | fault
 
-/-- One step of a thread with global memory `m` and allocations `al`. -/
+/-- One step of a thread with global memory `m` and allocations `al`, for the
+global-only fragment the M1-M3 proofs use: shared accesses, atomics and
+barriers are not steps here (they are `fault`), so a run of `stepMem`
+never contains one. `tstep_of_stepMem` is the bridge to `tstep`. -/
 def stepMem (K : Kernel) (al : List Region) (c : Ctx) (s : TState) (m : Mem) : Res :=
   match action K c s with
   | .next s' => .ok s' m
-  | .load a sz k => if accessOk al a sz then .ok (k (rd m a sz)) m else .fault
-  | .store a sz v s' => if accessOk al a sz then .ok s' (wr m a sz v) else .fault
+  | .load .global a sz k => if accessOk al a sz then .ok (k (rd m a sz)) m else .fault
+  | .store .global a sz v s' => if accessOk al a sz then .ok s' (wr m a sz v) else .fault
   | .done => .halted
-  | .fault => .fault
+  | _ => .fault
+
+theorem tstep_of_stepMem {K : Kernel} {al : Sp → List Region} {c : Ctx} {s s' : TState}
+    {m m' sh : Mem} (h : stepMem K (al .global) c s m = .ok s' m') :
+    tstep K al c s ⟨m, sh⟩ = .ok s' ⟨m', sh⟩ := by
+  unfold stepMem at h; unfold tstep
+  split at h
+  · next hA => rw [hA]; cases h; rfl
+  · next a sz k hA =>
+    rw [hA]; split at h
+    · next hok => cases h; simp [hok, Heap.at]
+    · cases h
+  · next a sz v s'' hA =>
+    rw [hA]; split at h
+    · next hok => cases h; simp [hok, Heap.at, Heap.set]
+    · cases h
+  · cases h
+  · cases h
+
+theorem tstep_halted_of_stepMem {K : Kernel} {al : Sp → List Region} {c : Ctx} {s : TState}
+    {m sh : Mem} (h : stepMem K (al .global) c s m = .halted) : tstep K al c s ⟨m, sh⟩ = .halted := by
+  unfold stepMem at h; unfold tstep
+  split at h <;> (try split at h) <;> simp_all
 
 end Ptx

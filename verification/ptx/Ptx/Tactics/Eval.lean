@@ -21,6 +21,6 @@ attribute [ptx_eval] wp_succ wp_zero action exec opVal fit Ty.width Ty.signed
   List.getElem?_cons_succ List.getElem?_cons_zero List.getElem?_nil
   Bool.false_eq_true beq_self_eq_true beq_iff_eq Option.map_some Option.map
   String.reduceEq Nat.reduceAdd Nat.reduceBEq Nat.reduceBNe reduceIte Prod.snd Prod.fst
-  Ty.size reduceCtorEq
+  Ty.size reduceCtorEq dataAddr wpAct_bar wpAct_atom wpAct_load_shared wpAct_store_shared
 
 end Ptx

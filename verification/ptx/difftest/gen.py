@@ -146,7 +146,90 @@ def forms():
         "LL:", "setp.ge.u32 \t%p1, %r3, %r7;", "@%p1 bra \tLE;",
         "xor.b32 \t%r2, %r5, %r3;", "add.u32 \t%r8, %r8, %r2;", "st.global.u32 \t[%rd4+4], %r8;",
         "add.u32 \t%r3, %r3, 1;", "bra.uni \tLL;", "LE:", store("u32")]))
-    # special registers on a 3-D launch, flattened index
+    return out
+
+
+# M4: every form below may use the shared array sm (8 bytes per thread at
+# %r10 = sm + 8 * tid) and %r10..%r15, %rd10..%rd15.
+SLOT = ["shl.b32 \t%r10, %r3, 3;", "mov.u32 \t%r11, sm;", "add.u32 \t%r10, %r11, %r10;"]
+# a word shared by the whole grid, after every thread's record (OUTEXTRA)
+TAIL = ["mov.u32 \t%r12, %nctaid.x;", "mul.lo.u32 \t%r12, %r12, %r2;",
+        "mul.wide.u32 \t%rd10, %r12, 48;", "add.u64 \t%rd10, %rd2, %rd10;"]
+OUTEXTRA = 16
+
+ATOM_TYS = {"add": ["u32", "s32", "u64"], "min": ARITH, "max": ARITH,
+            "exch": BITS, "and": BITS, "or": BITS, "xor": BITS}
+
+
+def m4_forms():
+    """(form description, body lines, needs the grid tail word)."""
+    out = []
+    for t in TYS:
+        a, b, c, d = regs(t)
+        out.append((f"st/ld.shared.{t} own slot", SLOT + [f"st.shared.{t} \t[%r10], {a};",
+                    f"ld.shared.{t} \t{d}, [%r10];", store(t)], False))
+    out.append(("ld.shared +off, 64-bit address", SLOT + ["st.shared.u32 \t[%r10+4], %r5;",
+                "cvt.u64.u32 \t%rd11, %r10;", "ld.shared.u32 \t%r8, [%rd11+4];", store("u32")], False))
+    out.append(("st.shared.u32 imm", SLOT + ["st.shared.u32 \t[%r10], -7;",
+                "ld.shared.u32 \t%r8, [%r10];", store("u32")], False))
+    # a value from the next thread, through shared memory and a barrier
+    nxt = ["add.u32 \t%r12, %r3, 1;", "setp.eq.u32 \t%p2, %r12, %r2;", "selp.u32 \t%r12, 0, %r12, %p2;",
+           "shl.b32 \t%r12, %r12, 3;", "add.u32 \t%r12, %r11, %r12;"]
+    out.append(("bar.sync: neighbour's value", SLOT + nxt + ["st.shared.u32 \t[%r10], %r5;", "bar.sync \t0;",
+                "ld.shared.u32 \t%r8, [%r12];", store("u32")], False))
+    out.append(("bar.sync: two phases", SLOT + nxt + ["st.shared.u64 \t[%r10], %rd5;", "bar.sync \t0;",
+                "ld.shared.u64 \t%rd8, [%r12];", "bar.sync \t0;", "st.shared.u64 \t[%r10], %rd6;",
+                "bar.sync \t0;", "ld.shared.u64 \t%rd9, [%r12];", "xor.b64 \t%rd8, %rd8, %rd9;", store("u64")], False))
+    # interleaved tree reduction over the block, any block size, with the
+    # barrier inside the loop
+    out.append(("bar.sync in a loop: block sum", SLOT + ["st.shared.u32 \t[%r10], %r5;", "bar.sync \t0;",
+                "mov.u32 \t%r12, 1;", "LR:", "setp.ge.u32 \t%p2, %r12, %r2;", "@%p2 bra \tLE;",
+                "shl.b32 \t%r13, %r12, 1;", "sub.u32 \t%r14, %r13, 1;", "and.b32 \t%r14, %r3, %r14;",
+                "setp.ne.u32 \t%p1, %r14, 0;", "add.u32 \t%r15, %r3, %r12;", "setp.ge.u32 \t%p2, %r15, %r2;",
+                "@%p2 mov.u32 \t%r14, 1;",
+                "setp.ne.u32 \t%p1, %r14, 0;", "@%p1 bra \tLS;",
+                "shl.b32 \t%r15, %r12, 3;", "add.u32 \t%r15, %r10, %r15;", "ld.shared.u32 \t%r6, [%r15];",
+                "ld.shared.u32 \t%r7, [%r10];", "add.u32 \t%r7, %r7, %r6;", "st.shared.u32 \t[%r10], %r7;",
+                "LS:", "bar.sync \t0;", "mov.u32 \t%r12, %r13;", "bra.uni \tLR;",
+                "LE:", "ld.shared.u32 \t%r8, [sm];", store("u32")], False))
+    # atomics on a location only this thread touches: old and new values
+    # are both determined
+    for op, ts in ATOM_TYS.items():
+        for t in ts:
+            a, b, c, d = regs(t)
+            st8 = f"st.global.{t} \t[%rd4+8], {d};"
+            out.append((f"atom.global.{op}.{t}", [f"st.global.{t} \t[%rd4], {a};",
+                        f"atom.global.{op}.{t} \t{d}, [%rd4], {b};", st8], False))
+            out.append((f"atom.shared.{op}.{t}", SLOT + [f"st.shared.{t} \t[%r10], {a};",
+                        f"atom.shared.{op}.{t} \t{d}, [%r10], {b};", st8,
+                        f"ld.shared.{t} \t{d}, [%r10];", f"st.global.{t} \t[%rd4], {d};"], False))
+            if op != "exch":
+                out.append((f"red.global.{op}.{t}", [f"st.global.{t} \t[%rd4], {a};",
+                            f"red.global.{op}.{t} \t[%rd4], {b};"], False))
+                imm = "-2" if t.startswith("s") else "7"
+                out.append((f"red.shared.{op}.{t} imm", SLOT + [f"st.shared.{t} \t[%r10], {a};",
+                            f"red.shared.{op}.{t} \t[%r10], {imm};", f"ld.shared.{t} \t{d}, [%r10];", store(t)], False))
+    for t in BITS:
+        a, b, c, d = regs(t)
+        st8 = f"st.global.{t} \t[%rd4+8], {d};"
+        out.append((f"atom.global.cas.{t} equal", [f"st.global.{t} \t[%rd4], {a};",
+                    f"atom.global.cas.{t} \t{d}, [%rd4], {a}, {c};", st8], False))
+        out.append((f"atom.global.cas.{t} maybe", [f"st.global.{t} \t[%rd4], {a};",
+                    f"atom.global.cas.{t} \t{d}, [%rd4], {b}, {c};", st8], False))
+        out.append((f"atom.shared.cas.{t}", SLOT + [f"st.shared.{t} \t[%r10], {a};",
+                    f"atom.shared.cas.{t} \t{d}, [%r10], {a}, 5;", st8,
+                    f"ld.shared.{t} \t{d}, [%r10];", f"st.global.{t} \t[%rd4], {d};"], False))
+    # contended atomics: the final value does not depend on the order
+    for op, t, init in [("add", "u32", "0"), ("xor", "b32", "0"), ("and", "b32", "-1"), ("or", "b32", "0"),
+                        ("max", "u32", "0"), ("min", "s32", "2147483647"), ("add", "u64", "0"),
+                        ("max", "s64", "-9223372036854775808")]:
+        a, b, c, d = regs(t)
+        wt = "u32" if w(t) == 32 else "u64"
+        out.append((f"contended red.shared.{op}.{t}", ["setp.ne.u32 \t%p1, %r3, 0;",
+                    f"@!%p1 st.shared.{wt} \t[sm], {init};", "bar.sync \t0;",
+                    f"red.shared.{op}.{t} \t[sm], {a};", "bar.sync \t0;",
+                    f"ld.shared.{t} \t{d}, [sm];", store(t)], False))
+        out.append((f"contended atom.global.{op}.{t}", TAIL + [f"atom.global.{op}.{t} \t{d}, [%rd10], {a};"], True))
     return out
 
 
@@ -204,6 +287,11 @@ SREG_KERNEL = """
 # (CUDA_ERROR_MISALIGNED_ADDRESS). Out-of-bounds accesses are not tested:
 # the GPU only reports those that leave its allocation granularity.
 FAULT_FORMS = [
+    ("misaligned ld.shared.u32", SLOT + ["ld.shared.u32 \t%r8, [%r10+1];", store("u32")]),
+    ("misaligned st.shared.u64", SLOT + ["st.shared.u64 \t[%r10+4], %rd5;"]),
+    ("misaligned atom.global.add.u32", ["atom.global.add.u32 \t%r8, [%rd4+2], 1;"]),
+    ("misaligned atom.shared.add.u32", SLOT + ["atom.shared.add.u32 \t%r8, [%r10+1], 1;"]),
+    ("misaligned red.global.add.u64", ["red.global.add.u64 \t[%rd4+4], 1;"]),
     ("misaligned ld.global.u32", ["ld.global.u32 \t%r8, [%rd3+1];", store("u32")]),
     ("misaligned ld.global.u64", ["ld.global.u64 \t%rd8, [%rd3+4];", store("u64")]),
     ("misaligned ld.global.s32", ["ld.global.s32 \t%r8, [%rd3+2];", store("u32")]),
@@ -216,10 +304,13 @@ def kernel_text(name, body):
     lines = []
     for l in body:
         lines.append(l if l.endswith(":") else "\t" + l)
+    shared = any("sm" in l for l in body)
+    regs, rregs = "%r<16>", "%rd<16>"
+    decl = "\t.shared .align 8 .b8 \tsm[1024];\n" if shared else ""
     return (
         f"\n.visible .entry {name}(\n\t.param .u64 {name}_in,\n\t.param .u64 {name}_out,\n"
-        f"\t.param .u32 {name}_s\n)\n{{\n\t.reg .pred \t%p<3>;\n\t.reg .b32 \t%r<10>;\n"
-        f"\t.reg .b64 \t%rd<10>;\n\n" + PROLOGUE.format(k=name) + "\n".join(lines) + "\n\tret;\n}\n"
+        f"\t.param .u32 {name}_s\n)\n{{\n\t.reg .pred \t%p<3>;\n\t.reg .b32 \t{regs};\n"
+        f"\t.reg .b64 \t{rregs};\n{decl}\n" + PROLOGUE.format(k=name) + "\n".join(lines) + "\n\tret;\n}\n"
     )
 
 
@@ -253,17 +344,17 @@ def main():
     outdir = sys.argv[1]
     os.makedirs(outdir, exist_ok=True)
     rng = random.Random(20261101)
-    fs = forms()
+    fs = [(d, b, False) for d, b in forms()] + m4_forms()
     with open(os.path.join(outdir, "diff.ptx"), "w") as f:
         f.write("// Generated by verification/ptx/difftest/gen.py. Do not edit.\n")
         f.write(".version 8.0\n.target sm_86\n.address_size 64\n")
-        for i, (_, body) in enumerate(fs):
+        for i, (_, body, _) in enumerate(fs):
             f.write(kernel_text(f"d{i}", body))
         f.write(SREG_KERNEL.format())
         for i, (_, body) in enumerate(FAULT_FORMS):
             f.write(kernel_text(f"f{i}", body))
     with open(os.path.join(outdir, "forms.txt"), "w") as f:
-        for i, (desc, _) in enumerate(fs):
+        for i, (desc, _, _) in enumerate(fs):
             f.write(f"d{i}\t{desc}\n")
         f.write("sregs\tspecial registers, 3-D launch\n")
         for i, (desc, _) in enumerate(FAULT_FORMS):
@@ -271,14 +362,15 @@ def main():
     # launches: (grid, block)
     launches = [((2, 1, 1), (64, 1, 1)), ((1, 1, 1), (96, 1, 1))]
     with open(os.path.join(outdir, "cases.txt"), "w") as f:
-        for i in range(len(fs)):
+        for i, (_, _, tail) in enumerate(fs):
             for (g, b) in launches:
                 n = g[0] * g[1] * g[2] * b[0] * b[1] * b[2]
                 vals = values(rng, n)
                 inb = b"".join(x.to_bytes(8, "little") + y.to_bytes(8, "little") + z.to_bytes(8, "little")
                                for x, y, z in vals)
                 s = rng.getrandbits(32)
-                f.write(f"case d{i} {' '.join(map(str, g))} {' '.join(map(str, b))} {s} {inb.hex()} {n * REC_OUT}\n")
+                outn = n * REC_OUT + (OUTEXTRA if tail else 0)
+                f.write(f"case d{i} {' '.join(map(str, g))} {' '.join(map(str, b))} {s} {inb.hex()} {outn}\n")
         for (g, b) in [((2, 3, 2), (4, 2, 3)), ((1, 1, 1), (1, 1, 1)), ((3, 1, 1), (2, 5, 1))]:
             n = g[0] * g[1] * g[2] * b[0] * b[1] * b[2]
             f.write(f"case sregs {' '.join(map(str, g))} {' '.join(map(str, b))} 0 00 {n * REC_OUT}\n")

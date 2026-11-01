@@ -50,6 +50,7 @@ fn operand(o: &Operand) -> String {
             };
             format!("(.sreg (.{c} {}))", dim(*d))
         }
+        Operand::Sym(n) => format!("(.sym {})", string(n)),
     }
 }
 
@@ -87,6 +88,28 @@ fn instr(i: &Instr) -> String {
         Instr::Bra(u, l) => format!(".bra {u} {}", s(l)),
         Instr::Ret => ".ret".into(),
         Instr::Exit => ".exit".into(),
+        Instr::Atom(sp, op, t, d, a, b) => format!(
+            ".atom .{} .{} {} {} {} {}",
+            sp.name(),
+            op.name(),
+            ty(*t),
+            s(d),
+            address(a),
+            o(b)
+        ),
+        Instr::Cas(sp, t, d, a, b, c) => format!(
+            ".cas .{} {} {} {} {} {}",
+            sp.name(),
+            ty(*t),
+            s(d),
+            address(a),
+            o(b),
+            o(c)
+        ),
+        Instr::Red(sp, op, t, a, b) => {
+            format!(".red .{} .{} {} {} {}", sp.name(), op.name(), ty(*t), address(a), o(b))
+        }
+        Instr::Bar => ".bar".into(),
     }
 }
 
@@ -140,6 +163,14 @@ pub fn kernel_def(k: &Kernel) -> String {
         })
         .collect();
     writeln!(s, "  regs := [{}]", regs.join(", ")).unwrap();
+    if !k.shared.is_empty() {
+        let sh: Vec<String> = k
+            .shared
+            .iter()
+            .map(|d| format!("⟨{}, {}, {}⟩", string(&d.name), d.alignment(), d.size()))
+            .collect();
+        writeln!(s, "  shared := [{}]", sh.join(", ")).unwrap();
+    }
     s.push_str("  body := [");
     for (i, st) in k.body.iter().enumerate() {
         let g = match &st.guard {

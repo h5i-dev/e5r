@@ -99,7 +99,7 @@ partial def collectAddrs (e : Expr) : StateT (Array Expr) MetaM Unit := do
   if e.isAppOfArity ``Ptx.wr 4 then add (e.getArg! 1)
   if e.isAppOfArity ``Ptx.InFoot 3 then
     let acc := e.getArg! 2
-    if acc.isAppOfArity ``Prod.mk 4 then add (acc.getArg! 2)
+    if acc.isAppOfArity ``Ptx.Acc.mk 4 then add (acc.getArg! 1)
   match e with
   | .app f a => collectAddrs f; collectAddrs a
   | .lam _ t b _ | .forallE _ t b _ => collectAddrs t; collectAddrs b

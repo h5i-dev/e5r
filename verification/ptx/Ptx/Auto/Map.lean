@@ -83,10 +83,16 @@ def Pre : Prop :=
 /-- The value output element `i` must hold, from the initial memory. -/
 def val (m₀ : Mem) (i : Nat) : BitVec 32 := S.f A.sc fun a => rd32 m₀ (elem (A.base a) i)
 
+/-- The class statement. The kernel declares no `.shared` variable (so the
+launch's placement of them is irrelevant); for every launch in `Pre`, every
+initial global memory, shared memory and register content, and every
+execution: the clauses below. -/
 def Correct (K : Kernel) : Prop :=
-  ∀ (A : Args) (m₀ : Mem) (r₀ : Tid → String → Val) (p₀ : Tid → String → Bool), S.Pre A →
+  K.shared = [] ∧
+  ∀ (A : Args) (m₀ : Mem) (s₀ : Dim3 → Mem) (r₀ : Tid → String → Val) (p₀ : Tid → String → Bool),
+    S.Pre A →
     let L := S.launch A
-    let c₀ := Cfg.init r₀ p₀ m₀
+    let c₀ := Cfg.init r₀ p₀ m₀ s₀
     (∀ c, Reach K L c₀ c → ¬ Faults K L c) ∧
     (∀ c, Reach K L c₀ c → Done K L c ∨ ∃ c', Step K L c c') ∧
     (∃ bound, ∀ j c, Steps K L j c₀ c → j ≤ bound) ∧
@@ -130,8 +136,10 @@ theorem own_unique {A : Args} {g₁ g₂ i : Nat} (h₁ : MapSpec.Own A g₁ i) 
     g₁ = g₂ := by
   unfold MapSpec.Own at h₁ h₂; omega
 
-theorem correct_of_threadOk {S : MapSpec} {K : Kernel} (h : S.ThreadOk K) : S.Correct K := by
-  intro A m₀ r₀ p₀ hpre L c₀
+theorem correct_of_threadOk {S : MapSpec} {K : Kernel} (hsh : K.shared = []) (h : S.ThreadOk K) :
+    S.Correct K := by
+  refine ⟨hsh, ?_⟩
+  intro A m₀ s₀ r₀ p₀ hpre L c₀
   obtain ⟨hout, hfit, hsep, hsch⟩ := hpre
   have h1 := launch_oneD S A
   let SS := A.G.toNat * A.B.toNat
@@ -154,7 +162,7 @@ theorem correct_of_threadOk {S : MapSpec} {K : Kernel} (h : S.ThreadOk K) : S.Co
     · have hs := hsep a ha hao
       exact elem_disjoint₂ hfo (hfit a ha).1 (by unfold MapSpec.Sep at hs; omega) hi hj hc hc'
   obtain ⟨bound, g⟩ := grid_sound (R := fun t => S.R A (gid A.B t))
-    (W := fun t => S.W A (gid A.B t)) (P := fun t => S.Post A m₀ (gid A.B t)) hsolo hdisj
+    (W := fun t => S.W A (gid A.B t)) (P := fun t => S.Post A m₀ (gid A.B t)) hsolo hdisj s₀
   refine ⟨g.noFault, g.progress, ⟨bound, g.bounded⟩, g.raceFree, g.exists_done, ?_⟩
   intro cfg hr hd hS
   obtain ⟨hown, hrest⟩ := g.final cfg hr hd
@@ -173,9 +181,9 @@ end Ptx.Auto
 
 namespace Ptx
 
-theorem InFoot.mono {R W R' W' : Addr → Prop} {acc : Addr × Size × Bool}
+theorem InFoot.mono {R W R' W' : Addr → Prop} {acc : Acc}
     (hR : ∀ x, R x → R' x) (hW : ∀ x, W x → W' x) (h : InFoot R W acc) : InFoot R' W' acc :=
-  fun x hx => (h x hx).imp (hW x) fun ⟨h1, h2⟩ => ⟨h1, hR x h2⟩
+  ⟨h.global, h.plain, fun x hx => (h.bytes x hx).imp (hW x) fun ⟨h1, h2⟩ => ⟨h1, hR x h2⟩⟩
 
 theorem Safe.foot_mono {K : Kernel} {al : List Region} {c : Ctx} {R W R' W' : Addr → Prop}
     {J : TState → Mem → Prop} {s m} (hR : ∀ x, R x → R' x) (hW : ∀ x, W x → W' x)
@@ -244,12 +252,12 @@ section
 variable {S : MapSpec} {A : Args}
 
 theorem MapSpec.infoot_load {i : Nat} {a : String} (ha : a ∈ S.arrays) (hi : i < A.n.toNat) :
-    InFoot (S.ER A i) (S.EW A i) (elem (A.base a) i, .b4, false) :=
-  fun _ hx => .inr ⟨rfl, hi, a, ha, hx⟩
+    InFoot (S.ER A i) (S.EW A i) ⟨.global, elem (A.base a) i, .b4, .read⟩ :=
+  ⟨rfl, nofun, fun _ hx => .inr ⟨rfl, hi, a, ha, hx⟩⟩
 
 theorem MapSpec.infoot_store {i : Nat} {o : String} (ho : S.out = o) (hi : i < A.n.toNat) :
-    InFoot (S.ER A i) (S.EW A i) (elem (A.base o) i, .b4, true) :=
-  fun _ hx => .inl ⟨hi, ho ▸ hx⟩
+    InFoot (S.ER A i) (S.EW A i) ⟨.global, elem (A.base o) i, .b4, .write⟩ :=
+  ⟨rfl, nofun, fun _ hx => .inl ⟨hi, ho ▸ hx⟩⟩
 
 theorem own_self {A : Args} {g : Nat} (hg : g < A.G.toNat * A.B.toNat) : MapSpec.Own A g g :=
   Nat.mod_eq_of_lt hg

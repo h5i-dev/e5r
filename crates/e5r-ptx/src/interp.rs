@@ -1,11 +1,12 @@
 //! A concrete interpreter of the subset, written to mirror
-//! `verification/ptx/Ptx/Semantics/Instruction.lean` line for line.
+//! `verification/ptx/Ptx/Semantics/Instruction.lean` and `SIMT.lean` line
+//! for line.
 //!
 //! It is not trusted. It is used to search for counterexamples, and every
 //! counterexample it finds is replayed by the Lean kernel against the Lean
 //! definitions before anything is reported (`e5r-verify ptx check`). It is
 //! also cross-checked against the Lean model and the GPU on the differential
-//! test cases (`tests/interp_vs_model.rs`, `scripts/check-ptx-difftest.sh`).
+//! test cases (`scripts/check-ptx-difftest.sh`).
 
 use crate::ast::*;
 use std::collections::HashMap;
@@ -53,6 +54,9 @@ pub struct Ctx {
     pub nctaid: Dim3,
     /// Raw parameter bits, `.u32` zero-extended; missing names read 0.
     pub params: HashMap<String, u64>,
+    /// Where each `.shared` variable is placed (`Launch.shared`); missing
+    /// names read 0.
+    pub sym: HashMap<String, u64>,
 }
 
 /// Byte-addressed memory with a default of zero.
@@ -93,18 +97,93 @@ pub struct TState {
     pub p: HashMap<String, bool>,
 }
 
-/// One memory access: address, size in bytes, is-store.
-pub type Access = (u64, u32, bool);
+/// The data spaces (`Ptx.Sp`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Sp {
+    /// Global memory.
+    Global,
+    /// The CTA's shared memory.
+    Shared,
+}
 
-/// The result of one step (`Ptx.Res`), with the access it made.
+/// `Ptx.AccKind`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Kind {
+    /// A load.
+    Read,
+    /// A store.
+    Write,
+    /// An atomic read-modify-write.
+    Atomic,
+}
+
+/// One memory access (`Ptx.Acc`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Access {
+    /// Space.
+    pub sp: Sp,
+    /// First byte.
+    pub addr: u64,
+    /// Bytes.
+    pub size: u32,
+    /// Load, store or atomic.
+    pub kind: Kind,
+}
+
+/// The result of one step (`Ptx.TRes`), with the access it made.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Res {
     /// The thread moved; the access it made, if any.
     Ok(Option<Access>),
+    /// The thread waits at `bar.sync` (its pc is unchanged).
+    Wait,
     /// `ret`/`exit`.
     Halted,
     /// A fault, with the reason.
     Fault(String),
+}
+
+/// The allocations of each space (`Launch.allocs`).
+#[derive(Clone, Debug, Default)]
+pub struct Allocs {
+    /// Global allocations.
+    pub global: Vec<Region>,
+    /// The `.shared` variables, as placed.
+    pub shared: Vec<Region>,
+}
+
+impl Allocs {
+    fn of(&self, sp: Sp) -> &[Region] {
+        match sp {
+            Sp::Global => &self.global,
+            Sp::Shared => &self.shared,
+        }
+    }
+}
+
+/// The shared regions of `k` under a placement (`Launch.sregions`).
+pub fn shared_regions(k: &Kernel, sym: &HashMap<String, u64>) -> Vec<Region> {
+    k.shared
+        .iter()
+        .map(|d| Region {
+            base: sym.get(&d.name).copied().unwrap_or(0),
+            size: d.size() as u128,
+        })
+        .collect()
+}
+
+/// A placement ptxas could choose (`LayoutOk`): in declaration order, each
+/// variable at the next multiple of its alignment, starting at `start`.
+pub fn layout(k: &Kernel, start: u64) -> HashMap<String, u64> {
+    let mut at = start;
+    let mut out = HashMap::new();
+    for d in &k.shared {
+        let a = d.alignment() as u64;
+        at = at.div_ceil(a) * a;
+        out.insert(d.name.clone(), at);
+        at += d.size();
+    }
+    out
 }
 
 fn width(t: Ty) -> u32 {
@@ -150,6 +229,7 @@ impl TState {
                     Sreg::Nctaid(d) => c.nctaid.get(*d),
                 }) as u64
             }
+            Operand::Sym(n) => c.sym.get(n).copied().unwrap_or(0),
         }
     }
     fn set(&mut self, d: &str, v: u64) {
@@ -255,13 +335,68 @@ fn shift(w: u32, a: u64, b: u64, kind: u8) -> u64 {
     }
 }
 
-/// One step of thread `s` (`Ptx.stepMem`).
-pub fn step(k: &Kernel, al: &[Region], c: &Ctx, s: &mut TState, m: &mut Mem) -> Res {
+/// `Ptx.atomVal`: the value an `atom`/`red` stores.
+fn atom_val(op: AtomOp, t: Ty, old: u64, b: u64) -> u64 {
+    let w = width(t);
+    let signed = matches!(t, Ty::S32 | Ty::S64);
+    let le = |x: u64, y: u64| {
+        if signed {
+            if w == 32 {
+                (x as u32 as i32) <= (y as u32 as i32)
+            } else {
+                (x as i64) <= (y as i64)
+            }
+        } else {
+            x <= y
+        }
+    };
+    match op {
+        AtomOp::Add => at_width(w, u64::wrapping_add, old, b),
+        AtomOp::And => at_width(w, |x, y| x & y, old, b),
+        AtomOp::Or => at_width(w, |x, y| x | y, old, b),
+        AtomOp::Xor => at_width(w, |x, y| x ^ y, old, b),
+        AtomOp::Exch => fit(t, b),
+        AtomOp::Min => at_width(w, |x, y| if le(x, y) { x } else { y }, old, b),
+        AtomOp::Max => at_width(w, |x, y| if le(y, x) { x } else { y }, old, b),
+    }
+}
+
+/// `Ptx.dataAddr`.
+fn data_addr(c: &Ctx, s: &TState, sp: Space, a: &Address) -> Option<(Sp, u64)> {
+    match (sp, a) {
+        (Space::Global, Address::Reg(r, off)) => {
+            Some((Sp::Global, s.reg(r).wrapping_add(imm(off.unwrap_or(0)))))
+        }
+        (Space::Shared, Address::Reg(r, off)) => {
+            Some((Sp::Shared, s.reg(r).wrapping_add(imm(off.unwrap_or(0)))))
+        }
+        (Space::Shared, Address::Param(n, off)) => Some((
+            Sp::Shared,
+            c.sym
+                .get(n)
+                .copied()
+                .unwrap_or(0)
+                .wrapping_add(imm(off.unwrap_or(0))),
+        )),
+        _ => None,
+    }
+}
+
+/// One step of thread `s` (`Ptx.tstep`) against global memory `g` and its
+/// CTA's shared memory `sh`.
+pub fn step(
+    k: &Kernel,
+    al: &Allocs,
+    c: &Ctx,
+    s: &mut TState,
+    g: &mut Mem,
+    sh: &mut Mem,
+) -> Res {
     let Some(st) = k.body.get(s.pc) else {
         return Res::Fault(format!("pc {} past the end of the body", s.pc));
     };
-    if let Some(g) = &st.guard {
-        if s.pred(&g.pred) == g.neg {
+    if let Some(gd) = &st.guard {
+        if s.pred(&gd.pred) == gd.neg {
             s.pc += 1;
             return Res::Ok(None);
         }
@@ -326,28 +461,80 @@ pub fn step(k: &Kernel, al: &[Region], c: &Ctx, s: &mut TState, m: &mut Mem) -> 
             let v = fit(*t, c.params.get(n).copied().unwrap_or(0));
             s.set(d, v);
         }
-        Ld(Space::Global, t, d, Address::Reg(r, off)) => {
-            let a = s.reg(r).wrapping_add(imm(off.unwrap_or(0)));
+        Ld(Space::Param, ..) | St(Space::Param, ..) => {
+            return Res::Fault("unsupported memory form".into());
+        }
+        Ld(sp, t, d, a) => {
+            let Some((sp, a)) = data_addr(c, s, *sp, a) else {
+                return Res::Fault("unsupported memory form".into());
+            };
             let n = width(*t) / 8;
-            if !access_ok(al, a, n) {
-                return Res::Fault(format!("load of {n} bytes at {a:#x}"));
+            if !access_ok(al.of(sp), a, n) {
+                return Res::Fault(format!("load of {n} bytes at {sp:?} {a:#x}"));
             }
+            let m = if sp == Sp::Global { &*g } else { &*sh };
             let v = m.rd(a, n);
             s.set(d, v);
-            return Res::Ok(Some((a, n, false)));
+            return Res::Ok(Some(Access {
+                sp,
+                addr: a,
+                size: n,
+                kind: Kind::Read,
+            }));
         }
-        St(Space::Global, t, Address::Reg(r, off), v) => {
-            let a = s.reg(r).wrapping_add(imm(off.unwrap_or(0)));
+        St(sp, t, a, v) => {
+            let Some((sp, a)) = data_addr(c, s, *sp, a) else {
+                return Res::Fault("unsupported memory form".into());
+            };
             let n = width(*t) / 8;
-            if !access_ok(al, a, n) {
-                return Res::Fault(format!("store of {n} bytes at {a:#x}"));
+            if !access_ok(al.of(sp), a, n) {
+                return Res::Fault(format!("store of {n} bytes at {sp:?} {a:#x}"));
             }
             let x = s.op(c, v);
+            let m = if sp == Sp::Global { g } else { sh };
             m.wr(a, n, x);
             s.pc += 1;
-            return Res::Ok(Some((a, n, true)));
+            return Res::Ok(Some(Access {
+                sp,
+                addr: a,
+                size: n,
+                kind: Kind::Write,
+            }));
         }
-        Ld(..) | St(..) => return Res::Fault("unsupported memory form".into()),
+        Atom(sp, _, t, _, a, _) | Cas(sp, t, _, a, _, _) | Red(sp, _, t, a, _) => {
+            let Some((sp, a)) = data_addr(c, s, *sp, a) else {
+                return Res::Fault("unsupported memory form".into());
+            };
+            let n = width(*t) / 8;
+            if !access_ok(al.of(sp), a, n) {
+                return Res::Fault(format!("atomic of {n} bytes at {sp:?} {a:#x}"));
+            }
+            let m = if sp == Sp::Global { g } else { sh };
+            let old = m.rd(a, n);
+            let new = match &st.instr {
+                Atom(_, op, _, _, _, b) | Red(_, op, _, _, b) => atom_val(*op, *t, old, s.op(c, b)),
+                Cas(_, _, _, _, b, e) => {
+                    if fit(*t, old) == fit(*t, s.op(c, b)) {
+                        s.op(c, e)
+                    } else {
+                        old
+                    }
+                }
+                _ => unreachable!(),
+            };
+            m.wr(a, n, new);
+            match &st.instr {
+                Atom(_, _, _, d, _, _) | Cas(_, _, d, _, _, _) => s.set(d, fit(*t, old)),
+                _ => s.pc += 1,
+            }
+            return Res::Ok(Some(Access {
+                sp,
+                addr: a,
+                size: n,
+                kind: Kind::Atomic,
+            }));
+        }
+        Bar => return Res::Wait,
         Bra(_, l) => match k.labels.iter().find(|(m, _)| m == l) {
             Some((_, pc)) => s.pc = *pc,
             None => return Res::Fault(format!("missing label {l}")),
@@ -362,29 +549,214 @@ pub fn step(k: &Kernel, al: &[Region], c: &Ctx, s: &mut TState, m: &mut Mem) -> 
 pub enum End {
     /// `ret`/`exit` after this many steps.
     Halted(usize),
+    /// At a barrier after this many steps.
+    Wait(usize),
     /// A fault at this step.
     Fault(usize, String),
     /// Still running after the fuel.
     OutOfFuel,
 }
 
-/// Run one thread alone from `m` for at most `fuel` steps. Returns how it
-/// ended and every access it made, in order.
-pub fn run_solo(
+/// Run one thread alone from its state, for at most `fuel` steps, until it
+/// halts, faults or reaches a barrier. Returns how it ended and every access
+/// it made, with the step it made it at, in order.
+pub fn run_until_wait(
     k: &Kernel,
-    al: &[Region],
+    al: &Allocs,
     c: &Ctx,
-    m: &mut Mem,
+    s: &mut TState,
+    g: &mut Mem,
+    sh: &mut Mem,
     fuel: usize,
-) -> (End, Vec<Access>) {
-    let mut s = TState::default();
+) -> (End, Vec<(usize, Access)>) {
     let mut acc = Vec::new();
     for i in 0..fuel {
-        match step(k, al, c, &mut s, m) {
-            Res::Ok(a) => acc.extend(a),
+        match step(k, al, c, s, g, sh) {
+            Res::Ok(a) => acc.extend(a.map(|a| (i, a))),
+            Res::Wait => return (End::Wait(i), acc),
             Res::Halted => return (End::Halted(i), acc),
             Res::Fault(why) => return (End::Fault(i, why), acc),
         }
     }
     (End::OutOfFuel, acc)
+}
+
+/// Run one thread alone from the start for at most `fuel` steps.
+pub fn run_solo(
+    k: &Kernel,
+    al: &Allocs,
+    c: &Ctx,
+    g: &mut Mem,
+    sh: &mut Mem,
+    fuel: usize,
+) -> (End, Vec<Access>) {
+    let mut s = TState::default();
+    let (e, acc) = run_until_wait(k, al, c, &mut s, g, sh, fuel);
+    (e, acc.into_iter().map(|(_, a)| a).collect())
+}
+
+/// One access in a whole-launch run: who made it, in which phase of its
+/// CTA (barriers passed), at which of its own steps, and what it was.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Event {
+    /// The thread's index in [`Launch::threads`].
+    pub thread: usize,
+    /// Barriers its CTA had passed.
+    pub phase: usize,
+    /// The thread's step count before this access.
+    pub step: usize,
+    /// The access.
+    pub access: Access,
+}
+
+/// A concrete launch for [`run_grid`].
+#[derive(Clone, Debug)]
+pub struct Launch {
+    /// `%nctaid`.
+    pub grid: Dim3,
+    /// `%ntid`.
+    pub block: Dim3,
+    /// Parameter bits.
+    pub params: HashMap<String, u64>,
+    /// Shared variable placement.
+    pub sym: HashMap<String, u64>,
+    /// Global allocations.
+    pub alloc: Vec<Region>,
+}
+
+impl Launch {
+    /// Every thread, in the order of `Launch.threads`: CTAs z, y, x, then
+    /// threads z, y, x.
+    pub fn threads(&self) -> Vec<(Dim3, Dim3)> {
+        let mut v = Vec::new();
+        for cz in 0..self.grid.z {
+            for cy in 0..self.grid.y {
+                for cx in 0..self.grid.x {
+                    for tz in 0..self.block.z {
+                        for ty in 0..self.block.y {
+                            for tx in 0..self.block.x {
+                                v.push((
+                                    Dim3 {
+                                        x: cx,
+                                        y: cy,
+                                        z: cz,
+                                    },
+                                    Dim3 {
+                                        x: tx,
+                                        y: ty,
+                                        z: tz,
+                                    },
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        v
+    }
+
+    /// The context of one thread.
+    pub fn ctx(&self, cta: Dim3, tid: Dim3) -> Ctx {
+        Ctx {
+            tid,
+            ntid: self.block,
+            ctaid: cta,
+            nctaid: self.grid,
+            params: self.params.clone(),
+            sym: self.sym.clone(),
+        }
+    }
+
+    /// The allocations, for kernel `k`.
+    pub fn allocs(&self, k: &Kernel) -> Allocs {
+        Allocs {
+            global: self.alloc.clone(),
+            shared: shared_regions(k, &self.sym),
+        }
+    }
+}
+
+/// How a whole-launch run ended.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GridEnd {
+    /// Every thread halted.
+    Done,
+    /// Thread (index) faulted.
+    Fault(usize, String),
+    /// A barrier diverged in the CTA of this thread (`Ptx.Diverged`).
+    Diverged(usize),
+    /// Fuel ran out.
+    OutOfFuel,
+}
+
+/// Run the whole launch on one schedule: CTA after CTA in `threads` order;
+/// inside a CTA, each thread in order runs until it waits, halts or faults,
+/// then the barrier is released when all wait at the same `bar.sync`.
+/// Every step is a `Ptx.Step`, so this is one of the model's executions.
+/// `sh0` is the initial content of every CTA's shared memory.
+pub fn run_grid(
+    k: &Kernel,
+    l: &Launch,
+    g: &mut Mem,
+    sh0: &Mem,
+    fuel: usize,
+) -> (GridEnd, Vec<Event>) {
+    let al = l.allocs(k);
+    let all = l.threads();
+    let per = (l.block.x as usize) * (l.block.y as usize) * (l.block.z as usize);
+    let mut events = Vec::new();
+    let mut left = fuel;
+    for (ci, chunk) in all.chunks(per.max(1)).enumerate() {
+        if per == 0 {
+            break;
+        }
+        let mut sh = sh0.clone();
+        let ctxs: Vec<Ctx> = chunk.iter().map(|(c, t)| l.ctx(*c, *t)).collect();
+        let mut ts: Vec<TState> = vec![TState::default(); chunk.len()];
+        let mut steps = vec![0usize; chunk.len()];
+        let mut phase = 0;
+        loop {
+            let mut ends = Vec::new();
+            for (i, s) in ts.iter_mut().enumerate() {
+                let (e, acc) = run_until_wait(k, &al, &ctxs[i], s, g, &mut sh, left);
+                let idx = ci * per + i;
+                for (st, a) in acc {
+                    events.push(Event {
+                        thread: idx,
+                        phase,
+                        step: steps[i] + st,
+                        access: a,
+                    });
+                }
+                let used = match &e {
+                    End::Halted(n) | End::Wait(n) => *n,
+                    End::Fault(_, why) => return (GridEnd::Fault(idx, why.clone()), events),
+                    End::OutOfFuel => return (GridEnd::OutOfFuel, events),
+                };
+                steps[i] += used;
+                left -= used;
+                ends.push(e);
+            }
+            let waiting: Vec<usize> = (0..ts.len())
+                .filter(|i| matches!(ends[*i], End::Wait(_)))
+                .collect();
+            if waiting.is_empty() {
+                break; // every thread halted
+            }
+            let pc = ts[waiting[0]].pc;
+            if waiting.len() != ts.len() || waiting.iter().any(|i| ts[*i].pc != pc) {
+                return (GridEnd::Diverged(ci * per + waiting[0]), events);
+            }
+            for s in ts.iter_mut() {
+                s.pc += 1;
+            }
+            phase += 1;
+            if left == 0 {
+                return (GridEnd::OutOfFuel, events);
+            }
+            left -= 1;
+        }
+    }
+    (GridEnd::Done, events)
 }

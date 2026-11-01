@@ -12,7 +12,7 @@
 
 use super::spec::{Sched, Spec};
 use e5r_ptx::ast::Kernel;
-use e5r_ptx::interp::{self, Access, Ctx, Dim3, End, Mem, Region};
+use e5r_ptx::interp::{self, Access, Allocs, Ctx, Dim3, End, Kind, Mem, Region};
 use std::collections::{BTreeMap, HashMap};
 
 /// A concrete launch and initial memory, inside the spec's `Pre`.
@@ -80,14 +80,18 @@ impl Witness {
 const FUEL: usize = 20_000;
 
 impl World {
-    fn regions(&self) -> Vec<Region> {
-        self.bases
-            .iter()
-            .map(|(_, b)| Region {
-                base: *b,
-                size: 4 * self.n as u128,
-            })
-            .collect()
+    fn regions(&self) -> Allocs {
+        Allocs {
+            global: self
+                .bases
+                .iter()
+                .map(|(_, b)| Region {
+                    base: *b,
+                    size: 4 * self.n as u128,
+                })
+                .collect(),
+            shared: Vec::new(),
+        }
     }
     fn ctx(&self, sp: &Spec, t: (u32, u32)) -> Ctx {
         let mut params = HashMap::new();
@@ -112,6 +116,7 @@ impl World {
                 z: 1,
             },
             params,
+            sym: HashMap::new(),
         }
     }
     fn base(&self, a: &str) -> u64 {
@@ -129,23 +134,17 @@ fn solo(k: &Kernel, sp: &Spec, w: &World, t: (u32, u32)) -> (End, Vec<(usize, Ac
     let c = w.ctx(sp, t);
     let mut m = w.mem.clone();
     let mut s = interp::TState::default();
-    let mut acc = Vec::new();
-    for i in 0..FUEL {
-        match interp::step(k, &al, &c, &mut s, &mut m) {
-            interp::Res::Ok(a) => acc.extend(a.map(|a| (i, a))),
-            interp::Res::Halted => return (End::Halted(i), acc),
-            interp::Res::Fault(why) => return (End::Fault(i, why), acc),
-        }
-    }
-    (End::OutOfFuel, acc)
+    interp::run_until_wait(k, &al, &c, &mut s, &mut m, &mut Mem::default(), FUEL)
 }
 
+/// The first common byte of two global accesses, one of them a write. The
+/// map class has no atomics or shared memory (validate refuses them).
 fn conflict(x: &Access, y: &Access) -> Option<u64> {
-    if !(x.2 || y.2) {
+    if x.kind == Kind::Read && y.kind == Kind::Read {
         return None;
     }
-    let lo = x.0.max(y.0) as u128;
-    let hi = (x.0 as u128 + x.1 as u128).min(y.0 as u128 + y.1 as u128);
+    let lo = x.addr.max(y.addr) as u128;
+    let hi = (x.addr as u128 + x.size as u128).min(y.addr as u128 + y.size as u128);
     (lo < hi).then_some(lo as u64)
 }
 
@@ -187,7 +186,7 @@ fn sequential(k: &Kernel, sp: &Spec, w: &World) -> Option<Witness> {
     let mut order = Vec::new();
     for t in w.threads() {
         let c = w.ctx(sp, t);
-        match interp::run_solo(k, &al, &c, &mut m, FUEL) {
+        match interp::run_solo(k, &al, &c, &mut m, &mut Mem::default(), FUEL) {
             (End::Halted(steps), _) => order.push((t, steps)),
             _ => return None, // faults were looked for already; fuel: unknown
         }
@@ -340,8 +339,8 @@ pub fn search(k: &Kernel, sp: &Spec) -> (Option<(World, Witness)>, usize) {
             for t in &ts {
                 let (_, acc) = solo(k, sp, &w, *t);
                 for (_, a) in acc {
-                    if a.0 >= out && ((a.0 - out) / 4) < w.n as u64 {
-                        let owner = ((a.0 - out) / 4) % s;
+                    if a.addr >= out && ((a.addr - out) / 4) < w.n as u64 {
+                        let owner = ((a.addr - out) / 4) % s;
                         if !gids.contains(&owner) {
                             gids.push(owner);
                         }

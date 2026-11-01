@@ -43,9 +43,12 @@ inductive Operand where
   | reg (r : String)
   | imm (v : Int)
   | sreg (s : Sreg)
+  /-- The address of a `.shared` variable (`mov.u32 %r1, sdata`). -/
+  | sym (name : String)
   deriving Repr, DecidableEq, Inhabited
 
-/-- `[%rd8]`, `[%rd8+4]` or `[name]` (a kernel parameter). -/
+/-- `[%rd8]`, `[%rd8+4]` or `[name]`: a kernel parameter in `ld.param`, a
+`.shared` variable in a shared-memory access. -/
 inductive Address where
   | reg (r : String) (off : Int)
   | param (name : String) (off : Int)
@@ -58,7 +61,12 @@ inductive CmpOp where
   deriving Repr, DecidableEq, Inhabited
 
 inductive Space where
-  | global | param
+  | global | param | shared
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Operations of `atom` and `red` (`cas` is its own instruction). -/
+inductive AtomOp where
+  | add | min | max | exch | and | or | xor
   deriving Repr, DecidableEq, Inhabited
 
 inductive Instr where
@@ -87,6 +95,14 @@ inductive Instr where
   | bra (uni : Bool) (label : String)
   | ret
   | exit
+  /-- `atom.sp.op.t d, [a], b`: `d` gets the old value. -/
+  | atom (sp : Space) (op : AtomOp) (t : Ty) (d : String) (a : Address) (b : Operand)
+  /-- `atom.sp.cas.t d, [a], b, c`: store `c` if the old value is `b`. -/
+  | cas (sp : Space) (t : Ty) (d : String) (a : Address) (b c : Operand)
+  /-- `red.sp.op.t [a], b`: an atomic without a result. -/
+  | red (sp : Space) (op : AtomOp) (t : Ty) (a : Address) (b : Operand)
+  /-- `bar.sync 0`: wait until every thread of the CTA is at this barrier. -/
+  | bar
   deriving Repr, DecidableEq, Inhabited
 
 /-- `@%p` (`neg = false`) or `@!%p` (`neg = true`). -/
@@ -107,12 +123,22 @@ structure RegDecl where
   count : Option Nat
   deriving Repr, DecidableEq, Inhabited
 
+/-- `.shared .align a .b8 name[size];` (sizes in bytes). Where a variable is
+placed in the CTA's shared window is up to ptxas; the launch carries the
+placement and the theorems quantify over every valid one (`LayoutOk`). -/
+structure SharedVar where
+  name : String
+  align : Nat
+  size : Nat
+  deriving Repr, DecidableEq, Inhabited
+
 /-- One `.entry` kernel. `labels` maps a label to the index of the statement
 that follows it. -/
 structure Kernel where
   name : String
   params : List (String × Ty)
   regs : List RegDecl
+  shared : List SharedVar := []
   body : List Stmt
   labels : List (String × Nat)
   deriving Repr, Inhabited

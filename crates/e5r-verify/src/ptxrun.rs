@@ -5,7 +5,7 @@
 //! the Lean model.
 
 use e5r_ptx::ast::Module;
-use e5r_ptx::interp::{Ctx, Dim3, End, Mem, Region, run_solo};
+use e5r_ptx::interp::{Dim3, GridEnd, Launch, Mem, Region, layout, run_grid};
 use std::collections::HashMap;
 use std::fmt::Write;
 
@@ -18,6 +18,7 @@ fn unhex(s: &str) -> Vec<u8> {
         .collect()
 }
 
+/// Run every case line of `text` and print one result line per case.
 pub fn run_cases(m: &Module, text: &str) -> Result<String, String> {
     let mut out = String::new();
     for line in text.lines().filter(|l| !l.is_empty()) {
@@ -70,42 +71,21 @@ pub fn run_cases(m: &Module, text: &str) -> Result<String, String> {
         params.insert(format!("{k}_in"), IN);
         params.insert(format!("{k}_out"), OUT);
         params.insert(format!("{k}_s"), num(s)? as u64);
-        let mut fault = false;
-        // the order of `Launch.threads`: CTAs, then threads, z outermost
-        'all: for cz in 0..grid.z {
-            for cy in 0..grid.y {
-                for cx in 0..grid.x {
-                    for tz in 0..block.z {
-                        for ty in 0..block.y {
-                            for tx in 0..block.x {
-                                let c = Ctx {
-                                    tid: Dim3 {
-                                        x: tx,
-                                        y: ty,
-                                        z: tz,
-                                    },
-                                    ntid: block,
-                                    ctaid: Dim3 {
-                                        x: cx,
-                                        y: cy,
-                                        z: cz,
-                                    },
-                                    nctaid: grid,
-                                    params: params.clone(),
-                                };
-                                if !matches!(
-                                    run_solo(kern, &al, &c, &mut mem, 100_000).0,
-                                    End::Halted(_)
-                                ) {
-                                    fault = true;
-                                    break 'all;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // shared variables from offset 0 in declaration order, as ptxas
+        // places them; the test kernels' outputs do not depend on it
+        let l = Launch {
+            grid,
+            block,
+            params,
+            sym: layout(kern, 0),
+            alloc: al.to_vec(),
+        };
+        // one schedule of the model (`run_grid`): CTA after CTA, each
+        // thread to its next barrier in `Launch.threads` order
+        let fault = !matches!(
+            run_grid(kern, &l, &mut mem, &Mem::default(), 10_000_000).0,
+            GridEnd::Done
+        );
         if fault {
             writeln!(out, "fault {k}").unwrap();
         } else {

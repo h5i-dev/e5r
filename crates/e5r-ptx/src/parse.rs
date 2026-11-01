@@ -191,23 +191,37 @@ fn kernel(p: &mut P) -> R<Kernel> {
     p.punct(')')?;
     p.punct('{')?;
     let mut regs = Vec::new();
-    while p.peek() == Some(&Tok::Word(".reg".into())) {
-        p.pos += 1;
-        let ty = p.ty_directive()?;
-        let name = p.word()?;
-        let count = if p.is_punct('<') {
+    let mut shared = Vec::new();
+    let mut decls = Vec::new();
+    loop {
+        if p.peek() == Some(&Tok::Word(".reg".into())) {
             p.pos += 1;
-            let n = p.int()?;
-            p.punct('>')?;
-            Some(u32::try_from(n).map_err(|_| format!("line {}: bad register count", p.line()))?)
+            let ty = p.ty_directive()?;
+            let name = p.word()?;
+            let count = if p.is_punct('<') {
+                p.pos += 1;
+                let n = p.int()?;
+                p.punct('>')?;
+                Some(
+                    u32::try_from(n)
+                        .map_err(|_| format!("line {}: bad register count", p.line()))?,
+                )
+            } else {
+                None
+            };
+            if p.is_punct(',') {
+                return p.err("one register declaration per .reg");
+            }
+            p.punct(';')?;
+            decls.push(Decl::Reg(regs.len()));
+            regs.push(RegDecl { ty, name, count });
+        } else if p.peek() == Some(&Tok::Word(".shared".into())) {
+            p.pos += 1;
+            decls.push(Decl::Shared(shared.len()));
+            shared.push(shared_decl(p)?);
         } else {
-            None
-        };
-        if p.is_punct(',') {
-            return p.err("one register declaration per .reg");
+            break;
         }
-        p.punct(';')?;
-        regs.push(RegDecl { ty, name, count });
     }
     let mut body = Vec::new();
     let mut labels = Vec::new();
@@ -233,11 +247,68 @@ fn kernel(p: &mut P) -> R<Kernel> {
         name,
         params,
         regs,
+        shared,
+        decls,
         body,
         labels,
     };
     check(&k, &lines)?;
     Ok(k)
+}
+
+/// After `.shared`: `{.align a} .t name{[n]};`. Shared memory has no
+/// initialiser; `.extern` (dynamic) shared memory is not in the subset.
+fn shared_decl(p: &mut P) -> R<SharedDecl> {
+    let mut align = None;
+    if p.peek() == Some(&Tok::Word(".align".into())) {
+        p.pos += 1;
+        let a = p.int()?;
+        if !matches!(a, 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256) {
+            return p.err(format!("bad .align {a}"));
+        }
+        align = Some(a as u32);
+    }
+    let w = p.word()?;
+    let elem = match w.strip_prefix('.') {
+        Some(e) if SharedDecl::elem_bytes(e).is_some() => e.to_string(),
+        _ => {
+            p.pos -= 1;
+            return p.err(format!("unsupported .shared element type {w}"));
+        }
+    };
+    let name = p.word()?;
+    if name.starts_with('%') || name.starts_with('.') {
+        p.pos -= 1;
+        return p.err(format!("bad .shared name {name}"));
+    }
+    let count = if p.is_punct('[') {
+        p.pos += 1;
+        if p.is_punct(']') {
+            return p.err(".shared array without a size");
+        }
+        let n = p.int()?;
+        p.punct(']')?;
+        match u32::try_from(n) {
+            Ok(n) if n > 0 => Some(n),
+            _ => return p.err(format!("bad .shared array size {n}")),
+        }
+    } else {
+        None
+    };
+    if p.is_punct('=') || p.is_punct(',') {
+        return p.err("one .shared variable per declaration, without initialiser");
+    }
+    p.punct(';')?;
+    let d = SharedDecl {
+        align,
+        elem,
+        name,
+        count,
+    };
+    if d.size() > 48 * 1024 {
+        return p.err(format!("static .shared {} of {} bytes exceeds 48 KB", d.name, d.size()));
+    }
+    Ok(d)
 }
 
 fn operand(p: &mut P) -> R<Operand> {
@@ -256,8 +327,12 @@ fn operand(p: &mut P) -> R<Operand> {
         }
         return Ok(Operand::Reg(w));
     }
-    p.pos -= 1;
-    p.err(format!("unsupported operand {w}"))
+    if w.starts_with('.') || w.contains('.') {
+        p.pos -= 1;
+        return p.err(format!("unsupported operand {w}"));
+    }
+    // a variable name; check() requires a `.shared` variable, in `mov`
+    Ok(Operand::Sym(w))
 }
 
 fn reg(p: &mut P) -> R<String> {
@@ -387,6 +462,7 @@ fn stmt(p: &mut P) -> R<Stmt> {
             let sp = match *sp {
                 "global" => Space::Global,
                 "param" => Space::Param,
+                "shared" => Space::Shared,
                 _ => return p.err(format!("unsupported {op}")),
             };
             let t = ty(t, p)?;
@@ -394,11 +470,66 @@ fn stmt(p: &mut P) -> R<Stmt> {
             comma(p)?;
             Instr::Ld(sp, t, d, address(p)?)
         }
-        ["st", "global", t] => {
+        ["st", sp @ ("global" | "shared"), t] => {
+            let sp = if *sp == "global" {
+                Space::Global
+            } else {
+                Space::Shared
+            };
             let t = ty(t, p)?;
             let a = address(p)?;
             comma(p)?;
-            Instr::St(Space::Global, t, a, operand(p)?)
+            Instr::St(sp, t, a, operand(p)?)
+        }
+        ["atom", sp @ ("global" | "shared"), o, t] => {
+            let sp = if *sp == "global" {
+                Space::Global
+            } else {
+                Space::Shared
+            };
+            let t = ty(t, p)?;
+            let d = reg(p)?;
+            comma(p)?;
+            let a = address(p)?;
+            comma(p)?;
+            let b = operand(p)?;
+            if *o == "cas" {
+                comma(p)?;
+                Instr::Cas(sp, t, d, a, b, operand(p)?)
+            } else {
+                let o = AtomOp::from_name(o)
+                    .ok_or(format!("line {}: unsupported instruction {op}", p.line()))?;
+                Instr::Atom(sp, o, t, d, a, b)
+            }
+        }
+        ["red", sp @ ("global" | "shared"), o, t] => {
+            let sp = if *sp == "global" {
+                Space::Global
+            } else {
+                Space::Shared
+            };
+            let o = match AtomOp::from_name(o) {
+                Some(AtomOp::Exch) | None => {
+                    return p.err(format!("unsupported instruction {op}"));
+                }
+                Some(o) => o,
+            };
+            let t = ty(t, p)?;
+            let a = address(p)?;
+            comma(p)?;
+            Instr::Red(sp, o, t, a, operand(p)?)
+        }
+        ["bar", "sync"] => {
+            // `bar.sync 0` only: other barrier numbers and thread counts are
+            // not in the subset.
+            match operand(p)? {
+                Operand::Imm(0) => {}
+                _ => return p.err("only bar.sync 0 is supported"),
+            }
+            if p.is_punct(',') {
+                return p.err("bar.sync with a thread count is not supported");
+            }
+            Instr::Bar
         }
         ["bra"] => Instr::Bra(false, p.word()?),
         ["bra", "uni"] => Instr::Bra(true, p.word()?),
@@ -435,7 +566,14 @@ fn types_ok(i: &Instr) -> Result<(), String> {
         },
         Instr::Cvt(dt, st, ..) => arith(dt) && arith(st),
         Instr::CvtaGlobal(..) | Instr::Ld(..) | Instr::St(..) => true,
-        Instr::Bra(..) | Instr::Ret | Instr::Exit => true,
+        Instr::Bra(..) | Instr::Ret | Instr::Exit | Instr::Bar => true,
+        // PTX ISA, `atom` and `red`
+        Instr::Atom(_, o, t, ..) | Instr::Red(_, o, t, ..) => match o {
+            AtomOp::Add => matches!(t, U32 | S32 | U64),
+            AtomOp::Min | AtomOp::Max => arith(t),
+            AtomOp::Exch | AtomOp::And | AtomOp::Or | AtomOp::Xor => bits(t),
+        },
+        Instr::Cas(_, t, ..) => bits(t),
     };
     if ok {
         Ok(())
@@ -465,6 +603,7 @@ fn operands_ok(i: &Instr) -> Result<(), String> {
                 "special register {} outside mov/cvt",
                 print::sreg(*s)
             )),
+            Operand::Sym(n) => Err(format!("variable {n} outside mov")),
             _ => Ok(()),
         }
     };
@@ -502,14 +641,26 @@ fn operands_ok(i: &Instr) -> Result<(), String> {
             nosreg(a)?;
             imm(a, w(t))
         }
-        Instr::Mov(t, _, a) => imm(a, w(t)),
+        Instr::Mov(t, _, a) => {
+            if let Operand::Sym(n) = a {
+                if !matches!(t, Ty::U32 | Ty::B32 | Ty::U64 | Ty::B64) {
+                    return Err(format!("mov.{} of the address of {n}", t.name()));
+                }
+            }
+            imm(a, w(t))
+        }
         Instr::Setp(_, t, _, a, b) | Instr::Selp(t, _, a, b, _) => {
             nosreg(a)?;
             nosreg(b)?;
             imm(a, w(t))?;
             imm(b, w(t))
         }
-        Instr::Cvt(_, st, _, a) => imm(a, w(st)),
+        Instr::Cvt(_, st, _, a) => {
+            if let Operand::Sym(n) = a {
+                return Err(format!("variable {n} outside mov"));
+            }
+            imm(a, w(st))
+        }
         Instr::CvtaGlobal(_, a) => {
             nosreg(a)?;
             imm(a, 64)
@@ -520,7 +671,19 @@ fn operands_ok(i: &Instr) -> Result<(), String> {
             imm(v, w(t))?;
             off(a)
         }
-        Instr::Bra(..) | Instr::Ret | Instr::Exit => Ok(()),
+        Instr::Atom(_, _, t, _, a, b) | Instr::Red(_, _, t, a, b) => {
+            nosreg(b)?;
+            imm(b, w(t))?;
+            off(a)
+        }
+        Instr::Cas(_, t, _, a, b, c) => {
+            for o in [b, c] {
+                nosreg(o)?;
+                imm(o, w(t))?;
+            }
+            off(a)
+        }
+        Instr::Bra(..) | Instr::Ret | Instr::Exit | Instr::Bar => Ok(()),
     }
 }
 
@@ -539,6 +702,18 @@ fn check(k: &Kernel, lines: &[usize]) -> R<()> {
         }
     }
     let params: HashMap<&str, Ty> = k.params.iter().map(|(n, t)| (n.as_str(), *t)).collect();
+    let mut shared = std::collections::HashSet::new();
+    for d in &k.shared {
+        if !shared.insert(d.name.as_str()) || params.contains_key(d.name.as_str()) {
+            return Err(format!("{}: name {} declared twice", k.name, d.name));
+        }
+        if regs.contains_key(&d.name) {
+            return Err(format!("{}: {} is both a register and a variable", k.name, d.name));
+        }
+        if d.size() % d.alignment() as u64 != 0 && d.count.is_none() {
+            return Err(format!("{}: .shared {} smaller than its alignment", k.name, d.name));
+        }
+    }
     let mut seen = std::collections::HashSet::new();
     for (l, _) in &k.labels {
         if !seen.insert(l) {
@@ -570,6 +745,28 @@ fn check(k: &Kernel, lines: &[usize]) -> R<()> {
                 Operand::Imm(_) => Ok(()),
                 Operand::Sreg(_) if w == 32 => Ok(()),
                 Operand::Sreg(_) => Err(e("special registers are 32-bit".into())),
+                Operand::Sym(n) if shared.contains(n.as_str()) => Ok(()),
+                Operand::Sym(n) => Err(e(format!("{n} is not a .shared variable"))),
+            }
+        };
+        // a data address in `sp`: global needs a 64-bit register; shared takes
+        // a 32- or 64-bit register or a `.shared` variable
+        let addr = |sp: Space, a: &Address| -> R<()> {
+            match (sp, a) {
+                (Space::Global, Address::Reg(r, _)) => data(r, 64),
+                (Space::Shared, Address::Reg(r, _)) => match width_of(r)?.width() {
+                    Some(32 | 64) => Ok(()),
+                    _ => Err(e(format!("{r} is not a 32- or 64-bit register"))),
+                },
+                (Space::Shared, Address::Param(n, _)) if shared.contains(n.as_str()) => Ok(()),
+                (Space::Shared, Address::Param(n, _)) => {
+                    Err(e(format!("{n} is not a .shared variable")))
+                }
+                (_, Address::Param(..)) => Err(e(format!(
+                    "{} needs a register address",
+                    print::instr(&s.instr)
+                ))),
+                (Space::Param, _) => Err(e("not a data space".into())),
             }
         };
         let w = |t: Ty| t.width().unwrap();
@@ -578,6 +775,10 @@ fn check(k: &Kernel, lines: &[usize]) -> R<()> {
         }
         types_ok(&s.instr).map_err(e)?;
         operands_ok(&s.instr).map_err(e)?;
+        if s.guard.is_some() && matches!(s.instr, Instr::Bar) {
+            // bar.sync is .aligned: every thread of the CTA must execute it
+            return Err(e("predicated bar.sync".into()));
+        }
         if s.guard.is_some() && matches!(s.instr, Instr::Bra(true, _)) {
             // `bra.uni` promises the branch is non-divergent; a guarded one
             // can diverge, which PTX leaves undefined.
@@ -645,25 +846,31 @@ fn check(k: &Kernel, lines: &[usize]) -> R<()> {
                     _ => return Err(e("ld.param needs [parameter] without offset".into())),
                 }
             }
-            Instr::Ld(Space::Global, t, d, a) => {
+            Instr::Ld(sp, t, d, a) => {
                 data(d, w(*t))?;
-                match a {
-                    Address::Reg(r, _) => data(r, 64)?,
-                    Address::Param(..) => {
-                        return Err(e("ld.global needs a register address".into()));
-                    }
-                }
-            }
-            Instr::St(Space::Global, t, a, v) => {
-                src(v, w(*t))?;
-                match a {
-                    Address::Reg(r, _) => data(r, 64)?,
-                    Address::Param(..) => {
-                        return Err(e("st.global needs a register address".into()));
-                    }
-                }
+                addr(*sp, a)?;
             }
             Instr::St(Space::Param, ..) => return Err(e("st.param".into())),
+            Instr::St(sp, t, a, v) => {
+                src(v, w(*t))?;
+                addr(*sp, a)?;
+            }
+            Instr::Atom(sp, _, t, d, a, b) => {
+                data(d, w(*t))?;
+                src(b, w(*t))?;
+                addr(*sp, a)?;
+            }
+            Instr::Cas(sp, t, d, a, b, c) => {
+                data(d, w(*t))?;
+                src(b, w(*t))?;
+                src(c, w(*t))?;
+                addr(*sp, a)?;
+            }
+            Instr::Red(sp, _, t, a, b) => {
+                src(b, w(*t))?;
+                addr(*sp, a)?;
+            }
+            Instr::Bar => {}
             Instr::Bra(_, l) => {
                 if !k.labels.iter().any(|(m, _)| m == l) {
                     return Err(e(format!("undefined label {l}")));

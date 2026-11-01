@@ -134,8 +134,9 @@ theorem step (S g : Nat) (hS : 0 < S) (hSl : S < 2 ^ 64 - 2 ^ 32)
       rd32_congr fun b hb' => hb b fun q _ hqn hc' => elem_disjoint₂ fx fy sep hlt hqn hb' hc'
     have hyv : rd32 m (elem y i) = rd32 m₀ (elem y i) :=
       rd32_congr fun b hb' => hb b (fresh b hb')
-    refine ⟨?_, fun b hb' => .inr ⟨rfl, k, by omega, by rw [hi]; exact hb'⟩, ?_,
-      fun b hb' => .inl ⟨k, by omega, by rw [hi]; exact hb'⟩, ?_, fun b hb' => .inl ⟨k, by omega, by rw [hi]; exact hb'⟩,
+    refine ⟨?_, ⟨rfl, nofun, fun b hb' => .inr ⟨rfl, k, by omega, by rw [hi]; exact hb'⟩⟩, ?_,
+      ⟨rfl, nofun, fun b hb' => .inl ⟨k, by omega, by rw [hi]; exact hb'⟩⟩, ?_,
+      ⟨rfl, nofun, fun b hb' => .inl ⟨k, by omega, by rw [hi]; exact hb'⟩⟩,
       .inl ⟨n.toNat - (g + (k + 1) * S), by omega, k + 1, rfl, by omega, rfl, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩⟩
     · simp [accessOk, aligned_elem fx hlt ax, holds_elem fx hlt]
     · simp [accessOk, aligned_elem fy hlt ay, holds_elem fy hlt]
@@ -199,12 +200,12 @@ theorem thread {t : Tid} (ht : t ∈ (launch G B x y a n).threads) (r : String �
 
 end
 
-theorem saxpy_correct (G B a n : BitVec 32) (x y : Addr) (m₀ : Mem)
+theorem saxpy_correct (G B a n : BitVec 32) (x y : Addr) (m₀ : Mem) (s₀ : Dim3 → Mem)
     (r₀ : Tid → String → Val) (p₀ : Tid → String → Bool)
     (fx : Fits x n.toNat) (fy : Fits y n.toNat) (ax : x.toNat % 4 = 0) (ay : y.toNat % 4 = 0)
     (sep : x.toNat + 4 * n.toNat ≤ y.toNat ∨ y.toNat + 4 * n.toNat ≤ x.toNat) :
     let L := launch G B x y a n
-    let c₀ := Cfg.init r₀ p₀ m₀
+    let c₀ := Cfg.init r₀ p₀ m₀ s₀
     (∀ cfg, Reach K L c₀ cfg → ¬ Faults K L cfg) ∧
     (∀ cfg, Reach K L c₀ cfg → Done K L cfg ∨ ∃ cfg', Step K L cfg cfg') ∧
     (∃ bound, ∀ j cfg, Steps K L j c₀ cfg → j ≤ bound) ∧
@@ -228,7 +229,7 @@ theorem saxpy_correct (G B a n : BitVec 32) (x y : Addr) (m₀ : Mem)
       htu (h1.gid_inj ht hu (stride_inj (h1.gid_lt ht) (h1.gid_lt hu) h))
     exact elem_disjoint fy hq hq' hne hc hc'
   obtain ⟨bound, g⟩ := grid_sound (R := fun t => R S n.toNat x (gid B t))
-    (W := fun t => W S n.toNat y (gid B t)) (P := fun t => Post S n.toNat x y a m₀ (gid B t)) hsolo hdisj
+    (W := fun t => W S n.toNat y (gid B t)) (P := fun t => Post S n.toNat x y a m₀ (gid B t)) hsolo hdisj s₀
   refine ⟨g.noFault, g.progress, ⟨bound, g.bounded⟩, g.raceFree, g.exists_done, ?_⟩
   intro cfg hr hd hS
   obtain ⟨hown, hrest⟩ := g.final cfg hr hd

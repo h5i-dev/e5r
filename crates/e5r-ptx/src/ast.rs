@@ -99,6 +99,8 @@ pub enum Operand {
     Imm(i128),
     /// A special register.
     Sreg(Sreg),
+    /// The address of a `.shared` variable (only in `mov`).
+    Sym(String),
 }
 
 /// A memory operand. The offset is `None` when the source wrote none.
@@ -106,7 +108,8 @@ pub enum Operand {
 pub enum Address {
     /// `[%rd]` or `[%rd+off]`.
     Reg(String, Option<i128>),
-    /// `[param]` or `[param+off]`.
+    /// `[name]` or `[name+off]`: a parameter (`ld.param`) or a `.shared`
+    /// variable.
     Param(String, Option<i128>),
 }
 
@@ -166,13 +169,15 @@ impl CmpOp {
     }
 }
 
-/// State spaces of `ld`/`st`.
+/// State spaces of `ld`/`st`/`atom`/`red`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Space {
     /// `.global`
     Global,
     /// `.param`
     Param,
+    /// `.shared`
+    Shared,
 }
 
 impl Space {
@@ -181,7 +186,50 @@ impl Space {
         match self {
             Space::Global => "global",
             Space::Param => "param",
+            Space::Shared => "shared",
         }
+    }
+}
+
+/// Operations of `atom` and `red`; `cas` is its own instruction.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(missing_docs)]
+pub enum AtomOp {
+    Add,
+    Min,
+    Max,
+    Exch,
+    And,
+    Or,
+    Xor,
+}
+
+impl AtomOp {
+    /// The PTX spelling, which is also the Lean constructor name.
+    pub fn name(self) -> &'static str {
+        match self {
+            AtomOp::Add => "add",
+            AtomOp::Min => "min",
+            AtomOp::Max => "max",
+            AtomOp::Exch => "exch",
+            AtomOp::And => "and",
+            AtomOp::Or => "or",
+            AtomOp::Xor => "xor",
+        }
+    }
+
+    /// Parse a spelling.
+    pub fn from_name(s: &str) -> Option<AtomOp> {
+        Some(match s {
+            "add" => AtomOp::Add,
+            "min" => AtomOp::Min,
+            "max" => AtomOp::Max,
+            "exch" => AtomOp::Exch,
+            "and" => AtomOp::And,
+            "or" => AtomOp::Or,
+            "xor" => AtomOp::Xor,
+            _ => return None,
+        })
     }
 }
 
@@ -249,6 +297,14 @@ pub enum Instr {
     Bra(bool, String),
     Ret,
     Exit,
+    /// `atom.sp.op.t d, [a], b`
+    Atom(Space, AtomOp, Ty, String, Address, Operand),
+    /// `atom.sp.cas.t d, [a], b, c`
+    Cas(Space, Ty, String, Address, Operand, Operand),
+    /// `red.sp.op.t [a], b`
+    Red(Space, AtomOp, Ty, Address, Operand),
+    /// `bar.sync 0`
+    Bar,
 }
 
 /// `@%p` or `@!%p`.
@@ -280,6 +336,54 @@ pub struct RegDecl {
     pub count: Option<u32>,
 }
 
+/// `.shared {.align a} .t name{[n]};`. The element type is kept as written
+/// (`b8`, `u32`, ...) for the round trip; the model only needs the size and
+/// the alignment.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SharedDecl {
+    /// `.align a`, if written.
+    pub align: Option<u32>,
+    /// Element type, without the dot: `b8 u8 s8 b16 u16 s16` or a [`Ty`].
+    pub elem: String,
+    /// Name.
+    pub name: String,
+    /// `[n]`, if an array.
+    pub count: Option<u32>,
+}
+
+impl SharedDecl {
+    /// Bytes per element of a shared element type, `None` if not supported.
+    pub fn elem_bytes(elem: &str) -> Option<u32> {
+        match elem {
+            "b8" | "u8" | "s8" => Some(1),
+            "b16" | "u16" | "s16" => Some(2),
+            "b32" | "u32" | "s32" => Some(4),
+            "b64" | "u64" | "s64" => Some(8),
+            _ => None,
+        }
+    }
+
+    /// Size in bytes.
+    pub fn size(&self) -> u64 {
+        Self::elem_bytes(&self.elem).unwrap_or(1) as u64 * self.count.unwrap_or(1) as u64
+    }
+
+    /// Alignment in bytes: as written, or the element size.
+    pub fn alignment(&self) -> u32 {
+        self.align
+            .unwrap_or_else(|| Self::elem_bytes(&self.elem).unwrap_or(1))
+    }
+}
+
+/// A declaration at the head of a kernel body, in source order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Decl {
+    /// Index into [`Kernel::regs`].
+    Reg(usize),
+    /// Index into [`Kernel::shared`].
+    Shared(usize),
+}
+
 /// One `.entry`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Kernel {
@@ -291,6 +395,10 @@ pub struct Kernel {
     pub params: Vec<(String, Ty)>,
     /// Register declarations, in order.
     pub regs: Vec<RegDecl>,
+    /// `.shared` variable declarations, in order.
+    pub shared: Vec<SharedDecl>,
+    /// The order the declarations were written in.
+    pub decls: Vec<Decl>,
     /// Statements, in order.
     pub body: Vec<Stmt>,
     /// Each label and the index of the statement after it, in source order.

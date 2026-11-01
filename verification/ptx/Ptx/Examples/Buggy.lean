@@ -42,7 +42,7 @@ def tid (c t : BitVec 32) : Tid := ⟨⟨c, 0, 0⟩, ⟨t, 0, 0⟩⟩
 /-- `a[0] = 1`, `b[0] = 2`, everything else 0. -/
 def mem₀ : Mem := fun x => if x = 0x1000 then 1 else if x = 0x2000 then 2 else 0
 
-def cfg₀ : Cfg := Cfg.init (fun _ _ => 0) (fun _ _ => false) mem₀
+def cfg₀ : Cfg := Cfg.init (fun _ _ => 0) (fun _ _ => false) mem₀ (fun _ _ => 0)
 
 /-! ### No bounds check: an out-of-bounds load -/
 
@@ -50,10 +50,10 @@ theorem nobound_faults :
     ∃ c, Reach Ptx.Kernels.VAddNoBound.vadd (launch 1 2) cfg₀ c ∧
       Faults Ptx.Kernels.VAddNoBound.vadd (launch 1 2) c := by
   have ht : tid 0 1 ∈ (launch 1 2).threads := by rw [mem_threads]; simp only [Launch.Thread, launch, tid]; decide
-  refine ⟨cfg₀.advance _ _ (tid 0 1) 13, reach_thread' ht ?_, tid 0 1, ht, ?_⟩
+  refine ⟨cfg₀.advance _ _ (tid 0 1) 13, reach_thread' ht ?_, .inl ⟨tid 0 1, ht, ?_⟩⟩
   · simp [okSteps, stepMem, ptx_eval, Ptx.Kernels.VAddNoBound.vadd, launch, prm, cfg₀, Cfg.init,
       tid, accessOk, Region.holds, lo32, ext32]
-  · simp [Cfg.advance, Cfg.res, trace, stepMem, ptx_eval, Ptx.Kernels.VAddNoBound.vadd, launch, prm,
+  · simp [Cfg.advance, Cfg.res, Cfg.heap, tstep, trace, stepMem, ptx_eval, Ptx.Kernels.VAddNoBound.vadd, launch, prm,
       cfg₀, Cfg.init, tid, updT, accessOk, Region.holds, lo32, ext32]
 
 /-! ### Index from `%tid.x` only: a write-write race -/
@@ -71,15 +71,18 @@ theorem tid_races : ¬ RaceFree Ptx.Kernels.VAddTid.vadd (launch 2 1) cfg₀ := 
   have r₂ : Reach K (launch 2 1) c₁ c₂ := reach_thread' h1 (by
     simp [K, c₁, Cfg.advance, trace, okSteps, stepMem, ptx_eval, Ptx.Kernels.VAddTid.vadd, launch,
       prm, cfg₀, Cfg.init, tid, updT, accessOk, Region.holds, lo32, ext32])
-  have p₀ : c₂.pending K (launch 2 1) (tid 0 0) = some (0x3000, .b4, true) := by
+  have p₀ : c₂.pending K (launch 2 1) (tid 0 0) = some ⟨.global, 0x3000, .b4, .write⟩ := by
     simp [K, c₁, c₂, Cfg.pending, Cfg.advance, trace, stepMem, ptx_eval, Ptx.Kernels.VAddTid.vadd,
       launch, prm, cfg₀, Cfg.init, tid, updT, accessOk, Region.holds, lo32, ext32, Action.acc]
-  have p₁ : c₂.pending K (launch 2 1) (tid 1 0) = some (0x3000, .b4, true) := by
+  have p₁ : c₂.pending K (launch 2 1) (tid 1 0) = some ⟨.global, 0x3000, .b4, .write⟩ := by
     simp [K, c₁, c₂, Cfg.pending, Cfg.advance, trace, stepMem, ptx_eval, Ptx.Kernels.VAddTid.vadd,
       launch, prm, cfg₀, Cfg.init, tid, updT, accessOk, Region.holds, lo32, ext32, Action.acc]
   have hr := Reach.trans r₁ r₂
-  exact hrf c₂ c₂ hr hr _ h0 _ h1 (by decide) _ _ p₀ p₁
-    ⟨.inl rfl, 0x3000, by decide, by decide⟩
+  have := hrf c₂ c₂ hr hr _ h0 _ h1 (by decide) _ _ p₀ p₁
+    ⟨rfl, nofun, .inl nofun, 0x3000, by decide, by decide⟩
+  rcases this with ⟨h, -⟩ | ⟨h, -⟩
+  · cases h
+  · simp [tid] at h
 
 /-! ### `sub` for `add`: a wrong result -/
 
@@ -101,7 +104,7 @@ theorem sub_wrong :
   · simp [K, okSteps, stepMem, ptx_eval, Ptx.Kernels.VAddSub.vadd, launch, prm, cfg₀, Cfg.init,
       tid, accessOk, Region.holds, lo32, ext32]
   · rw [only t ht]
-    simp [K, c, Cfg.res, Cfg.advance, trace, stepMem, ptx_eval, Ptx.Kernels.VAddSub.vadd, launch,
+    simp [K, c, Cfg.res, Cfg.heap, tstep, Cfg.advance, trace, stepMem, ptx_eval, Ptx.Kernels.VAddSub.vadd, launch,
       prm, cfg₀, Cfg.init, tid, updT, accessOk, Region.holds, lo32, ext32]
   · simp [K, c, Cfg.advance, trace, stepMem, ptx_eval, Ptx.Kernels.VAddSub.vadd, launch, prm, cfg₀,
       Cfg.init, tid, updT, accessOk, Region.holds, lo32, ext32, rd, rd32, wr, mem₀]
