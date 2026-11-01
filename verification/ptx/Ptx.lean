@@ -23,3 +23,7 @@ import Ptx.Examples.Reduce
 import Ptx.Examples.Scan
 import Ptx.Logic.Sums
 import Ptx.Examples.ReduceAtomic
+import Ptx.Auto.Block
+import Ptx.Auto.Reduce32
+import Ptx.Auto.Scan32
+import Ptx.Logic.Schedule

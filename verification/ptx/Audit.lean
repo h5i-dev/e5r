@@ -47,6 +47,11 @@ elab "#audit_ptx" : command => do
 #print axioms Ptx.Auto.correct_of_threadOk
 #print axioms Ptx.Auto.threadOk_of_guardedOk
 #print axioms Ptx.Auto.threadOk_of_stride
+#print axioms Ptx.Auto.Reduce32.correct_of
+#print axioms Ptx.Auto.Reduce32.Atomic.correct_of
+#print axioms Ptx.Auto.Scan32.correct_of
+#print axioms Ptx.exec_reach
+#print axioms Ptx.race_of_exec
 #print axioms Ptx.Examples.VectorAdd.vadd_correct
 #print axioms Ptx.Examples.Sum.sum_correct
 #print axioms Ptx.Examples.Map.saxpy_correct

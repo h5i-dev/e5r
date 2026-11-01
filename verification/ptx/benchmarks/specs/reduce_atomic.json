@@ -1,0 +1,6 @@
+{ "schema": "e5r.ptx.spec.v1", "kernel": "reduce_atomic", "class": "reduce32", "result": "atomic",
+  "input": "reduce_atomic_param_0", "output": "reduce_atomic_param_1", "length": "reduce_atomic_param_2",
+  "shared": "_ZZ13reduce_atomicE1s", "max_block": 1024,
+  "barriers": {
+    "after_load": { "%r1": "ntid", "%r12": "ctaid", "%r2": "tid", "%r6": "shared_tid", "%rd2": "output" },
+    "loop": { "%r23": "stride", "%r12": "ctaid", "%r2": "tid", "%r6": "shared_tid", "%rd2": "output" } } }
