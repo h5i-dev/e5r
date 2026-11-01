@@ -88,10 +88,15 @@ def atWidth (w : Width) (f : (n : Nat) → BitVec n → BitVec n → BitVec n) (
   | .w32 => ext32 (f 32 (lo32 a) (lo32 b))
   | .w64 => f 64 a b
 
+/-- `shl`/`shr`: the shift amount is the unsigned 32-bit operand, and amounts
+greater than the register width are clamped to the width (PTX ISA, `shl` and
+`shr`). The clamp does not change the result of a `BitVec` shift; it is
+written out so the definition reads like the ISA, and so that executing it
+(the GPU differential test) does not build a 2^32-bit number. -/
 def shiftBy (w : Width) (f : (n : Nat) → BitVec n → Nat → BitVec n) (a b : Val) : Val :=
   match w with
-  | .w32 => ext32 (f 32 (lo32 a) (lo32 b).toNat)
-  | .w64 => f 64 a (lo32 b).toNat
+  | .w32 => ext32 (f 32 (lo32 a) (min (lo32 b).toNat 32))
+  | .w64 => f 64 a (min (lo32 b).toNat 64)
 
 /-- `setp.c.t a b`. Ordered comparisons on `.b` types are not PTX (`none`). -/
 def cmpVal (c : CmpOp) (t : Ty) (a b : Val) : Option Bool :=

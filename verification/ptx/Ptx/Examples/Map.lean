@@ -71,8 +71,8 @@ theorem stride_inj' {S g q₁ q₂ : Nat} (hS : 0 < S) (h : g + q₁ * S = g + q
   Nat.eq_of_mul_eq_mul_right hS (by omega)
 
 theorem shl2 {i : Nat} (h : i < 2 ^ 62) :
-    BitVec.ofNat 64 i <<< (lo32 (BitVec.ofInt 64 2)).toNat = BitVec.ofNat 64 (4 * i) := by
-  have : (lo32 (BitVec.ofInt 64 2)).toNat = 2 := by decide
+    BitVec.ofNat 64 i <<< min (lo32 (BitVec.ofInt 64 2)).toNat 64 = BitVec.ofNat 64 (4 * i) := by
+  have : min (lo32 (BitVec.ofInt 64 2)).toNat 64 = 2 := by decide
   rw [this]; apply BitVec.eq_of_toNat_eq
   simp [BitVec.toNat_shiftLeft, Nat.shiftLeft_eq, Nat.mod_eq_of_lt (by omega : i < 2 ^ 64)]
   omega
