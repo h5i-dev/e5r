@@ -204,9 +204,10 @@ jobs:
           path: verification/rv32/build/results/
 
   # Scope P (docs/verification-ptx.md): regenerate every PTX kernel module and
-  # refuse a stale one, build the Lean project from scratch and audit the
-  # axioms. No GPU or CUDA here: the ptxas assembly check is skipped and says
-  # so. e5r-verify is the dev profile, like the rest of this workflow.
+  # refuse a stale one, build the Lean project from scratch, audit the axioms,
+  # check every benchmark and mutant with `e5r-verify ptx check`. No GPU or
+  # CUDA here: the ptxas and GPU steps are skipped and say so. e5r-verify is
+  # the dev profile, like the rest of this workflow.
   ptx-verification:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -220,7 +221,8 @@ jobs:
           sh elan-init.sh -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - run: cargo build -p e5r-verify
-      - name: Every PTX proof, refutation and the axiom audit
+      - name: Every PTX proof, refutation, axiom audit, benchmark verdict and mutant
         env:
           E5R_VERIFY: target/debug/e5r-verify
-        run: ./scripts/check-lean-ptx.sh
+        # The GPU differential test needs a GPU and skips itself here.
+        run: ./scripts/recheck-ptx.sh
