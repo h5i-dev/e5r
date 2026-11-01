@@ -6,3 +6,6 @@ kernel on a symbolic thread state. Declared here and populated in Eval.lean
 import Lean
 
 register_simp_attr ptx_eval
+
+/-- The defining equations of one generated `MapSpec` (Ptx/Auto). -/
+register_simp_attr ptx_spec

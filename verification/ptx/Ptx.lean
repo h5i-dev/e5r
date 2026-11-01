@@ -12,3 +12,5 @@ import Ptx.Examples.Sum
 import Ptx.Examples.Map
 import Ptx.Logic.Refute
 import Ptx.Examples.Buggy
+import Ptx.Auto.Map
+import Ptx.Auto.Tactic

@@ -1,0 +1,11 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "vadd",
+  "class": "map32",
+  "arrays": ["vadd_param_0", "vadd_param_1", "vadd_param_2"],
+  "output": "vadd_param_2",
+  "length": "vadd_param_3",
+  "scalars": [],
+  "element": "vadd_param_0 + vadd_param_1",
+  "schedule": { "kind": "guarded", "max_threads": "2147483647" }
+}

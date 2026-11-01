@@ -10,6 +10,8 @@ use std::fmt::Write;
 pub mod board;
 pub mod flash;
 pub mod job;
+pub mod ptx;
+pub mod ptxrun;
 pub mod ram;
 pub mod sha256;
 

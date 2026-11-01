@@ -13,9 +13,9 @@
 //! describes the current inputs.
 //! `e5r-verify bundle JOB.json --out DIR` writes a self-contained directory
 //! whose `recheck.sh` rechecks the proofs with only the pinned Lean.
-//! `e5r-verify ptx [--namespace NS] [--name NAME] FILE.ptx` round-trips a PTX
-//! module through `e5r-ptx` and prints it as a Lean `Ptx.Module`
-//! (`docs/verification-ptx.md`).
+//! `e5r-verify ptx export|check|run …` exports PTX to Lean, proves or refutes
+//! a kernel against its spec, and runs differential-test cases
+//! (`docs/verification-ptx.md`, "Command line"; `e5r-verify ptx --help`).
 use std::process::ExitCode;
 
 fn run(args: Vec<String>) -> Result<String, String> {
@@ -104,7 +104,7 @@ fn run(args: Vec<String>) -> Result<String, String> {
                   ram-image (--ram BASE:SIZE | --board BOARD.json) --mapping paddr=vaddr \
                   [--max-file N] [--max-file-bytes N] [--namespace NS] --out DIR IMAGE.elf | \
                   check JOB.json [--resume] [--out RESULT.json] | verify-result RESULT.json | \
-                  bundle JOB.json --out DIR | ptx [--namespace NS] [--name NAME] FILE.ptx"
+                  bundle JOB.json --out DIR | ptx (export|check|run) … (see ptx --help)"
                 .into(),
         ),
     }
@@ -171,6 +171,28 @@ fn ram_image(args: &[String]) -> Result<String, String> {
 }
 
 fn ptx(args: &[String]) -> Result<String, String> {
+    match args.first().map(String::as_str) {
+        Some("export") => ptx_export(&args[1..]),
+        Some("check") => ptx_check(&args[1..]),
+        Some("run") => ptx_run(&args[1..]),
+        Some("--help") | Some("-h") | None => Ok(PTX_USAGE.into()),
+        // `ptx [--namespace NS] [--name NAME] FILE.ptx`, kept for existing scripts
+        _ => ptx_export(args),
+    }
+}
+
+const PTX_USAGE: &str = "\
+e5r-verify ptx export [--namespace NS] [--name NAME] FILE.ptx
+    print the Lean `Ptx.Module` of FILE.ptx (after the token round trip)
+e5r-verify ptx check FILE.ptx --spec SPEC.json [--project DIR] [--out RESULT.json]
+                     [--keep DIR] [--timeout SECS] [--memory-mb MB] [--no-search]
+    prove or refute SPEC for the kernel; prints an e5r.ptx.result.v1 document
+    exit status: 0 proved, 1 refuted, 2 unsupported, 3 unknown, 4 error, 64 usage
+e5r-verify ptx run --cases CASES FILE.ptx
+    run differential-test cases on the (untrusted) concrete interpreter
+";
+
+fn ptx_export(args: &[String]) -> Result<String, String> {
     let (mut ns, mut name, mut file) = ("Ptx.Kernels.Module".to_string(), None, None);
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -191,6 +213,95 @@ fn ptx(args: &[String]) -> Result<String, String> {
         e5r_verify::sha256::hex(&bytes)
     );
     e5r_ptx::export_lean(&src, &ns, &header).map_err(|e| format!("{file}: {e}"))
+}
+
+fn default_project() -> std::path::PathBuf {
+    if let Ok(p) = std::env::var("E5R_PTX_PROJECT") {
+        return p.into();
+    }
+    let here = std::path::PathBuf::from("verification/ptx");
+    if here.join("lakefile.lean").exists() {
+        return here;
+    }
+    std::env::current_exe()
+        .ok()
+        .and_then(|e| Some(e.parent()?.parent()?.parent()?.join("verification/ptx")))
+        .unwrap_or(here)
+}
+
+fn ptx_check(args: &[String]) -> Result<String, String> {
+    use e5r_verify::ptx;
+    let usage = |m: String| -> ! {
+        eprintln!("e5r-verify ptx check: {m}\n{PTX_USAGE}");
+        std::process::exit(ptx::EXIT_USAGE)
+    };
+    let (mut file, mut spec, mut out, mut keep) = (None, None, None, None);
+    let (mut project, mut timeout, mut memory, mut search) = (None, 600u64, 6144u64, true);
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        let mut value = || {
+            it.next()
+                .cloned()
+                .unwrap_or_else(|| usage(format!("{a} needs a value")))
+        };
+        match a.as_str() {
+            "--spec" => spec = Some(value()),
+            "--out" => out = Some(value()),
+            "--keep" => keep = Some(value()),
+            "--project" => project = Some(value()),
+            "--timeout" => {
+                timeout = value()
+                    .parse()
+                    .unwrap_or_else(|_| usage("--timeout takes seconds".into()))
+            }
+            "--memory-mb" => {
+                memory = value()
+                    .parse()
+                    .unwrap_or_else(|_| usage("--memory-mb takes a number".into()))
+            }
+            "--no-search" => search = false,
+            _ if file.is_none() && !a.starts_with('-') => file = Some(a.clone()),
+            _ => usage(format!("unexpected argument {a}")),
+        }
+    }
+    let file = file.unwrap_or_else(|| usage("needs a .ptx file".into()));
+    let spec = spec.unwrap_or_else(|| usage("needs --spec SPEC.json".into()));
+    let o = ptx::Options {
+        ptx: file.into(),
+        spec: spec.into(),
+        project: project.map(Into::into).unwrap_or_else(default_project),
+        keep: keep.map(Into::into),
+        timeout: std::time::Duration::from_secs(timeout),
+        memory_mb: memory,
+        search,
+    };
+    let (v, doc) = ptx::check(&o);
+    let text = serde_json::to_string_pretty(&doc).unwrap() + "\n";
+    if let Some(out) = out {
+        std::fs::write(&out, &text).map_err(|e| format!("{out}: {e}"))?;
+    }
+    print!("{text}");
+    std::process::exit(v.exit_code());
+}
+
+fn ptx_run(args: &[String]) -> Result<String, String> {
+    let (mut cases, mut file) = (None, None);
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--cases" => cases = it.next().cloned(),
+            _ if file.is_none() && !a.starts_with('-') => file = Some(a.clone()),
+            _ => return Err(format!("unexpected argument {a}")),
+        }
+    }
+    let (cases, file) = (
+        cases.ok_or("run needs --cases")?,
+        file.ok_or("run needs a .ptx file")?,
+    );
+    let src = std::fs::read_to_string(&file).map_err(|e| format!("{file}: {e}"))?;
+    let m = e5r_ptx::roundtrip(&src).map_err(|e| format!("{file}: {e}"))?;
+    let text = std::fs::read_to_string(&cases).map_err(|e| format!("{cases}: {e}"))?;
+    e5r_verify::ptxrun::run_cases(&m, &text)
 }
 
 fn main() -> ExitCode {

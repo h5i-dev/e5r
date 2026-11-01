@@ -102,44 +102,7 @@ pub fn module(m: &Module, ns: &str, header: &str) -> String {
     )
     .unwrap();
     for k in &m.kernels {
-        writeln!(s, "def «{}» : Kernel where", k.name).unwrap();
-        writeln!(s, "  name := {}", string(&k.name)).unwrap();
-        let params: Vec<String> = k
-            .params
-            .iter()
-            .map(|(n, t)| format!("({}, {})", string(n), ty(*t)))
-            .collect();
-        writeln!(s, "  params := [{}]", params.join(", ")).unwrap();
-        let regs: Vec<String> = k
-            .regs
-            .iter()
-            .map(|r| {
-                let c = match r.count {
-                    Some(n) => format!("(some {n})"),
-                    None => "none".into(),
-                };
-                format!("⟨{}, {}, {c}⟩", ty(r.ty), string(&r.name))
-            })
-            .collect();
-        writeln!(s, "  regs := [{}]", regs.join(", ")).unwrap();
-        s.push_str("  body := [");
-        for (i, st) in k.body.iter().enumerate() {
-            let g = match &st.guard {
-                None => "none".into(),
-                Some(g) => format!("(some ⟨{}, {}⟩)", string(&g.pred), g.neg),
-            };
-            let sep = if i + 1 < k.body.len() { "," } else { "]" };
-            write!(s, "\n    /- {i} -/ ⟨{g}, {}⟩{sep}", instr(&st.instr)).unwrap();
-        }
-        if k.body.is_empty() {
-            s.push(']');
-        }
-        let labels: Vec<String> = k
-            .labels
-            .iter()
-            .map(|(l, at)| format!("({}, {at})", string(l)))
-            .collect();
-        writeln!(s, "\n  labels := [{}]\n", labels.join(", ")).unwrap();
+        s.push_str(&kernel_def(k));
     }
     let names: Vec<String> = m.kernels.iter().map(|k| format!("«{}»", k.name)).collect();
     writeln!(
@@ -151,5 +114,49 @@ pub fn module(m: &Module, ns: &str, header: &str) -> String {
         names.join(", ")
     )
     .unwrap();
+    s
+}
+
+/// One kernel as `def «name» : Kernel where …`, followed by a blank line.
+pub fn kernel_def(k: &Kernel) -> String {
+    let mut s = String::new();
+    writeln!(s, "def «{}» : Kernel where", k.name).unwrap();
+    writeln!(s, "  name := {}", string(&k.name)).unwrap();
+    let params: Vec<String> = k
+        .params
+        .iter()
+        .map(|(n, t)| format!("({}, {})", string(n), ty(*t)))
+        .collect();
+    writeln!(s, "  params := [{}]", params.join(", ")).unwrap();
+    let regs: Vec<String> = k
+        .regs
+        .iter()
+        .map(|r| {
+            let c = match r.count {
+                Some(n) => format!("(some {n})"),
+                None => "none".into(),
+            };
+            format!("⟨{}, {}, {c}⟩", ty(r.ty), string(&r.name))
+        })
+        .collect();
+    writeln!(s, "  regs := [{}]", regs.join(", ")).unwrap();
+    s.push_str("  body := [");
+    for (i, st) in k.body.iter().enumerate() {
+        let g = match &st.guard {
+            None => "none".into(),
+            Some(g) => format!("(some ⟨{}, {}⟩)", string(&g.pred), g.neg),
+        };
+        let sep = if i + 1 < k.body.len() { "," } else { "]" };
+        write!(s, "\n    /- {i} -/ ⟨{g}, {}⟩{sep}", instr(&st.instr)).unwrap();
+    }
+    if k.body.is_empty() {
+        s.push(']');
+    }
+    let labels: Vec<String> = k
+        .labels
+        .iter()
+        .map(|(l, at)| format!("({}, {at})", string(l)))
+        .collect();
+    writeln!(s, "\n  labels := [{}]\n", labels.join(", ")).unwrap();
     s
 }
