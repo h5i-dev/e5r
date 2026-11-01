@@ -8,7 +8,7 @@
 #    and from a ptxas cubin.
 # 3. ptxdiff runs the same launches with the Lean definitions themselves
 #    (Ptx.Semantics.stepMem, compiled by Lean).
-# 4. All three outputs must be identical byte for byte. Each misaligned-access
+# 4. The interpreter of e5r-ptx runs them too. All four outputs must be identical byte for byte. Each misaligned-access
 #    launch must fault in the model and be refused by the GPU.
 #
 # Needs a CUDA GPU, the driver, nvcc's ptxas and gcc. Without a GPU it exits 77
@@ -38,8 +38,10 @@ gcc -O2 -Wall -o "$out/gpurun" $root/difftest/gpurun.c -I"$cuda/include" -lcuda
 "$out/gpurun" "$out/diff.ptx" "$out/cases.txt" >"$out/gpu-jit.txt"
 "$out/gpurun" "$out/diff.cubin" "$out/cases.txt" >"$out/gpu-cubin.txt"
 $root/.lake/build/bin/ptxdiff "$out/cases.txt" >"$out/model.txt"
+# the untrusted interpreter the counterexample search uses, on the same cases
+"$E5R_VERIFY" ptx run --cases "$out/cases.txt" "$out/diff.ptx" >"$out/interp.txt"
 n=$(wc -l <"$out/cases.txt")
-for g in gpu-jit gpu-cubin; do
+for g in gpu-jit gpu-cubin interp; do
   if [[ $(wc -l <"$out/$g.txt") -ne $n ]] || ! cmp -s "$out/$g.txt" "$out/model.txt"; then
     python3 - "$out/$g.txt" "$out/model.txt" "$out/forms.txt" <<'EOF' >&2
 import sys
@@ -54,7 +56,7 @@ EOF
     exit 1
   fi
 done
-echo "difftest: $n launches, $(grep -c . "$out/forms.txt") kernels: model = GPU (JIT) = GPU (ptxas cubin), byte for byte"
+echo "difftest: $n launches, $(grep -c . "$out/forms.txt") kernels: model = GPU (JIT) = GPU (ptxas cubin) = interpreter, byte for byte"
 
 faults=0
 while read -r line; do
