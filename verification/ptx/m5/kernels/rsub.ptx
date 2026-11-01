@@ -1,0 +1,30 @@
+.version 8.0
+.target sm_86
+.address_size 64
+
+.visible .entry rsub(.param .u64 rsub_a, .param .u64 rsub_b, .param .u64 rsub_c, .param .u32 rsub_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<9>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [rsub_a];
+	ld.param.u64 %rd2, [rsub_b];
+	ld.param.u64 %rd3, [rsub_c];
+	ld.param.u32 %r1, [rsub_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.s32 %r5, %r2, %r3, %r4;
+	setp.ge.s32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.s32 %rd4, %r5, 4;
+	add.s64 %rd5, %rd1, %rd4;
+	add.s64 %rd6, %rd2, %rd4;
+	add.s64 %rd7, %rd3, %rd4;
+	ld.global.u32 %r6, [%rd5];
+	ld.global.u32 %r7, [%rd6];
+	sub.s32 %r8, %r7, %r6;
+	st.global.u32 [%rd7], %r8;
+DONE:
+	ret;
+}

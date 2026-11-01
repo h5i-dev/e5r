@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "vor",
+  "class": "map32",
+  "arrays": [
+    "vor_a",
+    "vor_b",
+    "vor_c"
+  ],
+  "output": "vor_c",
+  "length": "vor_n",
+  "scalars": [],
+  "element": "vor_a | vor_b",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

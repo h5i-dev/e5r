@@ -1,0 +1,619 @@
+[
+ {
+  "name": "vsub",
+  "task": "c[i] = a[i] - b[i]",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "element": "vsub_a - vsub_b",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "2147483647"
+  }
+ },
+ {
+  "name": "vmul",
+  "task": "c[i] = a[i] * b[i]",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "element": "vmul_a * vmul_b",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  }
+ },
+ {
+  "name": "vxor",
+  "task": "c[i] = a[i] ^ b[i]",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "element": "vxor_a ^ vxor_b",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  }
+ },
+ {
+  "name": "scale",
+  "task": "y[i] = k * x[i]",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [
+   "k"
+  ],
+  "element": "scale_k * scale_x",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  }
+ },
+ {
+  "name": "axpb",
+  "task": "y[i] = a * x[i] + b",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [
+   "a",
+   "b"
+  ],
+  "element": "axpb_a * axpb_x + axpb_b",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  }
+ },
+ {
+  "name": "inc",
+  "task": "x[i] += 1 in place",
+  "arrays": [
+   "x"
+  ],
+  "output": "x",
+  "length": "n",
+  "element": "inc_x + 1",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  }
+ },
+ {
+  "name": "shl3",
+  "task": "y[i] = x[i] << 3",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "element": "shl3_x << 3",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  }
+ },
+ {
+  "name": "mask",
+  "task": "y[i] = (x[i] & 0xFF00FF00) | k",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [
+   "k"
+  ],
+  "element": "(mask_x & 0xFF00FF00) | mask_k",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  }
+ },
+ {
+  "name": "fma3",
+  "task": "d[i] = a[i] * b[i] + c[i]",
+  "arrays": [
+   "a",
+   "b",
+   "c",
+   "d"
+  ],
+  "output": "d",
+  "length": "n",
+  "element": "fma3_a * fma3_b + fma3_c",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  }
+ },
+ {
+  "name": "pred_store",
+  "task": "y[i] = ~x[i], with predicated instructions instead of a branch",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "element": "~pred_store_x",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  }
+ },
+ {
+  "name": "gs32_add",
+  "task": "c[i] = a[i] + b[i], grid-stride loop with a 32-bit index",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "element": "gs32_add_a + gs32_add_b",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^32",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs32_add_a",
+    "%rd2": "base gs32_add_b",
+    "%rd3": "base gs32_add_c",
+    "%r1": "length",
+    "%r5": "index32",
+    "%r7": "stride32"
+   }
+  }
+ },
+ {
+  "name": "gsptr_scale",
+  "task": "y[i] = k * x[i], grid-stride loop advancing pointers",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [
+   "k"
+  ],
+  "element": "gsptr_scale_k * gsptr_scale_x",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%r1": "scalar gsptr_scale_k",
+    "%rd3": "index64",
+    "%rd5": "stride64",
+    "%rd6": "length",
+    "%rd8": "ptr gsptr_scale_x",
+    "%rd9": "ptr gsptr_scale_y",
+    "%rd10": "ptr_stride"
+   }
+  }
+ },
+ {
+  "name": "vand",
+  "task": "c[i] = a[i] & b[i]",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "scalars": [],
+  "element": "vand_a & vand_b",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "vor",
+  "task": "c[i] = a[i] OR b[i]",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "scalars": [],
+  "element": "vor_a | vor_b",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "rsub",
+  "task": "c[i] = b[i] - a[i]",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "scalars": [],
+  "element": "rsub_b - rsub_a",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "2147483647"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "sqr",
+  "task": "y[i] = x[i] * x[i]",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "sqr_x * sqr_x",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "cube",
+  "task": "y[i] = x[i]^3",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "cube_x * cube_x * cube_x",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "poly2",
+  "task": "y[i] = a*x^2 + b*x + c",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [
+   "a",
+   "b",
+   "c"
+  ],
+  "element": "poly2_a * poly2_x * poly2_x + poly2_b * poly2_x + poly2_c",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "addk",
+  "task": "y[i] = x[i] + k",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [
+   "k"
+  ],
+  "element": "addk_x + addk_k",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "subk",
+  "task": "y[i] = x[i] - k",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [
+   "k"
+  ],
+  "element": "subk_x - subk_k",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "xork",
+  "task": "y[i] = x[i] ^ k",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [
+   "k"
+  ],
+  "element": "xork_x ^ xork_k",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "rot8",
+  "task": "y[i] = rotate x[i] left by 8",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "(rot8_x << 8) | (rot8_x >> 24)",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "times5",
+  "task": "y[i] = 5 * x[i] via shift and add",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "5 * times5_x",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "neg",
+  "task": "y[i] = -x[i]",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "-neg_x",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "bnot",
+  "task": "y[i] = ~x[i]",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "~bnot_x",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "copy",
+  "task": "y[i] = x[i]",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "copy_x",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "fill",
+  "task": "y[i] = k",
+  "arrays": [
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [
+   "k"
+  ],
+  "element": "fill_k",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "zero",
+  "task": "y[i] = 0",
+  "arrays": [
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "0",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "sum3",
+  "task": "d[i] = a[i] + b[i] + c[i]",
+  "arrays": [
+   "a",
+   "b",
+   "c",
+   "d"
+  ],
+  "output": "d",
+  "length": "n",
+  "scalars": [],
+  "element": "sum3_a + sum3_b + sum3_c",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "msub",
+  "task": "d[i] = a[i] * b[i] - c[i]",
+  "arrays": [
+   "a",
+   "b",
+   "c",
+   "d"
+  ],
+  "output": "d",
+  "length": "n",
+  "scalars": [],
+  "element": "msub_a * msub_b - msub_c",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "blend",
+  "task": "d[i] = a[i] where m[i] has a 1, else b[i]",
+  "arrays": [
+   "a",
+   "b",
+   "m",
+   "d"
+  ],
+  "output": "d",
+  "length": "n",
+  "scalars": [],
+  "element": "(blend_a & blend_m) | (blend_b & ~blend_m)",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "xorand",
+  "task": "d[i] = (a[i] ^ b[i]) & c[i]",
+  "arrays": [
+   "a",
+   "b",
+   "c",
+   "d"
+  ],
+  "output": "d",
+  "length": "n",
+  "scalars": [],
+  "element": "(xorand_a ^ xorand_b) & xorand_c",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "diffsq",
+  "task": "c[i] = (a[i] - b[i])^2",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "scalars": [],
+  "element": "(diffsq_a - diffsq_b) * (diffsq_a - diffsq_b)",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ },
+ {
+  "name": "lincomb",
+  "task": "c[i] = p*a[i] + q*b[i]",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "scalars": [
+   "p",
+   "q"
+  ],
+  "element": "lincomb_p * lincomb_a + lincomb_q * lincomb_b",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch1.txt"
+ }
+]

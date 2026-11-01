@@ -1,0 +1,21 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "lincomb",
+  "class": "map32",
+  "arrays": [
+    "lincomb_a",
+    "lincomb_b",
+    "lincomb_c"
+  ],
+  "output": "lincomb_c",
+  "length": "lincomb_n",
+  "scalars": [
+    "lincomb_p",
+    "lincomb_q"
+  ],
+  "element": "lincomb_p * lincomb_a + lincomb_q * lincomb_b",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

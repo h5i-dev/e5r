@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "rot8",
+  "class": "map32",
+  "arrays": [
+    "rot8_x",
+    "rot8_y"
+  ],
+  "output": "rot8_y",
+  "length": "rot8_n",
+  "scalars": [],
+  "element": "(rot8_x << 8) | (rot8_x >> 24)",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

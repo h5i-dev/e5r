@@ -1,0 +1,19 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "sum3",
+  "class": "map32",
+  "arrays": [
+    "sum3_a",
+    "sum3_b",
+    "sum3_c",
+    "sum3_d"
+  ],
+  "output": "sum3_d",
+  "length": "sum3_n",
+  "scalars": [],
+  "element": "sum3_a + sum3_b + sum3_c",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

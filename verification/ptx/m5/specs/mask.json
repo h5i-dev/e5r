@@ -1,0 +1,19 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "mask",
+  "class": "map32",
+  "arrays": [
+    "mask_x",
+    "mask_y"
+  ],
+  "output": "mask_y",
+  "length": "mask_n",
+  "scalars": [
+    "mask_k"
+  ],
+  "element": "(mask_x & 0xFF00FF00) | mask_k",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

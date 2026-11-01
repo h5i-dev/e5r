@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "vand",
+  "class": "map32",
+  "arrays": [
+    "vand_a",
+    "vand_b",
+    "vand_c"
+  ],
+  "output": "vand_c",
+  "length": "vand_n",
+  "scalars": [],
+  "element": "vand_a & vand_b",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

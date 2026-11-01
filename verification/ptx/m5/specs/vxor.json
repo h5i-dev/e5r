@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "vxor",
+  "class": "map32",
+  "arrays": [
+    "vxor_a",
+    "vxor_b",
+    "vxor_c"
+  ],
+  "output": "vxor_c",
+  "length": "vxor_n",
+  "scalars": [],
+  "element": "vxor_a ^ vxor_b",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

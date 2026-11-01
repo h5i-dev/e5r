@@ -56,6 +56,16 @@ theorem toNat_lo32 (v : Val) : (lo32 v).toNat = v.toNat % 2 ^ 32 := by simp [lo3
 theorem toNat_ext32 (v : BitVec 32) : (ext32 v).toNat = v.toNat := by
   simp [ext32, Nat.mod_eq_of_lt (Nat.lt_trans v.isLt (by decide : 2 ^ 32 < 2 ^ 64))]
 
+theorem lo32_not (v : Val) : lo32 (~~~ v) = ~~~ (lo32 v) := by
+  apply BitVec.eq_of_getLsbD_eq; intro i hi; simp [lo32, hi]
+
+/-- A left shift by a constant is a multiplication, so `grind`'s ring
+normalisation can compare `(x <<< 2) + x` with `5 * x`. -/
+theorem shl_mul (x : BitVec 32) (k : Nat) : x <<< k = x * BitVec.ofNat 32 (2 ^ k) := by
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_shiftLeft, Nat.shiftLeft_eq, BitVec.toNat_mul, BitVec.toNat_ofNat,
+    Nat.mul_mod_mod]
+
 end Ptx.Auto
 
 open Lean Meta Elab Tactic
@@ -72,7 +82,7 @@ macro "ptx_nat" : tactic => `(tactic| (
     Int.reduceNeg, decide_eq_true_eq, Nat.min_def, Nat.add_mod_mod, Nat.mod_mod_of_dvd,
     BitVec.toNat_and, BitVec.toNat_or, BitVec.reduceOfInt, BitVec.reduceSetWidth,
     BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceAdd, BitVec.add_zero, BitVec.reduceToNat]
-  (repeat' split) <;> omega))
+  all_goals ((repeat' split) <;> omega)))
 
 /-- Side conditions of the comparison lemmas. -/
 macro "ptx_disch" : tactic => `(tactic| ptx_nat)
@@ -158,6 +168,21 @@ macro "ptx_spec_simp" : tactic => `(tactic|
     Ptx.Auto.MapSpec.params, Ptx.Auto.MapSpec.launch_params, Ptx.Auto.MapSpec.launch_grid,
     Ptx.Auto.MapSpec.launch_block])
 
+/-- The value equation of a map obligation: fold 32-bit views, reduce
+constants, turn constant shifts into multiplications, then `grind`. -/
+macro "ptx_value" : tactic => `(tactic| (
+  all_goals (try simp only [Ptx.Auto.MapSpec.val, ptx_spec, Ptx.lo32_ext32, Ptx.lo32_rd_b4,
+    Ptx.Auto.lo32_not])
+  all_goals first
+    | done
+    | grind
+    | (simp (config := { failIfUnchanged := false }) only [Ptx.lo32, BitVec.reduceOfInt,
+        BitVec.reduceSetWidth, BitVec.reduceToNat, Nat.min_def, Nat.reduceLeDiff, reduceIte]
+       first
+         | done
+         | grind
+         | (simp only [Ptx.Auto.shl_mul, Nat.reducePow]; grind))))
+
 set_option hygiene false in
 /-- One verification condition of a map obligation. The names `hpre` and the
 spec lemmas tagged `ptx_spec` come from the generated proof. -/
@@ -171,8 +196,7 @@ macro "ptx_leaf" : tactic => `(tactic| first
   | (simp only [Ptx.Auto.MapSpec.EPost, ptx_spec]
      intro hi
      rw [rd32_wr_same]
-     all_goals (try simp only [Ptx.Auto.MapSpec.val, ptx_spec, lo32_ext32, lo32_rd_b4])
-     all_goals grind))
+     ptx_value))
 
 set_option hygiene false in
 /-- `ptx_guarded K fuel [bases]`: the whole `GuardedOk` obligation of a
@@ -253,6 +277,5 @@ macro "ptx_stride_body" K:ident head:num fuel:num " [" bs:term,* "]" : tactic =>
          simp only [ptx_spec, List.mem_cons, List.not_mem_nil, or_false, forall_eq_or_imp,
            forall_eq, hi, true_implies] at hin
          simp (config := { failIfUnchanged := false }) only [hin]
-         all_goals (try simp only [Ptx.Auto.MapSpec.val, ptx_spec, lo32_ext32, lo32_rd_b4])
-         all_goals grind
+         ptx_value
        · intro x hx; exact wr_outside hx)))

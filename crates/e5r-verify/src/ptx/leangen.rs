@@ -70,7 +70,7 @@ fn prelude(k: &Kernel, sp: &Spec, header: &str, extra_import: &str) -> String {
         ("out", q(&sp.output)),
         ("len", q(&sp.length)),
         ("scalars", list(&sp.scalars)),
-        ("f", f.clone()),
+        ("f", format!("({f} : (String → BitVec 32) → (String → BitVec 32) → BitVec 32)")),
         ("sched", sched.clone()),
     ] {
         writeln!(s, "@[ptx_spec] theorem spec_{n} : spec.{n} = {v} := rfl").unwrap();

@@ -1,0 +1,19 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "fma3",
+  "class": "map32",
+  "arrays": [
+    "fma3_a",
+    "fma3_b",
+    "fma3_c",
+    "fma3_d"
+  ],
+  "output": "fma3_d",
+  "length": "fma3_n",
+  "scalars": [],
+  "element": "fma3_a * fma3_b + fma3_c",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

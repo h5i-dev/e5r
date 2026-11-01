@@ -1,0 +1,31 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gsptr_scale",
+  "class": "map32",
+  "arrays": [
+    "gsptr_scale_x",
+    "gsptr_scale_y"
+  ],
+  "output": "gsptr_scale_y",
+  "length": "gsptr_scale_n",
+  "scalars": [
+    "gsptr_scale_k"
+  ],
+  "element": "gsptr_scale_k * gsptr_scale_x",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%r1": "scalar gsptr_scale_k",
+        "%rd3": "index64",
+        "%rd5": "stride64",
+        "%rd6": "length",
+        "%rd8": "ptr gsptr_scale_x",
+        "%rd9": "ptr gsptr_scale_y",
+        "%rd10": "ptr_stride"
+      }
+    }
+  }
+}
