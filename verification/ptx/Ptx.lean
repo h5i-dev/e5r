@@ -20,3 +20,4 @@ import Ptx.Logic.PhaseWp
 import Ptx.Logic.Cells
 import Ptx.Auto.Tactic4
 import Ptx.Examples.Reduce
+import Ptx.Examples.Scan

@@ -186,9 +186,10 @@ structure Ok (r0 : Tid → String → Val) (p0 : Tid → String → Bool) (m0 : 
       (fun _ => 0)
   compose : ∀ b k x, (∃ t ∈ L.threads, t.ctaid = b) → k < S.P b →
     (∀ t ∈ L.threads, t.ctaid = b → ¬ (S.F t k).w x) → (S.M b (k + 1)).get x = (S.M b k).get x
-  sameCta : ∀ t ∈ L.threads, ∀ u ∈ L.threads, t ≠ u → t.ctaid = u.ctaid → ∀ k x,
+  sameCta : ∀ t ∈ L.threads, ∀ u ∈ L.threads, t ≠ u → t.ctaid = u.ctaid → ∀ k < S.P t.ctaid, ∀ x,
     (S.F t k).w x → ¬ (S.F u k).touches x
-  crossCta : ∀ t ∈ L.threads, ∀ u ∈ L.threads, t.ctaid ≠ u.ctaid → ∀ k j a,
+  crossCta : ∀ t ∈ L.threads, ∀ u ∈ L.threads, t.ctaid ≠ u.ctaid → ∀ k < S.P t.ctaid,
+    ∀ j < S.P u.ctaid, ∀ a,
     (S.F t k).w (.global, a) → ¬ (S.F u j).touches (.global, a)
   cellsOut : ∀ t ∈ L.threads, ∀ k, CellsOut (S.F t k) S.Cell
   cellsDisj : ∀ a b, S.Cell a → S.Cell b → a ≠ b → ∀ y, covers a 4 y → ¬ covers b 4 y
@@ -429,11 +430,11 @@ theorem inv_of_change {c : Cfg} {n d} (hI : S.Inv K L m0 c n d) {t : Tid} (ht : 
       rcases hchg _ x hc with ⟨hw, hsh⟩ | ⟨hg, a, ha, hcov⟩
       · by_cases hcu : u.ctaid = t.ctaid
         · rw [hcu] at hx
-          exact hS.sameCta t ht u hu (Ne.symm hut) hcu.symm _ x hw hx
+          exact hS.sameCta t ht u hu (Ne.symm hut) hcu.symm _ (hI.ph t ht) x hw hx
         · obtain ⟨sp, y⟩ := x
           cases sp with
           | shared => exact hcu (hsh rfl)
-          | global => exact hS.crossCta t ht u hu (Ne.symm hcu) _ _ y hw hx
+          | global => exact hS.crossCta t ht u hu (Ne.symm hcu) _ (hI.ph t ht) _ (hI.ph u hu) y hw hx
       · obtain ⟨sp, y⟩ := x
         simp only at hg; subst hg
         exact cellsOut' hS ha hcov u hu _ hx
@@ -444,11 +445,11 @@ theorem inv_of_change {c : Cfg} {n d} (hI : S.Inv K L m0 c n d) {t : Tid} (ht : 
     rcases hchg b' x hc with ⟨hw, hsh⟩ | ⟨hg, a, ha, hcov⟩
     · by_cases hb : b' = t.ctaid
       · subst hb; exact hno t ht rfl hw
-      · obtain ⟨u, hu, rfl, j, -, hux⟩ := hx
+      · obtain ⟨u, hu, rfl, j, hj, hux⟩ := hx
         obtain ⟨sp, y⟩ := x
         cases sp with
         | shared => exact hb (hsh rfl)
-        | global => exact hS.crossCta t ht u hu (Ne.symm hb) _ j y hw hux
+        | global => exact hS.crossCta t ht u hu (Ne.symm hb) _ (hI.ph t ht) j hj y hw hux
     · obtain ⟨u, hu, -, j, -, hux⟩ := hx
       obtain ⟨sp, y⟩ := x
       simp only at hg; subst hg
@@ -668,14 +669,15 @@ theorem phase_sound : S.Result K L (Cfg.init r0 p0 m0 sh0) m0 := by
     have py := pendJ (hI₂.run u hu) hy
     -- a write of one thread against a touch of the other
     have clash : ∀ {v w : Tid} (hv : v ∈ L.threads) (hw : w ∈ L.threads), v ≠ w →
-        ∀ kv kw sp, (v.ctaid = w.ctaid → kv = kw) → (sp = .shared → v.ctaid = w.ctaid) →
+        ∀ kv kw sp, kv < S.P v.ctaid → kw < S.P w.ctaid → (v.ctaid = w.ctaid → kv = kw) →
+        (sp = .shared → v.ctaid = w.ctaid) →
         (S.F v kv).w (sp, byte) → (S.F w kw).touches (sp, byte) → False := by
-      intro v w hv hw hvw kv kw sp hk hshv hwv htw
+      intro v w hv hw hvw kv kw sp hkv hkw hk hshv hwv htw
       by_cases hc : v.ctaid = w.ctaid
-      · rw [hk hc] at hwv; exact hS.sameCta v hv w hw hvw hc _ _ hwv htw
+      · rw [hk hc] at hwv; exact hS.sameCta v hv w hw hvw hc _ (hk hc ▸ hkv) _ hwv htw
       · cases sp with
         | shared => exact hc (hshv rfl)
-        | global => exact hS.crossCta v hv w hw hc _ _ byte hwv htw
+        | global => exact hS.crossCta v hv w hw hc _ hkv _ hkw byte hwv htw
     -- each pending access as a touch, a write, or a cell
     have tx : x.kind ≠ .atomic → (S.F t (c₁.ph t.ctaid)).touches (x.sp, byte) := fun ha => by
       rcases px with ⟨_, h⟩ | ⟨_, h⟩ | ⟨h, -⟩
@@ -709,13 +711,15 @@ theorem phase_sound : S.Result K L (Cfg.init r0 p0 m0 sh0) m0 := by
       · exact h
     cases hxk : x.kind <;> cases hyk : y.kind
     · rw [hxk, hyk] at hkind; rcases hkind with h | h <;> exact absurd rfl h
-    · exact (clash hu ht (Ne.symm htu) _ _ y.sp (fun h => (same h.symm).symm)
+    · exact (clash hu ht (Ne.symm htu) _ _ y.sp (hI₂.ph u hu) (hI₁.ph t ht) (fun h => (same h.symm).symm)
         (fun h => (hsh (hsp ▸ h)).symm) (wy hyk) (hsp ▸ tx (by rw [hxk]; exact nofun))).elim
     · obtain ⟨hg, hs4, hc⟩ := cy hyk
       rw [hs4] at hby
       exact (cellsOut' hS hc hby t ht _ (hg ▸ hsp ▸ tx (by rw [hxk]; exact nofun))).elim
-    · exact (clash ht hu htu _ _ x.sp same hsh (wx hxk) (hsp ▸ ty (by rw [hyk]; exact nofun))).elim
-    · exact (clash ht hu htu _ _ x.sp same hsh (wx hxk) (hsp ▸ ty (by rw [hyk]; exact nofun))).elim
+    · exact (clash ht hu htu _ _ x.sp (hI₁.ph t ht) (hI₂.ph u hu) same hsh (wx hxk)
+        (hsp ▸ ty (by rw [hyk]; exact nofun))).elim
+    · exact (clash ht hu htu _ _ x.sp (hI₁.ph t ht) (hI₂.ph u hu) same hsh (wx hxk)
+        (hsp ▸ ty (by rw [hyk]; exact nofun))).elim
     · obtain ⟨hg, hs4, hc⟩ := cy hyk
       rw [hs4] at hby
       exact (cellsOut' hS hc hby t ht _ (hg ▸ hsp ▸ tx (by rw [hxk]; exact nofun))).elim

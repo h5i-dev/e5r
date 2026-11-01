@@ -107,6 +107,18 @@ theorem covers_of_lt {base x : Addr} {N : Nat} (hf : Fits base N) (h : (x - base
     omega
   · rw [Nat.mod_eq_of_lt (by omega)] at h; omega
 
+theorem elem_elem (b : Addr) (c i : Nat) : elem (elem b c) i = elem b (c + i) := by
+  apply BitVec.eq_of_toNat_eq
+  simp only [elem, BitVec.toNat_add, BitVec.toNat_ofNat]
+  omega
+
+/-- The part of an array starting at element `c` fits if the array does. -/
+theorem fits_tail {b : Addr} {N c M : Nat} (hf : Fits b N) (hc : c + M ≤ N) : Fits (elem b c) M := by
+  unfold Fits at *
+  by_cases h0 : M = 0
+  · subst h0; have := (elem b c).isLt; omega
+  · rw [toNat_elem hf (by omega)]; omega
+
 /-- An aligned element of an array that is one allocation of the list. -/
 theorem accessOk_elem_mem {al : List Region} {base : Addr} {N i : Nat} (hm : ⟨base, 4 * N⟩ ∈ al)
     (hf : Fits base N) (hal : base.toNat % 4 = 0) (hi : i < N) :

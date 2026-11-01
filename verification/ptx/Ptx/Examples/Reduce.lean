@@ -536,7 +536,7 @@ theorem ok (hpre : A.Pre) (m₀ : Mem) (sh₀ : Dim3 → Mem) (r₀ : Tid → St
             · rfl
           · intro _; rfl
   · -- in one phase of one CTA, no thread writes what another touches
-    intro t ht u hu htu hc k x hw htc
+    intro t ht u hu htu hc k _ x hw htc
     simp only [phased] at hw htc
     have hne := A.tid_ne hpre ht hu hc htu
     obtain ⟨-, hti, -⟩ := A.thread_facts hpre ht
@@ -563,7 +563,7 @@ theorem ok (hpre : A.Pre) (m₀ : Mem) (sh₀ : Dim3 → Mem) (r₀ : Tid → St
         · exact elem_disjoint fsbB hti (by omega) (by omega) hcv hcv'
         · exact elem_disjoint fsbB hti hui hne hcv hcv'
   · -- across CTAs, no global byte one writes is touched by another
-    intro t ht u hu hc k j' a hw htc
+    intro t ht u hu hc k _ j' _ a hw htc
     simp only [phased] at hw htc
     have hcne := A.cta_ne hpre ht hu hc
     obtain ⟨htc', -⟩ := A.thread_facts hpre ht
