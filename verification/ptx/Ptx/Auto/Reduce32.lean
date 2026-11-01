@@ -120,6 +120,12 @@ theorem stride_facts (hB : A.B.toNat = 2 ^ A.j) {m : Nat} (hm : m + 1 ≤ A.j) :
 theorem stride_last (hB : A.B.toNat = 2 ^ A.j) : stride A A.j = 1 := by
   rw [stride_eq A hB (Nat.le_refl _)]; simp
 
+/-- Before the last tree phase the stride is at least 2. -/
+theorem stride_two (hB : A.B.toNat = 2 ^ A.j) {k : Nat} (hk : k < A.j) : 2 ≤ stride A k := by
+  rw [stride_eq A hB (by omega), show A.j - k = (A.j - k - 1) + 1 by omega, Nat.pow_succ]
+  have := Nat.one_le_two_pow (n := A.j - k - 1)
+  omega
+
 end
 
 /-! ### What the generated proof supplies -/

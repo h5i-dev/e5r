@@ -82,6 +82,11 @@ theorem obligations : @NS@Obligations @K@ code := by
     obtain ⟨-, sbb, -⟩ := A.sb_facts fit hpre.2.2.2.2.2.2.2.2
     have fsb : Fits A.sb @W@ := by unfold Fits; omega
     obtain ⟨hh1, hh2, hh3, hh4⟩ := stride_facts A hpre.1 hm
+    have hs0 : stride A 0 = A.B.toNat := by simp [stride]
+    have hge2 : m + 1 = A.j ∨ 2 ≤ stride A (m + 1) := by
+      rcases Nat.lt_or_ge (m + 1) A.j with h | h
+      · exact .inr (stride_two A hpre.1 h)
+      · exact .inl (by omega)
     have hmin : min m A.j = m := Nat.min_eq_left (by omega)
     have hne : m ≠ A.j + 1 := by omega
     have hmin1 : min (m + 1) A.j = m + 1 := Nat.min_eq_left hm
@@ -100,6 +105,8 @@ theorem obligations : @NS@Obligations @K@ code := by
     · simp only [Code.Tc, code, phaseT] at hs
       obtain ⟨rfl, @PATL@⟩ := hs
       have hst : stride A (m' + 1) ≤ @W@ := by omega
+      have hh5 : stride A m' = 2 * stride A (m' + 1) := stride_succ A hpre.1 (by omega)
+      have hge3 : 2 ≤ stride A (m' + 1) := stride_two A hpre.1 (by omega)
       refine (wpR_sound (cut := fun _ => false) ?_).weaken fun s h d hq => hq.1
       simp only [@EVAL@@HYPL@, @NS@foot_tree A t (k := m' + 1 + 1) (by omega) hm]
       try simp only [show A.sh @SHNAME@ = A.sb from rfl]
@@ -115,6 +122,11 @@ theorem obligations : @NS@Obligations @K@ code := by
     have fout := hpre.2.2.2.2.2.1
     have oal := hpre.2.2.2.2.2.2.1
     have hlast := stride_last A hpre.1
+    have hprev : A.j = 0 ∨ stride A (A.j - 1) = 2 := by
+      rcases Nat.eq_zero_or_pos A.j with h | h
+      · exact .inl h
+      · refine .inr ?_
+        rw [stride_succ A hpre.1 (k := A.j - 1) (by omega), show A.j - 1 + 1 = A.j by omega, hlast]
     have hne : A.j ≠ A.j + 1 := by omega
     have hmin : min A.j A.j = A.j := Nat.min_self _
     have hmin' : min (A.j + 1) A.j = A.j := by omega

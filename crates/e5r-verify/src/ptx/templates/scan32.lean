@@ -109,7 +109,8 @@ theorem obligations : Obligations @K@ code := by
     rw [foot_read A t hiR]
     refine (wpR_sound (cut := fun _ => false) ?_).weaken fun s h d hq => hq.1
     rcases T_odd hs with ⟨hi0, rfl, @PAT1@⟩ | ⟨hi1, rfl, @PATA@⟩
-    · simp only [@EVAL@@HYP1@, ↓reduceIte, foot_read A t hiR,
+    · have h2i : 2 ^ i = 1 := by simp [hi0]
+      simp only [@EVAL@@HYP1@, ↓reduceIte, foot_read A t hiR,
         show 2 * i + 1 ≠ 0 by omega, show (2 * i + 1) % 2 = 1 by omega, hmid,
         show 2 * i ≠ 2 * A.j + 1 by omega]
       try simp only [show A.sh @SHNAME@ = A.sb from rfl]
@@ -159,6 +160,14 @@ theorem obligations : Obligations @K@ code := by
          rw [rd32_cells fsbB hi]
          simp only [Scan32.V, Scan32.rv]
          split <;> simp)
+      | (rintro ⟨sp, y⟩ ⟨hsp, hy⟩
+         try simp only at hsp
+         subst hsp
+         show cells _ _ _ _ y = cells _ _ _ _ y
+         obtain ⟨hq, hlt⟩ := cell_of_covers fsbB hi hy
+         refine cells_congr (fun _ => ?_) (fun h => absurd hlt h)
+         rw [hq]
+         simp only [Scan32.V, show ¬ 2 ^ i ≤ t.tid.x.toNat by omega, ↓reduceIte])
       | (simp (config := { failIfUnchanged := false }) only [code, Code.Tc, phaseT, upd, String.reduceEq,
            ↓reduceIte, true_and, and_true, show 2 * i + 2 + 1 ≠ 1 by omega,
            show ¬ ((2 * i + 2 + 1) % 2 = 0) by omega, show (2 * i + 2 + 1) / 2 - 1 = i by omega]

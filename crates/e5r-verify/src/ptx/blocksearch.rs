@@ -96,7 +96,9 @@ fn world(k: &Kernel, sp: &BlockSpec, g: u32, b: u32, n: u32) -> World {
     let x = 0x1000u64;
     let out = (x + 4 * n as u64 + 0x40).div_ceil(0x100) * 0x100;
     let mut mem = Mem::default();
-    for i in 0..n {
+    // Only the words a launch of `g * b` threads can read: the rest stay 0,
+    // which is still an initial memory, so huge lengths are cheap.
+    for i in 0..n.min(g * b + 1) {
         mem.wr(x + 4 * i as u64, 4, pattern(i) as u64);
     }
     let mut w = World {
@@ -134,7 +136,8 @@ fn worlds(k: &Kernel, sp: &BlockSpec) -> Vec<World> {
             let mut ns: Vec<u32> = if sp.class == Class::Scan {
                 vec![gb, gb.saturating_sub(1), 1, 0]
             } else {
-                vec![gb, gb.saturating_sub(1), gb + 1, 1, 0]
+                // Lengths a signed 32-bit comparison gets wrong.
+                vec![gb, gb.saturating_sub(1), gb + 1, 1, 0, 1 << 31, u32::MAX]
             };
             ns.sort();
             ns.dedup();

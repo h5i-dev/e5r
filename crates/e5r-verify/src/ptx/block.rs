@@ -75,6 +75,9 @@ pub enum Role {
     Length,
     /// `reduce32`, `loop`: the stride of the phase that just ended.
     Stride,
+    /// `reduce32`, `loop`: the stride of the phase before it (twice the
+    /// stride; the block size after the first tree phase).
+    StridePrev,
     /// `scan32`, `after_read` / `after_add`: the round's offset `2^k`.
     Offset,
     /// `scan32`, `after_read`: the value the thread read in the round.
@@ -83,6 +86,8 @@ pub enum Role {
     GidGeLen,
     /// A predicate: `gid < length`.
     GidLtLen,
+    /// `scan32`, `after_read`: a predicate, `tid < offset`.
+    TidLtOffset,
 }
 
 impl Role {
@@ -98,22 +103,26 @@ impl Role {
             "output" => Role::Output,
             "length" => Role::Length,
             "stride" => Role::Stride,
+            "stride_prev" => Role::StridePrev,
             "offset" => Role::Offset,
             "read" => Role::Read,
             "gid >= length" => Role::GidGeLen,
             "gid < length" => Role::GidLtLen,
+            "tid < offset" => Role::TidLtOffset,
             _ => return None,
         })
     }
     fn is_pred(self) -> bool {
-        matches!(self, Role::GidGeLen | Role::GidLtLen)
+        matches!(self, Role::GidGeLen | Role::GidLtLen | Role::TidLtOffset)
     }
     /// The barrier sets the role may appear in.
     fn allowed(self, class: Class, set: &str) -> bool {
         match self {
-            Role::Stride => matches!(class, Class::Reduce | Class::ReduceAtomic) && set == "loop",
+            Role::Stride | Role::StridePrev => {
+                matches!(class, Class::Reduce | Class::ReduceAtomic) && set == "loop"
+            }
             Role::Offset => class == Class::Scan && set != "after_load",
-            Role::Read => class == Class::Scan && set == "after_read",
+            Role::Read | Role::TidLtOffset => class == Class::Scan && set == "after_read",
             _ => true,
         }
     }
@@ -360,10 +369,15 @@ fn role_eq(r: &str, p: &str, reg: &str, role: Role, k: &str) -> String {
         Role::Output => "A.out".into(),
         Role::Length => "ext32 A.n".into(),
         Role::Stride => format!("ext32 (BitVec.ofNat 32 (stride A {k}))"),
+        Role::StridePrev => {
+            let p = if k == "(k + 1)" { "k".to_string() } else { format!("({k} - 1)") };
+            format!("ext32 (BitVec.ofNat 32 (stride A {p}))")
+        }
         Role::Offset => format!("ext32 (BitVec.ofNat 32 (2 ^ {k}))"),
         Role::Read => format!("ext32 (rv A m₀ t.ctaid.x.toNat {k} t.tid.x.toNat)"),
         Role::GidGeLen => format!("decide (A.n.toNat ≤ {GID})"),
         Role::GidLtLen => format!("decide ({GID} < A.n.toNat)"),
+        Role::TidLtOffset => format!("decide (t.tid.x.toNat < 2 ^ {k})"),
     };
     if role.is_pred() {
         format!("{p} {} = {v}", q(reg))
@@ -419,7 +433,8 @@ const TREE_ALTS: &str = "      all_goals (try and_intros)
            refine wr_cells fsbB hi hy ?_
            simp only [lo32_ext32, lo32_rd_b4, hmin, hmin1]
            rw [rd32_cells fsbB hi, rd32_cells fsbB (by omega)]
-           simp only [Reduce32.V, hlt, ↓reduceIte])
+           simp only [Reduce32.V, hlt, ↓reduceIte]
+           try exact BitVec.add_comm _ _)
         | (simp (config := { failIfUnchanged := false }) only [code, phaseT, upd, String.reduceEq,
              ↓reduceIte, true_and, and_true]
            all_goals (try and_intros)
@@ -487,6 +502,7 @@ const READ_ALTS: &str = "      all_goals (try and_intros)
              | ptx_reg4
              | rfl
              | assumption
+             | (simp only [Ptx.Auto.ult_toNat, Ptx.Auto.ule_toNat, decide_eq_decide]; ptx_nat4)
              | (rw [rd_b4, rd32_cells fsbB (by omega)]
                 simp only [Scan32.rv, show 2 ^ i ≤ t.tid.x.toNat by omega, ↓reduceIte])
              | (simp only [Scan32.rv, lo32_ofInt_zero, show ¬ 2 ^ i ≤ t.tid.x.toNat by omega, ↓reduceIte]

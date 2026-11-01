@@ -26,7 +26,8 @@
       "%rd2": "output",
       "%p1": "gid >= length",
       "%r26": "offset",
-      "%r27": "read"
+      "%r27": "read",
+      "%p3": "tid < offset"
     },
     "after_add": {
       "%r1": "ntid",

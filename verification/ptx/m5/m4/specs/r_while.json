@@ -21,7 +21,8 @@
       "%r2": "ctaid",
       "%r3": "tid",
       "%r7": "shared_tid",
-      "%rd2": "output"
+      "%rd2": "output",
+      "%r21": "stride_prev"
     }
   }
 }
