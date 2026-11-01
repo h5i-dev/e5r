@@ -6,3 +6,7 @@ buggy/vadd_nobound.ptx     vadd.json     refuted
 buggy/vadd_tid.ptx         vadd.json     refuted
 buggy/vadd_sub.ptx         vadd.json     refuted
 correct/sum.ptx            sum_as_map.json unsupported
+# M4: block reductions and scan (reduce32, scan32), nvcc 13.2 -O3 output.
+correct/reduce_nvcc.ptx    reduce.json   proved
+correct/reduce_atomic_nvcc.ptx reduce_atomic.json proved
+correct/scan_nvcc.ptx      scan.json     proved

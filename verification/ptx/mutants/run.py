@@ -9,7 +9,9 @@ mutant is proved. It also records how many were refuted with a counterexample
 the Lean kernel replayed and how many were left `unknown` (fail-closed but
 not refuted), per targeted property, and writes results.json.
 
-  run.py E5R_VERIFY OUTDIR
+  run.py E5R_VERIFY OUTDIR [PREFIX ...]
+
+With prefixes, only the mutants whose name starts with one of them run.
 """
 import json
 import os
@@ -88,6 +90,39 @@ MUTANTS = [
      None, spec_set("element", "saxpy_a * saxpy_x")),
     ("saxpy: index never advances", "termination", "correct/saxpy.ptx", "saxpy.json",
      sub(r"^\s*add\.u64 \t%rd3, %rd3, %rd5;\n", ""), None),
+    # reduce (nvcc 13.2, reduce32 per_block)
+    ("reduce: loop bar.sync removed", "race_freedom", "correct/reduce_nvcc.ptx", "reduce.json",
+     sub(r"(\$L__BB0_5:\n)\tbar\.sync \t0;\n", r"\1"), None),
+    ("reduce: load bound ge -> gt", "memory_safety", "correct/reduce_nvcc.ptx", "reduce.json",
+     sub(r"setp\.ge\.u32 \t%p1, %r4, %r12;", "setp.gt.u32 \t%p1, %r4, %r12;"), None),
+    ("reduce: tree test ge -> gt", "race_freedom", "correct/reduce_nvcc.ptx", "reduce.json",
+     sub(r"setp\.ge\.u32 \t%p3, %r3, %r22;", "setp.gt.u32 \t%p3, %r3, %r22;"), None),
+    ("reduce: first stride B/4", "functional_correctness", "correct/reduce_nvcc.ptx", "reduce.json",
+     sub(r"shr\.u32 \t%r22, %r1, 1;", "shr.u32 \t%r22, %r1, 2;"), None),
+    ("reduce: every thread stores out[ctaid]", "race_freedom", "correct/reduce_nvcc.ptx", "reduce.json",
+     sub(r"^\s*@%p5 bra \t\$L__BB0_8;\n", "\n"), None),
+    ("reduce: stores tid, not s[0]", "functional_correctness", "correct/reduce_nvcc.ptx", "reduce.json",
+     sub(r"st\.global\.u32 \t\[%rd8\], %r20;", "st.global.u32 \t[%rd8], %r3;"), None),
+    ("reduce: spec says atomic", "functional_correctness", "correct/reduce_nvcc.ptx", "reduce.json",
+     None, spec_set("result", "atomic")),
+    # reduce_atomic (reduce32 atomic)
+    ("reduce_atomic: atom.add -> st", "functional_correctness", "correct/reduce_atomic_nvcc.ptx",
+     "reduce_atomic.json",
+     sub(r"atom\.global\.add\.u32 \t%r21, \[%rd6\], %r20;", "st.global.u32 \t[%rd6], %r20;"), None),
+    ("reduce_atomic: atom.add -> atom.max", "functional_correctness", "correct/reduce_atomic_nvcc.ptx",
+     "reduce_atomic.json",
+     sub(r"atom\.global\.add\.u32", "atom.global.max.u32"), None),
+    ("reduce_atomic: loop bar.sync removed", "race_freedom", "correct/reduce_atomic_nvcc.ptx",
+     "reduce_atomic.json", sub(r"(\$L__BB0_5:\n)\tbar\.sync \t0;\n", r"\1"), None),
+    # scan (scan32)
+    ("scan: read barrier removed", "race_freedom", "correct/scan_nvcc.ptx", "scan.json",
+     sub(r"(\$L__BB0_6:\n)\tbar\.sync \t0;\n", r"\1"), None),
+    ("scan: read test lt -> le", "functional_correctness", "correct/scan_nvcc.ptx", "scan.json",
+     sub(r"setp\.lt\.u32 \t%p3, %r2, %r26;", "setp.le.u32 \t%p3, %r2, %r26;"), None),
+    ("scan: offset times 4", "functional_correctness", "correct/scan_nvcc.ptx", "scan.json",
+     sub(r"shl\.b32 \t%r26, %r26, 1;", "shl.b32 \t%r26, %r26, 2;"), None),
+    ("scan: store guard removed", "memory_safety", "correct/scan_nvcc.ptx", "scan.json",
+     sub(r"(\$L__BB0_7:\n)\t@%p1 bra \t\$L__BB0_9;\n", r"\1"), None),
 ]
 
 
@@ -95,7 +130,10 @@ def main():
     exe, out = sys.argv[1], sys.argv[2]
     os.makedirs(out, exist_ok=True)
     rows, proved = [], []
+    only = sys.argv[3:]
     for i, (name, prop, ptx, spec, pm, sm) in enumerate(MUTANTS):
+        if only and not any(name.startswith(p) for p in only):
+            continue
         src = open(os.path.join(BENCH, ptx)).read()
         sp = open(os.path.join(BENCH, "specs", spec)).read()
         src2 = pm(src) if pm else src

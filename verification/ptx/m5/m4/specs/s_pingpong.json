@@ -1,0 +1,15 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "s_pingpong",
+  "class": "scan32",
+  "input": "s_pingpong_param_0",
+  "output": "s_pingpong_param_1",
+  "length": "s_pingpong_param_2",
+  "shared": "_ZZ10s_pingpongE3buf",
+  "max_block": 1024,
+  "barriers": {
+    "after_load": {},
+    "after_read": {},
+    "after_add": {}
+  }
+}

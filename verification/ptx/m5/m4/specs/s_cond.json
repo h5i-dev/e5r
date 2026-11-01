@@ -1,0 +1,42 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "s_cond",
+  "class": "scan32",
+  "input": "s_cond_param_0",
+  "output": "s_cond_param_1",
+  "length": "s_cond_param_2",
+  "shared": "_ZZ6s_condE1s",
+  "max_block": 1024,
+  "barriers": {
+    "after_load": {
+      "%r1": "ntid",
+      "%r2": "tid",
+      "%r3": "gid",
+      "%r6": "shared_tid",
+      "%r15": "shared_base",
+      "%rd2": "output",
+      "%p1": "gid >= length"
+    },
+    "after_read": {
+      "%r1": "ntid",
+      "%r2": "tid",
+      "%r3": "gid",
+      "%r6": "shared_tid",
+      "%r15": "shared_base",
+      "%rd2": "output",
+      "%p1": "gid >= length",
+      "%r26": "offset",
+      "%r27": "read"
+    },
+    "after_add": {
+      "%r1": "ntid",
+      "%r2": "tid",
+      "%r3": "gid",
+      "%r6": "shared_tid",
+      "%r15": "shared_base",
+      "%rd2": "output",
+      "%p1": "gid >= length",
+      "%r26": "offset"
+    }
+  }
+}

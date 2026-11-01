@@ -564,8 +564,8 @@ pub fn refutation(k: &Kernel, sp: &BlockSpec, header: &str, w: &World, wit: &Wit
         } => {
             writeln!(
                 s,
-                "  exact hrf (race_of_exec (K := {kn}) (L := L₀) (c₀ := c₀) (t := {}) (u := {}) (b := {})\n    \
-                 (cs₁ := {}) (cs₂ := {}) (by decide +kernel))",
+                "  exact race_of_exec (K := {kn}) (L := L₀) (c₀ := c₀) (t := {}) (u := {}) (b := {})\n    \
+                 (cs₁ := {}) (cs₂ := {}) (by decide +kernel) hrf",
                 tid(*t),
                 tid(*u),
                 bv(*byte as u128, 64),

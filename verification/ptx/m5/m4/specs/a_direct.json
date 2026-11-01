@@ -1,0 +1,15 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "a_direct",
+  "class": "reduce32",
+  "result": "atomic",
+  "input": "a_direct_param_0",
+  "output": "a_direct_param_1",
+  "length": "a_direct_param_2",
+  "shared": "none",
+  "max_block": 1024,
+  "barriers": {
+    "after_load": {},
+    "loop": {}
+  }
+}
