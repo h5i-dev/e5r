@@ -1,0 +1,230 @@
+{
+ "rows": [
+  {
+   "name": "r_div2",
+   "ptxas": true,
+   "verdict": "unknown",
+   "check_seconds": 68.66,
+   "lean_seconds": 67.83,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [
+    "proof did not check: error: unsolved goals case refine_2.zero.isFalse.isFalse.isFalse.isTrue.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_1 A : Block.Args spec",
+    "no proof, and the search found no counterexample"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": null,
+   "task": "out[b] = sum of block b's elements; halving written as / 2"
+  },
+  {
+   "name": "r_int",
+   "ptxas": true,
+   "verdict": "unknown",
+   "check_seconds": 472.66,
+   "lean_seconds": 471.9,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [
+    "proof did not check: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   2147483648 \u2264 i \u2264 4294967295",
+    "no proof, and the search found no counterexample"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": null,
+   "task": "out[b] = sum of block b's elements; int indices and length"
+  },
+  {
+   "name": "r_256",
+   "ptxas": true,
+   "verdict": "proved",
+   "check_seconds": 63.66,
+   "lean_seconds": 62.77,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": null,
+   "task": "out[b] = sum of block b's elements; blocks of at most 256 threads"
+  },
+  {
+   "name": "r_while",
+   "ptxas": true,
+   "verdict": "unknown",
+   "check_seconds": 193.76,
+   "lean_seconds": 193.05,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [
+    "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   \u2200 {y : BitVec ?n}, BitVec.toNat ?x = y.toNat \u2192 ?x = y with the goal",
+    "no proof, and the search found no counterexample"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": null,
+   "task": "out[b] = sum of block b's elements; while loop"
+  },
+  {
+   "name": "r_interleaved",
+   "ptxas": true,
+   "verdict": "unsupported",
+   "check_seconds": 0.0,
+   "lean_seconds": null,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [
+    "PTX outside the subset: line 57: unsupported instruction rem.u32"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": null,
+   "task": "out[b] = sum of block b's elements; interleaved addressing (CUDA samples reduce0)"
+  },
+  {
+   "name": "r_earlyret",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 550.75,
+   "lean_seconds": 547.7,
+   "refutation_seconds": 2.25,
+   "counterexample": "wrong_value",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   \u2200 {y : BitVec ?n}, BitVec.toNat ?x = y.toNat \u2192 ?x = y with the goal"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=35001 block=2 n=70001: out[35000] = 852501375, want 1800792906",
+   "task": "out[b] = sum of block b's elements; out-of-range threads return first"
+  },
+  {
+   "name": "r_warp",
+   "ptxas": true,
+   "verdict": "unsupported",
+   "check_seconds": 0.0,
+   "lean_seconds": null,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [
+    "PTX outside the subset: line 80: unsupported instruction ld.volatile.shared.u32"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": null,
+   "task": "out[b] = sum of block b's elements; last warp unrolled without barriers (old CUDA samples reduce4)"
+  },
+  {
+   "name": "a_tree",
+   "ptxas": true,
+   "verdict": "proved",
+   "check_seconds": 48.46,
+   "lean_seconds": 47.64,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": null,
+   "task": "*total += sum of all elements: block tree, one atomicAdd per block"
+  },
+  {
+   "name": "a_int",
+   "ptxas": true,
+   "verdict": "unknown",
+   "check_seconds": 435.3,
+   "lean_seconds": 434.52,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [
+    "proof did not check: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   2147483648 \u2264 i \u2264 4294967295",
+    "no proof, and the search found no counterexample"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": null,
+   "task": "*total += sum of all elements; int indices, 512-word buffer"
+  },
+  {
+   "name": "a_direct",
+   "ptxas": true,
+   "verdict": "unsupported",
+   "check_seconds": 0.7,
+   "lean_seconds": null,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [
+    "no proof attempt: reduce32: no .shared variable none",
+    "no proof, and the search found no counterexample"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": null,
+   "task": "*total += sum of all elements; one atomicAdd per element"
+  },
+  {
+   "name": "s_hs",
+   "ptxas": true,
+   "verdict": "proved",
+   "check_seconds": 71.66,
+   "lean_seconds": 70.95,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": null,
+   "task": "y[i] = inclusive prefix sum of i's block segment (Hillis-Steele)"
+  },
+  {
+   "name": "s_int",
+   "ptxas": true,
+   "verdict": "unknown",
+   "check_seconds": 503.73,
+   "lean_seconds": 502.96,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [
+    "proof did not check: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   2147483648 \u2264 i \u2264 4294967295",
+    "no proof, and the search found no counterexample"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": null,
+   "task": "y[i] = inclusive prefix sum of i's block segment; int indices"
+  },
+  {
+   "name": "s_cond",
+   "ptxas": true,
+   "verdict": "unknown",
+   "check_seconds": 89.54,
+   "lean_seconds": 88.76,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [
+    "proof did not check: error: Tactic `assumption` failed  case refine_3.isTrue.isTrue.refine_2.refine_1",
+    "no proof, and the search found no counterexample"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": null,
+   "task": "y[i] = inclusive prefix sum of i's block segment; add only when tid >= offset"
+  },
+  {
+   "name": "s_pingpong",
+   "ptxas": true,
+   "verdict": "unsupported",
+   "check_seconds": 0.73,
+   "lean_seconds": null,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [
+    "no proof attempt: scan32: the kernel has 2 bar.sync, the class has 3",
+    "no proof, and the search found no counterexample"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": null,
+   "task": "y[i] = inclusive prefix sum of i's block segment; two buffers, one barrier per round"
+  }
+ ]
+}
