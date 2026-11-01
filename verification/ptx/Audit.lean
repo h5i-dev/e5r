@@ -38,6 +38,9 @@ elab "#audit_ptx" : command => do
 #audit_ptx
 
 #print axioms Ptx.grid_sound
+#print axioms Ptx.Phased.phase_sound
+#print axioms Ptx.Run.frame
+#print axioms Ptx.Run.step
 #print axioms Ptx.wp_sound
 #print axioms Ptx.Safe.solo
 #print axioms Ptx.Safe.loop

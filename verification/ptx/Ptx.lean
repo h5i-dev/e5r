@@ -14,3 +14,5 @@ import Ptx.Logic.Refute
 import Ptx.Examples.Buggy
 import Ptx.Auto.Map
 import Ptx.Auto.Tactic
+import Ptx.Logic.Phases
+import Ptx.Logic.PhaseSound
