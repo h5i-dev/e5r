@@ -1096,13 +1096,25 @@ checked only when its acceptance criterion has been run.
       that never advances: non-termination has no finite witness); 102 M5
       kernels proved with no per-kernel proof. Outside the class the verdict
       is `unsupported` or `unknown`.)
-- [ ] **P4 (M4). Shared memory, barriers, reductions.** *Accepted:* `.shared`,
+- [x] **P4 (M4). Shared memory, barriers, reductions.** *Accepted:* `.shared`,
       `bar.sync`, atomics in the model with the synchronization rules they
-      need; a parallel reduction and a scan proved. *Status:* not started; the
-      parser refuses all of them, so such kernels are `unsupported`. The
-      design it needs (barrier rule in `Step`, phase-relative race freedom, a
-      per-phase composition theorem) is sketched in `verification-ptx.md`,
-      "Open"; it was not attempted in the 2026-11-01 session.
+      need; a parallel reduction and a scan proved. (Accepted 2026-11-01:
+      per-CTA shared memory, `bar.sync 0` as a release rule in `Step` with
+      divergence a fault, `atom`/`red`/`atom.cas` as one read-modify-write,
+      phase-relative `RaceFree`; `grid_sound` re-proved on the new `Step`;
+      `phase_sound` composes per-thread, per-phase derivations with atomic
+      accumulator cells; `reduce_correct` (every power-of-two block up to 1024),
+      `scan_correct` (every block up to 1024) and `reduce_atomic_correct` on
+      nvcc 13.2's PTX. `e5r-verify ptx check` classes `reduce32` and `scan32`:
+      class theorems proved once, phase obligations generated from register
+      roles at each barrier, a barrier-aware search replayed in Lean through
+      `Cfg.exec`. Measured: the three benchmarks proved; 0 of 14 M4 mutants
+      proved, 14 refuted; parser, interpreter and ptxas agreement extended;
+      GPU differential test 1039 launches of 529 kernels identical across
+      the model, the interpreter, the JIT and ptxas. Outside the two classes
+      the verdict is `unsupported` or `unknown`; atomics other than `add` and
+      shared-memory accumulators are in the model but not in the phase
+      theorem.)
 - [x] **P5 (M5). AI-generated PTX at scale.** *Accepted:* specification to PTX
       to Lean to GPU benchmark, reported as the share of generated kernels
       proved, bugs found, proof time per kernel and speed against a CUDA or
@@ -1117,7 +1129,13 @@ checked only when its acceptance criterion has been run.
       first-run verdicts listed, no natural defect found, A10G only. The
       differential test of the instruction semantics against the A10G is
       done: 829 launches of 419 kernels identical across the Lean model, the
-      interpreter, the JIT and ptxas, and misaligned accesses fault on both.)
+      interpreter, the JIT and ptxas, and misaligned accesses fault on both.
+      Rerun 2026-11-01 with M4 kernels (`m5/m4/RESULTS.md`): 14 CUDA C kernels
+      written before any was checked and compiled by nvcc, no planted defect;
+      first run 3 proved, 1 refuted, 6 unknown, 4 unsupported; after the
+      fixes it prompted 6 proved, 3 refuted (two signed-length defects and an
+      early return before a barrier, none planted), 1 unknown, 4 unsupported;
+      24 random mutants: 0 proved, 21 refuted, 3 unknown.)
 
 Not in this scope, and not to be described as done: SASS, the ptxas or driver
 translation from PTX to SASS, floating point, the PTX memory model beyond the

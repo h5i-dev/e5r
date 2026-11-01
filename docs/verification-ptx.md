@@ -53,7 +53,7 @@ evaluation, which would put the compiler in the trusted base.
 ## Reproduce
 
 ```sh
-./scripts/recheck-ptx.sh       # everything below, about 8 min on the development machine
+./scripts/recheck-ptx.sh       # everything below, about 80 min on the development machine
 ```
 
 It runs, in order, and fails on the first problem:
@@ -363,7 +363,7 @@ bound tests flipped, a halved first stride, every thread storing the block
 result, the wrong value stored, `atom.add` replaced by a plain store or by
 `atom.max`, the scan's offset multiplied by 4, the scan's store guard
 removed, and the spec's `result` changed to `atomic`. Measured: 0 of 14
-proved, 14 refuted with a replayed counterexample (2 faults, 6 races, 6 wrong
+proved, 14 refuted with a replayed counterexample (2 faults, 5 races, 7 wrong
 values).
 
 The axiom audit was checked the same way: a module with an `axiom` and a

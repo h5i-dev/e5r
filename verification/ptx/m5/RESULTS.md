@@ -147,3 +147,26 @@ first run, with the tactics as they were at that moment:
 | batch 2 | 31 | 28 | gs32_or (bottom-tested loop), gs_addk_exit (leaf lemma unification); gs32_neg unsupported, unchanged |
 | batch 3, written to be correct | 23 | 20 | tid_major (product order), sel_guard (constants in branch conditions); two_out_one unsupported, unchanged |
 | batch 4 | 16 | 16 | none (no tactic change after it) |
+
+## M4 kernels (`m4/RESULTS.md`)
+
+The benchmark was rerun with block-level kernels in the M4 classes
+(`reduce32`, `scan32`). Two of the limits above are smaller there:
+
+- **Written independently of the tactics.** The 14 M4 kernels are CUDA C
+  written in one pass before any was checked, in the styles tutorials and the
+  old CUDA samples use, and compiled by nvcc; the PTX is nvcc's. They were
+  committed before their first run (commit f5bab5f), and the first-run
+  verdicts are kept in `m4/results_first_run.json`: 3 proved, 1 refuted,
+  6 unknown, 4 unsupported. After the fixes that run prompted (listed in
+  `docs/verification-ptx.md`): 6 proved, 3 refuted, 1 unknown, 4 unsupported.
+- **Defects nobody planted.** None of the 14 has a seeded defect. Three are
+  refuted: two declare the length `int`, so for `n ≥ 2^31` every thread skips
+  its load (the GPU test with small `n` passes them), and one returns before
+  `__syncthreads`. In addition, 24 mutants drawn by a seeded random mutation
+  operator (`m4/mutate.py`), not chosen by anyone, were checked: 0 proved, 21
+  refuted, 3 unknown (two never terminate, one is equivalent to the original).
+
+Still true for the M4 part: one model in one session, the specs (register
+roles at each barrier) written by the same agent from the PTX, the A10G only,
+and no speed comparison (the kernels are nvcc's output).
