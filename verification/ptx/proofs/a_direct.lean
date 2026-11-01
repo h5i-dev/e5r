@@ -44,12 +44,12 @@ def phased (m₀ : Mem) (sh₀ : Dim3 → Mem) : Phased where
   M := fun b _ => ⟨m₀, sh₀ b⟩
   bpc := fun _ _ => 0
   Cell := fun a => a = A.out
-  Δ := fun t _ a => if gid A t < A.n.toNat ∧ a = A.out then rd32 m₀ (elem A.x (gid A t)) else 0
+  Δ := fun t _ a => if gid A t < A.n.toNat ∧ a = A.out then ext32 (rd32 m₀ (elem A.x (gid A t))) else 0
 
 set_option maxHeartbeats 4000000 in
 theorem phase (hpre : Pre K 1 A) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Tid}
     (ht : t ∈ (A.launch 1).threads) (s : TState) (hs : s.pc = 0) :
-    Run K ((A.launch 1).allocs K) ((A.launch 1).ctx t) (foot A t 0) (fun a => a = A.out)
+    Run K ((A.launch 1).allocs K) ((A.launch 1).ctx t) (foot A t 0) (fun a => a = A.out) add32
       ((phased A m₀ sh₀).J K (A.launch 1) t 0) 24 s ⟨m₀, sh₀ t.ctaid⟩ (fun _ => 0) := by
   obtain ⟨pc, r, p⟩ := s
   simp only at hs; subst hs
@@ -81,7 +81,7 @@ theorem phase (hpre : Pre K 1 A) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Tid}
        simp only [hn, ↓reduceIte])
     | (refine ⟨_, addsTo_add _, fun v => ⟨?_, fun _ h => h.elim, trivial⟩⟩
        funext a
-       simp only [Ghost.add, lo32_rd_b4, elem_zero A.out]
+       simp only [Ghost.acc, add32_op, lo32_rd_b4, lo32_ext32, lo32_zero, BitVec.zero_add, elem_zero A.out]
        by_cases ha : a = A.out
        · subst ha; simp [show t.ctaid.x.toNat * A.B.toNat + t.tid.x.toNat < A.n.toNat by omega]
        · simp [ha])
@@ -124,13 +124,13 @@ theorem correct : E5rSpec.statement := by
     Phased.exists_done_of R.progress R.bounded, fun c hc hd => ?_⟩
   obtain ⟨-, hun, hcell⟩ := R.final c hc hd
   refine ⟨?_, fun y hy => hun y (fun t _ k _ h => h) ?_⟩
-  · rw [hcell A.out rfl]
+  · rw [cell_add32 (hcell A.out rfl)]
     congr 1
-    simp only [phased, accUpTo, and_true]
+    simp only [phased, and_true, lo32_tfold_add32, lo32_afold_add32, accUpTo]
     refine (tsum_congr fun t _ => ?_).trans
       (tsum_oneD_gid (A.launch_oneD 1) (fun i => if i < A.n.toNat then rd32 m₀ (elem A.x i) else 0))
     simp only [gid]
-    split <;> (rename_i h; simp [h])
+    split <;> (rename_i h; simp only [h, ↓reduceIte, lo32_ext32]; first | rfl | exact BitVec.zero_add _)
   · intro b hb; simp only [phased] at hb; subst hb; exact hy
 
 end E5rProof

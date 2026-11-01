@@ -201,7 +201,7 @@ theorem thread_facts (hpre : A.Pre) {t : Tid} (ht : t ∈ A.launch.threads) :
 set_option maxHeartbeats 2000000 in
 theorem phase0 (hpre : A.Pre) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Tid} (ht : t ∈ A.launch.threads)
     (s : TState) (hs : A.T t 0 s) :
-    Run K (A.launch.allocs K) (A.launch.ctx t) (A.foot t 0) (fun _ => False)
+    Run K (A.launch.allocs K) (A.launch.ctx t) (A.foot t 0) (fun _ => False) add32
       ((A.phased m₀ sh₀).J K A.launch t 0) 40 s (A.mem m₀ sh₀ t.ctaid 0) (fun _ => 0) := by
   obtain ⟨pc, r, p⟩ := s
   simp only [T] at hs; subst hs
@@ -268,7 +268,7 @@ theorem stride_facts (hpre : A.Pre) {m : Nat} (hm : m + 1 ≤ A.j) :
 set_option maxHeartbeats 4000000 in
 theorem phase_tree (hpre : A.Pre) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Tid} (ht : t ∈ A.launch.threads)
     {m : Nat} (hm : m + 1 ≤ A.j) (s : TState) (hs : A.T t (m + 1) s) :
-    Run K (A.launch.allocs K) (A.launch.ctx t) (A.foot t (m + 1)) (fun _ => False)
+    Run K (A.launch.allocs K) (A.launch.ctx t) (A.foot t (m + 1)) (fun _ => False) add32
       ((A.phased m₀ sh₀).J K A.launch t (m + 1)) 40 s (A.mem m₀ sh₀ t.ctaid (m + 1)) (fun _ => 0) := by
   obtain ⟨hc, hi, hB, hcB, hGB, -, -, -, -⟩ := A.thread_facts hpre ht
   obtain ⟨sal, sbb⟩ := A.sb_facts hpre
@@ -363,7 +363,7 @@ theorem T_last {t : Tid} {pc : Nat} {r : String → Val} {p : String → Bool}
 set_option maxHeartbeats 4000000 in
 theorem phase_last (hpre : A.Pre) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Tid} (ht : t ∈ A.launch.threads)
     (s : TState) (hs : A.T t (A.j + 1) s) :
-    Run K (A.launch.allocs K) (A.launch.ctx t) (A.foot t (A.j + 1)) (fun _ => False)
+    Run K (A.launch.allocs K) (A.launch.ctx t) (A.foot t (A.j + 1)) (fun _ => False) add32
       ((A.phased m₀ sh₀).J K A.launch t (A.j + 1)) 40 s (A.mem m₀ sh₀ t.ctaid (A.j + 1))
       (fun _ => 0) := by
   obtain ⟨hc, hi, hB, hcB, hGB, -, -, -, -⟩ := A.thread_facts hpre ht

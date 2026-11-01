@@ -174,7 +174,7 @@ def phased (m₀ : Mem) (sh₀ : Dim3 → Mem) : Phased where
   M := A.mem m₀ sh₀
   bpc := fun _ k => if k = 0 then 18 else 30
   Cell := fun a => a = A.out
-  Δ := fun t k a => if k = A.j + 1 ∧ t.tid.x.toNat = 0 ∧ a = A.out then A.V m₀ t.ctaid.x.toNat A.j 0 else 0
+  Δ := fun t k a => if k = A.j + 1 ∧ t.tid.x.toNat = 0 ∧ a = A.out then ext32 (A.V m₀ t.ctaid.x.toNat A.j 0) else 0
 
 /-- After phase `j`, `s[0]` holds the sum of the segment. -/
 theorem V_final (hB : A.B.toNat = 2 ^ A.j) (m₀ : Mem) (b : Nat) :
@@ -207,7 +207,7 @@ theorem thread_facts (hpre : A.Pre) {t : Tid} (ht : t ∈ A.launch.threads) :
 set_option maxHeartbeats 2000000 in
 theorem phase0 (hpre : A.Pre) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Tid} (ht : t ∈ A.launch.threads)
     (s : TState) (hs : A.T t 0 s) :
-    Run K (A.launch.allocs K) (A.launch.ctx t) (A.foot t 0) (fun a => a = A.out)
+    Run K (A.launch.allocs K) (A.launch.ctx t) (A.foot t 0) (fun a => a = A.out) add32
       ((A.phased m₀ sh₀).J K A.launch t 0) 40 s (A.mem m₀ sh₀ t.ctaid 0) (fun _ => 0) := by
   obtain ⟨pc, r, p⟩ := s
   simp only [T] at hs; subst hs
@@ -278,7 +278,7 @@ theorem stride_facts (hpre : A.Pre) {m : Nat} (hm : m + 1 ≤ A.j) :
 set_option maxHeartbeats 4000000 in
 theorem phase_tree (hpre : A.Pre) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Tid} (ht : t ∈ A.launch.threads)
     {m : Nat} (hm : m + 1 ≤ A.j) (s : TState) (hs : A.T t (m + 1) s) :
-    Run K (A.launch.allocs K) (A.launch.ctx t) (A.foot t (m + 1)) (fun a => a = A.out)
+    Run K (A.launch.allocs K) (A.launch.ctx t) (A.foot t (m + 1)) (fun a => a = A.out) add32
       ((A.phased m₀ sh₀).J K A.launch t (m + 1)) 40 s (A.mem m₀ sh₀ t.ctaid (m + 1)) (fun _ => 0) := by
   obtain ⟨hc, hi, hB, hcB, hGB, -, -, -, -⟩ := A.thread_facts hpre ht
   obtain ⟨sal, sbb⟩ := A.sb_facts hpre
@@ -381,7 +381,7 @@ theorem T_last {t : Tid} {pc : Nat} {r : String → Val} {p : String → Bool}
 set_option maxHeartbeats 4000000 in
 theorem phase_last (hpre : A.Pre) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Tid} (ht : t ∈ A.launch.threads)
     (s : TState) (hs : A.T t (A.j + 1) s) :
-    Run K (A.launch.allocs K) (A.launch.ctx t) (A.foot t (A.j + 1)) (fun a => a = A.out)
+    Run K (A.launch.allocs K) (A.launch.ctx t) (A.foot t (A.j + 1)) (fun a => a = A.out) add32
       ((A.phased m₀ sh₀).J K A.launch t (A.j + 1)) 40 s (A.mem m₀ sh₀ t.ctaid (A.j + 1))
       (fun _ => 0) := by
   obtain ⟨hc, hi, hB, hcB, hGB, -, -, -, -⟩ := A.thread_facts hpre ht
@@ -421,7 +421,7 @@ theorem phase_last (hpre : A.Pre) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Tid} 
     | exact elem_zero _
     | (refine ⟨_, addsTo_add _, fun v => ⟨?_, fun _ h => h.elim, trivial⟩⟩
        funext a
-       simp only [Ghost.add, lo32_rd_b4, elem_zero A.out]
+       simp only [Ghost.acc, add32_op, lo32_rd_b4, lo32_ext32, lo32_zero, BitVec.zero_add, elem_zero A.out]
        rw [rd32_cells fsbB (by omega)]
        by_cases ha : a = A.out
        · subst ha; simp [show t.tid.x.toNat = 0 by omega]
@@ -627,9 +627,9 @@ theorem reduce_atomic_correct (A : Args) (hpre : A.Pre) (m₀ : Mem) (sh₀ : Di
     Phased.exists_done_of R.progress R.bounded, fun c hc hd => ?_⟩
   obtain ⟨-, hun, hcell⟩ := R.final c hc hd
   refine ⟨?_, fun y hy => hun y ?_ ?_⟩
-  · rw [hcell A.out rfl]
+  · rw [cell_add32 (hcell A.out rfl)]
     congr 1
-    simp only [Args.phased]
+    simp only [Args.phased, lo32_tfold_add32]
     -- only phase `j + 1` of thread 0 of each block contributes
     rw [tsum_congr (g := fun t => if t.tid.x.toNat = 0 then A.V m₀ t.ctaid.x.toNat A.j 0 else 0)
       fun t _ => ?_]
@@ -639,9 +639,9 @@ theorem reduce_atomic_correct (A : Args) (hpre : A.Pre) (m₀ : Mem) (sh₀ : Di
       rw [A.V_final hpre.1]
       rfl
     · by_cases h0 : t.tid.x.toNat = 0
-      · simp only [h0, true_and, and_true, ↓reduceIte]
+      · simp only [h0, true_and, and_true, ↓reduceIte, lo32_afold_add32, lo32_ite_ext]
         exact accUpTo_single _ _ _ (by omega)
-      · simp only [h0, false_and, and_false, ↓reduceIte]
+      · simp only [h0, false_and, and_false, ↓reduceIte, lo32_afold_add32, lo32_zero]
         exact accUpTo_zero _
   · intro t ht k hk hwk
     simp only [Args.phased] at hk hwk

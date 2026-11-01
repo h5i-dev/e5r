@@ -38,9 +38,11 @@ theorem accUpTo_zero (N : Nat) : accUpTo (fun _ => (0 : BitVec 32)) N = 0 := by
   | zero => rfl
   | succ N ih => simp only [accUpTo, ih]; rfl
 
-/-- An `atom.add` adds its operand. -/
-theorem addsTo_add (b : BitVec 32) : AddsTo (fun old => ext32 (lo32 old + b)) b := by
-  intro w; simp
+/-- An `atom.add.u32` adds its operand. -/
+theorem addsTo_add (b : BitVec 32) : Accum add32 (fun old => ext32 (lo32 old + b)) (ext32 b) := by
+  intro w _
+  show Size.b4.trunc _ = ext32 (lo32 w + lo32 (ext32 b))
+  rw [trunc_b4_ext32, lo32_ext32]
 
 /-- Only one term is non-zero. -/
 theorem accUpTo_single (a : BitVec 32) (K N : Nat) (hK : K < N) :
@@ -169,5 +171,41 @@ theorem tsum_oneD_gid {L : Launch} {G B : BitVec 32} (h1 : L.OneD G B) (v : Nat 
   have := G.isLt
   show accUpTo (fun i => v ((BitVec.ofNat 32 m).toNat * B.toNat + i)) B.toNat = _
   simp; rw [Nat.mod_eq_of_lt (by omega)]
+
+end Ptx
+
+namespace Ptx
+
+/-! ### 32-bit additions as cell contributions -/
+
+theorem lo32_add32_op (x y : Val) : lo32 (add32.op x y) = lo32 x + lo32 y := by
+  rw [add32_op, lo32_ext32]
+
+theorem lo32_afold_add32 (f : Nat → Val) : ∀ N,
+    lo32 (afold add32 f N) = accUpTo (fun k => lo32 (f k)) N
+  | 0 => rfl
+  | N + 1 => by simp only [afold, accUpTo]; rw [lo32_add32_op, lo32_afold_add32 f N]
+
+theorem lo32_tfold_add32 (l : List Tid) (f : Tid → Val) :
+    lo32 (tfold add32 l f) = tsum l fun t => lo32 (f t) := by
+  induction l with
+  | nil => rfl
+  | cons a l ih =>
+    simp only [tfold, tsum, List.map_cons, List.foldr_cons] at ih ⊢
+    rw [lo32_add32_op, ih]
+
+theorem lo32_zero : lo32 (0 : Val) = 0 := rfl
+
+theorem lo32_ite_ext (p : Prop) [Decidable p] (v : BitVec 32) :
+    lo32 (if p then ext32 v else 0) = if p then v else 0 := by
+  split
+  · exact lo32_ext32 v
+  · rfl
+
+/-- The cell clause of `phase_sound` for 32-bit additions, as a sum. -/
+theorem cell_add32 {m m₀ : Mem} {b : Addr} {X : Val}
+    (h : rd m b .b4 = add32.op (rd m₀ b .b4) X) : rd32 m b = rd32 m₀ b + lo32 X := by
+  have := congrArg lo32 h
+  rwa [lo32_rd_b4, lo32_add32_op, lo32_rd_b4] at this
 
 end Ptx

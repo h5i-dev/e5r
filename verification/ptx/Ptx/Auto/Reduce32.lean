@@ -210,17 +210,17 @@ end
 structure Obligations (K : Kernel) (C : Code S) : Prop where
   load : ∀ A : Block.Args S, Pre K A.G.toNat A → ∀ m₀ sh₀, ∀ t ∈ (A.launch A.G.toNat).threads, ∀ s,
     C.Tc A m₀ t 0 s →
-    Run K ((A.launch A.G.toNat).allocs K) ((A.launch A.G.toNat).ctx t) (foot A t 0) (fun _ => False)
+    Run K ((A.launch A.G.toNat).allocs K) ((A.launch A.G.toNat).ctx t) (foot A t 0) (fun _ => False) add32
       ((phased A C m₀ sh₀).J K (A.launch A.G.toNat) t 0) C.N s (mem A m₀ sh₀ t.ctaid 0) (fun _ => 0)
   tree : ∀ A : Block.Args S, Pre K A.G.toNat A → ∀ m₀ sh₀, ∀ t ∈ (A.launch A.G.toNat).threads, ∀ m,
     m + 1 ≤ A.j → ∀ s, C.Tc A m₀ t (m + 1) s →
     Run K ((A.launch A.G.toNat).allocs K) ((A.launch A.G.toNat).ctx t) (foot A t (m + 1))
-      (fun _ => False) ((phased A C m₀ sh₀).J K (A.launch A.G.toNat) t (m + 1)) C.N s
+      (fun _ => False) add32 ((phased A C m₀ sh₀).J K (A.launch A.G.toNat) t (m + 1)) C.N s
       (mem A m₀ sh₀ t.ctaid (m + 1)) (fun _ => 0)
   last : ∀ A : Block.Args S, Pre K A.G.toNat A → ∀ m₀ sh₀, ∀ t ∈ (A.launch A.G.toNat).threads, ∀ s,
     C.Tc A m₀ t (A.j + 1) s →
     Run K ((A.launch A.G.toNat).allocs K) ((A.launch A.G.toNat).ctx t) (foot A t (A.j + 1))
-      (fun _ => False) ((phased A C m₀ sh₀).J K (A.launch A.G.toNat) t (A.j + 1)) C.N s
+      (fun _ => False) add32 ((phased A C m₀ sh₀).J K (A.launch A.G.toNat) t (A.j + 1)) C.N s
       (mem A m₀ sh₀ t.ctaid (A.j + 1)) (fun _ => 0)
 
 /-- What `per_block` claims about kernel `K`: for every launch in `Pre`,
@@ -466,7 +466,7 @@ def phased (C : Code S) (m₀ : Mem) (sh₀ : Dim3 → Mem) : Phased where
   M := mem A m₀ sh₀
   bpc := fun _ k => C.bpc A k
   Cell := fun a => a = A.out
-  Δ := fun t k a => if k = A.j + 1 ∧ t.tid.x.toNat = 0 ∧ a = A.out then V A m₀ t.ctaid.x.toNat A.j 0 else 0
+  Δ := fun t k a => if k = A.j + 1 ∧ t.tid.x.toNat = 0 ∧ a = A.out then ext32 (V A m₀ t.ctaid.x.toNat A.j 0) else 0
 
 theorem foot_zero (t : Tid) : foot A t 0 =
     { r := fun l => l.1 = .global ∧ t.ctaid.x.toNat * A.B.toNat + t.tid.x.toNat < A.n.toNat ∧
@@ -495,17 +495,17 @@ end
 structure Obligations (K : Kernel) (C : Code S) : Prop where
   load : ∀ A : Block.Args S, Pre K 1 A → ∀ m₀ sh₀, ∀ t ∈ (A.launch 1).threads, ∀ s,
     C.Tc A m₀ t 0 s →
-    Run K ((A.launch 1).allocs K) ((A.launch 1).ctx t) (foot A t 0) (fun a => a = A.out)
+    Run K ((A.launch 1).allocs K) ((A.launch 1).ctx t) (foot A t 0) (fun a => a = A.out) add32
       ((phased A C m₀ sh₀).J K (A.launch 1) t 0) C.N s (mem A m₀ sh₀ t.ctaid 0) (fun _ => 0)
   tree : ∀ A : Block.Args S, Pre K 1 A → ∀ m₀ sh₀, ∀ t ∈ (A.launch 1).threads, ∀ m,
     m + 1 ≤ A.j → ∀ s, C.Tc A m₀ t (m + 1) s →
     Run K ((A.launch 1).allocs K) ((A.launch 1).ctx t) (foot A t (m + 1))
-      (fun a => a = A.out) ((phased A C m₀ sh₀).J K (A.launch 1) t (m + 1)) C.N s
+      (fun a => a = A.out) add32 ((phased A C m₀ sh₀).J K (A.launch 1) t (m + 1)) C.N s
       (mem A m₀ sh₀ t.ctaid (m + 1)) (fun _ => 0)
   last : ∀ A : Block.Args S, Pre K 1 A → ∀ m₀ sh₀, ∀ t ∈ (A.launch 1).threads, ∀ s,
     C.Tc A m₀ t (A.j + 1) s →
     Run K ((A.launch 1).allocs K) ((A.launch 1).ctx t) (foot A t (A.j + 1))
-      (fun a => a = A.out) ((phased A C m₀ sh₀).J K (A.launch 1) t (A.j + 1)) C.N s
+      (fun a => a = A.out) add32 ((phased A C m₀ sh₀).J K (A.launch 1) t (A.j + 1)) C.N s
       (mem A m₀ sh₀ t.ctaid (A.j + 1)) (fun _ => 0)
 
 /-- What `atomic` claims about kernel `K`: for every launch in `Pre` (with a
@@ -660,9 +660,9 @@ theorem correct_of {K : Kernel} {W : Nat} (hfit : Fit S K W) (C : Code S) (hO : 
     Phased.exists_done_of R.progress R.bounded, fun c hc hd => ?_⟩
   obtain ⟨-, hun, hcell⟩ := R.final c hc hd
   refine ⟨?_, fun y hy => hun y ?_ ?_⟩
-  · rw [hcell A.out rfl]
+  · rw [cell_add32 (hcell A.out rfl)]
     congr 1
-    simp only [phased]
+    simp only [phased, lo32_tfold_add32]
     -- only phase `j + 1` of thread 0 of each block contributes
     rw [tsum_congr (g := fun t => if t.tid.x.toNat = 0 then V A m₀ t.ctaid.x.toNat A.j 0 else 0)
       fun t _ => ?_]
@@ -672,9 +672,9 @@ theorem correct_of {K : Kernel} {W : Nat} (hfit : Fit S K W) (C : Code S) (hO : 
       rw [V_final A hpre.1]
       rfl
     · by_cases h0 : t.tid.x.toNat = 0
-      · simp only [h0, true_and, and_true, ↓reduceIte]
+      · simp only [h0, true_and, and_true, ↓reduceIte, lo32_afold_add32, lo32_ite_ext]
         exact accUpTo_single _ _ _ (by omega)
-      · simp only [h0, false_and, and_false, ↓reduceIte]
+      · simp only [h0, false_and, and_false, ↓reduceIte, lo32_afold_add32, lo32_zero]
         exact accUpTo_zero _
   · intro t ht k hk hwk
     simp only [phased] at hk hwk

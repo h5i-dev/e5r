@@ -468,7 +468,7 @@ const LAST_ALTS_ATOMIC: &str = "      all_goals (try and_intros)
         | exact elem_zero _
         | (refine ⟨_, addsTo_add _, fun v => ⟨?_, fun _ h => h.elim, trivial⟩⟩
            funext a
-           simp only [Ghost.add, lo32_rd_b4, elem_zero A.out]
+           simp only [Ghost.acc, add32_op, lo32_rd_b4, lo32_ext32, lo32_zero, BitVec.zero_add, elem_zero A.out]
            rw [rd32_cells fsbB (by omega)]
            by_cases ha : a = A.out
            · subst ha; simp [show t.tid.x.toNat = 0 by omega]
@@ -652,6 +652,20 @@ pub fn proof(k: &Kernel, sp: &BlockSpec, sh: &Shape, header: &str) -> String {
     t
 }
 
+/// Kernel and spec in namespace `E5rSpec`, for the supplied-proof route.
+pub fn statement_prelude(k: &Kernel, sp: &BlockSpec, header: &str) -> String {
+    let import = match sp.class {
+        Class::Scan => "Ptx.Auto.Scan32",
+        _ => "Ptx.Auto.Reduce32",
+    };
+    format!(
+        "/-\n{}\n-/\nimport {import}\n\nnamespace E5rSpec\nopen Ptx Ptx.Auto Ptx.Auto.Block\n\n{}{}",
+        header.trim_end(),
+        e5r_ptx::lean::kernel_def(k),
+        spec_text(sp)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -680,18 +694,4 @@ mod tests {
         .unwrap();
         assert!(matches!(parse(&v, "reduce32"), Err(SpecError::Unsupported(_))));
     }
-}
-
-/// Kernel and spec in namespace `E5rSpec`, for the supplied-proof route.
-pub fn statement_prelude(k: &Kernel, sp: &BlockSpec, header: &str) -> String {
-    let import = match sp.class {
-        Class::Scan => "Ptx.Auto.Scan32",
-        _ => "Ptx.Auto.Reduce32",
-    };
-    format!(
-        "/-\n{}\n-/\nimport {import}\n\nnamespace E5rSpec\nopen Ptx Ptx.Auto Ptx.Auto.Block\n\n{}{}",
-        header.trim_end(),
-        e5r_ptx::lean::kernel_def(k),
-        spec_text(sp)
-    )
 }

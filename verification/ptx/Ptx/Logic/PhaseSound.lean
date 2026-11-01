@@ -41,6 +41,7 @@ of the CTA is at the end of its derivation; the next phase's derivation is
 moved from `M b (k+1)` onto the actual memory.
 -/
 import Ptx.Logic.Phases
+import Ptx.Logic.CellAlgs
 import Ptx.Logic.Launch1D
 
 namespace Ptx
@@ -157,6 +158,8 @@ structure Phased where
   M : Dim3 → Nat → Heap
   bpc : Dim3 → Nat → Nat
   Cell : Addr → Prop
+  /-- The cells' algebra (the atomic they are combined with). -/
+  Alg : CellAlg := add32
   Δ : Tid → Nat → Ghost
 
 namespace Phased
@@ -182,8 +185,8 @@ structure Ok (r0 : Tid → String → Val) (p0 : Tid → String → Bool) (m0 : 
   init : ∀ t ∈ L.threads, S.T t 0 ⟨0, r0 t, p0 t⟩
   initMem : ∀ b x, S.Tch L b x → (S.M b 0).get x = (Heap.mk m0 (sh0 b)).get x
   phase : ∀ t ∈ L.threads, ∀ k < S.P t.ctaid, ∀ s, S.T t k s →
-    Run K (L.allocs K) (L.ctx t) (S.F t k) S.Cell (S.J K L t k) (S.N t k) s (S.M t.ctaid k)
-      (fun _ => 0)
+    Run K (L.allocs K) (L.ctx t) (S.F t k) S.Cell S.Alg (S.J K L t k) (S.N t k) s (S.M t.ctaid k)
+      (fun _ => S.Alg.e)
   compose : ∀ b k x, (∃ t ∈ L.threads, t.ctaid = b) → k < S.P b →
     (∀ t ∈ L.threads, t.ctaid = b → ¬ (S.F t k).w x) → (S.M b (k + 1)).get x = (S.M b k).get x
   sameCta : ∀ t ∈ L.threads, ∀ u ∈ L.threads, t ≠ u → t.ctaid = u.ctaid → ∀ k < S.P t.ctaid, ∀ x,
@@ -191,8 +194,9 @@ structure Ok (r0 : Tid → String → Val) (p0 : Tid → String → Bool) (m0 : 
   crossCta : ∀ t ∈ L.threads, ∀ u ∈ L.threads, t.ctaid ≠ u.ctaid → ∀ k < S.P t.ctaid,
     ∀ j < S.P u.ctaid, ∀ a,
     (S.F t k).w (.global, a) → ¬ (S.F u j).touches (.global, a)
-  cellsOut : ∀ t ∈ L.threads, ∀ k, CellsOut (S.F t k) S.Cell
-  cellsDisj : ∀ a b, S.Cell a → S.Cell b → a ≠ b → ∀ y, covers a 4 y → ¬ covers b 4 y
+  cellsOut : ∀ t ∈ L.threads, ∀ k, CellsOut (S.F t k) S.Cell S.Alg.sz
+  cellsDisj : ∀ a b, S.Cell a → S.Cell b → a ≠ b → ∀ y, covers a S.Alg.sz.bytes y →
+    ¬ covers b S.Alg.sz.bytes y
 
 /-- What `phase_sound` proves about every execution from `c₀`. -/
 structure Result (c₀ : Cfg) (m0 : Mem) : Prop where
@@ -204,9 +208,9 @@ structure Result (c₀ : Cfg) (m0 : Mem) : Prop where
     (∀ t ∈ L.threads, ∀ k < S.P t.ctaid, ∀ a, (S.F t k).w (.global, a) →
       c.mem a = (S.M t.ctaid (S.P t.ctaid)).g a) ∧
     (∀ a, (∀ t ∈ L.threads, ∀ k < S.P t.ctaid, ¬ (S.F t k).w (.global, a)) →
-      (∀ b, S.Cell b → ¬ covers b 4 a) → c.mem a = m0 a) ∧
-    (∀ b, S.Cell b → rd32 c.mem b =
-      rd32 m0 b + tsum L.threads fun t => accUpTo (fun k => S.Δ t k b) (S.P t.ctaid))
+      (∀ b, S.Cell b → ¬ covers b S.Alg.sz.bytes a) → c.mem a = m0 a) ∧
+    (∀ b, S.Cell b → rd c.mem b S.Alg.sz = S.Alg.op (rd m0 b S.Alg.sz)
+      (tfold S.Alg L.threads fun t => afold S.Alg (fun k => S.Δ t k b) (S.P t.ctaid)))
 
 /-- The steps still allowed after phase `p` of thread `t`. -/
 def fut (t : Tid) (p : Nat) : Nat :=
@@ -225,14 +229,14 @@ theorem fut_succ {t : Tid} {p : Nat} (h : p + 1 < S.P t.ctaid) :
 ghosts `d`. -/
 structure Inv (m0 : Mem) (c : Cfg) (n : Tid → Nat) (d : Tid → Ghost) : Prop where
   ph : ∀ t ∈ L.threads, c.ph t.ctaid < S.P t.ctaid
-  run : ∀ t ∈ L.threads, Run K (L.allocs K) (L.ctx t) (S.F t (c.ph t.ctaid)) S.Cell
+  run : ∀ t ∈ L.threads, Run K (L.allocs K) (L.ctx t) (S.F t (c.ph t.ctaid)) S.Cell S.Alg
     (S.J K L t (c.ph t.ctaid)) (n t) (c.ts t) (c.heap t.ctaid) (d t)
   mem : ∀ b x, S.Tch L b x → (∀ t ∈ L.threads, t.ctaid = b → ¬ (S.F t (c.ph b)).w x) →
     (c.heap b).get x = (S.M b (c.ph b)).get x
   untouched : ∀ a, (∀ t ∈ L.threads, ∀ k < S.P t.ctaid, ¬ (S.F t k).w (.global, a)) →
-    (∀ b, S.Cell b → ¬ covers b 4 a) → c.mem a = m0 a
-  cells : ∀ b, S.Cell b → rd32 c.mem b =
-    rd32 m0 b + tsum L.threads fun t => accUpTo (fun k => S.Δ t k b) (c.ph t.ctaid) + d t b
+    (∀ b, S.Cell b → ¬ covers b S.Alg.sz.bytes a) → c.mem a = m0 a
+  cells : ∀ b, S.Cell b → rd c.mem b S.Alg.sz = S.Alg.op (rd m0 b S.Alg.sz)
+    (tfold S.Alg L.threads fun t => S.Alg.op (afold S.Alg (fun k => S.Δ t k b) (c.ph t.ctaid)) (d t b))
 
 def μ (c : Cfg) (n : Tid → Nat) : Nat := (L.threads.map fun t => n t + S.fut t (c.ph t.ctaid)).sum
 
@@ -257,29 +261,29 @@ theorem J_frame {t k s h h' d} (hj : S.J K L t k s h d) (hg : Heap.Agree (S.F t 
   exact ⟨h1, fun x hx => by rw [← hg x (.inr hx)]; exact h2 x hx, h3⟩
 
 theorem frameJ {t k n s h h' d}
-    (hr : Run K (L.allocs K) (L.ctx t) (S.F t k) S.Cell (S.J K L t k) n s h d)
+    (hr : Run K (L.allocs K) (L.ctx t) (S.F t k) S.Cell S.Alg (S.J K L t k) n s h d)
     (hg : Heap.Agree (S.F t k).touches h h') :
-    Run K (L.allocs K) (L.ctx t) (S.F t k) S.Cell (S.J K L t k) n s h' d :=
+    Run K (L.allocs K) (L.ctx t) (S.F t k) S.Cell S.Alg (S.J K L t k) n s h' d :=
   Run.frame (J := S.J K L t k) (fun _ _ _ _ hj hg => J_frame hj hg) hr hg
 
 theorem stepJ {t k n s h d s' h'}
-    (hr : Run K (L.allocs K) (L.ctx t) (S.F t k) S.Cell (S.J K L t k) n s h d)
-    (hco : CellsOut (S.F t k) S.Cell) (hs : tstep K (L.allocs K) (L.ctx t) s h = .ok s' h') :
-    ∃ n' < n, ∃ d', Run K (L.allocs K) (L.ctx t) (S.F t k) S.Cell (S.J K L t k) n' s' h' d' ∧
-      Effect (S.F t k) S.Cell h d h' d' :=
+    (hr : Run K (L.allocs K) (L.ctx t) (S.F t k) S.Cell S.Alg (S.J K L t k) n s h d)
+    (hco : CellsOut (S.F t k) S.Cell S.Alg.sz) (hs : tstep K (L.allocs K) (L.ctx t) s h = .ok s' h') :
+    ∃ n' < n, ∃ d', Run K (L.allocs K) (L.ctx t) (S.F t k) S.Cell S.Alg (S.J K L t k) n' s' h' d' ∧
+      Effect (S.F t k) S.Cell S.Alg h d h' d' :=
   Run.step (J := S.J K L t k) (fun _ _ _ hj => J_end hj) (fun _ _ _ _ hj hg => J_frame hj hg) hco hr hs
 
 theorem notFaultJ {t k n s h d}
-    (hr : Run K (L.allocs K) (L.ctx t) (S.F t k) S.Cell (S.J K L t k) n s h d) :
+    (hr : Run K (L.allocs K) (L.ctx t) (S.F t k) S.Cell S.Alg (S.J K L t k) n s h d) :
     tstep K (L.allocs K) (L.ctx t) s h ≠ .fault :=
   Run.not_fault (J := S.J K L t k) (fun _ _ _ hj => J_end hj) hr
 
 theorem pendJ {t k n s h d}
-    (hr : Run K (L.allocs K) (L.ctx t) (S.F t k) S.Cell (S.J K L t k) n s h d) {x : Ptx.Acc}
+    (hr : Run K (L.allocs K) (L.ctx t) (S.F t k) S.Cell S.Alg (S.J K L t k) n s h d) {x : Ptx.Acc}
     (hx : (action K (L.ctx t) s).acc = some x) :
     (x.kind = .read ∧ ∀ b, covers x.a x.sz.bytes b → (S.F t k).touches (x.sp, b)) ∨
     (x.kind = .write ∧ ∀ b, covers x.a x.sz.bytes b → (S.F t k).w (x.sp, b)) ∨
-    (x.kind = .atomic ∧ x.sp = .global ∧ x.sz = .b4 ∧ S.Cell x.a) :=
+    (x.kind = .atomic ∧ x.sp = .global ∧ x.sz = S.Alg.sz ∧ S.Cell x.a) :=
   Run.pending (J := S.J K L t k) hr (fun _ _ _ hj => J_end hj) hx
 
 theorem J_wait {t k s h d} (hj : S.J K L t k s h d) (hb : action K (L.ctx t) s = .bar) :
@@ -299,7 +303,7 @@ theorem J_done {t k s h d} (hj : S.J K L t k s h d) (hb : action K (L.ctx t) s =
 variable (hS : S.Ok K L r0 p0 m0 sh0)
 include hS
 
-theorem cellsOut' {a y} (ha : S.Cell a) (hy : covers a 4 y) :
+theorem cellsOut' {a y} (ha : S.Cell a) (hy : covers a S.Alg.sz.bytes y) :
     ∀ t ∈ L.threads, ∀ k, ¬ (S.F t k).touches (.global, y) :=
   fun t ht k => hS.cellsOut t ht k a ha y hy
 
@@ -324,8 +328,8 @@ theorem agree_after {c : Cfg} {n d} (hI : S.Inv K L m0 c n d) {b : Dim3}
 actual memory. -/
 theorem next_phase {c : Cfg} {n d} (hI : S.Inv K L m0 c n d) {t : Tid} (ht : t ∈ L.threads)
     (hall : ∀ u ∈ L.threads, u.ctaid = t.ctaid → c.res K L u = .wait) :
-    Run K (L.allocs K) (L.ctx t) (S.F t (c.ph t.ctaid + 1)) S.Cell (S.J K L t (c.ph t.ctaid + 1))
-      (S.N t (c.ph t.ctaid + 1)) (c.ts t).skip (c.heap t.ctaid) (fun _ => 0) ∧
+    Run K (L.allocs K) (L.ctx t) (S.F t (c.ph t.ctaid + 1)) S.Cell S.Alg (S.J K L t (c.ph t.ctaid + 1))
+      (S.N t (c.ph t.ctaid + 1)) (c.ts t).skip (c.heap t.ctaid) (fun _ => S.Alg.e) ∧
     c.ph t.ctaid + 1 < S.P t.ctaid ∧ (c.ts t).pc = S.bpc t.ctaid (c.ph t.ctaid) ∧
     d t = S.Δ t (c.ph t.ctaid) := by
   have hb := action_of_wait (hall t ht rfl)
@@ -358,7 +362,7 @@ theorem wait_pc {c : Cfg} {n d} (hI : S.Inv K L m0 c n d) {t u : Tid} (ht : t �
   rw [(J_wait ((hI.run t ht).stop_of (.inl hb)) hb).2.1,
     (J_wait ((hI.run u hu).stop_of (.inl hb')) hb').2.1, hc]
 
-theorem inv_init : S.Inv K L m0 (Cfg.init r0 p0 m0 sh0) (fun t => S.N t 0) (fun _ _ => 0) := by
+theorem inv_init : S.Inv K L m0 (Cfg.init r0 p0 m0 sh0) (fun t => S.N t 0) (fun _ _ => S.Alg.e) := by
   refine ⟨fun t ht => hS.pos t ht, ?_, ?_, fun _ _ _ => rfl, ?_⟩
   · intro t ht
     refine frameJ (hS.phase t ht 0 (hS.pos t ht) _ (hS.init t ht)) ?_
@@ -366,8 +370,10 @@ theorem inv_init : S.Inv K L m0 (Cfg.init r0 p0 m0 sh0) (fun t => S.N t 0) (fun 
     exact hS.initMem _ x ⟨t, ht, rfl, 0, hS.pos t ht, hx⟩
   · intro b x hx _; exact (hS.initMem b x hx).symm
   · intro b _
-    show rd32 m0 b = rd32 m0 b + tsum L.threads fun t => accUpTo _ 0 + 0
-    rw [tsum_congr (g := fun _ => 0) (fun t _ => by simp [accUpTo]), tsum_zero]; simp
+    show rd m0 b S.Alg.sz = S.Alg.op (rd m0 b S.Alg.sz) (tfold S.Alg L.threads fun t =>
+      S.Alg.op (afold S.Alg _ 0) S.Alg.e)
+    rw [tfold_congr (g := fun _ => S.Alg.e) (fun t _ => by simp only [afold]; exact op_e_e _),
+      tfold_e, S.Alg.unit _ (trunc_rd _ _ _)]
 
 omit hS in
 /-- What a store or an atomic of thread `t` leaves unchanged in CTA `b'`'s
@@ -407,13 +413,14 @@ changed (`Chg`): bytes `t` may write in this phase (shared ones only in its
 own CTA), or accumulator cells. -/
 theorem inv_of_change {c : Cfg} {n d} (hI : S.Inv K L m0 c n d) {t : Tid} (ht : t ∈ L.threads)
     {s' : TState} {h' : Heap} {m : Nat} {d₁ : Ghost} (Chg : Dim3 → Loc → Prop)
-    (hr : Run K (L.allocs K) (L.ctx t) (S.F t (c.ph t.ctaid)) S.Cell (S.J K L t (c.ph t.ctaid)) m
+    (hr : Run K (L.allocs K) (L.ctx t) (S.F t (c.ph t.ctaid)) S.Cell S.Alg (S.J K L t (c.ph t.ctaid)) m
       s' h' d₁)
     (hkeep : ∀ b' x, ¬ Chg b' x → ((c.write t s' h').heap b').get x = (c.heap b').get x)
     (hchg : ∀ b' x, Chg b' x → ((S.F t (c.ph t.ctaid)).w x ∧ (x.1 = .shared → b' = t.ctaid)) ∨
-      (x.1 = .global ∧ ∃ a, S.Cell a ∧ covers a 4 x.2))
-    (hcells : ∀ b, S.Cell b → rd32 (c.write t s' h').mem b = rd32 m0 b + tsum L.threads fun u =>
-      accUpTo (fun k => S.Δ u k b) (c.ph u.ctaid) + (if u = t then d₁ else d u) b) :
+      (x.1 = .global ∧ ∃ a, S.Cell a ∧ covers a S.Alg.sz.bytes x.2))
+    (hcells : ∀ b, S.Cell b → rd (c.write t s' h').mem b S.Alg.sz = S.Alg.op (rd m0 b S.Alg.sz)
+      (tfold S.Alg L.threads fun u =>
+        S.Alg.op (afold S.Alg (fun k => S.Δ u k b) (c.ph u.ctaid)) ((if u = t then d₁ else d u) b))) :
     S.Inv K L m0 (c.write t s' h') (fun u => if u = t then m else n u)
       (fun u => if u = t then d₁ else d u) := by
   classical
@@ -469,10 +476,10 @@ theorem inv_thread {c : Cfg} {n d} (hI : S.Inv K L m0 c n d) {t : Tid} (ht : t �
   obtain ⟨m, hm, d₁, hr, heff⟩ := stepJ (hI.run t ht) (hS.cellsOut t ht _) hres
   refine ⟨fun u => if u = t then m else n u, fun u => if u = t then d₁ else d u, ?_,
     by simp [hm], fun u hu => by simp [hu]⟩
-  have same : ∀ b, (tsum L.threads fun u => accUpTo (fun k => S.Δ u k b) (c.ph u.ctaid) +
-      (if u = t then d t else d u) b) =
-      tsum L.threads fun u => accUpTo (fun k => S.Δ u k b) (c.ph u.ctaid) + d u b :=
-    fun b => tsum_congr fun u _ => by by_cases h : u = t <;> simp [h]
+  have same : ∀ b, (tfold S.Alg L.threads fun u => S.Alg.op (afold S.Alg (fun k => S.Δ u k b) (c.ph u.ctaid))
+      ((if u = t then d t else d u) b)) =
+      tfold S.Alg L.threads fun u => S.Alg.op (afold S.Alg (fun k => S.Δ u k b) (c.ph u.ctaid)) (d u b) :=
+    fun b => tfold_congr fun u _ => by by_cases h : u = t <;> simp [h]
   cases heff with
   | none =>
     refine inv_of_change hS hI ht (fun _ _ => False) hr (fun b' x _ => by rw [write_none]) nofun ?_
@@ -486,31 +493,31 @@ theorem inv_thread {c : Cfg} {n d} (hI : S.Inv K L m0 c n d) {t : Tid} (ht : t �
     · rintro b' ⟨sp', y⟩ ⟨rfl, hsh, hcov⟩; exact .inl ⟨hf y hcov, hsh⟩
     · intro b hb
       rw [same b, ← hI.cells b hb]
-      apply rd32_congr; intro y hy
+      apply rd_congr; intro y hy
       have := hkeep t.ctaid (.global, y) fun ⟨hsp, _, hcov⟩ => by
         subst hsp; exact hS.cellsOut t ht _ b hb y hy (.inr (hf y hcov))
       exact this
   | @atom a g δ hcell hval =>
     have hkeep : ∀ b' x, ¬ (x.1 = .global ∧ (Sp.global = .shared → b' = t.ctaid) ∧
-        covers a Size.b4.bytes x.2) →
-        ((c.write t s' ((c.heap t.ctaid).set .global (wr (c.heap t.ctaid).g a .b4 g))).heap b').get x =
+        covers a S.Alg.sz.bytes x.2) →
+        ((c.write t s' ((c.heap t.ctaid).set .global (wr (c.heap t.ctaid).g a S.Alg.sz g))).heap b').get x =
           (c.heap b').get x := fun b' x hx => write_get (sp := .global) hx
     refine inv_of_change hS hI ht _ hr hkeep ?_ ?_
     · rintro b' ⟨sp', y⟩ ⟨rfl, -, hcov⟩; exact .inr ⟨rfl, a, hcell, hcov⟩
     · intro b hb
-      show rd32 (wr c.mem a .b4 g) b = _
+      show rd (wr c.mem a S.Alg.sz g) b S.Alg.sz = _
       by_cases hab : b = a
       · subst hab
-        rw [rd32_wr_same, hval]
-        show rd32 c.mem b + δ = _
-        rw [hI.cells b hb, BitVec.add_assoc]
+        rw [rd_wr_trunc, hval]
+        show S.Alg.op (rd c.mem b S.Alg.sz) δ = _
+        rw [hI.cells b hb, S.Alg.assoc]
         congr 1
-        refine (tsum_update (threads_nodup L) ht (fun u _ hut => by simp [hut]) ?_).symm
-        simp [Ghost.add]; rw [BitVec.add_assoc]
-      · rw [rd32_congr (m₂ := c.mem) fun y hy => wr_outside (hS.cellsDisj b a hb hcell hab y hy ∘ id),
+        refine (tfold_update (threads_nodup L) ht (fun u _ hut => by simp [hut]) ?_).symm
+        simp [Ghost.acc]; rw [S.Alg.assoc]
+      · rw [rd_congr (m₂ := c.mem) fun y hy => wr_outside (hS.cellsDisj b a hb hcell hab y hy ∘ id),
           hI.cells b hb]
         congr 1
-        exact tsum_congr fun u _ => by by_cases hut : u = t <;> simp [hut, Ghost.add, hab]
+        exact tfold_congr fun u _ => by by_cases hut : u = t <;> simp [hut, Ghost.acc, hab]
 
 theorem inv_bar {c : Cfg} {n d} (hI : S.Inv K L m0 c n d) {b : Dim3} (hb : BarReady K L c b) :
     ∃ n' d', S.Inv K L m0 (c.release b) n' d' ∧ S.μ L (c.release b) n' + 1 ≤ S.μ L c n := by
@@ -524,7 +531,7 @@ theorem inv_bar {c : Cfg} {n d} (hI : S.Inv K L m0 c n d) {b : Dim3} (hb : BarRe
   have hts : ∀ u, (c.release b).ts u = if u.ctaid = b then (c.ts u).skip else c.ts u := fun _ => rfl
   have hheap : ∀ b', (c.release b).heap b' = c.heap b' := fun _ => rfl
   refine ⟨fun u => if u.ctaid = b then S.N u (c.ph b + 1) else n u,
-    fun u => if u.ctaid = b then (fun _ => 0) else d u, ⟨?_, ?_, ?_, ?_, ?_⟩, ?_⟩
+    fun u => if u.ctaid = b then (fun _ => S.Alg.e) else d u, ⟨?_, ?_, ?_, ?_, ?_⟩, ?_⟩
   · intro u hu
     rw [hph]; split
     · next h => have := (np u hu h).2.1; rw [h] at this ⊢; exact this
@@ -549,11 +556,11 @@ theorem inv_bar {c : Cfg} {n d} (hI : S.Inv K L m0 c n d) {b : Dim3} (hb : BarRe
   · intro cell hc
     rw [show (c.release b).mem = c.mem from rfl, hI.cells cell hc]
     congr 1
-    refine tsum_congr fun u hu => ?_
+    refine tfold_congr fun u hu => ?_
     rw [hph]
     by_cases h : u.ctaid = b
-    · simp only [h, ↓reduceIte, accUpTo]
-      rw [(np u hu h).2.2.2, h]; simp
+    · simp only [h, ↓reduceIte, afold]
+      rw [(np u hu h).2.2.2, h, S.Alg.unit _ (S.Alg.closed _ _)]
     · simp [h]
   · unfold μ
     apply sum_lt_of_dec ht₀
@@ -699,12 +706,12 @@ theorem phase_sound : S.Result K L (Cfg.init r0 p0 m0 sh0) m0 := by
       · rw [hk] at h; cases h
       · exact h byte hby
       · rw [hk] at h; cases h
-    have cx : x.kind = .atomic → x.sp = .global ∧ x.sz = .b4 ∧ S.Cell x.a := fun hk => by
+    have cx : x.kind = .atomic → x.sp = .global ∧ x.sz = S.Alg.sz ∧ S.Cell x.a := fun hk => by
       rcases px with ⟨h, -⟩ | ⟨h, -⟩ | ⟨-, h⟩
       · rw [hk] at h; cases h
       · rw [hk] at h; cases h
       · exact h
-    have cy : y.kind = .atomic → y.sp = .global ∧ y.sz = .b4 ∧ S.Cell y.a := fun hk => by
+    have cy : y.kind = .atomic → y.sp = .global ∧ y.sz = S.Alg.sz ∧ S.Cell y.a := fun hk => by
       rcases py with ⟨h, -⟩ | ⟨h, -⟩ | ⟨-, h⟩
       · rw [hk] at h; cases h
       · rw [hk] at h; cases h
@@ -751,7 +758,7 @@ theorem phase_sound : S.Result K L (Cfg.init r0 p0 m0 sh0) m0 := by
     · intro cell hcell
       rw [hI.cells cell hcell]
       congr 1
-      refine tsum_congr fun t ht => ?_
+      refine tfold_congr fun t ht => ?_
       rw [← hlast t ht, (hJ t ht).1]; rfl
 
 end Phased

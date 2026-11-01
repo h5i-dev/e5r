@@ -176,22 +176,22 @@ end
 structure Obligations (K : Kernel) (C : Code S) : Prop where
   load : ∀ A : Block.Args S, Pre K A → ∀ m₀ sh₀, ∀ t ∈ (A.launch A.n.toNat).threads, ∀ s,
     C.Tc A m₀ t 0 s →
-    Run K ((A.launch A.n.toNat).allocs K) ((A.launch A.n.toNat).ctx t) (foot A t 0) (fun _ => False)
+    Run K ((A.launch A.n.toNat).allocs K) ((A.launch A.n.toNat).ctx t) (foot A t 0) (fun _ => False) add32
       ((phased A C m₀ sh₀).J K (A.launch A.n.toNat) t 0) C.N s (mem A m₀ sh₀ t.ctaid 0) (fun _ => 0)
   read : ∀ A : Block.Args S, Pre K A → ∀ m₀ sh₀, ∀ t ∈ (A.launch A.n.toNat).threads, ∀ i < A.j, ∀ s,
     C.Tc A m₀ t (2 * i + 1) s →
     Run K ((A.launch A.n.toNat).allocs K) ((A.launch A.n.toNat).ctx t) (foot A t (2 * i + 1))
-      (fun _ => False) ((phased A C m₀ sh₀).J K (A.launch A.n.toNat) t (2 * i + 1)) C.N s
+      (fun _ => False) add32 ((phased A C m₀ sh₀).J K (A.launch A.n.toNat) t (2 * i + 1)) C.N s
       (mem A m₀ sh₀ t.ctaid (2 * i + 1)) (fun _ => 0)
   add : ∀ A : Block.Args S, Pre K A → ∀ m₀ sh₀, ∀ t ∈ (A.launch A.n.toNat).threads, ∀ i < A.j, ∀ s,
     C.Tc A m₀ t (2 * i + 2) s →
     Run K ((A.launch A.n.toNat).allocs K) ((A.launch A.n.toNat).ctx t) (foot A t (2 * i + 2))
-      (fun _ => False) ((phased A C m₀ sh₀).J K (A.launch A.n.toNat) t (2 * i + 2)) C.N s
+      (fun _ => False) add32 ((phased A C m₀ sh₀).J K (A.launch A.n.toNat) t (2 * i + 2)) C.N s
       (mem A m₀ sh₀ t.ctaid (2 * i + 2)) (fun _ => 0)
   store : ∀ A : Block.Args S, Pre K A → ∀ m₀ sh₀, ∀ t ∈ (A.launch A.n.toNat).threads, ∀ s,
     C.Tc A m₀ t (2 * A.j + 1) s →
     Run K ((A.launch A.n.toNat).allocs K) ((A.launch A.n.toNat).ctx t) (foot A t (2 * A.j + 1))
-      (fun _ => False) ((phased A C m₀ sh₀).J K (A.launch A.n.toNat) t (2 * A.j + 1)) C.N s
+      (fun _ => False) add32 ((phased A C m₀ sh₀).J K (A.launch A.n.toNat) t (2 * A.j + 1)) C.N s
       (mem A m₀ sh₀ t.ctaid (2 * A.j + 1)) (fun _ => 0)
 
 /-- What `scan32` claims about kernel `K`: for every launch in `Pre`, under

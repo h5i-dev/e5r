@@ -5,11 +5,13 @@ shared memory, `bar.sync` and atomics.
 `Run … F J n s h d` is an inductive derivation that thread state `s`, seeing
 heap `h` (global memory and its CTA's shared memory), reaches a state
 satisfying `J` in at most `n` steps, with every access legal and inside the
-footprint `F`: loads in `F.r ∪ F.w`, stores in `F.w`, atomics only as 32-bit
-additions to the accumulator cells `Cell` (global, 4-byte). The thread's own
-derivation does not see what an atomic returns (it must hold for every
-value) nor the cell it adds to; `d` records, as a ghost, how much it has
-added to each cell so far. `J` is where the phase ends: a `bar.sync` or
+footprint `F`: loads in `F.r ∪ F.w`, stores in `F.w`, atomics only on the
+accumulator cells `Cell` (global), and only as an operation of the cells'
+algebra `A`: a commutative, associative operation with a unit on values of
+one access size (`add`, `min`, `max`, `and`, `or`, `xor` at 32 or 64 bits,
+Ptx/Logic/CellAlgs.lean). The thread's own derivation does not see what an
+atomic returns (it must hold for every value) nor the cell it combines into;
+`d` records, as a ghost, what it has combined into each cell so far. `J` is where the phase ends: a `bar.sync` or
 `ret`. `Run` is what the phase theorem (Ptx/Logic/PhaseSound.lean) consumes.
 
 `Run.frame`: a derivation stays valid when memory outside the footprint
@@ -36,13 +38,51 @@ structure Foot where
 
 def Foot.touches (F : Foot) (x : Loc) : Prop := F.r x ∨ F.w x
 
-/-- Contributions to the accumulator cells, by cell address. -/
-abbrev Ghost := Addr → BitVec 32
+/-- The value a load of `sz` bytes can return: the low `sz` bytes. -/
+def Size.trunc : Size → Val → Val
+  | .b4, v => (v.setWidth 32).setWidth 64
+  | .b8, v => v
 
-def Ghost.add (d : Ghost) (a : Addr) (δ : BitVec 32) : Ghost := fun x => if x = a then d x + δ else d x
+theorem rd_wr_trunc (m : Mem) (a : Addr) (sz : Size) (v : Val) :
+    rd (wr m a sz v) a sz = sz.trunc v := by
+  cases sz <;> simp [rd_wr_same, Size.trunc]
+
+theorem trunc_rd (m : Mem) (a : Addr) (sz : Size) : sz.trunc (rd m a sz) = rd m a sz := by
+  cases sz
+  · simp only [Size.trunc, rd]
+    apply BitVec.eq_of_toNat_eq
+    simp only [BitVec.toNat_setWidth]
+    have := (rd32 m a).isLt
+    rw [Nat.mod_eq_of_lt (a := (rd32 m a).toNat) (by omega), Nat.mod_eq_of_lt (by omega),
+      Nat.mod_eq_of_lt (by omega)]
+  · rfl
+
+/-- The algebra of the accumulator cells: the access size, and a
+commutative, associative operation with a unit on the values of that size.
+An atomic on a cell must combine the old value with some `δ` by `op`. -/
+structure CellAlg where
+  sz : Size
+  op : Val → Val → Val
+  e : Val
+  comm : ∀ x y, op x y = op y x
+  assoc : ∀ x y z, op (op x y) z = op x (op y z)
+  unit : ∀ x, sz.trunc x = x → op x e = x
+  closed : ∀ x y, sz.trunc (op x y) = op x y
+  e_ok : sz.trunc e = e
+
+/-- Contributions to the accumulator cells, by cell address. -/
+abbrev Ghost := Addr → Val
+
+/-- Combine `δ` into the contribution to cell `a`. -/
+def Ghost.acc (A : CellAlg) (d : Ghost) (a : Addr) (δ : Val) : Ghost :=
+  fun x => if x = a then A.op (d x) δ else d x
+
+/-- `g` combines the old value of a cell with `δ`. -/
+def Accum (A : CellAlg) (g : Val → Val) (δ : Val) : Prop :=
+  ∀ w, A.sz.trunc w = w → A.sz.trunc (g w) = A.op w δ
 
 section
-variable (K : Kernel) (al : Sp → List Region) (c : Ctx) (F : Foot) (Cell : Addr → Prop)
+variable (K : Kernel) (al : Sp → List Region) (c : Ctx) (F : Foot) (Cell : Addr → Prop) (A : CellAlg)
 
 inductive Run (J : TState → Heap → Ghost → Prop) : Nat → TState → Heap → Ghost → Prop
   | stop {n s h d} : J s h d → Run J n s h d
@@ -53,19 +93,18 @@ inductive Run (J : TState → Heap → Ghost → Prop) : Nat → TState → Heap
   | store {n s h d sp a sz v s'} : action K c s = .store sp a sz v s' → accessOk (al sp) a sz = true →
       (∀ x, covers a sz.bytes x → F.w (sp, x)) →
       Run J n s' (h.set sp (wr (h.at sp) a sz v)) d → Run J (n + 1) s h d
-  | atom {n s h d a f k} (δ : BitVec 32) : action K c s = .atom .global a .b4 f k →
-      accessOk (al .global) a .b4 = true → Cell a →
-      (∀ w : BitVec 32, lo32 (f (ext32 w)) = w + δ) →
-      (∀ v, Run J n (k v) h (d.add a δ)) → Run J (n + 1) s h d
+  | atom {n s h d a f k} (δ : Val) : action K c s = .atom .global a A.sz f k →
+      accessOk (al .global) a A.sz = true → Cell a → Accum A f δ →
+      (∀ v, Run J n (k v) h (d.acc A a δ)) → Run J (n + 1) s h d
 
 end
 
 section
 variable {K : Kernel} {al : Sp → List Region} {c : Ctx} {F : Foot} {Cell : Addr → Prop}
-  {J : TState → Heap → Ghost → Prop}
+  {A : CellAlg} {J : TState → Heap → Ghost → Prop}
 
-theorem Run.mono_index {n m s h d} (hr : Run K al c F Cell J n s h d) (hle : n ≤ m) :
-    Run K al c F Cell J m s h d := by
+theorem Run.mono_index {n m s h d} (hr : Run K al c F Cell A J n s h d) (hle : n ≤ m) :
+    Run K al c F Cell A J m s h d := by
   induction hr generalizing m with
   | stop hj => exact .stop hj
   | next ha _ ih =>
@@ -105,8 +144,8 @@ theorem Heap.Agree.wr {P : Loc → Prop} {h h' : Heap} (hg : Heap.Agree P h h') 
 /-- A derivation holds of every heap that agrees with its own on the
 footprint, provided the postcondition does too. -/
 theorem Run.frame (hJ : ∀ s h h' d, J s h d → Heap.Agree F.touches h h' → J s h' d) :
-    ∀ {n s h d}, Run K al c F Cell J n s h d → ∀ {h'}, Heap.Agree F.touches h h' →
-      Run K al c F Cell J n s h' d := by
+    ∀ {n s h d}, Run K al c F Cell A J n s h d → ∀ {h'}, Heap.Agree F.touches h h' →
+      Run K al c F Cell A J n s h' d := by
   intro n s h d hr
   induction hr with
   | stop hj => intro h' hg; exact .stop (hJ _ _ _ _ hj hg)
@@ -123,7 +162,7 @@ theorem Run.frame (hJ : ∀ s h h' d, J s h d → Heap.Agree F.touches h h' → 
 /-- A derivation never faults: the next step of a thread it covers is legal,
 or the thread waits or has finished in a state satisfying `J`. -/
 theorem Run.not_fault (hJ : ∀ s h d, J s h d → action K c s = .bar ∨ action K c s = .done)
-    {n s h d} (hr : Run K al c F Cell J n s h d) : tstep K al c s h ≠ .fault := by
+    {n s h d} (hr : Run K al c F Cell A J n s h d) : tstep K al c s h ≠ .fault := by
   cases hr with
   | stop hj => rcases hJ _ _ _ hj with h | h <;> simp [tstep, h]
   | next ha => simp [tstep, ha]
@@ -132,7 +171,7 @@ theorem Run.not_fault (hJ : ∀ s h d, J s h d → action K c s = .bar ∨ actio
   | atom δ ha hok => simp [tstep, ha, hok]
 
 /-- A thread that waits or has finished is at the end of its derivation. -/
-theorem Run.stop_of {n s h d} (hr : Run K al c F Cell J n s h d)
+theorem Run.stop_of {n s h d} (hr : Run K al c F Cell A J n s h d)
     (ha : action K c s = .bar ∨ action K c s = .done) : J s h d := by
   cases hr with
   | stop hj => exact hj
@@ -148,12 +187,12 @@ theorem action_of_halted {s h} (hw : tstep K al c s h = .halted) : action K c s 
   unfold tstep at hw; split at hw <;> (try split at hw) <;> simp_all
 
 /-- The access a derivation is about to make is inside its footprint. -/
-theorem Run.pending {n s h d} (hr : Run K al c F Cell J n s h d)
+theorem Run.pending {n s h d} (hr : Run K al c F Cell A J n s h d)
     (hJ : ∀ s h d, J s h d → action K c s = .bar ∨ action K c s = .done) {x : Ptx.Acc}
     (hx : (action K c s).acc = some x) :
     (x.kind = .read ∧ ∀ b, covers x.a x.sz.bytes b → F.touches (x.sp, b)) ∨
     (x.kind = .write ∧ ∀ b, covers x.a x.sz.bytes b → F.w (x.sp, b)) ∨
-    (x.kind = .atomic ∧ x.sp = .global ∧ x.sz = .b4 ∧ Cell x.a) := by
+    (x.kind = .atomic ∧ x.sp = .global ∧ x.sz = A.sz ∧ Cell x.a) := by
   cases hr with
   | stop hj => rcases hJ _ _ _ hj with h | h <;> rw [h] at hx <;> cases hx
   | next ha => rw [ha] at hx; cases hx
@@ -162,26 +201,27 @@ theorem Run.pending {n s h d} (hr : Run K al c F Cell J n s h d)
   | atom δ ha _ hacc => rw [ha] at hx; cases hx; exact .inr (.inr ⟨rfl, rfl, rfl, hacc⟩)
 
 /-- The cells are outside the footprint. -/
-def CellsOut (F : Foot) (Cell : Addr → Prop) : Prop :=
-  ∀ a, Cell a → ∀ y, covers a 4 y → ¬ F.touches (.global, y)
+def CellsOut (F : Foot) (Cell : Addr → Prop) (sz : Size) : Prop :=
+  ∀ a, Cell a → ∀ y, covers a sz.bytes y → ¬ F.touches (.global, y)
 
-/-- What one step does to the heap: nothing, a store inside `F.w`, or the
-addition of `δ` to an accumulator cell (recorded in the ghost). -/
-inductive Effect (F : Foot) (Cell : Addr → Prop) (h : Heap) (d : Ghost) : Heap → Ghost → Prop
-  | none : Effect F Cell h d h d
+/-- What one step does to the heap: nothing, a store inside `F.w`, or
+combining `δ` into an accumulator cell (recorded in the ghost). -/
+inductive Effect (F : Foot) (Cell : Addr → Prop) (A : CellAlg) (h : Heap) (d : Ghost) :
+    Heap → Ghost → Prop
+  | none : Effect F Cell A h d h d
   | store {sp a sz v} : (∀ x, covers a sz.bytes x → F.w (sp, x)) →
-      Effect F Cell h d (h.set sp (wr (h.at sp) a sz v)) d
-  | atom {a g} (δ : BitVec 32) : Cell a → lo32 g = rd32 h.g a + δ →
-      Effect F Cell h d (h.set .global (wr h.g a .b4 g)) (d.add a δ)
+      Effect F Cell A h d (h.set sp (wr (h.at sp) a sz v)) d
+  | atom {a g} (δ : Val) : Cell a → A.sz.trunc g = A.op (rd h.g a A.sz) δ →
+      Effect F Cell A h d (h.set .global (wr h.g a A.sz g)) (d.acc A a δ)
 
 theorem rd_b4_ext (m : Mem) (a : Addr) : rd m a .b4 = ext32 (rd32 m a) := rfl
 
 /-- One step of a thread covered by a derivation continues the derivation,
 with a smaller index, and changes the heap only as `Effect` allows. -/
 theorem Run.step (hJ : ∀ s h d, J s h d → action K c s = .bar ∨ action K c s = .done)
-    (hJf : ∀ s h h' d, J s h d → Heap.Agree F.touches h h' → J s h' d) (hco : CellsOut F Cell)
-    {n s h d s' h'} (hr : Run K al c F Cell J n s h d) (hs : tstep K al c s h = .ok s' h') :
-    ∃ n' < n, ∃ d', Run K al c F Cell J n' s' h' d' ∧ Effect F Cell h d h' d' := by
+    (hJf : ∀ s h h' d, J s h d → Heap.Agree F.touches h h' → J s h' d) (hco : CellsOut F Cell A.sz)
+    {n s h d s' h'} (hr : Run K al c F Cell A J n s h d) (hs : tstep K al c s h = .ok s' h') :
+    ∃ n' < n, ∃ d', Run K al c F Cell A J n' s' h' d' ∧ Effect F Cell A h d h' d' := by
   cases hr with
   | stop hj => rcases hJ _ _ _ hj with ha | ha <;> simp [tstep, ha] at hs
   | @next n _ s'' _ _ ha hr =>
@@ -195,16 +235,16 @@ theorem Run.step (hJ : ∀ s h d, J s h d → action K c s = .bar ∨ action K c
     exact ⟨n, by omega, d, hr, .store hf⟩
   | @atom n _ _ _ a f k δ ha hok hacc hf hr =>
     simp only [tstep, ha, hok, ↓reduceIte] at hs; cases hs
-    refine ⟨n, by omega, d.add a δ, ?_, .atom δ hacc ?_⟩
+    refine ⟨n, by omega, d.acc A a δ, ?_, .atom δ hacc ?_⟩
     · refine (hr _).frame hJf ?_
       rintro ⟨sp, x⟩ hx
       cases sp with
       | shared => rfl
       | global =>
-        show h.g x = wr h.g a .b4 _ x
+        show h.g x = wr h.g a A.sz _ x
         rw [wr_outside]
         intro hc; exact hco a hacc x hc hx
-    · rw [rd_b4_ext]; exact hf _
+    · exact hf _ (trunc_rd _ _ _)
 
 end
 
