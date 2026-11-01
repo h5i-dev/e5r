@@ -109,12 +109,12 @@ def gpu_one(ptxf, specf):
     print(json.dumps(row))
 
 
-def one(exe, out, name, ptxf, specf):
+def one(exe, out, name, ptxf, specf, timeout=600):
     row = {"name": name}
     a = subprocess.run([f"{CUDA}/bin/ptxas", "-arch=sm_86", ptxf, "-o", os.path.join(out, "k.cubin")],
                        capture_output=True, text=True)
     row["ptxas"] = a.returncode == 0
-    c = subprocess.run([exe, "ptx", "check", ptxf, "--spec", specf, "--timeout", "600"],
+    c = subprocess.run([exe, "ptx", "check", ptxf, "--spec", specf, "--timeout", str(timeout)],
                        capture_output=True, text=True)
     d = json.loads(c.stdout)
     cx = d.get("counterexample") or {}
@@ -144,7 +144,7 @@ def main():
         for m in json.load(open(os.path.join(HERE, "mutants.json"))):
             pf = os.path.join(out, m["id"] + ".ptx")
             open(pf, "w").write(m["ptx"])
-            r = one(exe, out, m["id"], pf, os.path.join(HERE, "specs", m["base"] + ".json"))
+            r = one(exe, out, m["id"], pf, os.path.join(HERE, "specs", m["base"] + ".json"), 300)
             r.update(base=m["base"], change=m["change"])
             rows.append(r)
         res = os.path.join(out, "mutants_results.json")
