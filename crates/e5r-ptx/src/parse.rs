@@ -3,6 +3,7 @@
 
 use crate::ast::*;
 use crate::lex::{Tok, Token, lex};
+use crate::print;
 use std::collections::HashMap;
 
 struct P {
@@ -80,6 +81,11 @@ impl P {
             false
         };
         match self.next()? {
+            // `-0` would print as `0` and fail the token round trip.
+            Tok::Int(0) if neg => {
+                self.pos -= 1;
+                self.err("negative zero")
+            }
             Tok::Int(v) => Ok(if neg { -v } else { v }),
             t => {
                 self.pos -= 1;
@@ -407,6 +413,117 @@ fn stmt(p: &mut P) -> R<Stmt> {
     Ok(Stmt { guard, instr })
 }
 
+/// The instruction types PTX defines for each opcode of the subset (PTX ISA
+/// §9.7; checked against ptxas in `tests/ptxas_agreement.rs`). The model
+/// gives a meaning to more combinations than PTX does; those are refused so
+/// that nothing is proved about text no assembler accepts.
+fn types_ok(i: &Instr) -> Result<(), String> {
+    use Ty::*;
+    let arith = |t: &Ty| matches!(t, U32 | S32 | U64 | S64);
+    let bits = |t: &Ty| matches!(t, B32 | B64);
+    let ok = match i {
+        Instr::Bin(BinOp::Add | BinOp::Sub | BinOp::MulLo, t, ..) | Instr::MadLo(t, ..) => arith(t),
+        Instr::Bin(BinOp::MulWide, t, ..) => matches!(t, U32 | S32),
+        Instr::Bin(BinOp::And | BinOp::Or | BinOp::Xor | BinOp::Shl, t, ..) | Instr::Not(t, ..) => {
+            bits(t)
+        }
+        Instr::Bin(BinOp::Shr, ..) | Instr::Mov(..) | Instr::Selp(..) => true,
+        Instr::Setp(c, t, ..) => match c {
+            CmpOp::Eq | CmpOp::Ne => true,
+            CmpOp::Lt | CmpOp::Le | CmpOp::Gt | CmpOp::Ge => arith(t),
+            CmpOp::Lo | CmpOp::Ls | CmpOp::Hi | CmpOp::Hs => matches!(t, U32 | U64),
+        },
+        Instr::Cvt(dt, st, ..) => arith(dt) && arith(st),
+        Instr::CvtaGlobal(..) | Instr::Ld(..) | Instr::St(..) => true,
+        Instr::Bra(..) | Instr::Ret | Instr::Exit => true,
+    };
+    if ok {
+        Ok(())
+    } else {
+        Err(format!("{} is not a PTX instruction type", print::instr(i)))
+    }
+}
+
+/// Immediates and address offsets inside the ranges whose meaning is not in
+/// doubt, and special registers only where ptxas allows them (`mov`, the
+/// source of `cvt`). ptxas accepts wider immediates (`add.u32 d, a,
+/// 0x1FFFFFFFF`); what it does with the excess bits is not specified, so the
+/// subset refuses them.
+fn operands_ok(i: &Instr) -> Result<(), String> {
+    let imm = |o: &Operand, w: u32| -> Result<(), String> {
+        if let Operand::Imm(v) = o {
+            let (lo, hi) = (-(1i128 << (w - 1)), (1i128 << w) - 1);
+            if *v < lo || *v > hi {
+                return Err(format!("immediate {v} does not fit {w} bits"));
+            }
+        }
+        Ok(())
+    };
+    let nosreg = |o: &Operand| -> Result<(), String> {
+        match o {
+            Operand::Sreg(s) => Err(format!(
+                "special register {} outside mov/cvt",
+                print::sreg(*s)
+            )),
+            _ => Ok(()),
+        }
+    };
+    let off = |a: &Address| -> Result<(), String> {
+        match a {
+            Address::Reg(_, Some(v)) | Address::Param(_, Some(v))
+                if *v < -(1i128 << 31) || *v >= (1i128 << 31) =>
+            {
+                Err(format!("address offset {v} does not fit 32 signed bits"))
+            }
+            _ => Ok(()),
+        }
+    };
+    let w = |t: &Ty| t.width().unwrap_or(32);
+    match i {
+        Instr::Bin(b, t, _, x, y) => {
+            let (wx, wy) = match b {
+                BinOp::MulWide => (32, 32),
+                BinOp::Shl | BinOp::Shr => (w(t), 32),
+                _ => (w(t), w(t)),
+            };
+            nosreg(x)?;
+            nosreg(y)?;
+            imm(x, wx)?;
+            imm(y, wy)
+        }
+        Instr::MadLo(t, _, a, b, c) => {
+            for o in [a, b, c] {
+                nosreg(o)?;
+                imm(o, w(t))?;
+            }
+            Ok(())
+        }
+        Instr::Not(t, _, a) => {
+            nosreg(a)?;
+            imm(a, w(t))
+        }
+        Instr::Mov(t, _, a) => imm(a, w(t)),
+        Instr::Setp(_, t, _, a, b) | Instr::Selp(t, _, a, b, _) => {
+            nosreg(a)?;
+            nosreg(b)?;
+            imm(a, w(t))?;
+            imm(b, w(t))
+        }
+        Instr::Cvt(_, st, _, a) => imm(a, w(st)),
+        Instr::CvtaGlobal(_, a) => {
+            nosreg(a)?;
+            imm(a, 64)
+        }
+        Instr::Ld(_, _, _, a) => off(a),
+        Instr::St(_, t, a, v) => {
+            nosreg(v)?;
+            imm(v, w(t))?;
+            off(a)
+        }
+        Instr::Bra(..) | Instr::Ret | Instr::Exit => Ok(()),
+    }
+}
+
 /// Declared registers, params and labels used at the right types.
 fn check(k: &Kernel, lines: &[usize]) -> R<()> {
     let mut regs: HashMap<String, Ty> = HashMap::new();
@@ -458,6 +575,13 @@ fn check(k: &Kernel, lines: &[usize]) -> R<()> {
         let w = |t: Ty| t.width().unwrap();
         if let Some(g) = &s.guard {
             pred(&g.pred)?;
+        }
+        types_ok(&s.instr).map_err(e)?;
+        operands_ok(&s.instr).map_err(e)?;
+        if s.guard.is_some() && matches!(s.instr, Instr::Bra(true, _)) {
+            // `bra.uni` promises the branch is non-divergent; a guarded one
+            // can diverge, which PTX leaves undefined.
+            return Err(e("predicated bra.uni".into()));
         }
         match &s.instr {
             Instr::Bin(BinOp::MulWide, t, d, a, b) => {

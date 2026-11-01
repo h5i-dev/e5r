@@ -83,7 +83,44 @@ fn subset_edges_are_refused() {
         "\tmov.u64 %rd1, %tid.x;\n\tret;",
         "special registers are 32-bit",
     );
-    refused("\tsetp.lt.b32 %p1, %r1, %r2;\n\tret;", "ordered comparison");
+    refused(
+        "\tsetp.lt.b32 %p1, %r1, %r2;\n\tret;",
+        "not a PTX instruction type",
+    );
+    refused(
+        "\tsetp.lo.s32 %p1, %r1, %r2;\n\tret;",
+        "not a PTX instruction type",
+    );
+    refused(
+        "\tand.u32 %r1, %r1, %r2;\n\tret;",
+        "not a PTX instruction type",
+    );
+    refused(
+        "\tadd.b32 %r1, %r1, %r2;\n\tret;",
+        "not a PTX instruction type",
+    );
+    refused(
+        "\tcvt.u64.b32 %rd1, %r2;\n\tret;",
+        "not a PTX instruction type",
+    );
+    refused("\tadd.u32 %r1, %tid.x, 1;\n\tret;", "outside mov/cvt");
+    refused(
+        "\tadd.u32 %r1, %r2, 0x1FFFFFFFF;\n\tret;",
+        "does not fit 32 bits",
+    );
+    refused(
+        "\tshl.b64 %rd1, %rd2, 4294967296;\n\tret;",
+        "does not fit 32 bits",
+    );
+    refused(
+        "\tadd.s64 %rd1, %rd2, 18446744073709551616;\n\tret;",
+        "does not fit 64 bits",
+    );
+    refused(
+        "\tld.global.u32 %r1, [%rd1+0x80000000];\n\tret;",
+        "does not fit 32 signed bits",
+    );
+    refused("L:\n\t@%p1 bra.uni L;\n\tret;", "predicated bra.uni");
     refused(
         "\tsetp.eq.u32 %r1, %r1, %r2;\n\tret;",
         "not a .pred register",
