@@ -1114,7 +1114,9 @@ checked only when its acceptance criterion has been run.
       the model, the interpreter, the JIT and ptxas. Outside the two classes
       the verdict is `unsupported` or `unknown`; atomics other than `add` and
       shared-memory accumulators are in the model but not in the phase
-      theorem.)
+      theorem. `scripts/recheck-ptx.sh` passes: 24 main theorems audited, 9
+      benchmark verdicts as expected, 0 of 35 mutants proved and 34 refuted,
+      the differential test identical.)
 - [x] **P5 (M5). AI-generated PTX at scale.** *Accepted:* specification to PTX
       to Lean to GPU benchmark, reported as the share of generated kernels
       proved, bugs found, proof time per kernel and speed against a CUDA or

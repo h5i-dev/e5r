@@ -59,7 +59,7 @@ evaluation, which would put the compiler in the trusted base.
 It runs, in order, and fails on the first problem:
 
 1. the parser tests, release profile: round trip, the ptxas agreement test
-   (506 forms), grammar and mutation fuzzing, the CLI tests;
+   (714 forms), grammar and mutation fuzzing, the CLI tests;
 2. `scripts/check-lean-ptx.sh`: regenerate every kernel module from its `.ptx`
    and refuse a stale one, assemble every benchmark with ptxas when it is
    installed, build the Lean project from scratch, and run the axiom audit;
