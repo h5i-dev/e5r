@@ -38,7 +38,7 @@ pub fn kname(k: &Kernel) -> String {
 }
 
 /// Kernel, spec and the `ptx_spec` lemmas: shared by both files.
-fn prelude(k: &Kernel, sp: &Spec, header: &str, extra_import: &str) -> String {
+pub(crate) fn prelude(k: &Kernel, sp: &Spec, header: &str, extra_import: &str) -> String {
     let mut s = String::new();
     writeln!(
         s,

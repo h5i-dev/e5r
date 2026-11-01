@@ -186,6 +186,7 @@ e5r-verify ptx export [--namespace NS] [--name NAME] FILE.ptx
     print the Lean `Ptx.Module` of FILE.ptx (after the token round trip)
 e5r-verify ptx check FILE.ptx --spec SPEC.json [--project DIR] [--out RESULT.json]
                      [--keep DIR] [--timeout SECS] [--memory-mb MB] [--no-search]
+                     [--proof PROOF.lean]
     prove or refute SPEC for the kernel; prints an e5r.ptx.result.v1 document
     exit status: 0 proved, 1 refuted, 2 unsupported, 3 unknown, 4 error, 64 usage
 e5r-verify ptx run --cases CASES FILE.ptx
@@ -236,6 +237,7 @@ fn ptx_check(args: &[String]) -> Result<String, String> {
         std::process::exit(ptx::EXIT_USAGE)
     };
     let (mut file, mut spec, mut out, mut keep) = (None, None, None, None);
+    let mut proof: Option<String> = None;
     let (mut project, mut timeout, mut memory, mut search) = (None, 600u64, 6144u64, true);
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -248,6 +250,7 @@ fn ptx_check(args: &[String]) -> Result<String, String> {
             "--spec" => spec = Some(value()),
             "--out" => out = Some(value()),
             "--keep" => keep = Some(value()),
+            "--proof" => proof = Some(value()),
             "--project" => project = Some(value()),
             "--timeout" => {
                 timeout = value()
@@ -274,6 +277,7 @@ fn ptx_check(args: &[String]) -> Result<String, String> {
         timeout: std::time::Duration::from_secs(timeout),
         memory_mb: memory,
         search,
+        proof: proof.map(Into::into),
     };
     let (v, doc) = ptx::check(&o);
     let text = serde_json::to_string_pretty(&doc).unwrap() + "\n";

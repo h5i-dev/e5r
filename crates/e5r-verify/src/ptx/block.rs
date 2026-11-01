@@ -681,3 +681,17 @@ mod tests {
         assert!(matches!(parse(&v, "reduce32"), Err(SpecError::Unsupported(_))));
     }
 }
+
+/// Kernel and spec in namespace `E5rSpec`, for the supplied-proof route.
+pub fn statement_prelude(k: &Kernel, sp: &BlockSpec, header: &str) -> String {
+    let import = match sp.class {
+        Class::Scan => "Ptx.Auto.Scan32",
+        _ => "Ptx.Auto.Reduce32",
+    };
+    format!(
+        "/-\n{}\n-/\nimport {import}\n\nnamespace E5rSpec\nopen Ptx Ptx.Auto Ptx.Auto.Block\n\n{}{}",
+        header.trim_end(),
+        e5r_ptx::lean::kernel_def(k),
+        spec_text(sp)
+    )
+}

@@ -146,4 +146,28 @@ theorem tsum_oneD_first {L : Launch} {G B : BitVec 32} (h1 : L.OneD G B) (hB : 0
   show v (BitVec.ofNat 32 m).toNat = v m
   simp; rw [Nat.mod_eq_of_lt (by omega)]
 
+/-- In a 1-D launch, summing a function of the global index over the threads
+is summing it over `0 .. G·B`. -/
+theorem tsum_oneD_gid {L : Launch} {G B : BitVec 32} (h1 : L.OneD G B) (v : Nat → BitVec 32) :
+    tsum L.threads (fun t => v (t.ctaid.x.toNat * B.toNat + t.tid.x.toNat)) =
+      accUpTo v (G.toNat * B.toNat) := by
+  rw [tsum_eq_lsum, Launch.threads, h1.1, h1.2, lsum_flatMap]
+  have inner : ∀ c : Dim3, lsum ((dims ⟨B, 1, 1⟩).map fun d => (⟨c, d⟩ : Tid))
+      (fun t => v (t.ctaid.x.toNat * B.toNat + t.tid.x.toNat)) =
+        accUpTo (fun i => v (c.x.toNat * B.toNat + i)) B.toNat := by
+    intro c
+    rw [show (⟨B, 1, 1⟩ : Dim3) = ⟨B, 1#32, 1#32⟩ from rfl, dims_oneD, List.map_map, lsum_map,
+      lsum_range32]
+    have hlt := B.isLt
+    refine accUpTo_congr' fun m hm => ?_
+    show v (c.x.toNat * B.toNat + (BitVec.ofNat 32 m).toNat) = _
+    simp; rw [Nat.mod_eq_of_lt (by omega)]
+  rw [lsum_congr fun c _ => inner c,
+    show (⟨G, 1, 1⟩ : Dim3) = ⟨G, 1#32, 1#32⟩ from rfl, dims_oneD, lsum_map, lsum_range32,
+    ← accUpTo_blocks v B.toNat G.toNat]
+  refine accUpTo_congr' fun m hm => ?_
+  have := G.isLt
+  show accUpTo (fun i => v ((BitVec.ofNat 32 m).toNat * B.toNat + i)) B.toNat = _
+  simp; rw [Nat.mod_eq_of_lt (by omega)]
+
 end Ptx

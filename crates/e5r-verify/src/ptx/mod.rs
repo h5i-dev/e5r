@@ -13,6 +13,7 @@ pub mod blocksearch;
 pub mod leangen;
 pub mod search;
 pub mod spec;
+pub mod supplied;
 
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
@@ -64,6 +65,8 @@ pub struct Options {
     pub timeout: Duration,
     pub memory_mb: u64,
     pub search: bool,
+    /// A supplied Lean proof (`--proof`), checked instead of generating one.
+    pub proof: Option<PathBuf>,
 }
 
 /// One run of Lean on one file, with the time and memory caps.
@@ -88,6 +91,17 @@ fn have_systemd_run() -> bool {
 /// cap when systemd is available (Lean's own `--memory` otherwise) and a
 /// wall-clock timeout.
 pub fn run_lean(project: &Path, args: &[&str], timeout: Duration, memory_mb: u64) -> LeanRun {
+    run_lean_env(project, args, timeout, memory_mb, &[])
+}
+
+/// `run_lean` with extra environment variables.
+pub fn run_lean_env(
+    project: &Path,
+    args: &[&str],
+    timeout: Duration,
+    memory_mb: u64,
+    env: &[(&str, &str)],
+) -> LeanRun {
     let start = Instant::now();
     let mut cmd = if have_systemd_run() {
         let mut c = Command::new("systemd-run");
@@ -101,6 +115,7 @@ pub fn run_lean(project: &Path, args: &[&str], timeout: Duration, memory_mb: u64
     cmd.current_dir(project)
         .args(args)
         .env("LEAN_NUM_THREADS", "1")
+        .envs(env.iter().copied())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let mut child = match cmd.spawn() {
@@ -334,6 +349,14 @@ pub fn check(o: &Options) -> (Verdict, Value) {
             )),
         );
     }
+    if let Some(pf) = &o.proof {
+        let pre = leangen::prelude(k, &sp, &header, "").replace("namespace E5rCheck", "namespace E5rSpec");
+        let stmt = format!("spec.Correct {}", leangen::kname(k));
+        let module = supplied::statement_module(&pre, &stmt);
+        let (v, why) = supplied_route(o, &mut doc, pf, &module, &stmt, "Ptx.Auto.MapSpec.Correct", &phash, &shash, &proj, &dir);
+        cleanup(&dir);
+        return finish(doc, v, why);
+    }
     let proof = dir.join("Proof.lean");
     let text = leangen::proof(k, &sp, &header);
     // What the theorem is about, as Lean reads it: the reviewer checks this
@@ -553,6 +576,12 @@ fn check_block(
         );
     }
     let statement = format!("{} spec «{}»", sp.class.definition().trim_start_matches("Ptx.Auto."), k.name);
+    if let Some(pf) = &o.proof {
+        let module = supplied::statement_module(&block::statement_prelude(k, &sp, &header), &statement);
+        let (v, why) = supplied_route(o, &mut doc, pf, &module, &statement, sp.class.definition(), phash, shash, &proj, &dir);
+        cleanup(&dir);
+        return finish(doc, v, why);
+    }
     match &shape {
         Err(e) => reason(&mut doc, format!("no proof attempt: {e}")),
         Ok(sh) => {
@@ -635,6 +664,29 @@ fn check_block(
             Some("the search found a candidate counterexample, but Lean did not replay it".into()),
         )
     }
+}
+
+/// Build what a supplied proof needs (the whole library and the checker),
+/// then check the proof.
+#[allow(clippy::too_many_arguments)]
+fn supplied_route(
+    o: &Options,
+    doc: &mut Value,
+    pf: &Path,
+    module: &str,
+    statement: &str,
+    definition: &str,
+    phash: &str,
+    shash: &str,
+    proj: &Path,
+    dir: &Path,
+) -> (Verdict, Option<String>) {
+    let warm = run_lean(proj, &["build", "-q", "Ptx", "proofcheck"], o.timeout * 6, o.memory_mb);
+    if !warm.ok {
+        return (Verdict::Error, Some(format!("building the Lean library failed: {}", tail(&warm.output))));
+    }
+    let tc = toolchain(proj);
+    supplied::check(o, doc, pf, module, statement, definition, phash, shash, &tc, proj, dir)
 }
 
 fn tail(s: &str) -> String {
