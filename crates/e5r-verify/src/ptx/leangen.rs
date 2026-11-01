@@ -47,7 +47,7 @@ fn prelude(k: &Kernel, sp: &Spec, header: &str, extra_import: &str) -> String {
     )
     .unwrap();
     s.push_str(
-        "set_option linter.unusedVariables false\nset_option linter.unusedSimpArgs false\n\n",
+        "set_option maxHeartbeats 1000000\nset_option linter.unusedVariables false\nset_option linter.unusedSimpArgs false\n\n",
     );
     s.push_str("namespace E5rCheck\nopen Ptx Ptx.Auto\n\n");
     s.push_str(&e5r_ptx::lean::kernel_def(k));

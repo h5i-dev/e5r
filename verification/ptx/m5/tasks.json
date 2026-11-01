@@ -615,5 +615,762 @@
    "max_threads": "4294967295"
   },
   "batch": "batch1.txt"
+ },
+ {
+  "name": "addto",
+  "task": "y[i] += x[i] in place",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "addto_y + addto_x",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "scale_ip",
+  "task": "x[i] *= k in place",
+  "arrays": [
+   "x"
+  ],
+  "output": "x",
+  "length": "n",
+  "scalars": [
+   "k"
+  ],
+  "element": "scale_ip_x * scale_ip_k",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "xor_ip",
+  "task": "x[i] ^= k in place",
+  "arrays": [
+   "x"
+  ],
+  "output": "x",
+  "length": "n",
+  "scalars": [
+   "k"
+  ],
+  "element": "xor_ip_x ^ xor_ip_k",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "not_ip",
+  "task": "x[i] = ~x[i] in place",
+  "arrays": [
+   "x"
+  ],
+  "output": "x",
+  "length": "n",
+  "scalars": [],
+  "element": "~not_ip_x",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "dbl_ip",
+  "task": "x[i] = 2 * x[i] in place, by shift",
+  "arrays": [
+   "x"
+  ],
+  "output": "x",
+  "length": "n",
+  "scalars": [],
+  "element": "2 * dbl_ip_x",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "saxpy_ip",
+  "task": "y[i] = a * x[i] + y[i], one element per thread",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [
+   "a"
+  ],
+  "element": "saxpy_ip_a * saxpy_ip_x + saxpy_ip_y",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "2147483647"
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "sub_ip",
+  "task": "y[i] -= x[i] in place",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "sub_ip_y - sub_ip_x",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "mul_ip",
+  "task": "y[i] *= x[i] in place",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "mul_ip_y * mul_ip_x",
+  "schedule": {
+   "kind": "guarded",
+   "max_threads": "4294967295"
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_vadd",
+  "task": "c[i] = a[i] + b[i], grid-stride, 64-bit index",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "scalars": [],
+  "element": "gs_vadd_a + gs_vadd_b",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_vadd_a",
+    "%rd2": "base gs_vadd_b",
+    "%rd3": "base gs_vadd_c",
+    "%rd4": "index64",
+    "%rd6": "stride64",
+    "%rd7": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_xor",
+  "task": "c[i] = a[i] ^ b[i], grid-stride, 64-bit index",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "scalars": [],
+  "element": "gs_xor_a ^ gs_xor_b",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_xor_a",
+    "%rd2": "base gs_xor_b",
+    "%rd3": "base gs_xor_c",
+    "%rd4": "index64",
+    "%rd6": "stride64",
+    "%rd7": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_scale",
+  "task": "y[i] = k * x[i], grid-stride, 64-bit index",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [
+   "k"
+  ],
+  "element": "gs_scale_k * gs_scale_x",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_scale_x",
+    "%rd2": "base gs_scale_y",
+    "%r1": "scalar gs_scale_k",
+    "%rd3": "index64",
+    "%rd5": "stride64",
+    "%rd6": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_inc",
+  "task": "x[i] += 1 in place, grid-stride",
+  "arrays": [
+   "x"
+  ],
+  "output": "x",
+  "length": "n",
+  "scalars": [],
+  "element": "gs_inc_x + 1",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_inc_x",
+    "%rd2": "index64",
+    "%rd4": "stride64",
+    "%rd5": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_fill",
+  "task": "y[i] = k, grid-stride",
+  "arrays": [
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [
+   "k"
+  ],
+  "element": "gs_fill_k",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_fill_y",
+    "%r1": "scalar gs_fill_k",
+    "%rd2": "index64",
+    "%rd4": "stride64",
+    "%rd5": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_copy",
+  "task": "y[i] = x[i], grid-stride",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "gs_copy_x",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_copy_x",
+    "%rd2": "base gs_copy_y",
+    "%rd3": "index64",
+    "%rd5": "stride64",
+    "%rd6": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_fma",
+  "task": "d[i] = a[i] * b[i] + c[i], grid-stride",
+  "arrays": [
+   "a",
+   "b",
+   "c",
+   "d"
+  ],
+  "output": "d",
+  "length": "n",
+  "scalars": [],
+  "element": "gs_fma_a * gs_fma_b + gs_fma_c",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_fma_a",
+    "%rd2": "base gs_fma_b",
+    "%rd3": "base gs_fma_c",
+    "%rd4": "base gs_fma_d",
+    "%rd5": "index64",
+    "%rd7": "stride64",
+    "%rd8": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_axpby",
+  "task": "y[i] = a*x[i] + b*y[i] in place, grid-stride",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [
+   "a",
+   "b"
+  ],
+  "element": "gs_axpby_a * gs_axpby_x + gs_axpby_b * gs_axpby_y",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_axpby_x",
+    "%rd2": "base gs_axpby_y",
+    "%r1": "scalar gs_axpby_a",
+    "%r2": "scalar gs_axpby_b",
+    "%rd3": "index64",
+    "%rd5": "stride64",
+    "%rd6": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs32_mul",
+  "task": "c[i] = a[i] * b[i], grid-stride, 32-bit index",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "scalars": [],
+  "element": "gs32_mul_a * gs32_mul_b",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^32",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs32_mul_a",
+    "%rd2": "base gs32_mul_b",
+    "%rd3": "base gs32_mul_c",
+    "%r1": "length",
+    "%r5": "index32",
+    "%r7": "stride32"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs32_sub",
+  "task": "c[i] = a[i] - b[i], grid-stride, signed 32-bit index",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "scalars": [],
+  "element": "gs32_sub_a - gs32_sub_b",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^31",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs32_sub_a",
+    "%rd2": "base gs32_sub_b",
+    "%rd3": "base gs32_sub_c",
+    "%r1": "length",
+    "%r5": "index32",
+    "%r7": "stride32"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs32_neg",
+  "task": "y[i] = -x[i], grid-stride, 32-bit index",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "-gs32_neg_x",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^32",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs32_neg_x",
+    "%rd2": "base gs32_neg_y",
+    "%r1": "length",
+    "%r5": "index32",
+    "%r7": "stride32"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs32_or",
+  "task": "c[i] = a[i] OR b[i], grid-stride, 32-bit index, loop test at the bottom",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "scalars": [],
+  "element": "gs32_or_a | gs32_or_b",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^32",
+   "head": "TOP",
+   "registers": {
+    "%rd1": "base gs32_or_a",
+    "%rd2": "base gs32_or_b",
+    "%rd3": "base gs32_or_c",
+    "%r1": "length",
+    "%r5": "index32",
+    "%r7": "stride32"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gsptr_copy",
+  "task": "y[i] = x[i], grid-stride advancing pointers",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "gsptr_copy_x",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd3": "index64",
+    "%rd5": "stride64",
+    "%rd6": "length",
+    "%rd8": "ptr gsptr_copy_x",
+    "%rd9": "ptr gsptr_copy_y",
+    "%rd10": "ptr_stride"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gsptr_add",
+  "task": "c[i] = a[i] + b[i], grid-stride advancing pointers",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "scalars": [],
+  "element": "gsptr_add_a + gsptr_add_b",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd4": "index64",
+    "%rd6": "stride64",
+    "%rd7": "length",
+    "%rd9": "ptr gsptr_add_a",
+    "%rd10": "ptr gsptr_add_b",
+    "%rd11": "ptr gsptr_add_c",
+    "%rd12": "ptr_stride"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_rot",
+  "task": "y[i] = rotate x[i] left by 13, grid-stride",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "(gs_rot_x << 13) | (gs_rot_x >> 19)",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_rot_x",
+    "%rd2": "base gs_rot_y",
+    "%rd3": "index64",
+    "%rd5": "stride64",
+    "%rd6": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_poly",
+  "task": "y[i] = x*x + 3*x + 7, grid-stride",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "gs_poly_x * gs_poly_x + 3 * gs_poly_x + 7",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_poly_x",
+    "%rd2": "base gs_poly_y",
+    "%rd3": "index64",
+    "%rd5": "stride64",
+    "%rd6": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_blend",
+  "task": "d[i] = a where m set else b, grid-stride",
+  "arrays": [
+   "a",
+   "b",
+   "m",
+   "d"
+  ],
+  "output": "d",
+  "length": "n",
+  "scalars": [],
+  "element": "(gs_blend_a & gs_blend_m) | (gs_blend_b & ~gs_blend_m)",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_blend_a",
+    "%rd2": "base gs_blend_b",
+    "%rd3": "base gs_blend_m",
+    "%rd4": "base gs_blend_d",
+    "%rd5": "index64",
+    "%rd7": "stride64",
+    "%rd8": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_xork_ip",
+  "task": "x[i] ^= k in place, grid-stride",
+  "arrays": [
+   "x"
+  ],
+  "output": "x",
+  "length": "n",
+  "scalars": [
+   "k"
+  ],
+  "element": "gs_xork_ip_x ^ gs_xork_ip_k",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_xork_ip_x",
+    "%r1": "scalar gs_xork_ip_k",
+    "%rd2": "index64",
+    "%rd4": "stride64",
+    "%rd5": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_lincomb",
+  "task": "c[i] = p*a[i] - q*b[i], grid-stride",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "scalars": [
+   "p",
+   "q"
+  ],
+  "element": "gs_lincomb_p * gs_lincomb_a - gs_lincomb_q * gs_lincomb_b",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_lincomb_a",
+    "%rd2": "base gs_lincomb_b",
+    "%rd3": "base gs_lincomb_c",
+    "%r1": "scalar gs_lincomb_p",
+    "%r2": "scalar gs_lincomb_q",
+    "%rd4": "index64",
+    "%rd6": "stride64",
+    "%rd7": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_sqdiff",
+  "task": "c[i] = (a[i]-b[i])^2, grid-stride",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "scalars": [],
+  "element": "(gs_sqdiff_a - gs_sqdiff_b) * (gs_sqdiff_a - gs_sqdiff_b)",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_sqdiff_a",
+    "%rd2": "base gs_sqdiff_b",
+    "%rd3": "base gs_sqdiff_c",
+    "%rd4": "index64",
+    "%rd6": "stride64",
+    "%rd7": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_notand",
+  "task": "c[i] = ~(a[i] & b[i]), grid-stride",
+  "arrays": [
+   "a",
+   "b",
+   "c"
+  ],
+  "output": "c",
+  "length": "n",
+  "scalars": [],
+  "element": "~(gs_notand_a & gs_notand_b)",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_notand_a",
+    "%rd2": "base gs_notand_b",
+    "%rd3": "base gs_notand_c",
+    "%rd4": "index64",
+    "%rd6": "stride64",
+    "%rd7": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_shr",
+  "task": "y[i] = x[i] >> 5 (logical), grid-stride",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [],
+  "element": "gs_shr_x >> 5",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_shr_x",
+    "%rd2": "base gs_shr_y",
+    "%rd3": "index64",
+    "%rd5": "stride64",
+    "%rd6": "length"
+   }
+  },
+  "batch": "batch2.txt"
+ },
+ {
+  "name": "gs_addk_exit",
+  "task": "y[i] = x[i] + k, grid-stride, exit at the end",
+  "arrays": [
+   "x",
+   "y"
+  ],
+  "output": "y",
+  "length": "n",
+  "scalars": [
+   "k"
+  ],
+  "element": "gs_addk_exit_x + gs_addk_exit_k",
+  "schedule": {
+   "kind": "stride",
+   "bound": "2^64",
+   "head": "LOOP",
+   "registers": {
+    "%rd1": "base gs_addk_exit_x",
+    "%rd2": "base gs_addk_exit_y",
+    "%r1": "scalar gs_addk_exit_k",
+    "%rd3": "index64",
+    "%rd5": "stride64",
+    "%rd6": "length"
+   }
+  },
+  "batch": "batch2.txt"
  }
 ]

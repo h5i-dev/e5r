@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "mul_ip",
+  "class": "map32",
+  "arrays": [
+    "mul_ip_x",
+    "mul_ip_y"
+  ],
+  "output": "mul_ip_y",
+  "length": "mul_ip_n",
+  "scalars": [],
+  "element": "mul_ip_y * mul_ip_x",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

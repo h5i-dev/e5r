@@ -1,0 +1,27 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_rot",
+  "class": "map32",
+  "arrays": [
+    "gs_rot_x",
+    "gs_rot_y"
+  ],
+  "output": "gs_rot_y",
+  "length": "gs_rot_n",
+  "scalars": [],
+  "element": "(gs_rot_x << 13) | (gs_rot_x >> 19)",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_rot_x",
+        "%rd2": "base gs_rot_y",
+        "%rd3": "index64",
+        "%rd5": "stride64",
+        "%rd6": "length"
+      }
+    }
+  }
+}

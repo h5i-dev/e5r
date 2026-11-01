@@ -1,0 +1,31 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_blend",
+  "class": "map32",
+  "arrays": [
+    "gs_blend_a",
+    "gs_blend_b",
+    "gs_blend_m",
+    "gs_blend_d"
+  ],
+  "output": "gs_blend_d",
+  "length": "gs_blend_n",
+  "scalars": [],
+  "element": "(gs_blend_a & gs_blend_m) | (gs_blend_b & ~gs_blend_m)",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_blend_a",
+        "%rd2": "base gs_blend_b",
+        "%rd3": "base gs_blend_m",
+        "%rd4": "base gs_blend_d",
+        "%rd5": "index64",
+        "%rd7": "stride64",
+        "%rd8": "length"
+      }
+    }
+  }
+}

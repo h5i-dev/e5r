@@ -188,9 +188,9 @@ set_option hygiene false in
 spec lemmas tagged `ptx_spec` come from the generated proof. -/
 macro "ptx_leaf" : tactic => `(tactic| first
   | done
-  | (exact Ptx.Auto.MapSpec.accessOk_elem hpre (by ptx_spec_simp) (by omega))
-  | (exact Ptx.Auto.MapSpec.infoot_load (by ptx_spec_simp) (by omega))
-  | (exact Ptx.Auto.MapSpec.infoot_store (by ptx_spec_simp) (by omega))
+  | (with_reducible exact Ptx.Auto.MapSpec.accessOk_elem hpre (by ptx_spec_simp) (by omega))
+  | (with_reducible exact Ptx.Auto.MapSpec.infoot_load (by ptx_spec_simp) (by omega))
+  | (with_reducible exact Ptx.Auto.MapSpec.infoot_store (by ptx_spec_simp) (by omega))
   | (intro hi; exfalso; omega)
   | (simp only [Ptx.Auto.MapSpec.EPost]; intro hi; exfalso; omega)
   | (simp only [Ptx.Auto.MapSpec.EPost, ptx_spec]
@@ -263,8 +263,17 @@ macro "ptx_stride_body" K:ident head:num fuel:num " [" bs:term,* "]" : tactic =>
   all_goals (try and_intros)
   all_goals first
     | ptx_leaf
-    | (right
+    | (right; left
        refine ⟨by omega, ?_, ?_⟩ <;> first | trivial | rfl | simp only [ptx_eval, $K:ident])
+    | (right; right
+       have hi : i < A.n.toNat := by omega
+       refine ⟨hi, by omega, ?_, ?_, fun x hx => wr_outside hx⟩
+       · first | trivial | rfl | simp only [ptx_eval, $K:ident]
+       · rw [rd32_wr_same]
+         simp only [ptx_spec, List.mem_cons, List.not_mem_nil, or_false, forall_eq_or_imp,
+           forall_eq, hi, true_implies] at hin
+         simp (config := { failIfUnchanged := false }) only [hin]
+         ptx_value)
     | (left
        refine ⟨by omega, ?_, ?_, ?_⟩
        · simp only [Ptx.Auto.Loop.At, ptx_spec, Ptx.Auto.RegsOk, and_true, true_and, Ptx.upd,

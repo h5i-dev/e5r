@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "scale_ip",
+  "class": "map32",
+  "arrays": [
+    "scale_ip_x"
+  ],
+  "output": "scale_ip_x",
+  "length": "scale_ip_n",
+  "scalars": [
+    "scale_ip_k"
+  ],
+  "element": "scale_ip_x * scale_ip_k",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

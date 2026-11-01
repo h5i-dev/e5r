@@ -1,0 +1,28 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gsptr_copy",
+  "class": "map32",
+  "arrays": [
+    "gsptr_copy_x",
+    "gsptr_copy_y"
+  ],
+  "output": "gsptr_copy_y",
+  "length": "gsptr_copy_n",
+  "scalars": [],
+  "element": "gsptr_copy_x",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd3": "index64",
+        "%rd5": "stride64",
+        "%rd6": "length",
+        "%rd8": "ptr gsptr_copy_x",
+        "%rd9": "ptr gsptr_copy_y",
+        "%rd10": "ptr_stride"
+      }
+    }
+  }
+}

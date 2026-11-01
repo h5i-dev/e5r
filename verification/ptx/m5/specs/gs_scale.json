@@ -1,0 +1,30 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_scale",
+  "class": "map32",
+  "arrays": [
+    "gs_scale_x",
+    "gs_scale_y"
+  ],
+  "output": "gs_scale_y",
+  "length": "gs_scale_n",
+  "scalars": [
+    "gs_scale_k"
+  ],
+  "element": "gs_scale_k * gs_scale_x",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_scale_x",
+        "%rd2": "base gs_scale_y",
+        "%r1": "scalar gs_scale_k",
+        "%rd3": "index64",
+        "%rd5": "stride64",
+        "%rd6": "length"
+      }
+    }
+  }
+}

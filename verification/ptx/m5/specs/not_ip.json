@@ -1,0 +1,16 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "not_ip",
+  "class": "map32",
+  "arrays": [
+    "not_ip_x"
+  ],
+  "output": "not_ip_x",
+  "length": "not_ip_n",
+  "scalars": [],
+  "element": "~not_ip_x",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

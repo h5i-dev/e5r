@@ -285,7 +285,9 @@ The two obligations are local. `EntryOk`: from the first instruction,
 without touching memory, reach the head with element `gid`. `BodyOk`: from
 the head at element `i`, with the arrays still initial at `i`, either
 (`i < n`) touch only element `i`, leave `f` in the output there and come
-back to the head at `i + G·B`, or (`n ≤ i`) touch nothing and finish. -/
+back to the head at `i + G·B`, or (`n ≤ i`) touch nothing and finish, or
+(`i < n ≤ i + G·B`, a loop tested at the bottom) handle element `i` and
+finish. -/
 
 namespace Ptx.Auto
 open Ptx
@@ -343,7 +345,11 @@ def BodyOk (Lp : Loop) (K : Kernel) : Prop :=
         (i < A.n.toNat ∧ Lp.At A (i + A.G.toNat * A.B.toNat) s' ∧
           rd32 m' (elem (A.base S.out) i) = S.val A m₀ i ∧
           ∀ x, ¬ covers (elem (A.base S.out) i) 4 x → m' x = m x) ∨
-        (A.n.toNat ≤ i ∧ action K ((S.launch A).ctx t) s' = .done ∧ m' = m)) s m
+        (A.n.toNat ≤ i ∧ action K ((S.launch A).ctx t) s' = .done ∧ m' = m) ∨
+        (i < A.n.toNat ∧ A.n.toNat ≤ i + A.G.toNat * A.B.toNat ∧
+          action K ((S.launch A).ctx t) s' = .done ∧
+          rd32 m' (elem (A.base S.out) i) = S.val A m₀ i ∧
+          ∀ x, ¬ covers (elem (A.base S.out) i) 4 x → m' x = m x)) s m
 
 end MapSpec
 
@@ -404,7 +410,7 @@ theorem threadOk_of_stride (he : S.EntryOk Lp K)
   · intro x ⟨hi, a, ha, hx⟩; exact ⟨i, hi, hio, a, ha, hx⟩
   · intro x ⟨hi, hx⟩; exact ⟨i, hi, hio, hx⟩
   · intro s' m' h
-    rcases h with ⟨hi, hat', hval, hfr⟩ | ⟨hni, hd, hm'⟩
+    rcases h with ⟨hi, hat', hval, hfr⟩ | ⟨hni, hd, hm'⟩ | ⟨hi, hlast, hd, hval, hfr⟩
     · left
       refine ⟨N + SS - (i + SS), by omega, i + SS, rfl, by rw [Nat.add_mod_right]; exact hio,
         by omega, by omega, hat', ?_, ?_⟩
@@ -421,6 +427,13 @@ theorem threadOk_of_stride (he : S.EntryOk Lp K)
     · right
       subst hm'
       exact ⟨hd, fun j hj hoj => hdone j hj hoj (by omega)⟩
+    · right
+      refine ⟨hd, fun j hj hoj => ?_⟩
+      by_cases hlt : j < i
+      · rw [rd32_congr fun x hx => hfr x fun hc => elem_disjoint hfo hi hj (by omega) hc hx]
+        exact hdone j hj hoj hlt
+      · have : j = i := own_between hio hoj (by omega) (by omega)
+        subst this; exact hval
 
 end
 

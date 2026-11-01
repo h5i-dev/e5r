@@ -1,0 +1,34 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_lincomb",
+  "class": "map32",
+  "arrays": [
+    "gs_lincomb_a",
+    "gs_lincomb_b",
+    "gs_lincomb_c"
+  ],
+  "output": "gs_lincomb_c",
+  "length": "gs_lincomb_n",
+  "scalars": [
+    "gs_lincomb_p",
+    "gs_lincomb_q"
+  ],
+  "element": "gs_lincomb_p * gs_lincomb_a - gs_lincomb_q * gs_lincomb_b",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_lincomb_a",
+        "%rd2": "base gs_lincomb_b",
+        "%rd3": "base gs_lincomb_c",
+        "%r1": "scalar gs_lincomb_p",
+        "%r2": "scalar gs_lincomb_q",
+        "%rd4": "index64",
+        "%rd6": "stride64",
+        "%rd7": "length"
+      }
+    }
+  }
+}

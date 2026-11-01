@@ -1,0 +1,27 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_copy",
+  "class": "map32",
+  "arrays": [
+    "gs_copy_x",
+    "gs_copy_y"
+  ],
+  "output": "gs_copy_y",
+  "length": "gs_copy_n",
+  "scalars": [],
+  "element": "gs_copy_x",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_copy_x",
+        "%rd2": "base gs_copy_y",
+        "%rd3": "index64",
+        "%rd5": "stride64",
+        "%rd6": "length"
+      }
+    }
+  }
+}

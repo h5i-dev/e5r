@@ -1,0 +1,31 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_fma",
+  "class": "map32",
+  "arrays": [
+    "gs_fma_a",
+    "gs_fma_b",
+    "gs_fma_c",
+    "gs_fma_d"
+  ],
+  "output": "gs_fma_d",
+  "length": "gs_fma_n",
+  "scalars": [],
+  "element": "gs_fma_a * gs_fma_b + gs_fma_c",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_fma_a",
+        "%rd2": "base gs_fma_b",
+        "%rd3": "base gs_fma_c",
+        "%rd4": "base gs_fma_d",
+        "%rd5": "index64",
+        "%rd7": "stride64",
+        "%rd8": "length"
+      }
+    }
+  }
+}
