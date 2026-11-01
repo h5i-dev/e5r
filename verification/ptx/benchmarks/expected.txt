@@ -1,0 +1,8 @@
+# benchmark                spec          verdict   (scripts/recheck-ptx.sh)
+# sum is a reduction, outside the map class: the check must say so, not guess.
+correct/vadd_nvcc.ptx      vadd.json     proved
+correct/saxpy.ptx          saxpy.json    proved
+buggy/vadd_nobound.ptx     vadd.json     refuted
+buggy/vadd_tid.ptx         vadd.json     refuted
+buggy/vadd_sub.ptx         vadd.json     refuted
+correct/sum.ptx            sum_as_map.json unsupported

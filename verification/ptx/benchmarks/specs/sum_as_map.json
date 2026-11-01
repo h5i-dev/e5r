@@ -1,0 +1,10 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "sum",
+  "class": "map32",
+  "arrays": ["sum_a", "sum_out"],
+  "output": "sum_out",
+  "length": "sum_n",
+  "element": "sum_a",
+  "schedule": { "kind": "guarded", "max_threads": "1" }
+}

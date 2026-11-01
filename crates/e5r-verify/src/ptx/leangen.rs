@@ -289,7 +289,7 @@ pub fn refutation(k: &Kernel, sp: &Spec, header: &str, w: &World, wit: &Witness)
                 .unwrap(),
                 super::search::Check::Frame { byte } => writeln!(
                     s,
-                    "  have hv := ({fin}).2 {} (by simp [{ev}, elem, covers]; decide)\n  revert hv\n  simp [{ev}{ds}]",
+                    "  have hv := ({fin}).2 {} (by simp [{ev}, elem, covers] <;> decide)\n  revert hv\n  simp [{ev}{ds}]",
                     bv(*byte as u128, 64)
                 )
                 .unwrap(),

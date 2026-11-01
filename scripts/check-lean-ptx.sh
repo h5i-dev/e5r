@@ -59,11 +59,23 @@ else
   echo "ptxas: not installed, assembly check skipped"
 fi
 
+# Lean memory and parallelism are capped: a Lean process was OOM-killed at
+# 15 GB on the development machine. With systemd the cap is a cgroup limit
+# (MemoryMax, no swap); without it only the thread count is capped.
+export LEAN_NUM_THREADS="${LEAN_NUM_THREADS:-2}"
+capped() {
+  if command -v systemd-run >/dev/null && systemd-run --scope --quiet -p MemoryMax=64M true 2>/dev/null; then
+    systemd-run --scope --quiet -p MemoryMax="${PTX_LEAN_MEMORY:-10G}" -p MemorySwapMax=0 -- "$@"
+  else
+    "$@"
+  fi
+}
 cd "$root"
 rm -rf .lake/build
-lake build
-lake env lean Audit.lean >"$tmp/axioms.txt"
+capped lake build
+capped lake env lean Audit.lean >"$tmp/axioms.txt"
 cat "$tmp/axioms.txt"
+grep -q "^axiom audit: [0-9]* declarations in Ptx.\*, standard axioms only" "$tmp/axioms.txt"
 if grep -E "sorryAx|ofReduceBool|trustCompiler|_native" "$tmp/axioms.txt"; then
   echo "axiom audit: forbidden axiom" >&2
   exit 1
@@ -76,4 +88,4 @@ if [[ -n "$bad" ]]; then
   exit 1
 fi
 n=$(grep -c "depends on axioms\|does not depend on any axioms" "$tmp/axioms.txt")
-echo "axiom audit: $n theorems, standard axioms only"
+echo "axiom audit: every Ptx.* declaration and $n main theorems, standard axioms only"
