@@ -123,9 +123,12 @@ def one(exe, out, name, ptxf, specf, timeout=600):
                refutation_seconds=d.get("lean", {}).get("refutation_seconds"),
                counterexample=cx.get("kind"), replayed=cx.get("replayed_in_lean"),
                reasons=[r[:240] for r in d.get("reasons", [])])
-    g = subprocess.run([sys.executable, __file__, "--gpu-one", ptxf, specf], capture_output=True, text=True)
     try:
+        g = subprocess.run([sys.executable, __file__, "--gpu-one", ptxf, specf], capture_output=True,
+                           text=True, timeout=180)
         row.update(json.loads(g.stdout.strip().splitlines()[-1]))
+    except subprocess.TimeoutExpired:
+        row["gpu_error"] = "the kernel did not finish within 180 s"
     except (IndexError, json.JSONDecodeError):
         row["gpu_error"] = (g.stderr or g.stdout)[-300:]
     ok = row.get("gpu_mismatch") is None and "gpu_error" not in row
