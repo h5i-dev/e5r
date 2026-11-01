@@ -55,3 +55,4 @@ elab "#audit_ptx" : command => do
 #print axioms Ptx.Examples.Buggy.sub_wrong
 #print axioms Ptx.Examples.Reduce.reduce_correct
 #print axioms Ptx.Examples.Scan.scan_correct
+#print axioms Ptx.Examples.ReduceAtomic.reduce_atomic_correct

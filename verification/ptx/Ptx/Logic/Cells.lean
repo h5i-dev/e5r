@@ -107,6 +107,8 @@ theorem covers_of_lt {base x : Addr} {N : Nat} (hf : Fits base N) (h : (x - base
     omega
   · rw [Nat.mod_eq_of_lt (by omega)] at h; omega
 
+@[simp] theorem elem_zero (b : Addr) : elem b 0 = b := by simp [elem]
+
 theorem elem_elem (b : Addr) (c i : Nat) : elem (elem b c) i = elem b (c + i) := by
   apply BitVec.eq_of_toNat_eq
   simp only [elem, BitVec.toNat_add, BitVec.toNat_ofNat]
