@@ -1081,25 +1081,43 @@ checked only when its acceptance criterion has been run.
       `nobound_faults`, `tid_races`, `sub_wrong`. `scripts/check-lean-ptx.sh`:
       6 generated modules current, all benchmarks assemble with ptxas 13.2, 10
       theorems audited, about 30 s.)
-- [ ] **P3 (M3). Proof automation.** *Accepted:* a model writes PTX and the
+- [x] **P3 (M3). Proof automation.** *Accepted:* a model writes PTX and the
       invariants, and a tactic proves the per-thread and grid obligations
       without a hand-written proof; wrong PTX yields a replayed counterexample
-      where one exists. *Status:* not started beyond the base: `simp only
-      [ptx_eval, K]` evaluates straight-line segments and loop bodies to their
-      verification conditions; disjointness and arithmetic are closed by
-      `omega`; the per-kernel proofs and the refutation inputs are still
-      written by hand.
+      where one exists. (Accepted 2026-11-01, for the `map32` class:
+      elementwise maps over 32-bit arrays, guarded or grid-stride, 1-D.
+      `e5r-verify ptx check` generates `spec.Correct K` from an
+      `e5r.ptx.spec.v1` spec whose loop invariant is register roles at the
+      loop head, proves it with `Ptx/Auto` (class theorem proved once,
+      per-thread obligations by `ptx_guarded`/`ptx_stride_*`), and otherwise
+      replays a counterexample from the interpreter search as `¬ spec.Correct
+      K`. Measured: vadd_nvcc and saxpy proved; vadd_nobound, vadd_tid,
+      vadd_sub refuted; 0 of 21 mutants proved, 20 refuted, 1 unknown (a loop
+      that never advances: non-termination has no finite witness); 102 M5
+      kernels proved with no per-kernel proof. Outside the class the verdict
+      is `unsupported` or `unknown`.)
 - [ ] **P4 (M4). Shared memory, barriers, reductions.** *Accepted:* `.shared`,
       `bar.sync`, atomics in the model with the synchronization rules they
       need; a parallel reduction and a scan proved. *Status:* not started; the
-      parser refuses all of them.
-- [ ] **P5 (M5). AI-generated PTX at scale.** *Accepted:* specification to PTX
+      parser refuses all of them, so such kernels are `unsupported`. The
+      design it needs (barrier rule in `Step`, phase-relative race freedom, a
+      per-phase composition theorem) is sketched in `verification-ptx.md`,
+      "Open"; it was not attempted in the 2026-11-01 session.
+- [x] **P5 (M5). AI-generated PTX at scale.** *Accepted:* specification to PTX
       to Lean to GPU benchmark, reported as the share of generated kernels
       proved, bugs found, proof time per kernel and speed against a CUDA or
-      Triton baseline. *Status:* not started. Also open: differential testing
-      of the instruction semantics against a GPU (an A10G is available on the
-      development machine), which would supplement, not replace, the
-      semantics' review.
+      Triton baseline. (Accepted 2026-11-01: `verification/ptx/m5`, 115
+      kernels written by the agent in one session, 11 of them with seeded
+      defects; of the 104 written to be correct 102 proved and 2 unsupported;
+      9 seeded defects refuted with replayed counterexamples, 2 unsupported;
+      proof time median 3.5 s, max 8.8 s; nvcc -O3 baseline time / PTX time
+      median 1.00 on the A10G; every proved kernel agrees with its spec on the
+      GPU. Limits, recorded in `m5/RESULTS.md`: no automated generation loop
+      (no model API on the machine), tactics improved during the run with
+      first-run verdicts listed, no natural defect found, A10G only. The
+      differential test of the instruction semantics against the A10G is
+      done: 829 launches of 419 kernels identical across the Lean model, the
+      interpreter, the JIT and ptxas, and misaligned accesses fault on both.)
 
 Not in this scope, and not to be described as done: SASS, the ptxas or driver
 translation from PTX to SASS, floating point, the PTX memory model beyond the

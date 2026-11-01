@@ -328,6 +328,20 @@ pub fn check(o: &Options) -> (Verdict, Value) {
     }
     let proof = dir.join("Proof.lean");
     let text = leangen::proof(k, &sp, &header);
+    // What the theorem is about, as Lean reads it: the reviewer checks this
+    // against the JSON spec (the translation is part of the trusted base).
+    if let (Some(i), Some(j)) = (
+        text.find("def spec : MapSpec where"),
+        text.find("@[ptx_spec]"),
+    ) {
+        doc["lean_spec"] = json!(text[i..j].trim_end());
+    }
+    if let (Some(i), Some(j)) = (
+        text.find("def loop : Loop where"),
+        text.find("@[ptx_spec] theorem loop_head"),
+    ) {
+        doc["lean_loop"] = json!(text[i..j].trim_end());
+    }
     if let Err(e) = std::fs::write(&proof, &text) {
         return finish(doc, Verdict::Error, Some(e.to_string()));
     }
