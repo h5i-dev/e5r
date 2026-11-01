@@ -184,8 +184,8 @@ structure Ok (r0 : Tid → String → Val) (p0 : Tid → String → Bool) (m0 : 
   phase : ∀ t ∈ L.threads, ∀ k < S.P t.ctaid, ∀ s, S.T t k s →
     Run K (L.allocs K) (L.ctx t) (S.F t k) S.Cell (S.J K L t k) (S.N t k) s (S.M t.ctaid k)
       (fun _ => 0)
-  compose : ∀ b k x, k < S.P b → (∀ t ∈ L.threads, t.ctaid = b → ¬ (S.F t k).w x) →
-    (S.M b (k + 1)).get x = (S.M b k).get x
+  compose : ∀ b k x, (∃ t ∈ L.threads, t.ctaid = b) → k < S.P b →
+    (∀ t ∈ L.threads, t.ctaid = b → ¬ (S.F t k).w x) → (S.M b (k + 1)).get x = (S.M b k).get x
   sameCta : ∀ t ∈ L.threads, ∀ u ∈ L.threads, t ≠ u → t.ctaid = u.ctaid → ∀ k x,
     (S.F t k).w x → ¬ (S.F u k).touches x
   crossCta : ∀ t ∈ L.threads, ∀ u ∈ L.threads, t.ctaid ≠ u.ctaid → ∀ k j a,
@@ -317,7 +317,7 @@ theorem agree_after {c : Cfg} {n d} (hI : S.Inv K L m0 c n d) {b : Dim3}
   · have hn : ∀ u ∈ L.threads, u.ctaid = b → ¬ (S.F u (c.ph b)).w x :=
       fun u hu hb hw => hW ⟨u, hu, hb, hw⟩
     obtain ⟨t, ht, rfl, hk⟩ := hx
-    rw [hI.mem _ x ⟨t, ht, rfl, hk⟩ hn, hS.compose _ _ x (hI.ph t ht) hn]
+    rw [hI.mem _ x ⟨t, ht, rfl, hk⟩ hn, hS.compose _ _ x ⟨t, ht, rfl⟩ (hI.ph t ht) hn]
 
 /-- The derivation of a thread after its CTA passes a barrier, against the
 actual memory. -/
@@ -598,6 +598,24 @@ theorem reach_inv {c : Cfg} (hc : Reach K L (Cfg.init r0 p0 m0 sh0) c) : ∃ n d
   obtain ⟨j, hj⟩ := hc.steps
   obtain ⟨n, d, hI, -⟩ := inv_reach hS j c hj
   exact ⟨n, d, hI⟩
+
+omit hS in
+/-- An execution that never faults, always progresses and is bounded has a
+finished configuration. -/
+theorem exists_done_of {c₀ : Cfg} (hp : ∀ c, Reach K L c₀ c → Done K L c ∨ ∃ c', Step K L c c')
+    (hb : ∃ bound, ∀ j c, Steps K L j c₀ c → j ≤ bound) : ∃ c, Reach K L c₀ c ∧ Done K L c := by
+  obtain ⟨bound, hb⟩ := hb
+  have key : ∀ d j c, bound - j = d → Steps K L j c₀ c → ∃ c', Reach K L c₀ c' ∧ Done K L c' := by
+    intro d
+    induction d using Nat.strongRecOn with
+    | _ d ih =>
+      intro j c hd hs
+      rcases hp c (Reach.of_steps hs) with hdone | ⟨c', hc'⟩
+      · exact ⟨c, Reach.of_steps hs, hdone⟩
+      · have hs' := Steps.tail hs hc'
+        have := hb _ _ hs'
+        exact ih (bound - (j + 1)) (by omega) (j + 1) c' rfl hs'
+  exact key _ 0 c₀ rfl (.refl _)
 
 /-- The phase theorem: per-thread, per-phase derivations and the
 disjointness conditions of `Phased.Ok` give no fault, progress, bounded

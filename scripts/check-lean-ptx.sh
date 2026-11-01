@@ -30,6 +30,9 @@ kernels=(
   "buggy/vadd_nobound.ptx VAddNoBound"
   "buggy/vadd_tid.ptx VAddTid"
   "buggy/vadd_sub.ptx VAddSub"
+  "correct/reduce_nvcc.ptx ReduceNvcc"
+  "correct/reduce_atomic_nvcc.ptx ReduceAtomicNvcc"
+  "correct/scan_nvcc.ptx ScanNvcc"
 )
 
 tmp=$(mktemp -d)
