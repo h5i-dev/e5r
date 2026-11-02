@@ -70,7 +70,7 @@ evaluation, which would put the compiler in the trusted base.
 ## Reproduce
 
 ```sh
-./scripts/recheck-ptx.sh       # everything below, about 80 min on the development machine
+./scripts/recheck-ptx.sh       # everything below, about 90 min on the development machine
 ```
 
 It runs, in order, and fails on the first problem:

@@ -1189,7 +1189,11 @@ checked only when its acceptance criterion has been run.
       unsupported on the first run and 5 refuted after a search fix; 0 of 13
       float mutants proved. Open, with the reasons in `verification-ptx.md`:
       error bounds proved only where the kernel is bit-exact, no float
-      reductions, no `.f64` maps, no approximate instructions.)
+      reductions, no `.f64` maps, no approximate instructions.
+      `scripts/recheck-ptx.sh` passes, 2026-11-02, 90 min: 26 benchmarks
+      proved, 3 refuted, 2 unsupported as expected; 0 of 59 mutants proved,
+      58 refuted; 2 supplied proofs accepted, 10 refused; difftest 1693
+      launches identical; cross-check audit clean.)
 
 Not in this scope, and not to be described as done: SASS, the ptxas or driver
 translation from PTX to SASS, floating-point formats other than `.f32` and
