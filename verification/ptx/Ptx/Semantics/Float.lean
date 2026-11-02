@@ -105,7 +105,7 @@ open Fmt
 inputs. -/
 def addCore (F : Fmt) (m : RMode) (ftz : Bool) (a b : Nat) : Option Nat :=
   if F.isNaN a || F.isNaN b then none
-  else if F.isInf a && F.isInf b then (if F.sgn a == F.sgn b then some a else none)
+  else if F.isInf a && F.isInf b then (if F.sgn a == F.sgn b then some (F.inf (F.sgn a)) else none)
   else if F.isInf a then some a
   else if F.isInf b then some b
   else

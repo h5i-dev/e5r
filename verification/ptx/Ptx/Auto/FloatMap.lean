@@ -245,29 +245,72 @@ theorem fres_nanEq_of_eq (c : Ctx) (s : TState) {r r' : Option Nat} (h : r = r')
 
 end Ptx.Auto
 
+
+/-! ### Commutative operands (nvcc writes `a * x` as `fma x, a, y` when it likes) -/
+
+namespace Ptx.Fp
+
+theorem ffma_comm (F : Fmt) (m : RMode) (ftz sat : Bool) (a b c : Nat) :
+    ffma F m ftz sat a b c = ffma F m ftz sat b a c := by
+  unfold ffma; dsimp only
+  generalize F.flush ftz a = A
+  generalize F.flush ftz b = B
+  rw [Rat.mul_comm (F.toQ A)]
+  cases F.isNaN A <;> cases F.isNaN B <;> cases F.isInf A <;> cases F.isInf B <;>
+    cases F.isZero A <;> cases F.isZero B <;> cases F.sgn A <;> cases F.sgn B <;> simp
+
+theorem fmul_comm (F : Fmt) (m : RMode) (ftz sat : Bool) (a b : Nat) :
+    fmul F m ftz sat a b = fmul F m ftz sat b a := by
+  unfold fmul; dsimp only
+  generalize F.flush ftz a = A
+  generalize F.flush ftz b = B
+  rw [Rat.mul_comm (F.toQ A)]
+  cases F.isNaN A <;> cases F.isNaN B <;> cases F.isInf A <;> cases F.isInf B <;>
+    cases F.isZero A <;> cases F.isZero B <;> cases F.sgn A <;> cases F.sgn B <;> simp
+
+theorem fadd_comm (F : Fmt) (m : RMode) (ftz sat : Bool) (a b : Nat) :
+    fadd F m ftz sat a b = fadd F m ftz sat b a := by
+  unfold fadd addCore; dsimp only
+  generalize F.flush ftz a = A
+  generalize F.flush ftz b = B
+  rw [Rat.add_comm (F.toQ A)]
+  cases F.isNaN A <;> cases F.isNaN B <;> cases F.isInf A <;> cases F.isInf B <;>
+    cases F.isZero A <;> cases F.isZero B <;> cases F.sgn A <;> cases F.sgn B <;> simp
+
+end Ptx.Fp
+
+/-- Close `R = R'` or `NanEq F a b` between a kernel's operation tree and
+the spec's, node by node; each alternative must close its goal entirely,
+so a wrong guess (operand order) backtracks. -/
+syntax "ptx_fnode" : tactic
+macro_rules
+  | `(tactic| ptx_fnode) => `(tactic| first
+    | rfl
+    | exact Ptx.Fp.NanEq.refl _ _
+    | (refine Ptx.Auto.fres_nanEq_of_eq _ _ ?_; ptx_fnode)
+    | (apply Ptx.Auto.fadd_congr <;> ptx_fnode)
+    | (rw [Ptx.Fp.fadd_comm] <;> (apply Ptx.Auto.fadd_congr <;> ptx_fnode))
+    | (apply Ptx.Auto.fsub_congr <;> ptx_fnode)
+    | (apply Ptx.Auto.fmul_congr <;> ptx_fnode)
+    | (rw [Ptx.Fp.fmul_comm] <;> (apply Ptx.Auto.fmul_congr <;> ptx_fnode))
+    | (apply Ptx.Auto.ffma_congr <;> ptx_fnode)
+    | (rw [Ptx.Fp.ffma_comm] <;> (apply Ptx.Auto.ffma_congr <;> ptx_fnode))
+    | (apply Ptx.Auto.fdiv_congr <;> ptx_fnode)
+    | (apply Ptx.Auto.frcp_congr <;> ptx_fnode)
+    | (apply Ptx.Auto.fsqrt_congr <;> ptx_fnode)
+    | (apply Ptx.Auto.fneg_congr <;> ptx_fnode)
+    | (apply Ptx.Auto.fabs_congr <;> ptx_fnode)
+    | (apply Ptx.Auto.fminmax_congr <;> ptx_fnode))
+
 /-- The value goal of a float map: unfold the spec's operations, then match
-the kernel's operation tree against the spec's node by node. -/
+the kernel's operation tree against the spec's. -/
 macro "ptx_fvalue" : tactic => `(tactic| (
   simp only [Ptx.Auto.MapSpec.val, ptx_spec, Ptx.lo32_ext32, Ptx.lo32_rd_b4, Ptx.Auto.F32.add,
     Ptx.Auto.F32.sub, Ptx.Auto.F32.mul, Ptx.Auto.F32.div, Ptx.Auto.F32.fma, Ptx.Auto.F32.sqrt,
     Ptx.Auto.F32.rcp, Ptx.Auto.F32.neg, Ptx.Auto.F32.abs, Ptx.Auto.F32.minmax]
   first
-    | refine Ptx.Fp.within32_of_feq (Ptx.Auto.feq_of_eq _ _ ?_)
-    | refine Ptx.Auto.feq_of_eq _ _ ?_
-  repeat' first
-    | rfl
-    | exact Ptx.Fp.NanEq.refl _ _
-    | refine Ptx.Auto.fres_nanEq_of_eq _ _ ?_
-    | apply Ptx.Auto.fadd_congr
-    | apply Ptx.Auto.fsub_congr
-    | apply Ptx.Auto.fmul_congr
-    | apply Ptx.Auto.ffma_congr
-    | apply Ptx.Auto.fdiv_congr
-    | apply Ptx.Auto.frcp_congr
-    | apply Ptx.Auto.fsqrt_congr
-    | apply Ptx.Auto.fneg_congr
-    | apply Ptx.Auto.fabs_congr
-    | apply Ptx.Auto.fminmax_congr))
+    | exact Ptx.Fp.within32_of_feq (Ptx.Auto.feq_of_eq _ _ (by ptx_fnode))
+    | exact Ptx.Auto.feq_of_eq _ _ (by ptx_fnode)))
 
 /-- Float specs: `ptx_value` falls back to `ptx_fvalue`. -/
 macro_rules | `(tactic| ptx_value) => `(tactic| ptx_fvalue)

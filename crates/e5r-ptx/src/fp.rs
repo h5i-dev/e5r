@@ -381,7 +381,7 @@ fn add_core(f: Fmt, m: RMode, ftz: bool, a: u64, b: u64) -> Option<u64> {
         return None;
     }
     if f.is_inf(a) && f.is_inf(b) {
-        return if f.sgn(a) == f.sgn(b) { Some(a) } else { None };
+        return if f.sgn(a) == f.sgn(b) { Some(f.inf(f.sgn(a))) } else { None };
     }
     if f.is_inf(a) {
         return Some(a);
