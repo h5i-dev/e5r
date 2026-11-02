@@ -11,7 +11,10 @@
 #   4b. the supplied-proof route (proofs/controls.sh): two supplied proofs
 #      accepted, every negative control refused;
 #   5. the GPU differential test (scripts/check-ptx-difftest.sh), skipped
-#      with a note when there is no GPU.
+#      with a note when there is no GPU;
+#   6. the cross-check of the float rounding core against lean-ieee754
+#      (scripts/check-ptx-ieee-crosscheck.sh), skipped with a note when its
+#      Mathlib dependency has not been fetched.
 #
 # E5R_VERIFY=path skips the cargo build and test (CI passes its dev build).
 # Lean runs with LEAN_NUM_THREADS=2 and a 10 GB cgroup cap unless overridden.
@@ -59,4 +62,10 @@ case $rc in
   77) echo "skipped: no GPU on this machine" ;;
   *) cat "$out/diff.log" >&2; exit 1 ;;
 esac
+echo "== cross-check of the rounding core against lean-ieee754"
+if [[ -d $root/../ptx-ieee-crosscheck/.lake/packages/mathlib/.lake/build ]]; then
+  ./scripts/check-ptx-ieee-crosscheck.sh 2>&1 | grep -E "^axiom audit"
+else
+  echo "skipped: Mathlib not fetched (scripts/check-ptx-ieee-crosscheck.sh fetches it, about 8 GB)"
+fi
 echo "recheck: all PTX verification claims rechecked"

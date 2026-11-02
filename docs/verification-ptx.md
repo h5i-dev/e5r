@@ -38,7 +38,15 @@ unsupported ones were later proved by supplied proofs the tool checked
 one word with an atomic (`accum`: `add`, `and`, `or`, `xor`, and signed and
 unsigned `min` and `max`, at 32 and 64 bits), 16 nvcc kernels, one per
 operation and type, were proved. `atom.exch` and `atom.cas`, whose result
-depends on the order, are not covered.
+depends on the order, are not covered. With `.f32` and `.f64` in the model
+(every correctly rounded operation of the PTX ISA, its rounding modifiers,
+`.ftz` and `.sat`), the model, the interpreter and the A10G agree bit for
+bit on 311 float instruction forms, and float maps are proved bit-exact up
+to NaN payloads: 5 nvcc kernels and all 16 float kernels the agent wrote to
+be correct (`m5/float/RESULTS.md`); 5 of 6 seeded float defects were
+refuted, the sixth uses an approximate instruction the model refuses.
+Error bounds against exact real arithmetic, float reductions and
+approximate instructions are not proved (Open).
 
 "Proved" below means checked by the Lean kernel with only `propext`,
 `Quot.sound` and `Classical.choice` among the axioms of every declaration
@@ -57,6 +65,7 @@ evaluation, which would put the compiler in the trusted base.
 | M5 AI-written PTX benchmark (P5) | done, with the limits stated | `m5/RESULTS.md`; differential test against the A10G |
 | Supplied proofs (P6) | done | `ptx check --proof`; `a_direct` and `s_pingpong` proved; 10 negative controls refused |
 | Commutative atomics (P7) | done for `accum`; `exch` and `cas` not covered | `phase_sound` over a cell algebra; 16 `accum` benchmarks proved; 0 of 11 `accum` mutants proved, 11 refuted |
+| Floating point (P8) | done for the correctly rounded operations and bit-exact `.f32` maps; error-bound proofs, float reductions, `.f64` maps and approximate instructions open | 311 float forms identical on the A10G; rounding core proved equal to lean-ieee754; 5 nvcc and 16 M5 float kernels proved; 0 of 13 float mutants proved, 13 refuted |
 
 ## Reproduce
 
@@ -67,16 +76,19 @@ evaluation, which would put the compiler in the trusted base.
 It runs, in order, and fails on the first problem:
 
 1. the parser tests, release profile: round trip, the ptxas agreement test
-   (714 forms), grammar and mutation fuzzing, the CLI tests;
+   (1025 forms), grammar and mutation fuzzing, the CLI tests;
 2. `scripts/check-lean-ptx.sh`: regenerate every kernel module from its `.ptx`
    and refuse a stale one, assemble every benchmark with ptxas when it is
    installed, build the Lean project from scratch, and run the axiom audit;
 3. `e5r-verify ptx check` on every benchmark against
-   `benchmarks/expected.txt` (21 proved, 3 refuted, 1 unsupported);
+   `benchmarks/expected.txt` (26 proved, 3 refuted, 2 unsupported);
 4. the mutation controls (`mutants/run.py`): no mutant may be proved;
 5. the supplied proofs and their negative controls (`proofs/controls.sh`);
 6. the GPU differential test (`scripts/check-ptx-difftest.sh`), skipped with
-   a note when there is no GPU.
+   a note when there is no GPU;
+7. the cross-check of the rounding core against lean-ieee754
+   (`scripts/check-ptx-ieee-crosscheck.sh`), skipped with a note when its
+   Mathlib dependency (about 8 GB) has not been fetched.
 
 The M5 benchmark is separate because it needs the GPU and takes 12 minutes
 for the M3 part and about 2 hours for the M4 part (most of it failed proof
@@ -88,10 +100,15 @@ python3 verification/ptx/m5/report.py /tmp/m5/results.json
 python3.12 verification/ptx/m5/m4/run4.py ./target/release/e5r-verify /tmp/m5m4
 python3.12 verification/ptx/m5/m4/run4.py --mutants ./target/release/e5r-verify /tmp/m5mut
 python3 verification/ptx/m5/m4/report4.py    # reads the copies in m5/m4/
+python3.12 verification/ptx/m5/float/run_float.py ./target/release/e5r-verify /tmp/m5f
+python3 verification/ptx/m5/float/report_float.py   # reads the copies in m5/float/
 ```
 
 Lean is core v4.35.0, the toolchain `verification/rv32` already uses. The
 project has no `require`, so nothing is downloaded. Mathlib is not used.
+The cross-check (`verification/ptx-ieee-crosscheck`) is a separate project
+on lean-ieee754's toolchain (v4.33.1) with Mathlib; nothing in
+`verification/ptx` depends on it.
 
 Lean is capped on purpose: a Lean process was OOM-killed at 15 GB on the
 development machine. The scripts run Lean with `LEAN_NUM_THREADS=2` under a
@@ -174,6 +191,37 @@ The claimed ranges are part of what is checked. The vadd that nvcc emits
 compares a signed 32-bit index, so its spec claims `max_threads` 2^31 − 1;
 claiming 2^32 − 1 is refuted with a thread whose index wraps negative
 (`mutants/run.py`).
+
+### Float maps (`map32` with `"element_type": "f32"`)
+
+```json
+{ "schema": "e5r.ptx.spec.v1", "kernel": "saxpy_f32", "class": "map32",
+  "element_type": "f32",
+  "arrays": ["saxpy_f32_param_1", "saxpy_f32_param_2"], "output": "saxpy_f32_param_2",
+  "length": "saxpy_f32_param_3", "scalars": ["saxpy_f32_param_0"],
+  "element": "fma.rn(saxpy_f32_param_0, saxpy_f32_param_1, saxpy_f32_param_2)",
+  "result": "bit_exact",
+  "schedule": { "kind": "guarded", "max_threads": "2^32" } }
+```
+
+- The arrays hold `.f32` elements and the scalars are `.f32` parameters.
+- `element` is an expression of the model's own operations, spelled like
+  the instructions: `add sub mul div fma sqrt rcp` with a rounding modifier
+  (`.rn .rz .rm .rp`) and optional `.ftz`/`.sat` where PTX has them,
+  `neg abs` with optional `.ftz`, `min max` with optional `.ftz`/`.NaN`, and
+  `0fXXXXXXXX` literals. Each node is the operation of
+  `Ptx/Semantics/Float.lean` (`Ptx.Auto.F32.*`), so the spec states exact
+  bits, not real numbers.
+- `result` is `"bit_exact"` (the default): every output element has
+  exactly the bits of `element`, except that where `element` is a NaN the
+  output is some NaN (`Ptx.Fp.feq32`). The exception is forced: PTX does not
+  fix NaN bits (below). Or `{"max_ulps": k}`: both NaN, the same infinity,
+  or both finite and at most `k` representable numbers apart
+  (`Ptx.Fp.within32 k`). The checker proves `max_ulps` only where the kernel
+  is bit-exact; a bound against a differently rounded or exact real
+  computation is not proved (Open).
+- `MapSpec.Correct` quantifies over the launch's NaN oracle as over every
+  other launch input.
 
 ### The block specs (`reduce32`, `scan32`)
 
@@ -422,6 +470,136 @@ Not covered, and why:
   gets no proof from the classes.
 - **The returned old value** carries no information (above).
 
+### Floating point
+
+**Model.** `Ptx/Semantics/FloatCore.lean` and `Float.lean`, written from
+the PTX ISA 9.4 (9.7.3 floating-point instructions, Tables 23 to 25 of
+9.3.1.2, 9.7.10.24 `cvt`) and IEEE 754-2019 (§4.3 rounding, §6.3 zero
+signs, §7.4 overflow, §7.5 tininess). A value is its bit pattern. Each
+correctly rounded operation computes the exact result as a rational (a
+square root by comparing `q` with squares) and rounds it once:
+`add sub mul fma div rcp sqrt` at `.rn .rz .rm .rp`, `min max` (with
+`.NaN`), `neg abs`, `setp` with all 14 comparisons, and `cvt` between
+`.f32`, `.f64` and the four integer types with every rounding (`.rn .rz .rm
+.rp`, `.rni .rzi .rmi .rpi` for integers and for rounding to an integral
+float). `.ftz` flushes subnormal inputs and results to sign-preserving zero
+(f32 only, as the ISA allows); `.sat` clamps to `[+0.0, 1.0]` with NaN to
+`+0.0`; float-to-integer conversions clamp and send NaN to 0, or to
+`1 << (w − 1)` when the source is `.f64` or the destination is 64-bit.
+
+Where the ISA's text is not a complete specification, the model does this:
+
+- **`.ftz` on results** flushes a result that is tiny after rounding with
+  an unbounded exponent (IEEE 754 §7.5's after-rounding test). The ISA only
+  says "subnormal results"; the A10G flushes `fma.rn.ftz` of
+  `2^-126 − 2^-150` (exactly representable below the smallest normal) and
+  keeps `2^-126 − 2^-152` (which rounds to the smallest normal), which only
+  this rule gives. Measured, and checked by the difftest.
+- **`add`, `sub`, `mul` without a rounding modifier** are refused. The ISA
+  says ptxas may fuse such a `mul` with an `add` into an `fma`, so their
+  result is not determined by the instruction. nvcc emits them for `x + y`
+  with its default `-fmad=true`; those kernels are `unsupported`
+  (`benchmarks/correct/float/fadd_default.ptx`).
+- **NaN results** follow the ISA's text, not measured hardware. The ISA
+  says single-precision instructions "return an unspecified NaN" and that
+  double precision supports payloads without saying which input's payload a
+  result carries; for `neg`, `abs` and the `cvt` forms it is also
+  unspecified. The A10G returns `0x7fffffff` for f32 arithmetic and
+  `0xfff8000000000000` for invalid f64 operations, but which input's
+  payload an f64 result carries depends on the operand order ptxas chose
+  (`add(qa, qb)` returned `qb` with the operands loaded from memory and `qa`
+  when ptxas constant-folded the same instruction), and `neg.f32` of a NaN
+  returned a sign-flipped payload when folded and `0x7fffffff` at run time.
+  Fixing any one rule would make theorems claim bits the hardware does not
+  promise. So every NaN result takes its bits from the launch's NaN oracle
+  (`Launch.nan : Tid → TState → Val`, forced to be a NaN of the format), and
+  float theorems hold for every oracle. Integer instructions never read it,
+  and every result that is not NaN is fully determined.
+- **Approximate instructions** (`sin cos lg2 ex2 tanh rsqrt` and the
+  `.approx`/`.full` forms of `div rcp sqrt`) are refused as unsupported.
+  NVIDIA documents bounds for some of them (`rcp.approx.f32` at most 1 ulp,
+  `sqrt.approx.f32` relative error `2^-23`, `div.approx.f32` 2 ulp for
+  `|b|` in `[2^-126, 2^126]`), but a bound is a set of allowed results, and
+  using one would need an oracle constrained by it in the launch, a GPU
+  check of the bound (exhaustive over f32 for the unary ones), and
+  error-bound reasoning in the proofs, none of which is built. Each bound
+  in the documentation also has range conditions and special cases that
+  would have to be modelled exactly.
+- Not modelled: `.f16`, `.bf16`, `.f32x2`, `mad.f32`, `copysign`, `testp`,
+  `min/max.xorsign.abs`, three-input `min/max`, `.rna`, `.rs`, float atomics
+  and `cvt.f32.f32` without integer rounding.
+
+**Differential test.** The float forms run like the integer ones (below):
+311 kernels, every operation at every rounding with and without `.ftz` and
+`.sat`, every comparison, every conversion, literals, moves, loads and
+stores, each on 2176 threads whose inputs are the pairs of 45 (f32) or 42
+(f64) edge values (zeros, subnormals, the smallest normal, `±1`, values one
+unit in the last place apart, the largest finite number, infinities, quiet
+and signalling NaNs, integer and overflow boundaries) and random patterns,
+random normal numbers, values near the subnormal and overflow boundaries,
+and pairs that cancel. A float result is stored with every NaN replaced by
+one pattern first (`setp.nan`, `selp`), since its bits are unspecified;
+every other result is compared bit for bit. Measured on the A10G: identical
+on all 622 float launches (about 677,000 results). Planted errors were
+detected: ties rounded away from zero (69 launches differ) and `.ftz`
+deciding tininess before rounding (9 launches differ).
+
+**Cross-check against lean-ieee754.** The rounding core
+(`FloatCore.lean`) is in the trusted base, so it was compared with an
+independent IEEE 754 specification. `verification/ptx-ieee-crosscheck`
+proves, with Mathlib, for every rational, both formats and the four
+rounding modes (`Crosscheck/Rounding.lean`):
+`roundQ = roundWithMode`, `precRoundQ = precisionRoundWithMode`,
+`overflows ↔ OverflowWithMode`, `tiny ↔ TinyWithMode`, and
+`roundSqrtQ q = roundWithMode (√q)`, the finite result lean-ieee754's
+`Sqrt` contract requires; `binary32` and `binary64` are the model's
+formats. Its axiom audit covers the 838 declarations involved; all of
+lean-ieee754 (3697 declarations, built at 529ed78 under a 7 GB cap in 4
+minutes) uses only the three standard axioms. The bit-pattern layer
+(decoding, encoding, special operands, zero signs, NaNs, `.sat`) is not
+cross-checked; the difftest checks it.
+
+The decision on lean-ieee754
+(https://github.com/tunnellm/lean-ieee754, Apache-2.0, 529ed78): use it
+only as an independent cross-check, not as a dependency and not vendored.
+
+- Depending on it would put Mathlib in the main project's build and
+  trusted base and pin it to Lean v4.33.1, against this project's v4.35.0
+  (`.olean` files do not cross toolchains), and its definitions are
+  noncomputable over `ℝ`. The model has to execute: the difftest runs it,
+  and refutations are decided by the Lean kernel evaluating it.
+- Vendoring parts would bring the same Mathlib dependency, since its
+  `Spec` is stated with `ℝ`, `Int.log` and `Int.floor`.
+- Its specification is not PTX. Its NaN policy (a deterministic choice of
+  an input payload, a positive canonical NaN for invalid operations) is
+  IEEE-style where PTX leaves NaN bits unspecified, and it has no `.ftz`,
+  `.sat` or PTX `min`/`max`. Read against IEEE 754-2019, its rounding
+  definitions (`roundInteger`, `roundWithMode` with
+  `quantum = 2^(max(emin, ⌊log₂|x|⌋) − p + 1)`, `OverflowWithMode` on the
+  unbounded-exponent result, `TinyWithMode` after rounding,
+  `OverflowToInfinity` by direction, the zero-sign rule of §6.3 in
+  `arithmeticCase`) agree with the standard; those are the parts the
+  cross-check uses. Its README says it is mostly LLM-written without
+  expert review, so agreement is evidence from a second, independently
+  written statement, not an authority; the A10G difftest stays the
+  hardware check.
+
+**Automation.** `Ptx/Auto/FloatMap.lean`. The map class theorem is
+unchanged except that the output relation is a parameter (`MapSpec.rel`,
+equality for integer maps) and the launch carries the NaN oracle. After
+the symbolic run, the kernel's output is `lo32 (fres c s .f32 R)` for an
+operation tree `R`; the spec's is the same tree with `F32.lift`. `ptx_fnode`
+matches them node by node: equal leaves (loaded words, scalars, literals),
+inner results through `fres_nanEq_of_eq`, and each operation through a
+congruence lemma (`fadd_congr`, ..., `fminmax_congr`) stating that it
+gives the same result for any two NaN inputs, so the oracle's choice never
+matters. `ffma_comm`, `fmul_comm` and `fadd_comm` (proved by cases on the
+operands' classes) let it accept commuted operands, which nvcc produces.
+The match backtracks; a mismatch leaves the goal open, so the verdict is
+`unknown`, never `proved`. Refutations of float values are decided by
+`decide +kernel`: the Lean kernel evaluates the model on the
+counterexample.
+
 ### Theorems in the library
 
 All of these quantify over every initial register content and every
@@ -443,6 +621,8 @@ interleaving.
 | `Ptx.Auto.Accum.correct_of` | every `accum` kernel, all 16 algebras | `Obligation` (one phase per thread) | `Accum.Correct` |
 | `E5rCheck.correct` (generated) | `benchmarks/correct/accum/acc_*.ptx`, nvcc 13.2 | `Accum.Args.Pre` | `Accum.Correct` for `add.u32 add.u64 and/or/xor.b32 and/or/xor.b64 min/max.u32 min/max.s32 min/max.u64 min/max.s64` |
 | `E5rProof.correct` (supplied) | `m5/m4/kernels/a_direct.ptx`, `s_pingpong.ptx` | the class's `Pre` | `Reduce32.Atomic.Correct`, `Scan32.Correct` |
+| `E5rCheck.correct` (generated) | `benchmarks/correct/float/saxpy_f32.ptx`, `fdefault.ptx` (nvcc 13.2) | `MapSpec.Pre`, any NaN oracle | output = `fma.rn(a, x, y)`, `div.rn(x, y)`, `sqrt.rn(x)`, `max(x, 0)` bit for bit, any NaN where that is NaN |
+| `Crosscheck.roundQ_eq`, `overflows_iff`, `tiny_iff`, `roundSqrtQ_eq` (separate project, Mathlib) | the rounding core | none | equal to lean-ieee754's `roundWithMode`, `OverflowWithMode`, `TinyWithMode` |
 
 The vadd preconditions are the ones the PTX needs:
 
@@ -514,6 +694,13 @@ refuted with a replayed counterexample (3 faults, 8 wrong values). The plain
 store is refuted as a wrong value (one thread, `*out` not combined), which
 comes first in the search, not as a race.
 
+The float benchmarks have 13 more: `fma.rn` to `fma.rz`, the fma split into
+`mul.rn` and `add.rn`, `a·y + x`, `.ftz` and `.sat` added, the bound check
+removed, a load from `x[i+1]`, the spec's rounding changed to `.rm` and to a
+separately rounded product, `div.rn` to `div.rz`, `y / x`, `max` to `min`
+and `sqrt.rn` to `sqrt.rp`. Measured: 0 of 13 proved, 13 refuted with a
+replayed counterexample (2 faults, 11 wrong values).
+
 The axiom audit was checked the same way: a module with an `axiom` and a
 `native_decide` added to the library makes `Audit.lean` fail, naming both.
 The ptxas agreement test was checked by letting the parser accept `and.u32`;
@@ -521,7 +708,8 @@ it failed and listed the forms.
 
 ## Differential testing against the GPU
 
-`scripts/check-ptx-difftest.sh` runs 1071 launches of 545 generated kernels,
+`scripts/check-ptx-difftest.sh` runs 1693 launches of 856 generated kernels
+(311 of them float forms, described under "Floating point"),
 one per instruction form of the subset (every operation at every type the
 parser accepts, register and immediate operands including edge values,
 shifts by 0 to 100 and by 2^32 − 1, every comparison, every conversion,
@@ -544,7 +732,7 @@ The Lean side runs the CTAs with the same schedule as the interpreter
 values do not depend on it for the commutative operations tested.
 
 Measured on the A10G, driver 595.112.07, CUDA 13.2: all four outputs are
-identical byte for byte on all 1071 launches. Ten misaligned accesses fault
+identical byte for byte on all 1693 launches. Ten misaligned accesses fault
 in the model and are refused by the GPU with
 `CUDA_ERROR_MISALIGNED_ADDRESS`. A planted error in the model (`atom.min.s32`
 compared unsigned) was detected by the test. Out-of-bounds accesses are not
@@ -635,6 +823,47 @@ compiled by nvcc -O3, specs written from the PTX. Nothing was planted.
 - Random mechanical mutants of three proved kernels (24, seeded): see
   `m5/m4/RESULTS.md`.
 
+### Float part (`m5/float/`)
+
+22 `.f32` map kernels the agent wrote in one pass before any was checked,
+but after the float automation was built, so not blind to it: 16 meant to
+be correct (fused and unfused axpy, `.ftz` scaling, ReLU, clamping with
+`.sat`, abs, negation, `sqrt`, division, reciprocal, lerp, a 3-way min,
+Horner's rule with two fmas, `max.NaN`, round-toward-zero addition, a
+grid-stride saxpy) and 6 with a seeded defect. 21 share one skeleton
+(`write_kernels.py`); the stride kernel is written by hand. The GPU test
+runs each kernel and a CUDA C baseline using the intrinsic of the same
+rounding (`__fmaf_rn`, `__fdiv_rn`, ...; nvcc -O3, `-ftz=true` where the task
+flushes) on the same 133,094 inputs (edge values, random patterns, random
+normal numbers) and requires equal bits, any NaN matching any NaN. The
+baseline does not use the Lean model.
+
+| | kernels | proved | refuted | unknown | unsupported |
+| --- | --- | --- | --- | --- | --- |
+| written to be correct, first run | 16 | 16 | 0 | 0 | 0 |
+| seeded defect, first run | 6 | 0 | 4 | 1 | 1 |
+| seeded defect, after the fix | 6 | 0 | 5 | 0 | 1 |
+
+- All 16 proved kernels agree with their baselines on the GPU; all 6
+  seeded kernels differ from theirs. Proof time median 4.1 s, max 10.3 s.
+  Speed against the baseline: median 1.00.
+- The fix: `fbug_axpy_fused` (an fma where the spec rounds the product
+  first) was `unknown` because the search, 44 small launches of random bit
+  patterns, found no input where the two roundings differ. The search now
+  also draws normal numbers of nearby magnitude and tries 2000 one-element
+  launches for float maps; the counterexample it then found was replayed in
+  Lean.
+- `fbug_div_approx` (`div.approx.f32`) is `unsupported`: the model refuses
+  approximate instructions.
+- The nvcc benchmarks (`benchmarks/correct/float/`), compiled from plain
+  CUDA C with nvcc's defaults: `a * x[i] + y[i]` (nvcc contracts it to
+  `fma.rn.f32` with the operands in the order `x, a, y`), `x / y`
+  (`div.rn.f32`), `sqrtf` (`sqrt.rn.f32`) and `fmaxf(x, 0)`. First run: div,
+  sqrt and max proved, axpy `unknown`, because the matcher required the
+  spec's operand order; after `ffma_comm`/`fmul_comm`/`fadd_comm` were added,
+  all four are proved. `x + y` compiles to `add.f32` with no rounding
+  modifier and is `unsupported` (above).
+
 ## How it works
 
 ```
@@ -645,7 +874,9 @@ spec.json --e5r-verify ptx check--> Proof.lean (template) --lake env lean--> axi
 Ptx/Semantics: Memory, Instruction (one thread), SIMT (grid, interleaving)
 Ptx/Logic:     Hoare (Safe, wp, loop rule), RaceFreedom (grid_sound), Regions, Launch1D, Refute,
                Phases, PhaseSound (phase_sound), PhaseWp, Cells, Sums, Schedule (replay with barriers)
+Ptx/Semantics/FloatCore, Float: rounding core and the float instructions on bit patterns
 Ptx/Auto:      Map (the map32 class, proved once), Tactic (ptx_guarded, ptx_stride_*),
+               FloatMap (float element functions, NaN congruence, ptx_fvalue),
                Block, Reduce32, Scan32, Accum (the M4 classes, proved once), Tactic4
 Ptx/Logic/CellAlgs: the 16 atomic algebras and their laws
 Checker:       proofcheck, the supplied-proof checker
@@ -686,8 +917,8 @@ interleaving. A new kernel never re-proves concurrency.
 ### Parser
 
 `crates/e5r-ptx` lexes, parses and type-checks the subset and refuses
-everything else with a line number: other types (`.f32`, `.u16`), state spaces
-(`.local`, `.const`), instructions (`neg`, `rem`, `mad.wide`, `ld.global.nc`,
+everything else with a line number: other types (`.u16`, `.f16`), state spaces
+(`.local`, `.const`), instructions (integer `neg`, `rem`, `mad.wide`, `ld.global.nc`,
 `ld.volatile`, `barrier.sync`, `bar.arrive`, `bar.sync` with another barrier
 or a thread count, a predicated `bar.sync`), special registers (`%laneid`),
 and forms ptxas rejects or
@@ -736,8 +967,16 @@ What a theorem here does and does not establish:
    axiom list of `E5rCheck.correct`. That code (`src/ptx/mod.rs`, `run_lean`
    and `check`) is trusted for the exit status.
 3. **The semantics' fidelity to PTX.** Written from the PTX ISA manual and
-   differentially tested on the A10G (above). Modelling decisions that are
-   part of it:
+   differentially tested on the A10G (above). The float definitions
+   (`Ptx/Semantics/FloatCore.lean`, `Float.lean`) are part of it; their
+   rounding core is cross-checked against lean-ieee754, their bit layer by
+   the difftest, and their modelling decisions (the `.ftz` tininess rule,
+   refused unrounded `add`/`sub`/`mul`, NaN bits from the oracle, refused
+   approximate instructions) are listed under "Floating point". A float
+   theorem also trusts that ptxas does not change the result of an
+   instruction with an explicit rounding modifier, which the ISA states
+   ("treated conservatively by the code optimizer"). Modelling decisions
+   that are part of it:
    - `cvta.to.global.u64` is the identity, as it is for global allocations on
      current GPUs;
    - `ld.param` reads the launch's parameter values, `.u32` zero-extended;
@@ -903,11 +1142,29 @@ combines these four things:
 - **M5 at the plan's scale.** 115 M3 kernels and 14 M4 kernels from one
   model in one session, no automated generation loop, no Hopper or Blackwell
   hardware.
+- **Float error bounds.** The `max_ulps` spec form exists, but the checker
+  proves it only where the kernel is bit-exact. A bound against exact real
+  arithmetic or a differently rounded computation needs rounding-error
+  lemmas on the model (`|roundQ q − q| ≤ ulp/2` and their propagation); the
+  main project has none (they exist in lean-ieee754, on Mathlib, which the
+  main project does not use). Not built.
+- **Float reductions.** Not proved, with or without an error bound: the
+  reduction classes are integer (`CellAlg` needs an associative operation,
+  and float addition is not), a float tree reduction would need the error
+  bound above per phase, and float atomics (`atom.add.f32`) are not in the
+  model, their order-dependent rounding being exactly what `phase_sound`'s
+  fold cannot express.
+- **`.f64` maps.** The model, parser, interpreter and difftest have `.f64`;
+  the map class is 32-bit, so no `.f64` kernel is proved.
+- **Approximate instructions** are refused (see "Floating point" for why).
+- **NaN bits.** By design nothing is proved about them; a kernel whose
+  output depends on the bits of a NaN (through `mov.b32` and integer
+  operations) cannot be proved.
 
 Not in scope, and not to be described as done:
 
 - SASS, or the translation from PTX to it;
-- floating point;
+- floating-point formats other than `.f32` and `.f64`;
 - the PTX memory model beyond the data-race-free fragment;
 - warp-level instructions, tensor cores, texture or surface memory;
 - any kernel the theorems or a `check` result do not name.

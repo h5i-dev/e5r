@@ -1164,9 +1164,36 @@ checked only when its acceptance criterion has been run.
       `verification-ptx.md` with the reason and what a rule would need.
       Shared-memory atomics and mixed operations per kernel are also not
       covered.)
+- [x] **P8. Floating point.** *Accepted:* `.f32` and `.f64` in the model,
+      parser, interpreter and difftest from the PTX ISA and IEEE 754 (add,
+      sub, mul, fma, div, sqrt, rcp, min, max, neg, abs, setp, cvt between
+      float and integer, every rounding modifier, `.ftz`, `.sat`, NaN,
+      signed zero, subnormals, infinities); correctly rounded operations
+      bit-identical to the A10G on a large difftest with edge cases;
+      approximate instructions modelled with a justified bound or refused;
+      a spec format for bit-exact results or error bounds; automation for
+      float maps and, if possible, float reductions with an error bound;
+      float kernels in M5 with first-run verdicts. (Accepted 2026-11-02, with
+      the limits stated: 311 float kernels, 622 launches, about 677,000
+      results identical across the Lean model, the interpreter, the JIT and
+      ptxas, NaN results compared as NaN because PTX leaves their bits
+      unspecified and the model takes them from a launch oracle; planted
+      rounding and `.ftz` errors detected; the rounding core proved equal to
+      lean-ieee754's `roundWithMode`, `OverflowWithMode`, `TinyWithMode` and
+      its square-root rounding in a separate Mathlib project; unrounded
+      `add/sub/mul` (fusable by ptxas) and approximate instructions refused;
+      float map specs `bit_exact` or `max_ulps`; nvcc's saxpy (fma), div,
+      sqrt and fmaxf kernels proved; M5 float part: 16 of 16 agent-written
+      kernels proved on the first run and bit-equal to nvcc intrinsic
+      baselines on the GPU, 6 seeded defects 4 refuted, 1 unknown, 1
+      unsupported on the first run and 5 refuted after a search fix; 0 of 13
+      float mutants proved. Open, with the reasons in `verification-ptx.md`:
+      error bounds proved only where the kernel is bit-exact, no float
+      reductions, no `.f64` maps, no approximate instructions.)
 
 Not in this scope, and not to be described as done: SASS, the ptxas or driver
-translation from PTX to SASS, floating point, the PTX memory model beyond the
+translation from PTX to SASS, floating-point formats other than `.f32` and
+`.f64`, the PTX memory model beyond the
 data-race-free fragment, warp-level instructions, tensor cores, texture or
 surface memory, or any kernel beyond the ones the theorems name.
 

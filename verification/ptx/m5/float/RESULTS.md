@@ -19,8 +19,7 @@ and requires equal bits, any NaN matching any NaN. The baseline does not use the
 | seeded defect, after the fix | 6 | 0 | 5 | 0 | 1 |
 
 - Lean proof time per proved kernel: median 4.1 s, max 10.3 s (one Lean thread).
-- All 16 proved kernels agree with the baseline on the GPU; every seeded defect except the
-  unsupported one differs from it.
+- All 16 proved kernels agree with the baseline on the GPU; 6 of 6 seeded kernels differ from theirs.
 - Speed, baseline time / PTX time at 2^24 elements: median 1.00 (0.98 to 1.02).
 - The fix after the first run: `fbug_axpy_fused` (an fma where the spec rounds the product first) was
   `unknown` because the counterexample search tried 44 small launches of random bit patterns and found

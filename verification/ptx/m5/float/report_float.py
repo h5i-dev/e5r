@@ -25,8 +25,8 @@ pr = [r for r in rows if r["verdict"] == "proved"]
 lt = sorted(r["lean_seconds"] for r in pr if r.get("lean_seconds"))
 sp = [r["baseline_us"] / r["ptx_us"] for r in pr if r.get("ptx_us") and r.get("baseline_us")]
 out += ["", f"- Lean proof time per proved kernel: median {st.median(lt):.1f} s, max {lt[-1]:.1f} s (one Lean thread).",
-        f"- All {len(pr)} proved kernels agree with the baseline on the GPU; every seeded defect except the",
-        "  unsupported one differs from it.",
+        f"- All {len(pr)} proved kernels agree with the baseline on the GPU; "
+        f"{sum(not ok(r) for r in rows if r.get('seeded'))} of {sum(1 for r in rows if r.get('seeded'))} seeded kernels differ from theirs.",
         f"- Speed, baseline time / PTX time at 2^24 elements: median {st.median(sp):.2f} ({min(sp):.2f} to {max(sp):.2f}).",
         "- The fix after the first run: `fbug_axpy_fused` (an fma where the spec rounds the product first) was",
         "  `unknown` because the counterexample search tried 44 small launches of random bit patterns and found",

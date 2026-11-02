@@ -170,3 +170,23 @@ The benchmark was rerun with block-level kernels in the M4 classes
 Still true for the M4 part: one model in one session, the specs (register
 roles at each barrier) written by the same agent from the PTX, the A10G only,
 and no speed comparison (the kernels are nvcc's output).
+
+## Float kernels (`float/RESULTS.md`)
+
+The benchmark was rerun with `.f32` map kernels whose specs state each output
+element as an expression of the model's float operations (bit-exact up to
+NaN payloads, which PTX leaves unspecified). 22 kernels written by the agent
+in one pass before any was checked, but after the float automation existed:
+16 meant to be correct, 6 with a seeded defect. First run: the 16 proved, and
+4 seeded defects refuted, 1 `unknown` (an fma where the spec rounds the
+product first; the search found no input where they differ), 1 `unsupported`
+(`div.approx.f32`, which the model refuses). After the search was given
+normal numbers of nearby magnitude and 2000 one-element launches, the
+`unknown` one was refuted. The GPU test compares each kernel with a CUDA C
+baseline using the intrinsic of the same rounding on 133,094 inputs: all 16
+proved kernels agree with theirs bit for bit, all 6 seeded ones differ. Speed
+against the baseline: median 1.00.
+
+Still true for the float part: one model in one session, kernels from one
+skeleton for 21 of 22, specs by the same agent, the A10G only, and no error
+bounds against real arithmetic (only bit-exact specs are proved).
