@@ -153,7 +153,7 @@ fn worlds(k: &Kernel, sp: &BlockSpec) -> Vec<World> {
     v
 }
 
-struct Ev {
+pub(crate) struct Ev {
     t: (u32, u32),
     cta: u32,
     phase: usize,
@@ -162,7 +162,7 @@ struct Ev {
     within: usize,
 }
 
-enum Ran {
+pub(crate) enum Ran {
     Done,
     Fault(Option<(u32, u32)>, String),
     Fuel,
@@ -193,7 +193,7 @@ fn launch(sp: &BlockSpec, w: &World) -> interp::Launch {
 }
 
 /// The schedule `interp::run_grid` follows, recorded.
-fn run(k: &Kernel, l: &interp::Launch, g: &mut Mem, fuel: usize) -> (Ran, Vec<Choice>, Vec<Ev>) {
+pub(crate) fn run(k: &Kernel, l: &interp::Launch, g: &mut Mem, fuel: usize) -> (Ran, Vec<Choice>, Vec<Ev>) {
     let al = l.allocs(k);
     let mut ch = Vec::new();
     let mut evs = Vec::new();
@@ -265,7 +265,7 @@ fn overlap(x: &Access, y: &Access) -> Option<u64> {
 }
 
 /// The first pair of accesses `RaceFree` forbids.
-fn race(ch: &[Choice], evs: &[Ev]) -> Option<Witness> {
+pub(crate) fn race(ch: &[Choice], evs: &[Ev]) -> Option<Witness> {
     for (i, a) in evs.iter().enumerate() {
         for b in &evs[i + 1..] {
             if a.t == b.t || a.access.sp != b.access.sp {
@@ -421,7 +421,7 @@ pub fn search(k: &Kernel, sp: &BlockSpec) -> (Option<(World, Witness)>, usize) {
     (None, tried)
 }
 
-fn acc_json(a: &Access) -> Value {
+pub(crate) fn acc_json(a: &Access) -> Value {
     json!({"space": if a.sp == Sp::Shared {"shared"} else {"global"},
            "address": format!("{:#x}", a.addr), "bytes": a.size,
            "kind": match a.kind { Kind::Read => "read", Kind::Write => "write", Kind::Atomic => "atomic" }})
@@ -459,15 +459,15 @@ pub fn describe(w: &World, wit: &Witness) -> Value {
     v
 }
 
-fn bv(v: u128, w: u32) -> String {
+pub(crate) fn bv(v: u128, w: u32) -> String {
     format!("({v}#{w})")
 }
 
-fn tid(t: (u32, u32)) -> String {
+pub(crate) fn tid(t: (u32, u32)) -> String {
     format!("(tid {} {})", t.0, t.1)
 }
 
-fn sched(cs: &[Choice]) -> String {
+pub(crate) fn sched(cs: &[Choice]) -> String {
     let items: Vec<String> = cs
         .iter()
         .map(|c| match c {

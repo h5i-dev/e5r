@@ -1,0 +1,10 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "acc_min_u64",
+  "class": "accum",
+  "op": "min",
+  "type": "u64",
+  "input": "acc_min_u64_param_0",
+  "output": "acc_min_u64_param_1",
+  "length": "acc_min_u64_param_2"
+}

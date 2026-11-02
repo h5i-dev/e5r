@@ -1,0 +1,10 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "acc_and_b32",
+  "class": "accum",
+  "op": "and",
+  "type": "b32",
+  "input": "acc_and_b32_param_0",
+  "output": "acc_and_b32_param_1",
+  "length": "acc_and_b32_param_2"
+}

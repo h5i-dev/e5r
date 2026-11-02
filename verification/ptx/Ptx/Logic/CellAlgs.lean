@@ -198,6 +198,34 @@ theorem accum32 {f : BitVec 32 → BitVec 32 → BitVec 32} {u : BitVec 32} {c a
 theorem accum64 {f : BitVec 64 → BitVec 64 → BitVec 64} {u : BitVec 64} {c a n} (b : Val) :
     Accum (alg64 f u c a n) (fun old => f old b) b := fun _ _ => rfl
 
+
+/-! ### The update of each atomic, per algebra -/
+
+theorem accum_add32 (b : Val) : Accum add32 (fun old => ext32 ((· + ·) (lo32 old) (lo32 b))) (ext32 (lo32 b)) :=
+  accum32 b
+theorem accum_and32 (b : Val) : Accum and32 (fun old => ext32 ((· &&& ·) (lo32 old) (lo32 b))) (ext32 (lo32 b)) :=
+  accum32 b
+theorem accum_or32 (b : Val) : Accum or32 (fun old => ext32 ((· ||| ·) (lo32 old) (lo32 b))) (ext32 (lo32 b)) :=
+  accum32 b
+theorem accum_xor32 (b : Val) : Accum xor32 (fun old => ext32 ((· ^^^ ·) (lo32 old) (lo32 b))) (ext32 (lo32 b)) :=
+  accum32 b
+theorem accum_minu32 (b : Val) : Accum minu32 (fun old => ext32 ((bmin BitVec.ule) (lo32 old) (lo32 b))) (ext32 (lo32 b)) :=
+  accum32 b
+theorem accum_maxu32 (b : Val) : Accum maxu32 (fun old => ext32 ((bmin fun x y => BitVec.ule y x) (lo32 old) (lo32 b))) (ext32 (lo32 b)) :=
+  accum32 b
+theorem accum_mins32 (b : Val) : Accum mins32 (fun old => ext32 ((bmin BitVec.sle) (lo32 old) (lo32 b))) (ext32 (lo32 b)) :=
+  accum32 b
+theorem accum_maxs32 (b : Val) : Accum maxs32 (fun old => ext32 ((bmin fun x y => BitVec.sle y x) (lo32 old) (lo32 b))) (ext32 (lo32 b)) :=
+  accum32 b
+theorem accum_add64 (b : Val) : Accum add64 (fun old => (· + ·) old b) b := accum64 b
+theorem accum_and64 (b : Val) : Accum and64 (fun old => (· &&& ·) old b) b := accum64 b
+theorem accum_or64 (b : Val) : Accum or64 (fun old => (· ||| ·) old b) b := accum64 b
+theorem accum_xor64 (b : Val) : Accum xor64 (fun old => (· ^^^ ·) old b) b := accum64 b
+theorem accum_minu64 (b : Val) : Accum minu64 (fun old => (bmin BitVec.ule) old b) b := accum64 b
+theorem accum_maxu64 (b : Val) : Accum maxu64 (fun old => (bmin fun x y => BitVec.ule y x) old b) b := accum64 b
+theorem accum_mins64 (b : Val) : Accum mins64 (fun old => (bmin BitVec.sle) old b) b := accum64 b
+theorem accum_maxs64 (b : Val) : Accum maxs64 (fun old => (bmin fun x y => BitVec.sle y x) old b) b := accum64 b
+
 /-! ### Folds of contributions -/
 
 /-- `e ∘ f 0 ∘ … ∘ f (k-1)`. -/

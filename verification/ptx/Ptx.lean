@@ -26,4 +26,6 @@ import Ptx.Examples.ReduceAtomic
 import Ptx.Auto.Block
 import Ptx.Auto.Reduce32
 import Ptx.Auto.Scan32
+import Ptx.Logic.CellAlgs
+import Ptx.Auto.Accum
 import Ptx.Logic.Schedule

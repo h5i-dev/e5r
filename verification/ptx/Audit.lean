@@ -50,6 +50,8 @@ elab "#audit_ptx" : command => do
 #print axioms Ptx.Auto.Reduce32.correct_of
 #print axioms Ptx.Auto.Reduce32.Atomic.correct_of
 #print axioms Ptx.Auto.Scan32.correct_of
+#print axioms Ptx.Auto.Accum.correct_of
+#print axioms Ptx.Auto.Accum.tfold_oneD_gid
 #print axioms Ptx.exec_reach
 #print axioms Ptx.race_of_exec
 #print axioms Ptx.Examples.VectorAdd.vadd_correct
