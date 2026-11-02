@@ -47,10 +47,15 @@ structure Launch where
   params : String → Val
   alloc : List Region
   shared : String → Addr := fun _ => 0
+  /-- The bits of every NaN a floating-point instruction produces, as a
+  function of the thread and its state (PTX leaves them unspecified;
+  `Ptx/Semantics/Float.lean`). Theorems about float kernels quantify over
+  it; integer instructions never read it. -/
+  nan : Tid → TState → Val := fun _ _ => 0
 
 def Launch.ctx (L : Launch) (t : Tid) : Ctx :=
   { tid := t.tid, ntid := L.block, ctaid := t.ctaid, nctaid := L.grid, params := L.params,
-    sym := L.shared }
+    sym := L.shared, nan := L.nan t }
 
 /-- The shared variables of `K` as placed by the launch. -/
 def Launch.sregions (L : Launch) (K : Kernel) : List Region :=

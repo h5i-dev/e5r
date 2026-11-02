@@ -312,11 +312,187 @@ def kernel_text(name, body):
     shared = any("sm" in l for l in body)
     regs, rregs = "%r<16>", "%rd<16>"
     decl = "\t.shared .align 8 .b8 \tsm[1024];\n" if shared else ""
+    fdecl = "\t.reg .f32 \t%f<8>;\n\t.reg .f64 \t%fd<8>;\n" if any("%f" in l for l in body) else ""
     return (
         f"\n.visible .entry {name}(\n\t.param .u64 {name}_in,\n\t.param .u64 {name}_out,\n"
         f"\t.param .u32 {name}_s\n)\n{{\n\t.reg .pred \t%p<3>;\n\t.reg .b32 \t{regs};\n"
-        f"\t.reg .b64 \t{rregs};\n{decl}\n" + PROLOGUE.format(k=name) + "\n".join(lines) + "\n\tret;\n}\n"
+        f"\t.reg .b64 \t{rregs};\n{fdecl}{decl}\n" + PROLOGUE.format(k=name) + "\n".join(lines) + "\n\tret;\n}\n"
     )
+
+
+# Floating point. a, b, c are the bit patterns of the inputs (the low 32 bits
+# for .f32); a float result is stored with every NaN replaced by one
+# canonical pattern first (setp.nan, selp), because PTX leaves the bits of a
+# NaN result unspecified and the model takes them from an oracle. Every other
+# result is compared bit for bit.
+RNDS = ["rn", "rz", "rm", "rp"]
+
+
+def fregs(t):
+    return ("%f1", "%f2", "%f3", "%f4") if t == "f32" else ("%fd1", "%fd2", "%fd3", "%fd4")
+
+
+def fload(t):
+    if t == "f32":
+        return ["mov.b32 \t%f1, %r5;", "mov.b32 \t%f2, %r6;", "mov.b32 \t%f3, %r7;"]
+    return ["mov.b64 \t%fd1, %rd5;", "mov.b64 \t%fd2, %rd6;", "mov.b64 \t%fd3, %rd7;"]
+
+
+def fstore(t, d=None):
+    d = d or fregs(t)[3]
+    if t == "f32":
+        return ["setp.nan.f32 \t%p2, " + d + ", " + d + ";", "mov.b32 \t%r8, " + d + ";",
+                "selp.b32 \t%r8, 2147483647, %r8, %p2;", "st.global.u32 \t[%rd4], %r8;"]
+    return ["setp.nan.f64 \t%p2, " + d + ", " + d + ";", "mov.b64 \t%rd8, " + d + ";",
+            "selp.b64 \t%rd8, 9223372036854775807, %rd8, %p2;", "st.global.u64 \t[%rd4], %rd8;"]
+
+
+def fmods(ftz, sat):
+    return (".ftz" if ftz else "") + (".sat" if sat else "")
+
+
+def float_forms():
+    """(description, body, float width) for every float form of the subset."""
+    out = []
+    for t in ["f32", "f64"]:
+        a, b, c, d = fregs(t)
+        fl = ["ftz/sat"] if t == "f32" else [None]
+        combos = [(f, s) for f in (False, True) for s in (False, True)] if t == "f32" else [(False, False)]
+        for op in ["add", "sub", "mul"]:
+            for r in RNDS:
+                for ftz, sat in combos:
+                    m = f"{op}.{r}{fmods(ftz, sat)}.{t}"
+                    out.append((m, fload(t) + [f"{m} \t{d}, {a}, {b};"] + fstore(t), t))
+        for r in RNDS:
+            for ftz, sat in combos:
+                m = f"fma.{r}{fmods(ftz, sat)}.{t}"
+                out.append((m, fload(t) + [f"{m} \t{d}, {a}, {b}, {c};"] + fstore(t), t))
+        ftzs = [False, True] if t == "f32" else [False]
+        for op in ["div", "sqrt", "rcp"]:
+            for r in RNDS:
+                for ftz in ftzs:
+                    m = f"{op}.{r}{fmods(ftz, False)}.{t}"
+                    args = f"{a}, {b}" if op == "div" else a
+                    out.append((m, fload(t) + [f"{m} \t{d}, {args};"] + fstore(t), t))
+        for op in ["neg", "abs"]:
+            for ftz in ftzs:
+                m = f"{op}{fmods(ftz, False)}.{t}"
+                out.append((m, fload(t) + [f"{m} \t{d}, {a};"] + fstore(t), t))
+        for op in ["min", "max"]:
+            for ftz in ftzs:
+                for nan in ([False, True] if t == "f32" else [False]):
+                    m = f"{op}{fmods(ftz, False)}{'.NaN' if nan else ''}.{t}"
+                    out.append((m, fload(t) + [f"{m} \t{d}, {a}, {b};"] + fstore(t), t))
+        for cmp in ["eq", "ne", "lt", "le", "gt", "ge", "equ", "neu", "ltu", "leu", "gtu", "geu", "num", "nan"]:
+            for ftz in ftzs:
+                m = f"setp.{cmp}{fmods(ftz, False)}.{t}"
+                out.append((m, fload(t) + [f"{m} \t%p1, {a}, {b};", "selp.u32 \t%r8, 1, 0, %p1;",
+                                           store("u32")], t))
+        # literals, moves, loads and stores at the float type
+        lit = "0f3FC00000" if t == "f32" else "0d3FF8000000000000"
+        out.append((f"fma.rn.{t} literal", fload(t) + [f"fma.rn.{t} \t{d}, {a}, {lit}, {b};"] + fstore(t), t))
+        out.append((f"mov.{t}", fload(t) + [f"mov.{t} \t{d}, {a};"] + fstore(t), t))
+        out.append((f"mov.{t} literal", fload(t) + [f"mov.{t} \t{d}, {lit};"] + fstore(t), t))
+        out.append((f"selp.{t}", fload(t) + ["setp.ne.u32 \t%p1, %r7, 0;", f"selp.{t} \t{d}, {a}, {b}, %p1;"]
+                    + fstore(t), t))
+        sz = 4 if t == "f32" else 8
+        out.append((f"ld/st.global.{t}", [f"ld.global.{t} \t{d}, [%rd3+{sz}];",
+                                          f"st.global.{t} \t[%rd4+8], {d};"] + fstore(t), t))
+        # integer to float, every rounding
+        for st in ARITH:
+            src = regs(st)[0]
+            for r in RNDS:
+                for sat in ([False, True] if t == "f32" else [False]):
+                    m = f"cvt.{r}{fmods(False, sat)}.{t}.{st}"
+                    out.append((m, [f"{m} \t{d}, {src};"] + fstore(t), "i" + t))
+        # float to integer, every integer rounding
+        for dt in ARITH:
+            dst = regs(dt)[3]
+            for r in RNDS:
+                for ftz in ftzs:
+                    m = f"cvt.{r}i{fmods(ftz, False)}.{dt}.{t}"
+                    out.append((m, fload(t) + [f"{m} \t{dst}, {a};", store(dt)], t))
+        # round to an integral value
+        for r in RNDS:
+            for ftz in ftzs:
+                m = f"cvt.{r}i{fmods(ftz, False)}.{t}.{t}"
+                out.append((m, fload(t) + [f"{m} \t{d}, {a};"] + fstore(t), t))
+    for ftz, sat in [(False, False), (True, False), (False, True)]:
+        m = f"cvt{fmods(ftz, sat)}.f64.f32"
+        out.append((m, fload("f32") + [f"{m} \t%fd4, %f1;"] + fstore("f64"), "f32"))
+    for r in RNDS:
+        for ftz, sat in [(False, False), (True, False), (False, True), (True, True)]:
+            m = f"cvt.{r}{fmods(ftz, sat)}.f32.f64"
+            out.append((m, fload("f64") + [f"{m} \t%f4, %fd1;"] + fstore("f32"), "f64"))
+    return out
+
+
+# Float inputs: special values, the subnormal and overflow boundaries, values
+# one unit in the last place apart, and random patterns, random normal
+# numbers of moderate exponent, and pairs chosen to cancel.
+F32_EDGE = [0x00000000, 0x80000000, 0x00000001, 0x80000001, 0x007FFFFF, 0x807FFFFF, 0x00800000,
+            0x80800000, 0x00800001, 0x3F800000, 0xBF800000, 0x3F7FFFFF, 0x3F800001, 0x3FC00000,
+            0x40000000, 0x3F000000, 0x3EAAAAAB, 0x7F7FFFFF, 0xFF7FFFFF, 0x7F000000, 0x7F800000,
+            0xFF800000, 0x7FC00000, 0xFFC00000, 0x7FC12345, 0x7F800001, 0xFF800001, 0x4B000000,
+            0x4B7FFFFF, 0x4F000000, 0x4F800000, 0x5F000000, 0x5F800000, 0xCF000000, 0xDF000000,
+            0x3F7FFFFE, 0xB2800000, 0x00400000, 0x34000000, 0x33800000, 0x3EFFFFFF, 0x3F400000,
+            0x40400000, 0x4EFFFFFF, 0xCF000001]
+F64_EDGE = [0x0, 0x8000000000000000, 0x1, 0x8000000000000001, 0x000FFFFFFFFFFFFF, 0x0010000000000000,
+            0x8010000000000000, 0x3FF0000000000000, 0xBFF0000000000000, 0x3FEFFFFFFFFFFFFF,
+            0x3FF0000000000001, 0x3FF8000000000000, 0x4000000000000000, 0x3FE0000000000000,
+            0x3FD5555555555555, 0x7FEFFFFFFFFFFFFF, 0xFFEFFFFFFFFFFFFF, 0x7FE0000000000000,
+            0x7FF0000000000000, 0xFFF0000000000000, 0x7FF8000000000000, 0xFFF8000000000000,
+            0x7FF8000000012345, 0x7FF0000000000001, 0x4330000000000000, 0x433FFFFFFFFFFFFF,
+            0x41E0000000000000, 0x41F0000000000000, 0x43E0000000000000, 0x43F0000000000000,
+            0xC1E0000000000000, 0xC3E0000000000000, 0x3CA0000000000000, 0x3CB0000000000000,
+            0x3690000000000000, 0x380FFFFFFFFFFFFF, 0x3800000000000000, 0x47EFFFFFE0000000,
+            0x47EFFFFFF0000000, 0x47F0000000000000, 0x36A0000000000000, 0xC1E0000000200000]
+
+
+def fvalues(rng, n, t):
+    """n (a, b, c) bit-pattern triples for format t ('f32', 'f64', or 'if32'
+    and 'if64' for integer-to-float, whose inputs are integers)."""
+    if t.startswith("i"):
+        return [(rng.choice([rng.getrandbits(64), rng.choice(EDGE64), rng.getrandbits(rng.randrange(1, 64))]),
+                 0, 0) for _ in range(n)]
+    w = 32 if t == "f32" else 64
+    fb, eb = (23, 8) if w == 32 else (52, 11)
+    edge = F32_EDGE if w == 32 else F64_EDGE
+    bias = (1 << (eb - 1)) - 1
+
+    def normal(lo, hi):
+        e = rng.randrange(lo, hi) + bias
+        return (rng.getrandbits(1) << (w - 1)) | (e << fb) | rng.getrandbits(fb)
+
+    def one():
+        k = rng.randrange(8)
+        if k == 0:
+            return rng.choice(edge)
+        if k == 1:
+            return rng.getrandbits(w)
+        if k == 2:  # near the subnormal boundary
+            return normal(-bias - 2 + 3, -bias + 6) if rng.randrange(2) else rng.getrandbits(fb)
+        if k == 3:  # near overflow
+            return normal(bias - 4, bias + 1)
+        return normal(-30, 30)
+
+    pairs = [(x, y) for x in edge for y in edge]
+    rng.shuffle(pairs)
+    out = []
+    for i in range(n):
+        if i < min(len(pairs), n // 2):
+            a, b = pairs[i]
+            c = rng.choice(edge) if rng.randrange(2) else one()
+        else:
+            a, b, c = one(), one(), one()
+            k = rng.randrange(6)
+            if k == 0:  # b one or two units in the last place from ±a: cancellation
+                b = (a ^ (1 << (w - 1))) + rng.choice([-2, -1, 0, 1, 2])
+                b &= (1 << w) - 1
+            elif k == 1:  # c close to -(a*b): fma cancellation
+                c = (b ^ (1 << (w - 1)))
+        out.append((a, b, c))
+    return out
 
 
 EDGE64 = [0, 1, 2, 3, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF, 0x100000000, 0x7FFFFFFFFFFFFFFF,
@@ -350,6 +526,9 @@ def main():
     os.makedirs(outdir, exist_ok=True)
     rng = random.Random(20261101)
     fs = [(d, b, False) for d, b in forms()] + m4_forms()
+    ffs = float_forms()
+    nint = len(fs)
+    fs += [("float: " + d, b, False) for d, b, _ in ffs]
     with open(os.path.join(outdir, "diff.ptx"), "w") as f:
         f.write("// Generated by verification/ptx/difftest/gen.py. Do not edit.\n")
         f.write(".version 8.0\n.target sm_86\n.address_size 64\n")
@@ -368,6 +547,18 @@ def main():
     launches = [((2, 1, 1), (64, 1, 1)), ((1, 1, 1), (96, 1, 1))]
     with open(os.path.join(outdir, "cases.txt"), "w") as f:
         for i, (_, _, tail) in enumerate(fs):
+            if i >= nint:
+                ft = ffs[i - nint][2]
+                fl = [((8, 1, 1), (256, 1, 1)), ((1, 1, 1), (128, 1, 1))]
+                allv = fvalues(rng, sum(g[0] * b[0] for g, b in fl), ft)
+                at = 0
+                for (g, b) in fl:
+                    n = g[0] * b[0]
+                    vals, at = allv[at:at + n], at + n
+                    inb = b"".join(x.to_bytes(8, "little") + y.to_bytes(8, "little") + z.to_bytes(8, "little")
+                                   for x, y, z in vals)
+                    f.write(f"case d{i} {' '.join(map(str, g))} {' '.join(map(str, b))} 0 {inb.hex()} {n * REC_OUT}\n")
+                continue
             for (g, b) in launches:
                 n = g[0] * g[1] * g[2] * b[0] * b[1] * b[2]
                 vals = values(rng, n)
@@ -385,7 +576,8 @@ def main():
             inb = b"".join(x.to_bytes(8, "little") + y.to_bytes(8, "little") + z.to_bytes(8, "little")
                            for x, y, z in vals)
             f.write(f"case f{i} 1 1 1 32 1 1 0 {inb.hex()} {32 * REC_OUT}\n")
-    print(f"{len(fs) + 1 + len(FAULT_FORMS)} kernels, {len(fs) * len(launches) + 3} launches, {len(FAULT_FORMS)} fault launches")
+    print(f"{len(fs) + 1 + len(FAULT_FORMS)} kernels ({len(ffs)} float), {nint * len(launches) + 2 * len(ffs) + 3} launches, "
+          f"{len(FAULT_FORMS)} fault launches")
 
 
 if __name__ == "__main__":

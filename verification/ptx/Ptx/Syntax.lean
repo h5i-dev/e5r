@@ -9,12 +9,15 @@ round trip against the original file (docs/verification-ptx.md, "Parser").
 
 Anything not listed here is refused by the parser, not approximated.
 -/
+import Ptx.Semantics.Float
+
 namespace Ptx
+open Ptx.Fp (RMode FCmp)
 
 /-- Scalar types of the subset. `pred` is only used by `.reg .pred`
 declarations; predicate registers live in their own file. -/
 inductive Ty where
-  | u32 | s32 | b32 | u64 | s64 | b64 | pred
+  | u32 | s32 | b32 | u64 | s64 | b64 | pred | f32 | f64
   deriving Repr, DecidableEq, Inhabited
 
 /-- Operand width of a data type. -/
@@ -23,7 +26,7 @@ inductive Width where
   deriving Repr, DecidableEq, Inhabited
 
 def Ty.width : Ty → Width
-  | .u64 | .s64 | .b64 => .w64
+  | .u64 | .s64 | .b64 | .f64 => .w64
   | _ => .w32
 
 def Ty.signed : Ty → Bool
@@ -69,6 +72,18 @@ inductive AtomOp where
   | add | min | max | exch | and | or | xor
   deriving Repr, DecidableEq, Inhabited
 
+inductive FBin where
+  | add | sub | mul | div
+  deriving Repr, DecidableEq, Inhabited
+
+/-- The rounding of a `cvt`: none (exact widening), floating-point
+(`.rn .rz .rm .rp`) or integer (`.rni .rzi .rmi .rpi`). -/
+inductive CvtRnd where
+  | none
+  | f (m : RMode)
+  | i (m : RMode)
+  deriving Repr, DecidableEq, Inhabited
+
 inductive Instr where
   | add (t : Ty) (d : String) (a b : Operand)
   | sub (t : Ty) (d : String) (a b : Operand)
@@ -103,6 +118,19 @@ inductive Instr where
   | red (sp : Space) (op : AtomOp) (t : Ty) (a : Address) (b : Operand)
   /-- `bar.sync 0`: wait until every thread of the CTA is at this barrier. -/
   | bar
+  /-- `add sub mul div` on `.f32`/`.f64` with a rounding modifier
+  (`Ptx/Semantics/Float.lean`); `.sat` only on `.f32` add, sub, mul. -/
+  | fbin (op : FBin) (m : RMode) (ftz sat : Bool) (t : Ty) (d : String) (a b : Operand)
+  | ffma (m : RMode) (ftz sat : Bool) (t : Ty) (d : String) (a b c : Operand)
+  | fsqrt (m : RMode) (ftz : Bool) (t : Ty) (d : String) (a : Operand)
+  | frcp (m : RMode) (ftz : Bool) (t : Ty) (d : String) (a : Operand)
+  | fneg (ftz : Bool) (t : Ty) (d : String) (a : Operand)
+  | fabs (ftz : Bool) (t : Ty) (d : String) (a : Operand)
+  /-- `min`/`max{.ftz}{.NaN}`. -/
+  | fminmax (isMax ftz nan : Bool) (t : Ty) (d : String) (a b : Operand)
+  | fsetp (c : FCmp) (ftz : Bool) (t : Ty) (p : String) (a b : Operand)
+  /-- `cvt{.rnd}{.ftz}{.sat}.dt.st` with a floating-point side. -/
+  | cvtF (dt st : Ty) (r : CvtRnd) (ftz sat : Bool) (d : String) (a : Operand)
   deriving Repr, DecidableEq, Inhabited
 
 /-- `@%p` (`neg = false`) or `@!%p` (`neg = true`). -/

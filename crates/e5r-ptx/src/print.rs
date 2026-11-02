@@ -29,6 +29,21 @@ fn operand(o: &Operand) -> String {
         Operand::Imm(v) => v.to_string(),
         Operand::Sreg(s) => sreg(*s),
         Operand::Sym(n) => n.clone(),
+        Operand::FImm(v, 32) => format!("0f{v:08X}"),
+        Operand::FImm(v, _) => format!("0d{v:016X}"),
+    }
+}
+
+fn mods(ftz: bool, sat: bool) -> String {
+    format!("{}{}", if ftz { ".ftz" } else { "" }, if sat { ".sat" } else { "" })
+}
+
+/// The rounding of a `cvt`, with its dot.
+pub fn cvt_rnd(r: CvtRnd) -> String {
+    match r {
+        CvtRnd::None => String::new(),
+        CvtRnd::F(m) => format!(".{}", m.name()),
+        CvtRnd::I(m) => format!(".{}i", m.name()),
     }
 }
 
@@ -93,6 +108,57 @@ pub fn instr(i: &Instr) -> String {
             o(b)
         ),
         Instr::Bar => "bar.sync \t0".into(),
+        Instr::FBin(op, m, ftz, sat, t, d, a, b) => format!(
+            "{}.{}{}.{} \t{d}, {}, {}",
+            op.name(),
+            m.name(),
+            mods(*ftz, *sat),
+            t.name(),
+            o(a),
+            o(b)
+        ),
+        Instr::Ffma(m, ftz, sat, t, d, a, b, c) => format!(
+            "fma.{}{}.{} \t{d}, {}, {}, {}",
+            m.name(),
+            mods(*ftz, *sat),
+            t.name(),
+            o(a),
+            o(b),
+            o(c)
+        ),
+        Instr::Fsqrt(m, ftz, t, d, a) => {
+            format!("sqrt.{}{}.{} \t{d}, {}", m.name(), mods(*ftz, false), t.name(), o(a))
+        }
+        Instr::Frcp(m, ftz, t, d, a) => {
+            format!("rcp.{}{}.{} \t{d}, {}", m.name(), mods(*ftz, false), t.name(), o(a))
+        }
+        Instr::Fneg(ftz, t, d, a) => format!("neg{}.{} \t{d}, {}", mods(*ftz, false), t.name(), o(a)),
+        Instr::Fabs(ftz, t, d, a) => format!("abs{}.{} \t{d}, {}", mods(*ftz, false), t.name(), o(a)),
+        Instr::Fminmax(mx, ftz, nan, t, d, a, b) => format!(
+            "{}{}{}.{} \t{d}, {}, {}",
+            if *mx { "max" } else { "min" },
+            mods(*ftz, false),
+            if *nan { ".NaN" } else { "" },
+            t.name(),
+            o(a),
+            o(b)
+        ),
+        Instr::Fsetp(c, ftz, t, p, a, b) => format!(
+            "setp.{}{}.{} \t{p}, {}, {}",
+            c.name(),
+            mods(*ftz, false),
+            t.name(),
+            o(a),
+            o(b)
+        ),
+        Instr::CvtF(dt, st, r, ftz, sat, d, a) => format!(
+            "cvt{}{}.{}.{} \t{d}, {}",
+            cvt_rnd(*r),
+            mods(*ftz, *sat),
+            dt.name(),
+            st.name(),
+            o(a)
+        ),
     }
 }
 

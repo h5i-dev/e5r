@@ -41,6 +41,11 @@ def Dim3.get (v : Dim3) : Dim → BitVec 32
 /-- What one thread can observe of its launch: its indices, the launch shape,
 the raw bits of the kernel parameters (`.u32` parameters zero-extended), and
 the addresses of the kernel's `.shared` variables in the CTA's shared window. -/
+structure TState where
+  pc : Nat
+  r : String → Val
+  p : String → Bool
+
 structure Ctx where
   tid : Dim3
   ntid : Dim3
@@ -48,17 +53,15 @@ structure Ctx where
   nctaid : Dim3
   params : String → Val
   sym : String → Val := fun _ => 0
+  /-- The NaN oracle (`Launch.nan`): the bits of a NaN result, from the
+  state of the thread at the instruction. -/
+  nan : TState → Val := fun _ => 0
 
 def Ctx.sreg (c : Ctx) : Sreg → BitVec 32
   | .tid d => c.tid.get d
   | .ntid d => c.ntid.get d
   | .ctaid d => c.ctaid.get d
   | .nctaid d => c.nctaid.get d
-
-structure TState where
-  pc : Nat
-  r : String → Val
-  p : String → Bool
 
 def upd {α : Type} (f : String → α) (k : String) (v : α) : String → α :=
   fun x => if x = k then v else f x
@@ -112,6 +115,7 @@ def shiftBy (w : Width) (f : (n : Nat) → BitVec n → Nat → BitVec n) (a b :
 def cmpVal (c : CmpOp) (t : Ty) (a b : Val) : Option Bool :=
   let go {n : Nat} (x y : BitVec n) : Option Bool :=
     match c, t.signed, t with
+    | _, _, .f32 | _, _, .f64 => none
     | .eq, _, _ => some (x == y)
     | .ne, _, _ => some (x != y)
     | _, _, .b32 | _, _, .b64 | _, _, .pred => none
@@ -218,6 +222,59 @@ def atomic (c : Ctx) (s : TState) (sp : Space) (t : Ty) (a : Address) (f : Val �
   | some (sp', x) => .atom sp' x t.size f k
   | none => .fault
 
+/-- The format of a float type (`.f64`, else `.f32`). -/
+def Ty.fmt : Ty → Fp.Fmt
+  | .f64 => Fp.Fmt.f64
+  | _ => Fp.Fmt.f32
+
+/-- The bits of a float operand at the type's width. -/
+def fbits (t : Ty) (v : Val) : Nat :=
+  match t.width with
+  | .w32 => (lo32 v).toNat
+  | .w64 => v.toNat
+
+/-- The register value of a float result; a NaN result takes its bits from
+the oracle, forced to be a NaN of the format. -/
+def fres (c : Ctx) (s : TState) (t : Ty) : Option Nat → Val
+  | some x => BitVec.ofNat 64 x
+  | none =>
+    let v := fbits t (c.nan s)
+    BitVec.ofNat 64 (if t.fmt.isNaN v then v else t.fmt.qnan)
+
+/-- The integer an operand of an integer type holds. -/
+def intOf (t : Ty) (v : Val) : Int :=
+  match t.width, t.signed with
+  | .w32, true => (lo32 v).toInt
+  | .w32, false => (lo32 v).toNat
+  | .w64, true => v.toInt
+  | .w64, false => v.toNat
+
+def Ty.isFloat : Ty → Bool
+  | .f32 | .f64 => true
+  | _ => false
+
+/-- `cvt` with a floating-point side (`Fp.toInt`, `Fp.ofInt`,
+`Fp.roundIntegral`, `Fp.convertF`). Combinations PTX does not define are
+refused by the parser and fault here. -/
+def cvtFloat (c : Ctx) (s : TState) (dt st : Ty) (r : CvtRnd) (ftz sat : Bool) (a : Val) : Option Val :=
+  match dt.isFloat, st.isFloat, r with
+  | false, true, .i m =>
+    let w := match dt.width with | .w32 => 32 | .w64 => 64
+    let v := Fp.toInt st.fmt m (ftz && st = .f32) dt.signed w (fbits st a)
+    some (fit dt (BitVec.ofNat 64 v))
+  | true, false, .f m =>
+    some (fres c s dt (dt.fmt.sat sat (some (Fp.ofInt dt.fmt m false (intOf st a)))))
+  | true, true, .i m =>
+    if dt = st then some (fres c s dt (dt.fmt.sat sat (Fp.roundIntegral dt.fmt m (ftz && dt = .f32) (fbits st a))))
+    else none
+  | true, true, .f m =>
+    if dt = .f32 ∧ st = .f64 then some (fres c s dt (Fp.convertF dt.fmt st.fmt m ftz sat (fbits st a)))
+    else none
+  | true, true, .none =>
+    if dt = .f64 ∧ st = .f32 then some (fres c s dt (Fp.convertF dt.fmt st.fmt .rn ftz sat (fbits st a)))
+    else none
+  | _, _, _ => none
+
 /-- The effect of one (unguarded) instruction. -/
 def exec (K : Kernel) (c : Ctx) (s : TState) : Instr → Action
   | .add t d a b => .next (s.set d (atWidth t.width (fun _ x y => x + y) (opVal c s a) (opVal c s b)))
@@ -266,6 +323,30 @@ def exec (K : Kernel) (c : Ctx) (s : TState) : Instr → Action
   | .bar => .bar
   | .bra _ l => jump K s l
   | .ret | .exit => .done
+  | .fbin op m ftz sat t d a b =>
+    let F := t.fmt
+    let x := fbits t (opVal c s a)
+    let y := fbits t (opVal c s b)
+    let r := match op with
+      | .add => Fp.fadd F m ftz sat x y
+      | .sub => Fp.fsub F m ftz sat x y
+      | .mul => Fp.fmul F m ftz sat x y
+      | .div => Fp.fdiv F m ftz x y
+    .next (s.set d (fres c s t r))
+  | .ffma m ftz sat t d a b e =>
+    .next (s.set d (fres c s t (Fp.ffma t.fmt m ftz sat (fbits t (opVal c s a)) (fbits t (opVal c s b))
+      (fbits t (opVal c s e)))))
+  | .fsqrt m ftz t d a => .next (s.set d (fres c s t (Fp.fsqrt t.fmt m ftz (fbits t (opVal c s a)))))
+  | .frcp m ftz t d a => .next (s.set d (fres c s t (Fp.frcp t.fmt m ftz (fbits t (opVal c s a)))))
+  | .fneg ftz t d a => .next (s.set d (fres c s t (Fp.fneg t.fmt ftz (fbits t (opVal c s a)))))
+  | .fabs ftz t d a => .next (s.set d (fres c s t (Fp.fabs t.fmt ftz (fbits t (opVal c s a)))))
+  | .fminmax mx ftz nan t d a b =>
+    .next (s.set d (fres c s t (Fp.fminmax t.fmt mx ftz nan (fbits t (opVal c s a)) (fbits t (opVal c s b)))))
+  | .fsetp op ftz t p a b => .next (s.setp p (Fp.fsetp t.fmt op ftz (fbits t (opVal c s a)) (fbits t (opVal c s b))))
+  | .cvtF dt st r ftz sat d a =>
+    match cvtFloat c s dt st r ftz sat (opVal c s a) with
+    | some v => .next (s.set d v)
+    | none => .fault
 
 def guardHolds (s : TState) : Option Guard → Bool
   | none => true

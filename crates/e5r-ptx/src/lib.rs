@@ -15,6 +15,7 @@
 #![warn(missing_docs)]
 
 pub mod ast;
+pub mod fp;
 pub mod interp;
 pub mod lean;
 pub mod lex;

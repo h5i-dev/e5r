@@ -312,6 +312,10 @@ fn shared_decl(p: &mut P) -> R<SharedDecl> {
 }
 
 fn operand(p: &mut P) -> R<Operand> {
+    if let Some(Tok::Float(v, w)) = p.peek().cloned() {
+        p.pos += 1;
+        return Ok(Operand::FImm(v, w));
+    }
     if p.is_punct('-') || matches!(p.peek(), Some(Tok::Int(_))) {
         return Ok(Operand::Imm(p.int()?));
     }
@@ -369,6 +373,178 @@ fn comma(p: &mut P) -> R<()> {
     p.punct(',')
 }
 
+/// The modifiers between the opcode and the type of a float instruction,
+/// in the order the ISA writes them: rounding, `.ftz`, `.sat` (and `.NaN`
+/// for min/max). Returns (rounding, ftz, sat, NaN) or what is wrong.
+fn float_mods(mods: &[&str], round: &str, allow: &[&str]) -> Result<(Option<String>, bool, bool, bool), String> {
+    let order = ["rnd", "ftz", "sat", "NaN"];
+    let mut at = 0;
+    let (mut r, mut ftz, mut sat, mut nan) = (None, false, false, false);
+    for m in mods {
+        let kind = match *m {
+            "rn" | "rz" | "rm" | "rp" if round == "f" => "rnd",
+            "rni" | "rzi" | "rmi" | "rpi" if round == "i" => "rnd",
+            "rn" | "rz" | "rm" | "rp" | "rni" | "rzi" | "rmi" | "rpi" if round == "fi" => "rnd",
+            "ftz" => "ftz",
+            "sat" => "sat",
+            "NaN" => "NaN",
+            _ => return Err(format!("modifier .{m}")),
+        };
+        if !allow.contains(&kind) {
+            return Err(format!("modifier .{m}"));
+        }
+        let pos = order.iter().position(|k| *k == kind).unwrap();
+        if pos < at {
+            return Err(format!("modifiers out of order or repeated at .{m}"));
+        }
+        at = pos + 1;
+        match kind {
+            "rnd" => r = Some(m.to_string()),
+            "ftz" => ftz = true,
+            "sat" => sat = true,
+            _ => nan = true,
+        }
+    }
+    Ok((r, ftz, sat, nan))
+}
+
+fn rmode(s: &str) -> RMode {
+    RMode::from_name(s.trim_end_matches('i')).unwrap()
+}
+
+/// A float instruction (`.f32`/`.f64` arithmetic, `setp`, `cvt` with a
+/// float side), or `None` if `parts` is not one.
+fn float_instr(p: &mut P, op: &str, parts: &[&str]) -> Option<R<Instr>> {
+    let (&opc, rest) = parts.split_first()?;
+    let float = |s: &str| matches!(s, "f32" | "f64");
+    let t = |s: &str| if s == "f32" { Ty::F32 } else { Ty::F64 };
+    let unsup = |m: String| -> R<Instr> { Err(format!("line {}: {op}: {m}", p.line())) };
+    let last = *rest.last()?;
+    match opc {
+        "add" | "sub" | "mul" | "div" | "fma" | "sqrt" | "rcp" | "neg" | "abs" | "min" | "max"
+            if float(last) =>
+        {
+            let ty = t(last);
+            let mods = &rest[..rest.len() - 1];
+            if mods.iter().any(|m| matches!(*m, "approx" | "full")) {
+                return Some(unsup(
+                    "approximate instructions are not modelled (no exact specification)".into(),
+                ));
+            }
+            let allow: &[&str] = match opc {
+                "add" | "sub" | "mul" | "fma" if ty == Ty::F32 => &["rnd", "ftz", "sat"],
+                "div" | "sqrt" | "rcp" if ty == Ty::F32 => &["rnd", "ftz"],
+                "add" | "sub" | "mul" | "fma" | "div" | "sqrt" | "rcp" => &["rnd"],
+                "neg" | "abs" if ty == Ty::F32 => &["ftz"],
+                "min" | "max" if ty == Ty::F32 => &["ftz", "NaN"],
+                _ => &[],
+            };
+            let (r, ftz, sat, nan) = match float_mods(mods, "f", allow) {
+                Ok(v) => v,
+                Err(e) => return Some(unsup(e)),
+            };
+            let rounded = matches!(opc, "add" | "sub" | "mul" | "fma" | "div" | "sqrt" | "rcp");
+            if rounded && r.is_none() {
+                return Some(unsup(if matches!(opc, "add" | "sub" | "mul") {
+                    "no rounding modifier: ptxas may fuse it with a mul into an fma (PTX ISA), so its result is not determined; write .rn".into()
+                } else {
+                    "a rounding modifier is required".into()
+                }));
+            }
+            let m = r.map(|r| rmode(&r)).unwrap_or(RMode::Rn);
+            Some((|| {
+                let d = reg(p)?;
+                comma(p)?;
+                let a = operand(p)?;
+                Ok(match opc {
+                    "sqrt" => Instr::Fsqrt(m, ftz, ty, d, a),
+                    "rcp" => Instr::Frcp(m, ftz, ty, d, a),
+                    "neg" => Instr::Fneg(ftz, ty, d, a),
+                    "abs" => Instr::Fabs(ftz, ty, d, a),
+                    _ => {
+                        comma(p)?;
+                        let b = operand(p)?;
+                        match opc {
+                            "fma" => {
+                                comma(p)?;
+                                Instr::Ffma(m, ftz, sat, ty, d, a, b, operand(p)?)
+                            }
+                            "min" | "max" => Instr::Fminmax(opc == "max", ftz, nan, ty, d, a, b),
+                            _ => {
+                                let f = match opc {
+                                    "add" => FBin::Add,
+                                    "sub" => FBin::Sub,
+                                    "mul" => FBin::Mul,
+                                    _ => FBin::Div,
+                                };
+                                Instr::FBin(f, m, ftz, sat, ty, d, a, b)
+                            }
+                        }
+                    }
+                })
+            })())
+        }
+        "setp" if float(last) && rest.len() >= 2 => {
+            let ty = t(last);
+            let Some(c) = FCmp::from_name(rest[0]) else {
+                return Some(unsup(format!("comparison .{}", rest[0])));
+            };
+            let allow: &[&str] = if ty == Ty::F32 { &["ftz"] } else { &[] };
+            let ftz = match float_mods(&rest[1..rest.len() - 1], "f", allow) {
+                Ok((_, ftz, ..)) => ftz,
+                Err(e) => return Some(unsup(e)),
+            };
+            Some((|| {
+                let d = reg(p)?;
+                comma(p)?;
+                let a = operand(p)?;
+                comma(p)?;
+                Ok(Instr::Fsetp(c, ftz, ty, d, a, operand(p)?))
+            })())
+        }
+        "cvt" if rest.len() >= 2 => {
+            let (dt, st) = (rest[rest.len() - 2], rest[rest.len() - 1]);
+            let (Some(dt), Some(st)) = (Ty::from_name(dt), Ty::from_name(st)) else {
+                return None;
+            };
+            if !dt.is_float() && !st.is_float() {
+                return None;
+            }
+            let mods = &rest[..rest.len() - 2];
+            let (r, ftz, sat, _) = match float_mods(mods, "fi", &["rnd", "ftz", "sat"]) {
+                Ok(v) => v,
+                Err(e) => return Some(unsup(e)),
+            };
+            let rnd = match &r {
+                None => CvtRnd::None,
+                Some(s) if s.ends_with('i') => CvtRnd::I(rmode(s)),
+                Some(s) => CvtRnd::F(rmode(s)),
+            };
+            // PTX ISA, cvt: which rounding each combination takes.
+            let ok = match (dt.is_float(), st.is_float(), rnd) {
+                (false, true, CvtRnd::I(_)) => dt.is_int(),
+                (true, false, CvtRnd::F(_)) => st.is_int(),
+                (true, true, CvtRnd::I(_)) => dt == st,
+                (true, true, CvtRnd::F(_)) => dt == Ty::F32 && st == Ty::F64,
+                (true, true, CvtRnd::None) => dt == Ty::F64 && st == Ty::F32,
+                _ => false,
+            };
+            if !ok {
+                return Some(unsup("rounding modifier or types outside the subset".into()));
+            }
+            if ftz && dt != Ty::F32 && st != Ty::F32 {
+                return Some(unsup(".ftz needs an .f32 side".into()));
+            }
+            Some((|| {
+                let d = reg(p)?;
+                comma(p)?;
+                Ok(Instr::CvtF(dt, st, rnd, ftz, sat, d, operand(p)?))
+            })())
+        }
+        _ => None,
+    }
+}
+
 fn stmt(p: &mut P) -> R<Stmt> {
     let guard = if p.is_punct('@') {
         p.pos += 1;
@@ -382,6 +558,11 @@ fn stmt(p: &mut P) -> R<Stmt> {
     };
     let op = p.word()?;
     let parts: Vec<&str> = op.split('.').collect();
+    if let Some(r) = float_instr(p, &op, &parts) {
+        let instr = r?;
+        p.punct(';')?;
+        return Ok(Stmt { guard, instr });
+    }
     let ty = |s: &str, p: &P| -> R<Ty> {
         match Ty::from_name(s) {
             Some(t) if t != Ty::Pred => Ok(t),
@@ -558,7 +739,9 @@ fn types_ok(i: &Instr) -> Result<(), String> {
         Instr::Bin(BinOp::And | BinOp::Or | BinOp::Xor | BinOp::Shl, t, ..) | Instr::Not(t, ..) => {
             bits(t)
         }
-        Instr::Bin(BinOp::Shr, ..) | Instr::Mov(..) | Instr::Selp(..) => true,
+        Instr::Bin(BinOp::Shr, t, ..) => arith(t) || bits(t),
+        Instr::Mov(t, ..) | Instr::Selp(t, ..) => *t != Pred,
+        Instr::Setp(_, F32 | F64, ..) => false,
         Instr::Setp(c, t, ..) => match c {
             CmpOp::Eq | CmpOp::Ne => true,
             CmpOp::Lt | CmpOp::Le | CmpOp::Gt | CmpOp::Ge => arith(t),
@@ -574,6 +757,16 @@ fn types_ok(i: &Instr) -> Result<(), String> {
             AtomOp::Exch | AtomOp::And | AtomOp::Or | AtomOp::Xor => bits(t),
         },
         Instr::Cas(_, t, ..) => bits(t),
+        // float forms: modifiers and types were checked by `float_instr`
+        Instr::FBin(..)
+        | Instr::Ffma(..)
+        | Instr::Fsqrt(..)
+        | Instr::Frcp(..)
+        | Instr::Fneg(..)
+        | Instr::Fabs(..)
+        | Instr::Fminmax(..)
+        | Instr::Fsetp(..)
+        | Instr::CvtF(..) => true,
     };
     if ok {
         Ok(())
@@ -595,7 +788,24 @@ fn operands_ok(i: &Instr) -> Result<(), String> {
                 return Err(format!("immediate {v} does not fit {w} bits"));
             }
         }
+        if let Operand::FImm(..) = o {
+            return Err("floating-point literal in an integer instruction".into());
+        }
         Ok(())
+    };
+    // a source of a float-typed operand: a register or a float literal of
+    // the type's width (integer literals are refused)
+    let fsrc = |o: &Operand, t: Ty| -> Result<(), String> {
+        match o {
+            Operand::Reg(_) => Ok(()),
+            Operand::FImm(_, w) if Some(*w) == t.width() => Ok(()),
+            Operand::FImm(..) => Err(format!("literal of the wrong width for .{}", t.name())),
+            Operand::Imm(_) => Err(format!("integer literal for .{}: write 0f/0d", t.name())),
+            Operand::Sreg(_) | Operand::Sym(_) => Err("special register or variable in a float instruction".into()),
+        }
+    };
+    let src_at = |o: &Operand, t: Ty| -> Result<(), String> {
+        if t.is_float() { fsrc(o, t) } else { imm(o, t.width().unwrap_or(32)) }
     };
     let nosreg = |o: &Operand| -> Result<(), String> {
         match o {
@@ -647,13 +857,18 @@ fn operands_ok(i: &Instr) -> Result<(), String> {
                     return Err(format!("mov.{} of the address of {n}", t.name()));
                 }
             }
-            imm(a, w(t))
+            if let Operand::Sreg(_) = a {
+                if t.is_float() {
+                    return Err("mov of a special register to a float".into());
+                }
+            }
+            if matches!(a, Operand::Sreg(_) | Operand::Sym(_)) { Ok(()) } else { src_at(a, *t) }
         }
         Instr::Setp(_, t, _, a, b) | Instr::Selp(t, _, a, b, _) => {
             nosreg(a)?;
             nosreg(b)?;
-            imm(a, w(t))?;
-            imm(b, w(t))
+            src_at(a, *t)?;
+            src_at(b, *t)
         }
         Instr::Cvt(_, st, _, a) => {
             if let Operand::Sym(n) = a {
@@ -668,7 +883,7 @@ fn operands_ok(i: &Instr) -> Result<(), String> {
         Instr::Ld(_, _, _, a) => off(a),
         Instr::St(_, t, a, v) => {
             nosreg(v)?;
-            imm(v, w(t))?;
+            src_at(v, *t)?;
             off(a)
         }
         Instr::Atom(_, _, t, _, a, b) | Instr::Red(_, _, t, a, b) => {
@@ -684,6 +899,146 @@ fn operands_ok(i: &Instr) -> Result<(), String> {
             off(a)
         }
         Instr::Bra(..) | Instr::Ret | Instr::Exit | Instr::Bar => Ok(()),
+        Instr::FBin(.., t, _, a, b) | Instr::Fminmax(.., t, _, a, b) | Instr::Fsetp(_, _, t, _, a, b) => {
+            fsrc(a, *t)?;
+            fsrc(b, *t)
+        }
+        Instr::Ffma(.., t, _, a, b, c) => {
+            fsrc(a, *t)?;
+            fsrc(b, *t)?;
+            fsrc(c, *t)
+        }
+        Instr::Fsqrt(.., t, _, a) | Instr::Frcp(.., t, _, a) | Instr::Fneg(_, t, _, a) | Instr::Fabs(_, t, _, a) => {
+            fsrc(a, *t)
+        }
+        Instr::CvtF(_, st, .., a) => {
+            nosreg(a)?;
+            src_at(a, *st)
+        }
+    }
+}
+
+/// Each register an instruction reads or writes, with the type it is used
+/// at. A register declared `.f32`/`.f64` may be used only at its own type
+/// or a `.b` type of its width; another register never at a float type.
+fn typed_uses(i: &Instr) -> Vec<(&str, Ty)> {
+    fn o<'a>(x: &'a Operand, t: Ty, v: &mut Vec<(&'a str, Ty)>) {
+        if let Operand::Reg(r) = x {
+            v.push((r.as_str(), t));
+        }
+    }
+    fn addr<'a>(a: &'a Address, v: &mut Vec<(&'a str, Ty)>) {
+        if let Address::Reg(r, _) = a {
+            v.push((r.as_str(), Ty::B64));
+        }
+    }
+    let mut v: Vec<(&str, Ty)> = Vec::new();
+    match i {
+        Instr::Bin(BinOp::MulWide, t, d, a, b) => {
+            v.push((d.as_str(), Ty::U64));
+            o(a, *t, &mut v);
+            o(b, *t, &mut v);
+        }
+        Instr::Bin(BinOp::Shl | BinOp::Shr, t, d, a, b) => {
+            v.push((d.as_str(), *t));
+            o(a, *t, &mut v);
+            o(b, Ty::U32, &mut v);
+        }
+        Instr::Bin(_, t, d, a, b) => {
+            v.push((d.as_str(), *t));
+            o(a, *t, &mut v);
+            o(b, *t, &mut v);
+        }
+        Instr::MadLo(t, d, a, b, c) => {
+            v.push((d.as_str(), *t));
+            for x in [a, b, c] {
+                o(x, *t, &mut v);
+            }
+        }
+        Instr::Not(t, d, a) | Instr::Mov(t, d, a) => {
+            v.push((d.as_str(), *t));
+            o(a, *t, &mut v);
+        }
+        Instr::Setp(_, t, _, a, b) => {
+            o(a, *t, &mut v);
+            o(b, *t, &mut v);
+        }
+        Instr::Selp(t, d, a, b, _) => {
+            v.push((d.as_str(), *t));
+            o(a, *t, &mut v);
+            o(b, *t, &mut v);
+        }
+        Instr::Cvt(dt, st, d, a) | Instr::CvtF(dt, st, _, _, _, d, a) => {
+            v.push((d.as_str(), *dt));
+            o(a, *st, &mut v);
+        }
+        Instr::CvtaGlobal(d, a) => {
+            v.push((d.as_str(), Ty::U64));
+            o(a, Ty::U64, &mut v);
+        }
+        Instr::Ld(sp, t, d, a) => {
+            v.push((d.as_str(), *t));
+            if *sp != Space::Shared {
+                addr(a, &mut v);
+            }
+        }
+        Instr::St(sp, t, a, x) => {
+            o(x, *t, &mut v);
+            if *sp != Space::Shared {
+                addr(a, &mut v);
+            }
+        }
+        Instr::Atom(sp, _, t, d, a, b) => {
+            v.push((d.as_str(), *t));
+            o(b, *t, &mut v);
+            if *sp != Space::Shared {
+                addr(a, &mut v);
+            }
+        }
+        Instr::Cas(sp, t, d, a, b, c) => {
+            v.push((d.as_str(), *t));
+            o(b, *t, &mut v);
+            o(c, *t, &mut v);
+            if *sp != Space::Shared {
+                addr(a, &mut v);
+            }
+        }
+        Instr::Red(sp, _, t, a, b) => {
+            o(b, *t, &mut v);
+            if *sp != Space::Shared {
+                addr(a, &mut v);
+            }
+        }
+        Instr::FBin(.., t, d, a, b) | Instr::Fminmax(.., t, d, a, b) => {
+            v.push((d.as_str(), *t));
+            o(a, *t, &mut v);
+            o(b, *t, &mut v);
+        }
+        Instr::Ffma(.., t, d, a, b, c) => {
+            v.push((d.as_str(), *t));
+            for x in [a, b, c] {
+                o(x, *t, &mut v);
+            }
+        }
+        Instr::Fsqrt(.., t, d, a) | Instr::Frcp(.., t, d, a) | Instr::Fneg(_, t, d, a) | Instr::Fabs(_, t, d, a) => {
+            v.push((d.as_str(), *t));
+            o(a, *t, &mut v);
+        }
+        Instr::Fsetp(_, _, t, _, a, b) => {
+            o(a, *t, &mut v);
+            o(b, *t, &mut v);
+        }
+        Instr::Bra(..) | Instr::Ret | Instr::Exit | Instr::Bar => {}
+    }
+    v
+}
+
+/// The type rule of [`typed_uses`].
+fn compatible(declared: Ty, used: Ty) -> bool {
+    if declared.is_float() {
+        used == declared || (used.is_bits() && used.width() == declared.width())
+    } else {
+        !used.is_float()
     }
 }
 
@@ -747,6 +1102,8 @@ fn check(k: &Kernel, lines: &[usize]) -> R<()> {
                 Operand::Sreg(_) => Err(e("special registers are 32-bit".into())),
                 Operand::Sym(n) if shared.contains(n.as_str()) => Ok(()),
                 Operand::Sym(n) => Err(e(format!("{n} is not a .shared variable"))),
+                Operand::FImm(_, fw) if *fw == w => Ok(()),
+                Operand::FImm(..) => Err(e("float literal of the wrong width".into())),
             }
         };
         // a data address in `sp`: global needs a 64-bit register; shared takes
@@ -775,6 +1132,13 @@ fn check(k: &Kernel, lines: &[usize]) -> R<()> {
         }
         types_ok(&s.instr).map_err(e)?;
         operands_ok(&s.instr).map_err(e)?;
+        for (r, t) in typed_uses(&s.instr) {
+            if let Some(dt) = regs.get(r) {
+                if !compatible(*dt, t) {
+                    return Err(e(format!("register {r} (.{}) used at .{}", dt.name(), t.name())));
+                }
+            }
+        }
         if s.guard.is_some() && matches!(s.instr, Instr::Bar) {
             // bar.sync is .aligned: every thread of the CTA must execute it
             return Err(e("predicated bar.sync".into()));
@@ -877,6 +1241,30 @@ fn check(k: &Kernel, lines: &[usize]) -> R<()> {
                 }
             }
             Instr::Ret | Instr::Exit => {}
+            Instr::FBin(.., t, d, a, b) | Instr::Fminmax(.., t, d, a, b) => {
+                data(d, w(*t))?;
+                src(a, w(*t))?;
+                src(b, w(*t))?;
+            }
+            Instr::Ffma(.., t, d, a, b, c) => {
+                data(d, w(*t))?;
+                src(a, w(*t))?;
+                src(b, w(*t))?;
+                src(c, w(*t))?;
+            }
+            Instr::Fsqrt(.., t, d, a) | Instr::Frcp(.., t, d, a) | Instr::Fneg(_, t, d, a) | Instr::Fabs(_, t, d, a) => {
+                data(d, w(*t))?;
+                src(a, w(*t))?;
+            }
+            Instr::Fsetp(_, _, t, d, a, b) => {
+                pred(d)?;
+                src(a, w(*t))?;
+                src(b, w(*t))?;
+            }
+            Instr::CvtF(dt, st, _, _, _, d, a) => {
+                data(d, w(*dt))?;
+                src(a, w(*st))?;
+            }
         }
     }
     Ok(())

@@ -21,6 +21,10 @@ pub enum Ty {
     B64,
     /// `.pred`
     Pred,
+    /// `.f32`
+    F32,
+    /// `.f64`
+    F64,
 }
 
 impl Ty {
@@ -34,6 +38,8 @@ impl Ty {
             Ty::S64 => "s64",
             Ty::B64 => "b64",
             Ty::Pred => "pred",
+            Ty::F32 => "f32",
+            Ty::F64 => "f64",
         }
     }
 
@@ -47,6 +53,8 @@ impl Ty {
             "s64" => Ty::S64,
             "b64" => Ty::B64,
             "pred" => Ty::Pred,
+            "f32" => Ty::F32,
+            "f64" => Ty::F64,
             _ => return None,
         })
     }
@@ -54,8 +62,8 @@ impl Ty {
     /// Bit width, `None` for `.pred`.
     pub fn width(self) -> Option<u32> {
         match self {
-            Ty::U32 | Ty::S32 | Ty::B32 => Some(32),
-            Ty::U64 | Ty::S64 | Ty::B64 => Some(64),
+            Ty::U32 | Ty::S32 | Ty::B32 | Ty::F32 => Some(32),
+            Ty::U64 | Ty::S64 | Ty::B64 | Ty::F64 => Some(64),
             Ty::Pred => None,
         }
     }
@@ -63,6 +71,21 @@ impl Ty {
     /// `.bN` types: only `eq`/`ne` comparisons are defined on them.
     pub fn is_bits(self) -> bool {
         matches!(self, Ty::B32 | Ty::B64)
+    }
+
+    /// `.f32` and `.f64`.
+    pub fn is_float(self) -> bool {
+        matches!(self, Ty::F32 | Ty::F64)
+    }
+
+    /// `.uN` and `.sN`.
+    pub fn is_int(self) -> bool {
+        matches!(self, Ty::U32 | Ty::S32 | Ty::U64 | Ty::S64)
+    }
+
+    /// The floating-point format of `.f32`/`.f64`.
+    pub fn fmt(self) -> crate::fp::Fmt {
+        if self == Ty::F64 { crate::fp::F64 } else { crate::fp::F32 }
     }
 }
 
@@ -101,6 +124,9 @@ pub enum Operand {
     Sreg(Sreg),
     /// The address of a `.shared` variable (only in `mov`).
     Sym(String),
+    /// A floating-point literal by its bits: `0fXXXXXXXX` (width 32) or
+    /// `0dXXXXXXXXXXXXXXXX` (width 64).
+    FImm(u64, u32),
 }
 
 /// A memory operand. The offset is `None` when the source wrote none.
@@ -280,6 +306,63 @@ impl BinOp {
     }
 }
 
+/// `add sub mul div` on `.f32`/`.f64`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(missing_docs)]
+pub enum FBin {
+    Add,
+    Sub,
+    Mul,
+    Div,
+}
+
+impl FBin {
+    /// The PTX spelling, which is also the Lean constructor.
+    pub fn name(self) -> &'static str {
+        match self {
+            FBin::Add => "add",
+            FBin::Sub => "sub",
+            FBin::Mul => "mul",
+            FBin::Div => "div",
+        }
+    }
+}
+
+pub use crate::fp::{FCmp, RMode};
+
+impl RMode {
+    /// `rn rz rm rp`, the Lean constructor too.
+    pub fn name(self) -> &'static str {
+        match self {
+            RMode::Rn => "rn",
+            RMode::Rz => "rz",
+            RMode::Rm => "rm",
+            RMode::Rp => "rp",
+        }
+    }
+    /// Parse `rn rz rm rp`.
+    pub fn from_name(s: &str) -> Option<RMode> {
+        Some(match s {
+            "rn" => RMode::Rn,
+            "rz" => RMode::Rz,
+            "rm" => RMode::Rm,
+            "rp" => RMode::Rp,
+            _ => return None,
+        })
+    }
+}
+
+/// The rounding of a `cvt` with a floating-point side.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CvtRnd {
+    /// None written (`cvt.f64.f32`).
+    None,
+    /// `.rn .rz .rm .rp`
+    F(RMode),
+    /// `.rni .rzi .rmi .rpi`
+    I(RMode),
+}
+
 /// One instruction.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(missing_docs)]
@@ -305,6 +388,24 @@ pub enum Instr {
     Red(Space, AtomOp, Ty, Address, Operand),
     /// `bar.sync 0`
     Bar,
+    /// `op.rnd{.ftz}{.sat}.t d, a, b` (`Ptx.Instr.fbin`)
+    FBin(FBin, RMode, bool, bool, Ty, String, Operand, Operand),
+    /// `fma.rnd{.ftz}{.sat}.t d, a, b, c`
+    Ffma(RMode, bool, bool, Ty, String, Operand, Operand, Operand),
+    /// `sqrt.rnd{.ftz}.t d, a`
+    Fsqrt(RMode, bool, Ty, String, Operand),
+    /// `rcp.rnd{.ftz}.t d, a`
+    Frcp(RMode, bool, Ty, String, Operand),
+    /// `neg{.ftz}.t d, a`
+    Fneg(bool, Ty, String, Operand),
+    /// `abs{.ftz}.t d, a`
+    Fabs(bool, Ty, String, Operand),
+    /// `min`/`max{.ftz}{.NaN}.t d, a, b`: (is max, ftz, NaN)
+    Fminmax(bool, bool, bool, Ty, String, Operand, Operand),
+    /// `setp.cmp{.ftz}.t p, a, b`
+    Fsetp(FCmp, bool, Ty, String, Operand, Operand),
+    /// `cvt{.rnd}{.ftz}{.sat}.dt.st d, a` with a floating-point side
+    CvtF(Ty, Ty, CvtRnd, bool, bool, String, Operand),
 }
 
 /// `@%p` or `@!%p`.

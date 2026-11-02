@@ -51,6 +51,15 @@ fn operand(o: &Operand) -> String {
             format!("(.sreg (.{c} {}))", dim(*d))
         }
         Operand::Sym(n) => format!("(.sym {})", string(n)),
+        Operand::FImm(v, _) => format!("(.imm {v})"),
+    }
+}
+
+fn cvt_rnd(r: CvtRnd) -> String {
+    match r {
+        CvtRnd::None => ".none".into(),
+        CvtRnd::F(m) => format!("(.f .{})", m.name()),
+        CvtRnd::I(m) => format!("(.i .{})", m.name()),
     }
 }
 
@@ -110,6 +119,42 @@ fn instr(i: &Instr) -> String {
             format!(".red .{} .{} {} {} {}", sp.name(), op.name(), ty(*t), address(a), o(b))
         }
         Instr::Bar => ".bar".into(),
+        Instr::FBin(op, m, ftz, sat, t, d, a, b) => format!(
+            ".fbin .{} .{} {ftz} {sat} {} {} {} {}",
+            op.name(),
+            m.name(),
+            ty(*t),
+            s(d),
+            o(a),
+            o(b)
+        ),
+        Instr::Ffma(m, ftz, sat, t, d, a, b, c) => format!(
+            ".ffma .{} {ftz} {sat} {} {} {} {} {}",
+            m.name(),
+            ty(*t),
+            s(d),
+            o(a),
+            o(b),
+            o(c)
+        ),
+        Instr::Fsqrt(m, ftz, t, d, a) => format!(".fsqrt .{} {ftz} {} {} {}", m.name(), ty(*t), s(d), o(a)),
+        Instr::Frcp(m, ftz, t, d, a) => format!(".frcp .{} {ftz} {} {} {}", m.name(), ty(*t), s(d), o(a)),
+        Instr::Fneg(ftz, t, d, a) => format!(".fneg {ftz} {} {} {}", ty(*t), s(d), o(a)),
+        Instr::Fabs(ftz, t, d, a) => format!(".fabs {ftz} {} {} {}", ty(*t), s(d), o(a)),
+        Instr::Fminmax(mx, ftz, nan, t, d, a, b) => {
+            format!(".fminmax {mx} {ftz} {nan} {} {} {} {}", ty(*t), s(d), o(a), o(b))
+        }
+        Instr::Fsetp(c, ftz, t, p, a, b) => {
+            format!(".fsetp .{} {ftz} {} {} {} {}", c.name(), ty(*t), s(p), o(a), o(b))
+        }
+        Instr::CvtF(dt, st, r, ftz, sat, d, a) => format!(
+            ".cvtF {} {} {} {ftz} {sat} {} {}",
+            ty(*dt),
+            ty(*st),
+            cvt_rnd(*r),
+            s(d),
+            o(a)
+        ),
     }
 }
 

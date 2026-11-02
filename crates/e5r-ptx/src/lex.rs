@@ -11,6 +11,9 @@ pub enum Tok {
     Int(i128),
     /// A numeric literal that is not an integer, as written (`9.2`).
     Num(String),
+    /// A floating-point literal by its bits and width: `0f3F800000` (32),
+    /// `0d3FF0000000000000` (64). Case of the hex digits does not matter.
+    Float(u64, u32),
     /// Punctuation.
     Punct(char),
 }
@@ -43,6 +46,18 @@ pub fn int_value(s: &str) -> Option<i128> {
         return None;
     }
     s.parse().ok()
+}
+
+/// `0f` + 8 or `0d` + 16 hex digits: a float literal by its bits.
+pub fn float_value(s: &str) -> Option<(u64, u32)> {
+    let (h, w) = match s.strip_prefix("0f").or_else(|| s.strip_prefix("0F")) {
+        Some(h) => (h, 32),
+        None => (s.strip_prefix("0d").or_else(|| s.strip_prefix("0D"))?, 64),
+    };
+    if h.len() != (w / 4) as usize || !h.chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    u64::from_str_radix(h, 16).ok().map(|v| (v, w))
 }
 
 /// Split `src` into tokens.
@@ -92,9 +107,10 @@ pub fn lex(src: &str) -> Result<Vec<Token>, String> {
                 i += 1;
             }
             let text: String = chars[s..i].iter().collect();
-            let tok = match int_value(&text) {
-                Some(v) => Tok::Int(v),
-                None => Tok::Num(text),
+            let tok = match (float_value(&text), int_value(&text)) {
+                (Some((v, w)), _) => Tok::Float(v, w),
+                (None, Some(v)) => Tok::Int(v),
+                (None, None) => Tok::Num(text),
             };
             out.push(Token { tok, line });
         } else if "{}()[]<>,;:@!+-".contains(c) {

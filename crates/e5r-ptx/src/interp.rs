@@ -9,6 +9,7 @@
 //! test cases (`scripts/check-ptx-difftest.sh`).
 
 use crate::ast::*;
+use crate::fp;
 use std::collections::HashMap;
 
 /// `%tid` etc. of one thread, and the launch shape.
@@ -230,6 +231,7 @@ impl TState {
                 }) as u64
             }
             Operand::Sym(n) => c.sym.get(n).copied().unwrap_or(0),
+            Operand::FImm(v, _) => *v,
         }
     }
     fn set(&mut self, d: &str, v: u64) {
@@ -540,8 +542,101 @@ pub fn step(
             None => return Res::Fault(format!("missing label {l}")),
         },
         Ret | Exit => return Res::Halted,
+        FBin(op, m, ftz, sat, t, d, a, b) => {
+            let f = t.fmt();
+            let (x, y) = (fbits(*t, s.op(c, a)), fbits(*t, s.op(c, b)));
+            let r = match op {
+                crate::ast::FBin::Add => fp::fadd(f, *m, *ftz, *sat, x, y),
+                crate::ast::FBin::Sub => fp::fsub(f, *m, *ftz, *sat, x, y),
+                crate::ast::FBin::Mul => fp::fmul(f, *m, *ftz, *sat, x, y),
+                crate::ast::FBin::Div => fp::fdiv(f, *m, *ftz, x, y),
+            };
+            s.set(d, fres(*t, r));
+        }
+        Ffma(m, ftz, sat, t, d, a, b, e) => {
+            let (x, y, z) = (fbits(*t, s.op(c, a)), fbits(*t, s.op(c, b)), fbits(*t, s.op(c, e)));
+            let r = fp::ffma(t.fmt(), *m, *ftz, *sat, x, y, z);
+            s.set(d, fres(*t, r));
+        }
+        Fsqrt(m, ftz, t, d, a) => {
+            let r = fp::fsqrt(t.fmt(), *m, *ftz, fbits(*t, s.op(c, a)));
+            s.set(d, fres(*t, r));
+        }
+        Frcp(m, ftz, t, d, a) => {
+            let r = fp::frcp(t.fmt(), *m, *ftz, fbits(*t, s.op(c, a)));
+            s.set(d, fres(*t, r));
+        }
+        Fneg(ftz, t, d, a) => {
+            let r = fp::fneg(t.fmt(), *ftz, fbits(*t, s.op(c, a)));
+            s.set(d, fres(*t, r));
+        }
+        Fabs(ftz, t, d, a) => {
+            let r = fp::fabs(t.fmt(), *ftz, fbits(*t, s.op(c, a)));
+            s.set(d, fres(*t, r));
+        }
+        Fminmax(mx, ftz, nan, t, d, a, b) => {
+            let r = fp::fminmax(t.fmt(), *mx, *ftz, *nan, fbits(*t, s.op(c, a)), fbits(*t, s.op(c, b)));
+            s.set(d, fres(*t, r));
+        }
+        Fsetp(op, ftz, t, p, a, b) => {
+            let v = fp::fsetp(t.fmt(), *op, *ftz, fbits(*t, s.op(c, a)), fbits(*t, s.op(c, b)));
+            s.p.insert(p.clone(), v);
+            s.pc += 1;
+        }
+        CvtF(dt, st, r, ftz, sat, d, a) => match cvt_float(*dt, *st, *r, *ftz, *sat, s.op(c, a)) {
+            Some(v) => s.set(d, v),
+            None => return Res::Fault("cvt form outside the subset".into()),
+        },
     }
     Res::Ok(None)
+}
+
+/// `Ptx.fbits`.
+fn fbits(t: Ty, v: u64) -> u64 {
+    fit(t, v)
+}
+
+/// `Ptx.fres` with the default NaN oracle (`Launch.nan` is `fun _ _ => 0`,
+/// which is not a NaN, so every NaN result is `Fmt.qnan`).
+fn fres(t: Ty, r: Option<u64>) -> u64 {
+    r.unwrap_or_else(|| t.fmt().qnan())
+}
+
+/// `Ptx.intOf`.
+fn int_of(t: Ty, v: u64) -> i128 {
+    match (width(t), matches!(t, Ty::S32 | Ty::S64)) {
+        (32, true) => v as u32 as i32 as i128,
+        (32, false) => v as u32 as i128,
+        (_, true) => v as i64 as i128,
+        _ => v as i128,
+    }
+}
+
+/// `Ptx.cvtFloat`.
+fn cvt_float(dt: Ty, st: Ty, r: CvtRnd, ftz: bool, sat: bool, a: u64) -> Option<u64> {
+    let (df, sf) = (dt.fmt(), st.fmt());
+    match (dt.is_float(), st.is_float(), r) {
+        (false, true, CvtRnd::I(m)) => {
+            let w = width(dt);
+            let signed = matches!(dt, Ty::S32 | Ty::S64);
+            Some(fit(dt, fp::to_int(sf, m, ftz && st == Ty::F32, signed, w, fbits(st, a))))
+        }
+        (true, false, CvtRnd::F(m)) => {
+            let v = fp::of_int(df, m, false, int_of(st, a));
+            Some(fres(dt, fp::sat_bits(df, sat, Some(v))))
+        }
+        (true, true, CvtRnd::I(m)) if dt == st => Some(fres(
+            dt,
+            fp::sat_bits(df, sat, fp::round_integral(df, m, ftz && dt == Ty::F32, fbits(st, a))),
+        )),
+        (true, true, CvtRnd::F(m)) if dt == Ty::F32 && st == Ty::F64 => {
+            Some(fres(dt, fp::convert_f(df, sf, m, ftz, sat, fbits(st, a))))
+        }
+        (true, true, CvtRnd::None) if dt == Ty::F64 && st == Ty::F32 => {
+            Some(fres(dt, fp::convert_f(df, sf, fp::RMode::Rn, ftz, sat, fbits(st, a))))
+        }
+        _ => None,
+    }
 }
 
 /// How a solo run of one thread ended.

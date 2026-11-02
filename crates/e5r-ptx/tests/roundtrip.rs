@@ -63,7 +63,12 @@ fn refused(body: &str, why: &str) {
 
 #[test]
 fn subset_edges_are_refused() {
-    refused("\tadd.f32 %r1, %r2, %r3;\n\tret;", "unsupported type");
+    refused("\tadd.f32 %r1, %r2, %r3;\n\tret;", "no rounding modifier");
+    refused("\tadd.rn.f32 %r1, %r2, %r3;\n\tret;", "used at .f32");
+    refused("\tdiv.approx.f32 %r1, %r2, %r3;\n\tret;", "approximate instructions");
+    refused("\tsin.approx.f32 %r1, %r2;\n\tret;", "unsupported instruction");
+    refused("\tadd.rn.f16 %r1, %r2, %r3;\n\tret;", "unsupported instruction");
+    refused("\tadd.ftz.rn.f32 %r1, %r2, %r3;\n\tret;", "out of order");
     refused("\tld.local.u32 %r1, [%rd1];\n\tret;", "unsupported ld");
     refused(
         "\tld.shared.u32 %r1, [nosuch];\n\tret;",
