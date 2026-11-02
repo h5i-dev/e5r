@@ -262,6 +262,11 @@ fn small_world(sp: &Spec, g: u32, b: u32, n: u32, alias: bool, rng: &mut Rng) ->
         let r = rng.next();
         if sp.float && r % 3 == 0 {
             FEDGE[(r >> 8) as usize % FEDGE.len()] as u64
+        } else if sp.float && r % 3 == 1 {
+            // a normal number in [2^-8, 2^8): products and sums of such
+            // values round in every way, and cancel
+            let e = 119 + (r >> 8) % 16;
+            ((r >> 40) & 1) << 31 | e << 23 | (r >> 12) & 0x7f_ffff
         } else {
             r & 0xffff_ffff
         }
@@ -330,6 +335,17 @@ pub fn search(k: &Kernel, sp: &Spec) -> (Option<(World, Witness)>, usize) {
                 if let Some(x) = sequential(k, sp, &w) {
                     return (Some((w, x)), tried);
                 }
+            }
+        }
+    }
+    // float maps: many one-element launches, since a wrong rounding shows
+    // only on some inputs (a one-element world also keeps the replay small)
+    if sp.float && in_range(sp, 1, 1, 1) {
+        for _ in 0..2000 {
+            tried += 1;
+            let w = small_world(sp, 1, 1, 1, false, &mut rng);
+            if let Some(x) = sequential(k, sp, &w) {
+                return (Some((w, x)), tried);
             }
         }
     }

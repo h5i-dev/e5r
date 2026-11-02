@@ -1,0 +1,23 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_horner",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_horner_x",
+  "f_horner_y"
+ ],
+ "output": "f_horner_y",
+ "length": "f_horner_n",
+ "scalars": [
+  "f_horner_c0",
+  "f_horner_c1",
+  "f_horner_c2"
+ ],
+ "element": "fma.rn(fma.rn(f_horner_c2, f_horner_x, f_horner_c1), f_horner_x, f_horner_c0)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

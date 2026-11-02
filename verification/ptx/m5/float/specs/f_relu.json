@@ -1,0 +1,19 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_relu",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_relu_x",
+  "f_relu_y"
+ ],
+ "output": "f_relu_y",
+ "length": "f_relu_n",
+ "scalars": [],
+ "element": "max(f_relu_x, 0f00000000)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

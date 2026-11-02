@@ -1,0 +1,20 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "fbug_negsub_order",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "fbug_negsub_order_x",
+  "fbug_negsub_order_y",
+  "fbug_negsub_order_z"
+ ],
+ "output": "fbug_negsub_order_z",
+ "length": "fbug_negsub_order_n",
+ "scalars": [],
+ "element": "sub.rn(neg(fbug_negsub_order_x), fbug_negsub_order_y)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

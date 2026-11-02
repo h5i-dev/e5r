@@ -1,0 +1,32 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_saxpy_stride",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_saxpy_stride_x",
+  "f_saxpy_stride_y"
+ ],
+ "output": "f_saxpy_stride_y",
+ "length": "f_saxpy_stride_n",
+ "scalars": [
+  "f_saxpy_stride_a"
+ ],
+ "element": "fma.rn(f_saxpy_stride_a, f_saxpy_stride_x, f_saxpy_stride_y)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "stride",
+  "bound": "2^64",
+  "loop": {
+   "head": "$L_loop",
+   "registers": {
+    "%rd1": "base f_saxpy_stride_x",
+    "%rd2": "base f_saxpy_stride_y",
+    "%f1": "scalar f_saxpy_stride_a",
+    "%rd3": "index64",
+    "%rd5": "stride64",
+    "%rd6": "length"
+   }
+  }
+ }
+}

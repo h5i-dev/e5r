@@ -1,0 +1,21 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_axpy_nofma",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_axpy_nofma_x",
+  "f_axpy_nofma_y"
+ ],
+ "output": "f_axpy_nofma_y",
+ "length": "f_axpy_nofma_n",
+ "scalars": [
+  "f_axpy_nofma_a"
+ ],
+ "element": "add.rn(mul.rn(f_axpy_nofma_a, f_axpy_nofma_x), f_axpy_nofma_y)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

@@ -1,0 +1,20 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "fbug_div_approx",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "fbug_div_approx_x",
+  "fbug_div_approx_y",
+  "fbug_div_approx_z"
+ ],
+ "output": "fbug_div_approx_z",
+ "length": "fbug_div_approx_n",
+ "scalars": [],
+ "element": "div.rn(fbug_div_approx_x, fbug_div_approx_y)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

@@ -1,0 +1,19 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_recip",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_recip_x",
+  "f_recip_y"
+ ],
+ "output": "f_recip_y",
+ "length": "f_recip_n",
+ "scalars": [],
+ "element": "rcp.rn(f_recip_x)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

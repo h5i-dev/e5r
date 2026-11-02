@@ -1,0 +1,19 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "fbug_sqrt_ftz",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "fbug_sqrt_ftz_x",
+  "fbug_sqrt_ftz_y"
+ ],
+ "output": "fbug_sqrt_ftz_y",
+ "length": "fbug_sqrt_ftz_n",
+ "scalars": [],
+ "element": "sqrt.rn(fbug_sqrt_ftz_x)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "fbug_saxpy_rz",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "fbug_saxpy_rz_x",
+  "fbug_saxpy_rz_y"
+ ],
+ "output": "fbug_saxpy_rz_y",
+ "length": "fbug_saxpy_rz_n",
+ "scalars": [
+  "fbug_saxpy_rz_a"
+ ],
+ "element": "fma.rn(fbug_saxpy_rz_a, fbug_saxpy_rz_x, fbug_saxpy_rz_y)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

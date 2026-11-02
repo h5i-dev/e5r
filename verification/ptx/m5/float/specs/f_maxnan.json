@@ -1,0 +1,20 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_maxnan",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_maxnan_x",
+  "f_maxnan_y",
+  "f_maxnan_z"
+ ],
+ "output": "f_maxnan_z",
+ "length": "f_maxnan_n",
+ "scalars": [],
+ "element": "max.NaN(f_maxnan_x, f_maxnan_y)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

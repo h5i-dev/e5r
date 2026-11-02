@@ -1,0 +1,21 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_scale_ftz",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_scale_ftz_x",
+  "f_scale_ftz_y"
+ ],
+ "output": "f_scale_ftz_y",
+ "length": "f_scale_ftz_n",
+ "scalars": [
+  "f_scale_ftz_a"
+ ],
+ "element": "mul.rn.ftz(f_scale_ftz_x, f_scale_ftz_a)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

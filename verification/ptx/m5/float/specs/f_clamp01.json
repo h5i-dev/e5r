@@ -1,0 +1,19 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_clamp01",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_clamp01_x",
+  "f_clamp01_y"
+ ],
+ "output": "f_clamp01_y",
+ "length": "f_clamp01_n",
+ "scalars": [],
+ "element": "add.rn.sat(f_clamp01_x, 0f80000000)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

@@ -1,0 +1,46 @@
+.version 8.0
+.target sm_86
+.address_size 64
+
+.visible .entry f_saxpy_stride(
+	.param .u64 f_saxpy_stride_x,
+	.param .u64 f_saxpy_stride_y,
+	.param .f32 f_saxpy_stride_a,
+	.param .u32 f_saxpy_stride_n
+)
+{
+	.reg .pred 	%p<2>;
+	.reg .f32 	%f<8>;
+	.reg .b32 	%r<8>;
+	.reg .b64 	%rd<12>;
+
+	ld.param.u64 	%rd1, [f_saxpy_stride_x];
+	ld.param.u64 	%rd2, [f_saxpy_stride_y];
+	ld.param.f32 	%f1, [f_saxpy_stride_a];
+	ld.param.u32 	%r2, [f_saxpy_stride_n];
+	cvta.to.global.u64 	%rd1, %rd1;
+	cvta.to.global.u64 	%rd2, %rd2;
+	mov.u32 	%r3, %ctaid.x;
+	mov.u32 	%r4, %ntid.x;
+	mov.u32 	%r5, %tid.x;
+	mov.u32 	%r6, %nctaid.x;
+	mul.wide.u32 	%rd3, %r3, %r4;
+	cvt.u64.u32 	%rd4, %r5;
+	add.u64 	%rd3, %rd3, %rd4;
+	mul.wide.u32 	%rd5, %r6, %r4;
+	cvt.u64.u32 	%rd6, %r2;
+$L_loop:
+	setp.ge.u64 	%p1, %rd3, %rd6;
+	@%p1 bra 	$L_done;
+	shl.b64 	%rd7, %rd3, 2;
+	add.u64 	%rd8, %rd1, %rd7;
+	add.u64 	%rd9, %rd2, %rd7;
+	ld.global.f32 	%f2, [%rd8];
+	ld.global.f32 	%f3, [%rd9];
+	fma.rn.f32 	%f4, %f1, %f2, %f3;
+	st.global.f32 	[%rd9], %f4;
+	add.u64 	%rd3, %rd3, %rd5;
+	bra.uni 	$L_loop;
+$L_done:
+	ret;
+}

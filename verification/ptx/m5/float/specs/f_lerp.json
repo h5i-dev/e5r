@@ -1,0 +1,22 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_lerp",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_lerp_a",
+  "f_lerp_b",
+  "f_lerp_c"
+ ],
+ "output": "f_lerp_c",
+ "length": "f_lerp_n",
+ "scalars": [
+  "f_lerp_t"
+ ],
+ "element": "fma.rn(f_lerp_t, sub.rn(f_lerp_b, f_lerp_a), f_lerp_a)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}
