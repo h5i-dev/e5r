@@ -42,7 +42,7 @@ pub(crate) fn prelude(k: &Kernel, sp: &Spec, header: &str, extra_import: &str) -
     let mut s = String::new();
     writeln!(
         s,
-        "/-\n{}\n-/\nimport Ptx.Auto.Tactic{extra_import}\n",
+        "/-\n{}\n-/\nimport Ptx.Auto.FloatMap{extra_import}\n",
         header.trim_end()
     )
     .unwrap();
@@ -58,11 +58,12 @@ pub(crate) fn prelude(k: &Kernel, sp: &Spec, header: &str, extra_import: &str) -
     let f = format!("fun s e => {}", sp.element.lean());
     writeln!(
         s,
-        "def spec : MapSpec where\n  arrays := {}\n  out := {}\n  len := {}\n  scalars := {}\n  f := {f}\n  sched := {sched}\n",
+        "def spec : MapSpec where\n  arrays := {}\n  out := {}\n  len := {}\n  scalars := {}\n  f := {f}\n  sched := {sched}\n  rel := {}\n",
         list(&sp.arrays),
         q(&sp.output),
         q(&sp.length),
-        list(&sp.scalars)
+        list(&sp.scalars),
+        sp.rel_lean()
     )
     .unwrap();
     for (n, v) in [
@@ -75,6 +76,7 @@ pub(crate) fn prelude(k: &Kernel, sp: &Spec, header: &str, extra_import: &str) -
             format!("({f} : (String → BitVec 32) → (String → BitVec 32) → BitVec 32)"),
         ),
         ("sched", sched.clone()),
+        ("rel", sp.rel_lean()),
     ] {
         writeln!(s, "@[ptx_spec] theorem spec_{n} : spec.{n} = {v} := rfl").unwrap();
     }
@@ -300,7 +302,9 @@ pub fn refutation(k: &Kernel, sp: &Spec, header: &str, w: &World, wit: &Witness)
             match check {
                 super::search::Check::Value { index } => writeln!(
                     s,
-                    "  have hv := ({fin}).1 {index} (by decide)\n  revert hv\n  simp [MapSpec.val{ds}, {ev}]"
+                    "  have hv := ({fin}).1 {index} (by decide)\n  revert hv\n  simp [MapSpec.val{ds}, {ev}]{}",
+                    // a float value is decided by evaluating the model in the kernel
+                    if sp.float { "\n  all_goals decide +kernel" } else { "" }
                 )
                 .unwrap(),
                 super::search::Check::Frame { byte } => writeln!(

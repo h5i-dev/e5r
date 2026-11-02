@@ -18,6 +18,16 @@
 //! thread, `max_threads` the largest `G·B` claimed) or `stride` (a
 //! grid-stride loop, `bound` the largest `n + G·B` claimed, and the loop
 //! invariant as register roles at the loop head).
+//!
+//! With `"element_type": "f32"` the arrays and scalars are `.f32` and
+//! `element` is an expression of the model's float operations, written like
+//! the PTX instructions: `fma.rn(saxpy_a, saxpy_x, saxpy_y)`,
+//! `add.rz.ftz(x, mul.rn(a, y))`, `sqrt.rn(x)`, `min.NaN(x, y)`, `neg(x)`,
+//! with `0fXXXXXXXX` literals. `"result"` is `"bit_exact"` (the default:
+//! the output has the expression's bits, or is some NaN where the expression
+//! is NaN, `Ptx.Fp.feq32`) or `{"max_ulps": k}` (both NaN, the same
+//! infinity, or finite and at most `k` representable numbers apart,
+//! `Ptx.Fp.within32 k`).
 
 use e5r_ptx::ast::{Kernel, Ty};
 use serde_json::Value;
@@ -34,6 +44,31 @@ pub enum Expr {
     Bin(char, Box<Expr>, Box<Expr>),
     Shl(Box<Expr>, u32),
     Shr(Box<Expr>, u32),
+    /// An `.f32` literal by its bits.
+    FLit(u32),
+    /// A float operation of the model (`Ptx.Auto.F32.*`).
+    FOp(FOp, Vec<Expr>),
+}
+
+/// `op{.rnd}{.ftz}{.sat}{.NaN}` in a float element.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FOp {
+    pub op: String,
+    pub rnd: Option<e5r_ptx::fp::RMode>,
+    pub ftz: bool,
+    pub sat: bool,
+    pub nan: bool,
+}
+
+/// How an output element is compared with `element`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Result32 {
+    /// Integer maps: equality.
+    Eq,
+    /// Float maps: the same bits, or both NaN.
+    BitExact,
+    /// Float maps: within this many units in the last place.
+    MaxUlps(u32),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -70,6 +105,9 @@ pub struct Spec {
     pub element: Expr,
     pub element_text: String,
     pub sched: Sched,
+    /// `"element_type": "f32"`.
+    pub float: bool,
+    pub result: Result32,
 }
 
 /// Why a spec cannot be checked: malformed (`Error`) or outside the class
@@ -166,9 +204,26 @@ pub fn parse(text: &str) -> Result<Spec, SpecError> {
     let arrays = strs(&v, "arrays")?;
     let scalars = strs(&v, "scalars")?;
     let element_text = s(&v, "element")?.to_string();
-    let element = Parser::new(&element_text, &arrays, &scalars)
+    let float = match v.get("element_type").and_then(Value::as_str) {
+        None | Some("u32") => false,
+        Some("f32") => true,
+        Some(t) => return Err(SpecError::Unsupported(format!("element_type {t:?} (u32 or f32)"))),
+    };
+    let mut parser = Parser::new(&element_text, &arrays, &scalars);
+    parser.float = float;
+    let element = parser
         .parse()
         .map_err(|e| SpecError::Malformed(format!("element: {e}")))?;
+    let result = match (float, v.get("result")) {
+        (false, None) => Result32::Eq,
+        (false, Some(_)) => return malformed("spec: \"result\" is for float elements"),
+        (true, None) => Result32::BitExact,
+        (true, Some(Value::String(t))) if t == "bit_exact" => Result32::BitExact,
+        (true, Some(r)) => match r.get("max_ulps").and_then(Value::as_u64) {
+            Some(k) if k < 1 << 31 => Result32::MaxUlps(k as u32),
+            _ => return malformed("spec: \"result\" is \"bit_exact\" or {\"max_ulps\": k}"),
+        },
+    };
     let sc = v
         .get("schedule")
         .ok_or_else(|| SpecError::Malformed("spec: \"schedule\" is required".into()))?;
@@ -209,6 +264,8 @@ pub fn parse(text: &str) -> Result<Spec, SpecError> {
         element,
         element_text,
         sched,
+        float,
+        result,
     })
 }
 
@@ -249,8 +306,10 @@ pub fn validate(sp: &Spec, k: &Kernel) -> Result<(), String> {
     for (p, t) in &k.params {
         let ok = if sp.arrays.contains(p) {
             matches!(t, Ty::U64 | Ty::S64 | Ty::B64)
-        } else if *p == sp.length || sp.scalars.contains(p) {
+        } else if *p == sp.length {
             matches!(t, Ty::U32 | Ty::S32 | Ty::B32)
+        } else if sp.scalars.contains(p) {
+            if sp.float { *t == Ty::F32 } else { matches!(t, Ty::U32 | Ty::S32 | Ty::B32) }
         } else {
             return Err(format!("parameter {p} is not named by the spec"));
         };
@@ -312,6 +371,7 @@ struct Parser<'a> {
     i: usize,
     arrays: &'a [String],
     scalars: &'a [String],
+    float: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -321,6 +381,7 @@ impl<'a> Parser<'a> {
             i: 0,
             arrays,
             scalars,
+            float: false,
         }
     }
     fn ws(&mut self) {
@@ -339,13 +400,78 @@ impl<'a> Parser<'a> {
         }
     }
     fn parse(mut self) -> Result<Expr, String> {
-        let e = self.bin(0)?;
+        let e = if self.float { self.fexpr()? } else { self.bin(0)? };
         self.ws();
         if self.i < self.t.len() {
             return Err(format!("unexpected {:?} at {}", self.t[self.i], self.i));
         }
         Ok(e)
     }
+    /// A float element: a call `op.mods(args)`, an array or scalar, or a
+    /// `0f` literal.
+    fn fexpr(&mut self) -> Result<Expr, String> {
+        self.ws();
+        let st = self.i;
+        while self
+            .t
+            .get(self.i)
+            .is_some_and(|c| c.is_ascii_alphanumeric() || matches!(*c, '_' | '$' | '.'))
+        {
+            self.i += 1;
+        }
+        let w: String = self.t[st..self.i].iter().collect();
+        if w.is_empty() {
+            return Err(format!("expected an operand at {st}"));
+        }
+        if let Some((v, 32)) = e5r_ptx::lex::float_value(&w) {
+            return Ok(Expr::FLit(v as u32));
+        }
+        if !self.eat("(") {
+            return if self.arrays.contains(&w) {
+                Ok(Expr::Arr(w))
+            } else if self.scalars.contains(&w) {
+                Ok(Expr::Scal(w))
+            } else {
+                Err(format!("{w} is neither an array, a scalar nor a 0f literal"))
+            };
+        }
+        let parts: Vec<&str> = w.split('.').collect();
+        let (op, mods) = parts.split_first().unwrap();
+        let arity = match *op {
+            "add" | "sub" | "mul" | "div" | "min" | "max" => 2,
+            "fma" => 3,
+            "sqrt" | "rcp" | "neg" | "abs" => 1,
+            _ => return Err(format!("unknown float operation {op}")),
+        };
+        let rounded = matches!(*op, "add" | "sub" | "mul" | "div" | "fma" | "sqrt" | "rcp");
+        let mut f = FOp { op: op.to_string(), rnd: None, ftz: false, sat: false, nan: false };
+        for m in mods {
+            match *m {
+                "rn" | "rz" | "rm" | "rp" if rounded && f.rnd.is_none() => {
+                    f.rnd = e5r_ptx::ast::RMode::from_name(m)
+                }
+                "ftz" if !f.ftz => f.ftz = true,
+                "sat" if matches!(*op, "add" | "sub" | "mul" | "fma") && !f.sat => f.sat = true,
+                "NaN" if matches!(*op, "min" | "max") && !f.nan => f.nan = true,
+                _ => return Err(format!("modifier .{m} on {op}")),
+            }
+        }
+        if rounded && f.rnd.is_none() {
+            return Err(format!("{op} needs a rounding modifier"));
+        }
+        let mut args = vec![self.fexpr()?];
+        while args.len() < arity {
+            if !self.eat(",") {
+                return Err(format!("{op} takes {arity} operands"));
+            }
+            args.push(self.fexpr()?);
+        }
+        if !self.eat(")") {
+            return Err(format!("missing ) after {op}"));
+        }
+        Ok(Expr::FOp(f, args))
+    }
+
     // precedence, loosest first: | ^ & (<< >>) (+ -) *
     fn bin(&mut self, lvl: usize) -> Result<Expr, String> {
         const OPS: [&[&str]; 5] = [&["|"], &["^"], &["&"], &["+", "-"], &["*"]];
@@ -429,6 +555,37 @@ impl<'a> Parser<'a> {
     }
 }
 
+impl Spec {
+    /// The Lean relation of `MapSpec.rel`.
+    pub fn rel_lean(&self) -> String {
+        match self.result {
+            Result32::Eq => "(fun a b => a = b)".into(),
+            Result32::BitExact => "Ptx.Fp.feq32".into(),
+            Result32::MaxUlps(k) => format!("(Ptx.Fp.within32 {k})"),
+        }
+    }
+
+    /// Whether output word `got` meets the spec's value `want`.
+    pub fn accepts(&self, got: u32, want: u32) -> bool {
+        let f = e5r_ptx::fp::F32;
+        let nan = |x: u32| f.is_nan(x as u64);
+        match self.result {
+            Result32::Eq => got == want,
+            Result32::BitExact => got == want || (nan(got) && nan(want)),
+            Result32::MaxUlps(k) => {
+                let inf = |x: u32| x & 0x7fff_ffff == 0x7f80_0000;
+                let ord = |x: u32| -> i64 {
+                    if x & 0x8000_0000 != 0 { -((x & 0x7fff_ffff) as i64) } else { x as i64 }
+                };
+                (nan(got) && nan(want))
+                    || (inf(got) && got == want)
+                    || (!nan(got) && !inf(got) && !nan(want) && !inf(want)
+                        && (ord(got) - ord(want)).unsigned_abs() <= k as u64)
+            }
+        }
+    }
+}
+
 impl Expr {
     /// The value, for the counterexample search.
     pub fn eval(&self, arr: &dyn Fn(&str) -> u32, sc: &dyn Fn(&str) -> u32) -> u32 {
@@ -440,6 +597,26 @@ impl Expr {
             Expr::Neg(e) => e.eval(arr, sc).wrapping_neg(),
             Expr::Shl(e, k) => e.eval(arr, sc) << k,
             Expr::Shr(e, k) => e.eval(arr, sc) >> k,
+            Expr::FLit(v) => *v,
+            Expr::FOp(f, args) => {
+                use e5r_ptx::fp;
+                let v: Vec<u64> = args.iter().map(|a| a.eval(arr, sc) as u64).collect();
+                let (m, ff) = (f.rnd.unwrap_or(fp::RMode::Rn), fp::F32);
+                let r = match f.op.as_str() {
+                    "add" => fp::fadd(ff, m, f.ftz, f.sat, v[0], v[1]),
+                    "sub" => fp::fsub(ff, m, f.ftz, f.sat, v[0], v[1]),
+                    "mul" => fp::fmul(ff, m, f.ftz, f.sat, v[0], v[1]),
+                    "div" => fp::fdiv(ff, m, f.ftz, v[0], v[1]),
+                    "fma" => fp::ffma(ff, m, f.ftz, f.sat, v[0], v[1], v[2]),
+                    "sqrt" => fp::fsqrt(ff, m, f.ftz, v[0]),
+                    "rcp" => fp::frcp(ff, m, f.ftz, v[0]),
+                    "neg" => fp::fneg(ff, f.ftz, v[0]),
+                    "abs" => fp::fabs(ff, f.ftz, v[0]),
+                    "min" => fp::fminmax(ff, false, f.ftz, f.nan, v[0], v[1]),
+                    _ => fp::fminmax(ff, true, f.ftz, f.nan, v[0], v[1]),
+                };
+                r.unwrap_or(ff.qnan()) as u32
+            }
             Expr::Bin(o, a, b) => {
                 let (x, y) = (a.eval(arr, sc), b.eval(arr, sc));
                 match o {
@@ -460,7 +637,19 @@ impl Expr {
         match self {
             Expr::Arr(a) => format!("e {}", q(a)),
             Expr::Scal(a) => format!("s {}", q(a)),
-            Expr::Lit(v) => format!("({v}#32)"),
+            Expr::Lit(v) | Expr::FLit(v) => format!("({v}#32)"),
+            Expr::FOp(f, args) => {
+                let a: Vec<String> = args.iter().map(|x| format!("({})", x.lean())).collect();
+                let m = f.rnd.map(|r| format!(" .{}", r.name())).unwrap_or_default();
+                match f.op.as_str() {
+                    "add" | "sub" | "mul" | "fma" => {
+                        format!("(F32.{}{m} {} {} {})", f.op, f.ftz, f.sat, a.join(" "))
+                    }
+                    "div" | "sqrt" | "rcp" => format!("(F32.{}{m} {} {})", f.op, f.ftz, a.join(" ")),
+                    "neg" | "abs" => format!("(F32.{} {} {})", f.op, f.ftz, a.join(" ")),
+                    op => format!("(F32.minmax {} {} {} {})", op == "max", f.ftz, f.nan, a.join(" ")),
+                }
+            }
             Expr::Not(e) => format!("(~~~({}))", e.lean()),
             Expr::Neg(e) => format!("(-({}))", e.lean()),
             Expr::Shl(e, k) => format!("(({}) <<< ({k} : Nat))", e.lean()),

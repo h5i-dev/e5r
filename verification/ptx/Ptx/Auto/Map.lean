@@ -44,6 +44,9 @@ structure MapSpec where
   scalars : List String
   f : (String → BitVec 32) → (String → BitVec 32) → BitVec 32
   sched : Sched
+  /-- How an output element is compared with `f`: equality, or for float
+  maps `Fp.feq32` (equal bits, or both NaN; `Ptx/Auto/FloatMap.lean`). -/
+  rel : BitVec 32 → BitVec 32 → Prop := fun a b => a = b
 
 /-- The launch-time values a theorem quantifies over. -/
 structure Args where
@@ -52,6 +55,8 @@ structure Args where
   n : BitVec 32
   base : String → Addr
   sc : String → BitVec 32
+  /-- The NaN oracle of the launch (`Launch.nan`); integer kernels never read it. -/
+  nan : Tid → TState → Val := fun _ _ => 0
 
 namespace MapSpec
 variable (S : MapSpec) (A : Args)
@@ -65,7 +70,7 @@ def params : String → Val := fun p =>
 
 def launch : Launch :=
   { grid := ⟨A.G, 1, 1⟩, block := ⟨A.B, 1, 1⟩, params := S.params A,
-    alloc := S.arrays.map fun a => ⟨A.base a, 4 * A.n.toNat⟩ }
+    alloc := S.arrays.map fun a => ⟨A.base a, 4 * A.n.toNat⟩, nan := A.nan }
 
 /-- Two arrays of `N` elements share no byte. -/
 def Sep (a b : Addr) (N : Nat) : Prop := a.toNat + 4 * N ≤ b.toNat ∨ b.toNat + 4 * N ≤ a.toNat
@@ -99,7 +104,7 @@ def Correct (K : Kernel) : Prop :=
     RaceFree K L c₀ ∧
     (∃ c, Reach K L c₀ c ∧ Done K L c) ∧
     (∀ c, Reach K L c₀ c → Done K L c → 0 < A.G.toNat * A.B.toNat →
-      (∀ i < A.n.toNat, rd32 c.mem (elem (A.base S.out) i) = S.val A m₀ i) ∧
+      (∀ i < A.n.toNat, S.rel (rd32 c.mem (elem (A.base S.out) i)) (S.val A m₀ i)) ∧
       (∀ x, (∀ i < A.n.toNat, ¬ covers (elem (A.base S.out) i) 4 x) → c.mem x = m₀ x))
 
 /-- Element `i` belongs to the thread with global index `g`. -/
@@ -112,7 +117,7 @@ def W (g : Nat) (x : Addr) : Prop :=
   ∃ i < A.n.toNat, Own A g i ∧ covers (elem (A.base S.out) i) 4 x
 
 def Post (m₀ : Mem) (g : Nat) (M : Mem) : Prop :=
-  ∀ i < A.n.toNat, Own A g i → rd32 M (elem (A.base S.out) i) = S.val A m₀ i
+  ∀ i < A.n.toNat, Own A g i → S.rel (rd32 M (elem (A.base S.out) i)) (S.val A m₀ i)
 
 /-- The per-thread obligation. -/
 def ThreadOk (K : Kernel) : Prop :=
@@ -172,8 +177,8 @@ theorem correct_of_threadOk {S : MapSpec} {K : Kernel} (hsh : K.shared = []) (h 
   obtain ⟨M, hP, hM⟩ := hown _ hm
   have ho : MapSpec.Own A (gid A.B (owner A.B (i % SS))) i := by
     unfold MapSpec.Own; rw [hg]
-  rw [← hP i hi ho]
-  exact rd32_congr fun x hx => hM x ⟨i, hi, ho, hx⟩
+  rw [rd32_congr fun x hx => hM x ⟨i, hi, ho, hx⟩]
+  exact hP i hi ho
 
 end Ptx.Auto
 
@@ -239,7 +244,7 @@ alone (and nothing if `i ≥ n`). -/
 def ER (i : Nat) (x : Addr) : Prop := i < A.n.toNat ∧ ∃ a ∈ S.arrays, covers (elem (A.base a) i) 4 x
 def EW (i : Nat) (x : Addr) : Prop := i < A.n.toNat ∧ covers (elem (A.base S.out) i) 4 x
 def EPost (m₀ : Mem) (i : Nat) (M : Mem) : Prop :=
-  i < A.n.toNat → rd32 M (elem (A.base S.out) i) = S.val A m₀ i
+  i < A.n.toNat → S.rel (rd32 M (elem (A.base S.out) i)) (S.val A m₀ i)
 
 def GuardedOk (K : Kernel) : Prop :=
   ∀ A, S.Pre A → ∀ (m₀ : Mem), ∀ t ∈ (S.launch A).threads, ∀ (r : String → Val) (p : String → Bool),
@@ -351,12 +356,12 @@ def BodyOk (Lp : Loop) (K : Kernel) : Prop :=
     Safe K (S.launch A).alloc ((S.launch A).ctx t) (S.ER A i) (S.EW A i)
       (fun s' m' =>
         (i < A.n.toNat ∧ Lp.At A (i + A.G.toNat * A.B.toNat) s' ∧
-          rd32 m' (elem (A.base S.out) i) = S.val A m₀ i ∧
+          S.rel (rd32 m' (elem (A.base S.out) i)) (S.val A m₀ i) ∧
           ∀ x, ¬ covers (elem (A.base S.out) i) 4 x → m' x = m x) ∨
         (A.n.toNat ≤ i ∧ action K ((S.launch A).ctx t) s' = .done ∧ m' = m) ∨
         (i < A.n.toNat ∧ A.n.toNat ≤ i + A.G.toNat * A.B.toNat ∧
           action K ((S.launch A).ctx t) s' = .done ∧
-          rd32 m' (elem (A.base S.out) i) = S.val A m₀ i ∧
+          S.rel (rd32 m' (elem (A.base S.out) i)) (S.val A m₀ i) ∧
           ∀ x, ¬ covers (elem (A.base S.out) i) 4 x → m' x = m x)) s m
 
 end MapSpec
@@ -369,7 +374,7 @@ def StrideInv (S : MapSpec) (Lp : Loop) (A : Args) (m₀ : Mem) (g : Nat) (v : N
     Prop :=
   ∃ i, v = A.n.toNat + A.G.toNat * A.B.toNat - i ∧ i % (A.G.toNat * A.B.toNat) = g ∧ g ≤ i ∧
     i < A.n.toNat + A.G.toNat * A.B.toNat ∧ Lp.At A i s ∧
-    (∀ j < A.n.toNat, MapSpec.Own A g j → j < i → rd32 m (elem (A.base S.out) j) = S.val A m₀ j) ∧
+    (∀ j < A.n.toNat, MapSpec.Own A g j → j < i → S.rel (rd32 m (elem (A.base S.out) j)) (S.val A m₀ j)) ∧
     (∀ x, (∀ j < A.n.toNat, MapSpec.Own A g j → j < i → ¬ covers (elem (A.base S.out) j) 4 x) →
       m x = m₀ x)
 

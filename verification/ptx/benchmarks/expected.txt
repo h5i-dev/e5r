@@ -10,6 +10,8 @@ correct/sum.ptx            sum_as_map.json unsupported
 correct/reduce_nvcc.ptx    reduce.json   proved
 correct/reduce_atomic_nvcc.ptx reduce_atomic.json proved
 correct/scan_nvcc.ptx      scan.json     proved
+# float maps (f32, bit-exact up to NaN payloads), nvcc 13.2 -O3
+correct/float/saxpy_f32.ptx saxpy_f32.json proved
 # accum: one atomic per element into one word, every commutative and associative
 # PTX atomic (add, and, or, xor, min, max at u/s, 32 and 64 bit), nvcc 13.2 -O3.
 correct/accum/acc_add_u32.ptx acc_add_u32.json   proved

@@ -1,0 +1,13 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "saxpy_f32",
+  "class": "map32",
+  "element_type": "f32",
+  "arrays": ["saxpy_f32_param_1", "saxpy_f32_param_2"],
+  "output": "saxpy_f32_param_2",
+  "length": "saxpy_f32_param_3",
+  "scalars": ["saxpy_f32_param_0"],
+  "element": "fma.rn(saxpy_f32_param_0, saxpy_f32_param_1, saxpy_f32_param_2)",
+  "result": "bit_exact",
+  "schedule": { "kind": "guarded", "max_threads": "2^32" }
+}

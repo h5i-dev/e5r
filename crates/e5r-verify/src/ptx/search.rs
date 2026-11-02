@@ -200,7 +200,7 @@ fn sequential(k: &Kernel, sp: &Spec, w: &World) -> Option<Witness> {
                 .find(|(x, _)| x == s)
                 .map_or(0, |(_, v)| *v)
         });
-        if m.rd(out.wrapping_add(4 * i), 4) as u32 != want {
+        if !sp.accepts(m.rd(out.wrapping_add(4 * i), 4) as u32, want) {
             return Some(Witness::Wrong {
                 order,
                 check: Check::Value { index: i },
@@ -251,15 +251,34 @@ fn small_world(sp: &Spec, g: u32, b: u32, n: u32, alias: bool, rng: &mut Rng) ->
         bases.push((a.clone(), base));
     }
     let mut mem = Mem::default();
+    // float maps: a third of the words from edge values (zeros, subnormals,
+    // the smallest normal, ±1, the largest finite number, infinities, NaNs)
+    const FEDGE: [u32; 16] = [
+        0, 0x8000_0000, 1, 0x807f_ffff, 0x0080_0000, 0x3f80_0000, 0xbf80_0000, 0x3f7f_ffff,
+        0x7f7f_ffff, 0x7f80_0000, 0xff80_0000, 0x7fc0_0000, 0x3f00_0000, 0x4b00_0001, 0x0040_0000,
+        0xff7f_ffff,
+    ];
+    let word = |rng: &mut Rng| -> u64 {
+        let r = rng.next();
+        if sp.float && r % 3 == 0 {
+            FEDGE[(r >> 8) as usize % FEDGE.len()] as u64
+        } else {
+            r & 0xffff_ffff
+        }
+    };
     for (_, base) in &bases {
         for i in 0..n as u64 {
-            mem.wr(base + 4 * i, 4, rng.next() & 0xffff_ffff);
+            let v = word(rng);
+            mem.wr(base + 4 * i, 4, v);
         }
     }
     let scalars = sp
         .scalars
         .iter()
-        .map(|s| (s.clone(), (rng.next() & 0xffff) as u32 | 2))
+        .map(|s| {
+            let v = if sp.float { word(rng) as u32 } else { (rng.next() & 0xffff) as u32 | 2 };
+            (s.clone(), v)
+        })
         .collect();
     World {
         g,
