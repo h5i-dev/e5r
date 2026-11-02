@@ -32,7 +32,13 @@ result, and `scan32`, Hillis-Steele block scans), 6 of 14 CUDA C kernels
 written independently of the tactics and compiled by nvcc were proved, 3 were
 refuted with replayed counterexamples (two of them defects nobody planted: a
 signed `int` length that drops every element when `n ≥ 2^31`), 1 is `unknown`
-and 4 are `unsupported` (`verification/ptx/m5/m4/RESULTS.md`).
+and 4 are `unsupported` (`verification/ptx/m5/m4/RESULTS.md`); two of the
+unsupported ones were later proved by supplied proofs the tool checked
+(`--proof`, below). For kernels where every thread combines one element into
+one word with an atomic (`accum`: `add`, `and`, `or`, `xor`, and signed and
+unsigned `min` and `max`, at 32 and 64 bits), 16 nvcc kernels, one per
+operation and type, were proved. `atom.exch` and `atom.cas`, whose result
+depends on the order, are not covered.
 
 "Proved" below means checked by the Lean kernel with only `propext`,
 `Quot.sound` and `Classical.choice` among the axioms of every declaration
@@ -49,6 +55,8 @@ evaluation, which would put the compiler in the trusted base.
 | M3 proof automation (P3) | done for `map32` | `e5r-verify ptx check`; 102 kernels proved, 20 of 21 mutants refuted |
 | M4 shared memory, barriers, reduction (P4) | done for `reduce32` and `scan32` | `phase_sound`; `reduce_correct`, `scan_correct`, `reduce_atomic_correct`; `ptx check` on 3 benchmarks and 6 M5 kernels; 0 of 14 M4 mutants proved, 14 refuted |
 | M5 AI-written PTX benchmark (P5) | done, with the limits stated | `m5/RESULTS.md`; differential test against the A10G |
+| Supplied proofs (P6) | done | `ptx check --proof`; `a_direct` and `s_pingpong` proved; 10 negative controls refused |
+| Commutative atomics (P7) | done for `accum`; `exch` and `cas` not covered | `phase_sound` over a cell algebra; 16 `accum` benchmarks proved; 0 of 11 `accum` mutants proved, 11 refuted |
 
 ## Reproduce
 
@@ -64,9 +72,10 @@ It runs, in order, and fails on the first problem:
    and refuse a stale one, assemble every benchmark with ptxas when it is
    installed, build the Lean project from scratch, and run the axiom audit;
 3. `e5r-verify ptx check` on every benchmark against
-   `benchmarks/expected.txt` (5 proved, 3 refuted, 1 unsupported);
+   `benchmarks/expected.txt` (21 proved, 3 refuted, 1 unsupported);
 4. the mutation controls (`mutants/run.py`): no mutant may be proved;
-5. the GPU differential test (`scripts/check-ptx-difftest.sh`), skipped with
+5. the supplied proofs and their negative controls (`proofs/controls.sh`);
+6. the GPU differential test (`scripts/check-ptx-difftest.sh`), skipped with
    a note when there is no GPU.
 
 The M5 benchmark is separate because it needs the GPU and takes 12 minutes
@@ -97,6 +106,7 @@ and the timeout apply.
 e5r-verify ptx export [--namespace NS] [--name NAME] FILE.ptx
 e5r-verify ptx check FILE.ptx --spec SPEC.json [--project DIR] [--out RESULT.json]
                      [--keep DIR] [--timeout SECS] [--memory-mb MB] [--no-search]
+                     [--proof PROOF.lean]
 e5r-verify ptx run --cases CASES FILE.ptx
 ```
 
@@ -211,6 +221,39 @@ Otherwise, or if that fails, the barrier-aware search runs. With no proof
 and no replayed counterexample the verdict is `unknown` inside the shape and
 `unsupported` outside it.
 
+### The atomic spec (`accum`)
+
+```json
+{ "schema": "e5r.ptx.spec.v1", "kernel": "acc_min_s32", "class": "accum",
+  "op": "min", "type": "s32",
+  "input": "acc_min_s32_param_0", "output": "acc_min_s32_param_1",
+  "length": "acc_min_s32_param_2" }
+```
+
+- `op` is `add`, `min`, `max`, `and`, `or` or `xor`; `type` is `u32`, `s32`,
+  `b32`, `u64`, `s64` or `b64`. `min` and `max` compare signed for `s` types
+  and unsigned otherwise; `add` takes `u` or `s`, the bitwise operations any
+  type of their width. Each pair names one algebra of
+  `Ptx/Logic/CellAlgs.lean` (`add32`, `mins32`, `maxu64`, ...). `exch` and
+  `cas` are refused as `unsupported`.
+- The kernel has exactly three parameters: `input` and `output` (`.u64`) and
+  `length` (`.u32`).
+- `Accum.Correct spec K` (`Ptx/Auto/Accum.lean`) claims, for every 1-D launch
+  with `G·B ≤ 2^32`, any `n`, an input of `n` elements of the type's width and
+  an output word that fit, are aligned to that width and do not overlap: the
+  five clauses of the M3 theorem, and when all threads are done
+  `*out = op(*out₀, x[0], …, x[min(n, G·B) − 1])` (the fold of the algebra,
+  in index order, which any order equals), and no byte outside `*out`
+  changed.
+
+The generated proof is one phase obligation per thread (from `pc 0` to the
+end, reading `x[gid]` when `gid < n`, combining it into `*out`); the class
+theorem `Accum.correct_of` is proved once from `phase_sound`. The proof is
+attempted only if every atomic in the kernel is `atom` or `red` with the
+spec's algebra; otherwise, or if it fails, the search runs (worlds up to 3
+blocks of up to 8 threads, lengths around the grid size, `2^31` and
+`2^32 − 1`, inputs with sign-bit and all-ones patterns).
+
 ### Supplied proofs (`--proof`)
 
 For a kernel the automation cannot handle, `check --proof PROOF.lean` checks
@@ -221,7 +264,7 @@ statement:
    exported, the spec definition, and `E5rSpec.statement : Prop`, the same
    class statement the automation would prove (`spec.Correct K` for `map32`,
    `Reduce32.Correct`, `Reduce32.Atomic.Correct` or `Scan32.Correct` for the
-   block classes). Only the statement-level checks apply (parameter names and
+   block classes, `Accum.Correct` for `accum`). Only the statement-level checks apply (parameter names and
    types); the class's proof shape (barrier count, roles, shared array) does
    not.
 2. The supplied file must be module `E5rProof`, contain a manifest
@@ -316,12 +359,13 @@ the entry state the phase's code reaches the next barrier (or the end) with
 every access inside the phase's read and write footprint, legal, and every
 written location holding what the per-phase memory `M` says; footprints of
 different threads of one CTA are disjoint within a phase; no global byte
-one CTA writes is touched by another; and atomic `add`s to designated
+one CTA writes is touched by another; and global atomics to designated
 accumulator cells, outside every footprint, are recorded as ghost
-contributions. It concludes the five clauses of the M3 theorem for every
-interleaving, the final memory on every written location, and each
-accumulator cell's final value as its initial value plus the sum of all
-contributions. `grid_sound` (M2) is re-proved on the new `Step`.
+contributions of the phased kernel's cell algebra (below). It concludes the
+five clauses of the M3 theorem for every interleaving, the final memory on
+every written location, and each accumulator cell's final value as
+`op(initial value, fold of all contributions)`. `grid_sound` (M2) is
+re-proved on the new `Step`.
 
 The class theorems `Ptx.Auto.Reduce32.correct_of`,
 `Ptx.Auto.Reduce32.Atomic.correct_of` and `Ptx.Auto.Scan32.correct_of`
@@ -333,6 +377,50 @@ only kernel-dependent hypothesis is the structure `Obligations`: one `Run`
 per phase kind from the entry states a `Code` claims (the spec's roles). The
 generated file supplies the `Code`, proves `Obligations` with the M4 tactics
 (`Ptx/Auto/Tactic4.lean`), and applies the class theorem.
+
+### Atomics: cell algebras
+
+`phase_sound` is stated for a `CellAlg` (`Ptx/Logic/Phases.lean`): a size
+(`.b4` or `.b8`), an operation `op` on values truncated to it, a unit `e`, and
+proofs that `op` is commutative and associative, that `e` is its unit, and
+that `op` stays truncated. In a `Run`, an atomic on a cell needs a
+contribution `δ` with `Accum A g δ`: the instruction's update function `g`
+(what the model's `atom`/`red` does to the old value) is `fun old => op old
+δ` on every old value. The value the atomic returns is universally
+quantified, so a kernel may use it, but the proof learns nothing about it.
+
+`Ptx/Logic/CellAlgs.lean` defines the 16 algebras PTX's commutative,
+associative atomics give and proves their laws: `add`, `and`, `or`, `xor`,
+unsigned `min`/`max` (units all-ones and 0) and signed `min`/`max` (units
+`2^(w−1) − 1` and `−2^(w−1)`), at 32 and 64 bits, and for each the lemma
+`accum_<alg>` that the model's update for that instruction form is
+`op old b`. 32-bit atomics act on the low 32 bits of the register value
+zero-extended, so the 32-bit algebras work on `ext32 (lo32 v)`.
+
+Not covered, and why:
+
+- **`atom.exch` and `atom.cas`.** Their final value depends on the order the
+  threads ran in. The ghost of `phase_sound` is a fold of a commutative
+  operation, which is order-independent by construction. The update of exch,
+  `fun _ => b`, has the form `op old δ` for every old value only when `b`
+  absorbs the algebra (exchanging 0 is `and` with 0, all-ones is `or` with
+  all-ones, an extreme value is `min` or `max` with it); the update of cas,
+  `fun old => if old = a then b else old`, only in similarly degenerate
+  cases. For what these instructions are used for (publishing a thread's
+  own value, taking a lock) no algebra fits, `Accum` cannot be proved, and
+  the kernel gets no proof; the `accum` class refuses both outright. A rule
+  for them would need a different invariant: a set of values the cell may
+  hold, preserved by every step of every thread (for exch: the initial value
+  or one of the written values; for a lock or flag protocol: a relation
+  between the cell and the data it guards, and for spin loops a fairness
+  assumption the model does not make). That is not built. The model and the
+  differential test have both instructions.
+- **Atomics on shared memory** are in the model; `Run` has no rule for
+  them, so a kernel accumulating in shared memory gets no proof.
+- **Several operations on one kernel's cells.** A `Phased` has one algebra,
+  so a kernel that, say, adds into one word and takes the max into another
+  gets no proof from the classes.
+- **The returned old value** carries no information (above).
 
 ### Theorems in the library
 
@@ -347,11 +435,14 @@ interleaving.
 | `Ptx.grid_sound` | every kernel | per-thread `Solo` runs, disjoint write footprints | the five clauses above |
 | `Ptx.Auto.correct_of_threadOk`, `threadOk_of_guardedOk`, `threadOk_of_stride` | every `map32` kernel | the local obligations | `MapSpec.Correct` |
 | `E5rCheck.correct` (generated) | each kernel `check` proves | `MapSpec.Pre` | `MapSpec.Correct` |
-| `Ptx.Phased.phase_sound` (M4) | every kernel | per-phase `Run` derivations, footprint disjointness, accumulator cells | the five clauses, final memory, accumulator sums |
+| `Ptx.Phased.phase_sound` (M4) | every kernel | per-phase `Run` derivations, footprint disjointness, accumulator cells of one `CellAlg` | the five clauses, final memory, each cell = `op(initial, fold of contributions)` |
 | `Ptx.Examples.Reduce.reduce_correct` (M4) | `benchmarks/correct/reduce_nvcc.ptx`, nvcc 13.2 | `B = 2^j ≤ 1024`, `G·B ≤ 2^32`, any `n`; arrays fit, aligned, disjoint; any shared placement ptxas could choose | `out[b]` = sum of block `b`'s segment |
 | `Ptx.Examples.ReduceAtomic.reduce_atomic_correct` (M4) | `reduce_atomic_nvcc.ptx` | as above, one output word | `*out` = initial + sum of `x[0 .. min(n, G·B))` |
 | `Ptx.Examples.Scan.scan_correct` (M4) | `scan_nvcc.ptx` | `1 ≤ B ≤ 1024`, `n ≤ G·B ≤ 2^32` | `out[i]` = inclusive prefix sum of `i`'s block segment |
 | `Ptx.Auto.Reduce32.correct_of`, `Reduce32.Atomic.correct_of`, `Scan32.correct_of` (M4) | every `reduce32` / `scan32` kernel | `Obligations` | the class's `Correct` |
+| `Ptx.Auto.Accum.correct_of` | every `accum` kernel, all 16 algebras | `Obligation` (one phase per thread) | `Accum.Correct` |
+| `E5rCheck.correct` (generated) | `benchmarks/correct/accum/acc_*.ptx`, nvcc 13.2 | `Accum.Args.Pre` | `Accum.Correct` for `add.u32 add.u64 and/or/xor.b32 and/or/xor.b64 min/max.u32 min/max.s32 min/max.u64 min/max.s64` |
+| `E5rProof.correct` (supplied) | `m5/m4/kernels/a_direct.ptx`, `s_pingpong.ptx` | the class's `Pre` | `Reduce32.Atomic.Correct`, `Scan32.Correct` |
 
 The vadd preconditions are the ones the PTX needs:
 
@@ -413,6 +504,16 @@ removed, and the spec's `result` changed to `atomic`. Measured: 0 of 14
 proved, 14 refuted with a replayed counterexample (2 faults, 5 races, 7 wrong
 values).
 
+The 16 `accum` benchmarks have 11 more: `min` replaced by `max`, `s32` by
+`u32` in the instruction and, separately, in the spec, the bound check
+removed, the load moved to `x[i+1]`, the atomic replaced by a plain store,
+the spec's operation changed (`add` to `xor`), `and` to `or`, a 64-bit
+element read with a 4-byte stride, unsigned `max` made signed, and a 64-bit
+add done as a 32-bit add of the low word. Measured: 0 of 11 proved, 11
+refuted with a replayed counterexample (3 faults, 8 wrong values). The plain
+store is refuted as a wrong value (one thread, `*out` not combined), which
+comes first in the search, not as a race.
+
 The axiom audit was checked the same way: a module with an `axiom` and a
 `native_decide` added to the library makes `Audit.lean` fail, naming both.
 The ptxas agreement test was checked by letting the parser accept `and.u32`;
@@ -420,7 +521,7 @@ it failed and listed the forms.
 
 ## Differential testing against the GPU
 
-`scripts/check-ptx-difftest.sh` runs 1039 launches of 529 generated kernels,
+`scripts/check-ptx-difftest.sh` runs 1071 launches of 545 generated kernels,
 one per instruction form of the subset (every operation at every type the
 parser accepts, register and immediate operands including edge values,
 shifts by 0 to 100 and by 2^32 − 1, every comparison, every conversion,
@@ -428,7 +529,8 @@ loads and stores at every type and at positive and negative offsets,
 `ld.param`, guards, branches, a loop, and all special registers on 3-D
 launches; for M4 `ld/st.shared`, `bar.sync` between phases that exchange
 values through shared memory, every `atom`, `red` and `atom.cas` form on
-global and shared memory, uncontended and with every thread on one address),
+global and shared memory, uncontended, and with every thread on one address
+for all 16 commutative, associative operation and type pairs),
 on 64 to 128 threads each with edge-value and pseudo-random
 inputs (fixed seed). The same launches run:
 
@@ -442,7 +544,7 @@ The Lean side runs the CTAs with the same schedule as the interpreter
 values do not depend on it for the commutative operations tested.
 
 Measured on the A10G, driver 595.112.07, CUDA 13.2: all four outputs are
-identical byte for byte on all 1039 launches. Ten misaligned accesses fault
+identical byte for byte on all 1071 launches. Ten misaligned accesses fault
 in the model and are refused by the GPU with
 `CUDA_ERROR_MISALIGNED_ADDRESS`. A planted error in the model (`atom.min.s32`
 compared unsigned) was detected by the test. Out-of-bounds accesses are not
@@ -522,6 +624,12 @@ compiled by nvcc -O3, specs written from the PTX. Nothing was planted.
   works on the GPU) are outside the subset; one `atomicAdd` per element has
   no shared array, and the double-buffered scan has one barrier per round,
   outside the classes' shapes.
+- After the run: `a_direct` and `s_pingpong` were proved by supplied proofs
+  (`proofs/`), checked by `check --proof` against the statements their
+  original specs generate. `a_direct` is also proved by the `accum` class
+  with `specs/a_direct_accum.json` (13 s). That is not an independent test
+  of the class: `accum` was built after this kernel was seen, and
+  `benchmarks/correct/accum/acc_add_u32.ptx` is the same code.
 - Proof time median 49 s (`reduce32` and `scan32` obligations run the
   instruction table per phase); replays 2 s.
 - Random mechanical mutants of three proved kernels (24, seeded): see
@@ -538,7 +646,9 @@ Ptx/Semantics: Memory, Instruction (one thread), SIMT (grid, interleaving)
 Ptx/Logic:     Hoare (Safe, wp, loop rule), RaceFreedom (grid_sound), Regions, Launch1D, Refute,
                Phases, PhaseSound (phase_sound), PhaseWp, Cells, Sums, Schedule (replay with barriers)
 Ptx/Auto:      Map (the map32 class, proved once), Tactic (ptx_guarded, ptx_stride_*),
-               Block, Reduce32, Scan32 (the M4 classes, proved once), Tactic4
+               Block, Reduce32, Scan32, Accum (the M4 classes, proved once), Tactic4
+Ptx/Logic/CellAlgs: the 16 atomic algebras and their laws
+Checker:       proofcheck, the supplied-proof checker
 Ptx/Tactics:   the ptx_eval simp set
 Ptx/Examples:  the M1/M2 hand proofs and refutations
 Diff/Main:     the model side of the GPU differential test
@@ -610,7 +720,13 @@ What a theorem here does and does not establish:
    For the block classes it is `Reduce32.Correct`, `Reduce32.Atomic.Correct`
    or `Scan32.Correct` (with `Pre`, `Block.Args.launch`, `params`, `seg`) and
    the generated `Block.Spec`, printed as `lean_spec`. The `Code` and the
-   roles are not trusted.
+   roles are not trusted. For `accum` it is `Accum.Correct` (with `Args.Pre`,
+   `launch`, `params`, `elt`), the algebra definitions of
+   `Ptx/Logic/CellAlgs.lean` the spec names (`op` and `e` are part of the
+   statement; their laws are proved), `afold`, and the generated
+   `Accum.Spec`. For a supplied proof it is the generated `E5rSpec`
+   module, and the checker `Checker/ProofCheck.lean` with the Lean kernel's
+   `replay`.
    A weak spec proves a weak property, and nothing here detects that.
    Not trusted: the tactics, `wp_sound` and the rest of `Ptx/Logic` and
    `Ptx/Auto` (proved), the counterexample search and the interpreter
@@ -650,9 +766,10 @@ What a theorem here does and does not establish:
    strong) or in different barrier phases of one CTA (ordered by the
    barrier); that this makes the interleaving result the PTX result is the
    same kind of argument, now also relying on `bar.sync` giving the
-   ordering PTX §8 states for it. Only atomic `add` to 32-bit accumulator
-   cells is in the phase theorem; other atomic operations are in the model
-   and the differential test, and a kernel relying on them is `unknown`.
+   ordering PTX §8 states for it. Global atomics with one commutative,
+   associative operation per kernel are in the phase theorem; `exch`, `cas`,
+   shared-memory atomics and mixed operations are in the model and the
+   differential test only, and a kernel relying on them gets no proof.
 5. **PTX is not what runs.** `ptxas` or the driver compiles PTX to SASS, and
    neither is verified. The differential test observes the result of that
    translation for single instructions; it is not a proof about SASS.
@@ -770,7 +887,11 @@ combines these four things:
   reduction. Interleaved addressing, double-buffered scans, warp shuffles,
   multiple shared arrays, accumulators in shared memory (atomics on shared
   memory are in the model, not in the phase theorem), histograms and
-  multi-block scans are `unsupported` or `unknown`.
+  multi-block scans are `unsupported` or `unknown`, unless someone supplies
+  a proof.
+- **`atom.exch`, `atom.cas`, mixed atomic operations.** Not covered by
+  `phase_sound` (see "Atomics: cell algebras" for why and what a rule would
+  need). Locks and flag protocols are not verified.
 - **Specs need register roles at each barrier.** They are read off the PTX;
   nothing infers them.
 - **Proof time.** About 50 s per M4 kernel, and a failing attempt runs to its

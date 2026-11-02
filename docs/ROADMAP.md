@@ -1113,8 +1113,8 @@ checked only when its acceptance criterion has been run.
       GPU differential test 1039 launches of 529 kernels identical across
       the model, the interpreter, the JIT and ptxas. Outside the two classes
       the verdict is `unsupported` or `unknown`; atomics other than `add` and
-      shared-memory accumulators are in the model but not in the phase
-      theorem. `scripts/recheck-ptx.sh` passes: 24 main theorems audited, 9
+      shared-memory accumulators were in the model but not in the phase
+      theorem (other commutative atomics added in P7). `scripts/recheck-ptx.sh` passes: 24 main theorems audited, 9
       benchmark verdicts as expected, 0 of 35 mutants proved and 34 refuted,
       the differential test identical.)
 - [x] **P5 (M5). AI-generated PTX at scale.** *Accepted:* specification to PTX
@@ -1138,6 +1138,32 @@ checked only when its acceptance criterion has been run.
       fixes it prompted 6 proved, 3 refuted (two signed-length defects and an
       early return before a barrier, none planted), 1 unknown, 4 unsupported;
       24 random mutants: 0 proved, 21 refuted, 3 unknown.)
+- [x] **P6. Supplied proofs.** *Accepted:* `ptx check` accepts a Lean proof
+      written by someone else for a kernel the automation cannot handle; the
+      tool generates the statement from the PTX and spec, checks the proof
+      proves exactly it, audits axioms, binds it to the PTX, spec and
+      toolchain hashes, and records in the JSON that the proof was supplied;
+      a weaker or different statement, `sorry`, an added axiom and a stale
+      hash are refused; two kernels unsupported only because of class shape
+      proved. (Accepted 2026-11-01: `--proof`, generated module `E5rSpec`,
+      checker `proofcheck` replaying every declaration through the Lean
+      kernel; `a_direct` and `s_pingpong` proved; `proofs/controls.sh`: 2
+      accepted, 10 refused, among them `debug.skipKernelTC`, `native_decide`,
+      a forbidden import and a missing manifest.)
+- [x] **P7. Commutative, associative atomics.** *Accepted:* `phase_sound`
+      and the automation cover `add`, `min`/`max` at each signedness, `and`,
+      `or`, `xor` at 32 and 64 bits; `exch` and `cas` either have a sound rule
+      or what is not covered is recorded; class kernels, nvcc benchmarks,
+      mutation controls and GPU difftest cases for each. (Accepted
+      2026-11-01: `phase_sound` over a `CellAlg`, 16 algebras with their
+      laws in `Ptx/Logic/CellAlgs.lean`; class `accum` with
+      `Accum.correct_of` proved once; 16 nvcc 13.2 benchmarks proved, 14 to
+      17 s each; 0 of 11 mutants proved, 11 refuted; the GPU differential
+      test has every operation and type contended on one address, 1071
+      launches identical. `exch` and `cas` have no rule: recorded in
+      `verification-ptx.md` with the reason and what a rule would need.
+      Shared-memory atomics and mixed operations per kernel are also not
+      covered.)
 
 Not in this scope, and not to be described as done: SASS, the ptxas or driver
 translation from PTX to SASS, floating point, the PTX memory model beyond the

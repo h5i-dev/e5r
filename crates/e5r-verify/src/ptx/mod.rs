@@ -571,7 +571,7 @@ fn check_block(
                 &format!("Accum.Correct spec «{}»", k.name),
             ),
             warm: vec!["Ptx.Auto.Accum", "Ptx.Logic.Schedule"],
-            proof: Ok(accum::proof(&k, &sp, &header)),
+            proof: accum::shape(&sp, &k).map(|()| accum::proof(&k, &sp, &header)),
             search: Box::new(move || {
                 let (found, tried) = accum::search(&k2, &sp2);
                 (

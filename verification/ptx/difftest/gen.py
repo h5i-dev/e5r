@@ -220,9 +220,14 @@ def m4_forms():
                     f"atom.shared.cas.{t} \t{d}, [%r10], {a}, 5;", st8,
                     f"ld.shared.{t} \t{d}, [%r10];", f"st.global.{t} \t[%rd4], {d};"], False))
     # contended atomics: the final value does not depend on the order
-    for op, t, init in [("add", "u32", "0"), ("xor", "b32", "0"), ("and", "b32", "-1"), ("or", "b32", "0"),
-                        ("max", "u32", "0"), ("min", "s32", "2147483647"), ("add", "u64", "0"),
-                        ("max", "s64", "-9223372036854775808")]:
+    # (every commutative, associative op at 32 and 64 bits; init is its unit)
+    for op, t, init in [("add", "u32", "0"), ("add", "u64", "0"),
+                        ("and", "b32", "-1"), ("and", "b64", "-1"), ("or", "b32", "0"), ("or", "b64", "0"),
+                        ("xor", "b32", "0"), ("xor", "b64", "0"),
+                        ("min", "u32", "-1"), ("min", "s32", "2147483647"),
+                        ("min", "u64", "-1"), ("min", "s64", "9223372036854775807"),
+                        ("max", "u32", "0"), ("max", "s32", "-2147483648"),
+                        ("max", "u64", "0"), ("max", "s64", "-9223372036854775808")]:
         a, b, c, d = regs(t)
         wt = "u32" if w(t) == 32 else "u64"
         out.append((f"contended red.shared.{op}.{t}", ["setp.ne.u32 \t%p1, %r3, 0;",

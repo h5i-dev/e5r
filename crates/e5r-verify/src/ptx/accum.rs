@@ -116,6 +116,37 @@ fn q(s: &str) -> String {
     serde_json::to_string(s).unwrap()
 }
 
+/// The proof template's shape: every atomic in the kernel is `atom` or `red`
+/// with the spec's algebra, and there is at least one. Outside it no proof
+/// is attempted (the template would only fail, possibly slowly); the search
+/// still runs. This decides nothing about correctness.
+pub fn shape(sp: &AccumSpec, k: &Kernel) -> Result<(), String> {
+    use e5r_ptx::ast::Instr;
+    let mut seen = 0;
+    for st in &k.body {
+        let (op, ty) = match &st.instr {
+            Instr::Atom(_, op, ty, ..) | Instr::Red(_, op, ty, ..) => (op, ty),
+            Instr::Cas(..) => return Err("atom.cas is outside the class (order-dependent)".into()),
+            _ => continue,
+        };
+        if alg(op.name(), ty.name()) != Some(sp.alg) {
+            return Err(format!(
+                "the kernel's atomic is {}.{}, the spec's algebra is {} ({}.{})",
+                op.name(),
+                ty.name(),
+                sp.alg,
+                sp.op,
+                sp.ty
+            ));
+        }
+        seen += 1;
+    }
+    if seen == 0 {
+        return Err("the kernel has no atomic".into());
+    }
+    Ok(())
+}
+
 pub fn spec_text(sp: &AccumSpec) -> String {
     let k = if sp.wide { 2 } else { 1 };
     let sz = if sp.wide { ".b8" } else { ".b4" };

@@ -46,6 +46,15 @@ for r in rows:
     note = tasks[r["name"]].get("pattern", "") or why(r)
     out.append(f"| {r['name']} | {f.get('verdict', '')} | {r['verdict']} | {r.get('counterexample') or ''} | "
                f"{r.get('lean_seconds') or ''} | {'agrees' if gpu_ok(r) else 'disagrees'} | {note} |")
+out += ["", "## After the run: supplied proofs and the accum class", "",
+        "The table above is what the automation did. Two of its unsupported kernels were proved later:",
+        "",
+        "- `a_direct`: `proofs/a_direct.lean`, a supplied proof of `Reduce32.Atomic.Correct` (the statement",
+        "  `specs/a_direct.json` generates), checked by `e5r-verify ptx check --proof`. With",
+        "  `specs/a_direct_accum.json` the `accum` class proves it with no supplied proof (13 s). That class",
+        "  was built after this kernel was seen, so it is not an independent test of the class.",
+        "- `s_pingpong`: `proofs/s_pingpong.lean`, a supplied proof of `Scan32.Correct`.",
+        "", "`../../proofs/controls.sh` reruns both and the ten negative controls."]
 if muts:
     out += ["", "## Random mechanical mutants", "",
             "`mutate.py 24 20261101` drew 24 mutants of `r_div2`, `a_tree` and `s_hs` (replace a register,",

@@ -34,6 +34,18 @@ two follow patterns from old CUDA samples (`r_interleaved`, `r_warp`) and one a 
 | s_cond | unknown | proved |  | 67.13 | agrees |  |
 | s_pingpong | unsupported | unsupported |  |  | agrees | no proof attempt: scan32: the kernel has 2 bar.sync, the class has 3 |
 
+## After the run: supplied proofs and the accum class
+
+The table above is what the automation did. Two of its unsupported kernels were proved later:
+
+- `a_direct`: `proofs/a_direct.lean`, a supplied proof of `Reduce32.Atomic.Correct` (the statement
+  `specs/a_direct.json` generates), checked by `e5r-verify ptx check --proof`. With
+  `specs/a_direct_accum.json` the `accum` class proves it with no supplied proof (13 s). That class
+  was built after this kernel was seen, so it is not an independent test of the class.
+- `s_pingpong`: `proofs/s_pingpong.lean`, a supplied proof of `Scan32.Correct`.
+
+`../../proofs/controls.sh` reruns both and the ten negative controls.
+
 ## Random mechanical mutants
 
 `mutate.py 24 20261101` drew 24 mutants of `r_div2`, `a_tree` and `s_hs` (replace a register,
