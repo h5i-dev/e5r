@@ -1,7 +1,7 @@
 # e5r: Assembly-Level Formal Verification with Lean 4
 
-e5r proves properties of the code a compiler actually emitted: NVIDIA PTX
-kernels and RISC-V firmware binaries. Every proof is checked by the Lean 4
+e5r proves properties of the code a compiler actually emitted, such as NVIDIA
+PTX kernels and RISC-V firmware binaries. Every proof is checked by the Lean 4
 kernel, so neither the compiler nor whoever wrote the code has to be trusted.
 
 ```bash
@@ -15,20 +15,12 @@ functional correctness for every launch, input and thread interleaving the
 spec allows. If the proof fails, it looks for a counterexample and has Lean
 replay it.
 
-## What works
+## Supported assembly
 
-- **PTX:** elementwise maps, block reductions and scans with shared memory and
-  barriers, commutative atomics, and bit-exact `.f32` maps are proved
-  automatically. Anything else in the instruction subset can be proved by
-  hand and checked with `--proof`. The Lean model agrees bit for bit with an
-  NVIDIA A10G on every differential test.
-- **RISC-V:** machine-code proofs for one board (HiFive1 Rev B), with the
-  semantics checked against QEMU. A whole-firmware safety theorem is not
-  proved yet.
-
-Each doc lists what is not covered and why:
-[PTX](docs/verification-ptx.md), [firmware](docs/firmware-verification.md),
-[RMK](docs/rmk-checkpoint.md).
+| Assembly | What is proved | Semantics checked against | Not yet | Docs |
+| --- | --- | --- | --- | --- |
+| NVIDIA PTX | Automatically: elementwise maps, block reductions and scans (shared memory, barriers), commutative atomics, bit-exact `.f32` maps. Other kernels in the subset: a hand-written proof checked by `--proof` | NVIDIA A10G, bit for bit | `exch`/`cas` atomics, float error bounds, float reductions, `.f64` maps, approximate instructions | [PTX](docs/verification-ptx.md) |
+| RISC-V (RV32IMAC, HiFive1 Rev B) | Hand-written machine-code proofs of functions and regions | QEMU | A whole-firmware safety theorem | [firmware](docs/firmware-verification.md), [RMK](docs/rmk-checkpoint.md) |
 
 ## Install
 
