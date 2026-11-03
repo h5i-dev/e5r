@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Recheck every binary-level firmware proof from source, with the pinned
 # toolchains, and run the model's differential tests and negative controls.
-# docs/firmware-verification.md describes what each step establishes.
+# docs/verification/firmware.md describes what each step establishes.
 #
 # Needs on PATH: elan (Lean is selected by verification/rv32/lean-toolchain),
 # rustup with toolchain 1.98.1 and the riscv32imac-unknown-none-elf target,

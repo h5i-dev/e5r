@@ -1,5 +1,5 @@
 //! A strict parser for a small integer subset of NVIDIA PTX, and its export
-//! to the Lean model in `verification/ptx` (docs/verification-ptx.md).
+//! to the Lean model in `verification/ptx` (docs/verification/ptx.md).
 //!
 //! The parser is not trusted by the proofs. What makes its output usable as
 //! a proof subject is [`roundtrip`]: the canonical printing of the parsed

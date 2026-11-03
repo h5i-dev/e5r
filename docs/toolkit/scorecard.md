@@ -460,7 +460,7 @@ threads, twice each. All 105 runs produce identical output. Green.
 The sections above are ours: we chose the fixtures and we grade our own work.
 [DecBench](https://decbench.com) is a third-party benchmark that does not.
 Full method, caveats and the defect analysis are in
-[`docs/decbench.md`](decbench.md); this is the headline.
+[`docs/toolkit/decbench.md`](decbench.md); this is the headline.
 
 Measured 2026-09-13 against DecBench `5818d67`. zlib 1.2.13 from its
 `projects/sailr` corpus, built by its own pipeline at O0 with DWARF, stripped

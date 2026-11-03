@@ -2,7 +2,7 @@
 
 Exports a RAM-resident, statically linked RV32 ELF as the initial RAM a loader
 writes, for machines without flash such as QEMU `-M virt -bios none -kernel`.
-Built for the RMK milestone (R0-R1 in [`ROADMAP.md`](ROADMAP.md)); the first
+Built for the RMK milestone (R0-R1 in [`ROADMAP.md`](../ROADMAP.md)); the first
 target is the pinned `qemu-riscv-rynk` example. It is a loader, not a proof:
 nothing about RMK is verified by exporting it.
 
@@ -130,7 +130,7 @@ OUT: 4 PT_LOADs, 170955 file bytes, 16606256 zero bytes, ELF sha256 f39d833f...
 `--ram` is the linker script's 16 MiB (`memory.x`), the tighter of it and QEMU's
 128 MiB. The manifest, `SHA256SUMS` of every output (including `image.lean`) and both
 oracle transcripts are in
-[`verification/rv32/ram-image/rmk-qemu-riscv-rynk/`](../verification/rv32/ram-image/rmk-qemu-riscv-rynk/).
+[`verification/rv32/ram-image/rmk-qemu-riscv-rynk/`](../../verification/rv32/ram-image/rmk-qemu-riscv-rynk/).
 Two exports, and one of a copy at another path, are byte-identical. The unit
 test `ram::tests::pinned_rmk_qemu_riscv_rynk` re-checks the layout and hashes
 when `E5R_RMK_ELF` names the ELF (it passes vacuously otherwise).

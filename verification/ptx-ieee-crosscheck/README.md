@@ -5,7 +5,7 @@
 with no Mathlib. This project proves, in Lean with Mathlib, that those
 definitions agree with an independently written IEEE 754 specification,
 `FP.IEEE.Spec.roundWithMode` and `OverflowWithMode` of lean-ieee754
-(docs/verification-ptx.md, "Floating point").
+(docs/verification/ptx.md, "Floating point").
 
 It compiles `Ptx/Semantics/FloatCore.lean` from the main project's source
 tree (`srcDir = "../ptx"`), so the file checked here is the file the model

@@ -1,4 +1,4 @@
-//! The `accum` class of `e5r.ptx.spec.v1` (docs/verification-ptx.md,
+//! The `accum` class of `e5r.ptx.spec.v1` (docs/verification/ptx.md,
 //! "Atomics"): every thread combines one input element into one output word
 //! with a commutative, associative atomic.
 //!

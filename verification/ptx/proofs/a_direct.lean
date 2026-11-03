@@ -1,6 +1,6 @@
 /- e5r-proof ptx=54c18301c47eebc7977431d6f215b5bae29e41b158dfe541fe8170141b31b44d spec=ce6a9031796b1300d647a23fc92b23f34cefbeb4478df82877b5a4f78ed8fdc6 toolchain=leanprover/lean4:v4.35.0 -/
 /-
-A supplied proof (docs/verification-ptx.md, "Supplied proofs") for
+A supplied proof (docs/verification/ptx.md, "Supplied proofs") for
 `m5/m4/kernels/a_direct.ptx`: every thread with `gid < n` adds `x[gid]` to
 `*out` with one `atom.global.add.u32`. There is no shared array and no
 barrier, so the `reduce32` automation does not apply (`unsupported`), but the

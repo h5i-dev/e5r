@@ -37,7 +37,7 @@ below were written before this decision and are kept as the record.
 | benchmarks and scorecard | built (M11) |
 | fuzzing, coverage and mutation tooling | built (M12); packaging not started |
 
-The measured numbers live in [`docs/scorecard.md`](scorecard.md),
+The measured numbers live in [`docs/toolkit/scorecard.md`](toolkit/scorecard.md),
 including the ones that go against us. In short: `libc.so.6` analyzes in 0.10s
 and 58 MB, finding 3,517 functions with 95.3% analyzed completely, where
 `objdump -d` takes 0.26s and only disassembles; both decoders are at zero
@@ -128,7 +128,7 @@ Dependency edges run downward only. `e5r-cli` may depend on everything;
       `.claude/settings.local.json`. This machine has 7.5 GB of RAM; a dev-profile
       build of a workspace this size is not affordable.
 - [x] Delete `src/`, `test/`, `script/`, `CMakeLists.txt` and the C++ build. Move
-      `MEMO.md` to `docs/x86-64-notes.md`.
+      `MEMO.md` to `docs/toolkit/x86-64-notes.md`.
 - [x] Cargo workspace, edition 2024, MSRV pinned, `resolver = "3"`.
 - [x] `[profile.release]` with `panic = "unwind"`, because the fuzz targets need
       it. Debug symbols are off: on 7.5 GB of RAM, linking with them is the
@@ -235,7 +235,7 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       declines because it faults on hardware, and what it decodes where llvm
       declines is listed with the reason.
 - [x] SLEIGH runtime. The `.sla` format is worked out in
-      [`docs/sla-format.md`](sla-format.md) and its reader consumes all
+      [`docs/toolkit/sla-format.md`](toolkit/sla-format.md) and its reader consumes all
       137 files Ghidra ships. The decode engine measures 0 wrong against
       objdump on AArch64 (19,710), x86-64 (5,688) and RISC-V 64 (2,567), the
       last being an architecture this tool could not decode at all and for
@@ -511,7 +511,7 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 
 This is the feature that distinguishes e5r from every incumbent, so it gets
 designed before it gets coded, and the design lives in
-[`docs/design/db.md`](design/db.md).
+[`docs/toolkit/design/db.md`](toolkit/design/db.md).
 
 - [x] Content anchors. A function is identified by a fingerprint of its
       instruction-shape stream with branch targets excluded, so the identity
@@ -681,7 +681,7 @@ designed before it gets coded, and the design lives in
       rerun in CI, with a regression budget. 16 binaries, 21x to 3,291x faster
       and 2.4x to 8.6x less memory, with the three qualifications that ratio
       needs in the table rather than under it, and the one row e5r loses left
-      in. `docs/benchmarks.md`, `scripts/bench-budget.json`. Ghidra's headless
+      in. `docs/toolkit/benchmarks.md`, `scripts/bench-budget.json`. Ghidra's headless
       analyzer is wired and opt-in behind `GHIDRA_INSTALL_DIR`, but its
       decompiler ships x86-64 only, so on this aarch64 host the comparison that
       would matter most cannot be made.
@@ -713,14 +713,14 @@ designed before it gets coded, and the design lives in
       read by indexing the slice instead of through the reader. A `cargo-fuzz`
       setup for longer runs is still to do.
 - [x] Resource caps on every attacker-controlled count, with a documented
-      policy in [`docs/design/limits.md`](design/limits.md): bound by
+      policy in [`docs/toolkit/design/limits.md`](toolkit/design/limits.md): bound by
       the file first, then by the cap, check the cursor advanced, and read
       through the reader. Checked by the mutation fuzzer in the ordinary test
       suite rather than by review.
 - [x] `#![forbid(unsafe_code)]` on every crate except `e5r-cli`, which is
       `#![deny(unsafe_code)]` so one audited call can opt in. There is exactly
       one exception, the memory map, and its justification is in
-      [`docs/design/limits.md`](design/limits.md).
+      [`docs/toolkit/design/limits.md`](toolkit/design/limits.md).
 - [x] A no-panic gate on every path that reads foreign bytes, 1.26 million cases
       inside a 12-second budget so it runs every time rather than nightly. It
       asserts three things and not one: no panic, a per-case ceiling, and that
@@ -745,9 +745,9 @@ designed before it gets coded, and the design lives in
       archive served locally, and against a tampered checksum, a missing
       `SHA256SUMS` and a missing archive, each of which it refuses. The draft
       Homebrew formula it replaced had never been run at all.
-- [x] `MANUAL.md`, a design document per subsystem under `docs/design/`, and a
+- [x] `MANUAL.md`, a design document per subsystem under `docs/toolkit/design/`, and a
       tutorial that takes a reader from a stripped binary to a named, typed,
-      committed annotation log (`docs/tutorial.md`).
+      committed annotation log (`docs/toolkit/tutorial.md`).
 
 ## V0. Binary-level Lean firmware research (2026-10-28 authorization)
 
@@ -776,7 +776,7 @@ or decompiler roadmap or authorize a firmware framework.
 
 The supported subset, exact statements, build commands, assumptions, provenance
 and trusted computing base are together in
-[`verification-rv32.md`](verification-rv32.md). Implementation is isolated in
+[`verification-rv32.md`](verification/rv32-research.md). Implementation is isolated in
 `e5r-verify` and `verification/rv32`; no empty firmware crate or CI profile change.
 
 ## F. Scoped firmware verification (2026-10-28 owner authorization)
@@ -785,7 +785,7 @@ The owner expanded V0 into a production tool for one scope: a binary-level,
 Lean-kernel-checked safety guarantee for firmware on one RISC-V board. This is
 the only architecture exception; it does not reorder M1-M12 or the decoder
 priorities, and nothing in it trusts e5r's decompiler, CFG recovery or IR.
-Product documentation is [`firmware-verification.md`](firmware-verification.md).
+Product documentation is [`firmware-verification.md`](verification/firmware.md).
 Each item is checked only when its acceptance criterion has been run.
 
 - [x] **F1. Stable baseline.** V0 committed as inherited, its fixture-corpus
@@ -863,7 +863,7 @@ Each item is checked only when its acceptance criterion has been run.
 
 ## R. RMK on RISC-V (2026-10-29 owner authorization)
 
-Integrated checkpoint and replay instructions: [RMK checkpoint](rmk-checkpoint.md).
+Integrated checkpoint and replay instructions: [RMK checkpoint](verification/rmk-checkpoint.md).
 This preserves partial results; `SessionSafe` and reproducible R0 remain open.
 
 The next product target is upstream [RMK](https://github.com/rmk-rs/rmk),
@@ -1060,7 +1060,7 @@ no equivalence check is part of the proof. The question the scope answers:
 can these properties of LLM-generated PTX be proved automatically in Lean 4
 without trusting the LLM or a high-level compiler? Design, theorem statements,
 assumptions and the trusted base are in
-[`verification-ptx.md`](verification-ptx.md). The Lean project is
+[`verification-ptx.md`](verification/ptx.md). The Lean project is
 `verification/ptx` (core Lean v4.35.0, no Mathlib); the parser and exporter are
 `crates/e5r-ptx`, reached through `e5r-verify ptx`. It does not reorder M1-M12
 and adds nothing to e5r's disassembler, lifter or decompiler. Each item is
@@ -1329,7 +1329,7 @@ Counted by what it finds, not by whether it runs.
 ## Scorecard
 
 The claim is that e5r is better than the incumbents, so it needs numbers that
-can prove it wrong. These get recorded in `docs/scorecard.md` from the first
+can prove it wrong. These get recorded in `docs/toolkit/scorecard.md` from the first
 release and rerun every release.
 
 | Measure | Against |
@@ -1420,17 +1420,17 @@ Tasks:
       ground-truth functions: 1.000 and 1.000 stripped, and 0.766 and 0.937
       with `.eh_frame` removed as well, which is the number that says what the
       analysis can do with nothing but code. See
-      [`docs/boundaries.md`](boundaries.md).
+      [`docs/toolkit/boundaries.md`](toolkit/boundaries.md).
 - [x] A DecBench backend for e5r, as `scripts/decbench_e5r.py`. Out of tree,
       which DecBench's own documentation permits, so the benchmark checkout
       stays untouched. Driven by `scripts/decbench.sh`.
 - [ ] Submit to the 250-function sample set as soon as M6 produces output at all.
       It needs no harness and no open-sourcing: decompile the kit, mail back the
       zip. An early bad score is a baseline, not an embarrassment.
-- [x] Record the DecBench numbers in `docs/scorecard.md` per release, including
+- [x] Record the DecBench numbers in `docs/toolkit/scorecard.md` per release, including
       the runs where we lose. The first run is one we lose: 23.4 union against
       angr's 37.0 on the same slice, with the method and the defect analysis in
-      [`docs/decbench.md`](decbench.md).
+      [`docs/toolkit/decbench.md`](toolkit/decbench.md).
 
 ## Not building
 
@@ -1441,7 +1441,7 @@ it was closed.
   for a local dashboard, durable project tasks and a decompiler pane. This
   workspace uses existing library analysis and keeps the CLI complete; it does
   not add a mandatory project service or desktop framework. See
-  [`docs/dashboard.md`](dashboard.md).
+  [`docs/toolkit/dashboard.md`](toolkit/dashboard.md).
 - **A debugger:** rizin and gdb do this well and it is a different product. The
   emulator in M10 runs code paths for analysis; it does not attach to a process.
 - **Ghidra script compatibility:** Running Java is the thing this project exists

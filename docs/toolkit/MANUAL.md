@@ -3,8 +3,8 @@
 This is the command reference for `e5r`, the binary analysis toolkit that
 serves as development infrastructure for the e5r Lean 4 verifier. The
 verifier, `e5r-verify`, is documented in
-[verification-ptx.md](verification-ptx.md) for PTX kernels and
-[firmware-verification.md](firmware-verification.md) for firmware binaries.
+[verification-ptx.md](../verification/ptx.md) for PTX kernels and
+[firmware-verification.md](../verification/firmware.md) for firmware binaries.
 
 Reverse engineering from the command line. Load a binary, recover its
 functions, disassemble them, decompile them, and ask questions about what is
@@ -472,7 +472,7 @@ e5r project task prog.e5r-proj update T-0001 --revision 1 --input task.json
 The browser and CLI share durable tasks with revision checks, owners, blockers,
 prerequisites, next actions and evidence. Analysis loads on demand; tasks refresh live across all projects. Global
 projects live under `E5R_PROJECT_HOME`, `$XDG_DATA_HOME/e5r/projects`, or
-`~/.local/share/e5r/projects`. See [docs/dashboard.md](dashboard.md)
+`~/.local/share/e5r/projects`. See [docs/toolkit/dashboard.md](dashboard.md)
 for the content format and supported project options.
 
 ## Driving it from a program

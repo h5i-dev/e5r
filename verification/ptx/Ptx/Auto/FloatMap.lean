@@ -1,5 +1,5 @@
 /-
-Float element functions for the map class (docs/verification-ptx.md,
+Float element functions for the map class (docs/verification/ptx.md,
 "Floating point: specs").
 
 A float map spec states each output element of `.f32` as an expression of

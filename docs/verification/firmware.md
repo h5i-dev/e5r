@@ -6,9 +6,9 @@ from the ELF file's bytes. e5r's decompiler, CFG recovery and IR are not
 inputs to any proof.
 
 This document defines the supported scope. Milestone status is in
-[ROADMAP.md, section F](ROADMAP.md#f-scoped-firmware-verification-2026-10-28-owner-authorization);
+[ROADMAP.md, section F](../ROADMAP.md#f-scoped-firmware-verification-2026-10-28-owner-authorization);
 the V0 research proofs it grew from are in
-[verification-rv32.md](verification-rv32.md).
+[verification-rv32.md](rv32-research.md).
 
 ## Status
 
@@ -45,7 +45,7 @@ which would also cover interrupts arriving in the middle of the function.
 
 The single source for the memory map, registers, boot assumptions and
 exclusions is the machine-readable
-[`verification/rv32/boards/hifive1-revb.json`](../verification/rv32/boards/hifive1-revb.json).
+[`verification/rv32/boards/hifive1-revb.json`](../../verification/rv32/boards/hifive1-revb.json).
 The Lean board definition is generated from it by `tools/gen_board.py`. The
 checker regenerates it and refuses to run if the committed copy differs.
 
@@ -155,7 +155,7 @@ bare-metal interrupt, device or boot behavior modeled here.
 ## Running the checks
 
 Installation on a fresh machine is in
-[firmware-verification-install.md](firmware-verification-install.md). One
+[firmware-verification-install.md](firmware-install.md). One
 command rebuilds everything from source and rechecks it:
 
 ```sh

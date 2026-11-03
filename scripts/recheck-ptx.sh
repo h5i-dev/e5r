@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One command that rechecks everything the PTX verification claims
-# (docs/verification-ptx.md, "Reproduce"):
+# (docs/verification/ptx.md, "Reproduce"):
 #
 #   1. parser, round trip, ptxas agreement and fuzz tests (cargo, release);
 #   2. every Lean proof and refutation from scratch, and the axiom audit of

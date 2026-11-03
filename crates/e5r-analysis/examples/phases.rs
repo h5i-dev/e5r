@@ -1,7 +1,7 @@
 //! Where the memory goes, stage by stage and structure by structure.
 //!
 //! Not a test and not wired into the CLI: it exists so the memory numbers in
-//! docs/scorecard.md and in an M11 report are measured rather than guessed.
+//! docs/toolkit/scorecard.md and in an M11 report are measured rather than guessed.
 //!
 //! A session is what makes this one run rather than four. Each part is forced
 //! in turn and nothing is dropped, so the resident set after a part minus the

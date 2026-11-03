@@ -1,5 +1,5 @@
 //! The supplied-proof route (`e5r-verify ptx check --proof PROOF.lean`,
-//! docs/verification-ptx.md, "Supplied proofs").
+//! docs/verification/ptx.md, "Supplied proofs").
 //!
 //! The tool, not the author, writes the statement: module `E5rSpec` with the
 //! kernel exported from the PTX, the spec, and `E5rSpec.statement : Prop`,

@@ -5,7 +5,7 @@ One constructor per supported instruction form. Register, parameter and label
 names are kept as the strings written in the `.ptx` file, so a generated
 `Kernel` value reads like the source it came from. `crates/e5r-ptx` produces
 these values; it is untrusted, and its output is checked by a token-level
-round trip against the original file (docs/verification-ptx.md, "Parser").
+round trip against the original file (docs/verification/ptx.md, "Parser").
 
 Anything not listed here is refused by the parser, not approximated.
 -/

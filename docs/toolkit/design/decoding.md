@@ -55,5 +55,5 @@ nearest thing would be wrong.
 
 ## Numbers
 
-In `docs/scorecard.md`, per architecture: instructions compared, wrong (zero),
+In `docs/toolkit/scorecard.md`, per architecture: instructions compared, wrong (zero),
 and the share decoded, with the floor that only rises.

@@ -34,8 +34,8 @@ unmodelled operations limit what pseudocode establishes. Prefer a single
 function and bounded `--limit` / `--budget` requests for large binaries. Exit
 codes: 0 success, 1 no match, 2 usage, 3 bad input.
 
-For details, read [the manual](../../docs/MANUAL.md) and
-[project/task formats](../../docs/dashboard.md). For repository development,
+For details, read [the manual](../../docs/toolkit/MANUAL.md) and
+[project/task formats](../../docs/toolkit/dashboard.md). For repository development,
 read [the roadmap](../../docs/ROADMAP.md) first.
 
 ## Names and investigation records

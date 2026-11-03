@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PTX verification (docs/verification-ptx.md): regenerate every kernel module
+# PTX verification (docs/verification/ptx.md): regenerate every kernel module
 # from its .ptx with the release e5r-verify and refuse a stale committed copy,
 # assemble every benchmark with ptxas when it is installed, build the Lean
 # project from scratch, and audit the axioms of the main theorems.

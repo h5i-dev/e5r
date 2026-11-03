@@ -328,8 +328,8 @@ where the mature tool is doing the more sensible thing.
 
 ## The regression budget
 
-The budget is [`scripts/bench-budget.json`](../scripts/bench-budget.json),
-checked by [`scripts/check-bench-budget.py`](../scripts/check-bench-budget.py).
+The budget is [`scripts/bench-budget.json`](../../scripts/bench-budget.json),
+checked by [`scripts/check-bench-budget.py`](../../scripts/check-bench-budget.py).
 It is the same shape as the ratchets elsewhere in this repository: a ceiling
 that only comes down, and a floor that only rises. It has two halves, and they
 are checkable in different places.
@@ -386,7 +386,7 @@ gate that fails for reasons unrelated to the commit is a gate people learn to
 skip, and a published number that means nothing is worse than no number.
 
 What does run, as the `recall` job in
-[`.github/workflows/ci.yaml`](../.github/workflows/ci.yaml), is the half of the
+[`.github/workflows/ci.yaml`](../../.github/workflows/ci.yaml), is the half of the
 budget that is deterministic: recall against the symbol table, and the count of
 entries no symbol names. Those are the same bytes in and the same numbers out on
 any machine at any thread count, so they gate on every push. It needs no tool but
@@ -422,7 +422,7 @@ scripts/check-bench-budget.py target/bench-tools.json
 
 rizin comes from the distribution package; nothing needs building. Ghidra joins
 the table by setting `GHIDRA_INSTALL_DIR` to an installation, and
-[`compare-ghidra.sh`](../scripts/compare-ghidra.sh) compares function recovery
+[`compare-ghidra.sh`](../../scripts/compare-ghidra.sh) compares function recovery
 against it on its own.
 
 The two largest libraries were measured once rather than three times, because a

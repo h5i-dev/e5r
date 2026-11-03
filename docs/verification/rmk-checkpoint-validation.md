@@ -67,7 +67,7 @@ separately and combines those proofs into the unchanged `enc_check` theorem.
 All ten cases remain required; negative-control declaration expectations
 follow the split.
 
-The [fresh checkpoint receipt](../verification/rv32/Projects/rmk/results/checkpoint.json)
+The [fresh checkpoint receipt](../../verification/rv32/Projects/rmk/results/checkpoint.json)
 records 2258.0 seconds elapsed and a maximum observed child RSS of
 7,808 MiB, within the job's 10,240 MiB cap.
 Its SHA-256 is `141cf83453939a20808fd40da91fdc7a87258bbe996e20f77bd298ac5af321bc`.

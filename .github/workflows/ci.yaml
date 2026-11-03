@@ -119,7 +119,7 @@ jobs:
   # and peak memory are facts about a machine, and a shared runner with a noisy
   # neighbour is not the machine the ceilings were recorded on -- so timing is
   # not measured here, not gated here, and not published from here. It is
-  # measured by hand on a known machine and written down in docs/benchmarks.md.
+  # measured by hand on a known machine and written down in docs/toolkit/benchmarks.md.
   #
   # One run per binary for the same reason: the fastest of three exists to beat
   # down timing noise, and there is no timing to beat down.
@@ -170,7 +170,7 @@ jobs:
       - name: The installer agrees with the release layout
         run: ./scripts/check-installer.sh
 
-  # Scope F (docs/firmware-verification.md): rebuild the firmware and the
+  # Scope F (docs/verification/firmware.md): rebuild the firmware and the
   # clamp fixture with the pinned rustc, recheck every verification job from
   # source with the pinned Lean, run the negative controls, and replay QEMU
   # traces (instruction-level in user mode, the whole firmware on sifive_e)
@@ -203,7 +203,7 @@ jobs:
           name: firmware-verification-results
           path: verification/rv32/build/results/
 
-  # Scope P (docs/verification-ptx.md): regenerate every PTX kernel module and
+  # Scope P (docs/verification/ptx.md): regenerate every PTX kernel module and
   # refuse a stale one, build the Lean project from scratch, audit the axioms,
   # check every benchmark and mutant with `e5r-verify ptx check`. No GPU or
   # CUDA here: the ptxas and GPU steps are skipped and say so. e5r-verify is

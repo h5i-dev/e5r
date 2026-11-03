@@ -2,7 +2,7 @@
 //! constructors with their patterns and their p-code templates.
 //!
 //! Every field here is one this reader established by experiment; see
-//! `docs/sla-format.md`. Anything else stays in [`crate::Sla::tree`] as raw
+//! `docs/toolkit/sla-format.md`. Anything else stays in [`crate::Sla::tree`] as raw
 //! nodes with their offsets, and [`Coverage`] says how much that is.
 
 use crate::decode::{Node, Value};
@@ -104,7 +104,7 @@ impl FieldDef {
 /// An operator inside a pattern expression, which is what a disassembly
 /// action computes with. Element ids 47 to 57 in alphabetical order of the
 /// operator's name, each settled by compiling a spec that uses only it; see
-/// `docs/sla-format.md`.
+/// `docs/toolkit/sla-format.md`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PatternOp {
     /// `$and`, two operands.

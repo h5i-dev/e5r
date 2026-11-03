@@ -1,5 +1,5 @@
 //! The block classes of `e5r.ptx.spec.v1`: `reduce32` and `scan32`
-//! (docs/verification-ptx.md, "M4 classes").
+//! (docs/verification/ptx.md, "M4 classes").
 //!
 //! ```json
 //! { "schema": "e5r.ptx.spec.v1", "kernel": "reduce", "class": "reduce32",

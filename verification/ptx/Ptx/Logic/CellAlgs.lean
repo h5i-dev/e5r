@@ -9,7 +9,7 @@ old value with the operand by the algebra's operation (`Accum`).
   of the order).
 
 `exch` and `cas` are not here: the value they leave depends on the order of
-the threads, so no commutative fold describes it (docs/verification-ptx.md,
+the threads, so no commutative fold describes it (docs/verification/ptx.md,
 "Atomics").
 -/
 import Ptx.Logic.Phases

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the cross-check of the PTX model's rounding core against lean-ieee754
-# (verification/ptx-ieee-crosscheck, docs/verification-ptx.md) and run its
+# (verification/ptx-ieee-crosscheck, docs/verification/ptx.md) and run its
 # axiom audit. lean-ieee754 is pinned at 529ed78 and needs Mathlib; the first
 # run fetches it and Mathlib's prebuilt cache (about 8 GB under .lake/).
 # Lean runs with LEAN_NUM_THREADS=2 under a 7 GB cgroup cap (override with

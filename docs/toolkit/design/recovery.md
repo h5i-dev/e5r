@@ -53,4 +53,4 @@ wrong often enough to be dangerous.
 Recall against the symbol table on binaries where one exists, then the same
 binaries stripped. Against Ghidra headless on the same file, reporting what
 each found that the other did not, and the wall clock for both. The numbers
-are in `docs/scorecard.md`.
+are in `docs/toolkit/scorecard.md`.

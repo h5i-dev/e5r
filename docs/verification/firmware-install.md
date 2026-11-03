@@ -62,6 +62,6 @@ result still describes the sources with
 
 A machine with only Lean installed can recheck a bundle produced elsewhere.
 See "Rechecking without e5r" in
-[firmware-verification.md](firmware-verification.md). Rebuilding the
+[firmware-verification.md](firmware.md). Rebuilding the
 firmware itself needs its crates. Run `cargo fetch` (or `cargo vendor`) in
 `verification/rv32/firmware/hifive1-embassy` while online.

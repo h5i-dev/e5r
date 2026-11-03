@@ -459,7 +459,7 @@ pub enum DisplayPiece {
 /// or the end of an earlier operand's match.
 ///
 /// The compiled `.sla` form carries the same pair per operand, with -1 as the
-/// "from the start of the instruction" sentinel; see `docs/sla-format.md`.
+/// "from the start of the instruction" sentinel; see `docs/toolkit/sla-format.md`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Offset {
     /// The operand whose match this is measured from the end of. `None`

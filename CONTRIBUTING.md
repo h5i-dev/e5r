@@ -40,7 +40,7 @@ short version:
 - **Wrong and missing are different.** A wrong answer is a bug with no
   allowance and the test asserts zero of them. A missing answer is a gap with a
   floor or a ceiling that only moves one way, and the number stays in
-  `docs/scorecard.md` even when it is unflattering.
+  `docs/toolkit/scorecard.md` even when it is unflattering.
 - **A test that cannot fail is not a test.** After writing one, break the code
   it covers on purpose and check that it goes red.
 

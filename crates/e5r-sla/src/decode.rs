@@ -1,6 +1,6 @@
 //! The tagged tree the decompressed `.sla` payload holds.
 //!
-//! The encoding is worked out in `docs/sla-format.md`. In short: a byte stream
+//! The encoding is worked out in `docs/toolkit/sla-format.md`. In short: a byte stream
 //! of element-start, element-end and attribute tags, where the top three bits
 //! of a tag byte pick the kind and say whether the id is in the low five bits
 //! or in following seven-bit chunks. Every attribute is followed by exactly one

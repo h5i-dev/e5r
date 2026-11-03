@@ -1,5 +1,5 @@
 //! `e5r-verify ptx`: export, check and run PTX kernels
-//! (docs/verification-ptx.md, "Command line").
+//! (docs/verification/ptx.md, "Command line").
 //!
 //! `check` is fail-closed: the exit status is 0 only when Lean has checked
 //! `E5rCheck.correct : spec.Correct K` with nothing but `propext`,
@@ -534,7 +534,7 @@ struct Plan {
 }
 
 /// `check` for the M4 classes (`reduce32`, `scan32`) and `accum`
-/// (docs/verification-ptx.md): the class theorem with the generated phase
+/// (docs/verification/ptx.md): the class theorem with the generated phase
 /// obligations, and otherwise the barrier-aware search with a replay in Lean.
 #[allow(clippy::too_many_arguments)]
 fn check_block(

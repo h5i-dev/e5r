@@ -31,7 +31,7 @@ implications. The old universal `EncodeContract` is refuted; these implications
 are **vacuous** and must not be counted as safety progress. The dispatch
 interface now takes an explicit world invariant, but no full dispatch proof
 is supplied. See `verification/rv32/Projects/rmk/review/SomeAudit.lean` and
-[the interface audit](../verification/rv32/rmk/some-interfaces.md).
+[the interface audit](../../verification/rv32/rmk/some-interfaces.md).
 
 The independent encode proof does not discharge that false contract.
 Establishing `EncPre` and the bridge's write-set separation at the caller,
@@ -70,7 +70,7 @@ R0 reproducibility is **not accepted**. The f39d image has an in-place rebuild
 record, not two accepted independent clean builds. Another fixed-path image
 has separate records but has not replaced this proof target. Existing R0
 records and historical receipts are retained without upgrading their claims.
-See [the roadmap](ROADMAP.md#r-rmk-on-risc-v-2026-10-29-owner-authorization)
+See [the roadmap](../ROADMAP.md#r-rmk-on-risc-v-2026-10-29-owner-authorization)
 and `verification/rv32/rmk-audit/`.
 
 The standard firmware CI script checks `jobs/*.json`; RMK jobs are under

@@ -1053,7 +1053,7 @@ mod tests {
     }
 
     /// The pinned RMK example, when its ELF is at hand (`E5R_RMK_ELF`): the
-    /// layout and hashes recorded in `docs/ram-image-export.md`.
+    /// layout and hashes recorded in `docs/verification/ram-image-export.md`.
     #[test]
     fn pinned_rmk_qemu_riscv_rynk() {
         let Ok(path) = std::env::var("E5R_RMK_ELF") else {

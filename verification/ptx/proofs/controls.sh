@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Supplied-proof route (docs/verification-ptx.md, "Supplied proofs"):
+# Supplied-proof route (docs/verification/ptx.md, "Supplied proofs"):
 # the two supplied proofs must be accepted, and every negative control
 # refused with the reason it targets.
 #

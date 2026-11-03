@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Differential test of the PTX instruction semantics against a real GPU
-# (docs/verification-ptx.md, "Differential testing").
+# (docs/verification/ptx.md, "Differential testing").
 #
 # 1. difftest/gen.py writes one kernel per instruction form of the subset and
 #    the launches with their input bytes (fixed seed).

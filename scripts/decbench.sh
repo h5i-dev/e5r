@@ -6,7 +6,7 @@
 # on first use), a JDK, and the network the first time it compiles a corpus
 # project from source. A single project at one optimization level takes tens of
 # minutes, most of it Joern parsing the source. The numbers it prints are
-# recorded by hand in docs/decbench.md and docs/scorecard.md.
+# recorded by hand in docs/toolkit/decbench.md and docs/toolkit/scorecard.md.
 #
 # Usage: scripts/decbench.sh [results-tree] [project] [opt-levels] [decompilers]
 #

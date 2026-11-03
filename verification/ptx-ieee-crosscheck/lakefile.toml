@@ -1,5 +1,5 @@
 # Cross-check of the PTX model's rounding core against lean-ieee754
-# (docs/verification-ptx.md, "Floating point: cross-check").
+# (docs/verification/ptx.md, "Floating point: cross-check").
 # A separate project so verification/ptx stays free of Mathlib.
 name = "crosscheck"
 defaultTargets = ["Crosscheck"]

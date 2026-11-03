@@ -5,7 +5,7 @@
 //! meaning was established that way are named. An id with no name is not a
 //! guess waiting to happen: it is counted as an uninterpreted region, so the
 //! gap between what this reader understands and what a `.sla` contains is a
-//! number rather than an impression. `docs/sla-format.md` records the evidence
+//! number rather than an impression. `docs/toolkit/sla-format.md` records the evidence
 //! for each name and separates what was proved from what was inferred.
 
 /// The name for an element id, or `None` if the meaning is not established.
@@ -213,7 +213,7 @@ pub mod el {
     pub const CONST_CURSPACE_SIZE: u32 = 84;
 
     /// Pattern expression operators, settled one experiment each; see
-    /// `docs/sla-format.md`. The run is alphabetical by the operator's name
+    /// `docs/toolkit/sla-format.md`. The run is alphabetical by the operator's name
     /// in the SLEIGH source, which is why it is contiguous.
     pub const PEXP_AND: u32 = 47;
     pub const PEXP_DIV: u32 = 48;

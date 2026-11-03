@@ -2,7 +2,7 @@
 # e5r measured against the other reverse engineering tools on this machine.
 #
 # Not a test: it needs rizin, and Ghidra with a JVM if that is asked for. The
-# numbers it prints are recorded in docs/benchmarks.md and docs/scorecard.md,
+# numbers it prints are recorded in docs/toolkit/benchmarks.md and docs/toolkit/scorecard.md,
 # and checked against scripts/bench-budget.json by scripts/check-bench-budget.py.
 #
 # Ghidra is opt-in: set GHIDRA_INSTALL_DIR to an installation and it joins the
@@ -54,7 +54,7 @@ case ",${SKIP:-}," in
   *,rizin,*) ;;
   *)
     [ -x "$rizin" ] || command -v "$rizin" > /dev/null || {
-      echo "no rizin: install it, set RIZIN, or SKIP=rizin. See docs/benchmarks.md." >&2
+      echo "no rizin: install it, set RIZIN, or SKIP=rizin. See docs/toolkit/benchmarks.md." >&2
       exit 2
     }
     ;;

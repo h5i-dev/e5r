@@ -1,6 +1,6 @@
 /- e5r-proof ptx=98e5d7357ce97b779e2ed7267c36d14b67db5d9bb1dcac5c52e44232c38449d6 spec=8f9da26877a81ec6873eb5d85d5cfc2c8848f380fa023b148eeda702bff5de9d toolchain=leanprover/lean4:v4.35.0 -/
 /-
-A supplied proof (docs/verification-ptx.md, "Supplied proofs") for
+A supplied proof (docs/verification/ptx.md, "Supplied proofs") for
 `m5/m4/kernels/s_pingpong.ptx`, a Hillis-Steele scan with two shared
 buffers and one barrier per round:
 

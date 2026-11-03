@@ -17,10 +17,10 @@ replay it.
 
 ## Supported assembly
 
-| Assembly | What is proved | Semantics checked against | Not yet | Docs |
-| --- | --- | --- | --- | --- |
-| NVIDIA PTX | Automatically: elementwise maps, block reductions and scans (shared memory, barriers), commutative atomics, bit-exact `.f32` maps. Other kernels in the subset: a hand-written proof checked by `--proof` | NVIDIA A10G, bit for bit | `exch`/`cas` atomics, float error bounds, float reductions, `.f64` maps, approximate instructions | [PTX](docs/verification-ptx.md) |
-| RISC-V (RV32IMAC, HiFive1 Rev B) | Hand-written machine-code proofs of functions and regions | QEMU | A whole-firmware safety theorem | [firmware](docs/firmware-verification.md), [RMK](docs/rmk-checkpoint.md) |
+| Assembly | What is proved | Not yet | Docs |
+| --- | --- | --- | --- |
+| NVIDIA PTX | Maps, reductions, scans, atomics and `.f32` maps, automatically; anything else via `--proof` | `exch`/`cas` atomics, float error bounds, float reductions, `.f64` maps, approximate instructions | [PTX](docs/verification/ptx.md) |
+| RISC-V (RV32IMAC, HiFive1 Rev B) | Hand-written machine-code proofs of functions and regions | A whole-firmware safety theorem | [firmware](docs/verification/firmware.md), [RMK](docs/verification/rmk-checkpoint.md) |
 
 ## Install
 
@@ -34,6 +34,6 @@ curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf 
 
 e5r also ships `e5r`, the binary analysis toolkit it grew out of:
 disassembler, decompiler, binary differ. It is development infrastructure
-here and is not an input to any proof. See [MANUAL.md](docs/MANUAL.md).
+here and is not an input to any proof. See [MANUAL.md](docs/toolkit/MANUAL.md).
 
 [ROADMAP](docs/ROADMAP.md) · [CONTRIBUTING](CONTRIBUTING.md) · Apache-2.0

@@ -7,7 +7,7 @@ Provenance: the `.sinc` sources next to them were written for this repository,
 and the `.sla` files are what Ghidra 12.1.3's shipped SLEIGH compiler
 (`support/sleigh`, Apache-2.0) produced from them. They are the output of a
 compiler run on our own input, and they exist so the format work in
-`docs/sla-format.md` is reproducible: recompiling a `.sinc` must give the same
+`docs/toolkit/sla-format.md` is reproducible: recompiling a `.sinc` must give the same
 `.sla`.
 
 | file | what it exercises |

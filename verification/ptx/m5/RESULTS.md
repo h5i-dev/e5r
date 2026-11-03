@@ -159,7 +159,7 @@ The benchmark was rerun with block-level kernels in the M4 classes
   committed before their first run (commit f5bab5f), and the first-run
   verdicts are kept in `m4/results_first_run.json`: 3 proved, 1 refuted,
   6 unknown, 4 unsupported. After the fixes that run prompted (listed in
-  `docs/verification-ptx.md`): 6 proved, 3 refuted, 1 unknown, 4 unsupported.
+  `docs/verification/ptx.md`): 6 proved, 3 refuted, 1 unknown, 4 unsupported.
 - **Defects nobody planted.** None of the 14 has a seeded defect. Three are
   refuted: two declare the length `int`, so for `n ≥ 2^31` every thread skips
   its load (the GPU test with small `n` passes them), and one returns before

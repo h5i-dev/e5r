@@ -25,7 +25,7 @@ freedom proved here: two different threads never make conflicting accesses
 unless both are atomics on the same location, or they are in one CTA and a
 barrier separates them (different phases). That under the PTX axioms such
 a program behaves as in the interleaving model is an assumption about
-NVIDIA's model (PTX ISA §8), recorded in docs/verification-ptx.md, not a
+NVIDIA's model (PTX ISA §8), recorded in docs/verification/ptx.md, not a
 theorem of this development.
 -/
 import Ptx.Semantics.Instruction

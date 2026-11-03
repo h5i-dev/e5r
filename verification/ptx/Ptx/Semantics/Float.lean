@@ -1,5 +1,5 @@
 /-
-`.f32` and `.f64` instructions on bit patterns (docs/verification-ptx.md,
+`.f32` and `.f64` instructions on bit patterns (docs/verification/ptx.md,
 "Floating point"), from the PTX ISA (9.7.3 floating-point instructions,
 9.3.1.2 comparisons, 9.7.10 `cvt`) and IEEE 754-2019.
 

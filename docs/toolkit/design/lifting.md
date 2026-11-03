@@ -64,5 +64,5 @@ wrong, which is the failure this project cares most about avoiding.
 
 ## Numbers
 
-In `docs/scorecard.md`: the share of instructions lifted per architecture, and
+In `docs/toolkit/scorecard.md`: the share of instructions lifted per architecture, and
 the number of executions matched against hardware.

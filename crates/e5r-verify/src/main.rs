@@ -7,7 +7,7 @@
 //! the flash contents a board boots from.
 //! `e5r-verify ram-image (--ram BASE:SIZE | --board BOARD.json) --mapping paddr=vaddr
 //! [--max-file N] [--max-file-bytes N] [--namespace NS] --out DIR IMAGE.elf` exports the
-//! initial RAM a loader writes for a RAM-resident ELF (`docs/ram-image-export.md`).
+//! initial RAM a loader writes for a RAM-resident ELF (`docs/verification/ram-image-export.md`).
 //! `e5r-verify check JOB.json [--resume] [--out RESULT.json]` rebuilds and rechecks a
 //! verification job and prints its `e5r.verify.result.v1` document; the exit
 //! status is 0 only for `proved`.
@@ -17,7 +17,7 @@
 //! whose `recheck.sh` rechecks the proofs with only the pinned Lean.
 //! `e5r-verify ptx export|check|run …` exports PTX to Lean, proves or refutes
 //! a kernel against its spec, and runs differential-test cases
-//! (`docs/verification-ptx.md`, "Command line"; `e5r-verify ptx --help`).
+//! (`docs/verification/ptx.md`, "Command line"; `e5r-verify ptx --help`).
 use std::process::ExitCode;
 
 fn run(args: Vec<String>) -> Result<String, String> {
@@ -115,13 +115,13 @@ e5r-verify: assembly-level formal verification with Lean 4
 
 Proves properties of the code a compiler emitted, checked by the Lean kernel.
 
-PTX kernels (docs/verification-ptx.md):
+PTX kernels (docs/verification/ptx.md):
   e5r-verify ptx check FILE.ptx --spec SPEC.json [--proof PROOF.lean] [--out RESULT.json]
       prove memory safety, race freedom and correctness, or replay a counterexample
       exit status: 0 proved, 1 refuted, 2 unsupported, 3 unknown, 4 error, 64 usage
   e5r-verify ptx export|run ...      see `e5r-verify ptx --help`
 
-RISC-V firmware binaries (docs/firmware-verification.md):
+RISC-V firmware binaries (docs/verification/firmware.md):
   e5r-verify check JOB.json [--resume] [--out RESULT.json]
       rebuild and recheck a verification job; exit status 0 only for proved
   e5r-verify verify-result RESULT.json

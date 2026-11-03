@@ -4,7 +4,7 @@
 compiles real projects from source with DWARF retained, strips the binaries,
 hands each decompiler the stripped copy, and scores the C that comes back
 against the original source on three axes. We did not choose the corpus, the
-metrics or the thresholds, which is the point: `docs/scorecard.md` is us
+metrics or the thresholds, which is the point: `docs/toolkit/scorecard.md` is us
 grading our own work, and this is not.
 
 This document records what was measured, how to reproduce it, and the numbers,
@@ -231,7 +231,7 @@ A function e5r structures without a goto scores 36.2% perfect, which is
 *better* than angr's 34.6% over its whole set. Every function that needs one is
 a near-certain zero. At that rate across all 774 scored functions the GED
 column would read about 36 instead of 22.9, which is thirteen points and most
-of the distance to angr. The goto ceiling in `docs/scorecard.md` is measured on
+of the distance to angr. The goto ceiling in `docs/toolkit/scorecard.md` is measured on
 the fixture corpus, where it reads 0.00 to 0.24 per function; on real code at
 O0 it is 1.98. The fixture corpus is not representative and the scorecard
 number is optimistic.
@@ -296,7 +296,7 @@ been re-run.
 
 This one does not show up as a GED loss, because a call is a call whatever its
 arguments, but it is the reason a recompiled e5r function computes the wrong
-thing, and it is a `docs/design/decompiling.md` violation: the design says the
+thing, and it is a `docs/toolkit/design/decompiling.md` violation: the design says the
 decompiler does not silently drop anything, and this drops every argument at
 the call.
 
@@ -452,7 +452,7 @@ reported and skipped; each failure names its build log under
 `~/.cache/e5r/decbench/log/`. The corpus is whatever actually builds here.
 
 What consumes it is `scripts/boundary-gate.sh`, which is G4:
-[`docs/boundaries.md`](boundaries.md) has the method and the numbers. The
+[`docs/toolkit/boundaries.md`](boundaries.md) has the method and the numbers. The
 decompiler score in this document and that boundary score are independent: one
 is DecBench's metrics on our C output, the other is DWARF read by `readelf`
 against our function list, and neither borrows the other's corpus preparation.

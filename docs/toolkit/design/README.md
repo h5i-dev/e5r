@@ -22,7 +22,7 @@ repeat them it is because they are assumed.
 **Wrong and missing are different.** A wrong answer is a bug with no
 allowance and a test asserts zero of them. A missing answer is a gap with a
 number, a floor or a ceiling that moves one way, and it stays in
-`docs/scorecard.md` even when it is unflattering. Collapsing the two is how a
+`docs/toolkit/scorecard.md` even when it is unflattering. Collapsing the two is how a
 tool comes to be confidently wrong, which is worse than useless to someone
 who has to trust it.
 

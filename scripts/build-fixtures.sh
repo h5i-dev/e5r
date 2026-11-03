@@ -882,4 +882,4 @@ fi
 #   scripts/decbench-fixtures.sh zlib bzip2 gzip   # or --all, or --list
 #   scripts/boundary-gate.sh                       # G4, both corpora
 #
-# See docs/decbench.md.
+# See docs/toolkit/decbench.md.

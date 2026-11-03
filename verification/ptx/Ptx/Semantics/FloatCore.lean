@@ -1,5 +1,5 @@
 /-
-The rounding core of the floating-point model (docs/verification-ptx.md,
+The rounding core of the floating-point model (docs/verification/ptx.md,
 "Floating point").
 
 IEEE 754-2019 §4.3 defines rounding of an exact real result to a format:
@@ -21,7 +21,7 @@ rational except a square root, so the core works on `Rat`:
 
 This file imports nothing but core Lean, so it also compiles in the
 project that cross-checks it against `lean-ieee754`'s `roundWithMode`
-(docs/verification-ptx.md, "Cross-check").
+(docs/verification/ptx.md, "Cross-check").
 -/
 namespace Ptx.Fp
 

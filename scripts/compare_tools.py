@@ -634,7 +634,7 @@ def rescore_run(results: Path) -> int:
 
 
 def markdown_run(results: Path) -> int:
-    """Emit the tables in docs/benchmarks.md from a results file.
+    """Emit the tables in docs/toolkit/benchmarks.md from a results file.
 
     The document's numbers are generated rather than transcribed, because a
     table copied by hand is a table that drifts from the run it claims to
