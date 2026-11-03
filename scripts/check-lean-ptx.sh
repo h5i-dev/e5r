@@ -8,7 +8,7 @@
 #   scripts/check-lean-ptx.sh --update   rewrite the generated modules first
 #
 # E5R_VERIFY names an existing e5r-verify binary (CI builds its own, in the
-# dev profile); otherwise this builds the release one (AGENTS.md: never
+# dev profile); otherwise this builds the release one (CONTRIBUTING.md: never
 # target/debug on the maintainer's machine).
 set -euo pipefail
 cd "$(dirname "$0")/.."

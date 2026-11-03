@@ -49,7 +49,7 @@ serde_json = "1.0"
 clap = { version = "4.5", features = ["derive", "wrap_help"] }
 
 # A dev-profile build lands in target/debug, which this checkout forbids
-# (see CLAUDE.md). Release is the only profile used here.
+# (see CONTRIBUTING.md, "Building"). Release is the only profile used here.
 [profile.release]
 opt-level = 3
 # Off on purpose: this machine has 7.5 GB of RAM and debug info in a workspace

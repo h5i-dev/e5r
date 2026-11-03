@@ -29,7 +29,7 @@ concurrency:
 # apt options below retain retries and fail with the actual download error.
 jobs:
   # Runners are disposable, so these build the dev profile on purpose. The
-  # release-only rule in CLAUDE.md is about the maintainer's machine.
+  # release-only rule in CONTRIBUTING.md is about the maintainer's machine.
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 20

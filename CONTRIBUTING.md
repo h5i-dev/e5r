@@ -56,8 +56,9 @@ short version:
 
 ## Building
 
-This checkout is release-only; `CLAUDE.md` explains why and how the guards
-work. Every command takes `--release`:
+This checkout is release-only. The development machine has 7.5 GB of RAM, and a
+dev-profile build of this workspace is too large for it. Every command takes
+`--release`, and the binaries are under `target/release/`:
 
 ```
 CARGO_BUILD_JOBS=4 cargo build --release
@@ -65,6 +66,25 @@ CARGO_BUILD_JOBS=4 cargo test --release
 bash scripts/build-fixtures.sh      # the corpus the gates measure against
 bash scripts/check-determinism.sh   # the same input must give the same output
 ```
+
+Whether a dev build is affordable is a fact about the machine, so the guards
+are opt-in and not committed settings:
+
+- `scripts/no-debug-guard.sh on` puts a regular file at `target/debug`, so cargo
+  stops with "failed to create directory ... File exists" before it compiles
+  anything. `off` and `status` do what they say.
+- `scripts/deny-debug-build.py` is a PreToolUse hook for coding agents that
+  refuses dev-profile cargo commands, target-directory redirection and attempts
+  to remove the guard.
+
+Do not work around a "File exists" failure on `target/debug`: build release,
+or turn the guard off deliberately.
+
+CI runs on disposable runners and builds the dev profile on purpose. Do not add
+`--release` there. Dev profile panics on an overflowing `-` where release wraps
+it and returns a wrong answer quietly, so an arithmetic bug can be invisible
+locally and show up only on CI. A red CI is worth reading before assuming it is
+about the runner.
 
 Fixtures are built, not committed. A test whose fixture or tool is missing
 returns early rather than failing, so a fresh checkout on a different machine

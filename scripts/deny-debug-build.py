@@ -10,7 +10,7 @@ other tool too.
 Opt-in, and deliberately not wired up by the repository. Nothing here fires
 until someone adds it to their own .claude/settings.local.json, because whether
 a dev build is affordable is a fact about the machine, not about the project.
-See CLAUDE.md.
+See CONTRIBUTING.md, "Building".
 """
 import json
 import re
