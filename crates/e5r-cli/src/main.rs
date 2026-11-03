@@ -49,9 +49,10 @@ mod exit {
 #[command(
     name = "e5r",
     version,
-    about = "Reverse engineering from the command line",
+    about = "Binary analysis toolkit for the e5r Lean 4 verifier",
     long_about = "Loads a binary, recovers functions, disassembles, and reports \
-                  what it found and why it believes it.\n\n\
+                  what it found and why it believes it. This is the development \
+                  infrastructure of e5r; the Lean 4 verifier is e5r-verify.\n\n\
                   Every command takes --json. Exit codes: 0 ok, 1 nothing found, \
                   2 bad usage, 3 bad input."
 )]

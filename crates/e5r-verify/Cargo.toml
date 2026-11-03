@@ -1,5 +1,6 @@
 [package]
 name = "e5r-verify"
+description = "e5r — assembly-level formal verification with Lean 4: PTX kernels and RISC-V firmware binaries."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

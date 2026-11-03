@@ -1,237 +1,306 @@
-# e5r: The Reverse Engineering Toolkit for AI Agents
+# e5r: Assembly-Level Formal Verification with Lean 4
 
-**e5r** is a disassembler, decompiler and binary differ with a command line as
-its primary interface and an optional local project workspace. Every command
-speaks JSON, every recovered fact carries the evidence for it, and every name,
-type and comment an agent writes lands in a git-mergeable log. One static Rust binary: no JVM, no required project server, no
-proprietary database.
+**e5r** proves properties of the machine code a compiler actually emitted, not
+of the source it came from. The input is the assembly: an NVIDIA PTX kernel,
+or the bytes of a firmware ELF. The output is a theorem the Lean 4 kernel has
+checked, or a counterexample the Lean kernel has replayed, or a verdict that
+says neither was obtained. The compiler, the source language and the model or
+person who wrote the code are not trusted.
 
 ```bash
-# Look at a binary.
-e5r info ./a.out                              # container, architecture, entry, what the loader noticed
-e5r funcs ./a.out                             # every function, with the evidence for each boundary
-e5r disas ./a.out main                        # one function, or a range, or everything
-e5r decompile ./a.out main                    # pseudo-C, with a goto where the shape is not there
+# Prove a PTX kernel memory-safe, race-free and correct against its spec.
+e5r-verify ptx check saxpy_f32.ptx --spec saxpy_f32.json --out result.json
+echo $?                                   # 0 proved, 1 refuted, 2 unsupported, 3 unknown
 
-# Ask questions instead of reading output.
-e5r xrefs ./a.out 0x4006e8                    # who reaches this, and how
-e5r strings ./a.out                           # ASCII, UTF-8 and UTF-16LE, by section
-e5r classes ./a.out                           # C++ hierarchy from the vtables and the RTTI
-e5r query ./a.out 'functions where insns > 100 and name ~ "crypt"'
+# A kernel the automation cannot handle: supply your own Lean proof.
+# The tool writes the statement; your proof must prove exactly that.
+e5r-verify ptx check kernel.ptx --spec kernel.json --proof Proof.lean
 
-# Write what you worked out, and merge it like code.
-e5r annotate ./a.out name 0x4006e8 parse_header
-e5r annotate ./a.out type 0x4006e8 "int parse_header(struct hdr *h, size_t n)"
-e5r decompile ./a.out parse_header            # the assertion reaches the output
+# Check a proof job against a firmware binary for one RISC-V board.
+e5r-verify check verification/rv32/jobs/hifive1-duty.json --out duty.json
+e5r-verify verify-result duty.json        # refuses a result whose inputs changed
+```
 
-# Drive it from an agent.
-e5r batch ./a.out --command funcs --command strings   # several commands, one document
-e5r funcs ./a.out --json                      # every command takes it
+e5r grew out of a binary analysis toolkit (disassembler, decompiler, binary
+differ), which still ships as the `e5r` binary and is the development
+infrastructure the verifier is built and debugged with. It is described in
+[section 7](#7-development-infrastructure-the-e5r-toolkit). No output of it,
+decompiled C, recovered control flow or IR, is an input to any proof.
+
+---
+
+## 1. What is proved
+
+"Proved" means checked by the Lean kernel, with only `propext`, `Quot.sound`
+and `Classical.choice` among the axioms of every declaration audited. No
+`sorry`, `native_decide` or `bv_decide`.
+
+### NVIDIA PTX kernels ([docs/verification-ptx.md](docs/verification-ptx.md))
+
+For a `.ptx` kernel and a JSON spec, `e5r-verify ptx check` proves, for every
+launch the spec allows, every initial memory and register content and every
+interleaving of the threads:
+
+- memory safety: no fault, no access outside the allocations, no misaligned access;
+- termination;
+- race freedom;
+- functional correctness: every output element is what the spec says, and no
+  other byte changes.
+
+| Kernel class | State |
+| --- | --- |
+| `map32`, elementwise maps over 32-bit arrays (one element per thread, or a grid-stride loop) | Automatic. 102 of 104 model-written kernels proved; the other 2 are outside the instruction subset |
+| `reduce32`, `scan32`: block reductions and scans with `.shared`, `bar.sync` and atomics | Automatic. nvcc's tree reduction (every power-of-two block up to 1024), Hillis-Steele scan (every block up to 1024) and atomic reduction proved |
+| `accum`: one atomic per element (`add and or xor`, signed and unsigned `min max`, 32 and 64 bit) | Automatic. 16 nvcc kernels proved |
+| `.f32` maps, correctly rounded operations (every rounding modifier, `.ftz`, `.sat`) | Automatic, bit-exact up to NaN payloads. nvcc's `fma.rn` saxpy and 16 model-written float kernels proved |
+| Anything else in the subset | A supplied Lean proof, checked by `--proof` against the generated statement |
+
+The current numbers from `./scripts/recheck-ptx.sh`: 26 benchmarks proved, 3
+refuted, 2 unsupported, all as expected. 0 of 59 mutants proved (58 refuted
+with a replayed counterexample, 1 unknown). The Lean model, a Rust
+interpreter and an NVIDIA A10G agree on all 1,693 differential-test launches,
+bit for bit.
+
+Defects it found that nobody planted: kernels that take the length as `int`
+and silently drop every element when `n ≥ 2^31`, and a reduction that returns
+before `__syncthreads`. The GPU tests passed all of them.
+
+Not covered, and refused or reported as `unknown` rather than proved:
+`atom.exch` and `atom.cas`; float error bounds against exact arithmetic;
+float reductions; `.f64` maps; approximate instructions (`sin.approx`,
+`rcp.approx`, ...); `add`/`sub`/`mul.f32` without a rounding modifier, which
+ptxas may fuse; PTX-to-SASS compilation. The full list and the reasons are in
+the doc's "Open" section.
+
+### RISC-V firmware binaries ([docs/firmware-verification.md](docs/firmware-verification.md))
+
+One board: SiFive HiFive1 Rev B (RV32IMAC, M-mode, interrupts, CLINT, UART,
+PWM), with the semantics validated against QEMU on a 62,773-step whole-firmware
+replay. The proof subject is the flash image built from the ELF bytes.
+
+| Result | State |
+| --- | --- |
+| A clamp binary, for all 2^32 inputs | Proved |
+| The `duty()` contract of an Embassy firmware binary | Proved |
+| Soundness of the whole-firmware certificate checker | Proved |
+| Whole-firmware safety theorem for the Embassy example | **Not proved**: no certificate small enough yet |
+
+The same machinery has machine-code proofs for parts of the
+[RMK](https://github.com/rmk-rs/rmk) keyboard firmware on QEMU `virt`
+(memmove, the COBS decoder, the deframer): see
+[docs/rmk-checkpoint.md](docs/rmk-checkpoint.md). That is not a proof of RMK.
+
+---
+
+## 2. What you have to trust
+
+A theorem is only as good as its statement and its model of the machine.
+e5r keeps both small and says where they are:
+
+- **The Lean kernel** and the statement. For `ptx check` the statement is a
+  class theorem plus the definitions generated from your spec, which the
+  result prints as `lean_spec` so a person can compare it with the JSON. A
+  weak spec proves a weak property.
+- **The ISA semantics**, written from the PTX ISA manual and the RISC-V
+  specifications, and tested against hardware: the A10G for PTX, QEMU for the
+  board. Float rounding is also proved equal to an independent formalization,
+  [lean-ieee754](https://github.com/tunnellm/lean-ieee754).
+- **Stated assumptions**, for example that PTX's memory model gives
+  sequentially consistent results for kernels with no conflicting accesses,
+  and that ptxas does not change an instruction with an explicit rounding
+  modifier.
+
+Not trusted: the tactics, the proof generator, the counterexample search and
+the interpreter. They build proof terms the kernel checks, or counterexamples
+the kernel replays.
+
+Each doc has the full list: [PTX](docs/verification-ptx.md#assumptions-and-trusted-base),
+[firmware](docs/firmware-verification.md).
+
+---
+
+## 3. Install
+
+The verifier is built from source; release archives carry only the `e5r`
+toolkit binary so far.
+
+```bash
+cargo build --release -p e5r-verify          # ./target/release/e5r-verify
+curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh
+```
+
+The Lean projects pin their toolchains (`verification/ptx/lean-toolchain`,
+core Lean v4.35.0, no Mathlib). PTX differential testing needs an NVIDIA GPU
+and the CUDA toolkit; firmware replay needs QEMU. Each doc lists the exact
+versions.
+
+---
+
+## 4. Verify a PTX kernel
+
+A spec names the arrays, the output and what each element must become:
+
+```json
+{ "schema": "e5r.ptx.spec.v1", "kernel": "saxpy_f32", "class": "map32",
+  "element_type": "f32",
+  "arrays": ["saxpy_f32_param_1", "saxpy_f32_param_2"],
+  "output": "saxpy_f32_param_2", "length": "saxpy_f32_param_3",
+  "scalars": ["saxpy_f32_param_0"],
+  "element": "fma.rn(saxpy_f32_param_0, saxpy_f32_param_1, saxpy_f32_param_2)",
+  "result": "bit_exact",
+  "schedule": { "kind": "guarded", "max_threads": "2^32" } }
+```
+
+```bash
+cd verification/ptx/benchmarks
+e5r-verify ptx check correct/float/saxpy_f32.ptx --spec specs/saxpy_f32.json
+e5r-verify ptx check buggy/vadd_nobound.ptx --spec specs/vadd.json   # refuted: out-of-bounds load
+```
+
+The result is versioned JSON (`e5r.ptx.result.v1`): the verdict, each
+property's status, the theorem and its axioms, or the counterexample (fault,
+race, wrong value or a changed byte outside the output) with the launch that
+triggers it. Only `proved` exits 0. A timeout or a memory cap gives
+`unknown`, never `proved`.
+
+---
+
+## 5. Verify a firmware binary
+
+A job file names the ELF, the board, the property and the entry or boot
+model. The result is bound to the hashes of all of them and of the
+toolchain, and a stale one is refused.
+
+```bash
+e5r-verify check verification/rv32/jobs/hifive1-clamp32.json --out clamp.json
+e5r-verify bundle verification/rv32/jobs/hifive1-clamp32.json --out clamp-bundle
+cd clamp-bundle && ./recheck.sh        # Lean only, offline
 ```
 
 ---
 
-## 1. Install
+## 6. Recheck everything
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/h5i-dev/e5r/main/install.sh | sh
-# cargo install --path crates/e5r-cli   # build from source
+./scripts/recheck-ptx.sh                     # PTX: parser, Lean build, audit, benchmarks, mutants, GPU difftest (~90 min)
+./scripts/check-firmware-verification.sh     # firmware: rebuild from source and recheck
 ```
 
-One binary, no runtime dependency. The script works out the platform, verifies
-the download against the release's `SHA256SUMS`, and refuses to install if it
-does not match. [`MANUAL.md`](docs/MANUAL.md) has the environment variables.
-
-```bash
-e5r completions bash > /etc/bash_completion.d/e5r   # or zsh, fish, elvish
-e5r manpage > ~/.local/share/man/man1/e5r.1
-```
+Lean runs with two threads under a memory cap; see the docs for the
+overrides.
 
 ---
 
-## 2. Use it
+## 7. Development infrastructure: the `e5r` toolkit
 
-### 2.1. Read a binary
-
-Everything e5r recovers carries the evidence for it, and the strength of that
-evidence is printed next to it, so a boundary from an `.eh_frame` record and one
-from a prologue pattern are never the same claim:
+The verifier needs to read binaries, decode instructions and find out what a
+compiler did. That tooling is a reverse engineering toolkit in its own right,
+and it ships as the `e5r` binary: ELF, PE and Mach-O loaders, x86-64,
+AArch64, ARM32 and i386 decoders, a SLEIGH runtime, an IR with dataflow, a
+decompiler to C, a binary differ, and an annotation log that merges with
+`git merge`. Every command takes `--json`.
 
 ```bash
 e5r info ./a.out                    # container, architecture, entry, warnings
-e5r sections ./a.out                # and how each maps into memory
-e5r funcs ./a.out                   # address, size, blocks, strength, evidence, name
+e5r funcs ./a.out                   # every function, with the evidence for each boundary
 e5r disas ./a.out main              # a function, an address, a range, or `all`
-e5r stats ./a.out --json            # counts, for a script rather than a reader
-```
-
-### 2.2. Decompile
-
-```bash
 e5r decompile ./a.out main          # pseudo-C
-e5r decompile ./a.out all --json    # every complete function, with a position map
-e5r shapes ./a.out parse_header     # what the pointers it takes appear to point at
-e5r emulate ./a.out checksum 1 2 3  # run it in the interpreter and see what comes back
-```
-
-### 2.3. Write analysis back, and merge it
-
-Names, types and comments are lines in an append-only log keyed to **content
-anchors**.
-
-```bash
+e5r xrefs ./a.out 0x4006e8          # who reaches this, and how
+e5r diff ./old ./new                # which functions changed, and what changed inside
 e5r annotate ./a.out name 0x4006e8 parse_header
-e5r annotate ./a.out comment 0x400710 "length is attacker-controlled"
-e5r annotate ./a.out list
+e5r ui                              # local read-only dashboard over a project
 ```
-
-### 2.4. Compare two builds
 
 ```bash
-e5r diff ./old ./new                # which functions changed, moved, appeared, vanished
-e5r diff ./old ./new --json         # and what changed inside each one
+curl -fsSL https://raw.githubusercontent.com/h5i-dev/e5r/main/install.sh | sh
 ```
 
-### 2.5. Patch, and say why
-
-```bash
-e5r patch ./a.out record 0x4006f0 --asm "nop" --out fix.e5rpatch
-e5r patch ./a.out preview fix.e5rpatch         # what it would change
-e5r patch ./a.out apply fix.e5rpatch --out ./patched   # a new file, never in place
-```
-
-### 2.6. Drive it from an agent
-
-```bash
-e5r funcs ./a.out --json                      # every command takes it
-e5r batch ./a.out --command funcs --command strings
-e5r project new ./a.out --out a.e5rproj      # reopen it later without reanalysing
-```
+[MANUAL.md](docs/MANUAL.md) is the command reference,
+[docs/tutorial.md](docs/tutorial.md) a walkthrough, and
+[docs/scorecard.md](docs/scorecard.md) every measured number, including the
+bad ones. The decompiler scores 23.4 union on DecBench against IDA's published
+47.9 ([docs/decbench.md](docs/decbench.md)); it is a debugging aid here, not
+the product.
 
 ---
 
-## 3. Project workspace
-
-A local dashboard puts blockers, review requests and next actions first. Its
-decompiler pane provides searchable functions, pseudocode, disassembly and
-references and direct call graphs. The UI is read-only; agents edit tasks,
-findings, notes and reports through the CLI, and humans read the live results.
-
-```bash
-e5r project new ./a.out --name investigation
-e5r ui
-e5r project task investigation list --json
-```
-
-Projects default to `~/.local/share/e5r/projects`; `e5r ui` lists them all.
-Open the printed loopback URL. See [the workspace guide](docs/dashboard.md) for
-task creation, handoffs and conflict handling.
-
----
-
-## 6. Build
+## 8. Build
 
 The checkout is release-only; see [`CLAUDE.md`](CLAUDE.md).
 
 ```bash
 cargo build --release
-./scripts/build-fixtures.sh       # the corpus the gates measure against
+./scripts/build-fixtures.sh       # the corpus the toolkit's gates measure against
 cargo test --release --workspace
-./scripts/bench.sh
 ```
 
 ---
 
-## 7. Documentation
+## 9. Documentation
 
-- [MANUAL.md](docs/MANUAL.md) / `man e5r`: the full command reference
-- [docs/tutorial.md](docs/tutorial.md): a stripped binary to a committed annotation log
-- [docs/firmware-verification.md](docs/firmware-verification.md): binary-level Lean firmware verification for the HiFive1 Rev B (scope, guarantees, assumptions, TCB)
-- [docs/rmk-checkpoint.md](docs/rmk-checkpoint.md): RMK machine-code proof checkpoint, replay commands and open boundaries
-- [docs/verification-rv32.md](docs/verification-rv32.md): the bounded V0 RV32I Lean research proofs it grew from
-- [docs/verification-ptx.md](docs/verification-ptx.md): Lean proofs of memory safety, race freedom and correctness for NVIDIA PTX kernels (scope P)
-- [docs/design/](docs/design/): one document per subsystem, and why it is shaped that way
-- [docs/scorecard.md](docs/scorecard.md): every measured number, including the bad ones
+Verification:
+
+- [docs/verification-ptx.md](docs/verification-ptx.md): PTX kernels: model, classes, spec format, command line, trusted base, open items
+- [docs/firmware-verification.md](docs/firmware-verification.md): firmware for the HiFive1 Rev B: scope, guarantees, assumptions, trusted base
+- [docs/firmware-verification-install.md](docs/firmware-verification-install.md): installing the firmware toolchain
+- [docs/rmk-checkpoint.md](docs/rmk-checkpoint.md): RMK machine-code proofs, replay commands and open boundaries
+- [docs/verification-rv32.md](docs/verification-rv32.md): the RV32I research proofs the firmware work grew from
+
+Project:
+
+- [docs/ROADMAP.md](docs/ROADMAP.md): scope, milestones and what will not be built
 - [CONTRIBUTING.md](CONTRIBUTING.md): what a change has to measure, and the clean-room rule
+- [docs/design/](docs/design/): one document per toolkit subsystem
 
 ---
 
-## 8. FAQ
+## 10. FAQ
 
 <details>
-<summary>What is e5r?</summary>
+<summary>Why verify assembly instead of source?</summary>
 
-A reverse engineering toolkit: it loads a binary, recovers its functions,
-disassembles and decompiles them, and lets you write names, types and comments
-back into a log you can commit. It runs locally, is written in Rust, and ships
-as one static binary.
+Because the assembly is what runs. A proof about CUDA C or Rust trusts the
+compiler that lowered it, and a proof about a model's intermediate output
+trusts the model. Verifying the emitted PTX or firmware bytes removes both
+from the trusted base. It also catches what the source hides: the nvcc `vadd`
+proof needed three preconditions, each a real limit of the PTX nvcc emitted,
+such as a 32-bit signed index that wraps above 2^31 threads.
 
 </details>
 
 <details>
-<summary>Why another one, when Ghidra and rizin exist?</summary>
+<summary>Who writes the specs and the proofs?</summary>
 
-Not because they are bad. Because a few things are hard to retrofit: an
-annotation store that merges with `git merge` rather than with a project-file
-lock, output that is deterministic across thread counts, a provenance record on
-every recovered fact, and an interface designed for a program to call rather
-than for a person to click. Those are design choices rather than effort, and
-they are what e5r is betting on.
-
-</details>
-
-<details>
-<summary>Is the decompiler as good as Hex-Rays?</summary>
-
-No, and the gap is measured rather than estimated: 23.4 union on DecBench
-against IDA's published 47.9 — on a different corpus, which
-[`docs/decbench.md`](docs/decbench.md) is careful about. What e5r does claim is
-narrower and checked: every function it decompiles, that can be compiled and
-run, computes what the machine computes.
+The spec is written by a person or an agent; it is the one thing a reader has
+to check. For the supported classes nobody writes a proof: the class theorem
+is proved once in Lean, and `check` discharges the per-kernel obligations
+with tactics whose output the kernel checks. Outside the classes, a person or
+an agent writes the proof and `--proof` checks that it proves exactly the
+statement the tool generated.
 
 </details>
 
 <details>
-<summary>What does "agent-native" actually mean here?</summary>
+<summary>Does a proved kernel run correctly on the GPU?</summary>
 
-Two things that are properties of the tool rather than a wrapper around it.
-Every command emits JSON with a schema and a documented exit code, so an agent
-drives it the same way it drives `git`. And an agent's conclusions are
-first-class input: an asserted name or type reaches the decompiled output and
-the recovered prototype, so read, conclude, correct, re-read is the normal way
-to use it rather than a feature bolted on.
-
-</details>
-
-<details>
-<summary>Can I trust what it tells me?</summary>
-
-Look at the evidence column, and at [`docs/scorecard.md`](docs/scorecard.md).
-"Wrong" is treated as a bug with no allowance; "not recovered" is a gap with a
-number and a floor that only rises. Where the two could be confused, the
-scorecard says so — it has a section for what is *not* measured.
-
-</details>
-
-<details>
-<summary>What is not built?</summary>
-
-WASM, .NET, DEX and Java class files; scripting beyond the batch language; and
-the decompiler quality needed to clear the DecBench milestone. All of it is in
-[`ROADMAP.md`](docs/ROADMAP.md) with the reason, and none of it is claimed here.
+It runs correctly on the PTX semantics in the model, which agrees with the
+A10G on every differential test so far. Compilation from PTX to SASS by ptxas
+or the driver is outside the proof, and only the A10G has been tested.
 
 </details>
 
 ---
 
-## 9. History
+## 11. History
 
-e5r began as a C++ teaching disassembler for x86-64. That code is in the git
-history, and its x86-64 and ELF notes are kept at
+e5r began as a C++ teaching disassembler for x86-64, then became a reverse
+engineering toolkit for AI agents, and in October 2026 grew the Lean 4
+verifier that is now its main purpose. The old code is in the git history,
+and its x86-64 and ELF notes are kept at
 [`docs/x86-64-notes.md`](docs/x86-64-notes.md).
 
 ---
 
-## 10. License
+## 12. License
 
 Apache-2.0. See [LICENSE](LICENSE).

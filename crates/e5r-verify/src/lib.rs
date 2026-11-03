@@ -1,6 +1,9 @@
-//! Strict research export of an ELF32 RV32I loaded image to Lean source.
+//! e5r's Lean 4 verifier: assembly-level proofs about PTX kernels and RISC-V
+//! firmware binaries.
 //!
-//! No disassembly, CFG or decompiler facts enter the proof subject.
+//! The crate root holds the strict research export of an ELF32 RV32I loaded
+//! image to Lean source. No disassembly, CFG or decompiler facts enter any
+//! proof subject.
 #![forbid(unsafe_code)]
 
 use e5r_core::{Arch, Bits, Endian};

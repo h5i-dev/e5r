@@ -1,4 +1,6 @@
-//! `e5r-verify`: export binaries for the Lean checker.
+//! `e5r-verify`: assembly-level formal verification with Lean 4. It proves
+//! properties of PTX kernels and RISC-V firmware binaries, and exports the
+//! binaries the Lean proofs are about.
 //!
 //! `e5r-verify IMAGE.elf` is the V0 research export (strict RV32I subset).
 //! `e5r-verify flash --board BOARD.json [--namespace NS] IMAGE.elf` exports
@@ -86,6 +88,7 @@ fn run(args: Vec<String>) -> Result<String, String> {
                 out.display()
             ))
         }
+        Some("--help") | Some("-h") => Ok(HELP.into()),
         Some("verify-result") => {
             let path = args.get(1).ok_or("verify-result needs a result file")?;
             let text = String::from_utf8(read(path)?).map_err(|e| e.to_string())?;
@@ -100,15 +103,38 @@ fn run(args: Vec<String>) -> Result<String, String> {
         }
         Some(path) if args.len() == 1 && !path.starts_with('-') => e5r_verify::export(&read(path)?),
         _ => Err(
-            "usage: e5r-verify IMAGE.elf | flash --board BOARD.json [--namespace NS] IMAGE.elf | \
-                  ram-image (--ram BASE:SIZE | --board BOARD.json) --mapping paddr=vaddr \
-                  [--max-file N] [--max-file-bytes N] [--namespace NS] --out DIR IMAGE.elf | \
-                  check JOB.json [--resume] [--out RESULT.json] | verify-result RESULT.json | \
-                  bundle JOB.json --out DIR | ptx (export|check|run) … (see ptx --help)"
+            "usage: e5r-verify (ptx check|check|verify-result|bundle|flash|ram-image) ... \
+                  or IMAGE.elf; run `e5r-verify --help`"
                 .into(),
         ),
     }
 }
+
+const HELP: &str = "\
+e5r-verify: assembly-level formal verification with Lean 4
+
+Proves properties of the code a compiler emitted, checked by the Lean kernel.
+
+PTX kernels (docs/verification-ptx.md):
+  e5r-verify ptx check FILE.ptx --spec SPEC.json [--proof PROOF.lean] [--out RESULT.json]
+      prove memory safety, race freedom and correctness, or replay a counterexample
+      exit status: 0 proved, 1 refuted, 2 unsupported, 3 unknown, 4 error, 64 usage
+  e5r-verify ptx export|run ...      see `e5r-verify ptx --help`
+
+RISC-V firmware binaries (docs/firmware-verification.md):
+  e5r-verify check JOB.json [--resume] [--out RESULT.json]
+      rebuild and recheck a verification job; exit status 0 only for proved
+  e5r-verify verify-result RESULT.json
+      say whether a stored result still describes the current inputs
+  e5r-verify bundle JOB.json --out DIR
+      write a directory whose recheck.sh needs only the pinned Lean
+
+Exporting a binary to Lean:
+  e5r-verify flash --board BOARD.json [--namespace NS] IMAGE.elf
+  e5r-verify ram-image (--ram BASE:SIZE | --board BOARD.json) --mapping paddr=vaddr
+                       [--max-file N] [--max-file-bytes N] [--namespace NS] --out DIR IMAGE.elf
+  e5r-verify IMAGE.elf               the V0 research export (strict RV32I subset)
+";
 
 fn number(s: &str) -> Result<u64, String> {
     match s.strip_prefix("0x") {

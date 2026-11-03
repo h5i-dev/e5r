@@ -1,5 +1,11 @@
 # e5r
 
+This is the command reference for `e5r`, the binary analysis toolkit that
+serves as development infrastructure for the e5r Lean 4 verifier. The
+verifier, `e5r-verify`, is documented in
+[verification-ptx.md](verification-ptx.md) for PTX kernels and
+[firmware-verification.md](firmware-verification.md) for firmware binaries.
+
 Reverse engineering from the command line. Load a binary, recover its
 functions, disassemble them, decompile them, and ask questions about what is
 there.

@@ -4,6 +4,16 @@ Status: in progress, 2026-09-13. This file is the scope authority for e5r:
 what it is, what gets built in what order, and what will be refused in review
 rather than argued about again.
 
+**Repositioning (owner decision, 2026-11-03).** e5r is now presented as
+*assembly-level formal verification with Lean 4*. The verifier, `e5r-verify`,
+with the PTX scope P and the RISC-V scopes V0, F and R below, is the product.
+The binary analysis toolkit described by M0 to M12 (loaders, decoders, IR,
+decompiler, differ, annotation log) ships unchanged as the `e5r` binary and
+is development infrastructure for the verifier. Its milestones and the "Not
+building" list stay in force; when the two compete for effort, the verifier
+comes first. No output of the toolkit is an input to any proof. The sections
+below were written before this decision and are kept as the record.
+
 ## Where it stands
 
 | Part | State |

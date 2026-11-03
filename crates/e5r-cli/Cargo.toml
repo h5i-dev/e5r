@@ -1,6 +1,6 @@
 [package]
 name = "e5r-cli"
-description = "e5r — the command line. Load a binary, recover functions, disassemble, decompile, diff."
+description = "e5r — the binary analysis toolkit behind the e5r Lean 4 verifier. Load a binary, recover functions, disassemble, decompile, diff."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
