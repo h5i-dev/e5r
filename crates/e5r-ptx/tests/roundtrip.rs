@@ -65,16 +65,28 @@ fn refused(body: &str, why: &str) {
 fn subset_edges_are_refused() {
     refused("\tadd.f32 %r1, %r2, %r3;\n\tret;", "no rounding modifier");
     refused("\tadd.rn.f32 %r1, %r2, %r3;\n\tret;", "used at .f32");
-    refused("\tdiv.approx.f32 %r1, %r2, %r3;\n\tret;", "approximate instructions");
-    refused("\tsin.approx.f32 %r1, %r2;\n\tret;", "unsupported instruction");
-    refused("\tadd.rn.f16 %r1, %r2, %r3;\n\tret;", "unsupported instruction");
+    refused(
+        "\tdiv.approx.f32 %r1, %r2, %r3;\n\tret;",
+        "approximate instructions",
+    );
+    refused(
+        "\tsin.approx.f32 %r1, %r2;\n\tret;",
+        "unsupported instruction",
+    );
+    refused(
+        "\tadd.rn.f16 %r1, %r2, %r3;\n\tret;",
+        "unsupported instruction",
+    );
     refused("\tadd.ftz.rn.f32 %r1, %r2, %r3;\n\tret;", "out of order");
     refused("\tld.local.u32 %r1, [%rd1];\n\tret;", "unsupported ld");
     refused(
         "\tld.shared.u32 %r1, [nosuch];\n\tret;",
         "nosuch is not a .shared variable",
     );
-    refused("\tmov.u32 %r1, nosuch;\n\tret;", "nosuch is not a .shared variable");
+    refused(
+        "\tmov.u32 %r1, nosuch;\n\tret;",
+        "nosuch is not a .shared variable",
+    );
     refused(
         "\tatom.global.inc.u32 %r1, [%rd1], 1;\n\tret;",
         "unsupported instruction",
@@ -201,21 +213,45 @@ fn shared_declarations() {
         "\t.shared .u32 t[16];\n\t.shared .u64 c;",
         "\tmov.u64 %rd1, c;\n\tatom.shared.add.u64 %rd2, [%rd1], 1;\n\tred.shared.max.s32 [t], %r1;\n\tatom.shared.cas.b32 %r1, [t+4], 0, 1;\n\tret;",
     );
-    let m = roundtrip(&kernel_sh("\t.shared .align 8 .b8 s[12];\n\t.shared .u16 h[3];", "\tret;")).unwrap();
+    let m = roundtrip(&kernel_sh(
+        "\t.shared .align 8 .b8 s[12];\n\t.shared .u16 h[3];",
+        "\tret;",
+    ))
+    .unwrap();
     assert_eq!(m.kernels[0].shared[0].size(), 12);
     assert_eq!(m.kernels[0].shared[0].alignment(), 8);
     assert_eq!(m.kernels[0].shared[1].size(), 6);
     assert_eq!(m.kernels[0].shared[1].alignment(), 2);
-    bad("\t.shared .f32 s[4];", "\tret;", "unsupported .shared element type");
+    bad(
+        "\t.shared .f32 s[4];",
+        "\tret;",
+        "unsupported .shared element type",
+    );
     bad("\t.shared .align 3 .b8 s[4];", "\tret;", "bad .align");
     bad("\t.shared .b8 s[];", "\tret;", "without a size");
     bad("\t.shared .b8 s[0];", "\tret;", "bad .shared array size");
     bad("\t.shared .b8 s[65536];", "\tret;", "exceeds 48 KB");
-    bad("\t.shared .u32 s;\n\t.shared .u32 s;", "\tret;", "declared twice");
+    bad(
+        "\t.shared .u32 s;\n\t.shared .u32 s;",
+        "\tret;",
+        "declared twice",
+    );
     bad("\t.shared .u32 k_p;", "\tret;", "declared twice");
-    bad("\t.shared .u32 s;", "\tmov.s32 %r1, s;\n\tret;", "mov.s32 of the address");
-    bad("\t.shared .u32 s;", "\tld.global.u32 %r1, [s];\n\tret;", "needs a register address");
-    bad("\t.shared .u32 s;", "\tld.shared.u32 %r1, [%p1];\n\tret;", "not a 32- or 64-bit register");
+    bad(
+        "\t.shared .u32 s;",
+        "\tmov.s32 %r1, s;\n\tret;",
+        "mov.s32 of the address",
+    );
+    bad(
+        "\t.shared .u32 s;",
+        "\tld.global.u32 %r1, [s];\n\tret;",
+        "needs a register address",
+    );
+    bad(
+        "\t.shared .u32 s;",
+        "\tld.shared.u32 %r1, [%p1];\n\tret;",
+        "not a 32- or 64-bit register",
+    );
 }
 
 #[test]

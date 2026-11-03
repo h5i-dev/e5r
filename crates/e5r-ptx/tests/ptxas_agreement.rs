@@ -132,7 +132,13 @@ fn forms() -> Vec<String> {
     }
     v.push("add.u32 %r1, sm, 4".into());
     v.push("ld.global.u32 %r1, [sm]".into());
-    for b in ["bar.sync 0", "bar.sync 1", "bar.sync 0, 32", "barrier.sync 0", "bar.cta.sync 0"] {
+    for b in [
+        "bar.sync 0",
+        "bar.sync 1",
+        "bar.sync 0, 32",
+        "barrier.sync 0",
+        "bar.cta.sync 0",
+    ] {
         v.push(b.into());
     }
     v.push("@%p1 bar.sync 0".into());
@@ -141,10 +147,36 @@ fn forms() -> Vec<String> {
     // floating point: every modifier combination, orders, literals, and
     // register kinds the type rules allow or refuse
     for t in ["f32", "f64"] {
-        let r = |i: u32| if t == "f32" { format!("%f{i}") } else { format!("%fd{i}") };
+        let r = |i: u32| {
+            if t == "f32" {
+                format!("%f{i}")
+            } else {
+                format!("%fd{i}")
+            }
+        };
         let (d, a, b, c) = (r(1), r(2), r(3), r(4));
-        let lit = if t == "f32" { "0f3F800000" } else { "0d3FF0000000000000" };
-        let mods = ["", ".rn", ".rz", ".rm", ".rp", ".rn.ftz", ".rn.sat", ".rn.ftz.sat", ".ftz.rn", ".sat.ftz", ".ftz", ".approx", ".full", ".approx.ftz", ".rni"];
+        let lit = if t == "f32" {
+            "0f3F800000"
+        } else {
+            "0d3FF0000000000000"
+        };
+        let mods = [
+            "",
+            ".rn",
+            ".rz",
+            ".rm",
+            ".rp",
+            ".rn.ftz",
+            ".rn.sat",
+            ".rn.ftz.sat",
+            ".ftz.rn",
+            ".sat.ftz",
+            ".ftz",
+            ".approx",
+            ".full",
+            ".approx.ftz",
+            ".rni",
+        ];
         for m in mods {
             for op in ["add", "sub", "mul", "div"] {
                 v.push(format!("{op}{m}.{t} {d}, {a}, {b}"));
@@ -158,7 +190,10 @@ fn forms() -> Vec<String> {
             v.push(format!("min{m}.{t} {d}, {a}, {b}"));
             v.push(format!("max{m}.{t} {d}, {a}, {b}"));
         }
-        for cmp in ["eq", "ne", "lt", "le", "gt", "ge", "equ", "neu", "ltu", "leu", "gtu", "geu", "num", "nan", "lo", "hs"] {
+        for cmp in [
+            "eq", "ne", "lt", "le", "gt", "ge", "equ", "neu", "ltu", "leu", "gtu", "geu", "num",
+            "nan", "lo", "hs",
+        ] {
             v.push(format!("setp.{cmp}.{t} %p1, {a}, {b}"));
             v.push(format!("setp.{cmp}.ftz.{t} %p1, {a}, {b}"));
             v.push(format!("setp.{cmp}.{t} %p1, {a}, {lit}"));
@@ -173,26 +208,45 @@ fn forms() -> Vec<String> {
         v.push(format!("ld.global.{t} {d}, [%rd5]"));
         v.push(format!("st.global.{t} [%rd5], {a}"));
         v.push(format!("st.global.{t} [%rd5], {lit}"));
-        let (bt, ir) = if t == "f32" { ("b32", "%r2") } else { ("b64", "%rd2") };
+        let (bt, ir) = if t == "f32" {
+            ("b32", "%r2")
+        } else {
+            ("b64", "%rd2")
+        };
         v.push(format!("mov.{bt} {d}, {ir}"));
         v.push(format!("mov.{bt} {ir}, {a}"));
         v.push(format!("add.u{} {ir}, {a}, {ir}", &bt[1..]));
         v.push(format!("add.rn.{t} {d}, {ir}, {a}"));
         for it in TYS {
             let ireg = reg(it, 2);
-            for m in ["", ".rn", ".rz", ".rm", ".rp", ".rni", ".rzi", ".rn.ftz", ".rn.sat", ".rmi.ftz", ".rpi.sat"] {
+            for m in [
+                "", ".rn", ".rz", ".rm", ".rp", ".rni", ".rzi", ".rn.ftz", ".rn.sat", ".rmi.ftz",
+                ".rpi.sat",
+            ] {
                 v.push(format!("cvt{m}.{t}.{it} {d}, {ireg}"));
                 v.push(format!("cvt{m}.{it}.{t} {}, {a}", reg(it, 1)));
             }
         }
-        for m in ["", ".rni", ".rzi", ".rmi", ".rpi", ".rn", ".rni.ftz", ".rzi.sat", ".ftz"] {
+        for m in [
+            "", ".rni", ".rzi", ".rmi", ".rpi", ".rn", ".rni.ftz", ".rzi.sat", ".ftz",
+        ] {
             v.push(format!("cvt{m}.{t}.{t} {d}, {a}"));
         }
     }
     for m in ["", ".ftz", ".sat", ".ftz.sat", ".rn", ".rz"] {
         v.push(format!("cvt{m}.f64.f32 %fd1, %f2"));
     }
-    for m in ["", ".rn", ".rz", ".rm", ".rp", ".rn.ftz", ".rz.sat", ".rp.ftz.sat", ".rni"] {
+    for m in [
+        "",
+        ".rn",
+        ".rz",
+        ".rm",
+        ".rp",
+        ".rn.ftz",
+        ".rz.sat",
+        ".rp.ftz.sat",
+        ".rni",
+    ] {
         v.push(format!("cvt{m}.f32.f64 %f1, %fd2"));
     }
     for g in ["", "@%p1 ", "@!%p1 "] {

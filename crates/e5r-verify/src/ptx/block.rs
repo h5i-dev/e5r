@@ -256,7 +256,10 @@ fn declared(k: &Kernel, r: &str) -> Option<Ty> {
 pub fn validate(sp: &BlockSpec, k: &Kernel) -> Result<(), String> {
     let c = sp.class.name();
     if RESERVED.contains(&k.name.as_str()) {
-        return Err(format!("{c}: kernel name {} is reserved by the proof file", k.name));
+        return Err(format!(
+            "{c}: kernel name {} is reserved by the proof file",
+            k.name
+        ));
     }
     let names = [&sp.input, &sp.output, &sp.length];
     if names[0] == names[1] || names[0] == names[2] || names[1] == names[2] {
@@ -320,7 +323,10 @@ pub fn shape(sp: &BlockSpec, k: &Kernel) -> Result<Shape, String> {
             bars.len()
         ));
     }
-    if k.body.iter().any(|st| st.guard.is_some() && matches!(st.instr, Instr::Bar)) {
+    if k.body
+        .iter()
+        .any(|st| st.guard.is_some() && matches!(st.instr, Instr::Bar))
+    {
         return Err(format!("{c}: a predicated bar.sync"));
     }
     for (set, roles) in &sp.barriers {
@@ -329,7 +335,10 @@ pub fn shape(sp: &BlockSpec, k: &Kernel) -> Result<Shape, String> {
                 return Err(format!("{set}: register {r} is not declared"));
             };
             if (ty == Ty::Pred) != role.is_pred() {
-                return Err(format!("{set}: register {r} has type .{} for its role", ty.name()));
+                return Err(format!(
+                    "{set}: register {r} has type .{} for its role",
+                    ty.name()
+                ));
             }
         }
     }
@@ -370,7 +379,11 @@ fn role_eq(r: &str, p: &str, reg: &str, role: Role, k: &str) -> String {
         Role::Length => "ext32 A.n".into(),
         Role::Stride => format!("ext32 (BitVec.ofNat 32 (stride A {k}))"),
         Role::StridePrev => {
-            let p = if k == "(k + 1)" { "k".to_string() } else { format!("({k} - 1)") };
+            let p = if k == "(k + 1)" {
+                "k".to_string()
+            } else {
+                format!("({k} - 1)")
+            };
             format!("ext32 (BitVec.ofNat 32 (stride A {p}))")
         }
         Role::Offset => format!("ext32 (BitVec.ofNat 32 (2 ^ {k}))"),
@@ -564,9 +577,8 @@ pub fn lean_spec(sp: &BlockSpec) -> String {
 /// The proof attempt: `theorem E5rCheck.correct : <class>.Correct spec K`.
 pub fn proof(k: &Kernel, sp: &BlockSpec, sh: &Shape, header: &str) -> String {
     let kn = format!("«{}»", k.name);
-    let roles = |n: &str| -> &[(String, Role)] {
-        &sp.barriers.iter().find(|(m, _)| m == n).unwrap().1
-    };
+    let roles =
+        |n: &str| -> &[(String, Role)] { &sp.barriers.iter().find(|(m, _)| m == n).unwrap().1 };
     let common = [
         ("@HEADER@", header.trim_end().to_string()),
         ("@KERNEL_DEF@", e5r_ptx::lean::kernel_def(k)),
@@ -578,7 +590,11 @@ pub fn proof(k: &Kernel, sp: &BlockSpec, sh: &Shape, header: &str) -> String {
     let mut t = match sp.class {
         Class::Reduce | Class::ReduceAtomic => {
             let atomic = sp.class == Class::ReduceAtomic;
-            let mp = if atomic { "Reduce32.Atomic." } else { "Reduce32." };
+            let mp = if atomic {
+                "Reduce32.Atomic."
+            } else {
+                "Reduce32."
+            };
             let (l, p) = (roles("after_load"), roles("loop"));
             let eval = format!(
                 "ptx_eval, {kn}, Block.Args.launch, Block.Args.params, spec_input, spec_output,\n        \
@@ -685,13 +701,19 @@ mod tests {
                 "barriers":{"after_load":{"%r1":"stride"},"loop":{}}}"#,
         )
         .unwrap();
-        assert!(matches!(parse(&v, "reduce32"), Err(SpecError::Malformed(_))));
+        assert!(matches!(
+            parse(&v, "reduce32"),
+            Err(SpecError::Malformed(_))
+        ));
         let v: Value = serde_json::from_str(
             r#"{"kernel":"k","result":"per_block","input":"a","output":"b","length":"n",
                 "shared":"s","max_block":300,
                 "barriers":{"after_load":{},"loop":{}}}"#,
         )
         .unwrap();
-        assert!(matches!(parse(&v, "reduce32"), Err(SpecError::Unsupported(_))));
+        assert!(matches!(
+            parse(&v, "reduce32"),
+            Err(SpecError::Unsupported(_))
+        ));
     }
 }

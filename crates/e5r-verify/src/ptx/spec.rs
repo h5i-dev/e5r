@@ -207,7 +207,11 @@ pub fn parse(text: &str) -> Result<Spec, SpecError> {
     let float = match v.get("element_type").and_then(Value::as_str) {
         None | Some("u32") => false,
         Some("f32") => true,
-        Some(t) => return Err(SpecError::Unsupported(format!("element_type {t:?} (u32 or f32)"))),
+        Some(t) => {
+            return Err(SpecError::Unsupported(format!(
+                "element_type {t:?} (u32 or f32)"
+            )));
+        }
     };
     let mut parser = Parser::new(&element_text, &arrays, &scalars);
     parser.float = float;
@@ -309,7 +313,11 @@ pub fn validate(sp: &Spec, k: &Kernel) -> Result<(), String> {
         } else if *p == sp.length {
             matches!(t, Ty::U32 | Ty::S32 | Ty::B32)
         } else if sp.scalars.contains(p) {
-            if sp.float { *t == Ty::F32 } else { matches!(t, Ty::U32 | Ty::S32 | Ty::B32) }
+            if sp.float {
+                *t == Ty::F32
+            } else {
+                matches!(t, Ty::U32 | Ty::S32 | Ty::B32)
+            }
         } else {
             return Err(format!("parameter {p} is not named by the spec"));
         };
@@ -400,7 +408,11 @@ impl<'a> Parser<'a> {
         }
     }
     fn parse(mut self) -> Result<Expr, String> {
-        let e = if self.float { self.fexpr()? } else { self.bin(0)? };
+        let e = if self.float {
+            self.fexpr()?
+        } else {
+            self.bin(0)?
+        };
         self.ws();
         if self.i < self.t.len() {
             return Err(format!("unexpected {:?} at {}", self.t[self.i], self.i));
@@ -432,7 +444,9 @@ impl<'a> Parser<'a> {
             } else if self.scalars.contains(&w) {
                 Ok(Expr::Scal(w))
             } else {
-                Err(format!("{w} is neither an array, a scalar nor a 0f literal"))
+                Err(format!(
+                    "{w} is neither an array, a scalar nor a 0f literal"
+                ))
             };
         }
         let parts: Vec<&str> = w.split('.').collect();
@@ -444,7 +458,13 @@ impl<'a> Parser<'a> {
             _ => return Err(format!("unknown float operation {op}")),
         };
         let rounded = matches!(*op, "add" | "sub" | "mul" | "div" | "fma" | "sqrt" | "rcp");
-        let mut f = FOp { op: op.to_string(), rnd: None, ftz: false, sat: false, nan: false };
+        let mut f = FOp {
+            op: op.to_string(),
+            rnd: None,
+            ftz: false,
+            sat: false,
+            nan: false,
+        };
         for m in mods {
             match *m {
                 "rn" | "rz" | "rm" | "rp" if rounded && f.rnd.is_none() => {
@@ -575,11 +595,18 @@ impl Spec {
             Result32::MaxUlps(k) => {
                 let inf = |x: u32| x & 0x7fff_ffff == 0x7f80_0000;
                 let ord = |x: u32| -> i64 {
-                    if x & 0x8000_0000 != 0 { -((x & 0x7fff_ffff) as i64) } else { x as i64 }
+                    if x & 0x8000_0000 != 0 {
+                        -((x & 0x7fff_ffff) as i64)
+                    } else {
+                        x as i64
+                    }
                 };
                 (nan(got) && nan(want))
                     || (inf(got) && got == want)
-                    || (!nan(got) && !inf(got) && !nan(want) && !inf(want)
+                    || (!nan(got)
+                        && !inf(got)
+                        && !nan(want)
+                        && !inf(want)
                         && (ord(got) - ord(want)).unsigned_abs() <= k as u64)
             }
         }
@@ -645,9 +672,17 @@ impl Expr {
                     "add" | "sub" | "mul" | "fma" => {
                         format!("(F32.{}{m} {} {} {})", f.op, f.ftz, f.sat, a.join(" "))
                     }
-                    "div" | "sqrt" | "rcp" => format!("(F32.{}{m} {} {})", f.op, f.ftz, a.join(" ")),
+                    "div" | "sqrt" | "rcp" => {
+                        format!("(F32.{}{m} {} {})", f.op, f.ftz, a.join(" "))
+                    }
                     "neg" | "abs" => format!("(F32.{} {} {})", f.op, f.ftz, a.join(" ")),
-                    op => format!("(F32.minmax {} {} {} {})", op == "max", f.ftz, f.nan, a.join(" ")),
+                    op => format!(
+                        "(F32.minmax {} {} {} {})",
+                        op == "max",
+                        f.ftz,
+                        f.nan,
+                        a.join(" ")
+                    ),
                 }
             }
             Expr::Not(e) => format!("(~~~({}))", e.lean()),

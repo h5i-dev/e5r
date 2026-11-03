@@ -183,7 +183,11 @@ impl Q {
     fn ilog2(&self) -> i64 {
         let k = self.n.bits() as i64 - self.d.bits() as i64;
         // |q| < 2^k ⇔ N·2^e < D·2^k  (exponent e moved to the shifts)
-        if self.lt_pow2(k + self.e) { k + self.e - 1 } else { k + self.e }
+        if self.lt_pow2(k + self.e) {
+            k + self.e - 1
+        } else {
+            k + self.e
+        }
     }
     /// `|q| < 2^k`.
     fn lt_pow2(&self, k: i64) -> bool {
@@ -262,15 +266,27 @@ impl Fmt {
         if self.bexp(x) == 0 {
             (self.frac(x), self.emin() - self.fb as i64)
         } else {
-            (self.frac(x) + (1u64 << self.fb), self.bexp(x) as i64 - self.bias() - self.fb as i64)
+            (
+                self.frac(x) + (1u64 << self.fb),
+                self.bexp(x) as i64 - self.bias() - self.fb as i64,
+            )
         }
     }
     fn to_q(self, x: u64) -> Q {
         let (m, e) = self.me(x);
-        Q { neg: self.sgn(x), n: Big::from(m as u128), d: Big::from(1), e }
+        Q {
+            neg: self.sgn(x),
+            n: Big::from(m as u128),
+            d: Big::from(1),
+            e,
+        }
     }
     fn flush(self, ftz: bool, x: u64) -> u64 {
-        if ftz && self.is_sub(x) { self.zero(self.sgn(x)) } else { x }
+        if ftz && self.is_sub(x) {
+            self.zero(self.sgn(x))
+        } else {
+            x
+        }
     }
     fn neg_bits(self, x: u64) -> u64 {
         x ^ self.sign_bit()
@@ -328,7 +344,11 @@ impl Fmt {
         let overflow = e > self.emax() || (e == self.emax() && pm == 1u128 << p);
         if overflow {
             let inf = m == RMode::Rn || (m == RMode::Rm && neg) || (m == RMode::Rp && !neg);
-            return if inf { self.inf(neg) } else { self.max_fin(neg) };
+            return if inf {
+                self.inf(neg)
+            } else {
+                self.max_fin(neg)
+            };
         }
         let tiny = e < self.emin() && !(e == self.emin() - 1 && pm == 1u128 << p);
         if ftz && tiny {
@@ -336,7 +356,11 @@ impl Fmt {
         }
         let qe = e.max(self.emin()) - fb;
         let mm = self.round_at(m, q, qe);
-        if mm == 0 { self.zero(neg) } else { self.encode(neg, mm, qe) }
+        if mm == 0 {
+            self.zero(neg)
+        } else {
+            self.encode(neg, mm, qe)
+        }
     }
 
     fn sat(self, on: bool, r: Option<u64>) -> Option<u64> {
@@ -369,11 +393,21 @@ fn add_q(a: &Q, b: &Q) -> Q {
             _ => (a.neg, x.sub(&y)),
         }
     };
-    Q { neg, n, d: Big::from(1), e }
+    Q {
+        neg,
+        n,
+        d: Big::from(1),
+        e,
+    }
 }
 
 fn mul_q(a: &Q, b: &Q) -> Q {
-    Q { neg: a.neg != b.neg, n: a.n.mul(&b.n), d: a.d.mul(&b.d), e: a.e + b.e }
+    Q {
+        neg: a.neg != b.neg,
+        n: a.n.mul(&b.n),
+        d: a.d.mul(&b.d),
+        e: a.e + b.e,
+    }
 }
 
 fn add_core(f: Fmt, m: RMode, ftz: bool, a: u64, b: u64) -> Option<u64> {
@@ -381,7 +415,11 @@ fn add_core(f: Fmt, m: RMode, ftz: bool, a: u64, b: u64) -> Option<u64> {
         return None;
     }
     if f.is_inf(a) && f.is_inf(b) {
-        return if f.sgn(a) == f.sgn(b) { Some(f.inf(f.sgn(a))) } else { None };
+        return if f.sgn(a) == f.sgn(b) {
+            Some(f.inf(f.sgn(a)))
+        } else {
+            None
+        };
     }
     if f.is_inf(a) {
         return Some(a);
@@ -432,7 +470,11 @@ pub fn ffma(f: Fmt, m: RMode, ftz: bool, sat: bool, a: u64, b: u64, c: u64) -> O
     let r = if f.is_nan(a) || f.is_nan(b) || f.is_nan(c) || invalid {
         None
     } else if f.is_inf(a) || f.is_inf(b) {
-        if f.is_inf(c) && f.sgn(c) != pneg { None } else { Some(f.inf(pneg)) }
+        if f.is_inf(c) && f.sgn(c) != pneg {
+            None
+        } else {
+            Some(f.inf(pneg))
+        }
     } else if f.is_inf(c) {
         Some(c)
     } else {
@@ -467,7 +509,12 @@ pub fn fdiv(f: Fmt, m: RMode, ftz: bool, a: u64, b: u64) -> Option<u64> {
         return Some(f.inf(neg));
     }
     let (qa, qb) = (f.to_q(a), f.to_q(b));
-    let q = Q { neg, n: qa.n, d: qb.n, e: qa.e - qb.e };
+    let q = Q {
+        neg,
+        n: qa.n,
+        d: qb.n,
+        e: qa.e - qb.e,
+    };
     Some(f.round(m, ftz, &q, neg))
 }
 
@@ -538,13 +585,21 @@ pub fn fsqrt(f: Fmt, m: RMode, ftz: bool, a: u64) -> Option<u64> {
 /// `Fp.fneg`.
 pub fn fneg(f: Fmt, ftz: bool, a: u64) -> Option<u64> {
     let a = f.flush(ftz, a);
-    if f.is_nan(a) { None } else { Some(f.neg_bits(a)) }
+    if f.is_nan(a) {
+        None
+    } else {
+        Some(f.neg_bits(a))
+    }
 }
 
 /// `Fp.fabs`.
 pub fn fabs(f: Fmt, ftz: bool, a: u64) -> Option<u64> {
     let a = f.flush(ftz, a);
-    if f.is_nan(a) { None } else { Some(a & !f.sign_bit()) }
+    if f.is_nan(a) {
+        None
+    } else {
+        Some(a & !f.sign_bit())
+    }
 }
 
 /// Signed order of finite patterns as integers: sign-magnitude to a key.
@@ -703,7 +758,11 @@ pub fn to_int(f: Fmt, m: RMode, ftz: bool, signed: bool, w: u32, a: u64) -> u64 
     };
     let enc = |v: i128| (v.rem_euclid(1i128 << w)) as u64;
     if f.is_nan(a) {
-        return if f == F64 || w == 64 { 1u64 << (w - 1) } else { 0 };
+        return if f == F64 || w == 64 {
+            1u64 << (w - 1)
+        } else {
+            0
+        };
     }
     if f.is_inf(a) {
         return enc(if f.sgn(a) { lo } else { hi });
@@ -713,7 +772,12 @@ pub fn to_int(f: Fmt, m: RMode, ftz: bool, signed: bool, w: u32, a: u64) -> u64 
 
 /// `Fp.ofInt`.
 pub fn of_int(f: Fmt, m: RMode, ftz: bool, v: i128) -> u64 {
-    let q = Q { neg: v < 0, n: Big::from(v.unsigned_abs()), d: Big::from(1), e: 0 };
+    let q = Q {
+        neg: v < 0,
+        n: Big::from(v.unsigned_abs()),
+        d: Big::from(1),
+        e: 0,
+    };
     f.round(m, ftz, &q, false)
 }
 
@@ -731,7 +795,11 @@ pub fn round_integral(f: Fmt, m: RMode, ftz: bool, a: u64) -> Option<u64> {
         return Some(a); // already an integer
     }
     let v = f.round_at(m, &q, 0);
-    Some(if v == 0 { f.zero(f.sgn(a)) } else { f.encode(q.neg, v, 0) })
+    Some(if v == 0 {
+        f.zero(f.sgn(a))
+    } else {
+        f.encode(q.neg, v, 0)
+    })
 }
 
 /// `Fmt.sat`.
@@ -759,15 +827,47 @@ mod tests {
     use super::*;
     #[test]
     fn known_values() {
-        assert_eq!(fadd(F32, RMode::Rn, false, false, 0x3f80_0000, 0x3f80_0000), Some(0x4000_0000));
-        assert_eq!(fmul(F32, RMode::Rn, true, false, 0x3f7f_ffff, 0x0080_0000), Some(0));
-        assert_eq!(fmul(F32, RMode::Rn, false, false, 0x3f7f_ffff, 0x0080_0000), Some(0x0080_0000));
-        assert_eq!(ffma(F32, RMode::Rn, true, false, 0xb280_0000, 0x0080_0000, 0x0080_0000), Some(0x0080_0000));
+        assert_eq!(
+            fadd(F32, RMode::Rn, false, false, 0x3f80_0000, 0x3f80_0000),
+            Some(0x4000_0000)
+        );
+        assert_eq!(
+            fmul(F32, RMode::Rn, true, false, 0x3f7f_ffff, 0x0080_0000),
+            Some(0)
+        );
+        assert_eq!(
+            fmul(F32, RMode::Rn, false, false, 0x3f7f_ffff, 0x0080_0000),
+            Some(0x0080_0000)
+        );
+        assert_eq!(
+            ffma(
+                F32,
+                RMode::Rn,
+                true,
+                false,
+                0xb280_0000,
+                0x0080_0000,
+                0x0080_0000
+            ),
+            Some(0x0080_0000)
+        );
         assert_eq!(fmul(F32, RMode::Rp, false, false, 1, 0x3f00_0000), Some(1));
         assert_eq!(fsqrt(F32, RMode::Rn, false, 0x4000_0000), Some(0x3fb5_04f3));
-        assert_eq!(fdiv(F32, RMode::Rn, false, 0x3f80_0000, 0x4040_0000), Some(0x3eaa_aaab));
-        assert_eq!(fmul(F32, RMode::Rz, false, false, 0x7f7f_ffff, 0x4000_0000), Some(0x7f7f_ffff));
-        assert_eq!(fsqrt(F64, RMode::Rn, false, 0x4000_0000_0000_0000), Some(0x3ff6_a09e_667f_3bcd));
-        assert_eq!(to_int(F32, RMode::Rz, false, true, 32, 0x7f80_0000), 0x7fff_ffff);
+        assert_eq!(
+            fdiv(F32, RMode::Rn, false, 0x3f80_0000, 0x4040_0000),
+            Some(0x3eaa_aaab)
+        );
+        assert_eq!(
+            fmul(F32, RMode::Rz, false, false, 0x7f7f_ffff, 0x4000_0000),
+            Some(0x7f7f_ffff)
+        );
+        assert_eq!(
+            fsqrt(F64, RMode::Rn, false, 0x4000_0000_0000_0000),
+            Some(0x3ff6_a09e_667f_3bcd)
+        );
+        assert_eq!(
+            to_int(F32, RMode::Rz, false, true, 32, 0x7f80_0000),
+            0x7fff_ffff
+        );
     }
 }

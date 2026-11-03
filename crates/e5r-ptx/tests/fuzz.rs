@@ -151,7 +151,12 @@ fn kernel(r: &mut Rng) -> String {
     let n = 1 + r.below(30);
     for _ in 0..n {
         let s = match r.below(22) {
-            16 => format!("ld.shared.u32 \t{}, [{}+{}]", reg32(r), reg32(r), 4 * r.below(9)),
+            16 => format!(
+                "ld.shared.u32 \t{}, [{}+{}]",
+                reg32(r),
+                reg32(r),
+                4 * r.below(9)
+            ),
             17 => format!("st.shared.u32 \t[sm+{}], {}", 4 * r.below(16), reg32(r)),
             18 => format!(
                 "atom.{}.{}.u32 \t{}, [{}], {}",
@@ -162,7 +167,12 @@ fn kernel(r: &mut Rng) -> String {
                 reg32(r)
             ),
             19 => format!("red.shared.xor.b32 \t[sm], {}", imm(r)),
-            20 => format!("atom.shared.cas.b32 \t{}, [sm+4], {}, {}", reg32(r), reg32(r), imm(r)),
+            20 => format!(
+                "atom.shared.cas.b32 \t{}, [sm+4], {}, {}",
+                reg32(r),
+                reg32(r),
+                imm(r)
+            ),
             21 => "bar.sync \t0".to_string(),
             0 => format!(
                 "add.{} \t{}, {}, {}",

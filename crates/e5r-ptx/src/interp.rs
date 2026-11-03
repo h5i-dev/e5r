@@ -386,14 +386,7 @@ fn data_addr(c: &Ctx, s: &TState, sp: Space, a: &Address) -> Option<(Sp, u64)> {
 
 /// One step of thread `s` (`Ptx.tstep`) against global memory `g` and its
 /// CTA's shared memory `sh`.
-pub fn step(
-    k: &Kernel,
-    al: &Allocs,
-    c: &Ctx,
-    s: &mut TState,
-    g: &mut Mem,
-    sh: &mut Mem,
-) -> Res {
+pub fn step(k: &Kernel, al: &Allocs, c: &Ctx, s: &mut TState, g: &mut Mem, sh: &mut Mem) -> Res {
     let Some(st) = k.body.get(s.pc) else {
         return Res::Fault(format!("pc {} past the end of the body", s.pc));
     };
@@ -554,7 +547,11 @@ pub fn step(
             s.set(d, fres(*t, r));
         }
         Ffma(m, ftz, sat, t, d, a, b, e) => {
-            let (x, y, z) = (fbits(*t, s.op(c, a)), fbits(*t, s.op(c, b)), fbits(*t, s.op(c, e)));
+            let (x, y, z) = (
+                fbits(*t, s.op(c, a)),
+                fbits(*t, s.op(c, b)),
+                fbits(*t, s.op(c, e)),
+            );
             let r = fp::ffma(t.fmt(), *m, *ftz, *sat, x, y, z);
             s.set(d, fres(*t, r));
         }
@@ -575,11 +572,24 @@ pub fn step(
             s.set(d, fres(*t, r));
         }
         Fminmax(mx, ftz, nan, t, d, a, b) => {
-            let r = fp::fminmax(t.fmt(), *mx, *ftz, *nan, fbits(*t, s.op(c, a)), fbits(*t, s.op(c, b)));
+            let r = fp::fminmax(
+                t.fmt(),
+                *mx,
+                *ftz,
+                *nan,
+                fbits(*t, s.op(c, a)),
+                fbits(*t, s.op(c, b)),
+            );
             s.set(d, fres(*t, r));
         }
         Fsetp(op, ftz, t, p, a, b) => {
-            let v = fp::fsetp(t.fmt(), *op, *ftz, fbits(*t, s.op(c, a)), fbits(*t, s.op(c, b)));
+            let v = fp::fsetp(
+                t.fmt(),
+                *op,
+                *ftz,
+                fbits(*t, s.op(c, a)),
+                fbits(*t, s.op(c, b)),
+            );
             s.p.insert(p.clone(), v);
             s.pc += 1;
         }
@@ -619,7 +629,10 @@ fn cvt_float(dt: Ty, st: Ty, r: CvtRnd, ftz: bool, sat: bool, a: u64) -> Option<
         (false, true, CvtRnd::I(m)) => {
             let w = width(dt);
             let signed = matches!(dt, Ty::S32 | Ty::S64);
-            Some(fit(dt, fp::to_int(sf, m, ftz && st == Ty::F32, signed, w, fbits(st, a))))
+            Some(fit(
+                dt,
+                fp::to_int(sf, m, ftz && st == Ty::F32, signed, w, fbits(st, a)),
+            ))
         }
         (true, false, CvtRnd::F(m)) => {
             let v = fp::of_int(df, m, false, int_of(st, a));
@@ -627,14 +640,19 @@ fn cvt_float(dt: Ty, st: Ty, r: CvtRnd, ftz: bool, sat: bool, a: u64) -> Option<
         }
         (true, true, CvtRnd::I(m)) if dt == st => Some(fres(
             dt,
-            fp::sat_bits(df, sat, fp::round_integral(df, m, ftz && dt == Ty::F32, fbits(st, a))),
+            fp::sat_bits(
+                df,
+                sat,
+                fp::round_integral(df, m, ftz && dt == Ty::F32, fbits(st, a)),
+            ),
         )),
         (true, true, CvtRnd::F(m)) if dt == Ty::F32 && st == Ty::F64 => {
             Some(fres(dt, fp::convert_f(df, sf, m, ftz, sat, fbits(st, a))))
         }
-        (true, true, CvtRnd::None) if dt == Ty::F64 && st == Ty::F32 => {
-            Some(fres(dt, fp::convert_f(df, sf, fp::RMode::Rn, ftz, sat, fbits(st, a))))
-        }
+        (true, true, CvtRnd::None) if dt == Ty::F64 && st == Ty::F32 => Some(fres(
+            dt,
+            fp::convert_f(df, sf, fp::RMode::Rn, ftz, sat, fbits(st, a)),
+        )),
         _ => None,
     }
 }

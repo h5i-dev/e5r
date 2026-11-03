@@ -254,8 +254,21 @@ fn small_world(sp: &Spec, g: u32, b: u32, n: u32, alias: bool, rng: &mut Rng) ->
     // float maps: a third of the words from edge values (zeros, subnormals,
     // the smallest normal, ±1, the largest finite number, infinities, NaNs)
     const FEDGE: [u32; 16] = [
-        0, 0x8000_0000, 1, 0x807f_ffff, 0x0080_0000, 0x3f80_0000, 0xbf80_0000, 0x3f7f_ffff,
-        0x7f7f_ffff, 0x7f80_0000, 0xff80_0000, 0x7fc0_0000, 0x3f00_0000, 0x4b00_0001, 0x0040_0000,
+        0,
+        0x8000_0000,
+        1,
+        0x807f_ffff,
+        0x0080_0000,
+        0x3f80_0000,
+        0xbf80_0000,
+        0x3f7f_ffff,
+        0x7f7f_ffff,
+        0x7f80_0000,
+        0xff80_0000,
+        0x7fc0_0000,
+        0x3f00_0000,
+        0x4b00_0001,
+        0x0040_0000,
         0xff7f_ffff,
     ];
     let word = |rng: &mut Rng| -> u64 {
@@ -281,7 +294,11 @@ fn small_world(sp: &Spec, g: u32, b: u32, n: u32, alias: bool, rng: &mut Rng) ->
         .scalars
         .iter()
         .map(|s| {
-            let v = if sp.float { word(rng) as u32 } else { (rng.next() & 0xffff) as u32 | 2 };
+            let v = if sp.float {
+                word(rng) as u32
+            } else {
+                (rng.next() & 0xffff) as u32 | 2
+            };
             (s.clone(), v)
         })
         .collect();

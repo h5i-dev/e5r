@@ -35,7 +35,11 @@ fn operand(o: &Operand) -> String {
 }
 
 fn mods(ftz: bool, sat: bool) -> String {
-    format!("{}{}", if ftz { ".ftz" } else { "" }, if sat { ".sat" } else { "" })
+    format!(
+        "{}{}",
+        if ftz { ".ftz" } else { "" },
+        if sat { ".sat" } else { "" }
+    )
 }
 
 /// The rounding of a `cvt`, with its dot.
@@ -127,13 +131,29 @@ pub fn instr(i: &Instr) -> String {
             o(c)
         ),
         Instr::Fsqrt(m, ftz, t, d, a) => {
-            format!("sqrt.{}{}.{} \t{d}, {}", m.name(), mods(*ftz, false), t.name(), o(a))
+            format!(
+                "sqrt.{}{}.{} \t{d}, {}",
+                m.name(),
+                mods(*ftz, false),
+                t.name(),
+                o(a)
+            )
         }
         Instr::Frcp(m, ftz, t, d, a) => {
-            format!("rcp.{}{}.{} \t{d}, {}", m.name(), mods(*ftz, false), t.name(), o(a))
+            format!(
+                "rcp.{}{}.{} \t{d}, {}",
+                m.name(),
+                mods(*ftz, false),
+                t.name(),
+                o(a)
+            )
         }
-        Instr::Fneg(ftz, t, d, a) => format!("neg{}.{} \t{d}, {}", mods(*ftz, false), t.name(), o(a)),
-        Instr::Fabs(ftz, t, d, a) => format!("abs{}.{} \t{d}, {}", mods(*ftz, false), t.name(), o(a)),
+        Instr::Fneg(ftz, t, d, a) => {
+            format!("neg{}.{} \t{d}, {}", mods(*ftz, false), t.name(), o(a))
+        }
+        Instr::Fabs(ftz, t, d, a) => {
+            format!("abs{}.{} \t{d}, {}", mods(*ftz, false), t.name(), o(a))
+        }
         Instr::Fminmax(mx, ftz, nan, t, d, a, b) => format!(
             "{}{}{}.{} \t{d}, {}, {}",
             if *mx { "max" } else { "min" },

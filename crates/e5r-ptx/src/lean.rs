@@ -116,7 +116,14 @@ fn instr(i: &Instr) -> String {
             o(c)
         ),
         Instr::Red(sp, op, t, a, b) => {
-            format!(".red .{} .{} {} {} {}", sp.name(), op.name(), ty(*t), address(a), o(b))
+            format!(
+                ".red .{} .{} {} {} {}",
+                sp.name(),
+                op.name(),
+                ty(*t),
+                address(a),
+                o(b)
+            )
         }
         Instr::Bar => ".bar".into(),
         Instr::FBin(op, m, ftz, sat, t, d, a, b) => format!(
@@ -137,15 +144,32 @@ fn instr(i: &Instr) -> String {
             o(b),
             o(c)
         ),
-        Instr::Fsqrt(m, ftz, t, d, a) => format!(".fsqrt .{} {ftz} {} {} {}", m.name(), ty(*t), s(d), o(a)),
-        Instr::Frcp(m, ftz, t, d, a) => format!(".frcp .{} {ftz} {} {} {}", m.name(), ty(*t), s(d), o(a)),
+        Instr::Fsqrt(m, ftz, t, d, a) => {
+            format!(".fsqrt .{} {ftz} {} {} {}", m.name(), ty(*t), s(d), o(a))
+        }
+        Instr::Frcp(m, ftz, t, d, a) => {
+            format!(".frcp .{} {ftz} {} {} {}", m.name(), ty(*t), s(d), o(a))
+        }
         Instr::Fneg(ftz, t, d, a) => format!(".fneg {ftz} {} {} {}", ty(*t), s(d), o(a)),
         Instr::Fabs(ftz, t, d, a) => format!(".fabs {ftz} {} {} {}", ty(*t), s(d), o(a)),
         Instr::Fminmax(mx, ftz, nan, t, d, a, b) => {
-            format!(".fminmax {mx} {ftz} {nan} {} {} {} {}", ty(*t), s(d), o(a), o(b))
+            format!(
+                ".fminmax {mx} {ftz} {nan} {} {} {} {}",
+                ty(*t),
+                s(d),
+                o(a),
+                o(b)
+            )
         }
         Instr::Fsetp(c, ftz, t, p, a, b) => {
-            format!(".fsetp .{} {ftz} {} {} {} {}", c.name(), ty(*t), s(p), o(a), o(b))
+            format!(
+                ".fsetp .{} {ftz} {} {} {} {}",
+                c.name(),
+                ty(*t),
+                s(p),
+                o(a),
+                o(b)
+            )
         }
         Instr::CvtF(dt, st, r, ftz, sat, d, a) => format!(
             ".cvtF {} {} {} {ftz} {sat} {} {}",

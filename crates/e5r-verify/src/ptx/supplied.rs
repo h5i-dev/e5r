@@ -60,7 +60,8 @@ pub fn check(
     proj: &Path,
     dir: &Path,
 ) -> (Verdict, Option<String>) {
-    doc["proof"] = json!({"supplied": true, "path": proof.display().to_string(), "accepted": false});
+    doc["proof"] =
+        json!({"supplied": true, "path": proof.display().to_string(), "accepted": false});
     let (bytes, prhash) = match sha(proof) {
         Ok(x) => x,
         Err(e) => return (Verdict::Error, Some(e)),
@@ -72,7 +73,10 @@ pub fn check(
     let Some((mp, ms, mt)) = manifest(&text) else {
         return (
             Verdict::Unknown,
-            Some("supplied proof refused: no `e5r-proof ptx=... spec=... toolchain=...` manifest".into()),
+            Some(
+                "supplied proof refused: no `e5r-proof ptx=... spec=... toolchain=...` manifest"
+                    .into(),
+            ),
         );
     };
     doc["proof"]["manifest"] = json!({"ptx": mp, "spec": ms, "toolchain": mt});
@@ -89,10 +93,16 @@ pub fn check(
     if !stale.is_empty() {
         return (
             Verdict::Unknown,
-            Some(format!("supplied proof refused: written for a different {}", stale.join(", "))),
+            Some(format!(
+                "supplied proof refused: written for a different {}",
+                stale.join(", ")
+            )),
         );
     }
-    for (f, t) in [("E5rSpec.lean", statement_module), ("E5rProof.lean", text.as_str())] {
+    for (f, t) in [
+        ("E5rSpec.lean", statement_module),
+        ("E5rProof.lean", text.as_str()),
+    ] {
         if let Err(e) = std::fs::write(dir.join(f), t) {
             return (Verdict::Error, Some(e.to_string()));
         }
@@ -122,16 +132,30 @@ pub fn check(
     if !r.ok {
         return (
             Verdict::Error,
-            Some(format!("the generated statement does not compile: {}", first_error(&r.output))),
+            Some(format!(
+                "the generated statement does not compile: {}",
+                first_error(&r.output)
+            )),
         );
     }
     let r = compile("E5rProof");
     doc["lean"]["proof_seconds"] = json!((r.seconds * 100.0).round() / 100.0);
     if !dir.join("E5rProof.olean").exists() {
-        let why = r.limit.map(|l| format!("stopped: {l}")).unwrap_or_else(|| first_error(&r.output));
-        return (Verdict::Unknown, Some(format!("supplied proof refused: it does not compile: {why}")));
+        let why = r
+            .limit
+            .map(|l| format!("stopped: {l}"))
+            .unwrap_or_else(|| first_error(&r.output));
+        return (
+            Verdict::Unknown,
+            Some(format!(
+                "supplied proof refused: it does not compile: {why}"
+            )),
+        );
     }
-    let checker = proj.join(".lake/build/bin/proofcheck").display().to_string();
+    let checker = proj
+        .join(".lake/build/bin/proofcheck")
+        .display()
+        .to_string();
     let r = run_lean_env(
         proj,
         &[
@@ -148,7 +172,12 @@ pub fn check(
         &env,
     );
     doc["lean"]["proof_check_seconds"] = json!((r.seconds * 100.0).round() / 100.0);
-    let line = r.output.lines().rev().find(|l| l.trim_start().starts_with('{')).unwrap_or("");
+    let line = r
+        .output
+        .lines()
+        .rev()
+        .find(|l| l.trim_start().starts_with('{'))
+        .unwrap_or("");
     let res: Value = serde_json::from_str(line).unwrap_or(Value::Null);
     doc["proof"]["check"] = res.clone();
     if res["ok"] != json!(true) {
@@ -157,7 +186,10 @@ pub fn check(
             .map(str::to_string)
             .or(r.limit.map(|l| format!("stopped: {l}")))
             .unwrap_or_else(|| first_error(&r.output));
-        return (Verdict::Unknown, Some(format!("supplied proof refused: {why}")));
+        return (
+            Verdict::Unknown,
+            Some(format!("supplied proof refused: {why}")),
+        );
     }
     doc["proof"]["accepted"] = json!(true);
     doc["theorem"] = json!({"name": "E5rProof.correct", "statement": statement,

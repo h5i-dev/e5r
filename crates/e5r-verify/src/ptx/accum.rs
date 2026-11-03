@@ -88,14 +88,20 @@ pub fn parse(v: &Value) -> Result<AccumSpec, SpecError> {
 /// What the statement needs from the kernel.
 pub fn validate(sp: &AccumSpec, k: &Kernel) -> Result<(), String> {
     if ["spec", "obligation", "correct"].contains(&k.name.as_str()) {
-        return Err(format!("accum: kernel name {} is reserved by the proof file", k.name));
+        return Err(format!(
+            "accum: kernel name {} is reserved by the proof file",
+            k.name
+        ));
     }
     let names = [&sp.input, &sp.output, &sp.length];
     if names[0] == names[1] || names[0] == names[2] || names[1] == names[2] {
         return Err("input, output and length must be different parameters".into());
     }
     if k.params.len() != 3 {
-        return Err(format!("accum: the kernel has {} parameters (input, output, length)", k.params.len()));
+        return Err(format!(
+            "accum: the kernel has {} parameters (input, output, length)",
+            k.params.len()
+        ));
     }
     for (p, t) in &k.params {
         let ok = if *p == sp.input || *p == sp.output {
@@ -160,7 +166,11 @@ pub fn spec_text(sp: &AccumSpec) -> String {
         sp.alg
     )
     .unwrap();
-    for (n, v) in [("input", q(&sp.input)), ("output", q(&sp.output)), ("length", q(&sp.length))] {
+    for (n, v) in [
+        ("input", q(&sp.input)),
+        ("output", q(&sp.output)),
+        ("length", q(&sp.length)),
+    ] {
         writeln!(t, "@[simp] theorem spec_{n} : spec.{n} = {v} := rfl").unwrap();
     }
     writeln!(t, "@[simp] theorem spec_k : spec.k = {k} := rfl").unwrap();
@@ -248,7 +258,11 @@ fn op(sp: &AccumSpec, a: u64, b: u64) -> u64 {
     let signed = sp.ty.starts_with('s');
     let lt = |x: u64, y: u64| {
         if signed {
-            if sp.wide { (x as i64) < (y as i64) } else { (x as u32 as i32) < (y as u32 as i32) }
+            if sp.wide {
+                (x as i64) < (y as i64)
+            } else {
+                (x as u32 as i32) < (y as u32 as i32)
+            }
         } else {
             x < y
         }
@@ -260,8 +274,20 @@ fn op(sp: &AccumSpec, a: u64, b: u64) -> u64 {
             "and" => a & b,
             "or" => a | b,
             "xor" => a ^ b,
-            "min" => if lt(b, a) { b } else { a },
-            _ => if lt(a, b) { b } else { a },
+            "min" => {
+                if lt(b, a) {
+                    b
+                } else {
+                    a
+                }
+            }
+            _ => {
+                if lt(a, b) {
+                    b
+                } else {
+                    a
+                }
+            }
         },
     )
 }
@@ -288,7 +314,14 @@ fn worlds(sp: &AccumSpec) -> Vec<World> {
                     mem.wr(x + w * i as u64, bytes(sp), pattern(sp, i));
                 }
                 mem.wr(out, bytes(sp), mask(sp, 0xc3c3_c3c3_c3c3_c3c3));
-                v.push(World { g, b, n, x, out, mem });
+                v.push(World {
+                    g,
+                    b,
+                    n,
+                    x,
+                    out,
+                    mem,
+                });
             }
         }
     }
@@ -308,8 +341,14 @@ fn launch(sp: &AccumSpec, w: &World) -> interp::Launch {
         params,
         sym: HashMap::new(),
         alloc: vec![
-            interp::Region { base: w.x, size: wb * w.n as u128 },
-            interp::Region { base: w.out, size: wb },
+            interp::Region {
+                base: w.x,
+                size: wb * w.n as u128,
+            },
+            interp::Region {
+                base: w.out,
+                size: wb,
+            },
         ],
     }
 }
@@ -326,7 +365,17 @@ pub fn search(k: &Kernel, sp: &AccumSpec) -> (Option<(World, Witness)>, usize) {
         let (end, ch, evs) = blocksearch::run(k, &l, &mut g, fuel);
         match end {
             Ran::Fault(thread, why) => {
-                return (Some((w, Witness::Fault { sched: ch, thread, why })), tried);
+                return (
+                    Some((
+                        w,
+                        Witness::Fault {
+                            sched: ch,
+                            thread,
+                            why,
+                        },
+                    )),
+                    tried,
+                );
             }
             Ran::Fuel => continue,
             Ran::Done => {}
@@ -342,7 +391,18 @@ pub fn search(k: &Kernel, sp: &AccumSpec) -> (Option<(World, Witness)>, usize) {
         }
         let got = g.rd(w.out, wb);
         if got != want {
-            return (Some((w, Witness::Wrong { sched: ch, check: Check::Value(0), got, want })), tried);
+            return (
+                Some((
+                    w,
+                    Witness::Wrong {
+                        sched: ch,
+                        check: Check::Value(0),
+                        got,
+                        want,
+                    },
+                )),
+                tried,
+            );
         }
         let mut keys: Vec<u64> = g.bytes.keys().chain(w.mem.bytes.keys()).copied().collect();
         keys.sort();
@@ -352,7 +412,15 @@ pub fn search(k: &Kernel, sp: &AccumSpec) -> (Option<(World, Witness)>, usize) {
             if !inside && g.get(a) != w.mem.get(a) {
                 let (gv, wv) = (g.get(a) as u64, w.mem.get(a) as u64);
                 return (
-                    Some((w, Witness::Wrong { sched: ch, check: Check::Frame(a), got: gv, want: wv })),
+                    Some((
+                        w,
+                        Witness::Wrong {
+                            sched: ch,
+                            check: Check::Frame(a),
+                            got: gv,
+                            want: wv,
+                        },
+                    )),
                     tried,
                 );
             }
@@ -374,12 +442,16 @@ pub fn describe(w: &World, wit: &Witness) -> Value {
             v["reason"] = json!(why);
             v["schedule_length"] = json!(sched.len());
         }
-        Witness::Race { t, u, x, y, byte, .. } => {
+        Witness::Race {
+            t, u, x, y, byte, ..
+        } => {
             v["first"] = json!({"ctaid": t.0, "tid": t.1, "access": blocksearch::acc_json(x)});
             v["second"] = json!({"ctaid": u.0, "tid": u.1, "access": blocksearch::acc_json(y)});
             v["byte"] = json!(format!("{byte:#x}"));
         }
-        Witness::Wrong { check, got, want, .. } => {
+        Witness::Wrong {
+            check, got, want, ..
+        } => {
             if let Check::Frame(a) = check {
                 v["byte"] = json!(format!("{a:#x}"));
             }
@@ -409,7 +481,11 @@ pub fn refutation(k: &Kernel, sp: &AccumSpec, header: &str, w: &World, wit: &Wit
     let mut bs: Vec<(&u64, &u8)> = w.mem.bytes.iter().filter(|(_, v)| **v != 0).collect();
     bs.sort();
     for (a, v) in bs.iter().rev() {
-        mem = format!("if x = {} then {} else {mem}", bv(**a as u128, 64), bv(**v as u128, 8));
+        mem = format!(
+            "if x = {} then {} else {mem}",
+            bv(**a as u128, 64),
+            bv(**v as u128, 8)
+        );
     }
     writeln!(
         s,

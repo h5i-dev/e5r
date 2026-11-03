@@ -275,13 +275,12 @@ pub fn check(o: &Options) -> (Verdict, Value) {
     if let Some(class) = block_class(&stext) {
         return check_block(o, doc, started, &module, &stext, &class, &phash, &shash);
     }
-    let sp = match Ok::<String, String>(stext)
-        .and_then(|t| {
-            spec::parse(&t).map_err(|e| match e {
-                spec::SpecError::Malformed(m) => format!("malformed: {m}"),
-                spec::SpecError::Unsupported(m) => format!("unsupported: {m}"),
-            })
-        }) {
+    let sp = match Ok::<String, String>(stext).and_then(|t| {
+        spec::parse(&t).map_err(|e| match e {
+            spec::SpecError::Malformed(m) => format!("malformed: {m}"),
+            spec::SpecError::Unsupported(m) => format!("unsupported: {m}"),
+        })
+    }) {
         Ok(s) => s,
         Err(e) if e.starts_with("unsupported: ") => {
             return finish(doc, Verdict::Unsupported, Some(e[13..].to_string()));
@@ -351,10 +350,22 @@ pub fn check(o: &Options) -> (Verdict, Value) {
         );
     }
     if let Some(pf) = &o.proof {
-        let pre = leangen::prelude(k, &sp, &header, "").replace("namespace E5rCheck", "namespace E5rSpec");
+        let pre = leangen::prelude(k, &sp, &header, "")
+            .replace("namespace E5rCheck", "namespace E5rSpec");
         let stmt = format!("spec.Correct {}", leangen::kname(k));
         let module = supplied::statement_module(&pre, &stmt);
-        let (v, why) = supplied_route(o, &mut doc, pf, &module, &stmt, "Ptx.Auto.MapSpec.Correct", &phash, &shash, &proj, &dir);
+        let (v, why) = supplied_route(
+            o,
+            &mut doc,
+            pf,
+            &module,
+            &stmt,
+            "Ptx.Auto.MapSpec.Correct",
+            &phash,
+            &shash,
+            &proj,
+            &dir,
+        );
         cleanup(&dir);
         return finish(doc, v, why);
     }
@@ -484,7 +495,12 @@ fn block_class(text: &str) -> Option<String> {
     matches!(c, "reduce32" | "scan32" | "accum").then(|| c.to_string())
 }
 
-fn finish_at(started: Instant, mut doc: Value, v: Verdict, reason: Option<String>) -> (Verdict, Value) {
+fn finish_at(
+    started: Instant,
+    mut doc: Value,
+    v: Verdict,
+    reason: Option<String>,
+) -> (Verdict, Value) {
     doc["verdict"] = json!(v.name());
     if let Some(r) = reason {
         doc["reasons"].as_array_mut().unwrap().push(json!(r));
@@ -557,7 +573,11 @@ fn check_block(
             "output": sp.output, "length": sp.length});
         doc["lean_spec"] = json!(accum::lean_spec(&sp));
         let Some(k) = kernel_named(&sp.kernel) else {
-            return finish(doc, Verdict::Error, Some(format!("no kernel {} in the PTX", sp.kernel)));
+            return finish(
+                doc,
+                Verdict::Error,
+                Some(format!("no kernel {} in the PTX", sp.kernel)),
+            );
         };
         if let Err(e) = accum::validate(&sp, &k) {
             return finish(doc, Verdict::Unsupported, Some(e));
@@ -576,7 +596,11 @@ fn check_block(
                 let (found, tried) = accum::search(&k2, &sp2);
                 (
                     found.map(|(w, wit)| {
-                        (accum::describe(&w, &wit), wit.kind(), accum::refutation(&k2, &sp2, &h2, &w, &wit))
+                        (
+                            accum::describe(&w, &wit),
+                            wit.kind(),
+                            accum::refutation(&k2, &sp2, &h2, &w, &wit),
+                        )
                     }),
                     tried,
                 )
@@ -599,13 +623,20 @@ fn check_block(
             "max_block": sp.max_block});
         doc["lean_spec"] = json!(block::lean_spec(&sp));
         let Some(k) = kernel_named(&sp.kernel) else {
-            return finish(doc, Verdict::Error, Some(format!("no kernel {} in the PTX", sp.kernel)));
+            return finish(
+                doc,
+                Verdict::Error,
+                Some(format!("no kernel {} in the PTX", sp.kernel)),
+            );
         };
         if let Err(e) = block::validate(&sp, &k) {
             return finish(doc, Verdict::Unsupported, Some(e));
         }
-        let statement =
-            format!("{} spec «{}»", sp.class.definition().trim_start_matches("Ptx.Auto."), k.name);
+        let statement = format!(
+            "{} spec «{}»",
+            sp.class.definition().trim_start_matches("Ptx.Auto."),
+            k.name
+        );
         let (k2, sp2, h2) = (k.clone(), sp.clone(), header.clone());
         Plan {
             statement_module: supplied::statement_module(
@@ -620,8 +651,11 @@ fn check_block(
                 let (found, tried) = blocksearch::search(&k2, &sp2);
                 (
                     found.map(|(w, wit)| {
-                        (blocksearch::describe(&w, &wit), wit.kind(),
-                         blocksearch::refutation(&k2, &sp2, &h2, &w, &wit))
+                        (
+                            blocksearch::describe(&w, &wit),
+                            wit.kind(),
+                            blocksearch::refutation(&k2, &sp2, &h2, &w, &wit),
+                        )
                     }),
                     tried,
                 )
@@ -630,7 +664,9 @@ fn check_block(
     };
     let dir = match &o.keep {
         Some(d) => d.clone(),
-        None => std::env::temp_dir().join(format!("e5r-ptx-{}-{}", std::process::id(), &phash[..12])),
+        None => {
+            std::env::temp_dir().join(format!("e5r-ptx-{}-{}", std::process::id(), &phash[..12]))
+        }
     };
     if let Err(e) = std::fs::create_dir_all(&dir) {
         return finish(doc, Verdict::Error, Some(format!("{}: {e}", dir.display())));
@@ -642,11 +678,27 @@ fn check_block(
     };
     let proj = match o.project.canonicalize() {
         Ok(p) => p,
-        Err(e) => return finish(doc, Verdict::Error, Some(format!("{}: {e}", o.project.display()))),
+        Err(e) => {
+            return finish(
+                doc,
+                Verdict::Error,
+                Some(format!("{}: {e}", o.project.display())),
+            );
+        }
     };
     if let Some(pf) = &o.proof {
-        let (v, why) = supplied_route(o, &mut doc, pf, &plan.statement_module, &plan.statement,
-            plan.definition, phash, shash, &proj, &dir);
+        let (v, why) = supplied_route(
+            o,
+            &mut doc,
+            pf,
+            &plan.statement_module,
+            &plan.statement,
+            plan.definition,
+            phash,
+            shash,
+            &proj,
+            &dir,
+        );
         cleanup(&dir);
         return finish(doc, v, why);
     }
@@ -658,7 +710,10 @@ fn check_block(
         return finish(
             doc,
             Verdict::Error,
-            Some(format!("building the Lean library failed: {}", tail(&warm.output))),
+            Some(format!(
+                "building the Lean library failed: {}",
+                tail(&warm.output)
+            )),
         );
     }
     let statement = plan.statement.clone();
@@ -683,19 +738,29 @@ fn check_block(
                         cleanup(&dir);
                         return finish(doc, Verdict::Proved, None);
                     }
-                    Some(ax) => reason(&mut doc, format!("proof uses axioms outside the allowed set: {ax:?}")),
+                    Some(ax) => reason(
+                        &mut doc,
+                        format!("proof uses axioms outside the allowed set: {ax:?}"),
+                    ),
                     None => reason(&mut doc, "no axiom report for the theorem".into()),
                 }
             } else if let Some(l) = r.limit {
                 reason(&mut doc, format!("proof attempt stopped: {l}"));
             } else {
-                reason(&mut doc, format!("proof did not check: {}", first_error(&r.output)));
+                reason(
+                    &mut doc,
+                    format!("proof did not check: {}", first_error(&r.output)),
+                );
             }
         }
     }
     // Outside the proof's shape, a kernel can still be refuted, but no
     // counterexample does not make it unknown: the class cannot prove it.
-    let none = if plan.proof.is_err() { Verdict::Unsupported } else { Verdict::Unknown };
+    let none = if plan.proof.is_err() {
+        Verdict::Unsupported
+    } else {
+        Verdict::Unknown
+    };
     if !o.search {
         cleanup(&dir);
         return finish(doc, none, Some("counterexample search disabled".into()));
@@ -706,7 +771,11 @@ fn check_block(
         json!({"launches": tried, "seconds": (t0.elapsed().as_secs_f64() * 100.0).round() / 100.0});
     let Some((mut cx, kind, rtext)) = found else {
         cleanup(&dir);
-        return finish(doc, none, Some("no proof, and the search found no counterexample".into()));
+        return finish(
+            doc,
+            none,
+            Some("no proof, and the search found no counterexample".into()),
+        );
     };
     let rf = dir.join("Refute.lean");
     if let Err(e) = std::fs::write(&rf, rtext) {
@@ -724,7 +793,11 @@ fn check_block(
         cx["theorem"] = json!({"name": "E5rCheck.refuted", "statement": format!("¬ {statement}"),
             "axioms": r.axioms});
     } else {
-        cx["replay_error"] = json!(r.limit.map(|l| l.to_string()).unwrap_or_else(|| first_error(&r.output)));
+        cx["replay_error"] = json!(
+            r.limit
+                .map(|l| l.to_string())
+                .unwrap_or_else(|| first_error(&r.output))
+        );
     }
     let prop = match kind {
         "fault" => "memory_safety",
@@ -760,12 +833,25 @@ fn supplied_route(
     proj: &Path,
     dir: &Path,
 ) -> (Verdict, Option<String>) {
-    let warm = run_lean(proj, &["build", "-q", "Ptx", "proofcheck"], o.timeout * 6, o.memory_mb);
+    let warm = run_lean(
+        proj,
+        &["build", "-q", "Ptx", "proofcheck"],
+        o.timeout * 6,
+        o.memory_mb,
+    );
     if !warm.ok {
-        return (Verdict::Error, Some(format!("building the Lean library failed: {}", tail(&warm.output))));
+        return (
+            Verdict::Error,
+            Some(format!(
+                "building the Lean library failed: {}",
+                tail(&warm.output)
+            )),
+        );
     }
     let tc = toolchain(proj);
-    supplied::check(o, doc, pf, module, statement, definition, phash, shash, &tc, proj, dir)
+    supplied::check(
+        o, doc, pf, module, statement, definition, phash, shash, &tc, proj, dir,
+    )
 }
 
 fn tail(s: &str) -> String {

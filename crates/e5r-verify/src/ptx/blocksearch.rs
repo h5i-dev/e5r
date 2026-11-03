@@ -128,7 +128,10 @@ fn worlds(k: &Kernel, sp: &BlockSpec) -> Vec<World> {
     let mut v = Vec::new();
     let bs: Vec<u32> = match sp.class {
         Class::Scan => (1..=8).filter(|b| *b <= sp.max_block).collect(),
-        _ => [1, 2, 4, 8].into_iter().filter(|b| *b <= sp.max_block).collect(),
+        _ => [1, 2, 4, 8]
+            .into_iter()
+            .filter(|b| *b <= sp.max_block)
+            .collect(),
     };
     for g in 1..=3u32 {
         for &b in &bs {
@@ -193,7 +196,12 @@ fn launch(sp: &BlockSpec, w: &World) -> interp::Launch {
 }
 
 /// The schedule `interp::run_grid` follows, recorded.
-pub(crate) fn run(k: &Kernel, l: &interp::Launch, g: &mut Mem, fuel: usize) -> (Ran, Vec<Choice>, Vec<Ev>) {
+pub(crate) fn run(
+    k: &Kernel,
+    l: &interp::Launch,
+    g: &mut Mem,
+    fuel: usize,
+) -> (Ran, Vec<Choice>, Vec<Ev>) {
     let al = l.allocs(k);
     let mut ch = Vec::new();
     let mut evs = Vec::new();
@@ -210,8 +218,15 @@ pub(crate) fn run(k: &Kernel, l: &interp::Launch, g: &mut Mem, fuel: usize) -> (
             let mut ends = Vec::new();
             for t in 0..n {
                 let prefix = ch.len();
-                let (e, acc) =
-                    interp::run_until_wait(k, &al, &ctxs[t as usize], &mut ts[t as usize], g, &mut sh, left);
+                let (e, acc) = interp::run_until_wait(
+                    k,
+                    &al,
+                    &ctxs[t as usize],
+                    &mut ts[t as usize],
+                    g,
+                    &mut sh,
+                    left,
+                );
                 for (st, a) in acc {
                     evs.push(Ev {
                         t: (cta, t),
@@ -442,12 +457,16 @@ pub fn describe(w: &World, wit: &Witness) -> Value {
             v["reason"] = json!(why);
             v["schedule_length"] = json!(sched.len());
         }
-        Witness::Race { t, u, x, y, byte, .. } => {
+        Witness::Race {
+            t, u, x, y, byte, ..
+        } => {
             v["first"] = json!({"ctaid": t.0, "tid": t.1, "access": acc_json(x)});
             v["second"] = json!({"ctaid": u.0, "tid": u.1, "access": acc_json(y)});
             v["byte"] = json!(format!("{byte:#x}"));
         }
-        Witness::Wrong { check, got, want, .. } => {
+        Witness::Wrong {
+            check, got, want, ..
+        } => {
             match check {
                 Check::Value(i) => v["index"] = json!(i),
                 Check::Frame(a) => v["byte"] = json!(format!("{a:#x}")),
@@ -494,7 +513,12 @@ pub fn refutation(k: &Kernel, sp: &BlockSpec, header: &str, w: &World, wit: &Wit
             "Reduce32.Pre",
             "1",
         ),
-        Class::Scan => ("Ptx.Auto.Scan32", "Scan32.Correct", "Scan32.Pre", "A₀.n.toNat"),
+        Class::Scan => (
+            "Ptx.Auto.Scan32",
+            "Scan32.Correct",
+            "Scan32.Pre",
+            "A₀.n.toNat",
+        ),
     };
     let mut s = String::new();
     writeln!(

@@ -239,7 +239,11 @@ pub fn refutation(k: &Kernel, sp: &Spec, header: &str, w: &World, wit: &Witness)
                     e5r_ptx::interp::Kind::Write => ".write",
                     e5r_ptx::interp::Kind::Atomic => ".atomic",
                 };
-                format!("some ⟨.global, {}, .b{}, {kind}⟩", bv(a.addr as u128, 64), a.size)
+                format!(
+                    "some ⟨.global, {}, .b{}, {kind}⟩",
+                    bv(a.addr as u128, 64),
+                    a.size
+                )
             };
             let (ht, hu) = (format!("h{}_{}", t.0, t.1), format!("h{}_{}", u.0, u.1));
             writeln!(

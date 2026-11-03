@@ -85,7 +85,11 @@ impl Ty {
 
     /// The floating-point format of `.f32`/`.f64`.
     pub fn fmt(self) -> crate::fp::Fmt {
-        if self == Ty::F64 { crate::fp::F64 } else { crate::fp::F32 }
+        if self == Ty::F64 {
+            crate::fp::F64
+        } else {
+            crate::fp::F32
+        }
     }
 }
 
