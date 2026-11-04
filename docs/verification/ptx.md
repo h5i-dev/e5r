@@ -71,7 +71,13 @@ evaluation, which would put the compiler in the trusted base.
 
 ```sh
 ./scripts/recheck-ptx.sh       # everything below, about 90 min on the development machine
+E5R_PTX_QUICK=1 ./scripts/recheck-ptx.sh   # Lean proofs, axiom audit and benchmark verdicts only
 ```
+
+Pull requests run the quick form in CI (`ci.yaml`, `ptx-verification`). The
+mutation controls and the supplied-proof controls start Lean dozens of times and
+are not run per push; run the full form by hand, or start the `ptx-full`
+workflow from the Actions tab.
 
 It runs, in order, and fails on the first problem:
 

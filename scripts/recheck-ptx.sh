@@ -17,6 +17,7 @@
 #      Mathlib dependency has not been fetched.
 #
 # E5R_VERIFY=path skips the cargo build and test (CI passes its dev build).
+# E5R_PTX_QUICK=1 stops after step 3 (see below); the full run is about 90 min.
 # Lean runs with LEAN_NUM_THREADS=2 and a 10 GB cgroup cap unless overridden.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -45,6 +46,16 @@ while read -r ptx spec want; do
   [[ $got == "$want" ]] || fail=1
 done <"$root/benchmarks/expected.txt"
 ((fail)) && { echo "recheck: a benchmark verdict changed" >&2; exit 1; }
+
+# The quick set: steps 2 and 3 only. CI runs this on every pull request so it
+# finishes in minutes. Steps 4 to 6 launch Lean dozens of times (59 mutants,
+# 12 supplied-proof cases) and take most of the ~90 minutes of a full recheck,
+# so they are run by hand or by the manual ptx-full workflow, not per push.
+if [[ "${E5R_PTX_QUICK:-0}" == 1 ]]; then
+  echo "recheck: quick set passed (Lean proofs, axiom audit, benchmark verdicts);"
+  echo "         mutation controls and supplied proofs not run (unset E5R_PTX_QUICK)"
+  exit 0
+fi
 
 echo "== mutation controls"
 python3 $root/mutants/run.py "$E5R_VERIFY" "$out/mutants" | tail -1
