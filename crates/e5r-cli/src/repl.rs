@@ -133,7 +133,11 @@ fn step(
 
     // The file comes from the session, not the line, so a command cannot be
     // pointed at a different binary than the one that was analyzed.
-    let mut argv: Vec<String> = vec!["e5r".into(), name.into(), common.file.display().to_string()];
+    let mut argv: Vec<String> = vec![
+        "e5rx".into(),
+        name.into(),
+        common.file.display().to_string(),
+    ];
     let mut rest: Vec<String> = words[1..].to_vec();
     // A command that takes a target and was given none gets the current
     // address, which is what makes seeking worth anything.

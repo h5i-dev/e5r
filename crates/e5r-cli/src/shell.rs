@@ -258,7 +258,7 @@ mod tests {
                 sub.get_name()
             );
         }
-        assert!(page.starts_with(".TH E5R 1"));
+        assert!(page.starts_with(".TH E5RX 1"));
     }
 
     #[test]
