@@ -15,6 +15,12 @@ use e5r_db::signature::{Library, MAX_SIGNATURES, Signature};
 /// that nobody is tempted to skip the suite.
 const BUDGET: Duration = Duration::from_millis(1200);
 
+/// Fuzz tests do not run in GitHub Actions; CI sets GITHUB_ACTIONS, and these
+/// run locally on a plain `cargo test`. See .github/workflows/ci.yaml.
+fn skip_in_ci() -> bool {
+    std::env::var_os("GITHUB_ACTIONS").is_some()
+}
+
 /// A small deterministic generator, so a failure is reproducible from its seed.
 struct Rng(u64);
 
@@ -101,6 +107,9 @@ fn mutate(seed: &[u8], rng: &mut Rng) -> Vec<u8> {
 
 #[test]
 fn the_signature_reader_survives_mutated_files() {
+    if skip_in_ci() {
+        return;
+    }
     let base = seed();
     let mut rng = Rng(0x5eed_51c0_0000_0001);
     let start = Instant::now();
@@ -128,6 +137,9 @@ fn the_signature_reader_survives_mutated_files() {
 
 #[test]
 fn arbitrary_text_is_not_a_signature_library() {
+    if skip_in_ci() {
+        return;
+    }
     let mut rng = Rng(0x5eed_51c0_0000_0002);
     let start = Instant::now();
     let mut n = 0u64;

@@ -37,6 +37,12 @@ fn cases() -> usize {
         .unwrap_or(3000)
 }
 
+/// Fuzz tests do not run in GitHub Actions; CI sets GITHUB_ACTIONS, and these
+/// run locally on a plain `cargo test`. See .github/workflows/ci.yaml.
+fn skip_in_ci() -> bool {
+    std::env::var_os("GITHUB_ACTIONS").is_some()
+}
+
 const VOCAB: &[&str] = &[
     ".version",
     "8.0",
@@ -114,6 +120,9 @@ const VOCAB: &[&str] = &[
 
 #[test]
 fn token_soup_never_panics() {
+    if skip_in_ci() {
+        return;
+    }
     let mut r = Rng(0x9e37_79b9_7f4a_7c15);
     for _ in 0..cases() {
         let n = r.below(80);
@@ -296,6 +305,9 @@ fn kernel(r: &mut Rng) -> String {
 
 #[test]
 fn grammar_kernels_round_trip_and_export_deterministically() {
+    if skip_in_ci() {
+        return;
+    }
     let mut r = Rng(0x2545_f491_4f6c_dd1d);
     for _ in 0..cases() {
         let src = kernel(&mut r);
@@ -309,6 +321,9 @@ fn grammar_kernels_round_trip_and_export_deterministically() {
 
 #[test]
 fn mutated_kernels_are_refused_with_a_line_or_round_trip() {
+    if skip_in_ci() {
+        return;
+    }
     let mut r = Rng(0x0123_4567_89ab_cdef);
     let (mut refused, mut accepted) = (0, 0);
     for _ in 0..cases() {

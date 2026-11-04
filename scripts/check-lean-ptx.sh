@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # PTX verification (docs/verification/ptx.md): regenerate every kernel module
-# from its .ptx with the release e5r-verify and refuse a stale committed copy,
+# from its .ptx with the release e5r and refuse a stale committed copy,
 # assemble every benchmark with ptxas when it is installed, build the Lean
 # project from scratch, and audit the axioms of the main theorems.
 #
 #   scripts/check-lean-ptx.sh            check
 #   scripts/check-lean-ptx.sh --update   rewrite the generated modules first
 #
-# E5R_VERIFY names an existing e5r-verify binary (CI builds its own, in the
+# E5R_VERIFY names an existing e5r binary (CI builds its own, in the
 # dev profile); otherwise this builds the release one (CONTRIBUTING.md: never
 # target/debug on the maintainer's machine).
 set -euo pipefail
@@ -18,7 +18,7 @@ update=0
 
 if [[ -z "${E5R_VERIFY:-}" ]]; then
   CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" cargo build --release -p e5r-verify
-  E5R_VERIFY=./target/release/e5r-verify
+  E5R_VERIFY=./target/release/e5r
 fi
 bin=$E5R_VERIFY
 
@@ -74,7 +74,12 @@ capped() {
   fi
 }
 cd "$root"
-rm -rf .lake/build
+# From scratch by default (CONTRIBUTING.md: a stale build must never mask a
+# change). CI restores .lake/build from a cache keyed on the toolchain and the
+# Lean sources and sets E5R_PTX_KEEP_BUILD=1, so lake's own incremental check
+# rebuilds exactly what changed -- identical to a cold build when the key is
+# fresh, but seconds instead of tens of minutes when nothing moved.
+[[ "${E5R_PTX_KEEP_BUILD:-0}" == 1 ]] || rm -rf .lake/build
 capped lake build
 capped lake env lean Audit.lean >"$tmp/axioms.txt"
 cat "$tmp/axioms.txt"

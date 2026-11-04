@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for every property `e5r-verify ptx check` proves.
+"""Mutation controls for every property `e5r ptx check` proves.
 
 Each proved benchmark is mutated, one change at a time, in the PTX or in the
 spec. Every mutant changes what the kernel does on some launch inside the
@@ -184,6 +184,12 @@ MUTANTS = [
 
 def main():
     exe, out = sys.argv[1], sys.argv[2]
+    # Per-mutant wall-clock cap passed to `ptx check`. Every mutant here is a
+    # control that proves or refutes well under this; the cap only bounds the
+    # tail of a mutant that goes `unknown`. CI sets E5R_PTX_MUTANT_TIMEOUT low
+    # so a stuck mutant cannot run the job into its ceiling; the default keeps
+    # the maintainer's generous bound.
+    timeout = os.environ.get("E5R_PTX_MUTANT_TIMEOUT", "300")
     os.makedirs(out, exist_ok=True)
     rows, proved = [], []
     only = sys.argv[3:]
@@ -199,7 +205,7 @@ def main():
         open(pf, "w").write(src2)
         open(sf, "w").write(sp2)
         t = time.time()
-        r = subprocess.run([exe, "ptx", "check", pf, "--spec", sf, "--timeout", "300"],
+        r = subprocess.run([exe, "ptx", "check", pf, "--spec", sf, "--timeout", timeout],
                            capture_output=True, text=True)
         d = json.loads(r.stdout)
         cx = d.get("counterexample") or {}

@@ -91,12 +91,21 @@ Tail: sx     is sx { export *[const]:1 sx; }
 /// magnitude: a real one is under a microsecond.
 const BUDGET: Duration = Duration::from_millis(200);
 
+/// Fuzz tests do not run in GitHub Actions; CI sets GITHUB_ACTIONS, and these
+/// run locally on a plain `cargo test`. See .github/workflows/ci.yaml.
+fn skip_in_ci() -> bool {
+    std::env::var_os("GITHUB_ACTIONS").is_some()
+}
+
 fn toy() -> Spec {
     e5r_sleigh::parse_str(TOY).expect("the toy specification parses")
 }
 
 #[test]
 fn random_bytes_never_panic_and_always_finish() {
+    if skip_in_ci() {
+        return;
+    }
     let spec = toy();
     let mut rng = Rng(0x5eed_1234_abcd_0001);
     let mut decoded = 0usize;
@@ -139,6 +148,9 @@ fn random_bytes_never_panic_and_always_finish() {
 /// bytes say. A sweep that does either does not terminate.
 #[test]
 fn a_sweep_over_noise_always_advances() {
+    if skip_in_ci() {
+        return;
+    }
     let spec = toy();
     let mut rng = Rng(0xfeed_0000_0000_0002);
     let bytes: Vec<u8> = (0..1 << 16).map(|_| rng.byte()).collect();
@@ -166,6 +178,9 @@ fn a_sweep_over_noise_always_advances() {
 /// that says how big everything is.
 #[test]
 fn a_corrupted_specification_does_not_produce_a_misbehaving_decoder() {
+    if skip_in_ci() {
+        return;
+    }
     let original = TOY.as_bytes();
     let mut rng = Rng(0x00c0_ffee_0000_0003);
     let mut parsed = 0usize;
@@ -245,6 +260,9 @@ define token instr(8) op=(0,7);
 /// context re-parse do, and those are where a decode engine goes wrong.
 #[test]
 fn the_published_specifications_survive_noise() {
+    if skip_in_ci() {
+        return;
+    }
     let Some(root) = ghidra() else { return };
     let mut rng = Rng(0xabad_1dea_0000_0004);
     let bytes: Vec<u8> = (0..1 << 14).map(|_| rng.byte()).collect();

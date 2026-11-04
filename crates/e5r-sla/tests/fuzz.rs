@@ -18,6 +18,12 @@ use e5r_sla::{Sla, decode, inflate};
 
 const BUDGET: Duration = Duration::from_millis(1500);
 
+/// Fuzz tests do not run in GitHub Actions; CI sets GITHUB_ACTIONS, and these
+/// run locally on a plain `cargo test`. See .github/workflows/ci.yaml.
+fn skip_in_ci() -> bool {
+    std::env::var_os("GITHUB_ACTIONS").is_some()
+}
+
 /// Anything slower than this on one input means a walk that does not advance.
 const PER_CASE_CEILING: Duration = Duration::from_secs(2);
 
@@ -110,6 +116,9 @@ fn timed(case: &[u8]) {
 
 #[test]
 fn truncation_at_every_length_is_an_error_not_a_panic() {
+    if skip_in_ci() {
+        return;
+    }
     for seed in seeds() {
         for n in 0..seed.len() {
             timed(&seed[..n]);
@@ -119,6 +128,9 @@ fn truncation_at_every_length_is_an_error_not_a_panic() {
 
 #[test]
 fn mutated_files_never_panic() {
+    if skip_in_ci() {
+        return;
+    }
     let corpus = seeds();
     assert!(!corpus.is_empty(), "fixtures should be present");
     let mut rng = Rng(0x51a_0000_0000_0001);
@@ -138,6 +150,9 @@ fn mutated_files_never_panic() {
 
 #[test]
 fn arbitrary_bytes_behind_the_magic_never_panic() {
+    if skip_in_ci() {
+        return;
+    }
     let mut rng = Rng(0x51a_0000_0000_0002);
     let start = Instant::now();
     let mut n = 0u64;
@@ -160,6 +175,9 @@ fn arbitrary_bytes_behind_the_magic_never_panic() {
 /// hostile input at all.
 #[test]
 fn mutated_element_streams_never_panic() {
+    if skip_in_ci() {
+        return;
+    }
     let mut payloads: Vec<Vec<u8>> = Vec::new();
     for seed in seeds() {
         if seed.len() > 4 {
@@ -269,6 +287,9 @@ fn perturb(p: &mut e5r_sla::Program, rng: &mut Rng) {
 
 #[test]
 fn perturbed_programs_always_write_something_readable() {
+    if skip_in_ci() {
+        return;
+    }
     let Some(seed) = seeds().into_iter().next() else {
         return;
     };

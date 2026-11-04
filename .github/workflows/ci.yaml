@@ -174,7 +174,7 @@ jobs:
   # clamp fixture with the pinned rustc, recheck every verification job from
   # source with the pinned Lean, run the negative controls, and replay QEMU
   # traces (instruction-level in user mode, the whole firmware on sifive_e)
-  # in the model. e5r-verify itself is the dev profile here, like the rest
+  # in the model. e5r itself is the dev profile here, like the rest
   # of this workflow; the firmware is built --release because its bytes are
   # pinned.
   firmware-verification:
@@ -195,7 +195,7 @@ jobs:
       - run: cargo build -p e5r-verify
       - name: Every firmware proof, control and differential test
         env:
-          E5R_VERIFY: target/debug/e5r-verify
+          E5R_VERIFY: target/debug/e5r
         run: ./scripts/check-firmware-verification.sh
       - uses: actions/upload-artifact@v4
         if: always()
@@ -205,8 +205,8 @@ jobs:
 
   # Scope P (docs/verification/ptx.md): regenerate every PTX kernel module and
   # refuse a stale one, build the Lean project from scratch, audit the axioms,
-  # check every benchmark and mutant with `e5r-verify ptx check`. No GPU or
-  # CUDA here: the ptxas and GPU steps are skipped and say so. e5r-verify is
+  # check every benchmark and mutant with `e5r ptx check`. No GPU or
+  # CUDA here: the ptxas and GPU steps are skipped and say so. e5r is
   # the dev profile, like the rest of this workflow.
   ptx-verification:
     runs-on: ubuntu-24.04
@@ -220,9 +220,29 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/leanprover/elan/v4.1.2/elan-init.sh -o elan-init.sh
           sh elan-init.sh -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      # The Lean proof build dominates this job, and it is the one thing
+      # `rust-cache` above does not cover. `verification/ptx` has no fetched
+      # dependencies (core Lean only, see its lakefile), so `.lake/build` is a
+      # function of the pinned toolchain and the Lean sources alone: key the
+      # cache on both and `lake build` becomes a near-no-op on a hit. The key
+      # changes the instant any proof, kernel module or the toolchain changes,
+      # so a stale build can never be restored -- which is why the script's
+      # from-scratch `rm -rf` is safe to skip here (E5R_PTX_KEEP_BUILD=1).
+      - name: Cache the Lean build
+        uses: actions/cache@v4
+        with:
+          path: verification/ptx/.lake/build
+          key: ptx-lake-${{ runner.os }}-${{ hashFiles('verification/ptx/lean-toolchain', 'verification/ptx/lakefile.lean', 'verification/ptx/lake-manifest.json', 'verification/ptx/**/*.lean') }}
       - run: cargo build -p e5r-verify
       - name: Every PTX proof, refutation, axiom audit, benchmark verdict and mutant
         env:
-          E5R_VERIFY: target/debug/e5r-verify
+          E5R_VERIFY: target/debug/e5r
+          # Reuse the cached Lean build instead of rebuilding from scratch.
+          E5R_PTX_KEEP_BUILD: "1"
+          # Each mutant is a control that proves or refutes in seconds; cap the
+          # tail tightly so one stuck `unknown` cannot run the job to its
+          # ceiling. 60s is far above the real cost and still bounds 65 mutants
+          # well inside the job timeout.
+          E5R_PTX_MUTANT_TIMEOUT: "60"
         # The GPU differential test needs a GPU and skips itself here.
         run: ./scripts/recheck-ptx.sh

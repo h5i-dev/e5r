@@ -16,6 +16,12 @@ use e5r_format::{LoadOptions, load};
 /// that nobody is tempted to skip the suite.
 const BUDGET: Duration = Duration::from_millis(1500);
 
+/// Fuzz tests do not run in GitHub Actions; CI sets GITHUB_ACTIONS, and these
+/// run locally on a plain `cargo test`. See .github/workflows/ci.yaml.
+fn skip_in_ci() -> bool {
+    std::env::var_os("GITHUB_ACTIONS").is_some()
+}
+
 /// A small deterministic generator, so a failure is reproducible from its seed.
 struct Rng(u64);
 
@@ -111,6 +117,9 @@ fn mutate(seed: &[u8], rng: &mut Rng) -> Vec<u8> {
 
 #[test]
 fn loaders_survive_mutated_real_files() {
+    if skip_in_ci() {
+        return;
+    }
     let seeds = corpus();
     if seeds.is_empty() {
         return;
@@ -135,6 +144,9 @@ fn loaders_survive_mutated_real_files() {
 
 #[test]
 fn loaders_survive_arbitrary_bytes() {
+    if skip_in_ci() {
+        return;
+    }
     // Not mutations of anything: bytes that only look like a header by
     // accident are a different shape of input.
     let opts = LoadOptions::default();
