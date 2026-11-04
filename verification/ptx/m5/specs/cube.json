@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "cube",
+  "class": "map32",
+  "arrays": [
+    "cube_x",
+    "cube_y"
+  ],
+  "output": "cube_y",
+  "length": "cube_n",
+  "scalars": [],
+  "element": "cube_x * cube_x * cube_x",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "hi_lo_swap8",
+  "class": "map32",
+  "arrays": [
+    "hi_lo_swap8_x",
+    "hi_lo_swap8_y"
+  ],
+  "output": "hi_lo_swap8_y",
+  "length": "hi_lo_swap8_n",
+  "scalars": [],
+  "element": "(hi_lo_swap8_x >> 8) | (hi_lo_swap8_x << 24)",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

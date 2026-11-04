@@ -169,7 +169,7 @@ Controls: `python3 -I scripts/test-rmk-cobs-job.py E5R_VERIFY`; transcript
 A rejected precondition mutation shows the proof needs that hypothesis. It does not show
 the weakened statement is false.
 
-Bundle: `e5r-verify bundle jobs/rmk/rmk-cobs-decode.json` (281 s), then `recheck.sh`
+Bundle: `e5r bundle jobs/rmk/rmk-cobs-decode.json` (281 s), then `recheck.sh`
 (158 s).
 * The packing check passed: all 454,024 ELF bytes equal the Lean literal.
 * Every theorem rechecks with exactly the recorded axioms, the 10 in `axioms.expected`.

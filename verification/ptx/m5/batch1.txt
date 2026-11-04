@@ -1,0 +1,580 @@
+=== vand | c[i] = a[i] & b[i] | a,b,c | c | n | | vand_a & vand_b | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry vand(.param .u64 vand_a, .param .u64 vand_b, .param .u64 vand_c, .param .u32 vand_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<9>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [vand_a];
+	ld.param.u64 %rd2, [vand_b];
+	ld.param.u64 %rd3, [vand_c];
+	ld.param.u32 %r1, [vand_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd4, %r5, 4;
+	add.u64 %rd5, %rd1, %rd4;
+	add.u64 %rd6, %rd2, %rd4;
+	add.u64 %rd7, %rd3, %rd4;
+	ld.global.u32 %r6, [%rd5];
+	ld.global.u32 %r7, [%rd6];
+	and.b32 %r8, %r6, %r7;
+	st.global.u32 [%rd7], %r8;
+DONE:
+	ret;
+}
+=== vor | c[i] = a[i] OR b[i] | a,b,c | c | n | | vor_a | vor_b | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry vor(.param .u64 vor_a, .param .u64 vor_b, .param .u64 vor_c, .param .u32 vor_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<9>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [vor_a];
+	ld.param.u64 %rd2, [vor_b];
+	ld.param.u64 %rd3, [vor_c];
+	ld.param.u32 %r1, [vor_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd4, %r5, 4;
+	add.u64 %rd5, %rd1, %rd4;
+	add.u64 %rd6, %rd2, %rd4;
+	add.u64 %rd7, %rd3, %rd4;
+	ld.global.u32 %r6, [%rd5];
+	ld.global.u32 %r7, [%rd6];
+	or.b32 %r8, %r6, %r7;
+	st.global.u32 [%rd7], %r8;
+DONE:
+	ret;
+}
+=== rsub | c[i] = b[i] - a[i] | a,b,c | c | n | | rsub_b - rsub_a | {"kind":"guarded","max_threads":"2147483647"}
+.visible .entry rsub(.param .u64 rsub_a, .param .u64 rsub_b, .param .u64 rsub_c, .param .u32 rsub_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<9>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [rsub_a];
+	ld.param.u64 %rd2, [rsub_b];
+	ld.param.u64 %rd3, [rsub_c];
+	ld.param.u32 %r1, [rsub_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.s32 %r5, %r2, %r3, %r4;
+	setp.ge.s32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.s32 %rd4, %r5, 4;
+	add.s64 %rd5, %rd1, %rd4;
+	add.s64 %rd6, %rd2, %rd4;
+	add.s64 %rd7, %rd3, %rd4;
+	ld.global.u32 %r6, [%rd5];
+	ld.global.u32 %r7, [%rd6];
+	sub.s32 %r8, %r7, %r6;
+	st.global.u32 [%rd7], %r8;
+DONE:
+	ret;
+}
+=== sqr | y[i] = x[i] * x[i] | x,y | y | n | | sqr_x * sqr_x | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry sqr(.param .u64 sqr_x, .param .u64 sqr_y, .param .u32 sqr_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<8>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [sqr_x];
+	ld.param.u64 %rd2, [sqr_y];
+	ld.param.u32 %r1, [sqr_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	mul.lo.u32 %r7, %r6, %r6;
+	st.global.u32 [%rd5], %r7;
+DONE:
+	ret;
+}
+=== cube | y[i] = x[i]^3 | x,y | y | n | | cube_x * cube_x * cube_x | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry cube(.param .u64 cube_x, .param .u64 cube_y, .param .u32 cube_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<9>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [cube_x];
+	ld.param.u64 %rd2, [cube_y];
+	ld.param.u32 %r1, [cube_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	mul.lo.u32 %r7, %r6, %r6;
+	mul.lo.u32 %r8, %r7, %r6;
+	st.global.u32 [%rd5], %r8;
+DONE:
+	ret;
+}
+=== poly2 | y[i] = a*x^2 + b*x + c | x,y | y | n | a,b,c | poly2_a * poly2_x * poly2_x + poly2_b * poly2_x + poly2_c | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry poly2(.param .u64 poly2_x, .param .u64 poly2_y, .param .u32 poly2_a, .param .u32 poly2_b, .param .u32 poly2_c, .param .u32 poly2_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<14>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [poly2_x];
+	ld.param.u64 %rd2, [poly2_y];
+	ld.param.u32 %r1, [poly2_a];
+	ld.param.u32 %r2, [poly2_b];
+	ld.param.u32 %r3, [poly2_c];
+	ld.param.u32 %r4, [poly2_n];
+	mov.u32 %r5, %ctaid.x;
+	mov.u32 %r6, %ntid.x;
+	mov.u32 %r7, %tid.x;
+	mad.lo.u32 %r8, %r5, %r6, %r7;
+	setp.ge.u32 %p1, %r8, %r4;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r8, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r9, [%rd4];
+	mad.lo.u32 %r10, %r1, %r9, %r2;
+	mad.lo.u32 %r11, %r10, %r9, %r3;
+	st.global.u32 [%rd5], %r11;
+DONE:
+	ret;
+}
+=== addk | y[i] = x[i] + k | x,y | y | n | k | addk_x + addk_k | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry addk(.param .u64 addk_x, .param .u64 addk_y, .param .u32 addk_k, .param .u32 addk_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<9>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [addk_x];
+	ld.param.u64 %rd2, [addk_y];
+	ld.param.u32 %r1, [addk_k];
+	ld.param.u32 %r2, [addk_n];
+	mov.u32 %r3, %ctaid.x;
+	mov.u32 %r4, %ntid.x;
+	mov.u32 %r5, %tid.x;
+	mad.lo.u32 %r6, %r3, %r4, %r5;
+	setp.ge.u32 %p1, %r6, %r2;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r6, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r7, [%rd4];
+	add.u32 %r8, %r7, %r1;
+	st.global.u32 [%rd5], %r8;
+DONE:
+	ret;
+}
+=== subk | y[i] = x[i] - k | x,y | y | n | k | subk_x - subk_k | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry subk(.param .u64 subk_x, .param .u64 subk_y, .param .u32 subk_k, .param .u32 subk_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<9>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [subk_x];
+	ld.param.u64 %rd2, [subk_y];
+	ld.param.u32 %r1, [subk_k];
+	ld.param.u32 %r2, [subk_n];
+	mov.u32 %r3, %ctaid.x;
+	mov.u32 %r4, %ntid.x;
+	mov.u32 %r5, %tid.x;
+	mad.lo.u32 %r6, %r3, %r4, %r5;
+	setp.ge.u32 %p1, %r6, %r2;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r6, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r7, [%rd4];
+	sub.u32 %r8, %r7, %r1;
+	st.global.u32 [%rd5], %r8;
+DONE:
+	ret;
+}
+=== xork | y[i] = x[i] ^ k | x,y | y | n | k | xork_x ^ xork_k | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry xork(.param .u64 xork_x, .param .u64 xork_y, .param .u32 xork_k, .param .u32 xork_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<9>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [xork_x];
+	ld.param.u64 %rd2, [xork_y];
+	ld.param.u32 %r1, [xork_k];
+	ld.param.u32 %r2, [xork_n];
+	mov.u32 %r3, %ctaid.x;
+	mov.u32 %r4, %ntid.x;
+	mov.u32 %r5, %tid.x;
+	mad.lo.u32 %r6, %r3, %r4, %r5;
+	setp.ge.u32 %p1, %r6, %r2;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r6, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r7, [%rd4];
+	xor.b32 %r8, %r7, %r1;
+	st.global.u32 [%rd5], %r8;
+DONE:
+	ret;
+}
+=== rot8 | y[i] = rotate x[i] left by 8 | x,y | y | n | | (rot8_x << 8) | (rot8_x >> 24) | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry rot8(.param .u64 rot8_x, .param .u64 rot8_y, .param .u32 rot8_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [rot8_x];
+	ld.param.u64 %rd2, [rot8_y];
+	ld.param.u32 %r1, [rot8_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	shl.b32 %r7, %r6, 8;
+	shr.u32 %r8, %r6, 24;
+	or.b32 %r9, %r7, %r8;
+	st.global.u32 [%rd5], %r9;
+DONE:
+	ret;
+}
+=== times5 | y[i] = 5 * x[i] via shift and add | x,y | y | n | | 5 * times5_x | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry times5(.param .u64 times5_x, .param .u64 times5_y, .param .u32 times5_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<9>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [times5_x];
+	ld.param.u64 %rd2, [times5_y];
+	ld.param.u32 %r1, [times5_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	shl.b32 %r7, %r6, 2;
+	add.u32 %r8, %r7, %r6;
+	st.global.u32 [%rd5], %r8;
+DONE:
+	ret;
+}
+=== neg | y[i] = -x[i] | x,y | y | n | | -neg_x | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry neg(.param .u64 neg_x, .param .u64 neg_y, .param .u32 neg_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<8>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [neg_x];
+	ld.param.u64 %rd2, [neg_y];
+	ld.param.u32 %r1, [neg_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	sub.u32 %r7, 0, %r6;
+	st.global.u32 [%rd5], %r7;
+DONE:
+	ret;
+}
+=== bnot | y[i] = ~x[i] | x,y | y | n | | ~bnot_x | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry bnot(.param .u64 bnot_x, .param .u64 bnot_y, .param .u32 bnot_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<8>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [bnot_x];
+	ld.param.u64 %rd2, [bnot_y];
+	ld.param.u32 %r1, [bnot_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	not.b32 %r7, %r6;
+	st.global.u32 [%rd5], %r7;
+DONE:
+	ret;
+}
+=== copy | y[i] = x[i] | x,y | y | n | | copy_x | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry copy(.param .u64 copy_x, .param .u64 copy_y, .param .u32 copy_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<7>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [copy_x];
+	ld.param.u64 %rd2, [copy_y];
+	ld.param.u32 %r1, [copy_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	st.global.u32 [%rd5], %r6;
+DONE:
+	ret;
+}
+=== fill | y[i] = k | y | y | n | k | fill_k | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry fill(.param .u64 fill_y, .param .u32 fill_k, .param .u32 fill_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<7>;
+	.reg .b64 %rd<4>;
+	ld.param.u64 %rd1, [fill_y];
+	ld.param.u32 %r1, [fill_k];
+	ld.param.u32 %r2, [fill_n];
+	mov.u32 %r3, %ctaid.x;
+	mov.u32 %r4, %ntid.x;
+	mov.u32 %r5, %tid.x;
+	mad.lo.u32 %r6, %r3, %r4, %r5;
+	setp.ge.u32 %p1, %r6, %r2;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd2, %r6, 4;
+	add.u64 %rd3, %rd1, %rd2;
+	st.global.u32 [%rd3], %r1;
+DONE:
+	ret;
+}
+=== zero | y[i] = 0 | y | y | n | | 0 | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry zero(.param .u64 zero_y, .param .u32 zero_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<6>;
+	.reg .b64 %rd<4>;
+	ld.param.u64 %rd1, [zero_y];
+	ld.param.u32 %r1, [zero_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd2, %r5, 4;
+	add.u64 %rd3, %rd1, %rd2;
+	st.global.u32 [%rd3], 0;
+DONE:
+	ret;
+}
+=== sum3 | d[i] = a[i] + b[i] + c[i] | a,b,c,d | d | n | | sum3_a + sum3_b + sum3_c | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry sum3(.param .u64 sum3_a, .param .u64 sum3_b, .param .u64 sum3_c, .param .u64 sum3_d, .param .u32 sum3_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<11>;
+	.reg .b64 %rd<10>;
+	ld.param.u64 %rd1, [sum3_a];
+	ld.param.u64 %rd2, [sum3_b];
+	ld.param.u64 %rd3, [sum3_c];
+	ld.param.u64 %rd4, [sum3_d];
+	ld.param.u32 %r1, [sum3_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd5, %r5, 4;
+	add.u64 %rd6, %rd1, %rd5;
+	add.u64 %rd7, %rd2, %rd5;
+	add.u64 %rd8, %rd3, %rd5;
+	add.u64 %rd9, %rd4, %rd5;
+	ld.global.u32 %r6, [%rd6];
+	ld.global.u32 %r7, [%rd7];
+	ld.global.u32 %r8, [%rd8];
+	add.u32 %r9, %r6, %r7;
+	add.u32 %r10, %r9, %r8;
+	st.global.u32 [%rd9], %r10;
+DONE:
+	ret;
+}
+=== msub | d[i] = a[i] * b[i] - c[i] | a,b,c,d | d | n | | msub_a * msub_b - msub_c | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry msub(.param .u64 msub_a, .param .u64 msub_b, .param .u64 msub_c, .param .u64 msub_d, .param .u32 msub_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<11>;
+	.reg .b64 %rd<10>;
+	ld.param.u64 %rd1, [msub_a];
+	ld.param.u64 %rd2, [msub_b];
+	ld.param.u64 %rd3, [msub_c];
+	ld.param.u64 %rd4, [msub_d];
+	ld.param.u32 %r1, [msub_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd5, %r5, 4;
+	add.u64 %rd6, %rd1, %rd5;
+	add.u64 %rd7, %rd2, %rd5;
+	add.u64 %rd8, %rd3, %rd5;
+	add.u64 %rd9, %rd4, %rd5;
+	ld.global.u32 %r6, [%rd6];
+	ld.global.u32 %r7, [%rd7];
+	ld.global.u32 %r8, [%rd8];
+	mul.lo.u32 %r9, %r6, %r7;
+	sub.u32 %r10, %r9, %r8;
+	st.global.u32 [%rd9], %r10;
+DONE:
+	ret;
+}
+=== blend | d[i] = a[i] where m[i] has a 1, else b[i] | a,b,m,d | d | n | | (blend_a & blend_m) | (blend_b & ~blend_m) | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry blend(.param .u64 blend_a, .param .u64 blend_b, .param .u64 blend_m, .param .u64 blend_d, .param .u32 blend_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<13>;
+	.reg .b64 %rd<10>;
+	ld.param.u64 %rd1, [blend_a];
+	ld.param.u64 %rd2, [blend_b];
+	ld.param.u64 %rd3, [blend_m];
+	ld.param.u64 %rd4, [blend_d];
+	ld.param.u32 %r1, [blend_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd5, %r5, 4;
+	add.u64 %rd6, %rd1, %rd5;
+	add.u64 %rd7, %rd2, %rd5;
+	add.u64 %rd8, %rd3, %rd5;
+	add.u64 %rd9, %rd4, %rd5;
+	ld.global.u32 %r6, [%rd6];
+	ld.global.u32 %r7, [%rd7];
+	ld.global.u32 %r8, [%rd8];
+	and.b32 %r9, %r6, %r8;
+	not.b32 %r10, %r8;
+	and.b32 %r11, %r7, %r10;
+	or.b32 %r12, %r9, %r11;
+	st.global.u32 [%rd9], %r12;
+DONE:
+	ret;
+}
+=== xorand | d[i] = (a[i] ^ b[i]) & c[i] | a,b,c,d | d | n | | (xorand_a ^ xorand_b) & xorand_c | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry xorand(.param .u64 xorand_a, .param .u64 xorand_b, .param .u64 xorand_c, .param .u64 xorand_d, .param .u32 xorand_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<11>;
+	.reg .b64 %rd<10>;
+	ld.param.u64 %rd1, [xorand_a];
+	ld.param.u64 %rd2, [xorand_b];
+	ld.param.u64 %rd3, [xorand_c];
+	ld.param.u64 %rd4, [xorand_d];
+	ld.param.u32 %r1, [xorand_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd5, %r5, 4;
+	add.u64 %rd6, %rd1, %rd5;
+	add.u64 %rd7, %rd2, %rd5;
+	add.u64 %rd8, %rd3, %rd5;
+	add.u64 %rd9, %rd4, %rd5;
+	ld.global.u32 %r6, [%rd6];
+	ld.global.u32 %r7, [%rd7];
+	ld.global.u32 %r8, [%rd8];
+	xor.b32 %r9, %r6, %r7;
+	and.b32 %r10, %r9, %r8;
+	st.global.u32 [%rd9], %r10;
+DONE:
+	ret;
+}
+=== diffsq | c[i] = (a[i] - b[i])^2 | a,b,c | c | n | | (diffsq_a - diffsq_b) * (diffsq_a - diffsq_b) | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry diffsq(.param .u64 diffsq_a, .param .u64 diffsq_b, .param .u64 diffsq_c, .param .u32 diffsq_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [diffsq_a];
+	ld.param.u64 %rd2, [diffsq_b];
+	ld.param.u64 %rd3, [diffsq_c];
+	ld.param.u32 %r1, [diffsq_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd4, %r5, 4;
+	add.u64 %rd5, %rd1, %rd4;
+	add.u64 %rd6, %rd2, %rd4;
+	add.u64 %rd7, %rd3, %rd4;
+	ld.global.u32 %r6, [%rd5];
+	ld.global.u32 %r7, [%rd6];
+	sub.u32 %r8, %r6, %r7;
+	mul.lo.u32 %r9, %r8, %r8;
+	st.global.u32 [%rd7], %r9;
+DONE:
+	ret;
+}
+=== lincomb | c[i] = p*a[i] + q*b[i] | a,b,c | c | n | p,q | lincomb_p * lincomb_a + lincomb_q * lincomb_b | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry lincomb(.param .u64 lincomb_a, .param .u64 lincomb_b, .param .u64 lincomb_c, .param .u32 lincomb_p, .param .u32 lincomb_q, .param .u32 lincomb_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<13>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [lincomb_a];
+	ld.param.u64 %rd2, [lincomb_b];
+	ld.param.u64 %rd3, [lincomb_c];
+	ld.param.u32 %r1, [lincomb_p];
+	ld.param.u32 %r2, [lincomb_q];
+	ld.param.u32 %r3, [lincomb_n];
+	mov.u32 %r4, %ctaid.x;
+	mov.u32 %r5, %ntid.x;
+	mov.u32 %r6, %tid.x;
+	mad.lo.u32 %r7, %r4, %r5, %r6;
+	setp.ge.u32 %p1, %r7, %r3;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd4, %r7, 4;
+	add.u64 %rd5, %rd1, %rd4;
+	add.u64 %rd6, %rd2, %rd4;
+	add.u64 %rd7, %rd3, %rd4;
+	ld.global.u32 %r8, [%rd5];
+	ld.global.u32 %r9, [%rd6];
+	mul.lo.u32 %r10, %r9, %r2;
+	mad.lo.u32 %r11, %r8, %r1, %r10;
+	st.global.u32 [%rd7], %r11;
+DONE:
+	ret;
+}

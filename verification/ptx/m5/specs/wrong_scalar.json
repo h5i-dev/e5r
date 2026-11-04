@@ -1,0 +1,20 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "wrong_scalar",
+  "class": "map32",
+  "arrays": [
+    "wrong_scalar_x",
+    "wrong_scalar_y"
+  ],
+  "output": "wrong_scalar_y",
+  "length": "wrong_scalar_n",
+  "scalars": [
+    "wrong_scalar_a",
+    "wrong_scalar_b"
+  ],
+  "element": "wrong_scalar_a * wrong_scalar_x + wrong_scalar_b",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "sub_then_neg",
+  "class": "map32",
+  "arrays": [
+    "sub_then_neg_a",
+    "sub_then_neg_b",
+    "sub_then_neg_c"
+  ],
+  "output": "sub_then_neg_c",
+  "length": "sub_then_neg_n",
+  "scalars": [],
+  "element": "sub_then_neg_b - sub_then_neg_a",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

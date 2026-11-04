@@ -26,9 +26,9 @@ non-relational domain loses (`a2 = a1 - 4` across `seqz`).
 ```sh
 # Each job: build the binary with the pinned toolchain, export the image, check every module from
 # source with the pinned Lean, replay with leanchecker, audit axioms.
-../../target/release/e5r-verify check Projects/hifive1/hybrid/jobs/hybrid-ringhead-firmware.json --out build/results/hybrid-ringhead-firmware.json
-../../target/release/e5r-verify check Projects/hifive1/hybrid/jobs/hybrid-ring-demo.json --out build/results/hybrid-ring-demo.json
-../../target/release/e5r-verify check Projects/hifive1/hybrid/jobs/hybrid-ring-loop-demo.json --out build/results/hybrid-ring-loop-demo.json
+../../target/release/e5r check Projects/hifive1/hybrid/jobs/hybrid-ringhead-firmware.json --out build/results/hybrid-ringhead-firmware.json
+../../target/release/e5r check Projects/hifive1/hybrid/jobs/hybrid-ring-demo.json --out build/results/hybrid-ring-demo.json
+../../target/release/e5r check Projects/hifive1/hybrid/jobs/hybrid-ring-loop-demo.json --out build/results/hybrid-ring-loop-demo.json
 python3 Projects/hifive1/hybrid/test_controls.py          # needs the modules' .olean files (after the jobs)
 # Untrusted certificate producers (outputs are committed, the kernel checks them):
 lake env lean --run Projects/hifive1/hybrid/demo/AnalyzeDemo.lean Projects/hifive1/hybrid/demo/Cert.lean

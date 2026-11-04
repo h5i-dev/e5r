@@ -19,6 +19,12 @@ const BUDGET: Duration = Duration::from_millis(2000);
 /// exponentially passes a no-panic test and is still a denial of service.
 const PER_INPUT: Duration = Duration::from_millis(200);
 
+/// Fuzz tests do not run in GitHub Actions; CI sets GITHUB_ACTIONS, and these
+/// run locally on a plain `cargo test`. See .github/workflows/ci.yaml.
+fn skip_in_ci() -> bool {
+    std::env::var_os("GITHUB_ACTIONS").is_some()
+}
+
 struct Rng(u64);
 
 impl Rng {
@@ -125,6 +131,9 @@ fn drive(text: &str) {
 
 #[test]
 fn no_declaration_text_panics_or_runs_long() {
+    if skip_in_ci() {
+        return;
+    }
     let mut rng = Rng(0x1234_5678_9abc_def0);
     let started = Instant::now();
     let mut cases = 0usize;
@@ -138,6 +147,9 @@ fn no_declaration_text_panics_or_runs_long() {
 
 #[test]
 fn every_prefix_of_every_seed_is_survivable() {
+    if skip_in_ci() {
+        return;
+    }
     // Truncation deserves an exhaustive pass rather than a sampled one: it is
     // exactly what a half-typed command line looks like.
     for seed in SEEDS {

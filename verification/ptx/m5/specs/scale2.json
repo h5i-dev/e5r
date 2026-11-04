@@ -1,0 +1,20 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "scale2",
+  "class": "map32",
+  "arrays": [
+    "scale2_x",
+    "scale2_y"
+  ],
+  "output": "scale2_y",
+  "length": "scale2_n",
+  "scalars": [
+    "scale2_p",
+    "scale2_q"
+  ],
+  "element": "(scale2_x + scale2_p) * scale2_q",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

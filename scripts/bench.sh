@@ -9,7 +9,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-bin=target/release/e5r
+bin=target/release/e5rx
 [ -x "$bin" ] || { echo "build first: cargo build --release" >&2; exit 2; }
 
 # Best of three, printed as "seconds KB".

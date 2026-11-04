@@ -1,0 +1,6 @@
+{ "schema": "e5r.ptx.spec.v1", "kernel": "reduce", "class": "reduce32", "result": "per_block",
+  "input": "reduce_param_0", "output": "reduce_param_1", "length": "reduce_param_2",
+  "shared": "_ZZ6reduceE1s", "max_block": 1024,
+  "barriers": {
+    "after_load": { "%r1": "ntid", "%r2": "ctaid", "%r3": "tid", "%r7": "shared_tid", "%rd2": "output" },
+    "loop": { "%r22": "stride", "%r2": "ctaid", "%r3": "tid", "%r7": "shared_tid", "%rd2": "output" } } }

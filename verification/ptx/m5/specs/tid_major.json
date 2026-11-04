@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "tid_major",
+  "class": "map32",
+  "arrays": [
+    "tid_major_a",
+    "tid_major_b",
+    "tid_major_c"
+  ],
+  "output": "tid_major_c",
+  "length": "tid_major_n",
+  "scalars": [],
+  "element": "tid_major_a + 2 * tid_major_b",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

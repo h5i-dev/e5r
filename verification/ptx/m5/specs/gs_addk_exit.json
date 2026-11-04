@@ -1,0 +1,30 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_addk_exit",
+  "class": "map32",
+  "arrays": [
+    "gs_addk_exit_x",
+    "gs_addk_exit_y"
+  ],
+  "output": "gs_addk_exit_y",
+  "length": "gs_addk_exit_n",
+  "scalars": [
+    "gs_addk_exit_k"
+  ],
+  "element": "gs_addk_exit_x + gs_addk_exit_k",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_addk_exit_x",
+        "%rd2": "base gs_addk_exit_y",
+        "%r1": "scalar gs_addk_exit_k",
+        "%rd3": "index64",
+        "%rd5": "stride64",
+        "%rd6": "length"
+      }
+    }
+  }
+}

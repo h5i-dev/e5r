@@ -13,7 +13,7 @@
 //!   the fixed Huffman tables of RFC 1951 section 3.2.6. No dynamic tables:
 //!   they would buy perhaps another 15% and they are the part of DEFLATE with
 //!   the most ways to be subtly wrong, so the size is spent rather than the
-//!   risk taken. `docs/sla-format.md` records what this costs against the
+//!   risk taken. `docs/toolkit/sla-format.md` records what this costs against the
 //!   reference compiler's output.
 //!
 //! Neither reproduces zlib's own bit stream, and nothing here tries to: a

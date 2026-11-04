@@ -1,0 +1,26 @@
+.version 8.0
+.target sm_86
+.address_size 64
+
+.visible .entry ret_early(.param .u64 ret_early_x, .param .u64 ret_early_y, .param .u32 ret_early_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<8>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [ret_early_x];
+	ld.param.u64 %rd2, [ret_early_y];
+	ld.param.u32 %r1, [ret_early_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 ret;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	mad.lo.u32 %r7, %r6, 3, 1;
+	st.global.u32 [%rd5], %r7;
+	ret;
+}

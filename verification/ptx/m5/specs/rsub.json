@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "rsub",
+  "class": "map32",
+  "arrays": [
+    "rsub_a",
+    "rsub_b",
+    "rsub_c"
+  ],
+  "output": "rsub_c",
+  "length": "rsub_n",
+  "scalars": [],
+  "element": "rsub_b - rsub_a",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "2147483647"
+  }
+}

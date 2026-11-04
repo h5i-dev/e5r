@@ -107,11 +107,11 @@ RAM (0x80000000..), so:
 Neither is a bug in the FE310 work; they are obligations a `virt` board/loader must add before any
 RMK claim. Main owns Platform/boards; this is reported, not changed.
 
-## Blocker: e5r-verify cannot export this ELF yet (checked)
+## Blocker: e5r cannot export this ELF yet (checked)
 
-- `e5r-verify IMAGE.elf` (plain image export): `ELF must be between 52 and 65536 bytes` (file is 454 024 B;
+- `e5r IMAGE.elf` (plain image export): `ELF must be between 52 and 65536 bytes` (file is 454 024 B;
   crates/e5r-verify/src/lib.rs:17 also caps mapped bytes at 65 536, and `.text`+`.rodata` alone are ~168 KB).
-- `e5r-verify flash --board boards/hifive1-revb.json IMAGE.elf`: `PT_LOAD 0: physical address 0x80000000 is not
+- `e5r flash --board boards/hifive1-revb.json IMAGE.elf`: `PT_LOAD 0: physical address 0x80000000 is not
   in flash` (the loader only knows flash-resident images).
 - So the first RMK step on the e5r side is a loader/exporter mode for RAM-resident images (segments into the
   initial `ram`, with the size limits raised or the image restricted to the functions under proof) plus a
@@ -121,7 +121,7 @@ RMK claim. Main owns Platform/boards; this is reported, not changed.
 
 ## Independent review of the RAM-image exporter (exporter worker's commit 2752dd0)
 
-Built `e5r-verify` from 2752dd0 in a detached worktree (release) and exported the pinned ELF
+Built `e5r` from 2752dd0 in a detached worktree (release) and exported the pinned ELF
 (`ram-image --ram 0x80000000:0x1000000 --mapping paddr=vaddr`): 4 PT_LOADs (.text RX, .rodata R,
 .data RW, .bss+stack RW zero-fill to 0x81000000), 170 955 file bytes.
 

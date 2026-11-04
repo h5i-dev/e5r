@@ -1,0 +1,27 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_no_tid",
+  "class": "map32",
+  "arrays": [
+    "gs_no_tid_x",
+    "gs_no_tid_y"
+  ],
+  "output": "gs_no_tid_y",
+  "length": "gs_no_tid_n",
+  "scalars": [],
+  "element": "gs_no_tid_x + 1",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_no_tid_x",
+        "%rd2": "base gs_no_tid_y",
+        "%rd3": "index64",
+        "%rd5": "stride64",
+        "%rd6": "length"
+      }
+    }
+  }
+}

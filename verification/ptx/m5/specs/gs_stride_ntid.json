@@ -1,0 +1,30 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_stride_ntid",
+  "class": "map32",
+  "arrays": [
+    "gs_stride_ntid_x",
+    "gs_stride_ntid_y"
+  ],
+  "output": "gs_stride_ntid_y",
+  "length": "gs_stride_ntid_n",
+  "scalars": [
+    "gs_stride_ntid_k"
+  ],
+  "element": "gs_stride_ntid_x ^ gs_stride_ntid_k",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_stride_ntid_x",
+        "%rd2": "base gs_stride_ntid_y",
+        "%r1": "scalar gs_stride_ntid_k",
+        "%rd3": "index64",
+        "%rd5": "stride64",
+        "%rd6": "length"
+      }
+    }
+  }
+}

@@ -1,0 +1,39 @@
+.version 8.0
+.target sm_86
+.address_size 64
+
+.visible .entry gs_axpby(.param .u64 gs_axpby_x, .param .u64 gs_axpby_y, .param .u32 gs_axpby_a, .param .u32 gs_axpby_b, .param .u32 gs_axpby_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<13>;
+	.reg .b64 %rd<12>;
+	ld.param.u64 %rd1, [gs_axpby_x];
+	ld.param.u64 %rd2, [gs_axpby_y];
+	ld.param.u32 %r1, [gs_axpby_a];
+	ld.param.u32 %r2, [gs_axpby_b];
+	ld.param.u32 %r3, [gs_axpby_n];
+	mov.u32 %r4, %ctaid.x;
+	mov.u32 %r5, %ntid.x;
+	mov.u32 %r6, %tid.x;
+	mov.u32 %r7, %nctaid.x;
+	mul.wide.u32 %rd3, %r4, %r5;
+	cvt.u64.u32 %rd4, %r6;
+	add.u64 %rd3, %rd3, %rd4;
+	mul.wide.u32 %rd5, %r7, %r5;
+	cvt.u64.u32 %rd6, %r3;
+LOOP:
+	setp.ge.u64 %p1, %rd3, %rd6;
+	@%p1 bra DONE;
+	shl.b64 %rd7, %rd3, 2;
+	add.u64 %rd8, %rd1, %rd7;
+	add.u64 %rd9, %rd2, %rd7;
+	ld.global.u32 %r8, [%rd8];
+	ld.global.u32 %r9, [%rd9];
+	mul.lo.u32 %r10, %r9, %r2;
+	mad.lo.u32 %r11, %r8, %r1, %r10;
+	st.global.u32 [%rd9], %r11;
+	add.u64 %rd3, %rd3, %rd5;
+	bra.uni LOOP;
+DONE:
+	ret;
+}

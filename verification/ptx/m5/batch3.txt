@@ -1,0 +1,924 @@
+=== avg_floor | c[i] = (a[i] + b[i]) >> 1 (wrapping sum) | a,b,c | c | n | | (avg_floor_a + avg_floor_b) >> 1 | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry avg_floor(.param .u64 avg_floor_a, .param .u64 avg_floor_b, .param .u64 avg_floor_c, .param .u32 avg_floor_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [avg_floor_a];
+	ld.param.u64 %rd2, [avg_floor_b];
+	ld.param.u64 %rd3, [avg_floor_c];
+	ld.param.u32 %r1, [avg_floor_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd4, %r5, 4;
+	add.u64 %rd5, %rd1, %rd4;
+	add.u64 %rd6, %rd2, %rd4;
+	add.u64 %rd7, %rd3, %rd4;
+	ld.global.u32 %r6, [%rd5];
+	ld.global.u32 %r7, [%rd6];
+	add.u32 %r8, %r6, %r7;
+	shr.u32 %r9, %r8, 1;
+	st.global.u32 [%rd7], %r9;
+DONE:
+	ret;
+}
+=== hash1 | y[i] = (x[i] ^ (x[i] >> 16)) * 0x45d9f3b | x,y | y | n | | (hash1_x ^ (hash1_x >> 16)) * 0x45d9f3b | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry hash1(.param .u64 hash1_x, .param .u64 hash1_y, .param .u32 hash1_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [hash1_x];
+	ld.param.u64 %rd2, [hash1_y];
+	ld.param.u32 %r1, [hash1_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	shr.u32 %r7, %r6, 16;
+	xor.b32 %r8, %r6, %r7;
+	mul.lo.u32 %r9, %r8, 73244475;
+	st.global.u32 [%rd5], %r9;
+DONE:
+	ret;
+}
+=== lowbyte | y[i] = x[i] & 255 | x,y | y | n | | lowbyte_x & 255 | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry lowbyte(.param .u64 lowbyte_x, .param .u64 lowbyte_y, .param .u32 lowbyte_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<8>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [lowbyte_x];
+	ld.param.u64 %rd2, [lowbyte_y];
+	ld.param.u32 %r1, [lowbyte_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	and.b32 %r7, %r6, 255;
+	st.global.u32 [%rd5], %r7;
+DONE:
+	ret;
+}
+=== bswap_hi | y[i] = x[i] with its 16-bit halves swapped | x,y | y | n | | (bswap_hi_x << 16) | (bswap_hi_x >> 16) | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry bswap_hi(.param .u64 bswap_hi_x, .param .u64 bswap_hi_y, .param .u32 bswap_hi_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [bswap_hi_x];
+	ld.param.u64 %rd2, [bswap_hi_y];
+	ld.param.u32 %r1, [bswap_hi_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	shl.b32 %r7, %r6, 16;
+	shr.u32 %r8, %r6, 16;
+	or.b32 %r9, %r7, %r8;
+	st.global.u32 [%rd5], %r9;
+DONE:
+	ret;
+}
+=== tid_major | c[i] = a[i] + 2*b[i], index computed tid + ctaid*ntid | a,b,c | c | n | | tid_major_a + 2 * tid_major_b | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry tid_major(.param .u64 tid_major_a, .param .u64 tid_major_b, .param .u64 tid_major_c, .param .u32 tid_major_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [tid_major_a];
+	ld.param.u64 %rd2, [tid_major_b];
+	ld.param.u64 %rd3, [tid_major_c];
+	ld.param.u32 %r1, [tid_major_n];
+	mov.u32 %r2, %tid.x;
+	mov.u32 %r3, %ctaid.x;
+	mov.u32 %r4, %ntid.x;
+	mad.lo.u32 %r5, %r4, %r3, %r2;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd4, %r5, 4;
+	add.u64 %rd5, %rd1, %rd4;
+	add.u64 %rd6, %rd2, %rd4;
+	add.u64 %rd7, %rd3, %rd4;
+	ld.global.u32 %r6, [%rd5];
+	ld.global.u32 %r7, [%rd6];
+	shl.b32 %r8, %r7, 1;
+	add.u32 %r9, %r6, %r8;
+	st.global.u32 [%rd7], %r9;
+DONE:
+	ret;
+}
+=== sel_guard | y[i] = x[i] - 1, guard with selp-computed flag | x,y | y | n | | sel_guard_x - 1 | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry sel_guard(.param .u64 sel_guard_x, .param .u64 sel_guard_y, .param .u32 sel_guard_n)
+{
+	.reg .pred %p<3>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [sel_guard_x];
+	ld.param.u64 %rd2, [sel_guard_y];
+	ld.param.u32 %r1, [sel_guard_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.lt.u32 %p1, %r5, %r1;
+	selp.u32 %r6, 1, 0, %p1;
+	setp.eq.u32 %p2, %r6, 0;
+	@%p2 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r7, [%rd4];
+	add.u32 %r8, %r7, -1;
+	st.global.u32 [%rd5], %r8;
+DONE:
+	ret;
+}
+=== two_out_one | c[i] = a[i] * 3 - b[i] | a,b,c | c | n | | 3 * two_out_one_a - two_out_one_b | {"kind":"guarded","max_threads":"2147483647"}
+.visible .entry two_out_one(.param .u64 two_out_one_a, .param .u64 two_out_one_b, .param .u64 two_out_one_c, .param .u32 two_out_one_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [two_out_one_a];
+	ld.param.u64 %rd2, [two_out_one_b];
+	ld.param.u64 %rd3, [two_out_one_c];
+	ld.param.s32 %r1, [two_out_one_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.s32 %r5, %r2, %r3, %r4;
+	setp.ge.s32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.s32 %rd4, %r5, 4;
+	add.s64 %rd5, %rd1, %rd4;
+	add.s64 %rd6, %rd2, %rd4;
+	add.s64 %rd7, %rd3, %rd4;
+	ld.global.s32 %r6, [%rd5];
+	ld.global.s32 %r7, [%rd6];
+	mul.lo.s32 %r8, %r6, 3;
+	sub.s32 %r9, %r8, %r7;
+	st.global.s32 [%rd7], %r9;
+DONE:
+	ret;
+}
+=== mulhi_free | y[i] = x[i] * k + x[i] | x,y | y | n | k | mulhi_free_x * mulhi_free_k + mulhi_free_x | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry mulhi_free(.param .u64 mulhi_free_x, .param .u64 mulhi_free_y, .param .u32 mulhi_free_k, .param .u32 mulhi_free_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [mulhi_free_x];
+	ld.param.u64 %rd2, [mulhi_free_y];
+	ld.param.u32 %r1, [mulhi_free_k];
+	ld.param.u32 %r2, [mulhi_free_n];
+	mov.u32 %r3, %ctaid.x;
+	mov.u32 %r4, %ntid.x;
+	mov.u32 %r5, %tid.x;
+	mad.lo.u32 %r6, %r3, %r4, %r5;
+	setp.ge.u32 %p1, %r6, %r2;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r6, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r7, [%rd4];
+	add.u32 %r8, %r1, 1;
+	mul.lo.u32 %r9, %r7, %r8;
+	st.global.u32 [%rd5], %r9;
+DONE:
+	ret;
+}
+=== b64_index | y[i] = x[i] + 7, index widened by cvt then shl | x,y | y | n | | b64_index_x + 7 | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry b64_index(.param .u64 b64_index_x, .param .u64 b64_index_y, .param .u32 b64_index_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<8>;
+	.reg .b64 %rd<7>;
+	ld.param.u64 %rd1, [b64_index_x];
+	ld.param.u64 %rd2, [b64_index_y];
+	ld.param.u32 %r1, [b64_index_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	cvt.u64.u32 %rd3, %r5;
+	shl.b64 %rd4, %rd3, 2;
+	add.u64 %rd5, %rd1, %rd4;
+	add.u64 %rd6, %rd2, %rd4;
+	ld.global.u32 %r6, [%rd5];
+	add.u32 %r7, %r6, 7;
+	st.global.u32 [%rd6], %r7;
+DONE:
+	ret;
+}
+=== mulwide_idx | y[i] = x[i] ^ 0x55555555, 64-bit index from mul.wide of ctaid and ntid | x,y | y | n | | mulwide_idx_x ^ 0x55555555 | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry mulwide_idx(.param .u64 mulwide_idx_x, .param .u64 mulwide_idx_y, .param .u32 mulwide_idx_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<8>;
+	.reg .b64 %rd<10>;
+	ld.param.u64 %rd1, [mulwide_idx_x];
+	ld.param.u64 %rd2, [mulwide_idx_y];
+	ld.param.u32 %r1, [mulwide_idx_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mul.wide.u32 %rd3, %r2, %r3;
+	cvt.u64.u32 %rd4, %r4;
+	add.u64 %rd5, %rd3, %rd4;
+	cvt.u64.u32 %rd6, %r1;
+	setp.ge.u64 %p1, %rd5, %rd6;
+	@%p1 bra DONE;
+	shl.b64 %rd7, %rd5, 2;
+	add.u64 %rd8, %rd1, %rd7;
+	add.u64 %rd9, %rd2, %rd7;
+	ld.global.u32 %r5, [%rd8];
+	xor.b32 %r6, %r5, 1431655765;
+	st.global.u32 [%rd9], %r6;
+DONE:
+	ret;
+}
+=== ret_early | y[i] = 3*x[i] + 1, early ret | x,y | y | n | | 3 * ret_early_x + 1 | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry ret_early(.param .u64 ret_early_x, .param .u64 ret_early_y, .param .u32 ret_early_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<8>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [ret_early_x];
+	ld.param.u64 %rd2, [ret_early_y];
+	ld.param.u32 %r1, [ret_early_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 ret;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	mad.lo.u32 %r7, %r6, 3, 1;
+	st.global.u32 [%rd5], %r7;
+	ret;
+}
+=== sub_then_neg | c[i] = b[i] - a[i] computed as -(a-b) | a,b,c | c | n | | sub_then_neg_b - sub_then_neg_a | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry sub_then_neg(.param .u64 sub_then_neg_a, .param .u64 sub_then_neg_b, .param .u64 sub_then_neg_c, .param .u32 sub_then_neg_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [sub_then_neg_a];
+	ld.param.u64 %rd2, [sub_then_neg_b];
+	ld.param.u64 %rd3, [sub_then_neg_c];
+	ld.param.u32 %r1, [sub_then_neg_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd4, %r5, 4;
+	add.u64 %rd5, %rd1, %rd4;
+	add.u64 %rd6, %rd2, %rd4;
+	add.u64 %rd7, %rd3, %rd4;
+	ld.global.u32 %r6, [%rd5];
+	ld.global.u32 %r7, [%rd6];
+	sub.u32 %r8, %r6, %r7;
+	sub.u32 %r9, 0, %r8;
+	st.global.u32 [%rd7], %r9;
+DONE:
+	ret;
+}
+=== and_not | c[i] = a[i] & ~b[i] | a,b,c | c | n | | and_not_a & ~and_not_b | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry and_not(.param .u64 and_not_a, .param .u64 and_not_b, .param .u64 and_not_c, .param .u32 and_not_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [and_not_a];
+	ld.param.u64 %rd2, [and_not_b];
+	ld.param.u64 %rd3, [and_not_c];
+	ld.param.u32 %r1, [and_not_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd4, %r5, 4;
+	add.u64 %rd5, %rd1, %rd4;
+	add.u64 %rd6, %rd2, %rd4;
+	add.u64 %rd7, %rd3, %rd4;
+	ld.global.u32 %r6, [%rd5];
+	ld.global.u32 %r7, [%rd6];
+	not.b32 %r8, %r7;
+	and.b32 %r9, %r6, %r8;
+	st.global.u32 [%rd7], %r9;
+DONE:
+	ret;
+}
+=== xnor | c[i] = ~(a[i] ^ b[i]) | a,b,c | c | n | | ~(xnor_a ^ xnor_b) | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry xnor(.param .u64 xnor_a, .param .u64 xnor_b, .param .u64 xnor_c, .param .u32 xnor_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [xnor_a];
+	ld.param.u64 %rd2, [xnor_b];
+	ld.param.u64 %rd3, [xnor_c];
+	ld.param.u32 %r1, [xnor_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd4, %r5, 4;
+	add.u64 %rd5, %rd1, %rd4;
+	add.u64 %rd6, %rd2, %rd4;
+	add.u64 %rd7, %rd3, %rd4;
+	ld.global.u32 %r6, [%rd5];
+	ld.global.u32 %r7, [%rd6];
+	xor.b32 %r8, %r6, %r7;
+	not.b32 %r9, %r8;
+	st.global.u32 [%rd7], %r9;
+DONE:
+	ret;
+}
+=== horner3 | y[i] = ((x+1)*x+2)*x+3 | x,y | y | n | | ((horner3_x + 1) * horner3_x + 2) * horner3_x + 3 | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry horner3(.param .u64 horner3_x, .param .u64 horner3_y, .param .u32 horner3_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<11>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [horner3_x];
+	ld.param.u64 %rd2, [horner3_y];
+	ld.param.u32 %r1, [horner3_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	add.u32 %r7, %r6, 1;
+	mad.lo.u32 %r8, %r7, %r6, 2;
+	mad.lo.u32 %r9, %r8, %r6, 3;
+	st.global.u32 [%rd5], %r9;
+DONE:
+	ret;
+}
+=== shift_mix | y[i] = x ^ (x << 5) ^ (x >> 3) | x,y | y | n | | shift_mix_x ^ (shift_mix_x << 5) ^ (shift_mix_x >> 3) | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry shift_mix(.param .u64 shift_mix_x, .param .u64 shift_mix_y, .param .u32 shift_mix_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<11>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [shift_mix_x];
+	ld.param.u64 %rd2, [shift_mix_y];
+	ld.param.u32 %r1, [shift_mix_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	shl.b32 %r7, %r6, 5;
+	shr.u32 %r8, %r6, 3;
+	xor.b32 %r9, %r6, %r7;
+	xor.b32 %r10, %r9, %r8;
+	st.global.u32 [%rd5], %r10;
+DONE:
+	ret;
+}
+=== gs_avg | c[i] = (a[i] + b[i]) >> 1, grid-stride | a,b,c | c | n | | (gs_avg_a + gs_avg_b) >> 1 | {"kind":"stride","bound":"2^64","head":"LOOP","registers":{"%rd1":"base gs_avg_a","%rd2":"base gs_avg_b","%rd3":"base gs_avg_c","%rd4":"index64","%rd6":"stride64","%rd7":"length"}}
+.visible .entry gs_avg(.param .u64 gs_avg_a, .param .u64 gs_avg_b, .param .u64 gs_avg_c, .param .u32 gs_avg_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<14>;
+	ld.param.u64 %rd1, [gs_avg_a];
+	ld.param.u64 %rd2, [gs_avg_b];
+	ld.param.u64 %rd3, [gs_avg_c];
+	ld.param.u32 %r1, [gs_avg_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mov.u32 %r5, %nctaid.x;
+	mul.wide.u32 %rd4, %r2, %r3;
+	cvt.u64.u32 %rd5, %r4;
+	add.u64 %rd4, %rd4, %rd5;
+	mul.wide.u32 %rd6, %r5, %r3;
+	cvt.u64.u32 %rd7, %r1;
+LOOP:
+	setp.ge.u64 %p1, %rd4, %rd7;
+	@%p1 bra DONE;
+	shl.b64 %rd8, %rd4, 2;
+	add.u64 %rd9, %rd1, %rd8;
+	add.u64 %rd10, %rd2, %rd8;
+	add.u64 %rd11, %rd3, %rd8;
+	ld.global.u32 %r6, [%rd9];
+	ld.global.u32 %r7, [%rd10];
+	add.u32 %r8, %r6, %r7;
+	shr.u32 %r9, %r8, 1;
+	st.global.u32 [%rd11], %r9;
+	add.u64 %rd4, %rd4, %rd6;
+	bra.uni LOOP;
+DONE:
+	ret;
+}
+=== gs_hash | y[i] = (x ^ (x >> 16)) * 0x45d9f3b, grid-stride | x,y | y | n | | (gs_hash_x ^ (gs_hash_x >> 16)) * 0x45d9f3b | {"kind":"stride","bound":"2^64","head":"LOOP","registers":{"%rd1":"base gs_hash_x","%rd2":"base gs_hash_y","%rd3":"index64","%rd5":"stride64","%rd6":"length"}}
+.visible .entry gs_hash(.param .u64 gs_hash_x, .param .u64 gs_hash_y, .param .u32 gs_hash_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<11>;
+	.reg .b64 %rd<10>;
+	ld.param.u64 %rd1, [gs_hash_x];
+	ld.param.u64 %rd2, [gs_hash_y];
+	ld.param.u32 %r1, [gs_hash_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mov.u32 %r5, %nctaid.x;
+	mul.wide.u32 %rd3, %r2, %r3;
+	cvt.u64.u32 %rd4, %r4;
+	add.u64 %rd3, %rd3, %rd4;
+	mul.wide.u32 %rd5, %r5, %r3;
+	cvt.u64.u32 %rd6, %r1;
+LOOP:
+	setp.ge.u64 %p1, %rd3, %rd6;
+	@%p1 bra DONE;
+	shl.b64 %rd7, %rd3, 2;
+	add.u64 %rd8, %rd1, %rd7;
+	add.u64 %rd9, %rd2, %rd7;
+	ld.global.u32 %r6, [%rd8];
+	shr.u32 %r7, %r6, 16;
+	xor.b32 %r8, %r6, %r7;
+	mul.lo.u32 %r9, %r8, 73244475;
+	st.global.u32 [%rd9], %r9;
+	add.u64 %rd3, %rd3, %rd5;
+	bra.uni LOOP;
+DONE:
+	ret;
+}
+=== gs_mask_ip | x[i] &= m in place, grid-stride, 32-bit index | x | x | n | m | gs_mask_ip_x & gs_mask_ip_m | {"kind":"stride","bound":"2^32","head":"LOOP","registers":{"%rd1":"base gs_mask_ip_x","%r1":"scalar gs_mask_ip_m","%r2":"length","%r6":"index32","%r8":"stride32"}}
+.visible .entry gs_mask_ip(.param .u64 gs_mask_ip_x, .param .u32 gs_mask_ip_m, .param .u32 gs_mask_ip_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<12>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [gs_mask_ip_x];
+	ld.param.u32 %r1, [gs_mask_ip_m];
+	ld.param.u32 %r2, [gs_mask_ip_n];
+	mov.u32 %r3, %ctaid.x;
+	mov.u32 %r4, %ntid.x;
+	mov.u32 %r5, %tid.x;
+	mad.lo.u32 %r6, %r3, %r4, %r5;
+	mov.u32 %r7, %nctaid.x;
+	mul.lo.u32 %r8, %r7, %r4;
+LOOP:
+	setp.ge.u32 %p1, %r6, %r2;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd2, %r6, 4;
+	add.u64 %rd3, %rd1, %rd2;
+	ld.global.u32 %r9, [%rd3];
+	and.b32 %r10, %r9, %r1;
+	st.global.u32 [%rd3], %r10;
+	add.u32 %r6, %r6, %r8;
+	bra.uni LOOP;
+DONE:
+	ret;
+}
+=== gs32_fill | y[i] = k, grid-stride, 32-bit index | y | y | n | k | gs32_fill_k | {"kind":"stride","bound":"2^32","head":"LOOP","registers":{"%rd1":"base gs32_fill_y","%r1":"scalar gs32_fill_k","%r2":"length","%r6":"index32","%r8":"stride32"}}
+.visible .entry gs32_fill(.param .u64 gs32_fill_y, .param .u32 gs32_fill_k, .param .u32 gs32_fill_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<12>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [gs32_fill_y];
+	ld.param.u32 %r1, [gs32_fill_k];
+	ld.param.u32 %r2, [gs32_fill_n];
+	mov.u32 %r3, %ctaid.x;
+	mov.u32 %r4, %ntid.x;
+	mov.u32 %r5, %tid.x;
+	mad.lo.u32 %r6, %r3, %r4, %r5;
+	mov.u32 %r7, %nctaid.x;
+	mul.lo.u32 %r8, %r7, %r4;
+LOOP:
+	setp.ge.u32 %p1, %r6, %r2;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd2, %r6, 4;
+	add.u64 %rd3, %rd1, %rd2;
+	st.global.u32 [%rd3], %r1;
+	add.u32 %r6, %r6, %r8;
+	bra.uni LOOP;
+DONE:
+	ret;
+}
+=== gs32_copy | y[i] = x[i], grid-stride, 32-bit index | x,y | y | n | | gs32_copy_x | {"kind":"stride","bound":"2^32","head":"LOOP","registers":{"%rd1":"base gs32_copy_x","%rd2":"base gs32_copy_y","%r1":"length","%r5":"index32","%r7":"stride32"}}
+.visible .entry gs32_copy(.param .u64 gs32_copy_x, .param .u64 gs32_copy_y, .param .u32 gs32_copy_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<12>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [gs32_copy_x];
+	ld.param.u64 %rd2, [gs32_copy_y];
+	ld.param.u32 %r1, [gs32_copy_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	mov.u32 %r6, %nctaid.x;
+	mul.lo.u32 %r7, %r6, %r3;
+LOOP:
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r8, [%rd4];
+	st.global.u32 [%rd5], %r8;
+	add.u32 %r5, %r5, %r7;
+	bra.uni LOOP;
+DONE:
+	ret;
+}
+=== gs32_saxpy | y[i] = a*x[i] + y[i], grid-stride, 32-bit index | x,y | y | n | a | gs32_saxpy_a * gs32_saxpy_x + gs32_saxpy_y | {"kind":"stride","bound":"2^32","head":"LOOP","registers":{"%rd1":"base gs32_saxpy_x","%rd2":"base gs32_saxpy_y","%r1":"scalar gs32_saxpy_a","%r2":"length","%r6":"index32","%r8":"stride32"}}
+.visible .entry gs32_saxpy(.param .u64 gs32_saxpy_x, .param .u64 gs32_saxpy_y, .param .u32 gs32_saxpy_a, .param .u32 gs32_saxpy_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<12>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [gs32_saxpy_x];
+	ld.param.u64 %rd2, [gs32_saxpy_y];
+	ld.param.u32 %r1, [gs32_saxpy_a];
+	ld.param.u32 %r2, [gs32_saxpy_n];
+	mov.u32 %r3, %ctaid.x;
+	mov.u32 %r4, %ntid.x;
+	mov.u32 %r5, %tid.x;
+	mad.lo.u32 %r6, %r3, %r4, %r5;
+	mov.u32 %r7, %nctaid.x;
+	mul.lo.u32 %r8, %r7, %r4;
+LOOP:
+	setp.ge.u32 %p1, %r6, %r2;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r6, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r9, [%rd4];
+	ld.global.u32 %r10, [%rd5];
+	mad.lo.u32 %r11, %r1, %r9, %r10;
+	st.global.u32 [%rd5], %r11;
+	add.u32 %r6, %r6, %r8;
+	bra.uni LOOP;
+DONE:
+	ret;
+}
+=== gs32_wrap | SEEDED: index wraps above 2^32 but the spec claims 2^33; c[i] = a[i] + b[i], grid-stride, 32-bit index, spec claims n + G*B up to 2^33 | a,b,c | c | n | | gs32_wrap_a + gs32_wrap_b | {"kind":"stride","bound":"2^33","head":"LOOP","registers":{"%rd1":"base gs32_wrap_a","%rd2":"base gs32_wrap_b","%rd3":"base gs32_wrap_c","%r1":"length","%r5":"index32","%r7":"stride32"}}
+.visible .entry gs32_wrap(.param .u64 gs32_wrap_a, .param .u64 gs32_wrap_b, .param .u64 gs32_wrap_c, .param .u32 gs32_wrap_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<12>;
+	.reg .b64 %rd<10>;
+	ld.param.u64 %rd1, [gs32_wrap_a];
+	ld.param.u64 %rd2, [gs32_wrap_b];
+	ld.param.u64 %rd3, [gs32_wrap_c];
+	ld.param.u32 %r1, [gs32_wrap_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	mov.u32 %r6, %nctaid.x;
+	mul.lo.u32 %r7, %r6, %r3;
+LOOP:
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd4, %r5, 4;
+	add.u64 %rd5, %rd1, %rd4;
+	add.u64 %rd6, %rd2, %rd4;
+	add.u64 %rd7, %rd3, %rd4;
+	ld.global.u32 %r8, [%rd5];
+	ld.global.u32 %r9, [%rd6];
+	add.u32 %r10, %r8, %r9;
+	st.global.u32 [%rd7], %r10;
+	add.u32 %r5, %r5, %r7;
+	bra.uni LOOP;
+DONE:
+	ret;
+}
+=== guard_off_by_one | SEEDED: gt instead of ge in the bound test; y[i] = x[i] + 1, bound test written as gt | x,y | y | n | | guard_off_by_one_x + 1 | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry guard_off_by_one(.param .u64 guard_off_by_one_x, .param .u64 guard_off_by_one_y, .param .u32 guard_off_by_one_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<8>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [guard_off_by_one_x];
+	ld.param.u64 %rd2, [guard_off_by_one_y];
+	ld.param.u32 %r1, [guard_off_by_one_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.gt.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	add.u32 %r7, %r6, 1;
+	st.global.u32 [%rd5], %r7;
+DONE:
+	ret;
+}
+=== signed_idx_big | SEEDED: signed index with a spec claiming 2^32-1 threads; y[i] = x[i] * 2, signed index, spec claims 2^32 - 1 threads | x,y | y | n | | 2 * signed_idx_big_x | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry signed_idx_big(.param .u64 signed_idx_big_x, .param .u64 signed_idx_big_y, .param .u32 signed_idx_big_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<8>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [signed_idx_big_x];
+	ld.param.u64 %rd2, [signed_idx_big_y];
+	ld.param.u32 %r1, [signed_idx_big_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.s32 %r5, %r2, %r3, %r4;
+	setp.ge.s32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.s32 %rd3, %r5, 4;
+	add.s64 %rd4, %rd1, %rd3;
+	add.s64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	shl.b32 %r7, %r6, 1;
+	st.global.u32 [%rd5], %r7;
+DONE:
+	ret;
+}
+=== wrong_scalar | SEEDED: scalars a and b loaded swapped; y[i] = a*x[i] + b, scalars swapped by the writer | x,y | y | n | a,b | wrong_scalar_a * wrong_scalar_x + wrong_scalar_b | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry wrong_scalar(.param .u64 wrong_scalar_x, .param .u64 wrong_scalar_y, .param .u32 wrong_scalar_a, .param .u32 wrong_scalar_b, .param .u32 wrong_scalar_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [wrong_scalar_x];
+	ld.param.u64 %rd2, [wrong_scalar_y];
+	ld.param.u32 %r1, [wrong_scalar_b];
+	ld.param.u32 %r2, [wrong_scalar_a];
+	ld.param.u32 %r3, [wrong_scalar_n];
+	mov.u32 %r4, %ctaid.x;
+	mov.u32 %r5, %ntid.x;
+	mov.u32 %r6, %tid.x;
+	mad.lo.u32 %r7, %r4, %r5, %r6;
+	setp.ge.u32 %p1, %r7, %r3;
+	@%p1 ret;
+	mul.wide.u32 %rd3, %r7, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r8, [%rd4];
+	mad.lo.u32 %r9, %r8, %r1, %r2;
+	st.global.u32 [%rd5], %r9;
+	ret;
+}
+=== gs_no_tid | SEEDED: start index omits %tid.x; y[i] = x[i] + 1, grid-stride but start index forgets tid | x,y | y | n | | gs_no_tid_x + 1 | {"kind":"stride","bound":"2^64","head":"LOOP","registers":{"%rd1":"base gs_no_tid_x","%rd2":"base gs_no_tid_y","%rd3":"index64","%rd5":"stride64","%rd6":"length"}}
+.visible .entry gs_no_tid(.param .u64 gs_no_tid_x, .param .u64 gs_no_tid_y, .param .u32 gs_no_tid_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<10>;
+	ld.param.u64 %rd1, [gs_no_tid_x];
+	ld.param.u64 %rd2, [gs_no_tid_y];
+	ld.param.u32 %r1, [gs_no_tid_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r5, %nctaid.x;
+	mul.wide.u32 %rd3, %r2, %r3;
+	mul.wide.u32 %rd5, %r5, %r3;
+	cvt.u64.u32 %rd6, %r1;
+LOOP:
+	setp.ge.u64 %p1, %rd3, %rd6;
+	@%p1 bra DONE;
+	shl.b64 %rd7, %rd3, 2;
+	add.u64 %rd8, %rd1, %rd7;
+	add.u64 %rd9, %rd2, %rd7;
+	ld.global.u32 %r6, [%rd8];
+	add.u32 %r7, %r6, 1;
+	st.global.u32 [%rd9], %r7;
+	add.u64 %rd3, %rd3, %rd5;
+	bra.uni LOOP;
+DONE:
+	ret;
+}
+=== gs_stride_ntid | SEEDED: stride is ntid, not nctaid*ntid; y[i] = x[i] ^ k, grid-stride with stride ntid only | x,y | y | n | k | gs_stride_ntid_x ^ gs_stride_ntid_k | {"kind":"stride","bound":"2^64","head":"LOOP","registers":{"%rd1":"base gs_stride_ntid_x","%rd2":"base gs_stride_ntid_y","%r1":"scalar gs_stride_ntid_k","%rd3":"index64","%rd5":"stride64","%rd6":"length"}}
+.visible .entry gs_stride_ntid(.param .u64 gs_stride_ntid_x, .param .u64 gs_stride_ntid_y, .param .u32 gs_stride_ntid_k, .param .u32 gs_stride_ntid_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<10>;
+	.reg .b64 %rd<10>;
+	ld.param.u64 %rd1, [gs_stride_ntid_x];
+	ld.param.u64 %rd2, [gs_stride_ntid_y];
+	ld.param.u32 %r1, [gs_stride_ntid_k];
+	ld.param.u32 %r2, [gs_stride_ntid_n];
+	mov.u32 %r3, %ctaid.x;
+	mov.u32 %r4, %ntid.x;
+	mov.u32 %r5, %tid.x;
+	mul.wide.u32 %rd3, %r3, %r4;
+	cvt.u64.u32 %rd4, %r5;
+	add.u64 %rd3, %rd3, %rd4;
+	cvt.u64.u32 %rd5, %r4;
+	cvt.u64.u32 %rd6, %r2;
+LOOP:
+	setp.ge.u64 %p1, %rd3, %rd6;
+	@%p1 bra DONE;
+	shl.b64 %rd7, %rd3, 2;
+	add.u64 %rd8, %rd1, %rd7;
+	add.u64 %rd9, %rd2, %rd7;
+	ld.global.u32 %r6, [%rd8];
+	xor.b32 %r7, %r6, %r1;
+	st.global.u32 [%rd9], %r7;
+	add.u64 %rd3, %rd3, %rd5;
+	bra.uni LOOP;
+DONE:
+	ret;
+}
+=== u64_elems | SEEDED: 64-bit elements under a 32-bit-element spec; y[i] = x[i] + 1 on 64-bit elements | x,y | y | n | | u64_elems_x + 1 | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry u64_elems(.param .u64 u64_elems_x, .param .u64 u64_elems_y, .param .u32 u64_elems_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<6>;
+	.reg .b64 %rd<9>;
+	ld.param.u64 %rd1, [u64_elems_x];
+	ld.param.u64 %rd2, [u64_elems_y];
+	ld.param.u32 %r1, [u64_elems_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 8;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u64 %rd6, [%rd4];
+	add.u64 %rd7, %rd6, 1;
+	st.global.u64 [%rd5], %rd7;
+DONE:
+	ret;
+}
+=== madwide_idx | SEEDED: uses mad.wide, outside the subset; c[i] = a[i] + b[i], address with mad.wide | a,b,c | c | n | | madwide_idx_a + madwide_idx_b | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry madwide_idx(.param .u64 madwide_idx_a, .param .u64 madwide_idx_b, .param .u64 madwide_idx_c, .param .u32 madwide_idx_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<9>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [madwide_idx_a];
+	ld.param.u64 %rd2, [madwide_idx_b];
+	ld.param.u64 %rd3, [madwide_idx_c];
+	ld.param.u32 %r1, [madwide_idx_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mad.wide.u32 %rd5, %r5, 4, %rd1;
+	mad.wide.u32 %rd6, %r5, 4, %rd2;
+	mad.wide.u32 %rd7, %r5, 4, %rd3;
+	ld.global.u32 %r6, [%rd5];
+	ld.global.u32 %r7, [%rd6];
+	add.u32 %r8, %r6, %r7;
+	st.global.u32 [%rd7], %r8;
+DONE:
+	ret;
+}
+=== ldg_nc | SEEDED: uses ld.global.nc, outside the subset; y[i] = x[i] * x[i], reads through ld.global.nc | x,y | y | n | | ldg_nc_x * ldg_nc_x | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry ldg_nc(.param .u64 ldg_nc_x, .param .u64 ldg_nc_y, .param .u32 ldg_nc_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<8>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [ldg_nc_x];
+	ld.param.u64 %rd2, [ldg_nc_y];
+	ld.param.u32 %r1, [ldg_nc_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.nc.u32 %r6, [%rd4];
+	mul.lo.u32 %r7, %r6, %r6;
+	st.global.u32 [%rd5], %r7;
+DONE:
+	ret;
+}
+=== in_place_wrong | SEEDED: reads the neighbour x[i+1]; x[i] = x[i] + x[i+1] (reads a neighbour) | x | x | n | | in_place_wrong_x + in_place_wrong_x | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry in_place_wrong(.param .u64 in_place_wrong_x, .param .u32 in_place_wrong_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<9>;
+	.reg .b64 %rd<4>;
+	ld.param.u64 %rd1, [in_place_wrong_x];
+	ld.param.u32 %r1, [in_place_wrong_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd2, %r5, 4;
+	add.u64 %rd3, %rd1, %rd2;
+	ld.global.u32 %r6, [%rd3];
+	ld.global.u32 %r7, [%rd3+4];
+	add.u32 %r8, %r6, %r7;
+	st.global.u32 [%rd3], %r8;
+DONE:
+	ret;
+}
+=== tail_drop | SEEDED: bound rounded down to even n; y[i] = x[i] + 5, processes pairs and drops an odd tail | x,y | y | n | | tail_drop_x + 5 | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry tail_drop(.param .u64 tail_drop_x, .param .u64 tail_drop_y, .param .u32 tail_drop_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<9>;
+	.reg .b64 %rd<6>;
+	ld.param.u64 %rd1, [tail_drop_x];
+	ld.param.u64 %rd2, [tail_drop_y];
+	ld.param.u32 %r1, [tail_drop_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	and.b32 %r8, %r1, -2;
+	setp.ge.u32 %p1, %r5, %r8;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd3, %r5, 4;
+	add.u64 %rd4, %rd1, %rd3;
+	add.u64 %rd5, %rd2, %rd3;
+	ld.global.u32 %r6, [%rd4];
+	add.u32 %r7, %r6, 5;
+	st.global.u32 [%rd5], %r7;
+DONE:
+	ret;
+}
+=== xor3_ip | z[i] ^= x[i] ^ y[i] in place | x,y,z | z | n | | xor3_ip_z ^ xor3_ip_x ^ xor3_ip_y | {"kind":"guarded","max_threads":"4294967295"}
+.visible .entry xor3_ip(.param .u64 xor3_ip_x, .param .u64 xor3_ip_y, .param .u64 xor3_ip_z, .param .u32 xor3_ip_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<11>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [xor3_ip_x];
+	ld.param.u64 %rd2, [xor3_ip_y];
+	ld.param.u64 %rd3, [xor3_ip_z];
+	ld.param.u32 %r1, [xor3_ip_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd4, %r5, 4;
+	add.u64 %rd5, %rd1, %rd4;
+	add.u64 %rd6, %rd2, %rd4;
+	add.u64 %rd7, %rd3, %rd4;
+	ld.global.u32 %r6, [%rd5];
+	ld.global.u32 %r7, [%rd6];
+	ld.global.u32 %r8, [%rd7];
+	xor.b32 %r9, %r6, %r7;
+	xor.b32 %r10, %r8, %r9;
+	st.global.u32 [%rd7], %r10;
+DONE:
+	ret;
+}

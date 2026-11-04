@@ -1,0 +1,20 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "mix4",
+  "class": "map32",
+  "arrays": [
+    "mix4_a",
+    "mix4_b",
+    "mix4_c",
+    "mix4_d",
+    "mix4_e"
+  ],
+  "output": "mix4_e",
+  "length": "mix4_n",
+  "scalars": [],
+  "element": "mix4_a * mix4_b + mix4_c * mix4_d",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

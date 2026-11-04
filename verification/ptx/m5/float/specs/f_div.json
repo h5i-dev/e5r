@@ -1,0 +1,20 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_div",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_div_x",
+  "f_div_y",
+  "f_div_z"
+ ],
+ "output": "f_div_z",
+ "length": "f_div_n",
+ "scalars": [],
+ "element": "div.rn(f_div_x, f_div_y)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

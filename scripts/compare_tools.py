@@ -309,7 +309,7 @@ class E5r:
         return secs, rss, {int(f["addr"], 16) for f in data["items"]}
 
     def analyze(self, binary: Path, work: Path):
-        """Time `e5r stats`, count what `e5r funcs` lists.
+        """Time `e5rx stats`, count what `e5rx funcs` lists.
 
         `stats` is the command that does the whole job -- functions, control
         flow, cross references and strings -- which is what `rizin -A` also
@@ -634,7 +634,7 @@ def rescore_run(results: Path) -> int:
 
 
 def markdown_run(results: Path) -> int:
-    """Emit the tables in docs/benchmarks.md from a results file.
+    """Emit the tables in docs/toolkit/benchmarks.md from a results file.
 
     The document's numbers are generated rather than transcribed, because a
     table copied by hand is a table that drifts from the run it claims to
@@ -780,7 +780,7 @@ def build_tools(args) -> tuple[list, list[str]]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("binaries", nargs="*", type=Path)
-    ap.add_argument("--e5r", default=os.environ.get("E5R", "target/release/e5r"))
+    ap.add_argument("--e5r", default=os.environ.get("E5R", "target/release/e5rx"))
     ap.add_argument(
         "--e5r-name",
         default="",

@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "sub_ip",
+  "class": "map32",
+  "arrays": [
+    "sub_ip_x",
+    "sub_ip_y"
+  ],
+  "output": "sub_ip_y",
+  "length": "sub_ip_n",
+  "scalars": [],
+  "element": "sub_ip_y - sub_ip_x",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

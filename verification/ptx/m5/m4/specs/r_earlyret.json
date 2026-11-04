@@ -1,0 +1,26 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "r_earlyret",
+  "class": "reduce32",
+  "result": "per_block",
+  "input": "r_earlyret_param_0",
+  "output": "r_earlyret_param_1",
+  "length": "r_earlyret_param_2",
+  "shared": "_ZZ10r_earlyretE1s",
+  "max_block": 1024,
+  "barriers": {
+    "after_load": {
+      "%r1": "ntid",
+      "%r2": "ctaid",
+      "%r3": "tid",
+      "%r5": "shared_tid",
+      "%rd2": "output"
+    },
+    "loop": {
+      "%r2": "ctaid",
+      "%r3": "tid",
+      "%r5": "shared_tid",
+      "%rd2": "output"
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "axpb",
+  "class": "map32",
+  "arrays": [
+    "axpb_x",
+    "axpb_y"
+  ],
+  "output": "axpb_y",
+  "length": "axpb_n",
+  "scalars": [
+    "axpb_a",
+    "axpb_b"
+  ],
+  "element": "axpb_a * axpb_x + axpb_b",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

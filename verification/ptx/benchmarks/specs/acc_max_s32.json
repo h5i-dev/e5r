@@ -1,0 +1,10 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "acc_max_s32",
+  "class": "accum",
+  "op": "max",
+  "type": "s32",
+  "input": "acc_max_s32_param_0",
+  "output": "acc_max_s32_param_1",
+  "length": "acc_max_s32_param_2"
+}

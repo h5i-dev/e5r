@@ -1,0 +1,20 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_add_rz",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_add_rz_x",
+  "f_add_rz_y",
+  "f_add_rz_z"
+ ],
+ "output": "f_add_rz_z",
+ "length": "f_add_rz_n",
+ "scalars": [],
+ "element": "add.rz(f_add_rz_x, f_add_rz_y)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

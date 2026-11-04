@@ -6,7 +6,7 @@
 # on first use), a JDK, and the network the first time it compiles a corpus
 # project from source. A single project at one optimization level takes tens of
 # minutes, most of it Joern parsing the source. The numbers it prints are
-# recorded by hand in docs/decbench.md and docs/scorecard.md.
+# recorded by hand in docs/toolkit/decbench.md and docs/toolkit/scorecard.md.
 #
 # Usage: scripts/decbench.sh [results-tree] [project] [opt-levels] [decompilers]
 #
@@ -15,7 +15,7 @@
 #
 # Env: DECBENCH_REPO   the DecBench checkout (default ~/Ref/decbench)
 #      DECBENCH_VENV   virtualenv with decbench installed (default ~/.venvs/decbench)
-#      E5R            the e5r executable (default target/release/e5r)
+#      E5R            the e5r executable (default target/release/e5rx)
 #      GHIDRA_INSTALL_DIR  needed only when ghidra is one of the decompilers
 set -euo pipefail
 
@@ -27,7 +27,7 @@ decs=${4:-e5r}
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 decbench=${DECBENCH_REPO:-$HOME/Ref/decbench}
 venv=${DECBENCH_VENV:-$HOME/.venvs/decbench}
-e5r=${E5R:-$repo/target/release/e5r}
+e5r=${E5R:-$repo/target/release/e5rx}
 
 [ -d "$decbench/decbench" ] || {
   echo "no DecBench checkout at $decbench; set DECBENCH_REPO" >&2

@@ -1,0 +1,19 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_sqrt",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_sqrt_x",
+  "f_sqrt_y"
+ ],
+ "output": "f_sqrt_y",
+ "length": "f_sqrt_n",
+ "scalars": [],
+ "element": "sqrt.rn(f_sqrt_x)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

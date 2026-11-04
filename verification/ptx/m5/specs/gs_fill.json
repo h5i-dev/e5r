@@ -1,0 +1,28 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_fill",
+  "class": "map32",
+  "arrays": [
+    "gs_fill_y"
+  ],
+  "output": "gs_fill_y",
+  "length": "gs_fill_n",
+  "scalars": [
+    "gs_fill_k"
+  ],
+  "element": "gs_fill_k",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_fill_y",
+        "%r1": "scalar gs_fill_k",
+        "%rd2": "index64",
+        "%rd4": "stride64",
+        "%rd5": "length"
+      }
+    }
+  }
+}

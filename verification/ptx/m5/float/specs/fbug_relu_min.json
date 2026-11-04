@@ -1,0 +1,19 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "fbug_relu_min",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "fbug_relu_min_x",
+  "fbug_relu_min_y"
+ ],
+ "output": "fbug_relu_min_y",
+ "length": "fbug_relu_min_n",
+ "scalars": [],
+ "element": "max(fbug_relu_min_x, 0f00000000)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

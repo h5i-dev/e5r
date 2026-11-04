@@ -31,7 +31,7 @@ function render() {
         : "Start your first investigation.";
   $("headline-sub").textContent = projects.length
     ? `${projects.length} projects · task updates appear here automatically. Open a project to keep its next step clear.`
-    : "Ask an agent to run e5r project new PATH --name NAME. Existing manifests can be imported with e5r project import.";
+    : "Ask an agent to run e5rx project new PATH --name NAME. Existing manifests can be imported with e5rx project import.";
   $("counts").replaceChildren();
   for (const [n, label, tone] of [
     [projects.length, "projects", ""],
@@ -71,7 +71,7 @@ function render() {
       el(
         "div",
         p.error ||
-          `${availability[p.availability]} binary: ${p.binary}. Tasks remain available; use e5r project relocate ${p.name} PATH for a moved binary.`,
+          `${availability[p.availability]} binary: ${p.binary}. Tasks remain available; use e5rx project relocate ${p.name} PATH for a moved binary.`,
         "work-row-sub",
       ),
     );
@@ -161,7 +161,7 @@ $("search").oninput = renderProjects;
 $("filter").onchange = renderProjects;
 $("copy-command").onclick = async () => {
   try {
-    await navigator.clipboard.writeText("e5r project list --json");
+    await navigator.clipboard.writeText("e5rx project list --json");
     $("copy-command").textContent = "Copied";
     setTimeout(() => ($("copy-command").textContent = "Copy command"), 1200);
   } catch {}

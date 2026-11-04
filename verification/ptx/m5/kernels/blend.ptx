@@ -1,0 +1,36 @@
+.version 8.0
+.target sm_86
+.address_size 64
+
+.visible .entry blend(.param .u64 blend_a, .param .u64 blend_b, .param .u64 blend_m, .param .u64 blend_d, .param .u32 blend_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<13>;
+	.reg .b64 %rd<10>;
+	ld.param.u64 %rd1, [blend_a];
+	ld.param.u64 %rd2, [blend_b];
+	ld.param.u64 %rd3, [blend_m];
+	ld.param.u64 %rd4, [blend_d];
+	ld.param.u32 %r1, [blend_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd5, %r5, 4;
+	add.u64 %rd6, %rd1, %rd5;
+	add.u64 %rd7, %rd2, %rd5;
+	add.u64 %rd8, %rd3, %rd5;
+	add.u64 %rd9, %rd4, %rd5;
+	ld.global.u32 %r6, [%rd6];
+	ld.global.u32 %r7, [%rd7];
+	ld.global.u32 %r8, [%rd8];
+	and.b32 %r9, %r6, %r8;
+	not.b32 %r10, %r8;
+	and.b32 %r11, %r7, %r10;
+	or.b32 %r12, %r9, %r11;
+	st.global.u32 [%rd9], %r12;
+DONE:
+	ret;
+}

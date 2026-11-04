@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "sel_guard",
+  "class": "map32",
+  "arrays": [
+    "sel_guard_x",
+    "sel_guard_y"
+  ],
+  "output": "sel_guard_y",
+  "length": "sel_guard_n",
+  "scalars": [],
+  "element": "sel_guard_x - 1",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

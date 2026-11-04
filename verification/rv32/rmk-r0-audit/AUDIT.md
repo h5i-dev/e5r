@@ -144,7 +144,7 @@ crate hashes and `.llvm.<n>` suffixes ignored:
   the expected bytes in `Entry.lean` if any change (the entry bytes are the same).
   The generated fidelity module derives `rwBase` itself.
 * **Checked here, without migrating anything:** a throwaway RAM-image job on
-  5871dcee (`e5r-verify check`, board `qemu-virt-rv32`) is `proved`. The
+  5871dcee (`e5r check`, board `qemu-virt-rv32`) is `proved`. The
   exporter accepts the ELF, and the kernel proves `RamElf.accepts`, the manifest
   agreement, entry 0x80000000, `rwBase` 0x80029590 and the same first four bytes
   at the entry.

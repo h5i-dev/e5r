@@ -1,0 +1,25 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_inc",
+  "class": "map32",
+  "arrays": [
+    "gs_inc_x"
+  ],
+  "output": "gs_inc_x",
+  "length": "gs_inc_n",
+  "scalars": [],
+  "element": "gs_inc_x + 1",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_inc_x",
+        "%rd2": "index64",
+        "%rd4": "stride64",
+        "%rd5": "length"
+      }
+    }
+  }
+}

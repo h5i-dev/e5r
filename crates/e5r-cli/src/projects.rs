@@ -36,7 +36,7 @@ pub fn resolve(reference: &Path) -> Result<PathBuf, String> {
     let name = reference.to_str().ok_or("project name must be UTF-8")?;
     let path = registry()?.path(name)?;
     if !path.is_file() {
-        return Err(format!("project {name:?} not found; use e5r project list"));
+        return Err(format!("project {name:?} not found; use e5rx project list"));
     }
     Ok(path)
 }

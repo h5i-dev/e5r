@@ -1,0 +1,19 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "addk",
+  "class": "map32",
+  "arrays": [
+    "addk_x",
+    "addk_y"
+  ],
+  "output": "addk_y",
+  "length": "addk_n",
+  "scalars": [
+    "addk_k"
+  ],
+  "element": "addk_x + addk_k",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

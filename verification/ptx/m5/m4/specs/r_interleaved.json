@@ -1,0 +1,26 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "r_interleaved",
+  "class": "reduce32",
+  "result": "per_block",
+  "input": "r_interleaved_param_0",
+  "output": "r_interleaved_param_1",
+  "length": "r_interleaved_param_2",
+  "shared": "_ZZ13r_interleavedE1s",
+  "max_block": 1024,
+  "barriers": {
+    "after_load": {
+      "%r1": "ntid",
+      "%r2": "ctaid",
+      "%r3": "tid",
+      "%r7": "shared_tid",
+      "%rd2": "output"
+    },
+    "loop": {
+      "%r2": "ctaid",
+      "%r3": "tid",
+      "%r7": "shared_tid",
+      "%rd2": "output"
+    }
+  }
+}

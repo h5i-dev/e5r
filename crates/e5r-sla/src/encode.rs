@@ -3,7 +3,7 @@
 //! This is the exact inverse of [`crate::decode`], and it is held to that
 //! standard: the corpus test re-encodes every `.sla` Ghidra ships and requires
 //! the bytes back. That is what makes the encoding claims in
-//! `docs/sla-format.md` testable in the writing direction and not only the
+//! `docs/toolkit/sla-format.md` testable in the writing direction and not only the
 //! reading one, and it is the foundation everything above it stands on, since
 //! a writer that emits the right tree but the wrong bytes would look correct
 //! to our own reader and to nothing else.
@@ -96,7 +96,7 @@ fn push_tag(out: &mut Vec<u8>, short: u8, ext: u8, id: u32) {
     push_chunks(out, u128::from(id), n);
 }
 
-/// Value type codes. The reader's names, from `docs/sla-format.md`.
+/// Value type codes. The reader's names, from `docs/toolkit/sla-format.md`.
 const V_BOOL: u8 = 1;
 const V_SIGNED_POS: u8 = 2;
 const V_SIGNED_NEG: u8 = 3;
@@ -201,7 +201,7 @@ pub fn encode_into(out: &mut Vec<u8>, root: &Node) -> Result<(), EncodeError> {
 ///
 /// The compiler builds thousands of small elements and the shape of the file
 /// is easier to check when the code that writes it reads like the tree in
-/// `docs/sla-format.md`. Byte ranges are left at zero: they describe where a
+/// `docs/toolkit/sla-format.md`. Byte ranges are left at zero: they describe where a
 /// node was read from, and a node that was built rather than read has no such
 /// place. [`crate::Sla::parse`] fills them in when the result is read back.
 #[derive(Debug, Clone)]

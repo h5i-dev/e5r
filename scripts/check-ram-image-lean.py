@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check an `e5r-verify ram-image` image.lean against the ELF and the checker's reader.
+"""Check an `e5r ram-image` image.lean against the ELF and the checker's reader.
 
 Usage: python3 -I scripts/check-ram-image-lean.py IMAGE.elf OUT_DIR RV32_DIR [BASE SIZE]
 

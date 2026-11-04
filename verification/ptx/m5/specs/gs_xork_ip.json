@@ -1,0 +1,28 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_xork_ip",
+  "class": "map32",
+  "arrays": [
+    "gs_xork_ip_x"
+  ],
+  "output": "gs_xork_ip_x",
+  "length": "gs_xork_ip_n",
+  "scalars": [
+    "gs_xork_ip_k"
+  ],
+  "element": "gs_xork_ip_x ^ gs_xork_ip_k",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_xork_ip_x",
+        "%r1": "scalar gs_xork_ip_k",
+        "%rd2": "index64",
+        "%rd4": "stride64",
+        "%rd5": "length"
+      }
+    }
+  }
+}

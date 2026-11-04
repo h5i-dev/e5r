@@ -1,0 +1,21 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "fbug_axpy_fused",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "fbug_axpy_fused_x",
+  "fbug_axpy_fused_y"
+ ],
+ "output": "fbug_axpy_fused_y",
+ "length": "fbug_axpy_fused_n",
+ "scalars": [
+  "fbug_axpy_fused_a"
+ ],
+ "element": "add.rn(mul.rn(fbug_axpy_fused_a, fbug_axpy_fused_x), fbug_axpy_fused_y)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

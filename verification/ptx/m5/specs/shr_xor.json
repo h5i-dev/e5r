@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "shr_xor",
+  "class": "map32",
+  "arrays": [
+    "shr_xor_a",
+    "shr_xor_b",
+    "shr_xor_c"
+  ],
+  "output": "shr_xor_c",
+  "length": "shr_xor_n",
+  "scalars": [],
+  "element": "(shr_xor_a >> 7) ^ shr_xor_b",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

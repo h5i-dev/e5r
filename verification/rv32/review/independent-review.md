@@ -278,7 +278,7 @@ production replay accepts a model whose every device write is wrong.
 | --- | --- |
 | `lake env lean --run review/Repro.lean` | 5 PASS + control PASS (4 FAIL on `593ed31`) |
 | `python3 review/harness.py` | 1725 cases, every case as expected (the three SC cases are now a QEMU divergence or a decline) |
-| `lake env lean -j1 Projects/hifive1/Duty.lean` (image regenerated with `e5r-verify flash` from the 3a6742af ELF) | checks; `duty_contract` axioms `propext, Classical.choice, Quot.sound` |
+| `lake env lean -j1 Projects/hifive1/Duty.lean` (image regenerated with `e5r flash` from the 3a6742af ELF) | checks; `duty_contract` axioms `propext, Classical.choice, Quot.sound` |
 | `Projects/hifive1/clamp/Proof.lean` (ELF rebuilt with `rustc +1.98.1 --target riscv32imac-unknown-none-elf -C opt-level=2 -C panic=abort -C relocation-model=static -C link-arg=-Tlink.ld`, byte-identical to the production worker's `hifive1-clamp-O2.elf`, SHA-256 `0294b5dd…9544`) | checks; `clamp_all` axioms `propext, Quot.sound` |
 | review firmware replay | agrees (section 5) |
 

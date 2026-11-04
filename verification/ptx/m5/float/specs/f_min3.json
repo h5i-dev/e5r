@@ -1,0 +1,21 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_min3",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_min3_a",
+  "f_min3_b",
+  "f_min3_c",
+  "f_min3_d"
+ ],
+ "output": "f_min3_d",
+ "length": "f_min3_n",
+ "scalars": [],
+ "element": "min(min(f_min3_a, f_min3_b), f_min3_c)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

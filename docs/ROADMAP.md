@@ -4,6 +4,16 @@ Status: in progress, 2026-09-13. This file is the scope authority for e5r:
 what it is, what gets built in what order, and what will be refused in review
 rather than argued about again.
 
+**Repositioning (owner decision, 2026-11-03).** e5r is now presented as
+*assembly-level formal verification with Lean 4*. The verifier, `e5r`,
+with the PTX scope P and the RISC-V scopes V0, F and R below, is the product.
+The binary analysis toolkit described by M0 to M12 (loaders, decoders, IR,
+decompiler, differ, annotation log) ships as the `e5rx` binary and
+is development infrastructure for the verifier. Its milestones and the "Not
+building" list stay in force; when the two compete for effort, the verifier
+comes first. No output of the toolkit is an input to any proof. The sections
+below were written before this decision and are kept as the record.
+
 ## Where it stands
 
 | Part | State |
@@ -27,7 +37,7 @@ rather than argued about again.
 | benchmarks and scorecard | built (M11) |
 | fuzzing, coverage and mutation tooling | built (M12); packaging not started |
 
-The measured numbers live in [`docs/scorecard.md`](scorecard.md),
+The measured numbers live in [`docs/toolkit/scorecard.md`](toolkit/scorecard.md),
 including the ones that go against us. In short: `libc.so.6` analyzes in 0.10s
 and 58 MB, finding 3,517 functions with 95.3% analyzed completely, where
 `objdump -d` takes 0.26s and only disassembles; both decoders are at zero
@@ -103,7 +113,7 @@ e5r-db        content anchors, the annotation log, git merge semantics
 e5r-diff      function matching, build-to-build diff
 e5r-patch     assembler-backed patch sets
 e5r-api       stable library surface and the versioned JSON schema
-e5r-cli       the e5r binary
+e5r-cli       the e5rx binary (the toolkit)
 ```
 
 Dependency edges run downward only. `e5r-cli` may depend on everything;
@@ -118,7 +128,7 @@ Dependency edges run downward only. `e5r-cli` may depend on everything;
       `.claude/settings.local.json`. This machine has 7.5 GB of RAM; a dev-profile
       build of a workspace this size is not affordable.
 - [x] Delete `src/`, `test/`, `script/`, `CMakeLists.txt` and the C++ build. Move
-      `MEMO.md` to `docs/x86-64-notes.md`.
+      `MEMO.md` to `docs/toolkit/x86-64-notes.md`.
 - [x] Cargo workspace, edition 2024, MSRV pinned, `resolver = "3"`.
 - [x] `[profile.release]` with `panic = "unwind"`, because the fuzz targets need
       it. Debug symbols are off: on 7.5 GB of RAM, linking with them is the
@@ -225,7 +235,7 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       declines because it faults on hardware, and what it decodes where llvm
       declines is listed with the reason.
 - [x] SLEIGH runtime. The `.sla` format is worked out in
-      [`docs/sla-format.md`](sla-format.md) and its reader consumes all
+      [`docs/toolkit/sla-format.md`](toolkit/sla-format.md) and its reader consumes all
       137 files Ghidra ships. The decode engine measures 0 wrong against
       objdump on AArch64 (19,710), x86-64 (5,688) and RISC-V 64 (2,567), the
       last being an architecture this tool could not decode at all and for
@@ -249,7 +259,7 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       space table and 148 on the constructor count.
 - [x] Assembler for x86-64 and AArch64, needed by M10 patching. Encoding only,
       from public manuals, built around the decoder so it accepts our own
-      disassembly verbatim: a user can copy a line out of `e5r disas`, change
+      disassembly verbatim: a user can copy a line out of `e5rx disas`, change
       it, and assemble it back. Round trip over the whole fixture corpus, 0
       wrong on both architectures; byte-identical to `as` and
       `aarch64-linux-gnu-as` on every one of 2,535 and 1,272 comparable forms.
@@ -501,7 +511,7 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 
 This is the feature that distinguishes e5r from every incumbent, so it gets
 designed before it gets coded, and the design lives in
-[`docs/design/db.md`](design/db.md).
+[`docs/toolkit/design/db.md`](toolkit/design/db.md).
 
 - [x] Content anchors. A function is identified by a fingerprint of its
       instruction-shape stream with branch targets excluded, so the identity
@@ -644,7 +654,7 @@ designed before it gets coded, and the design lives in
       distribution's development packages carry the same code under the same
       names, are what a statically linked binary was built from, and need no
       reading of anyone's format.
-- [x] Emulation, built on the M4 IR interpreter: `e5r emulate` runs a
+- [x] Emulation, built on the M4 IR interpreter: `e5rx emulate` runs a
       function with given arguments and reports what came back and what it
       touched. Nothing escapes the process. Gated against the processor by
       running the oracle's case table through it.
@@ -671,7 +681,7 @@ designed before it gets coded, and the design lives in
       rerun in CI, with a regression budget. 16 binaries, 21x to 3,291x faster
       and 2.4x to 8.6x less memory, with the three qualifications that ratio
       needs in the table rather than under it, and the one row e5r loses left
-      in. `docs/benchmarks.md`, `scripts/bench-budget.json`. Ghidra's headless
+      in. `docs/toolkit/benchmarks.md`, `scripts/bench-budget.json`. Ghidra's headless
       analyzer is wired and opt-in behind `GHIDRA_INSTALL_DIR`, but its
       decompiler ships x86-64 only, so on this aarch64 host the comparison that
       would matter most cannot be made.
@@ -690,7 +700,7 @@ designed before it gets coded, and the design lives in
       stored blocks were 2.69M distinct ranges, held once per function that
       could reach them. Wall time is unchanged and is not claimed as a win.
 - [x] Profiling as a habit, with `scripts/flamegraph.sh` checked in and run
-      rather than merely written. It found that `e5r funcs` spends 12.3% of
+      rather than merely written. It found that `e5rx funcs` spends 12.3% of
       its time computing content anchors for every function before printing
       anything.
 
@@ -703,14 +713,14 @@ designed before it gets coded, and the design lives in
       read by indexing the slice instead of through the reader. A `cargo-fuzz`
       setup for longer runs is still to do.
 - [x] Resource caps on every attacker-controlled count, with a documented
-      policy in [`docs/design/limits.md`](design/limits.md): bound by
+      policy in [`docs/toolkit/design/limits.md`](toolkit/design/limits.md): bound by
       the file first, then by the cap, check the cursor advanced, and read
       through the reader. Checked by the mutation fuzzer in the ordinary test
       suite rather than by review.
 - [x] `#![forbid(unsafe_code)]` on every crate except `e5r-cli`, which is
       `#![deny(unsafe_code)]` so one audited call can opt in. There is exactly
       one exception, the memory map, and its justification is in
-      [`docs/design/limits.md`](design/limits.md).
+      [`docs/toolkit/design/limits.md`](toolkit/design/limits.md).
 - [x] A no-panic gate on every path that reads foreign bytes, 1.26 million cases
       inside a 12-second budget so it runs every time rather than nightly. It
       asserts three things and not one: no panic, a per-case ceiling, and that
@@ -735,9 +745,9 @@ designed before it gets coded, and the design lives in
       archive served locally, and against a tampered checksum, a missing
       `SHA256SUMS` and a missing archive, each of which it refuses. The draft
       Homebrew formula it replaced had never been run at all.
-- [x] `MANUAL.md`, a design document per subsystem under `docs/design/`, and a
+- [x] `MANUAL.md`, a design document per subsystem under `docs/toolkit/design/`, and a
       tutorial that takes a reader from a stripped binary to a named, typed,
-      committed annotation log (`docs/tutorial.md`).
+      committed annotation log (`docs/toolkit/tutorial.md`).
 
 ## V0. Binary-level Lean firmware research (2026-10-28 authorization)
 
@@ -766,8 +776,8 @@ or decompiler roadmap or authorize a firmware framework.
 
 The supported subset, exact statements, build commands, assumptions, provenance
 and trusted computing base are together in
-[`verification-rv32.md`](verification-rv32.md). Implementation is isolated in
-`e5r-verify` and `verification/rv32`; no empty firmware crate or CI profile change.
+[`verification-rv32.md`](verification/rv32-research.md). Implementation is isolated in
+`e5r` and `verification/rv32`; no empty firmware crate or CI profile change.
 
 ## F. Scoped firmware verification (2026-10-28 owner authorization)
 
@@ -775,7 +785,7 @@ The owner expanded V0 into a production tool for one scope: a binary-level,
 Lean-kernel-checked safety guarantee for firmware on one RISC-V board. This is
 the only architecture exception; it does not reorder M1-M12 or the decoder
 priorities, and nothing in it trusts e5r's decompiler, CFG recovery or IR.
-Product documentation is [`firmware-verification.md`](firmware-verification.md).
+Product documentation is [`firmware-verification.md`](verification/firmware.md).
 Each item is checked only when its acceptance criterion has been run.
 
 - [x] **F1. Stable baseline.** V0 committed as inherited, its fixture-corpus
@@ -805,7 +815,7 @@ Each item is checked only when its acceptance criterion has been run.
       execution is exhibited (nonvacuity); the axiom audit shows only
       `propext`, `Quot.sound` and `Classical.choice`. (Accepted 2026-10-29:
       `clamp_all`, `duty_contract`, both `nonvacuous`.)
-- [ ] **F5. General workflow.** *Accepted:* `e5r-verify check` takes a job
+- [ ] **F5. General workflow.** *Accepted:* `e5r check` takes a job
       file (ELF, board, property, entry/boot model) and returns structured JSON
       with one of `proved`, `counterexample`, `unknown`, `unsupported`,
       `resource_exhausted`, `error`; resource limits and resumable runs; a new
@@ -845,7 +855,7 @@ Each item is checked only when its acceptance criterion has been run.
       result binding and staleness, CI job (not yet run on a runner),
       malformed-input and runner controls, schema names, docs, an
       installation guide (`firmware-verification-install.md`), Lean-only
-      offline recheck bundles (`e5r-verify bundle`), kernel replay of every
+      offline recheck bundles (`e5r bundle`), kernel replay of every
       module (`leanchecker`), and an independent review by a separate
       reviewer agent session (findings fixed and recorded in
       `firmware-verification.md`). *Open:* a review by a human RISC-V or
@@ -853,7 +863,7 @@ Each item is checked only when its acceptance criterion has been run.
 
 ## R. RMK on RISC-V (2026-10-29 owner authorization)
 
-Integrated checkpoint and replay instructions: [RMK checkpoint](rmk-checkpoint.md).
+Integrated checkpoint and replay instructions: [RMK checkpoint](verification/rmk-checkpoint.md).
 This preserves partial results; `SessionSafe` and reproducible R0 remain open.
 
 The next product target is upstream [RMK](https://github.com/rmk-rs/rmk),
@@ -1040,6 +1050,167 @@ Not in this scope, and not to be described as done: Cortex-M, multiple harts,
 DMA, U-mode/PMP, microkernels, timing or deadline guarantees, other boards,
 verified Rust, verified compilers, or all of Embassy.
 
+## P. PTX kernel verification (2026-10-31 owner authorization)
+
+The owner authorized a second verification subject: NVIDIA PTX written
+directly by an AI (or emitted by a compiler), checked in Lean 4 for memory
+safety, data-race freedom and functional correctness against a Lean
+specification. No CUDA C++, Triton or Rust translation, no reference kernel and
+no equivalence check is part of the proof. The question the scope answers:
+can these properties of LLM-generated PTX be proved automatically in Lean 4
+without trusting the LLM or a high-level compiler? Design, theorem statements,
+assumptions and the trusted base are in
+[`verification-ptx.md`](verification/ptx.md). The Lean project is
+`verification/ptx` (core Lean v4.35.0, no Mathlib); the parser and exporter are
+`crates/e5r-ptx`, reached through `e5r ptx`. It does not reorder M1-M12
+and adds nothing to e5r's disassembler, lifter or decompiler. Each item is
+checked only when its acceptance criterion has been run.
+
+- [x] **P0. Prior work studied.** `facebookresearch/lean_kernel_verify`,
+      `alinamiretai/trident` and `verse-lab/velvet` read at source level, with
+      what is reused and what is not recorded. *Accepted:* the study section
+      of `verification-ptx.md`. (Accepted 2026-10-31.)
+- [x] **P1 (M1). PTX semantics and sequential proofs.** *Accepted:* Lean
+      semantics for the integer/global subset (`add sub mul.lo mul.wide mad.lo
+      and or xor not shl shr mov setp selp cvt cvta.to.global ld.param ld.global
+      st.global bra ret exit`, predication, `%tid %ntid %ctaid %nctaid`) with
+      wrapping arithmetic, alignment and allocation faults; a strict parser
+      whose output is checked by a token-level round trip; a single-thread loop
+      (`sum`) proved for every `n` by a loop invariant; axiom audit shows only
+      `propext`, `Quot.sound`, `Classical.choice`. (Accepted 2026-10-31:
+      `sum_correct`.)
+- [x] **P2 (M2). SIMT and data-race freedom.** *Accepted:* interleaved grid
+      semantics; one generic theorem from per-thread footprint proofs to
+      no fault, bounded termination, race freedom and the final memory under
+      every interleaving; vector add and a map proved for arbitrary input length
+      over the legal launch range; negative controls refuted by kernel-checked
+      counterexamples. The transfer from the sequentially consistent model to
+      PTX's weaker memory model is a recorded assumption, not a theorem. (Accepted 2026-10-31: `grid_sound`; `vadd_correct` on
+      nvcc 13.2's own PTX, for `G·B ≤ 2^31` threads covering `n < 2^31`;
+      `saxpy_correct` with a grid-stride loop, for every `G`, `B`, `n`;
+      `nobound_faults`, `tid_races`, `sub_wrong`. `scripts/check-lean-ptx.sh`:
+      6 generated modules current, all benchmarks assemble with ptxas 13.2, 10
+      theorems audited, about 30 s.)
+- [x] **P3 (M3). Proof automation.** *Accepted:* a model writes PTX and the
+      invariants, and a tactic proves the per-thread and grid obligations
+      without a hand-written proof; wrong PTX yields a replayed counterexample
+      where one exists. (Accepted 2026-11-01, for the `map32` class:
+      elementwise maps over 32-bit arrays, guarded or grid-stride, 1-D.
+      `e5r ptx check` generates `spec.Correct K` from an
+      `e5r.ptx.spec.v1` spec whose loop invariant is register roles at the
+      loop head, proves it with `Ptx/Auto` (class theorem proved once,
+      per-thread obligations by `ptx_guarded`/`ptx_stride_*`), and otherwise
+      replays a counterexample from the interpreter search as `¬ spec.Correct
+      K`. Measured: vadd_nvcc and saxpy proved; vadd_nobound, vadd_tid,
+      vadd_sub refuted; 0 of 21 mutants proved, 20 refuted, 1 unknown (a loop
+      that never advances: non-termination has no finite witness); 102 M5
+      kernels proved with no per-kernel proof. Outside the class the verdict
+      is `unsupported` or `unknown`.)
+- [x] **P4 (M4). Shared memory, barriers, reductions.** *Accepted:* `.shared`,
+      `bar.sync`, atomics in the model with the synchronization rules they
+      need; a parallel reduction and a scan proved. (Accepted 2026-11-01:
+      per-CTA shared memory, `bar.sync 0` as a release rule in `Step` with
+      divergence a fault, `atom`/`red`/`atom.cas` as one read-modify-write,
+      phase-relative `RaceFree`; `grid_sound` re-proved on the new `Step`;
+      `phase_sound` composes per-thread, per-phase derivations with atomic
+      accumulator cells; `reduce_correct` (every power-of-two block up to 1024),
+      `scan_correct` (every block up to 1024) and `reduce_atomic_correct` on
+      nvcc 13.2's PTX. `e5r ptx check` classes `reduce32` and `scan32`:
+      class theorems proved once, phase obligations generated from register
+      roles at each barrier, a barrier-aware search replayed in Lean through
+      `Cfg.exec`. Measured: the three benchmarks proved; 0 of 14 M4 mutants
+      proved, 14 refuted; parser, interpreter and ptxas agreement extended;
+      GPU differential test 1039 launches of 529 kernels identical across
+      the model, the interpreter, the JIT and ptxas. Outside the two classes
+      the verdict is `unsupported` or `unknown`; atomics other than `add` and
+      shared-memory accumulators were in the model but not in the phase
+      theorem (other commutative atomics added in P7). `scripts/recheck-ptx.sh` passes: 24 main theorems audited, 9
+      benchmark verdicts as expected, 0 of 35 mutants proved and 34 refuted,
+      the differential test identical.)
+- [x] **P5 (M5). AI-generated PTX at scale.** *Accepted:* specification to PTX
+      to Lean to GPU benchmark, reported as the share of generated kernels
+      proved, bugs found, proof time per kernel and speed against a CUDA or
+      Triton baseline. (Accepted 2026-11-01: `verification/ptx/m5`, 115
+      kernels written by the agent in one session, 11 of them with seeded
+      defects; of the 104 written to be correct 102 proved and 2 unsupported;
+      9 seeded defects refuted with replayed counterexamples, 2 unsupported;
+      proof time median 3.5 s, max 8.8 s; nvcc -O3 baseline time / PTX time
+      median 1.00 on the A10G; every proved kernel agrees with its spec on the
+      GPU. Limits, recorded in `m5/RESULTS.md`: no automated generation loop
+      (no model API on the machine), tactics improved during the run with
+      first-run verdicts listed, no natural defect found, A10G only. The
+      differential test of the instruction semantics against the A10G is
+      done: 829 launches of 419 kernels identical across the Lean model, the
+      interpreter, the JIT and ptxas, and misaligned accesses fault on both.
+      Rerun 2026-11-01 with M4 kernels (`m5/m4/RESULTS.md`): 14 CUDA C kernels
+      written before any was checked and compiled by nvcc, no planted defect;
+      first run 3 proved, 1 refuted, 6 unknown, 4 unsupported; after the
+      fixes it prompted 6 proved, 3 refuted (two signed-length defects and an
+      early return before a barrier, none planted), 1 unknown, 4 unsupported;
+      24 random mutants: 0 proved, 21 refuted, 3 unknown.)
+- [x] **P6. Supplied proofs.** *Accepted:* `ptx check` accepts a Lean proof
+      written by someone else for a kernel the automation cannot handle; the
+      tool generates the statement from the PTX and spec, checks the proof
+      proves exactly it, audits axioms, binds it to the PTX, spec and
+      toolchain hashes, and records in the JSON that the proof was supplied;
+      a weaker or different statement, `sorry`, an added axiom and a stale
+      hash are refused; two kernels unsupported only because of class shape
+      proved. (Accepted 2026-11-01: `--proof`, generated module `E5rSpec`,
+      checker `proofcheck` replaying every declaration through the Lean
+      kernel; `a_direct` and `s_pingpong` proved; `proofs/controls.sh`: 2
+      accepted, 10 refused, among them `debug.skipKernelTC`, `native_decide`,
+      a forbidden import and a missing manifest.)
+- [x] **P7. Commutative, associative atomics.** *Accepted:* `phase_sound`
+      and the automation cover `add`, `min`/`max` at each signedness, `and`,
+      `or`, `xor` at 32 and 64 bits; `exch` and `cas` either have a sound rule
+      or what is not covered is recorded; class kernels, nvcc benchmarks,
+      mutation controls and GPU difftest cases for each. (Accepted
+      2026-11-01: `phase_sound` over a `CellAlg`, 16 algebras with their
+      laws in `Ptx/Logic/CellAlgs.lean`; class `accum` with
+      `Accum.correct_of` proved once; 16 nvcc 13.2 benchmarks proved, 14 to
+      17 s each; 0 of 11 mutants proved, 11 refuted; the GPU differential
+      test has every operation and type contended on one address, 1071
+      launches identical. `exch` and `cas` have no rule: recorded in
+      `verification-ptx.md` with the reason and what a rule would need.
+      Shared-memory atomics and mixed operations per kernel are also not
+      covered.)
+- [x] **P8. Floating point.** *Accepted:* `.f32` and `.f64` in the model,
+      parser, interpreter and difftest from the PTX ISA and IEEE 754 (add,
+      sub, mul, fma, div, sqrt, rcp, min, max, neg, abs, setp, cvt between
+      float and integer, every rounding modifier, `.ftz`, `.sat`, NaN,
+      signed zero, subnormals, infinities); correctly rounded operations
+      bit-identical to the A10G on a large difftest with edge cases;
+      approximate instructions modelled with a justified bound or refused;
+      a spec format for bit-exact results or error bounds; automation for
+      float maps and, if possible, float reductions with an error bound;
+      float kernels in M5 with first-run verdicts. (Accepted 2026-11-02, with
+      the limits stated: 311 float kernels, 622 launches, about 677,000
+      results identical across the Lean model, the interpreter, the JIT and
+      ptxas, NaN results compared as NaN because PTX leaves their bits
+      unspecified and the model takes them from a launch oracle; planted
+      rounding and `.ftz` errors detected; the rounding core proved equal to
+      lean-ieee754's `roundWithMode`, `OverflowWithMode`, `TinyWithMode` and
+      its square-root rounding in a separate Mathlib project; unrounded
+      `add/sub/mul` (fusable by ptxas) and approximate instructions refused;
+      float map specs `bit_exact` or `max_ulps`; nvcc's saxpy (fma), div,
+      sqrt and fmaxf kernels proved; M5 float part: 16 of 16 agent-written
+      kernels proved on the first run and bit-equal to nvcc intrinsic
+      baselines on the GPU, 6 seeded defects 4 refuted, 1 unknown, 1
+      unsupported on the first run and 5 refuted after a search fix; 0 of 13
+      float mutants proved. Open, with the reasons in `verification-ptx.md`:
+      error bounds proved only where the kernel is bit-exact, no float
+      reductions, no `.f64` maps, no approximate instructions.
+      `scripts/recheck-ptx.sh` passes, 2026-11-02, 90 min: 26 benchmarks
+      proved, 3 refuted, 2 unsupported as expected; 0 of 59 mutants proved,
+      58 refuted; 2 supplied proofs accepted, 10 refused; difftest 1693
+      launches identical; cross-check audit clean.)
+
+Not in this scope, and not to be described as done: SASS, the ptxas or driver
+translation from PTX to SASS, floating-point formats other than `.f32` and
+`.f64`, the PTX memory model beyond the
+data-race-free fragment, warp-level instructions, tensor cores, texture or
+surface memory, or any kernel beyond the ones the theorems name.
+
 ## Quality gates
 
 Green before every merge to main. Each one is a command, not a judgment call.
@@ -1158,7 +1329,7 @@ Counted by what it finds, not by whether it runs.
 ## Scorecard
 
 The claim is that e5r is better than the incumbents, so it needs numbers that
-can prove it wrong. These get recorded in `docs/scorecard.md` from the first
+can prove it wrong. These get recorded in `docs/toolkit/scorecard.md` from the first
 release and rerun every release.
 
 | Measure | Against |
@@ -1249,17 +1420,17 @@ Tasks:
       ground-truth functions: 1.000 and 1.000 stripped, and 0.766 and 0.937
       with `.eh_frame` removed as well, which is the number that says what the
       analysis can do with nothing but code. See
-      [`docs/boundaries.md`](boundaries.md).
+      [`docs/toolkit/boundaries.md`](toolkit/boundaries.md).
 - [x] A DecBench backend for e5r, as `scripts/decbench_e5r.py`. Out of tree,
       which DecBench's own documentation permits, so the benchmark checkout
       stays untouched. Driven by `scripts/decbench.sh`.
 - [ ] Submit to the 250-function sample set as soon as M6 produces output at all.
       It needs no harness and no open-sourcing: decompile the kit, mail back the
       zip. An early bad score is a baseline, not an embarrassment.
-- [x] Record the DecBench numbers in `docs/scorecard.md` per release, including
+- [x] Record the DecBench numbers in `docs/toolkit/scorecard.md` per release, including
       the runs where we lose. The first run is one we lose: 23.4 union against
       angr's 37.0 on the same slice, with the method and the defect analysis in
-      [`docs/decbench.md`](decbench.md).
+      [`docs/toolkit/decbench.md`](toolkit/decbench.md).
 
 ## Not building
 
@@ -1270,16 +1441,18 @@ it was closed.
   for a local dashboard, durable project tasks and a decompiler pane. This
   workspace uses existing library analysis and keeps the CLI complete; it does
   not add a mandatory project service or desktop framework. See
-  [`docs/dashboard.md`](dashboard.md).
+  [`docs/toolkit/dashboard.md`](toolkit/dashboard.md).
 - **A debugger:** rizin and gdb do this well and it is a different product. The
   emulator in M10 runs code paths for analysis; it does not attach to a process.
 - **Ghidra script compatibility:** Running Java is the thing this project exists
   to avoid.
 - **Exotic architectures ahead of depth:** x86-64 and AArch64 on ELF, PE and
   Mach-O get finished before anything else gets attention, SLEIGH breadth aside.
-  The owner-authorized V0 research experiment and the F firmware-verification
-  scope above are the only exception: one RISC-V board for binary-level
-  proofs, not a general architecture expansion.
+  The owner-authorized scopes above are the only exceptions: V0, F and R
+  (binary-level proofs of RISC-V firmware: one board, then RMK on QEMU `virt`)
+  and P (NVIDIA PTX kernels as a Lean verification subject, 2026-10-31).
+  Neither is a general architecture expansion: P adds no PTX or SASS
+  disassembly, lifting or decompilation to e5r's analysis.
 - **Reverse engineering the incumbents' internals:** Clean-room: public
   specifications, published papers, and the source of permissively licensed
   projects used within their licenses.

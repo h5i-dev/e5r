@@ -1,0 +1,16 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "zero",
+  "class": "map32",
+  "arrays": [
+    "zero_y"
+  ],
+  "output": "zero_y",
+  "length": "zero_n",
+  "scalars": [],
+  "element": "0",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "lowbyte",
+  "class": "map32",
+  "arrays": [
+    "lowbyte_x",
+    "lowbyte_y"
+  ],
+  "output": "lowbyte_y",
+  "length": "lowbyte_n",
+  "scalars": [],
+  "element": "lowbyte_x & 255",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

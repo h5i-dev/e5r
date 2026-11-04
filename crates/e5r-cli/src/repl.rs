@@ -100,7 +100,7 @@ fn step(
     here: &mut Option<Addr>,
 ) -> Step {
     let Some(words) = crate::batch::split(text) else {
-        eprintln!("e5r: a quote was never closed");
+        eprintln!("e5rx: a quote was never closed");
         return Step::Continue;
     };
     let Some(first) = words.first().map(String::as_str) else {
@@ -118,7 +118,7 @@ fn step(
         "seek" | "s@" => {
             match words.get(1).and_then(|t| crate::addr::resolve(program, t)) {
                 Some(a) => *here = Some(a),
-                None => eprintln!("e5r: no such address"),
+                None => eprintln!("e5rx: no such address"),
             }
             return Step::Continue;
         }
@@ -133,7 +133,11 @@ fn step(
 
     // The file comes from the session, not the line, so a command cannot be
     // pointed at a different binary than the one that was analyzed.
-    let mut argv: Vec<String> = vec!["e5r".into(), name.into(), common.file.display().to_string()];
+    let mut argv: Vec<String> = vec![
+        "e5rx".into(),
+        name.into(),
+        common.file.display().to_string(),
+    ];
     let mut rest: Vec<String> = words[1..].to_vec();
     // A command that takes a target and was given none gets the current
     // address, which is what makes seeking worth anything.
@@ -148,7 +152,7 @@ fn step(
     let parsed = match <Cli as clap::Parser>::try_parse_from(&argv) {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("e5r: {e}");
+            eprintln!("e5rx: {e}");
             return Step::Continue;
         }
     };
@@ -156,7 +160,7 @@ fn step(
         // Both of these would analyze the file again, which is the cost this
         // exists to avoid, and nesting a session inside one answers nothing.
         Command::Repl { .. } | Command::Batch { .. } => {
-            eprintln!("e5r: not from a session");
+            eprintln!("e5rx: not from a session");
             return Step::Continue;
         }
         _ => {}
@@ -168,14 +172,14 @@ fn step(
     let opts = e5r_analysis::Options::default();
     let load = e5r_format::LoadOptions::default();
     if let Err(e) = crate::dispatch(&parsed, w, program, data, &load, &opts) {
-        eprintln!("e5r: {e}");
+        eprintln!("e5rx: {e}");
     }
     let _ = cli;
     Step::Continue
 }
 
 fn help(w: &mut Out) {
-    outln!(w, "Commands are the ones e5r takes, without the file:");
+    outln!(w, "Commands are the ones e5rx takes, without the file:");
     outln!(w, "");
     outln!(
         w,

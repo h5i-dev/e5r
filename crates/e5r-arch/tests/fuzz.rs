@@ -11,6 +11,12 @@ use e5r_core::Addr;
 
 const BUDGET: Duration = Duration::from_millis(1200);
 
+/// Fuzz tests do not run in GitHub Actions; CI sets GITHUB_ACTIONS, and these
+/// run locally on a plain `cargo test`. See .github/workflows/ci.yaml.
+fn skip_in_ci() -> bool {
+    std::env::var_os("GITHUB_ACTIONS").is_some()
+}
+
 struct Rng(u64);
 
 impl Rng {
@@ -26,6 +32,9 @@ impl Rng {
 
 #[test]
 fn aarch64_decodes_anything_without_panicking() {
+    if skip_in_ci() {
+        return;
+    }
     let mut rng = Rng(0xa64_0001);
     let start = Instant::now();
     let mut n = 0u64;
@@ -46,6 +55,9 @@ fn aarch64_decodes_anything_without_panicking() {
 
 #[test]
 fn x86_decodes_anything_without_panicking() {
+    if skip_in_ci() {
+        return;
+    }
     let mut rng = Rng(0x86_0002);
     let start = Instant::now();
     let mut n = 0u64;

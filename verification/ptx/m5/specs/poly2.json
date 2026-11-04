@@ -1,0 +1,21 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "poly2",
+  "class": "map32",
+  "arrays": [
+    "poly2_x",
+    "poly2_y"
+  ],
+  "output": "poly2_y",
+  "length": "poly2_n",
+  "scalars": [
+    "poly2_a",
+    "poly2_b",
+    "poly2_c"
+  ],
+  "element": "poly2_a * poly2_x * poly2_x + poly2_b * poly2_x + poly2_c",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

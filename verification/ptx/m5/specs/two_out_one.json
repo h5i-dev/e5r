@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "two_out_one",
+  "class": "map32",
+  "arrays": [
+    "two_out_one_a",
+    "two_out_one_b",
+    "two_out_one_c"
+  ],
+  "output": "two_out_one_c",
+  "length": "two_out_one_n",
+  "scalars": [],
+  "element": "3 * two_out_one_a - two_out_one_b",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "2147483647"
+  }
+}

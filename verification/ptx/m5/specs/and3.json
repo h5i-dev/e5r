@@ -1,0 +1,19 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "and3",
+  "class": "map32",
+  "arrays": [
+    "and3_a",
+    "and3_b",
+    "and3_c",
+    "and3_d"
+  ],
+  "output": "and3_d",
+  "length": "and3_n",
+  "scalars": [],
+  "element": "and3_a & and3_b & and3_c",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

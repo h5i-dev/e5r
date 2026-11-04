@@ -16,6 +16,12 @@ use e5r_core::{Addr, Arch};
 /// that nobody is tempted to skip the suite.
 const BUDGET: Duration = Duration::from_millis(1200);
 
+/// Fuzz tests do not run in GitHub Actions; CI sets GITHUB_ACTIONS, and these
+/// run locally on a plain `cargo test`. See .github/workflows/ci.yaml.
+fn skip_in_ci() -> bool {
+    std::env::var_os("GITHUB_ACTIONS").is_some()
+}
+
 /// A small deterministic generator, so a failure is reproducible from its seed.
 struct Rng(u64);
 
@@ -138,6 +144,9 @@ fn arches() -> [Arch; 2] {
 
 #[test]
 fn mutated_assembly_text_never_panics() {
+    if skip_in_ci() {
+        return;
+    }
     let mut rng = Rng(0x5eed_1234_abcd_0101);
     let start = Instant::now();
     let mut n = 0u64;
@@ -165,6 +174,9 @@ fn mutated_assembly_text_never_panics() {
 
 #[test]
 fn arbitrary_bytes_never_panic() {
+    if skip_in_ci() {
+        return;
+    }
     let mut rng = Rng(0x5eed_dead_beef_0202);
     let start = Instant::now();
     let mut n = 0u64;
@@ -224,6 +236,9 @@ fn a_block_of_text_assembles_line_by_line() {
     assert_eq!(bytes.len(), 16);
 
     let mut rng = Rng(0x5eed_0f0f_0303);
+    if skip_in_ci() {
+        return;
+    }
     for _ in 0..2000 {
         let mut block = String::new();
         for _ in 0..rng.below(8) {

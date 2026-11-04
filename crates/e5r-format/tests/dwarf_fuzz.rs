@@ -14,6 +14,12 @@ use std::time::{Duration, Instant};
 
 use e5r_format::{LoadOptions, load};
 
+/// Fuzz tests do not run in GitHub Actions; CI sets GITHUB_ACTIONS, and these
+/// run locally on a plain `cargo test`. See .github/workflows/ci.yaml.
+fn skip_in_ci() -> bool {
+    std::env::var_os("GITHUB_ACTIONS").is_some()
+}
+
 /// Sections whose contents the new readers walk.
 const TARGETS: [&str; 6] = [
     ".debug_info",
@@ -43,6 +49,9 @@ fn regions(bytes: &[u8]) -> Vec<(String, u64, u64)> {
 
 #[test]
 fn corrupting_a_debug_section_never_panics_or_hangs() {
+    if skip_in_ci() {
+        return;
+    }
     let Some(dir) = corpus() else { return };
     let opts = LoadOptions::default();
     let mut cases = 0u64;
@@ -82,6 +91,9 @@ fn corrupting_a_debug_section_never_panics_or_hangs() {
 
 #[test]
 fn a_truncated_debug_section_stops_rather_than_guessing() {
+    if skip_in_ci() {
+        return;
+    }
     let Some(dir) = corpus() else { return };
     let opts = LoadOptions::default();
     let started = Instant::now();
@@ -109,6 +121,9 @@ fn a_truncated_debug_section_stops_rather_than_guessing() {
 /// header followed by a list that lies, which a random flip rarely produces.
 #[test]
 fn a_range_list_that_runs_off_the_end_is_bounded() {
+    if skip_in_ci() {
+        return;
+    }
     let Some(dir) = corpus() else { return };
     let Ok(full) = std::fs::read(dir.join("hello.a64.O2")) else {
         return;

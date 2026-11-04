@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "pred_store",
+  "class": "map32",
+  "arrays": [
+    "pred_store_x",
+    "pred_store_y"
+  ],
+  "output": "pred_store_y",
+  "length": "pred_store_n",
+  "scalars": [],
+  "element": "~pred_store_x",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

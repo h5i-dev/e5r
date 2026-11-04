@@ -1,0 +1,28 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_mask_ip",
+  "class": "map32",
+  "arrays": [
+    "gs_mask_ip_x"
+  ],
+  "output": "gs_mask_ip_x",
+  "length": "gs_mask_ip_n",
+  "scalars": [
+    "gs_mask_ip_m"
+  ],
+  "element": "gs_mask_ip_x & gs_mask_ip_m",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^32",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_mask_ip_x",
+        "%r1": "scalar gs_mask_ip_m",
+        "%r2": "length",
+        "%r6": "index32",
+        "%r8": "stride32"
+      }
+    }
+  }
+}

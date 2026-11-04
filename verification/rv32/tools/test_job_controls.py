@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Negative controls for `e5r-verify check`: each must produce the stated
+"""Negative controls for `e5r check`: each must produce the stated
 status, and none may report `proved`. Run from the repository root after a
-release build of e5r-verify and with the pinned Lean on PATH."""
+release build of e5r and with the pinned Lean on PATH."""
 import json
 import os
 from pathlib import Path
@@ -11,7 +11,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[3]
 VERIFY = ROOT / 'verification/rv32'
-BIN = Path(os.environ.get('E5R_VERIFY', ROOT / 'target/release/e5r-verify'))
+BIN = Path(os.environ.get('E5R_VERIFY', ROOT / 'target/release/e5r'))
 WORK = VERIFY / 'build/controls'
 
 

@@ -27,5 +27,5 @@ Checks (from verification/rv32):
     python3 -I Projects/rmk/check_rmk.py ELF Projects/rmk/results/memmove-small.json  # proved, 93 theorems
     python3 -I Projects/rmk/test_controls.py                                           # 7/7 + baseline
 
-`check_rmk.py` does what `e5r-verify check` does (pin check, forbidden words, fresh compile, leanchecker,
+`check_rmk.py` does what `e5r check` does (pin check, forbidden words, fresh compile, leanchecker,
 axiom audit) because the runner cannot export RAM-resident images yet.

@@ -1,0 +1,29 @@
+.version 8.0
+.target sm_86
+.address_size 64
+
+.visible .entry madwide_idx(.param .u64 madwide_idx_a, .param .u64 madwide_idx_b, .param .u64 madwide_idx_c, .param .u32 madwide_idx_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<9>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [madwide_idx_a];
+	ld.param.u64 %rd2, [madwide_idx_b];
+	ld.param.u64 %rd3, [madwide_idx_c];
+	ld.param.u32 %r1, [madwide_idx_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mad.wide.u32 %rd5, %r5, 4, %rd1;
+	mad.wide.u32 %rd6, %r5, 4, %rd2;
+	mad.wide.u32 %rd7, %r5, 4, %rd3;
+	ld.global.u32 %r6, [%rd5];
+	ld.global.u32 %r7, [%rd6];
+	add.u32 %r8, %r6, %r7;
+	st.global.u32 [%rd7], %r8;
+DONE:
+	ret;
+}

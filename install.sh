@@ -12,7 +12,7 @@ main() {
       -h | --help)
         echo "Usage: install.sh"
         echo
-        echo "  Installs e5r, which is one binary with no runtime dependency."
+        echo "  Installs e5rx, the e5r toolkit binary, with no runtime dependency."
         echo
         echo "Piped into a shell, options go after \`sh -s --\`:"
         echo "  curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | sh -s -- --help"
@@ -39,7 +39,7 @@ main() {
     Darwin) os="macos" ;;
     *)
       echo "Unsupported OS: $OS" >&2
-      echo "Windows: download the .zip from the releases page and put e5r.exe on your PATH." >&2
+      echo "Windows: download the .zip from the releases page and put e5rx.exe on your PATH." >&2
       exit 1
       ;;
   esac
@@ -91,7 +91,7 @@ main() {
   # installer that has been run and one that has only been written.
   BASE="${E5R_BASE_URL:-https://github.com/${REPO}/releases/download/${VERSION}}"
 
-  echo "Installing e5r ${VERSION} (${target}) → ${INSTALL_DIR}/e5r"
+  echo "Installing e5r ${VERSION} (${target}) → ${INSTALL_DIR}/e5rx"
 
   if ! curl -fsSL "${BASE}/${ARCHIVE}" -o "${TMP}/${ARCHIVE}"; then
     echo "Could not download ${ARCHIVE}." >&2
@@ -148,16 +148,16 @@ main() {
   fi
 
   # ── install ────────────────────────────────────────────────────────────────
-  # `--no-same-owner`: only `$TMP/.../e5r` is installed, with an explicit mode,
+  # `--no-same-owner`: only `$TMP/.../e5rx` is installed, with an explicit mode,
   # so this changes nothing today. It is here so an archive with more members
   # cannot carry ownership in from a tarball the operator did not build.
   tar -xzf "${TMP}/${ARCHIVE}" -C "$TMP" --no-same-owner
 
   # The archive holds a directory, not a bare binary, so that the README, the
   # licence and the manual travel with it.
-  BIN="${TMP}/e5r-${BARE}-${target}/e5r"
+  BIN="${TMP}/e5r-${BARE}-${target}/e5rx"
   if [ ! -x "$BIN" ]; then
-    echo "The archive did not contain e5r where expected:" >&2
+    echo "The archive did not contain e5rx where expected:" >&2
     echo "  ${BIN}" >&2
     exit 1
   fi
@@ -166,17 +166,17 @@ main() {
   # which under sudo leaves a user-writable binary in a root-owned PATH
   # directory.
   if [ -w "$INSTALL_DIR" ]; then
-    install -m 755 "$BIN" "${INSTALL_DIR}/e5r"
+    install -m 755 "$BIN" "${INSTALL_DIR}/e5rx"
   elif [ -d "$INSTALL_DIR" ] || [ -w "$(dirname "$INSTALL_DIR")" ]; then
     sudo install -d -m 755 "$INSTALL_DIR"
-    sudo install -o root -g 0 -m 755 "$BIN" "${INSTALL_DIR}/e5r"
+    sudo install -o root -g 0 -m 755 "$BIN" "${INSTALL_DIR}/e5rx"
   else
     echo "${INSTALL_DIR} does not exist and its parent is not writable." >&2
     echo "Pick somewhere else: E5R_INSTALL_DIR=\$HOME/.local/bin sh install.sh" >&2
     exit 1
   fi
 
-  echo "✔  e5r ${VERSION} installed: run e5r --help"
+  echo "✔  e5r ${VERSION} installed: run e5rx --help"
 
   # Said once, at the end, rather than buried in the transcript above. A PATH
   # directory the invoking user can write is not a defect this script can fix
@@ -186,7 +186,7 @@ main() {
     *":${INSTALL_DIR}:"*) ;;
     *)
       echo "!  ${INSTALL_DIR} is not on your PATH." >&2
-      echo "   Add it, or run ${INSTALL_DIR}/e5r directly." >&2
+      echo "   Add it, or run ${INSTALL_DIR}/e5rx directly." >&2
       ;;
   esac
 }

@@ -20,7 +20,7 @@ pub enum Command {
         /// Concrete outcome. Required unless --input is supplied.
         #[arg(required_unless_present = "input", conflicts_with = "input")]
         title: Option<String>,
-        /// Full task content as JSON (see docs/dashboard.md).
+        /// Full task content as JSON (see docs/toolkit/dashboard.md).
         #[arg(long)]
         input: Option<PathBuf>,
         /// Responsible person or agent.

@@ -19,7 +19,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-e5r=${E5R:-target/release/e5r}
+e5r=${E5R:-target/release/e5rx}
 top=${TOP:-20}
 freq=${FREQ:-997}
 

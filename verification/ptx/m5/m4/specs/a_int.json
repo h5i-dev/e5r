@@ -1,0 +1,27 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "a_int",
+  "class": "reduce32",
+  "result": "atomic",
+  "input": "a_int_param_0",
+  "output": "a_int_param_1",
+  "length": "a_int_param_2",
+  "shared": "_ZZ5a_intE1s",
+  "max_block": 512,
+  "barriers": {
+    "after_load": {
+      "%r1": "ntid",
+      "%r12": "ctaid",
+      "%r2": "tid",
+      "%r6": "shared_tid",
+      "%rd2": "output"
+    },
+    "loop": {
+      "%r23": "stride",
+      "%r12": "ctaid",
+      "%r2": "tid",
+      "%r6": "shared_tid",
+      "%rd2": "output"
+    }
+  }
+}

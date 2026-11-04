@@ -272,6 +272,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "e5r-ptx"
+version = "0.1.0"
+
+[[package]]
 name = "e5r-sla"
 version = "0.1.0"
 dependencies = [
@@ -296,6 +300,7 @@ version = "0.1.0"
 dependencies = [
  "e5r-core",
  "e5r-format",
+ "e5r-ptx",
  "serde",
  "serde_json",
 ]

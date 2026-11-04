@@ -1,0 +1,32 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_axpby",
+  "class": "map32",
+  "arrays": [
+    "gs_axpby_x",
+    "gs_axpby_y"
+  ],
+  "output": "gs_axpby_y",
+  "length": "gs_axpby_n",
+  "scalars": [
+    "gs_axpby_a",
+    "gs_axpby_b"
+  ],
+  "element": "gs_axpby_a * gs_axpby_x + gs_axpby_b * gs_axpby_y",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_axpby_x",
+        "%rd2": "base gs_axpby_y",
+        "%r1": "scalar gs_axpby_a",
+        "%r2": "scalar gs_axpby_b",
+        "%rd3": "index64",
+        "%rd5": "stride64",
+        "%rd6": "length"
+      }
+    }
+  }
+}

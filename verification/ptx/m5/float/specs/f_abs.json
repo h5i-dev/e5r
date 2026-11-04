@@ -1,0 +1,19 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_abs",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_abs_x",
+  "f_abs_y"
+ ],
+ "output": "f_abs_y",
+ "length": "f_abs_n",
+ "scalars": [],
+ "element": "abs(f_abs_x)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

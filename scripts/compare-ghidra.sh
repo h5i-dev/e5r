@@ -3,7 +3,7 @@
 #
 # Not a test: it needs a JVM, a Ghidra installation and about twenty seconds
 # per binary. It is the comparison the roadmap claims to beat, so it is run by
-# hand and its numbers are recorded in docs/scorecard.md.
+# hand and its numbers are recorded in docs/toolkit/scorecard.md.
 #
 # Usage: scripts/compare-ghidra.sh <binary> [more binaries...]
 set -euo pipefail
@@ -11,7 +11,7 @@ set -euo pipefail
 # A fresh project each run: importing into an existing one is a no-op and
 # would report the previous analysis as if it were this one.
 project=${PROJECT:-e5rcompare-$$}
-e5r=${E5R:-target/release/e5r}
+e5r=${E5R:-target/release/e5rx}
 ghidra=${GHIDRA:-ghidra}
 
 command -v "$ghidra" > /dev/null || {

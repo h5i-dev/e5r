@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent oracle for `e5r-verify ram-image` output.
+"""Independent oracle for `e5r ram-image` output.
 
 Usage: python3 -I scripts/check-ram-image.py IMAGE.elf OUT_DIR
 

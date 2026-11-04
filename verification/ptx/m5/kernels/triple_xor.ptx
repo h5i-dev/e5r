@@ -1,0 +1,30 @@
+.version 8.0
+.target sm_86
+.address_size 64
+
+.visible .entry triple_xor(.param .u64 triple_xor_x, .param .u64 triple_xor_y, .param .u32 triple_xor_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<24>;
+	.reg .b64 %rd<24>;
+	ld.param.u64 %rd1, [triple_xor_x];
+	ld.param.u64 %rd2, [triple_xor_y];
+	ld.param.u32 %r1, [triple_xor_n];
+	mov.u32 %r2, %ctaid.x;
+	mov.u32 %r3, %ntid.x;
+	mov.u32 %r4, %tid.x;
+	mad.lo.u32 %r5, %r2, %r3, %r4;
+	setp.ge.u32 %p1, %r5, %r1;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd10, %r5, 4;
+	add.u64 %rd11, %rd1, %rd10;
+	add.u64 %rd12, %rd2, %rd10;
+	ld.global.u32 %r10, [%rd11];
+	shl.b32 %r8, %r10, 1;
+	xor.b32 %r9, %r10, %r8;
+	shl.b32 %r8, %r10, 2;
+	xor.b32 %r9, %r9, %r8;
+	st.global.u32 [%rd12], %r9;
+DONE:
+	ret;
+}

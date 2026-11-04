@@ -1,0 +1,48 @@
+name: ptx-full
+
+# The full PTX recheck (scripts/recheck-ptx.sh), by hand only.
+#
+# ci.yaml runs the quick set on every pull request. This adds what makes a full
+# recheck take about 90 minutes: the 59 mutation controls and the supplied-proof
+# controls, each of which starts Lean many times. That is mutation testing, not
+# a per-push check, so it is never triggered by a push or a pull request.
+# Start it from the Actions tab when you want the whole claim rechecked.
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  ptx-full:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Lean (elan; the version comes from verification/ptx/lean-toolchain)
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/v4.1.2/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Restore the Lean build
+        id: lake
+        uses: actions/cache/restore@v4
+        with:
+          path: verification/ptx/.lake/build
+          key: ptx-lake-${{ runner.os }}-${{ hashFiles('verification/ptx/lean-toolchain', 'verification/ptx/lakefile.lean', 'verification/ptx/lake-manifest.json', 'verification/ptx/**/*.lean') }}
+      - run: cargo build -p e5r-verify
+      - name: Every PTX proof, refutation, axiom audit, benchmark verdict, mutant and supplied proof
+        env:
+          E5R_VERIFY: target/debug/e5r
+          E5R_PTX_KEEP_BUILD: "1"
+        # The GPU differential test needs a GPU and skips itself here.
+        run: ./scripts/recheck-ptx.sh
+      - name: Save the Lean build
+        if: always() && steps.lake.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: verification/ptx/.lake/build
+          key: ${{ steps.lake.outputs.cache-primary-key }}

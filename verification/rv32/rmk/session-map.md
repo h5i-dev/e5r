@@ -95,7 +95,7 @@ lives in the task future, a static whose bases are s6 = 0x8002a4bd and s7 = 0x80
 ## Integrated checkpoint (2026-10-30)
 
 The table above records the original decomposition. The authoritative current status and
-commands are in [docs/rmk-checkpoint.md](../../../docs/rmk-checkpoint.md).
+commands are in [docs/verification/rmk-checkpoint.md](../../../docs/verification/rmk-checkpoint.md).
 
 * Event-aware composition exists in `Trees.lean`; UART read values are universally quantified.
 * `SomeRound.some_round` is a conditional implication with a refuted `EncodeContract` premise.

@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "bnot",
+  "class": "map32",
+  "arrays": [
+    "bnot_x",
+    "bnot_y"
+  ],
+  "output": "bnot_y",
+  "length": "bnot_n",
+  "scalars": [],
+  "element": "~bnot_x",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

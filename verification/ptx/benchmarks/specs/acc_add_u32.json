@@ -1,0 +1,10 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "acc_add_u32",
+  "class": "accum",
+  "op": "add",
+  "type": "u32",
+  "input": "acc_add_u32_param_0",
+  "output": "acc_add_u32_param_1",
+  "length": "acc_add_u32_param_2"
+}

@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "signed_idx_big",
+  "class": "map32",
+  "arrays": [
+    "signed_idx_big_x",
+    "signed_idx_big_y"
+  ],
+  "output": "signed_idx_big_y",
+  "length": "signed_idx_big_n",
+  "scalars": [],
+  "element": "2 * signed_idx_big_x",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

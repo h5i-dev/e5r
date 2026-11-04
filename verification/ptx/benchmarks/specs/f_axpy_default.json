@@ -1,0 +1,21 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_axpy_default",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_axpy_default_param_1",
+  "f_axpy_default_param_2"
+ ],
+ "output": "f_axpy_default_param_2",
+ "length": "f_axpy_default_param_3",
+ "scalars": [
+  "f_axpy_default_param_0"
+ ],
+ "element": "fma.rn(f_axpy_default_param_0, f_axpy_default_param_1, f_axpy_default_param_2)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "a_direct",
+  "class": "accum",
+  "op": "add",
+  "type": "u32",
+  "input": "a_direct_param_0",
+  "output": "a_direct_param_1",
+  "length": "a_direct_param_2"
+}

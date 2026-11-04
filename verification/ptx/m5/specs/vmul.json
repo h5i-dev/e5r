@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "vmul",
+  "class": "map32",
+  "arrays": [
+    "vmul_a",
+    "vmul_b",
+    "vmul_c"
+  ],
+  "output": "vmul_c",
+  "length": "vmul_n",
+  "scalars": [],
+  "element": "vmul_a * vmul_b",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

@@ -18,7 +18,7 @@
 //! disassembly actions and its subtable's decision tree. A file it writes
 //! decodes RISC-V and x86-64 identically to the specification it came from,
 //! and AArch64 identically but for eight encodings in twenty thousand; see
-//! `docs/sla-format.md`.
+//! `docs/toolkit/sla-format.md`.
 //!
 //! Not the p-code. A `construct_tpl` needs two things this project has not
 //! established by experiment: the rule the reference compiler uses to hand out

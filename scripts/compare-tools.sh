@@ -2,7 +2,7 @@
 # e5r measured against the other reverse engineering tools on this machine.
 #
 # Not a test: it needs rizin, and Ghidra with a JVM if that is asked for. The
-# numbers it prints are recorded in docs/benchmarks.md and docs/scorecard.md,
+# numbers it prints are recorded in docs/toolkit/benchmarks.md and docs/toolkit/scorecard.md,
 # and checked against scripts/bench-budget.json by scripts/check-bench-budget.py.
 #
 # Ghidra is opt-in: set GHIDRA_INSTALL_DIR to an installation and it joins the
@@ -15,7 +15,7 @@
 #   scripts/compare-tools.sh /bin/ls              # one binary
 #   RUNS=1 scripts/compare-tools.sh               # the fast loop
 #
-# Env: E5R                the e5r executable (default target/release/e5r)
+# Env: E5R                the e5r executable (default target/release/e5rx)
 #      RIZIN               the rizin executable (default whatever is on PATH)
 #      GHIDRA_INSTALL_DIR  a Ghidra installation; Ghidra is left out without one
 #      OUT                 where the JSON goes (default target/bench-tools.json,
@@ -29,7 +29,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-e5r=${E5R:-target/release/e5r}
+e5r=${E5R:-target/release/e5rx}
 rizin=${RIZIN:-rizin}
 out=${OUT:-target/bench-tools.json}
 
@@ -54,7 +54,7 @@ case ",${SKIP:-}," in
   *,rizin,*) ;;
   *)
     [ -x "$rizin" ] || command -v "$rizin" > /dev/null || {
-      echo "no rizin: install it, set RIZIN, or SKIP=rizin. See docs/benchmarks.md." >&2
+      echo "no rizin: install it, set RIZIN, or SKIP=rizin. See docs/toolkit/benchmarks.md." >&2
       exit 2
     }
     ;;

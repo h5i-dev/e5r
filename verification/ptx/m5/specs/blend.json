@@ -1,0 +1,19 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "blend",
+  "class": "map32",
+  "arrays": [
+    "blend_a",
+    "blend_b",
+    "blend_m",
+    "blend_d"
+  ],
+  "output": "blend_d",
+  "length": "blend_n",
+  "scalars": [],
+  "element": "(blend_a & blend_m) | (blend_b & ~blend_m)",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

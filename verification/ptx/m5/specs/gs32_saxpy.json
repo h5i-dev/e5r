@@ -1,0 +1,30 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs32_saxpy",
+  "class": "map32",
+  "arrays": [
+    "gs32_saxpy_x",
+    "gs32_saxpy_y"
+  ],
+  "output": "gs32_saxpy_y",
+  "length": "gs32_saxpy_n",
+  "scalars": [
+    "gs32_saxpy_a"
+  ],
+  "element": "gs32_saxpy_a * gs32_saxpy_x + gs32_saxpy_y",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^32",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs32_saxpy_x",
+        "%rd2": "base gs32_saxpy_y",
+        "%r1": "scalar gs32_saxpy_a",
+        "%r2": "length",
+        "%r6": "index32",
+        "%r8": "stride32"
+      }
+    }
+  }
+}

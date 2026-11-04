@@ -2,7 +2,7 @@
 //! assembled, and compared against the bytes it came from.
 //!
 //! This is the property the crate exists for. A user copies a line out of
-//! `e5r disas`, changes a register, and assembles it back; if the unchanged
+//! `e5rx disas`, changes a register, and assembles it back; if the unchanged
 //! line does not reproduce its own bytes then nothing built on top of this can
 //! be trusted. The corpus is enumerated with an external disassembler rather
 //! than with `e5r-format`, because the loader lives above this crate in the

@@ -14,7 +14,7 @@ const { chromium } = await import(
   process.env.E5R_PLAYWRIGHT_MODULE || "playwright"
 );
 const root = mkdtempSync(join(tmpdir(), "e5r-projects-"));
-const executable = resolve(process.env.E5R_BINARY || "target/release/e5r");
+const executable = resolve(process.env.E5R_BINARY || "target/release/e5rx");
 const env = { ...process.env, E5R_PROJECT_HOME: join(root, "registry") };
 const binary = join(root, "sample"),
   local = join(root, "local.e5rproj");

@@ -4,7 +4,7 @@
 //! whose contents are a tagged element tree. None of that is published, so it
 //! was worked out the way this toolkit works out any binary format: by
 //! compiling `.slaspec` inputs with the shipped SLEIGH compiler, changing one
-//! thing at a time, and watching which bytes moved. `docs/sla-format.md` is the
+//! thing at a time, and watching which bytes moved. `docs/toolkit/sla-format.md` is the
 //! write-up, and it separates what was proved that way from what was inferred.
 //!
 //! The reader has two layers, and both are public on purpose:

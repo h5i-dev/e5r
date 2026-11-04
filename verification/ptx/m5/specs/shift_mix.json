@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "shift_mix",
+  "class": "map32",
+  "arrays": [
+    "shift_mix_x",
+    "shift_mix_y"
+  ],
+  "output": "shift_mix_y",
+  "length": "shift_mix_n",
+  "scalars": [],
+  "element": "shift_mix_x ^ (shift_mix_x << 5) ^ (shift_mix_x >> 3)",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

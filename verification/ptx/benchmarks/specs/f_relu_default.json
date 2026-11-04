@@ -1,0 +1,19 @@
+{
+ "schema": "e5r.ptx.spec.v1",
+ "kernel": "f_relu_default",
+ "class": "map32",
+ "element_type": "f32",
+ "arrays": [
+  "f_relu_default_param_0",
+  "f_relu_default_param_1"
+ ],
+ "output": "f_relu_default_param_1",
+ "length": "f_relu_default_param_2",
+ "scalars": [],
+ "element": "max(f_relu_default_param_0, 0f00000000)",
+ "result": "bit_exact",
+ "schedule": {
+  "kind": "guarded",
+  "max_threads": "2^32"
+ }
+}

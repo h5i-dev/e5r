@@ -1,0 +1,19 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "xorand",
+  "class": "map32",
+  "arrays": [
+    "xorand_a",
+    "xorand_b",
+    "xorand_c",
+    "xorand_d"
+  ],
+  "output": "xorand_d",
+  "length": "xorand_n",
+  "scalars": [],
+  "element": "(xorand_a ^ xorand_b) & xorand_c",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

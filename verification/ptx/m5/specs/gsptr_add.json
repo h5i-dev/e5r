@@ -1,0 +1,30 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gsptr_add",
+  "class": "map32",
+  "arrays": [
+    "gsptr_add_a",
+    "gsptr_add_b",
+    "gsptr_add_c"
+  ],
+  "output": "gsptr_add_c",
+  "length": "gsptr_add_n",
+  "scalars": [],
+  "element": "gsptr_add_a + gsptr_add_b",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd4": "index64",
+        "%rd6": "stride64",
+        "%rd7": "length",
+        "%rd9": "ptr gsptr_add_a",
+        "%rd10": "ptr gsptr_add_b",
+        "%rd11": "ptr gsptr_add_c",
+        "%rd12": "ptr_stride"
+      }
+    }
+  }
+}

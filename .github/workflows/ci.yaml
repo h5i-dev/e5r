@@ -29,7 +29,7 @@ concurrency:
 # apt options below retain retries and fail with the actual download error.
 jobs:
   # Runners are disposable, so these build the dev profile on purpose. The
-  # release-only rule in CLAUDE.md is about the maintainer's machine.
+  # release-only rule in CONTRIBUTING.md is about the maintainer's machine.
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -119,7 +119,7 @@ jobs:
   # and peak memory are facts about a machine, and a shared runner with a noisy
   # neighbour is not the machine the ceilings were recorded on -- so timing is
   # not measured here, not gated here, and not published from here. It is
-  # measured by hand on a known machine and written down in docs/benchmarks.md.
+  # measured by hand on a known machine and written down in docs/toolkit/benchmarks.md.
   #
   # One run per binary for the same reason: the fastest of three exists to beat
   # down timing noise, and there is no timing to beat down.
@@ -170,11 +170,11 @@ jobs:
       - name: The installer agrees with the release layout
         run: ./scripts/check-installer.sh
 
-  # Scope F (docs/firmware-verification.md): rebuild the firmware and the
+  # Scope F (docs/verification/firmware.md): rebuild the firmware and the
   # clamp fixture with the pinned rustc, recheck every verification job from
   # source with the pinned Lean, run the negative controls, and replay QEMU
   # traces (instruction-level in user mode, the whole firmware on sifive_e)
-  # in the model. e5r-verify itself is the dev profile here, like the rest
+  # in the model. e5r itself is the dev profile here, like the rest
   # of this workflow; the firmware is built --release because its bytes are
   # pinned.
   firmware-verification:
@@ -195,10 +195,63 @@ jobs:
       - run: cargo build -p e5r-verify
       - name: Every firmware proof, control and differential test
         env:
-          E5R_VERIFY: target/debug/e5r-verify
+          E5R_VERIFY: target/debug/e5r
         run: ./scripts/check-firmware-verification.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: firmware-verification-results
           path: verification/rv32/build/results/
+
+  # Scope P (docs/verification/ptx.md), the quick set: regenerate every PTX
+  # kernel module and refuse a stale one, build the Lean project, audit the
+  # axioms, and check every benchmark's verdict with `e5r ptx check`. It has to
+  # finish in minutes, so it stops there (E5R_PTX_QUICK).
+  #
+  # What it leaves out is what makes a full recheck take ~90 minutes: the 59
+  # mutation controls and the supplied-proof controls, each of which starts Lean
+  # many times. Those are mutation testing, not a per-push check; they run by
+  # hand (`scripts/recheck-ptx.sh`) or from the manual ptx-full workflow. No GPU
+  # or CUDA here: the ptxas and GPU steps skip and say so.
+  ptx-verification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Lean (elan; the version comes from verification/ptx/lean-toolchain)
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/v4.1.2/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      # The Lean proof build is the one thing `rust-cache` does not cover.
+      # `verification/ptx` has no fetched dependencies (core Lean only), so
+      # `.lake/build` is a function of the pinned toolchain and the Lean sources
+      # alone: key the cache on both and `lake build` is a near-no-op on a hit.
+      # The key changes whenever any proof, kernel module or the toolchain does,
+      # so a stale build is never restored, which is why the script's
+      # from-scratch `rm -rf` is skipped here (E5R_PTX_KEEP_BUILD=1).
+      #
+      # Restore and save are separate steps, and save runs `always()`. A single
+      # `actions/cache` step saves only when the job succeeds, so a job that is
+      # cancelled at its time limit never saves and every retry starts cold.
+      - name: Restore the Lean build
+        id: lake
+        uses: actions/cache/restore@v4
+        with:
+          path: verification/ptx/.lake/build
+          key: ptx-lake-${{ runner.os }}-${{ hashFiles('verification/ptx/lean-toolchain', 'verification/ptx/lakefile.lean', 'verification/ptx/lake-manifest.json', 'verification/ptx/**/*.lean') }}
+      - run: cargo build -p e5r-verify
+      - name: Lean proofs, axiom audit and benchmark verdicts
+        env:
+          E5R_VERIFY: target/debug/e5r
+          E5R_PTX_KEEP_BUILD: "1"
+          E5R_PTX_QUICK: "1"
+        run: ./scripts/recheck-ptx.sh
+      - name: Save the Lean build
+        if: always() && steps.lake.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: verification/ptx/.lake/build
+          key: ${{ steps.lake.outputs.cache-primary-key }}

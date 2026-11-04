@@ -1,0 +1,176 @@
+{
+  "mutants": 14,
+  "proved": 0,
+  "refuted": 14,
+  "not_refuted": 0,
+  "rows": [
+    {
+      "mutant": "reduce: loop bar.sync removed",
+      "targets": "race_freedom",
+      "verdict": "refuted",
+      "exit": 1,
+      "counterexample": "race",
+      "replayed": true,
+      "seconds": 2.6,
+      "reasons": [
+        "no proof attempt: reduce32: the kernel has 1 bar.sync, the class has 2"
+      ]
+    },
+    {
+      "mutant": "reduce: load bound ge -> gt",
+      "targets": "memory_safety",
+      "verdict": "refuted",
+      "exit": 1,
+      "counterexample": "fault",
+      "replayed": true,
+      "seconds": 66.1,
+      "reasons": [
+        "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   ?x = ?y with the goal"
+      ]
+    },
+    {
+      "mutant": "reduce: tree test ge -> gt",
+      "targets": "race_freedom",
+      "verdict": "refuted",
+      "exit": 1,
+      "counterexample": "race",
+      "replayed": true,
+      "seconds": 250.0,
+      "reasons": [
+        "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   \u2200 {y : BitVec ?n}, BitVec.toNat ?x = y.toNat \u2192 ?x = y with the goal"
+      ]
+    },
+    {
+      "mutant": "reduce: first stride B/4",
+      "targets": "functional_correctness",
+      "verdict": "refuted",
+      "exit": 1,
+      "counterexample": "wrong_value",
+      "replayed": true,
+      "seconds": 240.1,
+      "reasons": [
+        "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   ?x = ?y with the goal"
+      ]
+    },
+    {
+      "mutant": "reduce: every thread stores out[ctaid]",
+      "targets": "race_freedom",
+      "verdict": "refuted",
+      "exit": 1,
+      "counterexample": "race",
+      "replayed": true,
+      "seconds": 46.2,
+      "reasons": [
+        "proof did not check: error: Tactic `cases` failed with a nested error: Dependent elimination failed: Failed to solve equation   3 ="
+      ]
+    },
+    {
+      "mutant": "reduce: stores tid, not s[0]",
+      "targets": "functional_correctness",
+      "verdict": "refuted",
+      "exit": 1,
+      "counterexample": "wrong_value",
+      "replayed": true,
+      "seconds": 54.7,
+      "reasons": [
+        "proof did not check: error: Tactic `rewrite` failed: Did not find an occurrence of the pattern   rd32 (cells A.sb A.B.toNat ?m.5316 ?m.5317) (elem A.sb ?m.5315) in the target expression"
+      ]
+    },
+    {
+      "mutant": "reduce: spec says atomic",
+      "targets": "functional_correctness",
+      "verdict": "refuted",
+      "exit": 1,
+      "counterexample": "wrong_value",
+      "replayed": true,
+      "seconds": 41.6,
+      "reasons": [
+        "proof did not check: error: Tactic `introN` failed: There are no additional binders or `let` bindings in the goal to introduce  case refine_3.inl.isTrue.isFalse.isFalse.refine_2.refine_2.refine_1"
+      ]
+    },
+    {
+      "mutant": "reduce_atomic: atom.add -> st",
+      "targets": "functional_correctness",
+      "verdict": "refuted",
+      "exit": 1,
+      "counterexample": "wrong_value",
+      "replayed": true,
+      "seconds": 43.3,
+      "reasons": [
+        "proof did not check: error: Tactic `cases` failed with a nested error: Dependent elimination failed: Failed to solve equation   3 ="
+      ]
+    },
+    {
+      "mutant": "reduce_atomic: atom.add -> atom.max",
+      "targets": "functional_correctness",
+      "verdict": "refuted",
+      "exit": 1,
+      "counterexample": "wrong_value",
+      "replayed": true,
+      "seconds": 225.0,
+      "reasons": [
+        "proof did not check: error: Tactic `introN` failed: There are no additional binders or `let` bindings in the goal to introduce  case refine_3.inl.isTrue.isFalse.isFalse.refine_2.refine_2.refine_2.refine_2"
+      ]
+    },
+    {
+      "mutant": "reduce_atomic: loop bar.sync removed",
+      "targets": "race_freedom",
+      "verdict": "refuted",
+      "exit": 1,
+      "counterexample": "race",
+      "replayed": true,
+      "seconds": 2.5,
+      "reasons": [
+        "no proof attempt: reduce32: the kernel has 1 bar.sync, the class has 2"
+      ]
+    },
+    {
+      "mutant": "scan: read barrier removed",
+      "targets": "race_freedom",
+      "verdict": "refuted",
+      "exit": 1,
+      "counterexample": "race",
+      "replayed": true,
+      "seconds": 2.5,
+      "reasons": [
+        "no proof attempt: scan32: the kernel has 2 bar.sync, the class has 3"
+      ]
+    },
+    {
+      "mutant": "scan: read test lt -> le",
+      "targets": "functional_correctness",
+      "verdict": "refuted",
+      "exit": 1,
+      "counterexample": "wrong_value",
+      "replayed": true,
+      "seconds": 70.9,
+      "reasons": [
+        "proof did not check: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   0 \u2264 h \u2264 1073740800"
+      ]
+    },
+    {
+      "mutant": "scan: offset times 4",
+      "targets": "functional_correctness",
+      "verdict": "refuted",
+      "exit": 1,
+      "counterexample": "wrong_value",
+      "replayed": true,
+      "seconds": 318.2,
+      "reasons": [
+        "proof attempt stopped: timeout"
+      ]
+    },
+    {
+      "mutant": "scan: store guard removed",
+      "targets": "memory_safety",
+      "verdict": "refuted",
+      "exit": 1,
+      "counterexample": "fault",
+      "replayed": true,
+      "seconds": 50.5,
+      "reasons": [
+        "proof did not check: error: Tactic `cases` failed with a nested error: Dependent elimination failed: Failed to solve equation   3 ="
+      ]
+    }
+  ]
+}

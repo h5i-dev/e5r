@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "fill",
+  "class": "map32",
+  "arrays": [
+    "fill_y"
+  ],
+  "output": "fill_y",
+  "length": "fill_n",
+  "scalars": [
+    "fill_k"
+  ],
+  "element": "fill_k",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

@@ -10,7 +10,7 @@ const { chromium } = await import(
   process.env.E5R_PLAYWRIGHT_MODULE || "playwright"
 );
 const root = mkdtempSync(join(tmpdir(), "e5r-dashboard-"));
-const executable = resolve(process.env.E5R_BINARY || "target/release/e5r");
+const executable = resolve(process.env.E5R_BINARY || "target/release/e5rx");
 const binary = join(root, "sample"),
   project = join(root, "sample.e5rproj");
 let server, browser;

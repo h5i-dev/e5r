@@ -1,0 +1,35 @@
+.version 8.0
+.target sm_86
+.address_size 64
+
+.visible .entry f_scale_ftz(
+	.param .u64 f_scale_ftz_x,
+	.param .u64 f_scale_ftz_y,
+	.param .f32 f_scale_ftz_a,
+	.param .u32 f_scale_ftz_n
+)
+{
+	.reg .pred 	%p<2>;
+	.reg .f32 	%f<16>;
+	.reg .b32 	%r<8>;
+	.reg .b64 	%rd<16>;
+
+	ld.param.u64 	%rd1, [f_scale_ftz_x];
+	ld.param.u64 	%rd2, [f_scale_ftz_y];
+	ld.param.f32 	%f10, [f_scale_ftz_a];
+	ld.param.u32 	%r1, [f_scale_ftz_n];
+	mov.u32 	%r2, %ctaid.x;
+	mov.u32 	%r3, %ntid.x;
+	mov.u32 	%r4, %tid.x;
+	mad.lo.u32 	%r5, %r2, %r3, %r4;
+	setp.ge.u32 	%p1, %r5, %r1;
+	@%p1 bra 	$L_done;
+	mul.wide.u32 	%rd8, %r5, 4;
+	add.u64 	%rd9, %rd1, %rd8;
+	add.u64 	%rd10, %rd2, %rd8;
+	ld.global.f32 	%f1, [%rd9];
+	mul.rn.ftz.f32 	%f9, %f1, %f10;
+	st.global.f32 	[%rd10], %f9;
+$L_done:
+	ret;
+}

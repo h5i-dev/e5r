@@ -1,0 +1,19 @@
+# Cross-check of the PTX model's rounding core against lean-ieee754
+# (docs/verification/ptx.md, "Floating point: cross-check").
+# A separate project so verification/ptx stays free of Mathlib.
+name = "crosscheck"
+defaultTargets = ["Crosscheck"]
+
+[[require]]
+name = "FP"
+git = "https://github.com/tunnellm/lean-ieee754"
+rev = "529ed78"
+
+# The file under test, compiled from the main project's source tree.
+[[lean_lib]]
+name = "PtxFloatCore"
+srcDir = "../ptx"
+roots = ["Ptx.Semantics.FloatCore"]
+
+[[lean_lib]]
+name = "Crosscheck"

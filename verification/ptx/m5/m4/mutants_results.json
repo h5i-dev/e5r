@@ -1,0 +1,413 @@
+{
+ "rows": [
+  {
+   "name": "mut00_s_hs",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 300.11,
+   "lean_seconds": 297.83,
+   "refutation_seconds": 1.67,
+   "counterexample": "fault",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   0 \u2264 h \u2264 1073740800"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "launch error 700 at grid=1 block=3 n=1",
+   "base": "s_hs",
+   "change": "`sub.s32 \t%r18, %r2, %r26;`: %r2 -> %r11"
+  },
+  {
+   "name": "mut01_s_hs",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 376.27,
+   "lean_seconds": 373.68,
+   "refutation_seconds": 1.98,
+   "counterexample": "wrong_value",
+   "replayed": true,
+   "reasons": [
+    "proof attempt stopped: timeout"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=2 block=3 n=5: out[2] = 2279350750, want 303171671",
+   "base": "s_hs",
+   "change": "`shl.b32 \t%r14, %r2, 2;`: 2 -> 3"
+  },
+  {
+   "name": "mut02_r_div2",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 49.6,
+   "lean_seconds": 47.17,
+   "refutation_seconds": 1.82,
+   "counterexample": "wrong_value",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   \u2200 {y : BitVec ?n}, BitVec.toNat ?x = y.toNat \u2192 ?x = y with the goal"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=1 block=2 n=1: out[0] = 16776640, want 4077734851",
+   "base": "r_div2",
+   "change": "delete `add.s32 \t%r19, %r18, %r15;`"
+  },
+  {
+   "name": "mut03_r_div2",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 182.57,
+   "lean_seconds": 180.14,
+   "refutation_seconds": 1.81,
+   "counterexample": "wrong_value",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   \u2200 {y : BitVec ?n}, BitVec.toNat ?x = y.toNat \u2192 ?x = y with the goal"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=5 block=1 n=5: out[1] = 1839133034, want 2246071201",
+   "base": "r_div2",
+   "change": "delete `mad.lo.s32 \t%r4, %r2, %r1, %r3;`"
+  },
+  {
+   "name": "mut04_r_div2",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 181.85,
+   "lean_seconds": 179.45,
+   "refutation_seconds": 1.78,
+   "counterexample": "wrong_value",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   ?x = ?y with the goal"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=5 block=1 n=5: out[1] = 1208806480, want 1883364568",
+   "base": "r_div2",
+   "change": "`mul.wide.u32 \t%rd4, %r4, 4;`: %r4 -> %r18"
+  },
+  {
+   "name": "mut05_r_div2",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 220.12,
+   "lean_seconds": 217.6,
+   "refutation_seconds": 1.88,
+   "counterexample": "wrong_value",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   ?x = ?y with the goal"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=3 block=2 n=5: out[0] = 1267141096, want 404799132",
+   "base": "r_div2",
+   "change": "`shr.u32 \t%r22, %r1, 1;`: 1 -> 2"
+  },
+  {
+   "name": "mut06_r_div2",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 71.06,
+   "lean_seconds": 68.64,
+   "refutation_seconds": 1.8,
+   "counterexample": "wrong_value",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   \u2200 {y : BitVec ?n}, BitVec.toNat ?x = y.toNat \u2192 ?x = y with the goal"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=3 block=2 n=5: out[0] = 2334525655, want 413036805",
+   "base": "r_div2",
+   "change": "delete `st.shared.u32 \t[%r7], %r19;`"
+  },
+  {
+   "name": "mut07_s_hs",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 52.28,
+   "lean_seconds": 49.8,
+   "refutation_seconds": 1.87,
+   "counterexample": "wrong_value",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   0 \u2264 h \u2264 1073740800"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=1 block=3 n=2: out[1] = 32601836, want 757169664",
+   "base": "s_hs",
+   "change": "delete `ld.shared.u32 \t%r27, [%r21];`"
+  },
+  {
+   "name": "mut08_r_div2",
+   "ptxas": true,
+   "verdict": "unknown",
+   "check_seconds": 40.13,
+   "lean_seconds": 39.52,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [
+    "proof did not check: error: Type mismatch   wr_lo32 ?m.4509 hy has type",
+    "no proof, and the search found no counterexample"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": null,
+   "base": "r_div2",
+   "change": "delete `@%p2 bra \t$L__BB0_6;`"
+  },
+  {
+   "name": "mut09_r_div2",
+   "ptxas": true,
+   "verdict": "unknown",
+   "check_seconds": 413.02,
+   "lean_seconds": 412.22,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [
+    "proof attempt stopped: timeout",
+    "no proof, and the search found no counterexample"
+   ],
+   "gpu_error": "the kernel did not finish; the test process was killed after 3 minutes",
+   "base": "r_div2",
+   "change": "delete `shr.u32 \t%r22, %r22, 1;`"
+  },
+  {
+   "name": "mut10_r_div2",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 60.46,
+   "lean_seconds": 56.75,
+   "refutation_seconds": 2.68,
+   "counterexample": "race",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: Tactic `cases` failed with a nested error: Dependent elimination failed: Failed to solve equation   3 ="
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": null,
+   "base": "r_div2",
+   "change": "delete `@%p5 bra \t$L__BB0_8;`"
+  },
+  {
+   "name": "mut11_a_tree",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 167.08,
+   "lean_seconds": 164.6,
+   "refutation_seconds": 1.62,
+   "counterexample": "fault",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: Tactic `introN` failed: There are no additional binders or `let` bindings in the goal to introduce  case refine_3.inl.isTrue.isFalse.isFalse.refine_2.refine_2.refine_1"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "launch error 700 at grid=1 block=1 n=1",
+   "base": "a_tree",
+   "change": "`cvta.to.global.u64 \t%rd6, %rd2;`: %rd2 -> %rd6"
+  },
+  {
+   "name": "mut12_r_div2",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 50.42,
+   "lean_seconds": 48.1,
+   "refutation_seconds": 1.71,
+   "counterexample": "wrong_value",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: Type mismatch   wr_lo32 ?m.5273 hy has type"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=1 block=1 n=1: out[0] = 2038156107, want 3063780738",
+   "base": "r_div2",
+   "change": "`setp.ne.s32 \t%p5, %r3, 0;` -> eq"
+  },
+  {
+   "name": "mut13_s_hs",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 56.09,
+   "lean_seconds": 53.66,
+   "refutation_seconds": 1.79,
+   "counterexample": "wrong_value",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: Tactic `assumption` failed  case refine_3.isTrue.refine_2.refine_2.refine_2.refine_1"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=1 block=3 n=1: out[0] = 0, want 2615492761",
+   "base": "s_hs",
+   "change": "delete `ld.shared.u32 \t%r22, [%r6];`"
+  },
+  {
+   "name": "mut14_r_div2",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 187.14,
+   "lean_seconds": 183.81,
+   "refutation_seconds": 2.73,
+   "counterexample": "wrong_value",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   ?x = ?y with the goal"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "launch error 716 at grid=1 block=2 n=1",
+   "base": "r_div2",
+   "change": "delete `shl.b32 \t%r16, %r22, 2;`"
+  },
+  {
+   "name": "mut15_s_hs",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 230.95,
+   "lean_seconds": 228.25,
+   "refutation_seconds": 1.92,
+   "counterexample": "fault",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: Tactic `rewrite` failed: Did not find an occurrence of the pattern   BitVec.ult ?x ?y in the target expression"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=5 block=1 n=5: out[1] = 216706364, want 1649954703",
+   "base": "s_hs",
+   "change": "`mul.wide.u32 \t%rd4, %r3, 4;`: 4 -> 8"
+  },
+  {
+   "name": "mut16_a_tree",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 2.42,
+   "lean_seconds": null,
+   "refutation_seconds": 1.77,
+   "counterexample": "race",
+   "replayed": true,
+   "reasons": [
+    "no proof attempt: reduce32: the kernel has 1 bar.sync, the class has 2"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=274 block=256 n=70001: out[0] = 83778193, want 2724980866",
+   "base": "a_tree",
+   "change": "delete `bar.sync \t0;`"
+  },
+  {
+   "name": "mut17_r_div2",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 55.18,
+   "lean_seconds": 52.88,
+   "refutation_seconds": 1.71,
+   "counterexample": "wrong_value",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   \u2200 {y : BitVec ?n}, BitVec.toNat ?x = y.toNat \u2192 ?x = y with the goal"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=1 block=256 n=1: out[0] = 457918094, want 1749706933",
+   "base": "r_div2",
+   "change": "delete `ld.param.u32 \t%r12, [r_div2_param_2];`"
+  },
+  {
+   "name": "mut18_s_hs",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 60.88,
+   "lean_seconds": 58.46,
+   "refutation_seconds": 1.8,
+   "counterexample": "wrong_value",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   0 \u2264 h \u2264 1073740800"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=1 block=3 n=2: out[1] = 672605957, want 2362746467",
+   "base": "s_hs",
+   "change": "`setp.lt.u32 \t%p3, %r2, %r26;` -> le"
+  },
+  {
+   "name": "mut19_s_hs",
+   "ptxas": true,
+   "verdict": "unknown",
+   "check_seconds": 534.74,
+   "lean_seconds": 533.52,
+   "refutation_seconds": null,
+   "counterexample": null,
+   "replayed": null,
+   "reasons": [
+    "proof attempt stopped: timeout",
+    "no proof, and the search found no counterexample"
+   ],
+   "gpu_error": "the kernel did not finish; the test process was killed after 3 minutes",
+   "base": "s_hs",
+   "change": "delete `shl.b32 \t%r26, %r26, 1;`"
+  },
+  {
+   "name": "mut20_r_div2",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 94.12,
+   "lean_seconds": 90.21,
+   "refutation_seconds": 2.95,
+   "counterexample": "wrong_value",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   \u2200 {y : BitVec ?n}, BitVec.toNat ?x = y.toNat \u2192 ?x = y with the goal"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=1 block=2 n=1: out[0] = 4232950443, want 4232950439",
+   "base": "r_div2",
+   "change": "`add.s32 \t%r19, %r18, %r15;`: %r18 -> %r16"
+  },
+  {
+   "name": "mut21_s_hs",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 430.62,
+   "lean_seconds": 426.05,
+   "refutation_seconds": 3.65,
+   "counterexample": "race",
+   "replayed": true,
+   "reasons": [
+    "proof attempt stopped: timeout"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=5 block=1 n=5: out[0] = 3004220145, want 3666905868",
+   "base": "s_hs",
+   "change": "delete `mul.wide.u32 \t%rd7, %r3, 4;`"
+  },
+  {
+   "name": "mut22_s_hs",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 574.49,
+   "lean_seconds": 570.45,
+   "refutation_seconds": 2.83,
+   "counterexample": "race",
+   "replayed": true,
+   "reasons": [
+    "proof attempt stopped: timeout"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "launch error 700 at grid=1 block=1 n=1",
+   "base": "s_hs",
+   "change": "`mul.wide.u32 \t%rd7, %r3, 4;`: %r3 -> %r21"
+  },
+  {
+   "name": "mut23_a_tree",
+   "ptxas": true,
+   "verdict": "refuted",
+   "check_seconds": 48.84,
+   "lean_seconds": 45.99,
+   "refutation_seconds": 1.99,
+   "counterexample": "fault",
+   "replayed": true,
+   "reasons": [
+    "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   \u2200 {y : BitVec ?n}, BitVec.toNat ?x = y.toNat \u2192 ?x = y with the goal"
+   ],
+   "gpu": "NVIDIA A10G",
+   "gpu_mismatch": "grid=500 block=2 n=1000: out[0] = 1119810248, want 328931599",
+   "base": "a_tree",
+   "change": "delete `setp.ge.u32 \t%p1, %r3, %r11;`"
+  }
+ ]
+}

@@ -1,0 +1,360 @@
+[
+ {
+  "name": "r_div2",
+  "class": "reduce32",
+  "result": "per_block",
+  "task": "out[b] = sum of block b's elements; halving written as / 2",
+  "shared": "_ZZ6r_div2E3buf",
+  "max_block": 1024,
+  "barriers": {
+   "after_load": {
+    "%r1": "ntid",
+    "%r2": "ctaid",
+    "%r3": "tid",
+    "%r7": "shared_tid",
+    "%rd2": "output"
+   },
+   "loop": {
+    "%r22": "stride",
+    "%r2": "ctaid",
+    "%r3": "tid",
+    "%r7": "shared_tid",
+    "%rd2": "output"
+   }
+  }
+ },
+ {
+  "name": "r_int",
+  "class": "reduce32",
+  "result": "per_block",
+  "task": "out[b] = sum of block b's elements; int indices and length",
+  "shared": "_ZZ5r_intE5sdata",
+  "max_block": 1024,
+  "barriers": {
+   "after_load": {
+    "%r1": "ntid",
+    "%r2": "ctaid",
+    "%r3": "tid",
+    "%r5": "shared_tid",
+    "%rd2": "output"
+   },
+   "loop": {
+    "%r20": "stride",
+    "%r2": "ctaid",
+    "%r3": "tid",
+    "%r5": "shared_tid",
+    "%rd2": "output"
+   }
+  }
+ },
+ {
+  "name": "r_256",
+  "class": "reduce32",
+  "result": "per_block",
+  "task": "out[b] = sum of block b's elements; blocks of at most 256 threads",
+  "shared": "_ZZ5r_256E1s",
+  "max_block": 256,
+  "barriers": {
+   "after_load": {
+    "%r1": "ntid",
+    "%r2": "ctaid",
+    "%r3": "tid",
+    "%r7": "shared_tid",
+    "%rd2": "output"
+   },
+   "loop": {
+    "%r22": "stride",
+    "%r2": "ctaid",
+    "%r3": "tid",
+    "%r7": "shared_tid",
+    "%rd2": "output"
+   }
+  }
+ },
+ {
+  "name": "r_while",
+  "class": "reduce32",
+  "result": "per_block",
+  "task": "out[b] = sum of block b's elements; while loop",
+  "shared": "_ZZ7r_whileE1s",
+  "max_block": 1024,
+  "barriers": {
+   "after_load": {
+    "%r21": "ntid",
+    "%r2": "ctaid",
+    "%r3": "tid",
+    "%r7": "shared_tid",
+    "%rd2": "output"
+   },
+   "loop": {
+    "%r9": "stride",
+    "%r2": "ctaid",
+    "%r3": "tid",
+    "%r7": "shared_tid",
+    "%rd2": "output",
+    "%r21": "stride_prev"
+   }
+  }
+ },
+ {
+  "name": "r_interleaved",
+  "class": "reduce32",
+  "result": "per_block",
+  "task": "out[b] = sum of block b's elements; interleaved addressing (CUDA samples reduce0)",
+  "shared": "_ZZ13r_interleavedE1s",
+  "max_block": 1024,
+  "barriers": {
+   "after_load": {
+    "%r1": "ntid",
+    "%r2": "ctaid",
+    "%r3": "tid",
+    "%r7": "shared_tid",
+    "%rd2": "output"
+   },
+   "loop": {
+    "%r2": "ctaid",
+    "%r3": "tid",
+    "%r7": "shared_tid",
+    "%rd2": "output"
+   }
+  }
+ },
+ {
+  "name": "r_earlyret",
+  "class": "reduce32",
+  "result": "per_block",
+  "task": "out[b] = sum of block b's elements; out-of-range threads return first",
+  "shared": "_ZZ10r_earlyretE1s",
+  "max_block": 1024,
+  "pattern": "common CUDA pattern: early return before __syncthreads",
+  "barriers": {
+   "after_load": {
+    "%r1": "ntid",
+    "%r2": "ctaid",
+    "%r3": "tid",
+    "%r5": "shared_tid",
+    "%rd2": "output"
+   },
+   "loop": {
+    "%r2": "ctaid",
+    "%r3": "tid",
+    "%r5": "shared_tid",
+    "%rd2": "output"
+   }
+  }
+ },
+ {
+  "name": "r_warp",
+  "class": "reduce32",
+  "result": "per_block",
+  "task": "out[b] = sum of block b's elements; last warp unrolled without barriers (old CUDA samples reduce4)",
+  "shared": "_ZZ6r_warpE1s",
+  "max_block": 1024,
+  "pattern": "warp-synchronous code from the old CUDA samples",
+  "barriers": {
+   "after_load": {
+    "%r1": "ntid",
+    "%r2": "ctaid",
+    "%r3": "tid",
+    "%r7": "shared_tid",
+    "%rd2": "output"
+   },
+   "loop": {
+    "%r2": "ctaid",
+    "%r3": "tid",
+    "%r7": "shared_tid",
+    "%rd2": "output"
+   }
+  }
+ },
+ {
+  "name": "a_tree",
+  "class": "reduce32",
+  "result": "atomic",
+  "task": "*total += sum of all elements: block tree, one atomicAdd per block",
+  "shared": "_ZZ6a_treeE4part",
+  "max_block": 1024,
+  "barriers": {
+   "after_load": {
+    "%r1": "ntid",
+    "%r12": "ctaid",
+    "%r2": "tid",
+    "%r6": "shared_tid",
+    "%rd2": "output"
+   },
+   "loop": {
+    "%r23": "stride",
+    "%r12": "ctaid",
+    "%r2": "tid",
+    "%r6": "shared_tid",
+    "%rd2": "output"
+   }
+  }
+ },
+ {
+  "name": "a_int",
+  "class": "reduce32",
+  "result": "atomic",
+  "task": "*total += sum of all elements; int indices, 512-word buffer",
+  "shared": "_ZZ5a_intE1s",
+  "max_block": 512,
+  "barriers": {
+   "after_load": {
+    "%r1": "ntid",
+    "%r12": "ctaid",
+    "%r2": "tid",
+    "%r6": "shared_tid",
+    "%rd2": "output"
+   },
+   "loop": {
+    "%r23": "stride",
+    "%r12": "ctaid",
+    "%r2": "tid",
+    "%r6": "shared_tid",
+    "%rd2": "output"
+   }
+  }
+ },
+ {
+  "name": "a_direct",
+  "class": "reduce32",
+  "result": "atomic",
+  "task": "*total += sum of all elements; one atomicAdd per element",
+  "shared": "none",
+  "max_block": 1024,
+  "barriers": {
+   "after_load": {},
+   "loop": {}
+  }
+ },
+ {
+  "name": "s_hs",
+  "class": "scan32",
+  "task": "y[i] = inclusive prefix sum of i's block segment (Hillis-Steele)",
+  "shared": "_ZZ4s_hsE1s",
+  "max_block": 1024,
+  "barriers": {
+   "after_load": {
+    "%r1": "ntid",
+    "%r2": "tid",
+    "%r3": "gid",
+    "%r6": "shared_tid",
+    "%r15": "shared_base",
+    "%rd2": "output",
+    "%p1": "gid >= length"
+   },
+   "after_read": {
+    "%r1": "ntid",
+    "%r2": "tid",
+    "%r3": "gid",
+    "%r6": "shared_tid",
+    "%r15": "shared_base",
+    "%rd2": "output",
+    "%p1": "gid >= length",
+    "%r26": "offset",
+    "%r27": "read"
+   },
+   "after_add": {
+    "%r1": "ntid",
+    "%r2": "tid",
+    "%r3": "gid",
+    "%r6": "shared_tid",
+    "%r15": "shared_base",
+    "%rd2": "output",
+    "%p1": "gid >= length",
+    "%r26": "offset"
+   }
+  }
+ },
+ {
+  "name": "s_int",
+  "class": "scan32",
+  "task": "y[i] = inclusive prefix sum of i's block segment; int indices",
+  "shared": "_ZZ5s_intE4temp",
+  "max_block": 1024,
+  "barriers": {
+   "after_load": {
+    "%r1": "ntid",
+    "%r2": "tid",
+    "%r3": "gid",
+    "%r6": "shared_tid",
+    "%r15": "shared_base",
+    "%rd2": "output",
+    "%p1": "gid >= length"
+   },
+   "after_read": {
+    "%r1": "ntid",
+    "%r2": "tid",
+    "%r3": "gid",
+    "%r6": "shared_tid",
+    "%r15": "shared_base",
+    "%rd2": "output",
+    "%p1": "gid >= length",
+    "%r26": "offset",
+    "%r27": "read"
+   },
+   "after_add": {
+    "%r1": "ntid",
+    "%r2": "tid",
+    "%r3": "gid",
+    "%r6": "shared_tid",
+    "%r15": "shared_base",
+    "%rd2": "output",
+    "%p1": "gid >= length",
+    "%r26": "offset"
+   }
+  }
+ },
+ {
+  "name": "s_cond",
+  "class": "scan32",
+  "task": "y[i] = inclusive prefix sum of i's block segment; add only when tid >= offset",
+  "shared": "_ZZ6s_condE1s",
+  "max_block": 1024,
+  "barriers": {
+   "after_load": {
+    "%r1": "ntid",
+    "%r2": "tid",
+    "%r3": "gid",
+    "%r6": "shared_tid",
+    "%r15": "shared_base",
+    "%rd2": "output",
+    "%p1": "gid >= length"
+   },
+   "after_read": {
+    "%r1": "ntid",
+    "%r2": "tid",
+    "%r3": "gid",
+    "%r6": "shared_tid",
+    "%r15": "shared_base",
+    "%rd2": "output",
+    "%p1": "gid >= length",
+    "%r26": "offset",
+    "%r27": "read",
+    "%p3": "tid < offset"
+   },
+   "after_add": {
+    "%r1": "ntid",
+    "%r2": "tid",
+    "%r3": "gid",
+    "%r6": "shared_tid",
+    "%r15": "shared_base",
+    "%rd2": "output",
+    "%p1": "gid >= length",
+    "%r26": "offset"
+   }
+  }
+ },
+ {
+  "name": "s_pingpong",
+  "class": "scan32",
+  "task": "y[i] = inclusive prefix sum of i's block segment; two buffers, one barrier per round",
+  "shared": "_ZZ10s_pingpongE3buf",
+  "max_block": 1024,
+  "barriers": {
+   "after_load": {},
+   "after_read": {},
+   "after_add": {}
+  }
+ }
+]

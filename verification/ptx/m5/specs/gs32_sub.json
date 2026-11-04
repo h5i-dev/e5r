@@ -1,0 +1,29 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs32_sub",
+  "class": "map32",
+  "arrays": [
+    "gs32_sub_a",
+    "gs32_sub_b",
+    "gs32_sub_c"
+  ],
+  "output": "gs32_sub_c",
+  "length": "gs32_sub_n",
+  "scalars": [],
+  "element": "gs32_sub_a - gs32_sub_b",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^31",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs32_sub_a",
+        "%rd2": "base gs32_sub_b",
+        "%rd3": "base gs32_sub_c",
+        "%r1": "length",
+        "%r5": "index32",
+        "%r7": "stride32"
+      }
+    }
+  }
+}

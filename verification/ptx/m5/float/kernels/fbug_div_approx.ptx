@@ -1,0 +1,37 @@
+.version 8.0
+.target sm_86
+.address_size 64
+
+.visible .entry fbug_div_approx(
+	.param .u64 fbug_div_approx_x,
+	.param .u64 fbug_div_approx_y,
+	.param .u64 fbug_div_approx_z,
+	.param .u32 fbug_div_approx_n
+)
+{
+	.reg .pred 	%p<2>;
+	.reg .f32 	%f<16>;
+	.reg .b32 	%r<8>;
+	.reg .b64 	%rd<16>;
+
+	ld.param.u64 	%rd1, [fbug_div_approx_x];
+	ld.param.u64 	%rd2, [fbug_div_approx_y];
+	ld.param.u64 	%rd3, [fbug_div_approx_z];
+	ld.param.u32 	%r1, [fbug_div_approx_n];
+	mov.u32 	%r2, %ctaid.x;
+	mov.u32 	%r3, %ntid.x;
+	mov.u32 	%r4, %tid.x;
+	mad.lo.u32 	%r5, %r2, %r3, %r4;
+	setp.ge.u32 	%p1, %r5, %r1;
+	@%p1 bra 	$L_done;
+	mul.wide.u32 	%rd8, %r5, 4;
+	add.u64 	%rd9, %rd1, %rd8;
+	add.u64 	%rd10, %rd2, %rd8;
+	add.u64 	%rd11, %rd3, %rd8;
+	ld.global.f32 	%f1, [%rd9];
+	ld.global.f32 	%f2, [%rd10];
+	div.approx.f32 	%f9, %f1, %f2;
+	st.global.f32 	[%rd11], %f9;
+$L_done:
+	ret;
+}

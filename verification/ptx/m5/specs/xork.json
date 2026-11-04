@@ -1,0 +1,19 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "xork",
+  "class": "map32",
+  "arrays": [
+    "xork_x",
+    "xork_y"
+  ],
+  "output": "xork_y",
+  "length": "xork_n",
+  "scalars": [
+    "xork_k"
+  ],
+  "element": "xork_x ^ xork_k",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

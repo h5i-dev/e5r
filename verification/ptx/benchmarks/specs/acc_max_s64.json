@@ -1,0 +1,10 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "acc_max_s64",
+  "class": "accum",
+  "op": "max",
+  "type": "s64",
+  "input": "acc_max_s64_param_0",
+  "output": "acc_max_s64_param_1",
+  "length": "acc_max_s64_param_2"
+}

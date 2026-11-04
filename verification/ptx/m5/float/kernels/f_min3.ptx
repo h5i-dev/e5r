@@ -1,0 +1,42 @@
+.version 8.0
+.target sm_86
+.address_size 64
+
+.visible .entry f_min3(
+	.param .u64 f_min3_a,
+	.param .u64 f_min3_b,
+	.param .u64 f_min3_c,
+	.param .u64 f_min3_d,
+	.param .u32 f_min3_n
+)
+{
+	.reg .pred 	%p<2>;
+	.reg .f32 	%f<16>;
+	.reg .b32 	%r<8>;
+	.reg .b64 	%rd<16>;
+
+	ld.param.u64 	%rd1, [f_min3_a];
+	ld.param.u64 	%rd2, [f_min3_b];
+	ld.param.u64 	%rd3, [f_min3_c];
+	ld.param.u64 	%rd4, [f_min3_d];
+	ld.param.u32 	%r1, [f_min3_n];
+	mov.u32 	%r2, %ctaid.x;
+	mov.u32 	%r3, %ntid.x;
+	mov.u32 	%r4, %tid.x;
+	mad.lo.u32 	%r5, %r2, %r3, %r4;
+	setp.ge.u32 	%p1, %r5, %r1;
+	@%p1 bra 	$L_done;
+	mul.wide.u32 	%rd8, %r5, 4;
+	add.u64 	%rd9, %rd1, %rd8;
+	add.u64 	%rd10, %rd2, %rd8;
+	add.u64 	%rd11, %rd3, %rd8;
+	add.u64 	%rd12, %rd4, %rd8;
+	ld.global.f32 	%f1, [%rd9];
+	ld.global.f32 	%f2, [%rd10];
+	ld.global.f32 	%f3, [%rd11];
+	min.f32 	%f5, %f1, %f2;
+	min.f32 	%f9, %f5, %f3;
+	st.global.f32 	[%rd12], %f9;
+$L_done:
+	ret;
+}

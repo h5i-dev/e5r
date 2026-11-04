@@ -1,0 +1,29 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "gs_notand",
+  "class": "map32",
+  "arrays": [
+    "gs_notand_a",
+    "gs_notand_b",
+    "gs_notand_c"
+  ],
+  "output": "gs_notand_c",
+  "length": "gs_notand_n",
+  "scalars": [],
+  "element": "~(gs_notand_a & gs_notand_b)",
+  "schedule": {
+    "kind": "stride",
+    "bound": "2^64",
+    "loop": {
+      "head": "LOOP",
+      "registers": {
+        "%rd1": "base gs_notand_a",
+        "%rd2": "base gs_notand_b",
+        "%rd3": "base gs_notand_c",
+        "%rd4": "index64",
+        "%rd6": "stride64",
+        "%rd7": "length"
+      }
+    }
+  }
+}

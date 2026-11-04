@@ -22,6 +22,12 @@ const BUDGET: Duration = Duration::from_millis(1500);
 /// that does not advance, which is the bug this catches.
 const PER_INPUT: Duration = Duration::from_millis(400);
 
+/// Fuzz tests do not run in GitHub Actions; CI sets GITHUB_ACTIONS, and these
+/// run locally on a plain `cargo test`. See .github/workflows/ci.yaml.
+fn skip_in_ci() -> bool {
+    std::env::var_os("GITHUB_ACTIONS").is_some()
+}
+
 /// xorshift64*, so a failure is reproducible from its seed.
 struct Rng(u64);
 
@@ -204,6 +210,9 @@ fn the_seeds_themselves_parse() {
 
 #[test]
 fn mutated_specifications_do_not_panic_or_hang() {
+    if skip_in_ci() {
+        return;
+    }
     let seeds = seeds();
     let mut rng = Rng(0x5eed_1234_abcd_ef01);
     let started = Instant::now();
@@ -221,6 +230,9 @@ fn mutated_specifications_do_not_panic_or_hang() {
 /// rather than at random.
 #[test]
 fn every_prefix_of_a_valid_specification_is_handled() {
+    if skip_in_ci() {
+        return;
+    }
     for seed in seeds() {
         let bytes = seed.as_bytes();
         // A stride keeps this a test rather than a sweep; the interesting
@@ -240,6 +252,9 @@ fn every_prefix_of_a_valid_specification_is_handled() {
 /// parser recurse, or a preprocessor loop.
 #[test]
 fn hostile_shapes_are_refused_rather_than_survived() {
+    if skip_in_ci() {
+        return;
+    }
     let header = "define endian=little;\ndefine space ram type=ram_space size=4 default;\n";
     let cases: Vec<(String, &str)> = vec![
         (

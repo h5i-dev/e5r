@@ -1,0 +1,18 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "not_or",
+  "class": "map32",
+  "arrays": [
+    "not_or_a",
+    "not_or_b",
+    "not_or_c"
+  ],
+  "output": "not_or_c",
+  "length": "not_or_n",
+  "scalars": [],
+  "element": "~not_or_a | not_or_b",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

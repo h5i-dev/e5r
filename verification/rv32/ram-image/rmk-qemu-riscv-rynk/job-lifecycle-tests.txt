@@ -4,8 +4,8 @@ ok fidelity copy checks unmodified: exit 0  | x
 ok fidelity with a wrong entry does not check: exit 1  | verification/rv32/build/testjobs/BadFidelity.lean:16:39: error: Tactic `decide` proved that
 ok fidelity with a wrong rwBase does not check: exit 1  | verification/rv32/build/testjobs/BadFidelity.lean:16:39: error: Tactic `decide` proved that
 ok fidelity with a wrong exec bit does not check: exit 1  | verification/rv32/build/testjobs/BadFidelity.lean:16:39: error: Tactic `decide` proved that
-ok edited packed module makes the result stale: exit 1  | e5r-verify: verification/rv32/build/testjobs/positive.result.json: stale: generated image
-ok edited manifest makes the result stale: exit 1  | e5r-verify: verification/rv32/build/testjobs/positive.result.json: stale: generated image
+ok edited packed module makes the result stale: exit 1  | e5r: verification/rv32/build/testjobs/positive.result.json: stale: generated image
+ok edited manifest makes the result stale: exit 1  | e5r: verification/rv32/build/testjobs/positive.result.json: stale: generated image
 ok restored files are current again: exit 0  | verification/rv32/build/testjobs/positive.result.json: current
 ok changed ELF against its pin: exit 13 error | ELF identity changed (aaa89442189eea054b3d71f55b0ae3d502f0f7929819eb6bae00e9beb27a166a, job pins f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6
 ok exporter refusal is unsupported: exit 11 unsupported | PT_LOAD 1: p_paddr 0x800220dc != p_vaddr 0x800210dc; only the paddr=vaddr mapping policy is supported{

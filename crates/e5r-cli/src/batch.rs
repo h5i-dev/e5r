@@ -78,7 +78,7 @@ fn one(cli: &Cli, common: &Common, line: &str) -> (u8, String) {
         return (exit::USAGE, quote("an empty command"));
     };
     let mut argv: Vec<String> = vec![
-        "e5r".to_string(),
+        "e5rx".to_string(),
         subcommand,
         common.file.display().to_string(),
     ];

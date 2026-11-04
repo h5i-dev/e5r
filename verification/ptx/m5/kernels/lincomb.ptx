@@ -1,0 +1,33 @@
+.version 8.0
+.target sm_86
+.address_size 64
+
+.visible .entry lincomb(.param .u64 lincomb_a, .param .u64 lincomb_b, .param .u64 lincomb_c, .param .u32 lincomb_p, .param .u32 lincomb_q, .param .u32 lincomb_n)
+{
+	.reg .pred %p<2>;
+	.reg .b32 %r<13>;
+	.reg .b64 %rd<8>;
+	ld.param.u64 %rd1, [lincomb_a];
+	ld.param.u64 %rd2, [lincomb_b];
+	ld.param.u64 %rd3, [lincomb_c];
+	ld.param.u32 %r1, [lincomb_p];
+	ld.param.u32 %r2, [lincomb_q];
+	ld.param.u32 %r3, [lincomb_n];
+	mov.u32 %r4, %ctaid.x;
+	mov.u32 %r5, %ntid.x;
+	mov.u32 %r6, %tid.x;
+	mad.lo.u32 %r7, %r4, %r5, %r6;
+	setp.ge.u32 %p1, %r7, %r3;
+	@%p1 bra DONE;
+	mul.wide.u32 %rd4, %r7, 4;
+	add.u64 %rd5, %rd1, %rd4;
+	add.u64 %rd6, %rd2, %rd4;
+	add.u64 %rd7, %rd3, %rd4;
+	ld.global.u32 %r8, [%rd5];
+	ld.global.u32 %r9, [%rd6];
+	mul.lo.u32 %r10, %r9, %r2;
+	mad.lo.u32 %r11, %r8, %r1, %r10;
+	st.global.u32 [%rd7], %r11;
+DONE:
+	ret;
+}

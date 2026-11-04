@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "tail_drop",
+  "class": "map32",
+  "arrays": [
+    "tail_drop_x",
+    "tail_drop_y"
+  ],
+  "output": "tail_drop_y",
+  "length": "tail_drop_n",
+  "scalars": [],
+  "element": "tail_drop_x + 5",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

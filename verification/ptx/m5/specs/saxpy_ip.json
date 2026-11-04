@@ -1,0 +1,19 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "saxpy_ip",
+  "class": "map32",
+  "arrays": [
+    "saxpy_ip_x",
+    "saxpy_ip_y"
+  ],
+  "output": "saxpy_ip_y",
+  "length": "saxpy_ip_n",
+  "scalars": [
+    "saxpy_ip_a"
+  ],
+  "element": "saxpy_ip_a * saxpy_ip_x + saxpy_ip_y",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "2147483647"
+  }
+}

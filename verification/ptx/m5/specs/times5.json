@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "times5",
+  "class": "map32",
+  "arrays": [
+    "times5_x",
+    "times5_y"
+  ],
+  "output": "times5_y",
+  "length": "times5_n",
+  "scalars": [],
+  "element": "5 * times5_x",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

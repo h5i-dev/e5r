@@ -1,0 +1,17 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "bswap_hi",
+  "class": "map32",
+  "arrays": [
+    "bswap_hi_x",
+    "bswap_hi_y"
+  ],
+  "output": "bswap_hi_y",
+  "length": "bswap_hi_n",
+  "scalars": [],
+  "element": "(bswap_hi_x << 16) | (bswap_hi_x >> 16)",
+  "schedule": {
+    "kind": "guarded",
+    "max_threads": "4294967295"
+  }
+}

@@ -15,7 +15,7 @@ and expects each to be refused for its own reason:
   * a proof address no longer at the named symbol: `error`;
   * a module claiming the board's model RAM starts 4 bytes later: `failed`;
   * the image declared as flash on the RAM board: `error`.
-With BUNDLE_DIR (from `e5r-verify bundle` of the job), a copy of it with the
+With BUNDLE_DIR (from `e5r bundle` of the job), a copy of it with the
 packed module changed by one word fails `recheck.sh` at the checksums, and
 with the checksum forged as well, at the packing check.
 Exit status 0 only if every case behaves as stated.
