@@ -59,13 +59,13 @@ for target in "${targets[@]}"; do
   # Only the binary and what it needs: a release job has no use for the test
   # binaries of fourteen crates, and on a small machine that is the difference
   # between a build that fits and one that swaps.
-  if ! RUSTFLAGS="$flags" cargo build --release --target "$target" -p e5r-cli --bin e5r; then
+  if ! RUSTFLAGS="$flags" cargo build --release --target "$target" -p e5r-cli --bin e5rx; then
     echo "FAIL $target: did not build here" >&2
     skipped+=("$target")
     continue
   fi
 
-  bin=target/$target/release/e5r
+  bin=target/$target/release/e5rx
   [ -x "$bin" ] || { echo "FAIL $target: no binary at $bin" >&2; skipped+=("$target"); continue; }
 
   # A gate rather than a print. A musl archive that picked up a dynamic
@@ -90,7 +90,7 @@ for target in "${targets[@]}"; do
   stage=$out/$name
   rm -rf "$stage"
   mkdir -p "$stage"
-  cp "$bin" "$stage/e5r"
+  cp "$bin" "$stage/e5rx"
   cp README.md LICENSE "$stage/"
   mkdir -p "$stage/docs"
   cp docs/toolkit/MANUAL.md docs/ROADMAP.md docs/toolkit/dashboard.md "$stage/docs/"

@@ -5,10 +5,10 @@ what it is, what gets built in what order, and what will be refused in review
 rather than argued about again.
 
 **Repositioning (owner decision, 2026-11-03).** e5r is now presented as
-*assembly-level formal verification with Lean 4*. The verifier, `e5r-verify`,
+*assembly-level formal verification with Lean 4*. The verifier, `e5r`,
 with the PTX scope P and the RISC-V scopes V0, F and R below, is the product.
 The binary analysis toolkit described by M0 to M12 (loaders, decoders, IR,
-decompiler, differ, annotation log) ships unchanged as the `e5r` binary and
+decompiler, differ, annotation log) ships as the `e5rx` binary and
 is development infrastructure for the verifier. Its milestones and the "Not
 building" list stay in force; when the two compete for effort, the verifier
 comes first. No output of the toolkit is an input to any proof. The sections
@@ -113,7 +113,7 @@ e5r-db        content anchors, the annotation log, git merge semantics
 e5r-diff      function matching, build-to-build diff
 e5r-patch     assembler-backed patch sets
 e5r-api       stable library surface and the versioned JSON schema
-e5r-cli       the e5r binary
+e5r-cli       the e5rx binary (the toolkit)
 ```
 
 Dependency edges run downward only. `e5r-cli` may depend on everything;
@@ -259,7 +259,7 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       space table and 148 on the constructor count.
 - [x] Assembler for x86-64 and AArch64, needed by M10 patching. Encoding only,
       from public manuals, built around the decoder so it accepts our own
-      disassembly verbatim: a user can copy a line out of `e5r disas`, change
+      disassembly verbatim: a user can copy a line out of `e5rx disas`, change
       it, and assemble it back. Round trip over the whole fixture corpus, 0
       wrong on both architectures; byte-identical to `as` and
       `aarch64-linux-gnu-as` on every one of 2,535 and 1,272 comparable forms.
@@ -654,7 +654,7 @@ designed before it gets coded, and the design lives in
       distribution's development packages carry the same code under the same
       names, are what a statically linked binary was built from, and need no
       reading of anyone's format.
-- [x] Emulation, built on the M4 IR interpreter: `e5r emulate` runs a
+- [x] Emulation, built on the M4 IR interpreter: `e5rx emulate` runs a
       function with given arguments and reports what came back and what it
       touched. Nothing escapes the process. Gated against the processor by
       running the oracle's case table through it.
@@ -700,7 +700,7 @@ designed before it gets coded, and the design lives in
       stored blocks were 2.69M distinct ranges, held once per function that
       could reach them. Wall time is unchanged and is not claimed as a win.
 - [x] Profiling as a habit, with `scripts/flamegraph.sh` checked in and run
-      rather than merely written. It found that `e5r funcs` spends 12.3% of
+      rather than merely written. It found that `e5rx funcs` spends 12.3% of
       its time computing content anchors for every function before printing
       anything.
 
@@ -777,7 +777,7 @@ or decompiler roadmap or authorize a firmware framework.
 The supported subset, exact statements, build commands, assumptions, provenance
 and trusted computing base are together in
 [`verification-rv32.md`](verification/rv32-research.md). Implementation is isolated in
-`e5r-verify` and `verification/rv32`; no empty firmware crate or CI profile change.
+`e5r` and `verification/rv32`; no empty firmware crate or CI profile change.
 
 ## F. Scoped firmware verification (2026-10-28 owner authorization)
 
@@ -815,7 +815,7 @@ Each item is checked only when its acceptance criterion has been run.
       execution is exhibited (nonvacuity); the axiom audit shows only
       `propext`, `Quot.sound` and `Classical.choice`. (Accepted 2026-10-29:
       `clamp_all`, `duty_contract`, both `nonvacuous`.)
-- [ ] **F5. General workflow.** *Accepted:* `e5r-verify check` takes a job
+- [ ] **F5. General workflow.** *Accepted:* `e5r check` takes a job
       file (ELF, board, property, entry/boot model) and returns structured JSON
       with one of `proved`, `counterexample`, `unknown`, `unsupported`,
       `resource_exhausted`, `error`; resource limits and resumable runs; a new
@@ -855,7 +855,7 @@ Each item is checked only when its acceptance criterion has been run.
       result binding and staleness, CI job (not yet run on a runner),
       malformed-input and runner controls, schema names, docs, an
       installation guide (`firmware-verification-install.md`), Lean-only
-      offline recheck bundles (`e5r-verify bundle`), kernel replay of every
+      offline recheck bundles (`e5r bundle`), kernel replay of every
       module (`leanchecker`), and an independent review by a separate
       reviewer agent session (findings fixed and recorded in
       `firmware-verification.md`). *Open:* a review by a human RISC-V or
@@ -1062,7 +1062,7 @@ without trusting the LLM or a high-level compiler? Design, theorem statements,
 assumptions and the trusted base are in
 [`verification-ptx.md`](verification/ptx.md). The Lean project is
 `verification/ptx` (core Lean v4.35.0, no Mathlib); the parser and exporter are
-`crates/e5r-ptx`, reached through `e5r-verify ptx`. It does not reorder M1-M12
+`crates/e5r-ptx`, reached through `e5r ptx`. It does not reorder M1-M12
 and adds nothing to e5r's disassembler, lifter or decompiler. Each item is
 checked only when its acceptance criterion has been run.
 
@@ -1096,7 +1096,7 @@ checked only when its acceptance criterion has been run.
       without a hand-written proof; wrong PTX yields a replayed counterexample
       where one exists. (Accepted 2026-11-01, for the `map32` class:
       elementwise maps over 32-bit arrays, guarded or grid-stride, 1-D.
-      `e5r-verify ptx check` generates `spec.Correct K` from an
+      `e5r ptx check` generates `spec.Correct K` from an
       `e5r.ptx.spec.v1` spec whose loop invariant is register roles at the
       loop head, proves it with `Ptx/Auto` (class theorem proved once,
       per-thread obligations by `ptx_guarded`/`ptx_stride_*`), and otherwise
@@ -1115,7 +1115,7 @@ checked only when its acceptance criterion has been run.
       `phase_sound` composes per-thread, per-phase derivations with atomic
       accumulator cells; `reduce_correct` (every power-of-two block up to 1024),
       `scan_correct` (every block up to 1024) and `reduce_atomic_correct` on
-      nvcc 13.2's PTX. `e5r-verify ptx check` classes `reduce32` and `scan32`:
+      nvcc 13.2's PTX. `e5r ptx check` classes `reduce32` and `scan32`:
       class theorems proved once, phase obligations generated from register
       roles at each barrier, a barrier-aware search replayed in Lean through
       `Cfg.exec`. Measured: the three benchmarks proved; 0 of 14 M4 mutants

@@ -17,7 +17,7 @@ the side conditions do not depend on the instructions. What does is left as
 hypotheses, the phase obligations: for each phase, from the registers the
 `Code` claims at its start, the thread's instructions do what the phase's
 footprint and memory say and stop at the next barrier with the registers the
-`Code` claims there. `e5r-verify ptx check` writes a `Code` from the spec's
+`Code` claims there. `e5r ptx check` writes a `Code` from the spec's
 register roles and proves the obligations with the M4 tactics; a `Code`
 that is wrong only makes them unprovable, it cannot make the theorem false.
 -/

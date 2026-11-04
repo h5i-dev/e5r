@@ -234,7 +234,7 @@ impl Project {
         let mut parts = header.split_whitespace();
         if parts.next() != Some(TAG) {
             return Err(Error::NotRecognized {
-                expected: "e5r project",
+                expected: "e5rx project",
             });
         }
         let version: u32 = parts

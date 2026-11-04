@@ -19,12 +19,12 @@ Validation on 2026-10-30, in the isolated `prepare/rmk-main` worktree:
 * `cargo test --release --workspace --no-fail-fast -j 2`: **not green**:
   1,050 passed, 21 failed, 20 ignored across 116 test/doc-test targets.
   The failures are the missing-input/tool gates below, not accepted passes.
-* `e5r-verify check .../rmk-checkpoint.json` **without `--resume`**:
+* `e5r check .../rmk-checkpoint.json` **without `--resume`**:
   **`proved`**. All 110 modules compiled from source and all 110 replayed
   through `leanchecker` (220 stages; no resumed stages). The audit checked
   the 17 requested endpoints and four image-binding theorems. Only
   `propext`, `Classical.choice` and `Quot.sound` were reported.
-* `e5r-verify verify-result .../checkpoint.json`: **current**, exit 0.
+* `e5r verify-result .../checkpoint.json`: **current**, exit 0.
   The receipt binds the supplied ELF, board, job, Lean version, verifier
   binary and proof sources. Proof sources are at `0c75c31`; this validation
   commit adds only documentation and the receipt.

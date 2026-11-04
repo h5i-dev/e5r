@@ -1,4 +1,4 @@
-//! `e5r-verify ptx check`: versioned JSON, documented exit statuses, and
+//! `e5r ptx check`: versioned JSON, documented exit statuses, and
 //! fail-closed verdicts. The tests that need Lean return early without
 //! `lake` (CONTRIBUTING.md: a missing tool skips, it does not pass silently
 //! in a way that claims anything).
@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn bin() -> &'static str {
-    env!("CARGO_BIN_EXE_e5r-verify")
+    env!("CARGO_BIN_EXE_e5r")
 }
 
 fn root() -> PathBuf {

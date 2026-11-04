@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the RMK proofs the way `e5r-verify check` checks a job, until the job
+"""Check the RMK proofs the way `e5r check` checks a job, until the job
 runner can export RAM-resident images (main owns job.rs; the exporter worker
 owns `ram-image`).
 

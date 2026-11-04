@@ -5,9 +5,9 @@ PTX kernels and RISC-V firmware binaries. Every proof is checked by the Lean 4
 kernel, so neither the compiler nor whoever wrote the code has to be trusted.
 
 ```bash
-e5r-verify ptx check saxpy.ptx --spec saxpy.json    # proved, refuted, unsupported or unknown
-e5r-verify ptx check k.ptx --spec k.json --proof Proof.lean   # check your own proof
-e5r-verify check verification/rv32/jobs/hifive1-duty.json     # a firmware proof job
+e5r ptx check saxpy.ptx --spec saxpy.json    # proved, refuted, unsupported or unknown
+e5r ptx check k.ptx --spec k.json --proof Proof.lean   # check your own proof
+e5r check verification/rv32/jobs/hifive1-duty.json     # a firmware proof job
 ```
 
 For a PTX kernel, `check` proves memory safety, race freedom, termination and
@@ -30,9 +30,9 @@ curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf 
 ./scripts/recheck-ptx.sh      # rebuild and recheck every PTX result
 ```
 
-## The `e5r` toolkit
+## The `e5rx` toolkit
 
-e5r also ships `e5r`, the binary analysis toolkit it grew out of:
+e5r also ships `e5rx`, the binary analysis toolkit it grew out of:
 disassembler, decompiler, binary differ. It is development infrastructure
 here and is not an input to any proof. See [MANUAL.md](docs/toolkit/MANUAL.md).
 

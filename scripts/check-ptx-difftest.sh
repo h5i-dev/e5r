@@ -24,7 +24,7 @@ if ! command -v nvidia-smi >/dev/null || ! nvidia-smi -L >/dev/null 2>&1 || [[ !
 fi
 if [[ -z "${E5R_VERIFY:-}" ]]; then
   CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" cargo build --release -p e5r-verify
-  E5R_VERIFY=./target/release/e5r-verify
+  E5R_VERIFY=./target/release/e5r
 fi
 out=${DIFFTEST_OUT:-$(mktemp -d)}
 mkdir -p "$out"

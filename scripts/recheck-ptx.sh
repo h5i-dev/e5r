@@ -5,7 +5,7 @@
 #   1. parser, round trip, ptxas agreement and fuzz tests (cargo, release);
 #   2. every Lean proof and refutation from scratch, and the axiom audit of
 #      every Ptx.* declaration (scripts/check-lean-ptx.sh);
-#   3. `e5r-verify ptx check` on every benchmark, against the verdict in
+#   3. `e5r ptx check` on every benchmark, against the verdict in
 #      benchmarks/expected.txt;
 #   4. the mutation controls (mutants/run.py): no mutant may be proved;
 #   4b. the supplied-proof route (proofs/controls.sh): two supplied proofs
@@ -25,7 +25,7 @@ export LEAN_NUM_THREADS="${LEAN_NUM_THREADS:-2}"
 if [[ -z "${E5R_VERIFY:-}" ]]; then
   CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" cargo test --release -p e5r-ptx -p e5r-verify -q
   CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" cargo build --release -p e5r-verify
-  export E5R_VERIFY=./target/release/e5r-verify
+  export E5R_VERIFY=./target/release/e5r
 fi
 echo "== Lean proofs and axiom audit"
 ./scripts/check-lean-ptx.sh | tail -3

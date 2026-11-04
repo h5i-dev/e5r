@@ -1,4 +1,4 @@
-//! `e5r-verify ptx run`: the differential-test cases on the concrete
+//! `e5r ptx run`: the differential-test cases on the concrete
 //! interpreter of `e5r-ptx`, printed in the format of `gpurun` and
 //! `ptxdiff` so scripts/check-ptx-difftest.sh can compare all of them. The
 //! interpreter is untrusted; this is how it is checked against the GPU and

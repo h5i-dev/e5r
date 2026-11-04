@@ -16,6 +16,6 @@ lean_lib Diff where
 lean_exe ptxdiff where
   root := `Diff.Main
 
--- The independent checker for supplied proofs (`e5r-verify ptx check --proof`).
+-- The independent checker for supplied proofs (`e5r ptx check --proof`).
 lean_exe proofcheck where
   root := `Checker.ProofCheck

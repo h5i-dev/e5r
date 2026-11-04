@@ -1,8 +1,8 @@
 # e5r
 
-This is the command reference for `e5r`, the binary analysis toolkit that
+This is the command reference for `e5rx`, the binary analysis toolkit that
 serves as development infrastructure for the e5r Lean 4 verifier. The
-verifier, `e5r-verify`, is documented in
+verifier, `e5r`, is documented in
 [verification-ptx.md](../verification/ptx.md) for PTX kernels and
 [firmware-verification.md](../verification/firmware.md) for firmware binaries.
 
@@ -16,7 +16,7 @@ a bad command line, and `3` for input that could not be read.
 
 ```
 cargo build --release
-./target/release/e5r info /bin/ls
+./target/release/e5rx info /bin/ls
 ```
 
 ## Installing
@@ -24,11 +24,11 @@ cargo build --release
 ### A release binary
 
 Every release attaches one archive per platform, a `SHA256SUMS` file and a
-signature over it. Unpack and put `e5r` on your path:
+signature over it. Unpack and put `e5rx` on your path:
 
 ```
 tar -xzf e5r-0.1.0-x86_64-unknown-linux-musl.tar.gz
-install -m755 e5r-0.1.0-x86_64-unknown-linux-musl/e5r /usr/local/bin/
+install -m755 e5r-0.1.0-x86_64-unknown-linux-musl/e5rx /usr/local/bin/
 ```
 
 Check what you downloaded first. The checksums cover the archives, and the
@@ -60,12 +60,12 @@ Alpine, a distroless container, or a rescue initramfs. `ldd` on it says it is
 not a dynamic executable, and that is the whole claim:
 
 ```
-$ file e5r
-e5r: ELF 64-bit LSB pie executable, x86-64, static-pie linked, stripped
+$ file e5rx
+e5rx: ELF 64-bit LSB pie executable, x86-64, static-pie linked, stripped
 ```
 
 Nothing outside the binary is needed at run time. The fixture corpus under
-`fixtures/` is what the test suite measures against; an installed `e5r` never
+`fixtures/` is what the test suite measures against; an installed `e5rx` never
 reads it, and no data file, configuration or cache directory is required to
 start.
 
@@ -144,13 +144,13 @@ the output rather than being approximated.
 ## Looking at a file
 
 ```
-e5r info FILE           container, architecture, entry, what the loader noticed
-e5r sections FILE       sections and where they are mapped
-e5r symbols FILE        symbols the container names
-e5r imports FILE        what it needs from elsewhere
-e5r exports FILE        what it offers
-e5r strings FILE        strings found in the image, by section
-e5r stats FILE          counts: functions, blocks, instructions, references
+e5rx info FILE           container, architecture, entry, what the loader noticed
+e5rx sections FILE       sections and where they are mapped
+e5rx symbols FILE        symbols the container names
+e5rx imports FILE        what it needs from elsewhere
+e5rx exports FILE        what it offers
+e5rx strings FILE        strings found in the image, by section
+e5rx stats FILE          counts: functions, blocks, instructions, references
 ```
 
 `info` and the listings above need only the container, so they are instant
@@ -159,11 +159,11 @@ whatever the size of the file.
 ## Code
 
 ```
-e5r funcs FILE                     every recovered function and its evidence
-e5r disas FILE TARGET              disassemble a function, an address, or `all`
-e5r xrefs FILE TARGET [--from]     references to an address, or from one
-e5r decompile FILE TARGET          pseudo-C for a function, or for `all`
-e5r emulate FILE TARGET [ARGS...]  run a function and report what it did
+e5rx funcs FILE                     every recovered function and its evidence
+e5rx disas FILE TARGET              disassemble a function, an address, or `all`
+e5rx xrefs FILE TARGET [--from]     references to an address, or from one
+e5rx decompile FILE TARGET          pseudo-C for a function, or for `all`
+e5rx emulate FILE TARGET [ARGS...]  run a function and report what it did
 ```
 
 `TARGET` is an address (`0x401000`, `401000`), a symbol name, or `all`.
@@ -192,21 +192,21 @@ wrong, so the identity the image asks for is checked before anything in the
 database is believed.
 
 ```
-$ e5r funcs prog.exe
+$ e5rx funcs prog.exe
 0x140001000  ...  proven  program database  compare_points
 0x140001020  ...  proven  program database  walk
 ```
 
 Without it, the same binary yields only its entry point.
 
-`e5r info` reports `pe.pdb`, `pe.pdb.key` and `pe.pdb.age`, which together
+`e5rx info` reports `pe.pdb`, `pe.pdb.key` and `pe.pdb.age`, which together
 are what a symbol server is indexed by.
 
 ## C++
 
 ```
-e5r classes prog                # the hierarchy
-e5r classes prog --members      # and every member function, with its `this`
+e5rx classes prog                # the hierarchy
+e5rx classes prog --members      # and every member function, with its `this`
 ```
 
 Classes come from the type information where a binary has it, and from the
@@ -229,8 +229,8 @@ default.
 ## Structure and types
 
 ```
-e5r shapes FILE TARGET     what the pointers a function takes point at
-e5r vtables FILE           virtual tables and the classes they belong to
+e5rx shapes FILE TARGET     what the pointers a function takes point at
+e5rx vtables FILE           virtual tables and the classes they belong to
 ```
 
 `shapes` reports the offsets a function touches through each pointer it is
@@ -241,9 +241,9 @@ two disagreeing strides into one.
 ## Asking questions
 
 ```
-e5r query FILE 'functions where insns > 100 and name ~ "crypt"'
-e5r query FILE 'strings where length >= 20 and text ~ "/etc/"'
-e5r query FILE 'xrefs where kind = call and to = 0x401000 limit 20'
+e5rx query FILE 'functions where insns > 100 and name ~ "crypt"'
+e5rx query FILE 'strings where length >= 20 and text ~ "/etc/"'
+e5rx query FILE 'xrefs where kind = call and to = 0x401000 limit 20'
 ```
 
 Entities: `functions`, `strings`, `symbols`, `imports`, `exports`, `sections`,
@@ -255,7 +255,7 @@ and is reported as one, with the fields there are.
 ## Comparing builds
 
 ```
-e5r diff OLD NEW [--all]
+e5rx diff OLD NEW [--all]
 ```
 
 Functions are matched across the two builds by a fingerprint of their
@@ -266,8 +266,8 @@ Given a vulnerable build and a patched one, this points at the change.
 ## Naming a stripped binary
 
 ```
-e5r sig FILE create -o LIBRARY      a signature for every named function
-e5r sig FILE apply LIBRARY          name what the library recognizes
+e5rx sig FILE create -o LIBRARY      a signature for every named function
+e5rx sig FILE apply LIBRARY          name what the library recognizes
 ```
 
 A signature identifies a function by its content rather than its address, so a
@@ -281,7 +281,7 @@ The file is sorted text, so a signature library reviews in a diff.
 ## An interactive session
 
 ```
-$ e5r repl prog
+$ e5rx repl prog
 38 function(s) in prog. `help` lists the commands, `quit` leaves.
 0x400144> f
 0x400144> seek parse_header
@@ -308,17 +308,17 @@ An assertion is not a note on the side: it changes the analysis. Decompile,
 see what the engine could not work out, say what it is, decompile again.
 
 ```
-$ e5r decompile prog nestedoffset
+$ e5rx decompile prog nestedoffset
 uint64_t nestedoffset(uint64_t arg0, uint64_t arg1, uint64_t arg2)
 {
     return (uint64_t)((uint64_t)(uint32_t)*(uint32_t *)(arg0 +
         ((int64_t)(int32_t)((uint32_t)arg1 + (uint32_t)arg2) << 2) + 12));
 }
 
-$ e5r annotate prog type nestedoffset \
+$ e5rx annotate prog type nestedoffset \
     "int nestedoffset(struct outer { int header; int pad; int array[8]; } *ptr, int a, int b)"
 
-$ e5r decompile prog nestedoffset
+$ e5rx decompile prog nestedoffset
 struct outer { int32_t header; int32_t pad; int32_t array[8]; };
 
 int32_t nestedoffset(struct outer *ptr, int32_t a, int32_t b)
@@ -341,7 +341,7 @@ where the machine kept it, so a program driving this can see what there is to
 assert:
 
 ```
-$ e5r decompile prog nestedoffset --json
+$ e5rx decompile prog nestedoffset --json
   ...
   "asserted": true,
   "variables": [
@@ -354,10 +354,10 @@ $ e5r decompile prog nestedoffset --json
 ## Annotations
 
 ```
-e5r annotate FILE name TARGET NAME
-e5r annotate FILE comment TARGET TEXT
-e5r annotate FILE list
-e5r annotate FILE undo
+e5rx annotate FILE name TARGET NAME
+e5rx annotate FILE comment TARGET TEXT
+e5rx annotate FILE list
+e5rx annotate FILE undo
 ```
 
 Annotations are written to a log beside the binary, keyed to a content anchor
@@ -376,8 +376,8 @@ than loaded: picking a member silently would make every later answer about
 bytes you did not choose.
 
 ```
-e5r archive libfoo.a              # members, sizes and offsets
-e5r archive libfoo.a --symbols    # and what each one defines
+e5rx archive libfoo.a              # members, sizes and offsets
+e5rx archive libfoo.a --symbols    # and what each one defines
 ```
 
 GNU and BSD archives, long names, both symbol index forms, and thin archives.
@@ -389,8 +389,8 @@ last `\n---- Bun! ----\n` marker, the offsets just before it, and either
 record size that layout has shipped.
 
 ```
-e5r bun prog                      # modules, loaders, sizes
-e5r bun prog --extract a.js       # that module's bytes on stdout
+e5rx bun prog                      # modules, loaders, sizes
+e5rx bun prog --extract a.js       # that module's bytes on stdout
 ```
 
 `--extract` takes the path the graph stores, a decimal index, or a unique
@@ -398,7 +398,7 @@ suffix that begins at a `/`. It writes the bytes and nothing else, so it is
 not combined with `--json`.
 
 ```
-e5r overlay firmware.exe
+e5rx overlay firmware.exe
 ```
 
 reports where the headers stop describing the file, what is appended past that
@@ -416,17 +416,17 @@ find, so a patch written against one build still lands on the right
 instruction in the next one, and says how it found it.
 
 ```
-e5r patch prog record 0x401234 --asm "nop" --note "skip the check" -o fix.e5r-patch
-e5r patch prog record 0x401234 --bytes 90909090 -o fix.e5r-patch
-e5r patch prog record 0x401234 --asm "mov eax, 1" --pad-to 8 -o fix.e5r-patch
-e5r patch prog preview fix.e5r-patch     # where it lands, what it overwrites
-e5r patch prog apply   fix.e5r-patch -o prog.patched
-e5r patch prog.patched revert fix.e5r-patch -o prog
-e5r patch prog merge a.e5r-patch b.e5r-patch -o both.e5r-patch
+e5rx patch prog record 0x401234 --asm "nop" --note "skip the check" -o fix.e5r-patch
+e5rx patch prog record 0x401234 --bytes 90909090 -o fix.e5r-patch
+e5rx patch prog record 0x401234 --asm "mov eax, 1" --pad-to 8 -o fix.e5r-patch
+e5rx patch prog preview fix.e5r-patch     # where it lands, what it overwrites
+e5rx patch prog apply   fix.e5r-patch -o prog.patched
+e5rx patch prog.patched revert fix.e5r-patch -o prog
+e5rx patch prog merge a.e5r-patch b.e5r-patch -o both.e5r-patch
 ```
 
 `--asm` assembles at the target address, because a branch encodes a
-displacement from where it sits. It accepts what `e5r disas` prints, so a
+displacement from where it sits. It accepts what `e5rx disas` prints, so a
 line can be copied out, changed, and assembled back. `--pad-to` fills the rest
 with no-ops: an instruction that encodes shorter than the one it replaces
 would otherwise leave the bytes after it meaning something they did not mean.
@@ -444,10 +444,10 @@ the bytes the anchor fingerprinted, which is exactly what applying it did.
 ## Saving a session
 
 ```
-e5r project new prog -o prog.e5r-proj --set scan_gaps=true
-e5r project add prog.e5r-proj --signatures libc.e5r-sig --patch fix.e5r-patch
-e5r project verify prog.e5r-proj
-e5r project show prog.e5r-proj
+e5rx project new prog -o prog.e5r-proj --set scan_gaps=true
+e5rx project add prog.e5r-proj --signatures libc.e5r-sig --patch fix.e5r-patch
+e5rx project verify prog.e5r-proj
+e5rx project show prog.e5r-proj
 ```
 
 A project names its binary by content as well as by path. Opening it against a
@@ -457,16 +457,16 @@ and a binary that only moved is still the right one.
 ## Project dashboard and tasks
 
 ```bash
-e5r project new prog --name investigation     # global project, absolute references
-e5r project list --json
-e5r ui                                      # every registered project
-e5r project import prog.e5r-proj --name imported
-e5r project task investigation list --json
-e5r project dashboard prog.e5r-proj             # local overview + decompiler pane
-e5r project dashboard prog.e5r-proj --port 0    # choose a free loopback port
-e5r project task prog.e5r-proj add "Trace parser" --owner agent-a --next "Inspect main"
-e5r project task prog.e5r-proj list --json
-e5r project task prog.e5r-proj update T-0001 --revision 1 --input task.json
+e5rx project new prog --name investigation     # global project, absolute references
+e5rx project list --json
+e5rx ui                                      # every registered project
+e5rx project import prog.e5r-proj --name imported
+e5rx project task investigation list --json
+e5rx project dashboard prog.e5r-proj             # local overview + decompiler pane
+e5rx project dashboard prog.e5r-proj --port 0    # choose a free loopback port
+e5rx project task prog.e5r-proj add "Trace parser" --owner agent-a --next "Inspect main"
+e5rx project task prog.e5r-proj list --json
+e5rx project task prog.e5r-proj update T-0001 --revision 1 --input task.json
 ```
 
 The browser and CLI share durable tasks with revision checks, owners, blockers,
@@ -484,10 +484,10 @@ float.
 ## Shell integration
 
 ```
-e5r completions bash > /etc/bash_completion.d/e5r
-e5r completions zsh  > ~/.zsh/completions/_e5r
-e5r completions fish > ~/.config/fish/completions/e5r.fish
-e5r manpage          > /usr/local/share/man/man1/e5r.1
+e5rx completions bash > /etc/bash_completion.d/e5rx
+e5rx completions zsh  > ~/.zsh/completions/_e5r
+e5rx completions fish > ~/.config/fish/completions/e5r.fish
+e5rx manpage          > /usr/local/share/man/man1/e5rx.1
 ```
 
 Both are generated from the command tree, so they cannot describe a command
@@ -511,8 +511,8 @@ A job that runs out of budget prints why on stderr and how much is left, and
 the output it already produced is still a valid document:
 
 ```
-$ e5r decompile libstdc++.so.6 all --budget 3 > partial.c
-e5r: out of time after 3.5s and 1024 of 5609 function(s); 4585 not done.
+$ e5rx decompile libstdc++.so.6 all --budget 3 > partial.c
+e5rx: out of time after 3.5s and 1024 of 5609 function(s); 4585 not done.
 Raise --budget or --limit, or narrow the target.
 ```
 

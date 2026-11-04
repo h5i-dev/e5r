@@ -50,7 +50,7 @@ optional: variable lists with ABI argument positions and line maps improve
 fidelity, but a backend that fills in only code and address is still scored on
 all three metrics, with type_match parsing types out of the C.
 
-Ours is `scripts/decbench_e5r.py`. It shells out to `e5r decompile <binary>
+Ours is `scripts/decbench_e5r.py`. It shells out to `e5rx decompile <binary>
 all --json` once per binary and splits the JSON document into functions, which
 is far cheaper than one call per function: every invocation re-analyzes the
 whole image, so `all` pays the analysis once (5s for 158 functions of zlib's
@@ -239,7 +239,7 @@ number is optimistic.
 **2. Locals reach the metric with no name, no offset and no type.** type_match
 scores parameters and locals together, and 444 of libz's 768 ground-truth
 variables (58%) are locals. DecBench matches locals by stack offset when the
-backend supplies `VariableInfo`, and by name otherwise. `e5r decompile
+backend supplies `VariableInfo`, and by name otherwise. `e5rx decompile
 --json` emits only a *count* of locals, so the adapter can supply neither, and
 every local is a guaranteed miss: 596 of e5r's 764 scored functions score
 exactly 0. Parameters are not much better: across libz's 151 functions e5r
@@ -280,8 +280,8 @@ Reproduce it in three lines:
 printf '#include <string.h>\nint f(const char*s){return strlen(s)>3;}\n%s\n' \
   'int main(int c,char**v){return f(v[0]);}' > /tmp/p.c
 gcc -g -O0 -fno-builtin /tmp/p.c -o /tmp/p
-./target/release/e5r decompile /tmp/p f     # v0 = (uint64_t)(sub_5f0());
-./target/release/e5r decompile /tmp/p all   # strlen_plt();  and v0 never assigned
+./target/release/e5rx decompile /tmp/p f     # v0 = (uint64_t)(sub_5f0());
+./target/release/e5rx decompile /tmp/p all   # strlen_plt();  and v0 never assigned
 ```
 
 The argument is gone in both. The assignment is gone only in `all`, which is

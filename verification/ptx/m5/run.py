@@ -5,7 +5,7 @@ For each task (kernels/NAME.ptx written by the model, specs/NAME.json from
 mkspec.py):
 
   1. ptxas -arch=sm_86 must assemble the PTX;
-  2. `e5r-verify ptx check` gives proved / refuted / unknown / unsupported,
+  2. `e5r ptx check` gives proved / refuted / unknown / unsupported,
      with the Lean time;
   3. on the GPU (CUDA driver API through ctypes): the kernel runs on random
      inputs at several lengths and launch shapes inside the spec's range, and

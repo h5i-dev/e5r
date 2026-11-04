@@ -20,7 +20,7 @@ categories.workspace = true
 # where fixtures/ and scripts/ do not exist.
 
 [[bin]]
-name = "e5r"
+name = "e5rx"
 path = "src/main.rs"
 
 [dependencies]

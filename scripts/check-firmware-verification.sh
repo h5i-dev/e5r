@@ -8,7 +8,7 @@
 # riscv64 binutils (CROSS_COMPILE prefix, default riscv64-linux-gnu-),
 # qemu-riscv32 and qemu-system-riscv32 8.2.2.
 #
-# E5R_VERIFY names an existing e5r-verify binary (CI builds its own, in the
+# E5R_VERIFY names an existing e5r binary (CI builds its own, in the
 # dev profile). Otherwise this builds the release one, as this checkout must.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -16,7 +16,7 @@ verify=verification/rv32
 
 if [ -z "${E5R_VERIFY:-}" ]; then
   CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-2} cargo build --release -p e5r-verify
-  E5R_VERIFY=target/release/e5r-verify
+  E5R_VERIFY=target/release/e5r
 fi
 export E5R_VERIFY
 

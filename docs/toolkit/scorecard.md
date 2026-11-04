@@ -40,8 +40,8 @@ not yet made. That is a gap in the scorecard, not a result.
 `scripts/compare-tools.sh`, measured 2026-09-14 against **rizin 0.8.2-1 arm64**
 from the project's own Ubuntu repository. Both tools are given the invocation
 their own documentation recommends: `rizin -N -q -A -c aflj <file>` against
-`e5r stats <file> --json`, with the function list for scoring taken from an
-untimed `e5r funcs`. Fastest of three runs, except the two largest libraries,
+`e5rx stats <file> --json`, with the function list for scoring taken from an
+untimed `e5rx funcs`. Fastest of three runs, except the two largest libraries,
 measured once because a single `rizin -A` on `libstdc++` takes over twelve
 minutes. Full method, every command, and the recall breakdown are in
 [`benchmarks.md`](benchmarks.md).
@@ -94,8 +94,8 @@ is not that. It is a stripped C++ binary whose boundaries survive stripping in
 `.eh_frame`; e5r reads those FDEs and rizin does not, so rizin is left with
 recursive descent through virtual dispatch and finds two functions.
 
-**One row goes against us.** `e5r info` on `panicky` takes 0.08s and 56 MB
-where `rz-bin -I` takes 0.02s and 19 MB, because `e5r info` parses the
+**One row goes against us.** `e5rx info` on `panicky` takes 0.08s and 56 MB
+where `rz-bin -I` takes 0.02s and 19 MB, because `e5rx info` parses the
 binary's 2.8 MB of DWARF to print a container header that needs none of it.
 Stripping the debug sections takes it to 0.00s and 5.4 MB.
 

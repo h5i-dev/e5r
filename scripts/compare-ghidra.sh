@@ -11,7 +11,7 @@ set -euo pipefail
 # A fresh project each run: importing into an existing one is a no-op and
 # would report the previous analysis as if it were this one.
 project=${PROJECT:-e5rcompare-$$}
-e5r=${E5R:-target/release/e5r}
+e5r=${E5R:-target/release/e5rx}
 ghidra=${GHIDRA:-ghidra}
 
 command -v "$ghidra" > /dev/null || {

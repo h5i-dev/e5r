@@ -98,7 +98,7 @@ def main():
             lean_ok = lr.returncode == 0
             ok = rust_ok == want and lean_ok
             bad += not ok
-            why = r.stderr.strip().removeprefix("e5r-verify: ") if not rust_ok else "accepted"
+            why = r.stderr.strip().removeprefix("e5r: ") if not rust_ok else "accepted"
             print(f"{'ok' if ok else 'FAIL'} {name}: rust {why!r}; "
                   f"lean kernel accepts = {str(want).lower()} {'proved' if lean_ok else 'NOT proved'}")
             if not lean_ok:

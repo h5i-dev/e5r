@@ -4,7 +4,7 @@
 //!
 //! It is not trusted. It is used to search for counterexamples, and every
 //! counterexample it finds is replayed by the Lean kernel against the Lean
-//! definitions before anything is reported (`e5r-verify ptx check`). It is
+//! definitions before anything is reported (`e5r ptx check`). It is
 //! also cross-checked against the Lean model and the GPU on the differential
 //! test cases (`scripts/check-ptx-difftest.sh`).
 

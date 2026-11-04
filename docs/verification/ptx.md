@@ -60,7 +60,7 @@ evaluation, which would put the compiler in the trusted base.
 | --- | --- | --- |
 | M1 semantics, sequential proofs (P1) | done | `sum_correct` |
 | M2 SIMT, race freedom (P2) | done | `grid_sound`, `vadd_correct`, `saxpy_correct`, three refutations |
-| M3 proof automation (P3) | done for `map32` | `e5r-verify ptx check`; 102 kernels proved, 20 of 21 mutants refuted |
+| M3 proof automation (P3) | done for `map32` | `e5r ptx check`; 102 kernels proved, 20 of 21 mutants refuted |
 | M4 shared memory, barriers, reduction (P4) | done for `reduce32` and `scan32` | `phase_sound`; `reduce_correct`, `scan_correct`, `reduce_atomic_correct`; `ptx check` on 3 benchmarks and 6 M5 kernels; 0 of 14 M4 mutants proved, 14 refuted |
 | M5 AI-written PTX benchmark (P5) | done, with the limits stated | `m5/RESULTS.md`; differential test against the A10G |
 | Supplied proofs (P6) | done | `ptx check --proof`; `a_direct` and `s_pingpong` proved; 10 negative controls refused |
@@ -80,7 +80,7 @@ It runs, in order, and fails on the first problem:
 2. `scripts/check-lean-ptx.sh`: regenerate every kernel module from its `.ptx`
    and refuse a stale one, assemble every benchmark with ptxas when it is
    installed, build the Lean project from scratch, and run the axiom audit;
-3. `e5r-verify ptx check` on every benchmark against
+3. `e5r ptx check` on every benchmark against
    `benchmarks/expected.txt` (26 proved, 3 refuted, 2 unsupported);
 4. the mutation controls (`mutants/run.py`): no mutant may be proved;
 5. the supplied proofs and their negative controls (`proofs/controls.sh`);
@@ -95,12 +95,12 @@ for the M3 part and about 2 hours for the M4 part (most of it failed proof
 attempts on mutants running into the timeout):
 
 ```sh
-python3.12 verification/ptx/m5/run.py ./target/release/e5r-verify /tmp/m5
+python3.12 verification/ptx/m5/run.py ./target/release/e5r /tmp/m5
 python3 verification/ptx/m5/report.py /tmp/m5/results.json
-python3.12 verification/ptx/m5/m4/run4.py ./target/release/e5r-verify /tmp/m5m4
-python3.12 verification/ptx/m5/m4/run4.py --mutants ./target/release/e5r-verify /tmp/m5mut
+python3.12 verification/ptx/m5/m4/run4.py ./target/release/e5r /tmp/m5m4
+python3.12 verification/ptx/m5/m4/run4.py --mutants ./target/release/e5r /tmp/m5mut
 python3 verification/ptx/m5/m4/report4.py    # reads the copies in m5/m4/
-python3.12 verification/ptx/m5/float/run_float.py ./target/release/e5r-verify /tmp/m5f
+python3.12 verification/ptx/m5/float/run_float.py ./target/release/e5r /tmp/m5f
 python3 verification/ptx/m5/float/report_float.py   # reads the copies in m5/float/
 ```
 
@@ -113,18 +113,18 @@ on lean-ieee754's toolchain (v4.33.1) with Mathlib; nothing in
 Lean is capped on purpose: a Lean process was OOM-killed at 15 GB on the
 development machine. The scripts run Lean with `LEAN_NUM_THREADS=2` under a
 10 GB cgroup limit (`systemd-run`, no swap; override with `PTX_LEAN_MEMORY`).
-`e5r-verify ptx check` runs one Lean thread under a 6 GB cap and a 600 s
+`e5r ptx check` runs one Lean thread under a 6 GB cap and a 600 s
 timeout (`--memory-mb`, `--timeout`). Without systemd only the thread count
 and the timeout apply.
 
 ## Command line
 
 ```
-e5r-verify ptx export [--namespace NS] [--name NAME] FILE.ptx
-e5r-verify ptx check FILE.ptx --spec SPEC.json [--project DIR] [--out RESULT.json]
+e5r ptx export [--namespace NS] [--name NAME] FILE.ptx
+e5r ptx check FILE.ptx --spec SPEC.json [--project DIR] [--out RESULT.json]
                      [--keep DIR] [--timeout SECS] [--memory-mb MB] [--no-search]
                      [--proof PROOF.lean]
-e5r-verify ptx run --cases CASES FILE.ptx
+e5r ptx run --cases CASES FILE.ptx
 ```
 
 `export` prints the Lean `Ptx.Module` of a file after the token round trip.
@@ -868,7 +868,7 @@ baseline does not use the Lean model.
 
 ```
 .ptx --e5r-ptx--> AST --token round trip--> Lean Ptx.Module
-spec.json --e5r-verify ptx check--> Proof.lean (template) --lake env lean--> axiom audit --> verdict
+spec.json --e5r ptx check--> Proof.lean (template) --lake env lean--> axiom audit --> verdict
                                  \-> interpreter search --> Refute.lean --lake env lean--> verdict
 
 Ptx/Semantics: Memory, Instruction (one thread), SIMT (grid, interleaving)
@@ -962,7 +962,7 @@ What a theorem here does and does not establish:
    Not trusted: the tactics, `wp_sound` and the rest of `Ptx/Logic` and
    `Ptx/Auto` (proved), the counterexample search and the interpreter
    (replayed), the Lean file generator beyond the statement it emits.
-2. **The verdict logic.** `e5r-verify ptx check` decides `proved` from Lean's
+2. **The verdict logic.** `e5r ptx check` decides `proved` from Lean's
    exit status, the absence of `error:` and `sorry` in its output, and the
    axiom list of `E5rCheck.correct`. That code (`src/ptx/mod.rs`, `run_lean`
    and `check`) is trusted for the exit status.

@@ -4,7 +4,7 @@
 //! immediately. A query it does not understand has to say which part it did
 //! not understand, because "no results" for a misspelling is worse than an
 //! error. And nothing typed at it may panic or take an unbounded time, since
-//! the same parser is behind `e5r query`, where an agent can put anything it
+//! the same parser is behind `e5rx query`, where an agent can put anything it
 //! likes in front of it.
 
 use std::path::{Path, PathBuf};

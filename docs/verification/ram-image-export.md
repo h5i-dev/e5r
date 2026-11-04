@@ -1,4 +1,4 @@
-# RAM-image export (`e5r-verify ram-image`)
+# RAM-image export (`e5r ram-image`)
 
 Exports a RAM-resident, statically linked RV32 ELF as the initial RAM a loader
 writes, for machines without flash such as QEMU `-M virt -bios none -kernel`.
@@ -6,14 +6,14 @@ Built for the RMK milestone (R0-R1 in [`ROADMAP.md`](../ROADMAP.md)); the first
 target is the pinned `qemu-riscv-rynk` example. It is a loader, not a proof:
 nothing about RMK is verified by exporting it.
 
-The flash exporter (`e5r-verify flash`) and the plain V0 export are unchanged
+The flash exporter (`e5r flash`) and the plain V0 export are unchanged
 and still refuse this ELF (`physical address 0x80000000 is not in flash`,
 `ELF must be between 52 and 65536 bytes`).
 
 ## Command
 
 ```
-e5r-verify ram-image (--ram BASE:SIZE | --board BOARD.json) --mapping paddr=vaddr \
+e5r ram-image (--ram BASE:SIZE | --board BOARD.json) --mapping paddr=vaddr \
     [--max-file N] [--max-file-bytes N] [--namespace NS] --out DIR IMAGE.elf
 ```
 
@@ -115,7 +115,7 @@ ELF: rmk `71556128fa72881fc35f0bf6c292d5e28ad9568d`,
 `f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30`.
 
 ```
-e5r-verify ram-image --ram 0x80000000:0x1000000 --mapping paddr=vaddr \
+e5r ram-image --ram 0x80000000:0x1000000 --mapping paddr=vaddr \
     --namespace Rmk.QemuRiscvRynk --out OUT rmk-qemu-riscv
 OUT: 4 PT_LOADs, 170955 file bytes, 16606256 zero bytes, ELF sha256 f39d833f...
 ```
@@ -166,7 +166,7 @@ bytes).
 
 ## Verification jobs over RAM images (`image.kind: "ram"`)
 
-`e5r-verify check JOB.json` runs RAM-image jobs alongside flash ones. The job
+`e5r check JOB.json` runs RAM-image jobs alongside flash ones. The job
 format is still `e5r.verify.job.v1`; one field is added:
 
 ```json
@@ -217,8 +217,8 @@ at `verification/rv32/build/rmk-qemu-riscv-rynk.elf`:
 cd verification/rv32
 cp <rmk>/examples/use_rust/qemu-riscv-rynk/target/riscv32imac-unknown-none-elf/release/rmk-qemu-riscv \
    build/rmk-qemu-riscv-rynk.elf
-e5r-verify check jobs/rmk/rmk-qemu-virt-image.json --out build/rmk-result.json   # proved
-e5r-verify verify-result build/rmk-result.json                                   # current
+e5r check jobs/rmk/rmk-qemu-virt-image.json --out build/rmk-result.json   # proved
+e5r verify-result build/rmk-result.json                                   # current
 ```
 
 It proves six theorems (the four bindings, plus `Projects/ramimage/Entry.lean`:
@@ -268,7 +268,7 @@ Result (`verification/rv32/ram-image/rmk-qemu-riscv-rynk/rmk-memmove-small.resul
 `proved` in 237 s. It checks eight theorems (the contract, the restated
 contract, the two equalities and the four image bindings), with the axioms
 `propext`, `Classical.choice` and `Quot.sound`. Every module is replayed by
-`leanchecker`. `e5r-verify bundle` plus `recheck.sh` recheck it offline in
+`leanchecker`. `e5r bundle` plus `recheck.sh` recheck it offline in
 137 s.
 
 Limits. The runner enforces `rss_mib` by sampling resident memory and passes

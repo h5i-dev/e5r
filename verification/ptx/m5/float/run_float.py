@@ -4,7 +4,7 @@
 For each task (kernels/NAME.ptx, specs/NAME.json from mkspec.py):
 
   1. ptxas -arch=sm_86 must assemble the PTX;
-  2. `e5r-verify ptx check` gives the verdict and the Lean time;
+  2. `e5r ptx check` gives the verdict and the Lean time;
   3. on the GPU: the PTX kernel and a CUDA C baseline written with the
      intrinsic of the same rounding (`__fmaf_rn`, `__fdiv_rn`, ...; `-ftz=true`
      where the task flushes) run on the same inputs (edge values, random bit

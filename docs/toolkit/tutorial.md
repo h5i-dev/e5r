@@ -16,7 +16,7 @@ $ strip ./prog
 ## 1. Ask what it is before asking anything else
 
 ```
-$ e5r info prog
+$ e5rx info prog
 ```
 
 Format, architecture, entry point, image base, whether it is position
@@ -29,7 +29,7 @@ after this point rests on it.
 ## 2. Find the functions, and look at the evidence column
 
 ```
-$ e5r funcs prog
+$ e5rx funcs prog
 address                 size  blocks   insns  strength  evidence                    name
 0x400144                  24       1       9  inferred  direct call target          sub_400144
 0x400168                  14       1       5  inferred  direct call target          sub_400168
@@ -49,8 +49,8 @@ into one number.
 To see what is fact and what is a scanner's opinion, run it both ways:
 
 ```
-$ e5r funcs prog --no-scan | wc -l
-$ e5r funcs prog | wc -l
+$ e5rx funcs prog --no-scan | wc -l
+$ e5rx funcs prog | wc -l
 ```
 
 The difference is the scan's contribution, and if it is large on your binary
@@ -61,9 +61,9 @@ that is worth knowing before you trust it.
 Build a signature library from a binary that has symbols:
 
 ```
-$ e5r sig fixtures/build/driver.a64.O2 create -o driver.e5r-sig
+$ e5rx sig fixtures/build/driver.a64.O2 create -o driver.e5r-sig
 38 signature(s) written
-$ e5r sig prog apply driver.e5r-sig
+$ e5rx sig prog apply driver.e5r-sig
 address              match      name                         was
 0x400144             exact      arith8                       sub_400144
 0x400168             exact      arith16                      sub_400168
@@ -92,8 +92,8 @@ worse than no name, because you will believe it.
 ## 4. Read the code
 
 ```
-$ e5r disas prog 0x400144
-$ e5r decompile prog 0x400144
+$ e5rx disas prog 0x400144
+$ e5rx decompile prog 0x400144
 ```
 
 The C is a statement of what the machine does, in C's notation. Where the
@@ -105,17 +105,17 @@ an operation has no C, a named helper appears (`__bits`, `__clobbered`,
 To find the function worth reading first:
 
 ```
-$ e5r query prog 'functions where insns > 100 and calls > 5'
-$ e5r strings prog --min 8
-$ e5r xrefs prog 0x410008
+$ e5rx query prog 'functions where insns > 100 and calls > 5'
+$ e5rx strings prog --min 8
+$ e5rx xrefs prog 0x410008
 ```
 
 ## 5. Write down what you worked out
 
 ```
-$ e5r annotate prog name 0x400144 parse_header
-$ e5r annotate prog comment 0x400144 "length is little endian, unlike the rest"
-$ e5r annotate prog type 0x400144 "int parse_header(const uint8_t *p, size_t n)"
+$ e5rx annotate prog name 0x400144 parse_header
+$ e5rx annotate prog comment 0x400144 "length is little endian, unlike the rest"
+$ e5rx annotate prog type 0x400144 "int parse_header(const uint8_t *p, size_t n)"
 ```
 
 Each one prints what it recorded:
@@ -150,8 +150,8 @@ and its address as a tiebreak. The first two survive a rebase and a relink.
 Made a mistake:
 
 ```
-$ e5r annotate prog undo
-$ e5r annotate prog redo
+$ e5rx annotate prog undo
+$ e5rx annotate prog redo
 ```
 
 Undo is a new assertion, not an edit, so the history is never rewritten.
@@ -184,7 +184,7 @@ This is the step the incumbents cannot do.
 
 ```
 $ make -B                      # rebuild the program from changed source
-$ e5r annotate ./prog list
+$ e5rx annotate ./prog list
 0x400144            name     "parse_header"
 0x400144            comment  "length is little endian, unlike the rest"
 ```
@@ -196,15 +196,15 @@ the same-binary fast path, and `abs=` is the address, used only as a tiebreak.
 
 Where it matters most is the case where an anchor resolves on the address
 alone, because that means the code the annotation was written against is not
-there any more. Nothing hides that. `e5r sig ... apply` prints the resolution
-per function in its `match` column, and `e5r patch ... apply` refuses outright
+there any more. Nothing hides that. `e5rx sig ... apply` prints the resolution
+per function in its `match` column, and `e5rx patch ... apply` refuses outright
 unless you pass `--allow-address-only`.
 
 ## 8. Save the session
 
 ```
-$ e5r project new prog -o prog.e5r-proj
-$ e5r project add prog.e5r-proj --signatures driver.e5r-sig
+$ e5rx project new prog -o prog.e5r-proj
+$ e5rx project add prog.e5r-proj --signatures driver.e5r-sig
 $ git add prog.e5r-proj && git commit -m "Record the session"
 ```
 

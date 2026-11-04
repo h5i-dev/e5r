@@ -1,4 +1,4 @@
-//! The `e5r` command line.
+//! The `e5rx` command line, the toolkit binary.
 //!
 //! A thin client: it parses arguments, calls the library, and prints. Every
 //! command takes `--json`, and the JSON is the same facts the text shows.
@@ -47,12 +47,12 @@ mod exit {
 
 #[derive(Parser)]
 #[command(
-    name = "e5r",
+    name = "e5rx",
     version,
     about = "Binary analysis toolkit for the e5r Lean 4 verifier",
     long_about = "Loads a binary, recovers functions, disassembles, and reports \
                   what it found and why it believes it. This is the development \
-                  infrastructure of e5r; the Lean 4 verifier is e5r-verify.\n\n\
+                  infrastructure of e5r; the Lean 4 verifier is the e5r binary.\n\n\
                   Every command takes --json. Exit codes: 0 ok, 1 nothing found, \
                   2 bad usage, 3 bad input."
 )]
@@ -233,7 +233,7 @@ pub enum Command {
         ///
         /// Not `--budget`, which is global and counts seconds. Two options
         /// with one name and two types is a clap panic at parse time, which is
-        /// what this was: `e5r emulate` could not be run at all.
+        /// what this was: `e5rx emulate` could not be run at all.
         #[arg(long, default_value_t = 1 << 22)]
         steps: u64,
     },
@@ -681,7 +681,7 @@ fn main() -> ExitCode {
     match result {
         Ok(code) => ExitCode::from(if piped_out { exit::OK } else { code }),
         Err(e) => {
-            eprintln!("e5r: {e}");
+            eprintln!("e5rx: {e}");
             ExitCode::from(exit::BAD_INPUT)
         }
     }
@@ -1170,7 +1170,7 @@ mod tests {
     /// runs the subcommand that contains it. `emulate` had one for its whole
     /// life -- a global `--budget` counting seconds and a subcommand
     /// `--budget` counting IR operations, two types under one name -- and
-    /// `e5r emulate` could not be run at all. Nothing noticed, because
+    /// `e5rx emulate` could not be run at all. Nothing noticed, because
     /// nothing ever built the parser outside of running the program.
     ///
     /// `debug_assert` is clap's own consistency check, and it is the same one

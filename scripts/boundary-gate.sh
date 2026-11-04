@@ -34,14 +34,14 @@
 #   scripts/boundary-gate.sh --csv        # machine-readable, for docs/
 #   scripts/boundary-gate.sh zlib         # only manifest rows matching zlib
 #
-# Env: E5R  the executable (default target/release/e5r)
+# Env: E5R  the executable (default target/release/e5rx)
 #
 # Degrades rather than fails: no corpus is a skip and a zero exit, like every
 # other gate here. A non-zero exit means a floor below was missed.
 set -euo pipefail
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-e5r=${E5R:-$repo/target/release/e5r}
+e5r=${E5R:-$repo/target/release/e5rx}
 
 csv=0
 if [ "${1:-}" = "--csv" ]; then csv=1; shift; fi

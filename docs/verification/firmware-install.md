@@ -47,7 +47,7 @@ git clone https://github.com/h5i-dev/e5r && cd e5r
 ./scripts/check-firmware-verification.sh
 ```
 
-The script first builds `e5r-verify` (release profile). Then it rebuilds
+The script first builds `e5r` (release profile). Then it rebuilds
 the firmware and the clamp fixture and checks every job from source. Last,
 it runs the negative controls and the two QEMU differential tests. On the
 development host this takes about 15 minutes, with a peak of about 1 GB of
@@ -56,7 +56,7 @@ resident-memory limit.
 
 Results land in `verification/rv32/build/results/`. Check that a stored
 result still describes the sources with
-`target/release/e5r-verify verify-result FILE`.
+`target/release/e5r verify-result FILE`.
 
 ## Without network access
 

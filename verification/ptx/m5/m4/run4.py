@@ -6,7 +6,7 @@ For each kernel (kernels/NAME.ptx, compiled from kernels/NAME.cu by nvcc 13.2
 -O3 -arch=sm_86 --ptx; specs/NAME.json):
 
   1. ptxas -arch=sm_86 must assemble the PTX;
-  2. `e5r-verify ptx check` gives proved / refuted / unknown / unsupported;
+  2. `e5r ptx check` gives proved / refuted / unknown / unsupported;
   3. on the GPU: the kernel runs on random inputs at several lengths and
      launch shapes inside the class's range, and the output words are
      compared with the class's result (numpy, uint32 wrap-around): `per_block`

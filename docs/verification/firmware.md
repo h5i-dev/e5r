@@ -1,6 +1,6 @@
 # Binary-level firmware verification (scope F)
 
-e5r-verify proves safety properties of a firmware **binary** for one board.
+e5r proves safety properties of a firmware **binary** for one board.
 The Lean kernel checks the proofs. The proof subject is the flash image built
 from the ELF file's bytes. e5r's decompiler, CFG recovery and IR are not
 inputs to any proof.
@@ -180,8 +180,8 @@ A job (`verification/rv32/jobs/*.json`, schema `e5r.verify.job.v1`) names:
 - time and resident-memory limits.
 
 ```sh
-target/release/e5r-verify check verification/rv32/jobs/hifive1-duty.json --out duty.json
-target/release/e5r-verify verify-result duty.json
+target/release/e5r check verification/rv32/jobs/hifive1-duty.json --out duty.json
+target/release/e5r verify-result duty.json
 ```
 
 `check` does the following:
@@ -218,7 +218,7 @@ current job kind produces one.
 A result records SHA-256 identities of:
 - the job, the board and the ELF;
 - every model and proof source;
-- the Lean and `e5r-verify` versions.
+- the Lean and `e5r` versions.
 
 `verify-result` recomputes them and reports the result stale if any differ,
 so a proof is never silently carried over to a changed binary,
@@ -230,7 +230,7 @@ development; CI and the one-command check always run fresh.
 ### Rechecking without e5r
 
 ```sh
-target/release/e5r-verify bundle verification/rv32/jobs/hifive1-clamp32.json --out clamp-bundle
+target/release/e5r bundle verification/rv32/jobs/hifive1-clamp32.json --out clamp-bundle
 cd clamp-bundle && ./recheck.sh
 ```
 
@@ -246,12 +246,12 @@ rechecks in under a minute.
 ### Adding a target
 
 1. Build the firmware so its ELF is byte-reproducible (no host paths in
-   loaded bytes), and run `e5r-verify flash` on it. A refusal names the rule
+   loaded bytes), and run `e5r flash` on it. A refusal names the rule
    the image breaks.
 2. Write the property in Lean against `Theories/Logic.lean` and the
    generated image module, as `Projects/hifive1/Duty.lean` does.
 3. Add a job file listing the build, the ELF pin, the modules and the
-   theorems, and run `e5r-verify check`.
+   theorems, and run `e5r check`.
 
 No runner needs editing. Writing the proof is still manual for now; the
 automatic whole-program checker is the open item above.

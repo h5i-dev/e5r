@@ -1,23 +1,23 @@
-//! `e5r-verify`: assembly-level formal verification with Lean 4. It proves
+//! `e5r`: assembly-level formal verification with Lean 4. It proves
 //! properties of PTX kernels and RISC-V firmware binaries, and exports the
 //! binaries the Lean proofs are about.
 //!
-//! `e5r-verify IMAGE.elf` is the V0 research export (strict RV32I subset).
-//! `e5r-verify flash --board BOARD.json [--namespace NS] IMAGE.elf` exports
+//! `e5r IMAGE.elf` is the V0 research export (strict RV32I subset).
+//! `e5r flash --board BOARD.json [--namespace NS] IMAGE.elf` exports
 //! the flash contents a board boots from.
-//! `e5r-verify ram-image (--ram BASE:SIZE | --board BOARD.json) --mapping paddr=vaddr
+//! `e5r ram-image (--ram BASE:SIZE | --board BOARD.json) --mapping paddr=vaddr
 //! [--max-file N] [--max-file-bytes N] [--namespace NS] --out DIR IMAGE.elf` exports the
 //! initial RAM a loader writes for a RAM-resident ELF (`docs/verification/ram-image-export.md`).
-//! `e5r-verify check JOB.json [--resume] [--out RESULT.json]` rebuilds and rechecks a
+//! `e5r check JOB.json [--resume] [--out RESULT.json]` rebuilds and rechecks a
 //! verification job and prints its `e5r.verify.result.v1` document; the exit
 //! status is 0 only for `proved`.
-//! `e5r-verify verify-result RESULT.json` says whether a stored result still
+//! `e5r verify-result RESULT.json` says whether a stored result still
 //! describes the current inputs.
-//! `e5r-verify bundle JOB.json --out DIR` writes a self-contained directory
+//! `e5r bundle JOB.json --out DIR` writes a self-contained directory
 //! whose `recheck.sh` rechecks the proofs with only the pinned Lean.
-//! `e5r-verify ptx export|check|run …` exports PTX to Lean, proves or refutes
+//! `e5r ptx export|check|run …` exports PTX to Lean, proves or refutes
 //! a kernel against its spec, and runs differential-test cases
-//! (`docs/verification/ptx.md`, "Command line"; `e5r-verify ptx --help`).
+//! (`docs/verification/ptx.md`, "Command line"; `e5r ptx --help`).
 use std::process::ExitCode;
 
 fn run(args: Vec<String>) -> Result<String, String> {
@@ -76,7 +76,7 @@ fn run(args: Vec<String>) -> Result<String, String> {
         Some("bundle") => {
             let (job, out) = match (args.get(1), args.get(2), args.get(3)) {
                 (Some(job), Some(flag), Some(out)) if flag == "--out" => (job, out),
-                _ => return Err("usage: e5r-verify bundle JOB.json --out DIR".into()),
+                _ => return Err("usage: e5r bundle JOB.json --out DIR".into()),
             };
             let out = std::path::Path::new(out);
             if out.exists() {
@@ -103,37 +103,37 @@ fn run(args: Vec<String>) -> Result<String, String> {
         }
         Some(path) if args.len() == 1 && !path.starts_with('-') => e5r_verify::export(&read(path)?),
         _ => Err(
-            "usage: e5r-verify (ptx check|check|verify-result|bundle|flash|ram-image) ... \
-                  or IMAGE.elf; run `e5r-verify --help`"
+            "usage: e5r (ptx check|check|verify-result|bundle|flash|ram-image) ... \
+                  or IMAGE.elf; run `e5r --help`"
                 .into(),
         ),
     }
 }
 
 const HELP: &str = "\
-e5r-verify: assembly-level formal verification with Lean 4
+e5r: assembly-level formal verification with Lean 4
 
 Proves properties of the code a compiler emitted, checked by the Lean kernel.
 
 PTX kernels (docs/verification/ptx.md):
-  e5r-verify ptx check FILE.ptx --spec SPEC.json [--proof PROOF.lean] [--out RESULT.json]
+  e5r ptx check FILE.ptx --spec SPEC.json [--proof PROOF.lean] [--out RESULT.json]
       prove memory safety, race freedom and correctness, or replay a counterexample
       exit status: 0 proved, 1 refuted, 2 unsupported, 3 unknown, 4 error, 64 usage
-  e5r-verify ptx export|run ...      see `e5r-verify ptx --help`
+  e5r ptx export|run ...      see `e5r ptx --help`
 
 RISC-V firmware binaries (docs/verification/firmware.md):
-  e5r-verify check JOB.json [--resume] [--out RESULT.json]
+  e5r check JOB.json [--resume] [--out RESULT.json]
       rebuild and recheck a verification job; exit status 0 only for proved
-  e5r-verify verify-result RESULT.json
+  e5r verify-result RESULT.json
       say whether a stored result still describes the current inputs
-  e5r-verify bundle JOB.json --out DIR
+  e5r bundle JOB.json --out DIR
       write a directory whose recheck.sh needs only the pinned Lean
 
 Exporting a binary to Lean:
-  e5r-verify flash --board BOARD.json [--namespace NS] IMAGE.elf
-  e5r-verify ram-image (--ram BASE:SIZE | --board BOARD.json) --mapping paddr=vaddr
+  e5r flash --board BOARD.json [--namespace NS] IMAGE.elf
+  e5r ram-image (--ram BASE:SIZE | --board BOARD.json) --mapping paddr=vaddr
                        [--max-file N] [--max-file-bytes N] [--namespace NS] --out DIR IMAGE.elf
-  e5r-verify IMAGE.elf               the V0 research export (strict RV32I subset)
+  e5r IMAGE.elf               the V0 research export (strict RV32I subset)
 ";
 
 fn number(s: &str) -> Result<u64, String> {
@@ -208,14 +208,14 @@ fn ptx(args: &[String]) -> Result<String, String> {
 }
 
 const PTX_USAGE: &str = "\
-e5r-verify ptx export [--namespace NS] [--name NAME] FILE.ptx
+e5r ptx export [--namespace NS] [--name NAME] FILE.ptx
     print the Lean `Ptx.Module` of FILE.ptx (after the token round trip)
-e5r-verify ptx check FILE.ptx --spec SPEC.json [--project DIR] [--out RESULT.json]
+e5r ptx check FILE.ptx --spec SPEC.json [--project DIR] [--out RESULT.json]
                      [--keep DIR] [--timeout SECS] [--memory-mb MB] [--no-search]
                      [--proof PROOF.lean]
     prove or refute SPEC for the kernel; prints an e5r.ptx.result.v1 document
     exit status: 0 proved, 1 refuted, 2 unsupported, 3 unknown, 4 error, 64 usage
-e5r-verify ptx run --cases CASES FILE.ptx
+e5r ptx run --cases CASES FILE.ptx
     run differential-test cases on the (untrusted) concrete interpreter
 ";
 
@@ -234,7 +234,7 @@ fn ptx_export(args: &[String]) -> Result<String, String> {
     let bytes = std::fs::read(&file).map_err(|e| format!("{file}: {e}"))?;
     let src = String::from_utf8(bytes.clone()).map_err(|e| format!("{file}: {e}"))?;
     let header = format!(
-        "Generated by `e5r-verify ptx` from {} (sha256 {}).\n\
+        "Generated by `e5r ptx` from {} (sha256 {}).\n\
          Do not edit: scripts/check-lean-ptx.sh regenerates it and refuses a stale copy.",
         name.as_deref().unwrap_or(&file),
         e5r_verify::sha256::hex(&bytes)
@@ -259,7 +259,7 @@ fn default_project() -> std::path::PathBuf {
 fn ptx_check(args: &[String]) -> Result<String, String> {
     use e5r_verify::ptx;
     let usage = |m: String| -> ! {
-        eprintln!("e5r-verify ptx check: {m}\n{PTX_USAGE}");
+        eprintln!("e5r ptx check: {m}\n{PTX_USAGE}");
         std::process::exit(ptx::EXIT_USAGE)
     };
     let (mut file, mut spec, mut out, mut keep) = (None, None, None, None);
@@ -341,7 +341,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(e) => {
-            eprintln!("e5r-verify: {e}");
+            eprintln!("e5r: {e}");
             ExitCode::FAILURE
         }
     }

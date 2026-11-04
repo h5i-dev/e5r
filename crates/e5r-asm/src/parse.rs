@@ -1,7 +1,7 @@
 //! Text to [`Insn`], the shape the decoders produce.
 //!
 //! The grammar is not an assembler's: it is exactly what the two printers in
-//! `e5r-arch` emit, so a line copied out of `e5r disas` parses. Anything
+//! `e5r-arch` emit, so a line copied out of `e5rx disas` parses. Anything
 //! else that happens to parse is a bonus, never a promise.
 
 use e5r_core::{Addr, Arch};

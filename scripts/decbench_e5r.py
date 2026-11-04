@@ -7,7 +7,7 @@ does. Keeping the class here rather than in the DecBench tree means the
 benchmark checkout stays exactly as upstream shipped it.
 
 e5r has no Python API, so the backend shells out to the CLI. One
-`e5r decompile <binary> all --json` call per binary is far cheaper than one
+`e5rx decompile <binary> all --json` call per binary is far cheaper than one
 call per function: every invocation re-analyzes the whole image from scratch,
 so `all` amortizes the analysis over every function instead of paying it
 per function (3.4s for 193 functions of zlib's `example`, against 3.4s each).
@@ -276,7 +276,7 @@ class E5rDecompiler(Decompiler):
         return result
 
     def _run(self, binary_path: Path, target: str) -> list[dict]:
-        """One `e5r decompile` call, returning its JSON items."""
+        """One `e5rx decompile` call, returning its JSON items."""
         cmd = [str(self._bin), "decompile", str(binary_path), target, "--json"]
         threads = os.environ.get("E5R_THREADS")
         if threads:

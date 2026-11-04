@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare an `e5r-verify ram-image` export with the RAM QEMU actually loads.
+"""Compare an `e5r ram-image` export with the RAM QEMU actually loads.
 
 Usage: QEMU=/path/qemu-system-riscv32 python3 -I scripts/check-ram-image-qemu.py \
            IMAGE.elf OUT_DIR [extra QEMU args, e.g. -m 16M]

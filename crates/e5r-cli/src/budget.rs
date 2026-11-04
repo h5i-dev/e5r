@@ -104,7 +104,7 @@ pub fn report(b: &Budget, why: Stopped, done: usize, total: usize, what: &str) {
         return;
     }
     eprintln!(
-        "e5r: {} after {:.1}s and {done} of {total} {what}; {} not done. \
+        "e5rx: {} after {:.1}s and {done} of {total} {what}; {} not done. \
          Raise --budget or --limit, or narrow the target.",
         why.as_str(),
         b.elapsed().as_secs_f64(),

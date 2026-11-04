@@ -3,11 +3,11 @@
 Start the global collection from any directory:
 
 ```sh
-e5r project new ./a.out --name parser
-e5r ui
+e5rx project new ./a.out --name parser
+e5rx ui
 ```
 
-In this checkout, use `./target/release/e5r` if e5r is not installed. Open the
+In this checkout, use `./target/release/e5rx` if e5r is not installed. Open the
 printed `http://127.0.0.1:7879` address. The collection shows every project's
 live tasks, blockers, review requests and binary availability. Select a project
 to open its task dashboard and decompiler; **All projects** returns to the
@@ -28,12 +28,12 @@ Named project commands work from any directory. A registered name takes
 precedence over a same-named local file; use `./FILE` to select a local manifest:
 
 ```sh
-e5r project list --json
-e5r project task parser list --json
-e5r project task parser add 'Trace input validation' --owner agent-a
-e5r project import ./old.e5rproj --name older-investigation
-e5r project relocate parser /new/path/to/a.out
-e5r project dashboard parser           # optional single-project mode
+e5rx project list --json
+e5rx project task parser list --json
+e5rx project task parser add 'Trace input validation' --owner agent-a
+e5rx project import ./old.e5rproj --name older-investigation
+e5rx project relocate parser /new/path/to/a.out
+e5rx project dashboard parser           # optional single-project mode
 ```
 
 Import copies the manifest and task history, preserving the original files.
@@ -143,11 +143,11 @@ analysis settings are `scan_gaps`, `follow_calls`, `strings`, `xrefs`, `noreturn
 The CLI writes the task store that the browser reads:
 
 ```sh
-e5r project task investigation.e5rproj add 'Trace input validation' \
+e5rx project task investigation.e5rproj add 'Trace input validation' \
   --owner agent-a --next 'Inspect parse_header and its callers' \
   --priority high --evidence function:0x401000 --author agent-a
-e5r project task investigation.e5rproj list --json
-e5r project task investigation.e5rproj update T-0001 \
+e5rx project task investigation.e5rproj list --json
+e5rx project task investigation.e5rproj update T-0001 \
   --revision 1 --input task.json --author agent-a
 ```
 
@@ -257,19 +257,19 @@ Records do not contribute to task readiness or task counts. Imports preserve
 all three stores along with tasks.
 
 ```sh
-e5r project record parser finding add 'Length check before copy' \
+e5rx project record parser finding add 'Length check before copy' \
   --description 'The recovered guard rejects lengths above 32 before the copy.' \
   --evidence function:0x401000 --author agent-a
-e5r project record parser note add 'Open questions' --description 'Check indirect callers.'
-e5r project record parser report add 'Parser investigation' --description 'Investigation text'
-e5r project record parser finding list --json
-e5r project record parser finding update T-0001 --revision 1 --input finding.json
+e5rx project record parser note add 'Open questions' --description 'Check indirect callers.'
+e5rx project record parser report add 'Parser investigation' --description 'Investigation text'
+e5rx project record parser finding list --json
+e5rx project record parser finding update T-0001 --revision 1 --input finding.json
 ```
 
 Attach a note to a recovered function using its exact address as evidence:
 
 ```sh
-e5r project record parser note add 'Input length checks' \
+e5rx project record parser note add 'Input length checks' \
   --description 'The parser rejects lengths above 32 before the copy.' \
   --evidence function:0x401000 --author agent-a
 ```

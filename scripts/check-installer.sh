@@ -2,7 +2,7 @@
 # The installer against a real archive, end to end.
 #
 # `install.sh` reaches into the archive by name -- it expects
-# `e5r-<version>-<target>/e5r` inside `e5r-<version>-<target>.tar.gz`, and it
+# `e5r-<version>-<target>/e5rx` inside `e5r-<version>-<target>.tar.gz`, and it
 # expects a `SHA256SUMS` beside it that names that archive. Every one of those
 # is decided by `scripts/build-release.sh`, in a different file, and nothing
 # links the two. A change to either that forgot the other is a download that
@@ -66,8 +66,8 @@ run() {
 echo "==> a good archive installs"
 mkdir -p "$work/good"
 run "$work/good"
-[ -x "$work/good/e5r" ] || { echo "FAIL: the installer left no binary" >&2; exit 1; }
-"$work/good/e5r" --version | grep -q "$version" ||
+[ -x "$work/good/e5rx" ] || { echo "FAIL: the installer left no binary" >&2; exit 1; }
+"$work/good/e5rx" --version | grep -q "$version" ||
   { echo "FAIL: the installed binary does not report $version" >&2; exit 1; }
 
 echo "==> a tampered checksum is refused"
@@ -85,7 +85,7 @@ if run "$work/bad" > /dev/null 2>&1; then
   echo "FAIL: the installer accepted a mismatched checksum" >&2
   exit 1
 fi
-[ -e "$work/bad/e5r" ] && { echo "FAIL: it installed anyway" >&2; exit 1; }
+[ -e "$work/bad/e5rx" ] && { echo "FAIL: it installed anyway" >&2; exit 1; }
 cp "$work/SHA256SUMS.good" "$work/SHA256SUMS"
 
 echo "==> a missing SHA256SUMS is refused"

@@ -11,7 +11,7 @@ The proof is one phase of `phase_sound` per thread, with `*out` the
 accumulator cell and each thread's element its ghost contribution.
 
 Check it with
-  e5r-verify ptx check m5/m4/kernels/a_direct.ptx --spec m5/m4/specs/a_direct.json \
+  e5r ptx check m5/m4/kernels/a_direct.ptx --spec m5/m4/specs/a_direct.json \
     --proof proofs/a_direct.lean
 -/
 import E5rSpec

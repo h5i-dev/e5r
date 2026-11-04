@@ -97,7 +97,7 @@ pub fn decode_for(arch: &Arch, bytes: &[u8], addr: Addr) -> Option<Insn> {
     e5r_arch::decode(arch, bytes, addr)
 }
 
-/// The text the assembler has to accept, which is what `e5r disas` prints.
+/// The text the assembler has to accept, which is what `e5rx disas` prints.
 pub fn render(arch: &Arch, i: &Insn) -> String {
     e5r_arch::format(arch, i, false)
 }
