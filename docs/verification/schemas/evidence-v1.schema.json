@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "e5r.verification.evidence.v1",
+  "title": "E5R common verification evidence v1",
+  "type": "object",
+  "required": ["schema", "evidence_id", "request", "outcome", "binding", "identity", "claim", "allowed_axioms"],
+  "properties": {
+    "schema": {"const": "e5r.verification.evidence.v1"},
+    "evidence_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "request": {
+      "type": "object", "required": ["backend", "architecture", "platform", "invocation"],
+      "properties": {
+        "backend": {"type": "string"}, "architecture": {"type": "string"},
+        "platform": {}, "invocation": {"type": "object", "required": ["kind"]}
+      }
+    },
+    "outcome": {"enum": ["proved", "refuted", "inconclusive", "resource_exhausted", "unsupported", "error"]},
+    "binding": {"enum": ["exact_generated_statement", "generated_claim", "reviewed_theorem_names"]},
+    "identity": {"$ref": "#/$defs/identity"},
+    "claim": {},
+    "allowed_axioms": {"const": ["propext", "Classical.choice", "Quot.sound"]}
+  },
+  "$defs": {
+    "identity": {
+      "type": "object", "required": ["files", "source_roots", "explicit_files", "toolchain"],
+      "properties": {
+        "files": {"type": "object", "additionalProperties": {
+          "type": "object", "required": ["sha256", "bytes"],
+          "properties": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "bytes": {"type": "integer", "minimum": 0}}
+        }},
+        "source_roots": {"type": "array", "items": {"type": "string"}},
+        "explicit_files": {"type": "array", "items": {"type": "string"}},
+        "toolchain": {"type": "object", "additionalProperties": {"type": "string"}}
+      }
+    }
+  }
+}

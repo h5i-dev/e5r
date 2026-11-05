@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "e5r.verification.bundle.v1",
+  "title": "E5R relocatable verification bundle v1",
+  "type": "object",
+  "required": ["schema", "invocation", "outcome", "identity"],
+  "properties": {
+    "schema": {"const": "e5r.verification.bundle.v1"},
+    "invocation": {"type": "object", "required": ["kind"]},
+    "outcome": {"enum": ["proved", "refuted"]},
+    "identity": {"$ref": "evidence-v1.schema.json#/$defs/identity"}
+  }
+}

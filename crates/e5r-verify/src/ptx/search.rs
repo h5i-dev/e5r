@@ -273,7 +273,7 @@ fn small_world(sp: &Spec, g: u32, b: u32, n: u32, alias: bool, rng: &mut Rng) ->
     ];
     let word = |rng: &mut Rng| -> u64 {
         let r = rng.next();
-        if sp.float && r % 3 == 0 {
+        if sp.float && r.is_multiple_of(3) {
             FEDGE[(r >> 8) as usize % FEDGE.len()] as u64
         } else if sp.float && r % 3 == 1 {
             // a normal number in [2^-8, 2^8): products and sums of such

@@ -9,14 +9,15 @@ axiom declared here. The audit fails the build if anything else appears, and
 prints the axioms of the main theorems for the log.
 -/
 import Ptx
-import Lean
+import E5rVerification.ProofCheck
 
 open Lean Elab Command
 
 elab "#audit_ptx" : command => do
   let env ← getEnv
-  let allowed : List Name := [``propext, ``Quot.sound, ``Classical.choice]
+  let allowed := E5rVerification.allowedAxioms
   let mut checked : Nat := 0
+  let mut axState : NameSet × Array Name := ({}, #[])
   let mut bad : Array String := #[]
   for (name, ci) in env.constants.map₁.toList do
     let some idx := env.getModuleIdxFor? name | continue
@@ -24,7 +25,9 @@ elab "#audit_ptx" : command => do
     unless (`Ptx).isPrefixOf mod do continue
     if let .axiomInfo _ := ci then
       bad := bad.push s!"{name} is an axiom declared in {mod}"
-    let axs ← liftCoreM (collectAxioms name)
+    let ((), st) := (E5rVerification.axiomsOf env name).run axState
+    axState := st
+    let axs := st.2
     for a in axs do
       unless allowed.contains a do
         bad := bad.push s!"{name} ({mod}) depends on {a}"

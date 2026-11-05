@@ -18,11 +18,11 @@ pub mod supplied;
 
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::time::{Duration, Instant};
 
 pub const RESULT_SCHEMA: &str = "e5r.ptx.result.v1";
-pub const ALLOWED_AXIOMS: [&str; 3] = ["propext", "Classical.choice", "Quot.sound"];
+pub use crate::core::proof::{ALLOWED_AXIOMS, axioms_allowed, axioms_of};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Verdict {
@@ -77,25 +77,14 @@ pub struct LeanRun {
     pub output: String,
     pub seconds: f64,
     pub limit: Option<&'static str>,
+    pub execution: Value,
 }
 
-fn have_systemd_run() -> bool {
-    Command::new("systemd-run")
-        .args(["--scope", "--quiet", "-p", "MemoryMax=64M", "true"])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|s| s.success())
-}
-
-/// `lake env lean FILE` in `project`, one Lean thread, under a cgroup memory
-/// cap when systemd is available (Lean's own `--memory` otherwise) and a
-/// wall-clock timeout.
+/// Run Lake under the shared process-group time, sampled RSS and output limits.
 pub fn run_lean(project: &Path, args: &[&str], timeout: Duration, memory_mb: u64) -> LeanRun {
     run_lean_env(project, args, timeout, memory_mb, &[])
 }
 
-/// `run_lean` with extra environment variables.
 pub fn run_lean_env(
     project: &Path,
     args: &[&str],
@@ -103,98 +92,105 @@ pub fn run_lean_env(
     memory_mb: u64,
     env: &[(&str, &str)],
 ) -> LeanRun {
-    let start = Instant::now();
-    let mut cmd = if have_systemd_run() {
-        let mut c = Command::new("systemd-run");
-        c.args(["--scope", "--quiet", "-p"])
-            .arg(format!("MemoryMax={memory_mb}M"))
-            .args(["-p", "MemorySwapMax=0", "--", "lake"]);
-        c
-    } else {
-        Command::new("lake")
-    };
+    use crate::core::process::{self, Exhaustion, Limits};
+    let mut cmd = Command::new("lake");
     cmd.current_dir(project)
         .args(args)
         .env("LEAN_NUM_THREADS", "1")
-        .envs(env.iter().copied())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = match cmd.spawn() {
-        Ok(c) => c,
+        .envs(env.iter().copied());
+    match process::run(cmd, Limits::new(timeout, memory_mb)) {
+        Err(e) => LeanRun {
+            ok: false,
+            axioms: None,
+            output: e.clone(),
+            seconds: 0.0,
+            limit: None,
+            execution: json!({"error": e}),
+        },
+        Ok(r) => LeanRun {
+            execution: json!({"success": r.success, "cancelled": r.cancelled, "cleanup_complete": r.cleanup_complete, "code": r.code, "exhaustion": r.exhaustion, "seconds": r.seconds, "peak_rss_mib": r.peak_rss_mib, "memory_monitor": r.memory_monitor}),
+            ok: r.success
+                && !r.output.contains("error:")
+                && !r.output.contains("declaration uses `sorry`")
+                && !r.output.contains("declaration uses 'sorry'"),
+            axioms: axioms_of(&r.output),
+            output: r.output,
+            seconds: r.seconds,
+            limit: r.exhaustion.map(|e| match e {
+                Exhaustion::Time => "timeout",
+                Exhaustion::Memory => "memory",
+                Exhaustion::Output => "output",
+            }),
+        },
+    }
+}
+
+/// Generated modules have tool-owned propositions; preserve their transitive
+/// axiom report and independently replay every declaration before acceptance.
+fn run_generated(o: &Options, project: &Path, file: &Path) -> LeanRun {
+    let dependencies = crate::core::artifact::compiled_dependencies(project);
+    let compiled = file.with_extension("olean");
+    let _ = std::fs::remove_file(&compiled);
+    let mut r = run_lean(
+        project,
+        &[
+            "env",
+            "lean",
+            "--root",
+            &file.parent().unwrap().display().to_string(),
+            "-o",
+            &compiled.display().to_string(),
+            &file.display().to_string(),
+        ],
+        o.timeout,
+        o.memory_mb,
+    );
+    if !r.ok {
+        return r;
+    }
+    let Some(dir) = file.parent().and_then(|p| p.canonicalize().ok()) else {
+        r.ok = false;
+        r.output.push_str("\nerror: invalid proof directory");
+        return r;
+    };
+    let module = file.file_stem().unwrap().to_string_lossy();
+    match crate::core::proof::replay(
+        project,
+        crate::core::proof::SearchPath::Lake(&dir),
+        &module,
+        crate::core::process::Limits::new(o.timeout, o.memory_mb),
+    ) {
         Err(e) => {
-            return LeanRun {
-                ok: false,
-                axioms: None,
-                output: format!("cannot run lake: {e}"),
-                seconds: 0.0,
-                limit: Some("lake missing"),
-            };
+            r.ok = false;
+            r.output.push_str(&format!("\nerror: replay: {e}"));
         }
-    };
-    let (mut out, mut err) = (child.stdout.take().unwrap(), child.stderr.take().unwrap());
-    let ro = std::thread::spawn(move || {
-        let mut s = String::new();
-        std::io::Read::read_to_string(&mut out, &mut s).ok();
-        s
-    });
-    let re = std::thread::spawn(move || {
-        let mut s = String::new();
-        std::io::Read::read_to_string(&mut err, &mut s).ok();
-        s
-    });
-    let mut limit = None;
-    let status = loop {
-        if let Ok(Some(s)) = child.try_wait() {
-            break Some(s);
+        Ok(replay) => {
+            r.execution = json!({"compile": r.execution, "replay": {"success": replay.success, "cancelled": replay.cancelled, "cleanup_complete": replay.cleanup_complete, "exhaustion": replay.exhaustion,
+                "seconds": replay.seconds, "peak_rss_mib": replay.peak_rss_mib, "memory_monitor": replay.memory_monitor}});
+            r.seconds += replay.seconds;
+            r.ok &= replay.success && replay.exhaustion.is_none();
+            if replay.exhaustion.is_some() {
+                r.limit = Some("kernel replay resource limit");
+            }
+            r.output.push_str(&replay.output);
         }
-        if start.elapsed() > timeout {
-            let _ = child.kill();
-            let _ = child.wait();
-            limit = Some("timeout");
-            break None;
+    }
+    match dependencies {
+        Ok(dependencies)
+            if crate::core::artifact::compiled_dependencies(project)
+                .ok()
+                .as_ref()
+                == Some(&dependencies) =>
+        {
+            r.execution["dependencies"] = serde_json::to_value(dependencies).unwrap();
         }
-        std::thread::sleep(Duration::from_millis(50));
-    };
-    let output = ro.join().unwrap_or_default() + &re.join().unwrap_or_default();
-    let killed = status.as_ref().is_some_and(|s| {
-        use std::os::unix::process::ExitStatusExt;
-        s.signal() == Some(9) || s.code() == Some(137)
-    });
-    if killed {
-        limit = Some("memory");
+        _ => {
+            r.ok = false;
+            r.output
+                .push_str("\nerror: compiled model dependencies changed during proof acceptance");
+        }
     }
-    let clean = status.is_some_and(|s| s.success())
-        && !output.contains("error:")
-        && !output.contains("declaration uses `sorry`")
-        && !output.contains("declaration uses 'sorry'");
-    LeanRun {
-        ok: clean,
-        axioms: axioms_of(&output),
-        output,
-        seconds: start.elapsed().as_secs_f64(),
-        limit,
-    }
-}
-
-/// The axiom list of the one `#print axioms` in the output.
-pub fn axioms_of(out: &str) -> Option<Vec<String>> {
-    let flat = out.replace('\n', " ");
-    if flat.contains("does not depend on any axioms") {
-        return Some(Vec::new());
-    }
-    let i = flat.find("depends on axioms: [")? + "depends on axioms: [".len();
-    let j = flat[i..].find(']')? + i;
-    Some(
-        flat[i..j]
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect(),
-    )
-}
-
-fn axioms_allowed(ax: &[String]) -> bool {
-    ax.iter().all(|a| ALLOWED_AXIOMS.contains(&a.as_str()))
+    r
 }
 
 fn sha(path: &Path) -> Result<(Vec<u8>, String), String> {
@@ -216,6 +212,53 @@ fn props(v: &str) -> Value {
 
 /// Run a whole check and return the `e5r.ptx.result.v1` document.
 pub fn check(o: &Options) -> (Verdict, Value) {
+    // Capture before reading the program/spec, then compare after acceptance.
+    // Lake manifests are build metadata; source inventory excludes them below.
+    let _lock = match crate::core::workspace::ProjectLock::acquire(&o.project) {
+        Ok(lock) => lock,
+        Err(e) => {
+            return (
+                Verdict::Error,
+                json!({"schema": RESULT_SCHEMA, "verdict": "error", "reasons": [e], "properties": props("unknown")}),
+            );
+        }
+    };
+    let before = crate::verification::ptx_identity(o);
+    let (mut verdict, mut doc) = check_backend(o);
+    if crate::core::process::cancellation_requested() {
+        doc["verdict"] = json!("error");
+        doc["properties"] = props("unknown");
+        reason(&mut doc, "verification cancelled".into());
+        return (Verdict::Error, doc);
+    }
+    if let Ok(identity) = before {
+        match identity.stale(&o.project) {
+            Ok(changed) if changed.is_empty() => {
+                if let Err(e) = crate::verification::attach_ptx(&mut doc, o, identity) {
+                    verdict = Verdict::Error;
+                    reason(&mut doc, format!("provenance: {e}"));
+                }
+            }
+            other => {
+                verdict = Verdict::Error;
+                reason(
+                    &mut doc,
+                    format!("inputs changed or unavailable during check: {other:?}"),
+                );
+            }
+        }
+    } else if matches!(verdict, Verdict::Proved | Verdict::Refuted) {
+        verdict = Verdict::Error;
+        reason(&mut doc, "cannot establish input provenance".into());
+    }
+    doc["verdict"] = json!(verdict.name());
+    if verdict == Verdict::Error {
+        doc["properties"] = props("unknown");
+    }
+    (verdict, doc)
+}
+
+fn check_backend(o: &Options) -> (Verdict, Value) {
     let started = Instant::now();
     let mut doc = json!({
         "schema": RESULT_SCHEMA,
@@ -308,20 +351,11 @@ pub fn check(o: &Options) -> (Verdict, Value) {
         o.ptx.display(),
         o.spec.display()
     );
-    let dir = match &o.keep {
-        Some(d) => d.clone(),
-        None => {
-            std::env::temp_dir().join(format!("e5r-ptx-{}-{}", std::process::id(), &phash[..12]))
-        }
+    let workspace = match crate::core::workspace::Workspace::new(o.keep.as_deref()) {
+        Ok(w) => w,
+        Err(e) => return finish(doc, Verdict::Error, Some(e)),
     };
-    if let Err(e) = std::fs::create_dir_all(&dir) {
-        return finish(doc, Verdict::Error, Some(format!("{}: {e}", dir.display())));
-    }
-    let cleanup = |d: &Path| {
-        if o.keep.is_none() {
-            let _ = std::fs::remove_dir_all(d);
-        }
-    };
+    let dir = workspace.path().to_path_buf();
     let proj = match o.project.canonicalize() {
         Ok(p) => p,
         Err(e) => {
@@ -334,12 +368,12 @@ pub fn check(o: &Options) -> (Verdict, Value) {
     };
     let warm = run_lean(
         &proj,
-        &["build", "-q", "Ptx.Auto.Tactic", "Ptx.Logic.Refute"],
+        &["build", "-q", "Ptx.Auto.FloatMap", "Ptx.Logic.Refute"],
         o.timeout * 4,
         o.memory_mb,
     );
+    doc["lean"]["build_execution"] = warm.execution.clone();
     if !warm.ok {
-        cleanup(&dir);
         return finish(
             doc,
             Verdict::Error,
@@ -366,7 +400,6 @@ pub fn check(o: &Options) -> (Verdict, Value) {
             &proj,
             &dir,
         );
-        cleanup(&dir);
         return finish(doc, v, why);
     }
     let proof = dir.join("Proof.lean");
@@ -389,7 +422,8 @@ pub fn check(o: &Options) -> (Verdict, Value) {
         return finish(doc, Verdict::Error, Some(e.to_string()));
     }
     let pf = proof.display().to_string();
-    let r = run_lean(&proj, &["env", "lean", &pf], o.timeout, o.memory_mb);
+    let r = run_generated(o, &proj, &proof);
+    doc["lean"]["proof_execution"] = r.execution.clone();
     doc["lean"]["proof_seconds"] = json!((r.seconds * 100.0).round() / 100.0);
     if o.keep.is_some() {
         doc["lean"]["proof_file"] = json!(pf);
@@ -400,7 +434,6 @@ pub fn check(o: &Options) -> (Verdict, Value) {
                 doc["theorem"] = json!({"name": "E5rCheck.correct",
                     "statement": format!("spec.Correct {}", leangen::kname(k)),
                     "definition": "Ptx.Auto.MapSpec.Correct", "axioms": ax});
-                cleanup(&dir);
                 return finish(doc, Verdict::Proved, None);
             }
             Some(ax) => {
@@ -427,19 +460,20 @@ pub fn check(o: &Options) -> (Verdict, Value) {
         )));
     }
     if !o.search {
-        cleanup(&dir);
         return finish(
             doc,
             Verdict::Unknown,
             Some("counterexample search disabled".into()),
         );
     }
+    if crate::core::process::cancellation_requested() {
+        return finish(doc, Verdict::Error, Some("verification cancelled".into()));
+    }
     let t0 = Instant::now();
     let (found, tried) = search::search(k, &sp);
     doc["search"] =
         json!({"launches": tried, "seconds": (t0.elapsed().as_secs_f64() * 100.0).round() / 100.0});
     let Some((w, wit)) = found else {
-        cleanup(&dir);
         return finish(
             doc,
             Verdict::Unknown,
@@ -453,7 +487,8 @@ pub fn check(o: &Options) -> (Verdict, Value) {
         return finish(doc, Verdict::Error, Some(e.to_string()));
     }
     let rfs = rf.display().to_string();
-    let r = run_lean(&proj, &["env", "lean", &rfs], o.timeout, o.memory_mb);
+    let r = run_generated(o, &proj, &rf);
+    doc["lean"]["refutation_execution"] = r.execution.clone();
     doc["lean"]["refutation_seconds"] = json!((r.seconds * 100.0).round() / 100.0);
     if o.keep.is_some() {
         doc["lean"]["refutation_file"] = json!(rfs);
@@ -472,7 +507,6 @@ pub fn check(o: &Options) -> (Verdict, Value) {
         _ => "functional_correctness",
     };
     doc["counterexample"] = cx;
-    cleanup(&dir);
     if replayed {
         doc["properties"][prop] = json!("refuted");
         finish(doc, Verdict::Refuted, None)
@@ -662,20 +696,11 @@ fn check_block(
             }),
         }
     };
-    let dir = match &o.keep {
-        Some(d) => d.clone(),
-        None => {
-            std::env::temp_dir().join(format!("e5r-ptx-{}-{}", std::process::id(), &phash[..12]))
-        }
+    let workspace = match crate::core::workspace::Workspace::new(o.keep.as_deref()) {
+        Ok(w) => w,
+        Err(e) => return finish(doc, Verdict::Error, Some(e)),
     };
-    if let Err(e) = std::fs::create_dir_all(&dir) {
-        return finish(doc, Verdict::Error, Some(format!("{}: {e}", dir.display())));
-    }
-    let cleanup = |d: &Path| {
-        if o.keep.is_none() {
-            let _ = std::fs::remove_dir_all(d);
-        }
-    };
+    let dir = workspace.path().to_path_buf();
     let proj = match o.project.canonicalize() {
         Ok(p) => p,
         Err(e) => {
@@ -699,14 +724,13 @@ fn check_block(
             &proj,
             &dir,
         );
-        cleanup(&dir);
         return finish(doc, v, why);
     }
     let mut warm_args = vec!["build", "-q"];
     warm_args.extend(plan.warm.iter().copied());
     let warm = run_lean(&proj, &warm_args, o.timeout * 4, o.memory_mb);
+    doc["lean"]["build_execution"] = warm.execution.clone();
     if !warm.ok {
-        cleanup(&dir);
         return finish(
             doc,
             Verdict::Error,
@@ -725,7 +749,8 @@ fn check_block(
                 return finish(doc, Verdict::Error, Some(e.to_string()));
             }
             let pf = proof.display().to_string();
-            let r = run_lean(&proj, &["env", "lean", &pf], o.timeout, o.memory_mb);
+            let r = run_generated(o, &proj, &proof);
+            doc["lean"]["proof_execution"] = r.execution.clone();
             doc["lean"]["proof_seconds"] = json!((r.seconds * 100.0).round() / 100.0);
             if o.keep.is_some() {
                 doc["lean"]["proof_file"] = json!(pf);
@@ -735,7 +760,6 @@ fn check_block(
                     Some(ax) if axioms_allowed(ax) => {
                         doc["theorem"] = json!({"name": "E5rCheck.correct", "statement": statement,
                             "definition": plan.definition, "axioms": ax});
-                        cleanup(&dir);
                         return finish(doc, Verdict::Proved, None);
                     }
                     Some(ax) => reason(
@@ -762,15 +786,16 @@ fn check_block(
         Verdict::Unknown
     };
     if !o.search {
-        cleanup(&dir);
         return finish(doc, none, Some("counterexample search disabled".into()));
+    }
+    if crate::core::process::cancellation_requested() {
+        return finish(doc, Verdict::Error, Some("verification cancelled".into()));
     }
     let t0 = Instant::now();
     let (found, tried) = (plan.search)();
     doc["search"] =
         json!({"launches": tried, "seconds": (t0.elapsed().as_secs_f64() * 100.0).round() / 100.0});
     let Some((mut cx, kind, rtext)) = found else {
-        cleanup(&dir);
         return finish(
             doc,
             none,
@@ -782,7 +807,8 @@ fn check_block(
         return finish(doc, Verdict::Error, Some(e.to_string()));
     }
     let rfs = rf.display().to_string();
-    let r = run_lean(&proj, &["env", "lean", &rfs], o.timeout, o.memory_mb);
+    let r = run_generated(o, &proj, &rf);
+    doc["lean"]["refutation_execution"] = r.execution.clone();
     doc["lean"]["refutation_seconds"] = json!((r.seconds * 100.0).round() / 100.0);
     if o.keep.is_some() {
         doc["lean"]["refutation_file"] = json!(rfs);
@@ -805,7 +831,6 @@ fn check_block(
         _ => "functional_correctness",
     };
     doc["counterexample"] = cx;
-    cleanup(&dir);
     if replayed {
         doc["properties"][prop] = json!("refuted");
         finish(doc, Verdict::Refuted, None)
@@ -839,6 +864,7 @@ fn supplied_route(
         o.timeout * 6,
         o.memory_mb,
     );
+    doc["lean"]["build_execution"] = warm.execution.clone();
     if !warm.ok {
         return (
             Verdict::Error,

@@ -1,8 +1,10 @@
 import Lake
 open Lake DSL
 
--- Core Lean only: no `require`, so nothing is fetched (docs/verification/ptx.md).
+-- Core Lean and local shared checker support only; no remote dependencies.
 package ptx
+
+require e5rVerification from "../common"
 
 @[default_target]
 lean_lib Ptx where

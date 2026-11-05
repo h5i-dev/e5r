@@ -3,7 +3,7 @@ name = "e5r-verify"
 description = "e5r — assembly-level formal verification with Lean 4: PTX kernels and RISC-V firmware binaries."
 version.workspace = true
 edition.workspace = true
-rust-version.workspace = true
+rust-version = "1.89"
 license.workspace = true
 
 [[bin]]
@@ -16,3 +16,4 @@ e5r-format.workspace = true
 e5r-ptx.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+signal-hook = "0.3.18"

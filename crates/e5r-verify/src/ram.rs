@@ -293,10 +293,10 @@ pub fn ram_image(bytes: &[u8], p: Policy) -> Result<RamImage, String> {
             "no RAM left above the read-only segments ({rw_base:#x})"
         ));
     }
-    if let Some(a) = &arch {
-        if !a.starts_with("rv32") {
-            return Err(format!("Tag_RISCV_arch {a:?} is not rv32"));
-        }
+    if let Some(a) = &arch
+        && !a.starts_with("rv32")
+    {
+        return Err(format!("Tag_RISCV_arch {a:?} is not rv32"));
     }
     cross_check(bytes, &loads)?;
     Ok(RamImage {

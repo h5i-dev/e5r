@@ -1,5 +1,9 @@
 # PTX kernel verification in Lean 4
 
+Shared execution, proof policy, provenance and replay are documented in
+[unified-core.md](unified-core.md), with this migration's executed checks in
+[unified-validation.md](unified-validation.md).
+
 This is scope P of the roadmap (owner authorization, 2026-10-31). The proof
 subject is a `.ptx` file, the NVIDIA virtual ISA a model writes directly or a
 compiler emits. Lean 4 checks three properties of it against a specification
@@ -111,17 +115,18 @@ python3 verification/ptx/m5/float/report_float.py   # reads the copies in m5/flo
 ```
 
 Lean is core v4.35.0, the toolchain `verification/rv32` already uses. The
-project has no `require`, so nothing is downloaded. Mathlib is not used.
+project requires only local `../common` checker support; no remote dependency is
+downloaded. Mathlib is not used.
 The cross-check (`verification/ptx-ieee-crosscheck`) is a separate project
 on lean-ieee754's toolchain (v4.33.1) with Mathlib; nothing in
 `verification/ptx` depends on it.
 
-Lean is capped on purpose: a Lean process was OOM-killed at 15 GB on the
-development machine. The scripts run Lean with `LEAN_NUM_THREADS=2` under a
-10 GB cgroup limit (`systemd-run`, no swap; override with `PTX_LEAN_MEMORY`).
-`e5r ptx check` runs one Lean thread under a 6 GB cap and a 600 s
-timeout (`--memory-mb`, `--timeout`). Without systemd only the thread count
-and the timeout apply.
+Lean commands use the shared Linux process-group runner with sampled aggregate
+RSS, output and wall-time limits. The checking script defaults to one Lean thread,
+4096 MiB and 1800 seconds per command (`E5R_CHECK_MEMORY_MIB`,
+`E5R_CHECK_TIMEOUT`). `e5r ptx check` defaults to one Lean thread, 6144 MiB and
+600 seconds per stage (`--memory-mb`, `--timeout`). These are sampled thresholds,
+not hard cgroup limits; see [the exact contract](unified-core.md#execution-contract).
 
 ## Command line
 
@@ -962,7 +967,8 @@ What a theorem here does and does not establish:
    `Ptx/Logic/CellAlgs.lean` the spec names (`op` and `e` are part of the
    statement; their laws are proved), `afold`, and the generated
    `Accum.Spec`. For a supplied proof it is the generated `E5rSpec`
-   module, and the checker `Checker/ProofCheck.lean` with the Lean kernel's
+   module, and the shared checker `../common/E5rVerification` (the local
+   `Checker/ProofCheck.lean` target is a compatibility adapter) with the Lean kernel's
    `replay`.
    A weak spec proves a weak property, and nothing here detects that.
    Not trusted: the tactics, `wp_sound` and the rest of `Ptx/Logic` and
@@ -970,7 +976,9 @@ What a theorem here does and does not establish:
    (replayed), the Lean file generator beyond the statement it emits.
 2. **The verdict logic.** `e5r ptx check` decides `proved` from Lean's
    exit status, the absence of `error:` and `sorry` in its output, and the
-   axiom list of `E5rCheck.correct`. That code (`src/ptx/mod.rs`, `run_lean`
+   axiom list of `E5rCheck.correct`, followed by independent kernel replay of
+   generated declarations. Supplied proofs use the shared exact-statement checker.
+   Common provenance must remain unchanged. That code (`src/ptx/mod.rs`, `run_lean`
    and `check`) is trusted for the exit status.
 3. **The semantics' fidelity to PTX.** Written from the PTX ISA manual and
    differentially tested on the A10G (above). The float definitions

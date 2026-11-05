@@ -5,6 +5,10 @@ The Lean kernel checks the proofs. The proof subject is the flash image built
 from the ELF file's bytes. e5r's decompiler, CFG recovery and IR are not
 inputs to any proof.
 
+Shared execution, proof acceptance policy, provenance and replay are documented
+in [unified-core.md](unified-core.md), with the migration's executed checks in
+[unified-validation.md](unified-validation.md).
+
 This document defines the supported scope. Milestone status is in
 [ROADMAP.md, section F](../ROADMAP.md#f-scoped-firmware-verification-2026-10-28-owner-authorization);
 the V0 research proofs it grew from are in
@@ -199,7 +203,8 @@ target/release/e5r verify-result duty.json
 5. Compiles each module from source with one Lean worker, under the limits,
    then replays every module's declarations through a fresh kernel with
    `leanchecker`.
-6. Prints each named theorem's axioms and refuses anything beyond `propext`,
+6. Uses the shared checker to require actual theorem declarations, validate compiled
+   import headers and audit transitive axioms, refusing anything beyond `propext`,
    `Classical.choice` and `Quot.sound`.
 
 The result (`e5r.verify.result.v1`) has one status:
@@ -209,7 +214,7 @@ The result (`e5r.verify.result.v1`) has one status:
 | `proved` | Every named theorem checked, with allowed axioms only |
 | `failed` | A proof did not check. **Not a counterexample**: it says nothing about whether the property holds |
 | `unsupported` | The exporter refused the binary or board as outside the scope; nothing was attempted |
-| `resource_exhausted` | A time or memory limit stopped a step |
+| `resource_exhausted` | A time, memory or output limit stopped a step |
 | `error` | The job could not run: a missing tool, a malformed job, a stale generated file, a changed ELF identity or an unknown theorem |
 
 `counterexample` is reserved for a violation replayed in the model. No
@@ -224,7 +229,7 @@ A result records SHA-256 identities of:
 so a proof is never silently carried over to a changed binary,
 specification, model or toolchain. `check --resume` skips recompiling a
 module only if its source, every earlier module's source and the Lean
-version are unchanged since it last compiled successfully. It is for
+version and compiled module bytes are unchanged since it last compiled successfully. It is for
 development; CI and the one-command check always run fresh.
 
 ### Rechecking without e5r

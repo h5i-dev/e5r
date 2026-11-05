@@ -111,7 +111,19 @@ pub fn check(
         let _ = std::fs::remove_file(dir.join(f));
     }
     let d = dir.display().to_string();
-    let env = [("E5R_PROOF_DIR", d.as_str())];
+    let checker = proj
+        .join(".lake/build/bin/proofcheck")
+        .display()
+        .to_string();
+    let checker_hash = match sha(Path::new(&checker)) {
+        Ok((_, hash)) => hash,
+        Err(e) => return (Verdict::Error, Some(format!("proof checker: {e}"))),
+    };
+    let checker_unchanged = || sha(Path::new(&checker)).is_ok_and(|(_, hash)| hash == checker_hash);
+    let env = [
+        ("E5R_PROOF_DIR", d.as_str()),
+        ("E5R_CHECKER", checker.as_str()),
+    ];
     let compile = |m: &str| {
         run_lean_env(
             proj,
@@ -129,6 +141,7 @@ pub fn check(
         )
     };
     let r = compile("E5rSpec");
+    doc["lean"]["statement_execution"] = r.execution.clone();
     if !r.ok {
         return (
             Verdict::Error,
@@ -138,9 +151,17 @@ pub fn check(
             )),
         );
     }
+    let statement_olean = match std::fs::read(dir.join("E5rSpec.olean")) {
+        Ok(b) => crate::sha256::hex(&b),
+        Err(e) => return (Verdict::Error, Some(format!("statement artifact: {e}"))),
+    };
+    let dependencies = crate::core::artifact::compiled_dependencies(proj);
     let r = compile("E5rProof");
+    doc["lean"]["proof_execution"] = r.execution.clone();
     doc["lean"]["proof_seconds"] = json!((r.seconds * 100.0).round() / 100.0);
-    if !dir.join("E5rProof.olean").exists() {
+    // The independent checker must diagnose elaborated sorry/unsafe declarations.
+    // A successful elaboration with warnings is not proof acceptance.
+    if r.execution["success"] != json!(true) || !dir.join("E5rProof.olean").exists() {
         let why = r
             .limit
             .map(|l| format!("stopped: {l}"))
@@ -152,25 +173,40 @@ pub fn check(
             )),
         );
     }
-    let checker = proj
-        .join(".lake/build/bin/proofcheck")
-        .display()
-        .to_string();
+    let statement_unchanged = || {
+        std::fs::read(dir.join("E5rSpec.olean"))
+            .is_ok_and(|b| crate::sha256::hex(&b) == statement_olean)
+            && std::fs::read_to_string(dir.join("E5rSpec.lean"))
+                .is_ok_and(|s| s == statement_module)
+    };
+    if !statement_unchanged() {
+        return (
+            Verdict::Unknown,
+            Some("supplied proof refused: generated statement artifacts changed".into()),
+        );
+    }
+    if !checker_unchanged() {
+        return (
+            Verdict::Unknown,
+            Some("supplied proof refused: proof checker executable changed".into()),
+        );
+    }
     let r = run_lean_env(
         proj,
         &[
             "env",
             "sh",
             "-c",
-            &format!(
-                "cd \"$E5R_PROOF_DIR\" && LEAN_PATH=\"$LEAN_PATH:$E5R_PROOF_DIR\" \"{checker}\" \
-                 E5rSpec E5rProof E5rProof.correct E5rSpec.statement"
-            ),
+            "cd \"$E5R_PROOF_DIR\" && LEAN_PATH=\"$LEAN_PATH:$E5R_PROOF_DIR\" \"$E5R_CHECKER\" exact E5rSpec E5rProof E5rProof.correct E5rSpec.statement Ptx Init Std Lean",
         ],
         o.timeout,
         o.memory_mb,
-        &env,
+        &[
+            ("E5R_PROOF_DIR", d.as_str()),
+            ("E5R_CHECKER", checker.as_str()),
+        ],
     );
+    doc["lean"]["proof_check_execution"] = r.execution.clone();
     doc["lean"]["proof_check_seconds"] = json!((r.seconds * 100.0).round() / 100.0);
     let line = r
         .output
@@ -180,7 +216,7 @@ pub fn check(
         .unwrap_or("");
     let res: Value = serde_json::from_str(line).unwrap_or(Value::Null);
     doc["proof"]["check"] = res.clone();
-    if res["ok"] != json!(true) {
+    if !r.ok || res["ok"] != json!(true) {
         let why = res["reason"]
             .as_str()
             .map(str::to_string)
@@ -191,6 +227,39 @@ pub fn check(
             Some(format!("supplied proof refused: {why}")),
         );
     }
+    if !statement_unchanged() {
+        return (
+            Verdict::Unknown,
+            Some(
+                "supplied proof refused: generated statement artifacts changed during replay"
+                    .into(),
+            ),
+        );
+    }
+    match dependencies {
+        Ok(dependencies)
+            if crate::core::artifact::compiled_dependencies(proj)
+                .ok()
+                .as_ref()
+                == Some(&dependencies) =>
+        {
+            doc["lean"]["proof_check_execution"]["dependencies"] =
+                serde_json::to_value(dependencies).unwrap();
+        }
+        _ => {
+            return (
+                Verdict::Unknown,
+                Some("supplied proof refused: compiled model dependencies changed".into()),
+            );
+        }
+    }
+    if !checker_unchanged() {
+        return (
+            Verdict::Unknown,
+            Some("supplied proof refused: proof checker executable changed during replay".into()),
+        );
+    }
+    doc["proof"]["checker_sha256"] = json!(checker_hash);
     doc["proof"]["accepted"] = json!(true);
     doc["theorem"] = json!({"name": "E5rProof.correct", "statement": statement,
         "definition": definition, "axioms": res["axioms"], "generated": false,

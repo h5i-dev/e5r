@@ -11,12 +11,14 @@ use e5r_format::{LoadOptions, Object};
 use std::fmt::Write;
 
 pub mod board;
+pub mod core;
 pub mod flash;
 pub mod job;
 pub mod ptx;
 pub mod ptxrun;
 pub mod ram;
 pub mod sha256;
+pub mod verification;
 
 /// Reject containers outside the small, static, relocation-free research contract.
 pub fn load_image(bytes: &[u8]) -> Result<Object, String> {

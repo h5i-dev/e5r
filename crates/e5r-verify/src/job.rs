@@ -22,7 +22,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::time::{Duration, Instant};
 
 use crate::board::Board;
@@ -32,7 +32,7 @@ pub const JOB_SCHEMA: &str = "e5r.verify.job.v1";
 pub const RESULT_SCHEMA: &str = "e5r.verify.result.v1";
 
 /// Axioms a checked theorem may depend on: Lean's standard ones.
-pub const ALLOWED_AXIOMS: [&str; 3] = ["propext", "Classical.choice", "Quot.sound"];
+pub use crate::core::proof::ALLOWED_AXIOMS;
 
 /// The semantic model every job is checked against, in dependency order.
 /// Its sources are part of every result's identity.
@@ -89,7 +89,7 @@ pub struct ImageSpec {
 /// every PT_LOAD into RAM in place (`ram::ram_image`); the image the model
 /// runs is defined by the checker's reader `E5R.RamElf.imageOf` applied to
 /// the packed file, and the board must say `"image_placement": "ram"`.
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, serde::Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ImageKind {
     #[default]
@@ -117,7 +117,7 @@ impl Default for Limits {
 pub enum Stop {
     Failed(String),
     Unsupported(String),
-    Exhausted(String),
+    Exhausted(String, Value),
     Error(String),
 }
 
@@ -126,13 +126,13 @@ impl Stop {
         match self {
             Stop::Failed(_) => "failed",
             Stop::Unsupported(_) => "unsupported",
-            Stop::Exhausted(_) => "resource_exhausted",
+            Stop::Exhausted(..) => "resource_exhausted",
             Stop::Error(_) => "error",
         }
     }
-    fn message(&self) -> &str {
+    pub(crate) fn message(&self) -> &str {
         match self {
-            Stop::Failed(m) | Stop::Unsupported(m) | Stop::Exhausted(m) | Stop::Error(m) => m,
+            Stop::Failed(m) | Stop::Unsupported(m) | Stop::Exhausted(m, _) | Stop::Error(m) => m,
         }
     }
 }
@@ -213,58 +213,29 @@ struct Stage {
     peak_rss_mib: u64,
 }
 
-/// A child process under the job's limits. The memory limit is enforced by
-/// sampling resident memory through /proc, because Lean reserves far more
-/// virtual memory than it uses, which rules out RLIMIT_AS.
-fn run_limited(mut cmd: Command, limits: &Limits, what: &str) -> Result<(String, u64), Stop> {
-    let out_path = std::env::temp_dir().join(format!(
-        "e5r-{}-{}.log",
-        std::process::id(),
-        what.replace(['/', ' '], "_")
-    ));
-    let out = std::fs::File::create(&out_path).map_err(err("log file"))?;
-    let child = cmd
-        .stdout(Stdio::from(out.try_clone().map_err(err("log file"))?))
-        .stderr(Stdio::from(out))
-        .spawn();
-    let mut child = child.map_err(|e| Stop::Error(format!("{what}: cannot start: {e}")))?;
-    let start = Instant::now();
-    let mut peak = 0u64;
-    let status = loop {
-        if let Some(status) = child.try_wait().map_err(err(what))? {
-            break status;
-        }
-        if let Ok(s) = std::fs::read_to_string(format!("/proc/{}/status", child.id())) {
-            if let Some(kb) = s
-                .lines()
-                .find_map(|l| l.strip_prefix("VmRSS:"))
-                .and_then(|v| v.trim().trim_end_matches(" kB").trim().parse::<u64>().ok())
-            {
-                peak = peak.max(kb / 1024);
-            }
-        }
-        let over_time = start.elapsed() > Duration::from_secs(limits.seconds);
-        if peak > limits.rss_mib || over_time {
-            let _ = child.kill();
-            let _ = child.wait();
-            let _ = std::fs::remove_file(&out_path);
-            return Err(Stop::Exhausted(if over_time {
-                format!("{what}: exceeded {} s", limits.seconds)
-            } else {
-                format!("{what}: exceeded {} MiB resident", limits.rss_mib)
-            }));
-        }
-        std::thread::sleep(Duration::from_millis(100));
-    };
-    let text = std::fs::read_to_string(&out_path).unwrap_or_default();
-    let _ = std::fs::remove_file(&out_path);
-    if !status.success() {
+fn run_limited(cmd: Command, limits: &Limits, what: &str) -> Result<(String, u64), Stop> {
+    let r = crate::core::process::run(
+        cmd,
+        crate::core::process::Limits::new(Duration::from_secs(limits.seconds), limits.rss_mib),
+    )
+    .map_err(|e| Stop::Error(format!("{what}: {e}")))?;
+    if r.cancelled {
+        return Err(Stop::Error(format!("{what}: execution cancelled")));
+    }
+    if let Some(limit) = r.exhaustion {
+        return Err(Stop::Exhausted(
+            format!("{what}: {limit:?} limit exceeded\n{}", tail(&r.output)),
+            serde_json::to_value(&r).unwrap(),
+        ));
+    }
+    if !r.success {
         return Err(Stop::Failed(format!(
-            "{what}: exited with {status}\n{}",
-            tail(&text)
+            "{what}: exited {:?}\n{}",
+            r.code,
+            tail(&r.output)
         )));
     }
-    Ok((text, peak))
+    Ok((r.output, r.peak_rss_mib))
 }
 
 fn tail(s: &str) -> String {
@@ -272,170 +243,20 @@ fn tail(s: &str) -> String {
     lines[lines.len().saturating_sub(40)..].join("\n")
 }
 
-/// Strip Lean comments and string literals, so a scan for forbidden
-/// commands only sees code.
-pub fn lean_code(src: &str) -> String {
-    let b = src.as_bytes();
-    let mut out = String::with_capacity(src.len());
-    let mut i = 0;
-    let mut depth = 0usize;
-    while i < b.len() {
-        if depth > 0 {
-            if b[i..].starts_with(b"/-") {
-                depth += 1;
-                i += 2;
-            } else if b[i..].starts_with(b"-/") {
-                depth -= 1;
-                i += 2;
-            } else {
-                i += 1;
-            }
-            continue;
-        }
-        if b[i..].starts_with(b"/-") {
-            depth = 1;
-            i += 2;
-        } else if b[i..].starts_with(b"--") {
-            while i < b.len() && b[i] != b'\n' {
-                i += 1;
-            }
-        } else if b[i] == b'\''
-            && (i == 0
-                || !(b[i - 1].is_ascii_alphanumeric() || b[i - 1] == b'_' || b[i - 1] == b'\''))
-            && (b.get(i + 2) == Some(&b'\'')
-                || (b.get(i + 1) == Some(&b'\\') && b.get(i + 3) == Some(&b'\'')))
-        {
-            // A character literal such as '"' or '\n': skip it whole.
-            i += if b[i + 1] == b'\\' { 4 } else { 3 };
-            out.push_str("' '");
-        } else if b[i] == b'"' {
-            i += 1;
-            while i < b.len() && b[i] != b'"' {
-                if b[i] == b'\\' {
-                    i += 1;
-                }
-                i += 1;
-            }
-            i += 1;
-            out.push_str("\"\"");
-        } else {
-            out.push(b[i] as char);
-            i += 1;
-        }
+pub use crate::core::proof::{FORBIDDEN, declared_theorems, escapes, lean_code, parse_axioms};
+
+fn tool_version(root: &Path, argv: &[&str]) -> Option<String> {
+    let mut cmd = Command::new(argv[0]);
+    cmd.current_dir(root).args(&argv[1..]);
+    let out = crate::core::process::run(
+        cmd,
+        crate::core::process::Limits::new(Duration::from_secs(10), 512),
+    )
+    .ok()?;
+    if !out.success {
+        return None;
     }
-    out
-}
-
-/// Commands and attributes that would let a proof bypass the kernel or add
-/// assumptions. Their presence anywhere in a checked module is an error.
-///
-/// Metaprogramming is banned outright: a `run_cmd` can call the
-/// environment's `addDecl` with kernel checking switched off through an
-/// option name assembled from strings, which no word scan can see. The
-/// kernel replay stage (`leanchecker`) is the check that does not depend on
-/// this list.
-pub const FORBIDDEN: [&str; 23] = [
-    "sorry",
-    "admit",
-    "axiom",
-    "native_decide",
-    "ofReduceBool",
-    "implemented_by",
-    "extern",
-    "unsafe",
-    "opaque",
-    "skipKernelTC",
-    "trustCompiler",
-    "run_cmd",
-    "run_elab",
-    "run_meta",
-    "#eval",
-    "elab",
-    "elab_rules",
-    "macro",
-    "macro_rules",
-    "syntax",
-    "initialize",
-    "builtin_initialize",
-    "addDecl",
-];
-
-pub fn escapes(code: &str) -> Vec<&'static str> {
-    let words: Vec<&str> = code
-        .split(|c: char| !(c.is_alphanumeric() || c == '_' || c == '.' || c == '#'))
-        .flat_map(|w| w.split('.'))
-        .collect();
-    FORBIDDEN
-        .iter()
-        .copied()
-        .filter(|f| words.contains(f))
-        .collect()
-}
-
-/// Parse `#print axioms` output: every theorem's axioms, or an error naming
-/// the line that could not be understood.
-pub fn parse_axioms(out: &str) -> Result<BTreeMap<String, Vec<String>>, String> {
-    let mut map = BTreeMap::new();
-    for line in out.lines().filter(|l| !l.trim().is_empty()) {
-        // Split at the whole marker, not at the first quote: Lean names may
-        // end in apostrophes (`recv_step'`).
-        if let Some(rest) = line.strip_prefix('\'') {
-            if let Some(name) = rest.strip_suffix("' does not depend on any axioms") {
-                map.insert(name.to_string(), vec![]);
-                continue;
-            }
-            if let Some((name, list)) = rest
-                .split_once("' depends on axioms: [")
-                .and_then(|(n, t)| Some((n, t.strip_suffix(']')?)))
-            {
-                map.insert(
-                    name.to_string(),
-                    list.split(", ").map(str::to_string).collect(),
-                );
-                continue;
-            }
-        }
-        return Err(format!("unexpected Lean output: {line}"));
-    }
-    Ok(map)
-}
-
-/// Fully qualified names of the theorems a module declares, following
-/// `namespace`/`end` (enough for this project's sources, which do not use
-/// `section` names or nested `namespace` blocks with the same name).
-pub fn declared_theorems(code: &str) -> Vec<String> {
-    let mut stack: Vec<String> = Vec::new();
-    let mut out = Vec::new();
-    for line in code.lines() {
-        // Attributes and modifiers may precede `theorem` on its line.
-        let mut rest = line.trim_start();
-        while let Some(r) = rest.strip_prefix("@[") {
-            rest = r.split_once(']').map_or("", |(_, t)| t).trim_start();
-        }
-        for m in ["private ", "protected ", "noncomputable ", "nonrec "] {
-            rest = rest.strip_prefix(m).unwrap_or(rest).trim_start();
-        }
-        let mut words = rest.split_whitespace();
-        match (words.next(), words.next()) {
-            (Some("namespace"), Some(ns)) => stack.push(ns.to_string()),
-            (Some("end"), Some(ns)) if stack.last().is_some_and(|l| l == ns) => {
-                stack.pop();
-            }
-            (Some("theorem"), Some(name)) => {
-                let mut full = stack.clone();
-                full.push(name.to_string());
-                out.push(full.join("."));
-            }
-            _ => {}
-        }
-    }
-    out
-}
-
-fn tool_version(argv: &[&str]) -> Option<String> {
-    let out = Command::new(argv[0]).args(&argv[1..]).output().ok()?;
-    let s = String::from_utf8_lossy(&out.stdout);
-    s.lines().next().map(|l| l.trim().to_string())
+    out.output.lines().next().map(|l| l.trim().to_string())
 }
 
 /// Everything a result depends on, hashed. `verify-result` recomputes this
@@ -454,9 +275,8 @@ pub fn identity(job: &Job, paths: &Paths) -> Result<Value, Stop> {
         sources.insert(f.clone(), sha256::hex(&read(&paths.root.join(f))?));
     }
     let elf = read(&paths.root.join(&job.elf))?;
-    let exe = std::env::current_exe()
+    let exe = std::fs::read("/proc/self/exe")
         .ok()
-        .and_then(|p| std::fs::read(p).ok())
         .map(|b| sha256::hex(&b));
     sources.insert(
         "tools/gen_board.py".into(),
@@ -482,13 +302,57 @@ pub fn identity(job: &Job, paths: &Paths) -> Result<Value, Stop> {
     } else {
         Value::Null
     };
+    let mut common_files: Vec<PathBuf> = files.iter().map(|f| paths.root.join(f)).collect();
+    common_files.extend([
+        paths.job.clone(),
+        paths.root.join(&job.board),
+        paths.root.join(&job.elf),
+        paths.root.join("lean-toolchain"),
+        paths.root.join("lakefile.lean"),
+        paths.root.join("lake-manifest.json"),
+        paths.root.join("tools/ProofCheck.lean"),
+        paths.root.join(Job::module_path(&job.image.module)),
+        paths.root.join(Job::module_path(&job.fidelity_module())),
+    ]);
+    if job.image.kind == ImageKind::Ram {
+        common_files.push(paths.root.join(job.ram_manifest()));
+    }
+    // Build recipes may invoke arbitrary tools. Capture the reviewed build source
+    // inventory as well as the resulting ELF; this does not prove compiler correctness.
+    fn build_sources(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), Stop> {
+        for entry in std::fs::read_dir(dir).map_err(err("build sources"))? {
+            let entry = entry.map_err(err("build source"))?;
+            let p = entry.path();
+            if entry.file_type().map_err(err("build source"))?.is_dir() {
+                if ![".lake", "build", "target", ".git", "__pycache__"]
+                    .contains(&entry.file_name().to_string_lossy().as_ref())
+                {
+                    build_sources(&p, out)?;
+                }
+            } else if matches!(
+                p.extension().and_then(|s| s.to_str()),
+                Some("rs" | "ld" | "toml" | "lock" | "py" | "sh" | "json")
+            ) {
+                out.push(p);
+            }
+        }
+        Ok(())
+    }
+    build_sources(&paths.root, &mut common_files)?;
+    let common = crate::core::artifact::Identity::capture(
+        &[paths.root.join("../common")],
+        &common_files,
+        &paths.root,
+    )
+    .map_err(Stop::Error)?;
     Ok(json!({
+        "common_identity": common,
         "image": image,
         "job_sha256": sha256::hex(&read(&paths.job)?),
         "board_sha256": sha256::hex(&read(&paths.root.join(&job.board))?),
         "elf": { "path": job.elf, "sha256": sha256::hex(&elf), "bytes": elf.len() },
         "sources": sources,
-        "lean": tool_version(&["lean", "--version"]),
+        "lean": tool_version(&paths.root, &["lean", "--version"]),
         "e5r_verify": env!("CARGO_PKG_VERSION"),
         "e5r_verify_sha256": exe,
         "allowed_axioms": ALLOWED_AXIOMS,
@@ -527,11 +391,17 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
     let mut checked: Vec<String> = Vec::new();
     let outcome = (|| -> Result<(Value, Value), Stop> {
         let (job, paths) = Job::load(job_path)?;
+        let _lock =
+            crate::core::workspace::ProjectLock::acquire(&paths.root).map_err(Stop::Error)?;
         let limits = &job.limits;
         // Build the ELF from source, if the job says how.
         for (i, step) in job.build.iter().enumerate() {
             let t = Instant::now();
-            let mut cmd = Command::new(&step.argv[0]);
+            let program = step
+                .argv
+                .first()
+                .ok_or_else(|| Stop::Error(format!("build step {i} has empty argv")))?;
+            let mut cmd = Command::new(program);
             cmd.args(&step.argv[1..])
                 .current_dir(paths.root.join(&step.cwd));
             let (_, rss) =
@@ -548,12 +418,12 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
         let elf_path = paths.root.join(&job.elf);
         let elf = std::fs::read(&elf_path).map_err(err("elf"))?;
         let digest = sha256::hex(&elf);
-        if let Some(pin) = &job.elf_sha256 {
-            if *pin != digest {
-                return Err(Stop::Error(format!(
-                    "ELF identity changed ({digest}, job pins {pin}); review the new bytes and update elf_sha256"
-                )));
-            }
+        if let Some(pin) = &job.elf_sha256
+            && *pin != digest
+        {
+            return Err(Stop::Error(format!(
+                "ELF identity changed ({digest}, job pins {pin}); review the new bytes and update elf_sha256"
+            )));
         }
         // Addresses the proofs hard-code must be where the named symbols are.
         if !job.symbols.is_empty() {
@@ -578,18 +448,17 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
             std::fs::read_to_string(paths.root.join(&job.board)).map_err(err("board"))?;
         let board = Board::parse(&board_text).map_err(Stop::Error)?;
         let board_mod = board_module_name(&job.board)?;
-        let regen = Command::new("python3")
+        let mut regen = Command::new("python3");
+        regen
             .arg(paths.root.join("tools/gen_board.py"))
             .arg("--check")
-            .arg(paths.root.join(&job.board))
-            .output()
-            .map_err(err("gen_board"))?;
-        if !regen.status.success() {
-            return Err(Stop::Error(format!(
-                "Theories/Board/{board_mod}.lean is stale: {}",
-                String::from_utf8_lossy(&regen.stderr).trim()
-            )));
-        }
+            .arg(paths.root.join(&job.board));
+        run_limited(regen, limits, "board generation").map_err(|s| match s {
+            Stop::Failed(m) => {
+                Stop::Error(format!("Theories/Board/{board_mod}.lean is stale: {m}"))
+            }
+            other => other,
+        })?;
         // Export the image. Refusal means the binary is out of scope. The
         // board must hold images the way the job says.
         let placement = image_placement(&board_text)?;
@@ -698,6 +567,12 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
                 }
             }
         }
+        let mut checker_build = Command::new("lake");
+        checker_build
+            .current_dir(&paths.root)
+            .env("LEAN_NUM_THREADS", "1")
+            .args(["build", "-q", "proofcheck"]);
+        run_limited(checker_build, limits, "shared proof checker build")?;
         let before = identity(&job, &paths)?;
         let manifest_path = paths
             .root
@@ -707,7 +582,7 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
             .and_then(|t| serde_json::from_str(&t).ok())
             .unwrap_or_default();
         let mut chain = sha256::hex(
-            tool_version(&["lean", "--version"])
+            tool_version(&paths.root, &["lean", "--version"])
                 .unwrap_or_default()
                 .as_bytes(),
         );
@@ -716,7 +591,13 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
             chain = sha256::hex(format!("{chain} {m} {}", sha256::hex(&src)).as_bytes());
             let t = Instant::now();
             let olean = Path::new(m).with_extension("olean");
-            if resume && manifest.get(m) == Some(&chain) && paths.root.join(&olean).exists() {
+            if resume
+                && manifest.get(m)
+                    == std::fs::read(paths.root.join(&olean))
+                        .ok()
+                        .map(|b| format!("{chain}:{}", sha256::hex(&b)))
+                        .as_ref()
+            {
                 resumed.push(m.clone());
                 continue;
             }
@@ -737,7 +618,9 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
                 seconds: t.elapsed().as_secs_f64(),
                 peak_rss_mib: rss,
             });
-            manifest.insert(m.clone(), chain.clone());
+            let compiled =
+                std::fs::read(paths.root.join(&olean)).map_err(err("compiled module"))?;
+            manifest.insert(m.clone(), format!("{chain}:{}", sha256::hex(&compiled)));
             if let Some(dir) = manifest_path.parent() {
                 let _ = std::fs::create_dir_all(dir);
             }
@@ -751,11 +634,29 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
         // the source looked like.
         for m in &order {
             let t = Instant::now();
-            let mut cmd = Command::new("leanchecker");
-            cmd.current_dir(&paths.root)
-                .env("LEAN_PATH", ".")
-                .arg(m.trim_end_matches(".lean").replace('/', "."));
-            let (_, rss) = run_limited(cmd, limits, &format!("leanchecker {m}"))?;
+            let replay = crate::core::proof::replay(
+                &paths.root,
+                crate::core::proof::SearchPath::Direct("."),
+                &m.trim_end_matches(".lean").replace('/', "."),
+                crate::core::process::Limits::new(
+                    Duration::from_secs(limits.seconds),
+                    limits.rss_mib,
+                ),
+            )
+            .map_err(Stop::Error)?;
+            if replay.cancelled {
+                return Err(Stop::Error("kernel replay cancelled".into()));
+            }
+            if let Some(e) = replay.exhaustion {
+                return Err(Stop::Exhausted(
+                    format!("leanchecker {m}: {e:?}"),
+                    serde_json::to_value(&replay).unwrap(),
+                ));
+            }
+            if !replay.success {
+                return Err(Stop::Failed(format!("leanchecker {m}: {}", replay.output)));
+            }
+            let rss = replay.peak_rss_mib;
             stages.push(Stage {
                 name: format!("leanchecker {m}"),
                 seconds: t.elapsed().as_secs_f64(),
@@ -786,50 +687,46 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
             }
         }
         names.extend(binding);
-        let imports: Vec<String> = order
-            .iter()
-            .map(|m| format!("import {}", m.trim_end_matches(".lean").replace('/', ".")))
-            .collect();
-        let audit = format!(
-            "{}\n{}\n",
-            imports.join("\n"),
-            names
-                .iter()
-                .map(|n| format!("#print axioms {n}"))
-                .collect::<Vec<_>>()
-                .join("\n")
+        let mut cmd = Command::new(
+            paths
+                .root
+                .join(".lake/build/bin/proofcheck")
+                .canonicalize()
+                .map_err(err("proof checker"))?,
         );
-        let audit_path = format!("Audit_{}.lean", job.id.replace('-', "_"));
-        std::fs::write(paths.root.join(&audit_path), audit).map_err(err("audit"))?;
-        let mut cmd = Command::new("lean");
         cmd.current_dir(&paths.root)
             .env("LEAN_PATH", ".")
-            .arg("-j1")
-            .arg(&audit_path);
-        let audited = run_limited(cmd, limits, "axiom audit");
-        let _ = std::fs::remove_file(paths.root.join(&audit_path));
-        // The audit only prints; if it fails, a named theorem does not exist.
-        let (out, _) = audited.map_err(|s| match s {
-            Stop::Failed(m) => Stop::Error(m),
-            other => other,
-        })?;
-        let axioms = parse_axioms(&out).map_err(Stop::Error)?;
-        let mut theorems = Vec::new();
-        for n in &names {
-            let used = axioms
-                .get(n)
-                .ok_or_else(|| Stop::Error(format!("no axiom report for {n}")))?;
-            let bad: Vec<&String> = used
-                .iter()
-                .filter(|a| !ALLOWED_AXIOMS.contains(&a.as_str()))
-                .collect();
-            if !bad.is_empty() {
-                return Err(Stop::Failed(format!(
-                    "{n} depends on disallowed axioms {bad:?}"
-                )));
-            }
-            theorems.push(json!({ "name": n, "axioms": used }));
+            .arg("named");
+        for m in &order {
+            cmd.arg(m.trim_end_matches(".lean").replace('/', "."));
         }
+        cmd.arg("--").args(&names);
+        let audited = crate::core::process::run(
+            cmd,
+            crate::core::process::Limits::new(Duration::from_secs(limits.seconds), limits.rss_mib),
+        )
+        .map_err(Stop::Error)?;
+        if audited.cancelled {
+            return Err(Stop::Error("axiom audit cancelled".into()));
+        }
+        if let Some(e) = audited.exhaustion {
+            return Err(Stop::Exhausted(
+                format!("axiom audit: {e:?}"),
+                serde_json::to_value(&audited).unwrap(),
+            ));
+        }
+        // Missing names are job errors; disallowed axioms are proof failures.
+        let report = crate::core::proof::checker_report(&audited).map_err(|e| {
+            if e.contains("axioms outside") {
+                Stop::Failed(e)
+            } else {
+                Stop::Error(e)
+            }
+        })?;
+        let theorems = report["theorems"]
+            .as_array()
+            .ok_or_else(|| Stop::Error("checker missing theorem reports".into()))?
+            .clone();
         let after = identity(&job, &paths)?;
         if after != before {
             return Err(Stop::Error("inputs changed while the job ran".into()));
@@ -857,14 +754,23 @@ pub fn run(job_path: &Path, resume: bool) -> Value {
             result["theorems"] = theorems;
         }
         Err(stop) => {
+            if let Stop::Exhausted(_, detail) = &stop {
+                result["execution"] = detail.clone();
+            }
             result["status"] = json!(stop.status());
             result["message"] = json!(stop.message());
-            if let Ok((job, paths)) = Job::load(job_path) {
-                if let Ok(ident) = identity(&job, &paths) {
-                    result["inputs"] = ident;
-                }
+            if let Ok((job, paths)) = Job::load(job_path)
+                && let Ok(ident) = identity(&job, &paths)
+            {
+                result["inputs"] = ident;
             }
         }
+    }
+    if let Err(e) = crate::verification::attach_firmware(&mut result, job_path)
+        && result["status"] == "proved"
+    {
+        result["status"] = json!("error");
+        result["message"] = json!(format!("provenance: {e}"));
     }
     result
 }
@@ -916,6 +822,14 @@ pub fn stale(result: &Value) -> Result<Vec<String>, String> {
     }
     if result["status"] != "proved" {
         changed.push(format!("status is {}", result["status"]));
+    }
+    if now["common_identity"] != then["common_identity"] {
+        changed.push("common provenance".into());
+    }
+    if let Some(common) = then.get("common_identity") {
+        let identity: crate::core::artifact::Identity =
+            serde_json::from_value(common.clone()).map_err(|e| e.to_string())?;
+        changed.extend(identity.stale(&paths.root)?);
     }
     Ok(changed)
 }
@@ -1018,24 +932,40 @@ pub fn bundle(job_path: &Path, out: &Path) -> Result<Value, String> {
          # Recheck this bundle with only Lean (the version in lean-toolchain).\n\
          set -euo pipefail\ncd \"$(dirname \"$0\")\"\n\
          sha256sum -c --quiet SHA256SUMS\n{packing}\
-         for m in {mods}; do\n  LEAN_PATH=. lean -j1 -o \"${{m%.lean}}.olean\" \"$m\"\ndone\n\
+         for m in {mods}; do\n  LEAN_PATH=. lean -j1 -o \"${{m%.lean}}.olean\" \"$m\"\n  mod=${{m%.lean}}\n  LEAN_PATH=. leanchecker \"${{mod//\\//.}}\"\ndone\n\
          LEAN_PATH=. lean -j1 Audit.lean > axioms.actual\n\
-         diff axioms.expected axioms.actual\n\
+         awk -f normalize-axioms.awk axioms.expected | LC_ALL=C sort > axioms.expected.sorted\n\
+         awk -f normalize-axioms.awk axioms.actual | LC_ALL=C sort > axioms.actual.sorted\n\
+         diff axioms.expected.sorted axioms.actual.sorted\n\
          echo \"recheck: every theorem checked, with exactly the recorded axioms\"\n",
         mods = modules.join(" ")
     );
+    let normalize = r#"{
+  marker = "' depends on axioms: ["
+  i = index($0, marker)
+  if (i) {
+    name = substr($0, 1, i - 1)
+    list = substr($0, i + length(marker))
+    sub(/\]$/, "", list)
+    n = split(list, ax, ", ")
+    for (j = 1; j <= n; j++) print name "|" ax[j]
+  } else print $0
+}
+"#;
     for (name, text) in [
         ("Audit.lean", audit),
         ("axioms.expected", expected),
         ("recheck.sh", script),
-        ("SHA256SUMS", sums),
+        ("normalize-axioms.awk", normalize.into()),
         (
             "result.json",
             serde_json::to_string_pretty(&result).unwrap() + "\n",
         ),
     ] {
+        sums.push_str(&format!("{}  {name}\n", sha256::hex(text.as_bytes())));
         std::fs::write(out.join(name), text).map_err(|e| format!("{name}: {e}"))?;
     }
+    std::fs::write(out.join("SHA256SUMS"), sums).map_err(|e| e.to_string())?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

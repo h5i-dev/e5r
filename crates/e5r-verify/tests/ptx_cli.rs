@@ -24,6 +24,9 @@ fn tmp(name: &str, text: &str) -> PathBuf {
 }
 
 fn check(ptx: &Path, spec: &Path, extra: &[&str]) -> (i32, Value) {
+    // CLI checks share one writable Lean project; the production lock is fail-fast.
+    static PROJECT: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _project = PROJECT.lock().unwrap();
     let o = Command::new(bin())
         .args(["ptx", "check"])
         .arg(ptx)

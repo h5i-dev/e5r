@@ -357,15 +357,15 @@ pub fn validate(sp: &Spec, k: &Kernel) -> Result<(), String> {
                 if !declared {
                     return Err(format!("loop register {r} is not declared"));
                 }
-                if let Role::Base(a) | Role::Ptr(a) = x {
-                    if !sp.arrays.contains(a) {
-                        return Err(format!("register {r}: {a} is not an array"));
-                    }
+                if let Role::Base(a) | Role::Ptr(a) = x
+                    && !sp.arrays.contains(a)
+                {
+                    return Err(format!("register {r}: {a} is not an array"));
                 }
-                if let Role::Scalar(a) = x {
-                    if !sp.scalars.contains(a) {
-                        return Err(format!("register {r}: {a} is not a scalar"));
-                    }
+                if let Role::Scalar(a) = x
+                    && !sp.scalars.contains(a)
+                {
+                    return Err(format!("register {r}: {a} is not a scalar"));
                 }
             }
             Ok(())

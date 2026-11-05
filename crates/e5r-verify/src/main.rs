@@ -44,6 +44,7 @@ fn run(args: Vec<String>) -> Result<String, String> {
         }
         Some("ram-image") => ram_image(&args[1..]),
         Some("ptx") => ptx(&args[1..]),
+        Some("exec") => exec_limited(&args[1..]),
         Some("check") => {
             let mut out = None;
             let mut job = None;
@@ -89,12 +90,32 @@ fn run(args: Vec<String>) -> Result<String, String> {
             ))
         }
         Some("--help") | Some("-h") => Ok(HELP.into()),
+        Some("bundle-result") | Some("replay-result") => {
+            let path = args.get(1).ok_or("needs a result file")?;
+            let doc: serde_json::Value =
+                serde_json::from_slice(&read(path)?).map_err(|e| e.to_string())?;
+            if args[0] == "bundle-result" {
+                if args.len() != 4 || args[2] != "--out" {
+                    return Err("usage: e5r bundle-result RESULT.json --out DIR".into());
+                }
+                e5r_verify::verification::bundle_result(&doc, std::path::Path::new(&args[3]))?;
+                Ok(format!("{}: bundle written\n", args[3]))
+            } else {
+                let result = e5r_verify::verification::replay_result(&doc)?;
+                Ok(serde_json::to_string_pretty(&result).unwrap() + "\n")
+            }
+        }
+        Some("replay-bundle") => {
+            let dir = args.get(1).ok_or("usage: e5r replay-bundle DIR")?;
+            let result = e5r_verify::verification::replay_bundle(std::path::Path::new(dir))?;
+            Ok(serde_json::to_string_pretty(&result).unwrap() + "\n")
+        }
         Some("verify-result") => {
             let path = args.get(1).ok_or("verify-result needs a result file")?;
             let text = String::from_utf8(read(path)?).map_err(|e| e.to_string())?;
             let result: serde_json::Value =
                 serde_json::from_str(&text).map_err(|e| format!("{path}: {e}"))?;
-            let changed = e5r_verify::job::stale(&result)?;
+            let changed = e5r_verify::verification::stale(&result)?;
             if changed.is_empty() {
                 Ok(format!("{path}: current\n"))
             } else {
@@ -124,7 +145,7 @@ PTX kernels (docs/verification/ptx.md):
 RISC-V firmware binaries (docs/verification/firmware.md):
   e5r check JOB.json [--resume] [--out RESULT.json]
       rebuild and recheck a verification job; exit status 0 only for proved
-  e5r verify-result RESULT.json
+  e5r bundle-result RESULT.json --out DIR\n  e5r replay-result RESULT.json\n  e5r replay-bundle DIR\n  e5r verify-result RESULT.json
       say whether a stored result still describes the current inputs
   e5r bundle JOB.json --out DIR
       write a directory whose recheck.sh needs only the pinned Lean
@@ -335,6 +356,10 @@ fn ptx_run(args: &[String]) -> Result<String, String> {
 }
 
 fn main() -> ExitCode {
+    if let Err(e) = e5r_verify::core::process::install_signal_handlers() {
+        eprintln!("e5r: cannot install cancellation handlers: {e}");
+        return ExitCode::FAILURE;
+    }
     match run(std::env::args().skip(1).collect()) {
         Ok(source) => {
             print!("{source}");
@@ -345,4 +370,43 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// Expose the same execution contract to repository validation scripts.
+fn exec_limited(args: &[String]) -> Result<String, String> {
+    let mut timeout = 1800;
+    let mut memory = 4096;
+    let mut cwd = None;
+    let mut i = 0;
+    while i < args.len() && args[i] != "--" {
+        let value = args.get(i + 1).ok_or("exec option needs a value")?;
+        match args[i].as_str() {
+            "--timeout" => timeout = value.parse::<u64>().map_err(|e| e.to_string())?,
+            "--memory-mib" => memory = value.parse::<u64>().map_err(|e| e.to_string())?,
+            "--cwd" => cwd = Some(value),
+            _ => return Err(format!("unknown exec option {}", args[i])),
+        }
+        i += 2;
+    }
+    let program = args.get(i + 1).ok_or(
+        "usage: e5r exec [--timeout SECS] [--memory-mib MIB] [--cwd DIR] -- COMMAND ARGS...",
+    )?;
+    let mut cmd = std::process::Command::new(program);
+    cmd.args(&args[i + 2..]);
+    if let Some(cwd) = cwd {
+        cmd.current_dir(cwd);
+    }
+    let r = e5r_verify::core::process::run(
+        cmd,
+        e5r_verify::core::process::Limits::new(std::time::Duration::from_secs(timeout), memory),
+    )?;
+    print!("{}", r.output);
+    if let Some(exhaustion) = r.exhaustion {
+        eprintln!(
+            "e5r exec: {exhaustion:?} limit exceeded ({} MiB sampled group RSS)",
+            r.peak_rss_mib
+        );
+        std::process::exit(124);
+    }
+    std::process::exit(if r.success { 0 } else { r.code.unwrap_or(1) });
 }

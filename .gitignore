@@ -260,3 +260,7 @@ __marimo__/
 
 *.work/*/.lock
 *.work/*/*.tmp
+
+# Cooperative verifier lock, held by the operating system.
+.e5r-verification.lock
+/verification/rv32/firmware/hifive1-embassy/target

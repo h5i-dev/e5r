@@ -18,11 +18,11 @@
 #
 # E5R_VERIFY=path skips the cargo build and test (CI passes its dev build).
 # E5R_PTX_QUICK=1 stops after step 3 (see below); the full run is about 90 min.
-# Lean runs with LEAN_NUM_THREADS=2 and a 10 GB cgroup cap unless overridden.
+# Lean checking uses the shared runner; see E5R_CHECK_MEMORY_MIB and E5R_CHECK_TIMEOUT.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 root=verification/ptx
-export LEAN_NUM_THREADS="${LEAN_NUM_THREADS:-2}"
+export LEAN_NUM_THREADS="${LEAN_NUM_THREADS:-1}"
 if [[ -z "${E5R_VERIFY:-}" ]]; then
   CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" cargo test --release -p e5r-ptx -p e5r-verify -q
   CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" cargo build --release -p e5r-verify

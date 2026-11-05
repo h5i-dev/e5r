@@ -62,16 +62,12 @@ else
   echo "ptxas: not installed, assembly check skipped"
 fi
 
-# Lean memory and parallelism are capped: a Lean process was OOM-killed at
-# 15 GB on the development machine. With systemd the cap is a cgroup limit
-# (MemoryMax, no swap); without it only the thread count is capped.
-export LEAN_NUM_THREADS="${LEAN_NUM_THREADS:-2}"
+# Use the same bounded runner as both verification backends. Aggregate RSS is
+# sampled; see docs/verification/unified-core.md for the exact contract.
+export LEAN_NUM_THREADS="${LEAN_NUM_THREADS:-1}"
+bin=$(realpath "$bin")
 capped() {
-  if command -v systemd-run >/dev/null && systemd-run --scope --quiet -p MemoryMax=64M true 2>/dev/null; then
-    systemd-run --scope --quiet -p MemoryMax="${PTX_LEAN_MEMORY:-10G}" -p MemorySwapMax=0 -- "$@"
-  else
-    "$@"
-  fi
+  "$bin" exec --timeout "${E5R_CHECK_TIMEOUT:-1800}" --memory-mib "${E5R_CHECK_MEMORY_MIB:-4096}" -- "$@"
 }
 cd "$root"
 # From scratch by default (CONTRIBUTING.md: a stale build must never mask a
@@ -80,7 +76,7 @@ cd "$root"
 # rebuilds exactly what changed -- identical to a cold build when the key is
 # fresh, but seconds instead of tens of minutes when nothing moved.
 [[ "${E5R_PTX_KEEP_BUILD:-0}" == 1 ]] || rm -rf .lake/build
-capped lake build
+capped lake build Ptx proofcheck
 capped lake env lean Audit.lean >"$tmp/axioms.txt"
 cat "$tmp/axioms.txt"
 grep -q "^axiom audit: [0-9]* declarations in Ptx.\*, standard axioms only" "$tmp/axioms.txt"

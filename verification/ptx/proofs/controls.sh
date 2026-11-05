@@ -66,6 +66,32 @@ neg import "only the statement module" 'import E5rSpec
 import Lake
 theorem E5rProof.correct : E5rSpec.statement := sorry'
 
+# Use the real accepted proof and add an elaboration side effect; its proposition
+# is unchanged in memory, but the tool-owned statement artifact must be immutable.
+python3 - "$here/a_direct.lean" "$tmp/artifact.lean" <<'PYCONTROL'
+import pathlib, sys
+s = pathlib.Path(sys.argv[1]).read_text()
+s = s.replace('import E5rSpec', 'import E5rSpec\nimport Lean', 1)
+s = s.replace('namespace E5rProof', 'run_cmd Lean.Elab.Command.liftTermElabM do\n  liftIO <| IO.FS.writeFile "E5rSpec.lean" "def statement : Prop := True"\n\nnamespace E5rProof', 1)
+pathlib.Path(sys.argv[2]).write_text(s)
+PYCONTROL
+run "refused: changed statement artifact" "$k/a_direct.ptx" "$s/a_direct.json" "$tmp/artifact.lean" unknown "generated statement artifacts changed"
+
+# The original checker is restored even if the mutation control fails.
+checker="$root/.lake/build/bin/proofcheck"
+cp "$checker" "$tmp/proofcheck.original"
+restore_checker() { cp "$tmp/proofcheck.original" "$checker"; rm -rf "$tmp"; }
+trap restore_checker EXIT
+python3 - "$here/a_direct.lean" "$tmp/checker-artifact.lean" <<'PYCONTROL'
+import pathlib, sys
+s = pathlib.Path(sys.argv[1]).read_text()
+s = s.replace('import E5rSpec', 'import E5rSpec\nimport Lean', 1)
+s = s.replace('namespace E5rProof', 'run_cmd Lean.Elab.Command.liftTermElabM do\n  liftIO do\n    let some path ← IO.getEnv "E5R_CHECKER" | throw <| IO.userError "missing checker"\n    let bytes ← IO.FS.readBinFile path\n    IO.FS.writeBinFile path (bytes.push 0)\n\nnamespace E5rProof', 1)
+pathlib.Path(sys.argv[2]).write_text(s)
+PYCONTROL
+run "refused: changed checker executable" "$k/a_direct.ptx" "$s/a_direct.json" "$tmp/checker-artifact.lean" unknown "proof checker executable changed"
+cp "$tmp/proofcheck.original" "$checker"
+
 # a proof bound to other inputs: the a_direct proof against an edited spec
 python3 - "$s/a_direct.json" "$tmp/a_direct_edited.json" <<'EOF'
 import json, sys
@@ -79,4 +105,4 @@ grep -v 'e5r-proof' "$here/a_direct.lean" >"$tmp/nomanifest.lean"
 run "refused: no manifest" "$k/a_direct.ptx" "$s/a_direct.json" "$tmp/nomanifest.lean" unknown "no \`e5r-proof"
 
 ((fail)) && { echo "proof controls: FAILED" >&2; exit 1; }
-echo "proof controls: 2 supplied proofs accepted, 10 negative controls refused"
+echo "proof controls: 2 supplied proofs accepted, 12 negative controls refused"

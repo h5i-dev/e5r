@@ -50,6 +50,8 @@ def main():
     imp = VERIFY / 'Projects/hifive1/clamp/ControlImport.lean'
     imp.write_text('import Theories.Absint\nnamespace E5R.Hifive1.Clamp\ntheorem ok : True := trivial\n'
                    'end E5R.Hifive1.Clamp\n')
+    multiline = VERIFY / 'Projects/hifive1/clamp/ControlImportMultiline.lean'
+    multiline.write_text('import\n  Theories.Absint\nnamespace E5R.Hifive1.Clamp\ntheorem ok : True := trivial\nend E5R.Hifive1.Clamp\n')
     failures = []
     try:
         cases = []
@@ -74,6 +76,9 @@ def main():
         j = base(); j['id'] = 'control-import'; j['modules'] = ['Projects/hifive1/clamp/ControlImport.lean']
         j['theorems'] = ['E5R.Hifive1.Clamp.ok']
         cases.append((j, 'error', 'an import the job does not check'))
+        j = base(); j['id'] = 'control-import-multiline'; j['modules'] = ['Projects/hifive1/clamp/ControlImportMultiline.lean']
+        j['theorems'] = ['E5R.Hifive1.Clamp.ok']
+        cases.append((j, 'error', 'a multiline unchecked import in the compiled header'))
         for job, want, what in cases:
             result, code = run(job)
             ok = result['status'] == want and code != 0
@@ -86,6 +91,7 @@ def main():
         sorry_proof.unlink(missing_ok=True)
         skip.unlink(missing_ok=True)
         imp.unlink(missing_ok=True)
+        multiline.unlink(missing_ok=True)
         for p in VERIFY.glob('Projects/hifive1/clamp/Control*.olean'):
             p.unlink()
     if failures:

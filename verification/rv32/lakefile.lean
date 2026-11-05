@@ -5,6 +5,8 @@ open Lake DSL
 -- module by module from tools/check.py, so no stale build output is trusted.
 package rv32
 
+require e5rVerification from "../common"
+
 lean_lib Theories where
   globs := #[.submodules `Theories]
 
@@ -37,3 +39,6 @@ lean_exe replay_isa where
 
 lean_exe trace_guard where
   root := `tools.TraceGuard
+
+lean_exe proofcheck where
+  root := `tools.ProofCheck

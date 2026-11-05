@@ -1,6 +1,14 @@
 {"version": "1.3.0",
  "packagesDir": ".lake/packages",
- "packages": [],
+ "packages":
+ [{"type": "path",
+   "scope": "",
+   "name": "e5rVerification",
+   "manifestFile": "lake-manifest.json",
+   "inherited": false,
+   "dir": "../common",
+   "copy": false,
+   "configFile": "lakefile.lean"}],
  "name": "ptx",
  "lakeDir": ".lake",
  "fixedToolchain": false}
