@@ -1,0 +1,1028 @@
+{
+  "date": "2026-11-05",
+  "branch": "unified-verification",
+  "implementation_commit": "b502c84",
+  "environment": {
+    "os": "Amazon Linux 2023",
+    "lean": "4.35.0",
+    "rust_host": "1.99.1",
+    "rust_firmware": "1.98.1",
+    "gpu": "NVIDIA A10G",
+    "driver": "595.112.07",
+    "cuda": "13.2"
+  },
+  "verifier_binaries": [
+    {
+      "name": "suite-e5r",
+      "sha256": "2120dc6cf45ec7e419d19bbc67bc1facaf280cfc0fd1c46e238dfdfe28c8f5c3",
+      "used_for": "firmware, artifact baseline, PTX library/benchmarks/mutants"
+    },
+    {
+      "name": "release-e5r",
+      "sha256": "b3d2b447d939b38b95cd69da730e2693f06c7ca617c299b4dde939478a6244b4",
+      "used_for": "final supplied controls and supplemental artifacts"
+    }
+  ],
+  "firmware": [
+    {
+      "job": "hifive1-checker",
+      "status": "proved",
+      "fresh_at_execution": true
+    },
+    {
+      "job": "hifive1-clamp32",
+      "status": "proved",
+      "fresh_at_execution": true
+    },
+    {
+      "job": "hifive1-duty",
+      "status": "proved",
+      "fresh_at_execution": true
+    }
+  ],
+  "ram_fixture": "Independent minimal static ELF; image fidelity only, no application property theorem",
+  "firmware_negative_controls": {
+    "passed": 9
+  },
+  "ptx_library": {
+    "audited_declarations": 5162,
+    "allowed_axioms": [
+      "propext",
+      "Quot.sound",
+      "Classical.choice"
+    ]
+  },
+  "benchmarks": [
+    {
+      "program": "verification/ptx/benchmarks/correct/vadd_nvcc.ptx",
+      "spec": "verification/ptx/benchmarks/specs/vadd.json",
+      "verdict": "proved",
+      "result_sha256": "d4a0bf4ef3232a055b7a6b12384e726b5ec0039c8b69a83a58f64f9cccf0c8d4"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/saxpy.ptx",
+      "spec": "verification/ptx/benchmarks/specs/saxpy.json",
+      "verdict": "proved",
+      "result_sha256": "2b1e9d3565ccc13daac8191819fb12c3689ef95e402a8144562c2278c9916017"
+    },
+    {
+      "program": "verification/ptx/benchmarks/buggy/vadd_nobound.ptx",
+      "spec": "verification/ptx/benchmarks/specs/vadd.json",
+      "verdict": "refuted",
+      "result_sha256": "b7098628e96e3bf4887f4199aa68c3e591dfb96090312379766b0675a1f15aad"
+    },
+    {
+      "program": "verification/ptx/benchmarks/buggy/vadd_tid.ptx",
+      "spec": "verification/ptx/benchmarks/specs/vadd.json",
+      "verdict": "refuted",
+      "result_sha256": "ccb6deb1cfe21036c2e7ecd208479fb2ae7508dde91dbb0edfdde0b0dfa768f2"
+    },
+    {
+      "program": "verification/ptx/benchmarks/buggy/vadd_sub.ptx",
+      "spec": "verification/ptx/benchmarks/specs/vadd.json",
+      "verdict": "refuted",
+      "result_sha256": "75f018c9a9acaa1eb8b1ae9e0ea1b8769910b37ca0e695895bd90aa3e06a8751"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/sum.ptx",
+      "spec": "verification/ptx/benchmarks/specs/sum_as_map.json",
+      "verdict": "unsupported",
+      "result_sha256": "a22875b9e24dfdf68a94d6b8986c8939623331b2bfea424288c4d230d0356ec1"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/reduce_nvcc.ptx",
+      "spec": "verification/ptx/benchmarks/specs/reduce.json",
+      "verdict": "proved",
+      "result_sha256": "a89f81b5a404e6b1a11e04860369086631750f3ad189f9ae1b6b1e5b4dd378c4"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/reduce_atomic_nvcc.ptx",
+      "spec": "verification/ptx/benchmarks/specs/reduce_atomic.json",
+      "verdict": "proved",
+      "result_sha256": "7e3d6e3a2238c0ed513d35440189dec59f36826298ba345edfab47e064a80ceb"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/scan_nvcc.ptx",
+      "spec": "verification/ptx/benchmarks/specs/scan.json",
+      "verdict": "proved",
+      "result_sha256": "53ebdfac939c8a647f388c3d6b23e41e489f373b0585530fbbc4c12ae0fbbfca"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/float/saxpy_f32.ptx",
+      "spec": "verification/ptx/benchmarks/specs/saxpy_f32.json",
+      "verdict": "proved",
+      "result_sha256": "4b75fbdf580c5df94bfac21812454468e548ee0a184332f12aa140444a00db65"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/float/fdefault.ptx",
+      "spec": "verification/ptx/benchmarks/specs/f_axpy_default.json",
+      "verdict": "proved",
+      "result_sha256": "f513b16fea2ee901ff3b8d37b2bd7bd4ed9366bd9e22fd2af75b9772fe6130de"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/float/fdefault.ptx",
+      "spec": "verification/ptx/benchmarks/specs/f_div_default.json",
+      "verdict": "proved",
+      "result_sha256": "0dc7de4313e1ab8e1555f120a54674d94eab0476d2414e0c36863d0183a4e10a"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/float/fdefault.ptx",
+      "spec": "verification/ptx/benchmarks/specs/f_sqrt_default.json",
+      "verdict": "proved",
+      "result_sha256": "5020cef95ba6ef7a5b7eff37ee69cabdc906dddb5223d2f89d9b74950d13c979"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/float/fdefault.ptx",
+      "spec": "verification/ptx/benchmarks/specs/f_relu_default.json",
+      "verdict": "proved",
+      "result_sha256": "6ce7228c6a2fe2df8994eb64245ad5193242706d6d797e8e35f2752adbfd3421"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/float/fadd_default.ptx",
+      "spec": "verification/ptx/benchmarks/specs/f_add_default.json",
+      "verdict": "unsupported",
+      "result_sha256": "46c109040619bc7b901e46f9154a92b9c0d4e59f66137faeb3c1f8a2ef47d170"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_add_u32.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_add_u32.json",
+      "verdict": "proved",
+      "result_sha256": "a3c3b86214527c459027d6ad2552fc4c6df2e17a12b42dde2d0aca151b039512"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_add_u64.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_add_u64.json",
+      "verdict": "proved",
+      "result_sha256": "0c3cd9c69b6edaa20155797b5ffdcc1a55f91965de7cf7bbfa01e500df4a9050"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_and_b32.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_and_b32.json",
+      "verdict": "proved",
+      "result_sha256": "3d30ad775cdef7a808cbf067f7901e72b5d43c192c36c6ad682cbefca318ccbd"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_and_b64.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_and_b64.json",
+      "verdict": "proved",
+      "result_sha256": "3d3b36f40c0f19484a163bf8f0e49a244bc9ef7f2f8447f39f6d8cc68076d8a9"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_max_s32.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_max_s32.json",
+      "verdict": "proved",
+      "result_sha256": "16a90dad9464754c1632a52b24625fd03f90f271b5a98c0ca692f6e18cec3ba3"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_max_s64.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_max_s64.json",
+      "verdict": "proved",
+      "result_sha256": "192abe5410603efdf6dcf7bbe06de5e7989bef2a945d5c9f6313557eef14bda6"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_max_u32.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_max_u32.json",
+      "verdict": "proved",
+      "result_sha256": "790cd2584fc7633615f876f166af9dc5cdb848f7abce6ba82dc29e4e1dec0070"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_max_u64.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_max_u64.json",
+      "verdict": "proved",
+      "result_sha256": "fbee7d80fa4e2f1836ad3879c3b71465ee06a04100e8c91a848674244cf6419b"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_min_s32.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_min_s32.json",
+      "verdict": "proved",
+      "result_sha256": "24a97b94c40fbd5df7dfd9f3318c792a7283789fa8869a4a4a99e5e24a387d3a"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_min_s64.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_min_s64.json",
+      "verdict": "proved",
+      "result_sha256": "666aecc4942f519b4e1b220a073e1754f2cdca65be6279430bd94f89094936eb"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_min_u32.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_min_u32.json",
+      "verdict": "proved",
+      "result_sha256": "1f0b24b505c86920c6dc5bea8cbdcfd80fb98a5de85f64b48eca0604c757a074"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_min_u64.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_min_u64.json",
+      "verdict": "proved",
+      "result_sha256": "a852a5ba1d480da6c422725d1de430d7e5485676e1a0ad0398d01bae09392724"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_or_b32.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_or_b32.json",
+      "verdict": "proved",
+      "result_sha256": "9109719d96c3fb7697bcfb0a01d10f3f60f498ad190aaa674e9041889600c15e"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_or_b64.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_or_b64.json",
+      "verdict": "proved",
+      "result_sha256": "b50ad2ab03c1fbb4564868dff460a924fc1cc51fb9f9d47917ab69e4b1f7b1b4"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_xor_b32.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_xor_b32.json",
+      "verdict": "proved",
+      "result_sha256": "a8ada36114e26132e202e92a425d04b9e4088f419756cbb6597264146cda414b"
+    },
+    {
+      "program": "verification/ptx/benchmarks/correct/accum/acc_xor_b64.ptx",
+      "spec": "verification/ptx/benchmarks/specs/acc_xor_b64.json",
+      "verdict": "proved",
+      "result_sha256": "bf617b3ca3655f6f6ced3ec22a5393a08501d1459a26f1156bb9f18c95ff26fa"
+    }
+  ],
+  "mutants": {
+    "mutants": 59,
+    "proved": 0,
+    "refuted": 58,
+    "not_refuted": 1,
+    "rows": [
+      {
+        "mutant": "vadd: ge -> gt in the bound check",
+        "targets": "memory_safety",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "fault",
+        "replayed": true,
+        "seconds": 15.8,
+        "reasons": [
+          "proof did not check: error: `simp` made no progress /mnt/scratch/e5r-unified-verification/e5r-proof-603421-0/Proof.lean:61:2: error: `simp` made no progress /mnt/scratch/e5r-unified-verification/e5r-proof-603421-0/Proof.lean:61:2: error: `simp` made no progress"
+        ]
+      },
+      {
+        "mutant": "vadd: bound check branch removed",
+        "targets": "memory_safety",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "fault",
+        "replayed": true,
+        "seconds": 13.6,
+        "reasons": [
+          "proof did not check: error: `simp` made no progress /mnt/scratch/e5r-unified-verification/e5r-proof-603530-0/Proof.lean:60:2: error: `simp` made no progress /mnt/scratch/e5r-unified-verification/e5r-proof-603530-0/Proof.lean:60:2: error: `simp` made no progress"
+        ]
+      },
+      {
+        "mutant": "vadd: element size 8 in the offset",
+        "targets": "memory_safety",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "fault",
+        "replayed": true,
+        "seconds": 14.7,
+        "reasons": [
+          "proof did not check: error: `simp` made no progress /mnt/scratch/e5r-unified-verification/e5r-proof-603701-0/Proof.lean:61:2: error: `simp` made no progress /mnt/scratch/e5r-unified-verification/e5r-proof-603701-0/Proof.lean:61:2: error: `simp` made no progress"
+        ]
+      },
+      {
+        "mutant": "vadd: load b[i+1]",
+        "targets": "memory_safety",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "fault",
+        "replayed": true,
+        "seconds": 93.2,
+        "reasons": [
+          "proof attempt stopped: memory"
+        ]
+      },
+      {
+        "mutant": "vadd: index from %tid.x only",
+        "targets": "race_freedom",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "race",
+        "replayed": true,
+        "seconds": 15.6,
+        "reasons": [
+          "proof did not check: error: `simp` made no progress /mnt/scratch/e5r-unified-verification/e5r-proof-606479-0/Proof.lean:61:2: error: `simp` made no progress /mnt/scratch/e5r-unified-verification/e5r-proof-606479-0/Proof.lean:61:2: error: `simp` made no progress"
+        ]
+      },
+      {
+        "mutant": "vadd: index from %ctaid.x only",
+        "targets": "race_freedom",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "race",
+        "replayed": true,
+        "seconds": 15.2,
+        "reasons": [
+          "proof did not check: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   0 \u2264 g \u2264 2147483647"
+        ]
+      },
+      {
+        "mutant": "vadd: add -> sub",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 15.5,
+        "reasons": [
+          "proof did not check: error: `simp` made no progress 'E5rCheck.correct' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]"
+        ]
+      },
+      {
+        "mutant": "vadd: b + b",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 17.1,
+        "reasons": [
+          "proof did not check: error: `simp` made no progress 'E5rCheck.correct' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]"
+        ]
+      },
+      {
+        "mutant": "vadd: store a[i]",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 14.8,
+        "reasons": [
+          "proof did not check: error: `simp` made no progress 'E5rCheck.correct' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]"
+        ]
+      },
+      {
+        "mutant": "vadd: store removed",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 13.3,
+        "reasons": [
+          "proof did not check: error: Tactic `rewrite` failed: Did not find an occurrence of the pattern   rd32 (wr ?m ?a Size.b4 ?v) ?a in the target expression"
+        ]
+      },
+      {
+        "mutant": "vadd: spec says a - b",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 14.2,
+        "reasons": [
+          "proof did not check: error: `simp` made no progress 'E5rCheck.correct' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]"
+        ]
+      },
+      {
+        "mutant": "vadd: spec says a + b + 1",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 14.2,
+        "reasons": [
+          "proof did not check: error: `simp` made no progress 'E5rCheck.correct' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]"
+        ]
+      },
+      {
+        "mutant": "vadd: spec claims 2^32 - 1 threads",
+        "targets": "memory_safety",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "fault",
+        "replayed": true,
+        "seconds": 12.1,
+        "reasons": [
+          "proof did not check: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   0 \u2264 g \u2264 4294967295"
+        ]
+      },
+      {
+        "mutant": "saxpy: ge -> gt in the loop test",
+        "targets": "memory_safety",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "fault",
+        "replayed": true,
+        "seconds": 16.4,
+        "reasons": [
+          "proof did not check: error: Tactic `left` failed: left tactic works for inductive types with exactly 2 constructors  case isFalse.refine_1"
+        ]
+      },
+      {
+        "mutant": "saxpy: shift by 3",
+        "targets": "memory_safety",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "fault",
+        "replayed": true,
+        "seconds": 23.2,
+        "reasons": [
+          "proof did not check: error: Tactic `left` failed: left tactic works for inductive types with exactly 2 constructors  case isFalse.refine_1"
+        ]
+      },
+      {
+        "mutant": "saxpy: loop bound from a, not n",
+        "targets": "memory_safety",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "fault",
+        "replayed": true,
+        "seconds": 21.7,
+        "reasons": [
+          "proof did not check: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   0 \u2264 h \u2264 4294967295"
+        ]
+      },
+      {
+        "mutant": "saxpy: stride 1",
+        "targets": "race_freedom",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "race",
+        "replayed": true,
+        "seconds": 27.8,
+        "reasons": [
+          "proof did not check: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   0 \u2264 h \u2264 18446744065119617025"
+        ]
+      },
+      {
+        "mutant": "saxpy: a*y + x",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 21.8,
+        "reasons": [
+          "proof did not check: error: `simp` made no progress 'E5rCheck.correct' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]"
+        ]
+      },
+      {
+        "mutant": "saxpy: also clears x[i]",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "frame",
+        "replayed": true,
+        "seconds": 28.4,
+        "reasons": [
+          "proof did not check: error: unsolved goals A : Args hpre : spec.Pre A"
+        ]
+      },
+      {
+        "mutant": "saxpy: spec says a*x",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 19.6,
+        "reasons": [
+          "proof did not check: error: `simp` made no progress 'E5rCheck.correct' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]"
+        ]
+      },
+      {
+        "mutant": "saxpy: index never advances",
+        "targets": "termination",
+        "verdict": "unknown",
+        "exit": 3,
+        "counterexample": null,
+        "replayed": null,
+        "seconds": 23.0,
+        "reasons": [
+          "proof did not check: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   0 \u2264 h \u2264 18446744065119617025",
+          "no proof, and the search found no counterexample"
+        ]
+      },
+      {
+        "mutant": "reduce: loop bar.sync removed",
+        "targets": "race_freedom",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "race",
+        "replayed": true,
+        "seconds": 7.0,
+        "reasons": [
+          "no proof attempt: reduce32: the kernel has 1 bar.sync, the class has 2"
+        ]
+      },
+      {
+        "mutant": "reduce: load bound ge -> gt",
+        "targets": "memory_safety",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "fault",
+        "replayed": true,
+        "seconds": 60.7,
+        "reasons": [
+          "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   ?x = ?y with the goal"
+        ]
+      },
+      {
+        "mutant": "reduce: tree test ge -> gt",
+        "targets": "race_freedom",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "race",
+        "replayed": true,
+        "seconds": 227.7,
+        "reasons": [
+          "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   \u2200 {y : BitVec ?n}, BitVec.toNat ?x = y.toNat \u2192 ?x = y with the goal"
+        ]
+      },
+      {
+        "mutant": "reduce: first stride B/4",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 240.7,
+        "reasons": [
+          "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@BitVec.eq_of_toNat_eq`   ?x = ?y with the goal"
+        ]
+      },
+      {
+        "mutant": "reduce: every thread stores out[ctaid]",
+        "targets": "race_freedom",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "race",
+        "replayed": true,
+        "seconds": 54.8,
+        "reasons": [
+          "proof did not check: error: Tactic `cases` failed with a nested error: Dependent elimination failed: Failed to solve equation   3 ="
+        ]
+      },
+      {
+        "mutant": "reduce: stores tid, not s[0]",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 59.6,
+        "reasons": [
+          "proof did not check: error: Tactic `rewrite` failed: Did not find an occurrence of the pattern   rd32 (cells A.sb A.B.toNat ?m.5324 ?m.5325) (elem A.sb ?m.5323) in the target expression"
+        ]
+      },
+      {
+        "mutant": "reduce: spec says atomic",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 48.9,
+        "reasons": [
+          "proof did not check: error: Tactic `introN` failed: There are no additional binders or `let` bindings in the goal to introduce  case refine_3.inl.isTrue.isFalse.isFalse.refine_2.refine_2.refine_1"
+        ]
+      },
+      {
+        "mutant": "reduce_atomic: atom.add -> st",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 46.7,
+        "reasons": [
+          "proof did not check: error: Tactic `cases` failed with a nested error: Dependent elimination failed: Failed to solve equation   3 ="
+        ]
+      },
+      {
+        "mutant": "reduce_atomic: atom.add -> atom.max",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 307.1,
+        "reasons": [
+          "proof attempt stopped: timeout"
+        ]
+      },
+      {
+        "mutant": "reduce_atomic: loop bar.sync removed",
+        "targets": "race_freedom",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "race",
+        "replayed": true,
+        "seconds": 6.5,
+        "reasons": [
+          "no proof attempt: reduce32: the kernel has 1 bar.sync, the class has 2"
+        ]
+      },
+      {
+        "mutant": "scan: read barrier removed",
+        "targets": "race_freedom",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "race",
+        "replayed": true,
+        "seconds": 6.3,
+        "reasons": [
+          "no proof attempt: scan32: the kernel has 2 bar.sync, the class has 3"
+        ]
+      },
+      {
+        "mutant": "scan: read test lt -> le",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 64.2,
+        "reasons": [
+          "proof did not check: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   0 \u2264 h \u2264 1073740800"
+        ]
+      },
+      {
+        "mutant": "scan: offset times 4",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 305.2,
+        "reasons": [
+          "proof did not check: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   k \u2265 0"
+        ]
+      },
+      {
+        "mutant": "scan: store guard removed",
+        "targets": "memory_safety",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "fault",
+        "replayed": true,
+        "seconds": 57.6,
+        "reasons": [
+          "proof did not check: error: Tactic `cases` failed with a nested error: Dependent elimination failed: Failed to solve equation   3 ="
+        ]
+      },
+      {
+        "mutant": "acc_min_s32: min -> max",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 6.4,
+        "reasons": [
+          "no proof attempt: the kernel's atomic is max.s32, the spec's algebra is mins32 (min.s32)"
+        ]
+      },
+      {
+        "mutant": "acc_min_s32: s32 -> u32",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 6.2,
+        "reasons": [
+          "no proof attempt: the kernel's atomic is min.u32, the spec's algebra is mins32 (min.s32)"
+        ]
+      },
+      {
+        "mutant": "acc_min_s32: spec says u32",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 6.2,
+        "reasons": [
+          "no proof attempt: the kernel's atomic is min.s32, the spec's algebra is minu32 (min.u32)"
+        ]
+      },
+      {
+        "mutant": "acc_min_s32: bound check removed",
+        "targets": "memory_safety",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "fault",
+        "replayed": true,
+        "seconds": 27.3,
+        "reasons": [
+          "proof did not check: error: Insufficient number of fields for `\u27e8...\u27e9` constructor: Constructor `Eq.refl` does not have explicit fields, but 3 were provided /mnt/scratch/e5r-unified-verification/e5r-proof-622058-0/Proof.lean:80:11: error: No goals to be solved /mnt/scratch/e5r-unified-verification/e5r-proof-622058-0/Proof.lean:79:14: error: Invalid `\u27e8...\u27e9` notation: The expected type"
+        ]
+      },
+      {
+        "mutant": "acc_min_s32: load x[i+1]",
+        "targets": "memory_safety",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "fault",
+        "replayed": true,
+        "seconds": 122.9,
+        "reasons": [
+          "proof did not check: error: Insufficient number of fields for `\u27e8...\u27e9` constructor: Constructor `Eq.refl` does not have explicit fields, but 3 were provided /mnt/scratch/e5r-unified-verification/e5r-proof-622327-0/Proof.lean:81:11: error: No goals to be solved /mnt/scratch/e5r-unified-verification/e5r-proof-622327-0/Proof.lean:80:14: error: Invalid `\u27e8...\u27e9` notation: The expected type"
+        ]
+      },
+      {
+        "mutant": "acc_min_s32: atom -> plain store",
+        "targets": "race_freedom",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 6.3,
+        "reasons": [
+          "no proof attempt: the kernel has no atomic"
+        ]
+      },
+      {
+        "mutant": "acc_add_u32: spec says xor",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 6.3,
+        "reasons": [
+          "no proof attempt: the kernel's atomic is add.u32, the spec's algebra is xor32 (xor.u32)"
+        ]
+      },
+      {
+        "mutant": "acc_and_b32: and -> or",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 6.3,
+        "reasons": [
+          "no proof attempt: the kernel's atomic is or.b32, the spec's algebra is and32 (and.b32)"
+        ]
+      },
+      {
+        "mutant": "acc_xor_b64: element size 4",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "fault",
+        "replayed": true,
+        "seconds": 112.5,
+        "reasons": [
+          "proof did not check: error: Insufficient number of fields for `\u27e8...\u27e9` constructor: Constructor `Eq.refl` does not have explicit fields, but 3 were provided /mnt/scratch/e5r-unified-verification/e5r-proof-623376-0/Proof.lean:81:11: error: No goals to be solved /mnt/scratch/e5r-unified-verification/e5r-proof-623376-0/Proof.lean:80:14: error: Invalid `\u27e8...\u27e9` notation: The expected type"
+        ]
+      },
+      {
+        "mutant": "acc_max_u64: u64 -> s64",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 6.4,
+        "reasons": [
+          "no proof attempt: the kernel's atomic is max.s64, the spec's algebra is maxu64 (max.u64)"
+        ]
+      },
+      {
+        "mutant": "acc_add_u64: add.u64 -> add.u32 on the low word",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 6.2,
+        "reasons": [
+          "no proof attempt: the kernel's atomic is add.u32, the spec's algebra is add64 (add.u64)"
+        ]
+      },
+      {
+        "mutant": "saxpy_f32: fma.rn -> fma.rz",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 18.1,
+        "reasons": [
+          "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@fminmax_congr`   Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a ?b = Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a' ?b' with the goal"
+        ]
+      },
+      {
+        "mutant": "saxpy_f32: fma -> mul.rn + add.rn",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 26.2,
+        "reasons": [
+          "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@fminmax_congr`   Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a ?b = Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a' ?b' with the goal"
+        ]
+      },
+      {
+        "mutant": "saxpy_f32: a*y + x",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 21.7,
+        "reasons": [
+          "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@fminmax_congr`   Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a ?b = Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a' ?b' with the goal"
+        ]
+      },
+      {
+        "mutant": "saxpy_f32: .ftz added",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 123.6,
+        "reasons": [
+          "proof did not check: error: (deterministic) timeout at `isDefEq`, maximum number of heartbeats (1000000) has been reached  Note: Use `set_option maxHeartbeats <num>` to set the limit."
+        ]
+      },
+      {
+        "mutant": "saxpy_f32: .sat added",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 18.1,
+        "reasons": [
+          "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@fminmax_congr`   Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a ?b = Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a' ?b' with the goal"
+        ]
+      },
+      {
+        "mutant": "saxpy_f32: bound check removed",
+        "targets": "memory_safety",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "fault",
+        "replayed": true,
+        "seconds": 11.9,
+        "reasons": [
+          "proof did not check: error: `simp` made no progress /mnt/scratch/e5r-unified-verification/e5r-proof-626507-0/Proof.lean:58:2: error: `simp` made no progress /mnt/scratch/e5r-unified-verification/e5r-proof-626507-0/Proof.lean:58:2: error: `simp` made no progress"
+        ]
+      },
+      {
+        "mutant": "saxpy_f32: load x[i+1]",
+        "targets": "memory_safety",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "fault",
+        "replayed": true,
+        "seconds": 19.9,
+        "reasons": [
+          "proof did not check: error: `simp` made no progress /mnt/scratch/e5r-unified-verification/e5r-proof-626619-0/Proof.lean:59:2: error: `simp` made no progress /mnt/scratch/e5r-unified-verification/e5r-proof-626619-0/Proof.lean:59:2: error: Tactic `apply` failed: could not unify the conclusion of `@fminmax_congr`"
+        ]
+      },
+      {
+        "mutant": "saxpy_f32: spec says fma.rm",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 27.1,
+        "reasons": [
+          "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@fminmax_congr`   Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a ?b = Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a' ?b' with the goal"
+        ]
+      },
+      {
+        "mutant": "saxpy_f32: spec says the product is rounded first",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 17.0,
+        "reasons": [
+          "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@fminmax_congr`   Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a ?b = Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a' ?b' with the goal"
+        ]
+      },
+      {
+        "mutant": "f_div_default: div.rn -> div.rz",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 16.0,
+        "reasons": [
+          "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@fminmax_congr`   Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a ?b = Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a' ?b' with the goal"
+        ]
+      },
+      {
+        "mutant": "f_div_default: y / x",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 16.1,
+        "reasons": [
+          "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@fminmax_congr`   Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a ?b = Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a' ?b' with the goal"
+        ]
+      },
+      {
+        "mutant": "f_relu_default: max -> min",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 12.6,
+        "reasons": [
+          "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@fminmax_congr`   Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a ?b = Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a' ?b' with the goal"
+        ]
+      },
+      {
+        "mutant": "f_sqrt_default: sqrt.rn -> sqrt.rp",
+        "targets": "functional_correctness",
+        "verdict": "refuted",
+        "exit": 1,
+        "counterexample": "wrong_value",
+        "replayed": true,
+        "seconds": 14.9,
+        "reasons": [
+          "proof did not check: error: Tactic `apply` failed: could not unify the conclusion of `@fminmax_congr`   Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a ?b = Fp.fminmax Fp.Fmt.f32 ?isMax ?ftz ?nan ?a' ?b' with the goal"
+        ]
+      }
+    ]
+  },
+  "supplied": {
+    "accepted": 2,
+    "negative_controls_refused": 12,
+    "exit_codes_checked": true,
+    "checker_freshness_checked": true
+  },
+  "artifacts": {
+    "kinds": [
+      "firmware_flash",
+      "firmware_ram",
+      "ptx_generated",
+      "ptx_refuted",
+      "ptx_supplied"
+    ],
+    "relocated_replay": true,
+    "legacy_lean_only_replay": true,
+    "supplied_repeated_replay": true,
+    "actual_program_spec_and_proof_tampering_refused": true
+  },
+  "gpu": {
+    "launches": 1693,
+    "kernels": 856,
+    "float_kernels": 311,
+    "fault_controls": 10,
+    "oracles": [
+      "Lean model",
+      "Rust interpreter",
+      "GPU driver JIT",
+      "GPU ptxas cubin"
+    ],
+    "result": "byte-for-byte agreement"
+  },
+  "rust_test_summaries": [
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s",
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 26.62s",
+    "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s",
+    "test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 26.69s",
+    "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.79s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ],
+  "clippy": "passed with -D warnings",
+  "raw_log_sha256": {
+    "artifacts-release.log": "9deab15ad3201a4118884bc6d9a72d54a77fba577b3e2997731c94a00a2f6ecd",
+    "firmware-controls-final.log": "4bbeb552c54a267e8b4969253ef565064ea7758bc520ff3aa0b6181c22fa5606",
+    "lean-ptx-final.log": "5ae095bbfa965f94964d3640803e5b0ff4c3f71c250f1d79adf34a8adc97d42c",
+    "mutants-final.log": "d0cacd1c4a8e73f742e623953fa2912ee0768e005faf135fcc07e9a72af6b229",
+    "gpu-diff.log": "600ed85a20bf819175022290a22d42332f19d37bd51d54de7a306afaecfac434",
+    "supplied-validated.log": "efe044afdb634511a610e329b7fc4da2d7d89a372938c1dc04a9de15f423d089",
+    "artifacts-supplemental.log": "21d629291d23f42193fdd829acf1a4938235185655132c945eac7866ea6cbcf3",
+    "rust-complete.log": "d472dbafd586d163aae3528dfae2f2c52eda5a35be9df695617ea53565869500",
+    "clippy-complete.log": "64d0cbd4b7e4c6329fde55978dd3d261407b55f34c21add0feebf7e0575ee531"
+  },
+  "not_executed": [
+    "Firmware QEMU differential/replay: QEMU and RISC-V binutils unavailable",
+    "Optional RMK jobs: external fixtures not prepared",
+    "Optional lean-ieee754 rounding cross-check: external Mathlib/FP dependencies not prepared",
+    "Remote GitHub CI execution"
+  ],
+  "limitations": [
+    "The non-advancing SAXPY mutant remains unknown, with no checked nontermination/refutation",
+    "Measurements record checks at execution time; source or verifier changes require fresh checks",
+    "Linux process-group RSS limits are sampled; execution is not an OS sandbox",
+    "Firmware theorem names require proposition/assumption review; no whole-firmware safety claim"
+  ]
+}

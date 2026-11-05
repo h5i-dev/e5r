@@ -20,6 +20,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--bin', required=True, type=Path)
     parser.add_argument('--out', required=True, type=Path)
+    parser.add_argument('--only', action='append', choices=['firmware', 'ram', 'ptx', 'refuted', 'supplied'])
     args = parser.parse_args()
     exe = args.bin.resolve()
     out = args.out.resolve()
@@ -75,8 +76,13 @@ def main():
                  '--spec', ROOT / 'verification/ptx/benchmarks/specs/vadd.json', '--memory-mb', '4096']),
         ('refuted', ['ptx', 'check', ROOT / 'verification/ptx/benchmarks/buggy/vadd_sub.ptx',
                      '--spec', ROOT / 'verification/ptx/benchmarks/specs/vadd.json', '--memory-mb', '4096']),
+        ('supplied', ['ptx', 'check', ROOT / 'verification/ptx/m5/m4/kernels/a_direct.ptx',
+                      '--spec', ROOT / 'verification/ptx/m5/m4/specs/a_direct.json',
+                      '--proof', ROOT / 'verification/ptx/proofs/a_direct.lean', '--memory-mb', '8192']),
     ]
     for name, command in cases:
+        if args.only and name not in args.only:
+            continue
         p = run(command, name != 'refuted')
         doc = json.loads(p.stdout)
         result = out / f'{name}.json'
@@ -113,15 +119,22 @@ def main():
         changed_manifest['outcome'] = 'refuted' if name != 'refuted' else 'proved'
         (moved / 'bundle.json').write_text(json.dumps(changed_manifest))
         run(['replay-bundle', moved], False)
-        if name in ['ptx', 'refuted']:
+        if name in ['ptx', 'refuted', 'supplied']:
             changed_manifest = copy.deepcopy(manifest)
             previous = changed_manifest['invocation']['program']
             changed_manifest['invocation']['program'] = next(p for p in manifest['identity']['files'] if p.endswith('.ptx') and p != previous)
             (moved / 'bundle.json').write_text(json.dumps(changed_manifest))
             run(['replay-bundle', moved], False)
         (moved / 'bundle.json').write_text(json.dumps(manifest))
-        for pattern in (['.elf', 'Proof.lean'] if name == 'firmware' else ['.elf', 'RamElf.lean'] if name == 'ram' else ['.ptx', 'vadd.json', 'Syntax.lean']):
-            rel = next(p for p in manifest['identity']['files'] if p.endswith(pattern))
+        if name in ['firmware', 'ram']:
+            patterns = ['.elf', 'Proof.lean'] if name == 'firmware' else ['.elf', 'RamElf.lean']
+            targets = [next(p for p in manifest['identity']['files'] if p.endswith(pattern)) for pattern in patterns]
+        else:
+            targets = [manifest['invocation']['program'], manifest['invocation']['spec'],
+                       next(p for p in manifest['identity']['files'] if p.endswith('Syntax.lean'))]
+            if name == 'supplied':
+                targets.append(manifest['invocation']['proof'])
+        for rel in targets:
             path = moved / rel
             original = path.read_bytes()
             path.write_bytes(original + b'\nchanged\n')
@@ -130,6 +143,10 @@ def main():
         replay = run(['replay-bundle', moved])
         (out / f'{name}-replayed.json').write_text(replay.stdout)
         assert json.loads(replay.stdout)['verification']['outcome'] == doc['verification']['outcome']
+        if name == 'supplied':
+            # A replay must leave the recorded acceptance inputs usable again.
+            run(['verify-result', out / f'{name}-replayed.json'])
+            run(['replay-bundle', moved])
         if name == 'firmware':
             replay_doc = json.loads(replay.stdout)
             private_job = Path(replay_doc['verification']['request']['invocation']['job'])
@@ -140,6 +157,9 @@ def main():
             assert resumed['status'] == 'proved'
             assert 'Theories/Hart.lean' not in resumed['resumed'], resumed['resumed']
         print(f'{name}: fresh identity, altered claim/policy refused, input tampering refused, relocated replay passed', flush=True)
+
+    if args.only and 'firmware' not in args.only:
+        return
 
     # Preserve the original firmware Lean-only bundle contract too.
     legacy = out / 'legacy-firmware'

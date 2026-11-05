@@ -10,20 +10,42 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
 tc=$(tr -d '[:space:]' <"$root/lean-toolchain")
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+checker="$root/.lake/build/bin/proofcheck"
+cleanup() {
+  if [[ -f "$tmp/proofcheck.original" ]]; then cp "$tmp/proofcheck.original" "$checker"; fi
+  rm -rf "$tmp"
+}
+trap cleanup EXIT
 fail=0
 
 run() { # name ptx spec proof want-verdict reason-substring
-  local name=$1 ptx=$2 spec=$3 proof=$4 want=$5 why=$6 got reason
+  local name=$1 ptx=$2 spec=$3 proof=$4 want=$5 why=$6 got reason rc expected_rc
   set +e
-  "$exe" ptx check "$ptx" --spec "$spec" --project "$root" --proof "$proof" >"$tmp/r.json"
+  "$exe" ptx check "$ptx" --spec "$spec" --project "$root" --proof "$proof" --memory-mb "${E5R_SUPPLIED_MEMORY_MIB:-6144}" >"$tmp/r.json"
+  rc=$?
   set -e
   got=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["verdict"])' "$tmp/r.json")
   reason=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(" ".join(d["reasons"]))' "$tmp/r.json")
-  if [[ $got == "$want" && $reason == *"$why"* ]]; then
+  if [[ $got == proved && $want == proved ]]; then
+    cp "$checker" "$tmp/proofcheck.original"
+    if ! "$exe" verify-result "$tmp/r.json" > /dev/null 2>&1; then
+      echo "WRONG: accepted supplied proof is not fresh" >&2; fail=1
+    fi
+    python3 - "$checker" <<'PYCHECKER'
+import pathlib, sys
+p = pathlib.Path(sys.argv[1]); p.write_bytes(p.read_bytes() + b'\0')
+PYCHECKER
+    if "$exe" verify-result "$tmp/r.json" > /dev/null 2>&1; then
+      echo "WRONG: a changed checker executable is still fresh" >&2; fail=1
+    fi
+    cp "$tmp/proofcheck.original" "$checker"
+  fi
+  expected_rc=3
+  [[ $want == proved ]] && expected_rc=0
+  if [[ $got == "$want" && $reason == *"$why"* && $rc == "$expected_rc" ]]; then
     printf '%-34s %-8s ok\n' "$name" "$got"
   else
-    printf '%-34s %-8s WRONG (want %s, reason %s): %s\n' "$name" "$got" "$want" "$why" "$reason"
+    printf '%-34s %-8s WRONG (want %s, reason %s, exit %s; got exit %s): %s\n' "$name" "$got" "$want" "$why" "$expected_rc" "$rc" "$reason"
     fail=1
   fi
 }
@@ -72,7 +94,7 @@ python3 - "$here/a_direct.lean" "$tmp/artifact.lean" <<'PYCONTROL'
 import pathlib, sys
 s = pathlib.Path(sys.argv[1]).read_text()
 s = s.replace('import E5rSpec', 'import E5rSpec\nimport Lean', 1)
-s = s.replace('namespace E5rProof', 'run_cmd Lean.Elab.Command.liftTermElabM do\n  liftIO <| IO.FS.writeFile "E5rSpec.lean" "def statement : Prop := True"\n\nnamespace E5rProof', 1)
+s = s.replace('namespace E5rProof', 'run_cmd Lean.Elab.Command.liftIO <| IO.FS.writeFile "E5rSpec.lean" "def statement : Prop := True"\n\nnamespace E5rProof', 1)
 pathlib.Path(sys.argv[2]).write_text(s)
 PYCONTROL
 run "refused: changed statement artifact" "$k/a_direct.ptx" "$s/a_direct.json" "$tmp/artifact.lean" unknown "generated statement artifacts changed"
@@ -80,13 +102,11 @@ run "refused: changed statement artifact" "$k/a_direct.ptx" "$s/a_direct.json" "
 # The original checker is restored even if the mutation control fails.
 checker="$root/.lake/build/bin/proofcheck"
 cp "$checker" "$tmp/proofcheck.original"
-restore_checker() { cp "$tmp/proofcheck.original" "$checker"; rm -rf "$tmp"; }
-trap restore_checker EXIT
 python3 - "$here/a_direct.lean" "$tmp/checker-artifact.lean" <<'PYCONTROL'
 import pathlib, sys
 s = pathlib.Path(sys.argv[1]).read_text()
 s = s.replace('import E5rSpec', 'import E5rSpec\nimport Lean', 1)
-s = s.replace('namespace E5rProof', 'run_cmd Lean.Elab.Command.liftTermElabM do\n  liftIO do\n    let some path ← IO.getEnv "E5R_CHECKER" | throw <| IO.userError "missing checker"\n    let bytes ← IO.FS.readBinFile path\n    IO.FS.writeBinFile path (bytes.push 0)\n\nnamespace E5rProof', 1)
+s = s.replace('namespace E5rProof', 'run_cmd Lean.Elab.Command.liftIO do\n    let some path ← IO.getEnv "E5R_CHECKER" | throw <| IO.userError "missing checker"\n    let bytes ← IO.FS.readBinFile path\n    IO.FS.writeBinFile path (bytes.push 0)\n\nnamespace E5rProof', 1)
 pathlib.Path(sys.argv[2]).write_text(s)
 PYCONTROL
 run "refused: changed checker executable" "$k/a_direct.ptx" "$s/a_direct.json" "$tmp/checker-artifact.lean" unknown "proof checker executable changed"
@@ -105,4 +125,4 @@ grep -v 'e5r-proof' "$here/a_direct.lean" >"$tmp/nomanifest.lean"
 run "refused: no manifest" "$k/a_direct.ptx" "$s/a_direct.json" "$tmp/nomanifest.lean" unknown "no \`e5r-proof"
 
 ((fail)) && { echo "proof controls: FAILED" >&2; exit 1; }
-echo "proof controls: 2 supplied proofs accepted, 12 negative controls refused"
+echo "proof controls: 2 supplied proofs accepted, 12 negative controls refused; checker freshness controls passed"

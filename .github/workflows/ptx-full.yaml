@@ -31,8 +31,10 @@ jobs:
         id: lake
         uses: actions/cache/restore@v4
         with:
-          path: verification/ptx/.lake/build
-          key: ptx-lake-${{ runner.os }}-${{ hashFiles('verification/ptx/lean-toolchain', 'verification/ptx/lakefile.lean', 'verification/ptx/lake-manifest.json', 'verification/ptx/**/*.lean') }}
+          path: |
+            verification/ptx/.lake/build
+            verification/common/.lake/build
+          key: ptx-lake-${{ runner.os }}-${{ hashFiles('verification/ptx/lean-toolchain', 'verification/ptx/lakefile.lean', 'verification/ptx/lake-manifest.json', 'verification/ptx/**/*.lean', 'verification/common/**/*.lean', 'verification/common/lean-toolchain', 'verification/common/lake-manifest.json') }}
       - run: cargo build -p e5r-verify
       - name: Every PTX proof, refutation, axiom audit, benchmark verdict, mutant and supplied proof
         env:
@@ -44,5 +46,7 @@ jobs:
         if: always() && steps.lake.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: verification/ptx/.lake/build
+          path: |
+            verification/ptx/.lake/build
+            verification/common/.lake/build
           key: ${{ steps.lake.outputs.cache-primary-key }}
