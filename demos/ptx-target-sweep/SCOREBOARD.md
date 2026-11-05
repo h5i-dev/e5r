@@ -1,6 +1,6 @@
 # Concrete PTX target scoreboard
 
-2f386ea stencil milestone preserved. All new rows are exploratory until their exact proof is accepted.
+Controlled translation-validation screens using project-authored CUDA originals, not production OSS kernels. Transpose starts from textbook naive uncoalesced stores and reaches tuned-CUDA parity. Xorshift is a handpicked fixed64 workload; tuned CUDA often wins. These measurements do not establish superiority over tuned OSS or nvcc broadly. Existing 2f386ea is preserved; new rows require separate exact proof acceptance.
 
 | Target | Correctness | Original parse | Graph GM original/candidate | Largest original/candidate | GM tuned/candidate | Status |
 |---|---:|---|---:|---:|---:|---|

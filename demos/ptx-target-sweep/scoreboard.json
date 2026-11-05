@@ -1,6 +1,8 @@
 [
   {
     "target": "advance256",
+    "baseline_source": "project-authored CUDA",
+    "baseline_quality": "controlled fixed workload; ordinary -O3 and separately tuned comparator",
     "cases": 3072,
     "parse": {
       "original": {
@@ -19,6 +21,8 @@
   },
   {
     "target": "transpose",
+    "baseline_source": "project-authored CUDA",
+    "baseline_quality": "textbook naive transpose; tuned coalesced shared CUDA comparator",
     "cases": 768,
     "parse": {
       "original": {
@@ -37,6 +41,8 @@
   },
   {
     "target": "laplace",
+    "baseline_source": "project-authored CUDA",
+    "baseline_quality": "controlled fixed workload; ordinary -O3 and separately tuned comparator",
     "cases": 768,
     "parse": {
       "original": {
@@ -55,6 +61,8 @@
   },
   {
     "target": "xor8",
+    "baseline_source": "project-authored CUDA",
+    "baseline_quality": "controlled fixed workload; ordinary -O3 and separately tuned comparator",
     "cases": 3072,
     "parse": {
       "original": {
@@ -73,6 +81,8 @@
   },
   {
     "target": "crc32word",
+    "baseline_source": "project-authored CUDA",
+    "baseline_quality": "controlled fixed workload; ordinary -O3 and separately tuned comparator",
     "cases": 3072,
     "parse": {
       "original": {
@@ -91,6 +101,8 @@
   },
   {
     "target": "xorshift32x64",
+    "baseline_source": "project-authored CUDA",
+    "baseline_quality": "controlled fixed workload; ordinary -O3 and separately tuned comparator",
     "cases": 5120,
     "parse": {
       "original": {

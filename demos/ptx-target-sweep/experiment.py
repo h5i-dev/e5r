@@ -125,7 +125,7 @@ def bench(name):
 
 
 def scoreboard():
- result=[];text=['# Concrete PTX target scoreboard','','2f386ea stencil milestone preserved. All new rows are exploratory until their exact proof is accepted.','',
+ result=[];text=['# Concrete PTX target scoreboard','','Controlled translation-validation screens using project-authored CUDA originals, not production OSS kernels. Transpose starts from textbook naive uncoalesced stores and reaches tuned-CUDA parity. Xorshift is a handpicked fixed64 workload; tuned CUDA often wins. These measurements do not establish superiority over tuned OSS or nvcc broadly. Existing 2f386ea is preserved; new rows require separate exact proof acceptance.','',
  '| Target | Correctness | Original parse | Graph GM original/candidate | Largest original/candidate | GM tuned/candidate | Status |','|---|---:|---|---:|---:|---:|---|']
  for name in NAMES:
   p=D/name/'results';parse=json.loads((p/'parse.json').read_text()) if (p/'parse.json').exists() else {};c=json.loads((p/'correctness.json').read_text()) if (p/'correctness.json').exists() else None
@@ -143,7 +143,7 @@ def scoreboard():
   proof=json.loads((p/'proof.json').read_text()) if (p/'proof.json').exists() else None
   if proof and proof['verdict']=='proved':
    assert proof['input']['ptx']['sha256']==hashes(name)['candidate'];state='PROVED direct equivalence'
-  row=dict(target=name,cases=c['cases'] if c else None,parse=parse,gm=gm,large=large,tuned_gm=tuned_gm,status=state);result.append(row)
+  row=dict(target=name,baseline_source='project-authored CUDA',baseline_quality=('textbook naive transpose; tuned coalesced shared CUDA comparator' if name=='transpose' else 'controlled fixed workload; ordinary -O3 and separately tuned comparator'),cases=c['cases'] if c else None,parse=parse,gm=gm,large=large,tuned_gm=tuned_gm,status=state);result.append(row)
   text.append(f"| {name} | {row['cases'] or 'pending'} | {parse.get('original',{}).get('supported','pending')} | {f'{gm:.3f}x' if gm else 'pending'} | {f'{large:.3f}x' if large else 'pending'} | {f'{tuned_gm:.3f}x' if tuned_gm else 'pending'} | {state} |")
  text+=['','All declared shapes, both graph/device-event regimes, variance, versions, resources and source hashes are in each results/performance.json. CUDA tuned comparators use the same known techniques; gains over original are not labeled PTX-only. Shared-tile shape restrictions and raw CRC semantics are explicit in PLAN.md.','', 'Proof status is separate from GPU tests and timing. Standard allowed axioms only; parser/exporter, nvcc, ptxas/JIT and hardware remain outside Lean.']
  (D/'SCOREBOARD.md').write_text('\n'.join(text)+'\n');(D/'scoreboard.json').write_text(json.dumps(result,indent=2)+'\n')

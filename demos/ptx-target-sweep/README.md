@@ -5,8 +5,11 @@ Six individually frozen CUDA originals and directly authored PTX edits. See
 `results/COMPARISON.md`. All six are currently **UNPROVED exploration**. Existing
 accepted stencil/unpack artifacts are preserved separately.
 
-On the pinned A10G, transpose and xorshift show robust gains over their ordinary
-originals. Matching tuned CUDA removes any claim of an inherent PTX-only gain.
+These are controlled translation-validation experiments with project-authored
+CUDA originals, not extracted production OSS. Transpose starts from textbook
+naive uncoalesced stores and reaches tuned-CUDA parity. Xorshift is a handpicked
+fixed64 workload; tuned CUDA often wins. Gains over these originals do not
+establish superiority over tuned OSS or nvcc broadly.
 The other four experiments are timeboxed misses, including nvcc already folding
 the affine advance. Original transpose/Laplacian contain unsupported `or.pred`;
 no verification acceptance is claimed. An initial transpose shared-address bug
