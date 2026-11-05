@@ -7,10 +7,13 @@ def main():
  keys=['gpu__time_duration.sum','dram__bytes_read.sum','dram__bytes_write.sum','dram__throughput.avg.pct_of_peak_sustained_elapsed','sm__warps_active.avg.pct_of_peak_sustained_active','lts__t_sector_hit_rate.pct','launch__registers_per_thread','launch__occupancy_limit_registers','launch__occupancy_limit_warps','launch__occupancy_limit_blocks']
  for p in sorted((D/'results').glob('profile-*.csv')):
   records=list(csv.DictReader(io.StringIO(p.read_text())))
-  r=next(r for r in records if r['ID'])
-  profiles.append(dict(run=p.stem,metrics={k:r[k] for k in keys}))
+  r=next(r for r in records if r['ID']);units=records[0]
+  def base(k):
+   factor={'Kbyte':1e3,'Mbyte':1e6,'Gbyte':1e9,'us':1e3,'ms':1e6,'s':1e9}.get(units.get(k),1)
+   return str(float(r[k])*factor)
+  profiles.append(dict(run=p.stem,source_units={k:units[k] for k in keys},metrics={k:base(k) for k in keys}))
  def norm(p):
-  return [re.sub(r'0x[0-9a-f]+','ADDRESS',re.sub(r'\s+0\s*$','',re.sub(r'^0x[0-9a-f]+\s+','',s))).strip() for s in p.read_text().splitlines() if re.match(r'^0x[0-9a-f]+\s',s)]
+  return [re.sub(r'(\bBRA .*?)\s+0x[0-9a-f]+$',r'\1 ADDRESS',re.sub(r'\s+0\s*$','',re.sub(r'^0x[0-9a-f]+\s+','',s))).strip() for s in p.read_text().splitlines() if re.match(r'^0x[0-9a-f]+\s',s)]
  identical=norm(D/'results/jit-optimized.sass')==norm(D/'results/jit-matching.sass')
  (D/'results/summary.json').write_text(json.dumps(dict(loaded_edited_matches_tuned_cuda_instructions=identical,profiles=profiles),indent=2)+'\n')
  text='''# Unpack headroom diagnosis after the proved milestone

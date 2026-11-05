@@ -3,182 +3,326 @@
   "profiles": [
     {
       "run": "profile-matching-1048576-all",
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Kbyte",
+        "dram__bytes_write.sum": "Kbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "lts__t_sector_hit_rate.pct": "%",
+        "launch__registers_per_thread": "register/thread",
+        "launch__occupancy_limit_registers": "block",
+        "launch__occupancy_limit_warps": "block",
+        "launch__occupancy_limit_blocks": "block"
+      },
       "metrics": {
-        "gpu__time_duration.sum": "3.552000",
-        "dram__bytes_read.sum": "146.688000",
-        "dram__bytes_write.sum": "165.632000",
+        "gpu__time_duration.sum": "3552.0",
+        "dram__bytes_read.sum": "146688.0",
+        "dram__bytes_write.sum": "165632.0",
         "dram__throughput.avg.pct_of_peak_sustained_elapsed": "14.777132",
         "sm__warps_active.avg.pct_of_peak_sustained_active": "70.950573",
-        "lts__t_sector_hit_rate.pct": "89.335390",
-        "launch__registers_per_thread": "16",
-        "launch__occupancy_limit_registers": "16.000000",
-        "launch__occupancy_limit_warps": "6.000000",
-        "launch__occupancy_limit_blocks": "16.000000"
+        "lts__t_sector_hit_rate.pct": "89.33539",
+        "launch__registers_per_thread": "16.0",
+        "launch__occupancy_limit_registers": "16.0",
+        "launch__occupancy_limit_warps": "6.0",
+        "launch__occupancy_limit_blocks": "16.0"
       }
     },
     {
       "run": "profile-matching-1048576-none",
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Kbyte",
+        "dram__bytes_write.sum": "Kbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "lts__t_sector_hit_rate.pct": "%",
+        "launch__registers_per_thread": "register/thread",
+        "launch__occupancy_limit_registers": "block",
+        "launch__occupancy_limit_warps": "block",
+        "launch__occupancy_limit_blocks": "block"
+      },
       "metrics": {
-        "gpu__time_duration.sum": "2.720000",
-        "dram__bytes_read.sum": "2.944000",
-        "dram__bytes_write.sum": "177.792000",
+        "gpu__time_duration.sum": "2720.0",
+        "dram__bytes_read.sum": "2944.0",
+        "dram__bytes_write.sum": "177792.0",
         "dram__throughput.avg.pct_of_peak_sustained_elapsed": "11.199239",
-        "sm__warps_active.avg.pct_of_peak_sustained_active": "61.429670",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "61.42967",
         "lts__t_sector_hit_rate.pct": "102.674786",
-        "launch__registers_per_thread": "16",
-        "launch__occupancy_limit_registers": "16.000000",
-        "launch__occupancy_limit_warps": "6.000000",
-        "launch__occupancy_limit_blocks": "16.000000"
+        "launch__registers_per_thread": "16.0",
+        "launch__occupancy_limit_registers": "16.0",
+        "launch__occupancy_limit_warps": "6.0",
+        "launch__occupancy_limit_blocks": "16.0"
       }
     },
     {
       "run": "profile-matching-134217728-all",
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Mbyte",
+        "dram__bytes_write.sum": "Mbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "lts__t_sector_hit_rate.pct": "%",
+        "launch__registers_per_thread": "register/thread",
+        "launch__occupancy_limit_registers": "block",
+        "launch__occupancy_limit_warps": "block",
+        "launch__occupancy_limit_blocks": "block"
+      },
       "metrics": {
-        "gpu__time_duration.sum": "307.776000",
-        "dram__bytes_read.sum": "18.447104",
-        "dram__bytes_write.sum": "149.702912",
+        "gpu__time_duration.sum": "307776.0",
+        "dram__bytes_read.sum": "18447104.0",
+        "dram__bytes_write.sum": "149702912.0",
         "dram__throughput.avg.pct_of_peak_sustained_elapsed": "91.142156",
         "sm__warps_active.avg.pct_of_peak_sustained_active": "84.884407",
         "lts__t_sector_hit_rate.pct": "88.885485",
-        "launch__registers_per_thread": "16",
-        "launch__occupancy_limit_registers": "16.000000",
-        "launch__occupancy_limit_warps": "6.000000",
-        "launch__occupancy_limit_blocks": "16.000000"
+        "launch__registers_per_thread": "16.0",
+        "launch__occupancy_limit_registers": "16.0",
+        "launch__occupancy_limit_warps": "6.0",
+        "launch__occupancy_limit_blocks": "16.0"
       }
     },
     {
       "run": "profile-matching-134217728-none",
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Mbyte",
+        "dram__bytes_write.sum": "Mbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "lts__t_sector_hit_rate.pct": "%",
+        "launch__registers_per_thread": "register/thread",
+        "launch__occupancy_limit_registers": "block",
+        "launch__occupancy_limit_warps": "block",
+        "launch__occupancy_limit_blocks": "block"
+      },
       "metrics": {
-        "gpu__time_duration.sum": "306.784000",
-        "dram__bytes_read.sum": "18.482304",
-        "dram__bytes_write.sum": "149.636864",
+        "gpu__time_duration.sum": "306784.0",
+        "dram__bytes_read.sum": "18482304.0",
+        "dram__bytes_write.sum": "149636864.0",
         "dram__throughput.avg.pct_of_peak_sustained_elapsed": "91.421772",
         "sm__warps_active.avg.pct_of_peak_sustained_active": "84.985595",
         "lts__t_sector_hit_rate.pct": "88.859465",
-        "launch__registers_per_thread": "16",
-        "launch__occupancy_limit_registers": "16.000000",
-        "launch__occupancy_limit_warps": "6.000000",
-        "launch__occupancy_limit_blocks": "16.000000"
+        "launch__registers_per_thread": "16.0",
+        "launch__occupancy_limit_registers": "16.0",
+        "launch__occupancy_limit_warps": "6.0",
+        "launch__occupancy_limit_blocks": "16.0"
       }
     },
     {
       "run": "profile-optimized-1048576-all",
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Kbyte",
+        "dram__bytes_write.sum": "Kbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "lts__t_sector_hit_rate.pct": "%",
+        "launch__registers_per_thread": "register/thread",
+        "launch__occupancy_limit_registers": "block",
+        "launch__occupancy_limit_warps": "block",
+        "launch__occupancy_limit_blocks": "block"
+      },
       "metrics": {
-        "gpu__time_duration.sum": "3.488000",
-        "dram__bytes_read.sum": "146.432000",
-        "dram__bytes_write.sum": "152.704000",
+        "gpu__time_duration.sum": "3488.0",
+        "dram__bytes_read.sum": "146432.0",
+        "dram__bytes_write.sum": "152704.0",
         "dram__throughput.avg.pct_of_peak_sustained_elapsed": "14.433053",
         "sm__warps_active.avg.pct_of_peak_sustained_active": "71.687497",
         "lts__t_sector_hit_rate.pct": "89.809741",
-        "launch__registers_per_thread": "16",
-        "launch__occupancy_limit_registers": "16.000000",
-        "launch__occupancy_limit_warps": "6.000000",
-        "launch__occupancy_limit_blocks": "16.000000"
+        "launch__registers_per_thread": "16.0",
+        "launch__occupancy_limit_registers": "16.0",
+        "launch__occupancy_limit_warps": "6.0",
+        "launch__occupancy_limit_blocks": "16.0"
       }
     },
     {
       "run": "profile-optimized-1048576-none",
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Kbyte",
+        "dram__bytes_write.sum": "Kbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "lts__t_sector_hit_rate.pct": "%",
+        "launch__registers_per_thread": "register/thread",
+        "launch__occupancy_limit_registers": "block",
+        "launch__occupancy_limit_warps": "block",
+        "launch__occupancy_limit_blocks": "block"
+      },
       "metrics": {
-        "gpu__time_duration.sum": "2.688000",
-        "dram__bytes_read.sum": "3.072000",
-        "dram__bytes_write.sum": "169.472000",
+        "gpu__time_duration.sum": "2688.0",
+        "dram__bytes_read.sum": "3072.0",
+        "dram__bytes_write.sum": "169472.0",
         "dram__throughput.avg.pct_of_peak_sustained_elapsed": "10.913212",
         "sm__warps_active.avg.pct_of_peak_sustained_active": "61.556909",
         "lts__t_sector_hit_rate.pct": "101.503547",
-        "launch__registers_per_thread": "16",
-        "launch__occupancy_limit_registers": "16.000000",
-        "launch__occupancy_limit_warps": "6.000000",
-        "launch__occupancy_limit_blocks": "16.000000"
+        "launch__registers_per_thread": "16.0",
+        "launch__occupancy_limit_registers": "16.0",
+        "launch__occupancy_limit_warps": "6.0",
+        "launch__occupancy_limit_blocks": "16.0"
       }
     },
     {
       "run": "profile-optimized-134217728-all",
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Mbyte",
+        "dram__bytes_write.sum": "Mbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "lts__t_sector_hit_rate.pct": "%",
+        "launch__registers_per_thread": "register/thread",
+        "launch__occupancy_limit_registers": "block",
+        "launch__occupancy_limit_warps": "block",
+        "launch__occupancy_limit_blocks": "block"
+      },
       "metrics": {
-        "gpu__time_duration.sum": "308.672000",
-        "dram__bytes_read.sum": "18.409856",
-        "dram__bytes_write.sum": "149.842304",
+        "gpu__time_duration.sum": "308672.0",
+        "dram__bytes_read.sum": "18409856.0",
+        "dram__bytes_write.sum": "149842304.0",
         "dram__throughput.avg.pct_of_peak_sustained_elapsed": "90.939091",
         "sm__warps_active.avg.pct_of_peak_sustained_active": "84.794907",
         "lts__t_sector_hit_rate.pct": "88.896627",
-        "launch__registers_per_thread": "16",
-        "launch__occupancy_limit_registers": "16.000000",
-        "launch__occupancy_limit_warps": "6.000000",
-        "launch__occupancy_limit_blocks": "16.000000"
+        "launch__registers_per_thread": "16.0",
+        "launch__occupancy_limit_registers": "16.0",
+        "launch__occupancy_limit_warps": "6.0",
+        "launch__occupancy_limit_blocks": "16.0"
       }
     },
     {
       "run": "profile-optimized-134217728-none",
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Mbyte",
+        "dram__bytes_write.sum": "Mbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "lts__t_sector_hit_rate.pct": "%",
+        "launch__registers_per_thread": "register/thread",
+        "launch__occupancy_limit_registers": "block",
+        "launch__occupancy_limit_warps": "block",
+        "launch__occupancy_limit_blocks": "block"
+      },
       "metrics": {
-        "gpu__time_duration.sum": "307.520000",
-        "dram__bytes_read.sum": "18.456832",
-        "dram__bytes_write.sum": "149.756160",
+        "gpu__time_duration.sum": "307520.0",
+        "dram__bytes_read.sum": "18456832.0",
+        "dram__bytes_write.sum": "149756160.0",
         "dram__throughput.avg.pct_of_peak_sustained_elapsed": "91.253277",
-        "sm__warps_active.avg.pct_of_peak_sustained_active": "84.854530",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "84.85453",
         "lts__t_sector_hit_rate.pct": "88.850114",
-        "launch__registers_per_thread": "16",
-        "launch__occupancy_limit_registers": "16.000000",
-        "launch__occupancy_limit_warps": "6.000000",
-        "launch__occupancy_limit_blocks": "16.000000"
+        "launch__registers_per_thread": "16.0",
+        "launch__occupancy_limit_registers": "16.0",
+        "launch__occupancy_limit_warps": "6.0",
+        "launch__occupancy_limit_blocks": "16.0"
       }
     },
     {
       "run": "profile-original-1048576-all",
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Kbyte",
+        "dram__bytes_write.sum": "Kbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "lts__t_sector_hit_rate.pct": "%",
+        "launch__registers_per_thread": "register/thread",
+        "launch__occupancy_limit_registers": "block",
+        "launch__occupancy_limit_warps": "block",
+        "launch__occupancy_limit_blocks": "block"
+      },
       "metrics": {
-        "gpu__time_duration.sum": "3.552000",
-        "dram__bytes_read.sum": "146.688000",
-        "dram__bytes_write.sum": "137.600000",
+        "gpu__time_duration.sum": "3552.0",
+        "dram__bytes_read.sum": "146688.0",
+        "dram__bytes_write.sum": "137600.0",
         "dram__throughput.avg.pct_of_peak_sustained_elapsed": "13.503161",
         "sm__warps_active.avg.pct_of_peak_sustained_active": "72.364906",
         "lts__t_sector_hit_rate.pct": "89.692366",
-        "launch__registers_per_thread": "16",
-        "launch__occupancy_limit_registers": "16.000000",
-        "launch__occupancy_limit_warps": "6.000000",
-        "launch__occupancy_limit_blocks": "16.000000"
+        "launch__registers_per_thread": "16.0",
+        "launch__occupancy_limit_registers": "16.0",
+        "launch__occupancy_limit_warps": "6.0",
+        "launch__occupancy_limit_blocks": "16.0"
       }
     },
     {
       "run": "profile-original-1048576-none",
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Kbyte",
+        "dram__bytes_write.sum": "Kbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "lts__t_sector_hit_rate.pct": "%",
+        "launch__registers_per_thread": "register/thread",
+        "launch__occupancy_limit_registers": "block",
+        "launch__occupancy_limit_warps": "block",
+        "launch__occupancy_limit_blocks": "block"
+      },
       "metrics": {
-        "gpu__time_duration.sum": "2.784000",
-        "dram__bytes_read.sum": "3.456000",
-        "dram__bytes_write.sum": "152.832000",
+        "gpu__time_duration.sum": "2784.0",
+        "dram__bytes_read.sum": "3456.0",
+        "dram__bytes_write.sum": "152832.0",
         "dram__throughput.avg.pct_of_peak_sustained_elapsed": "9.444616",
         "sm__warps_active.avg.pct_of_peak_sustained_active": "63.613894",
         "lts__t_sector_hit_rate.pct": "101.452069",
-        "launch__registers_per_thread": "16",
-        "launch__occupancy_limit_registers": "16.000000",
-        "launch__occupancy_limit_warps": "6.000000",
-        "launch__occupancy_limit_blocks": "16.000000"
+        "launch__registers_per_thread": "16.0",
+        "launch__occupancy_limit_registers": "16.0",
+        "launch__occupancy_limit_warps": "6.0",
+        "launch__occupancy_limit_blocks": "16.0"
       }
     },
     {
       "run": "profile-original-134217728-all",
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Mbyte",
+        "dram__bytes_write.sum": "Mbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "lts__t_sector_hit_rate.pct": "%",
+        "launch__registers_per_thread": "register/thread",
+        "launch__occupancy_limit_registers": "block",
+        "launch__occupancy_limit_warps": "block",
+        "launch__occupancy_limit_blocks": "block"
+      },
       "metrics": {
-        "gpu__time_duration.sum": "306.496000",
-        "dram__bytes_read.sum": "18.458112",
-        "dram__bytes_write.sum": "149.681792",
+        "gpu__time_duration.sum": "306496.0",
+        "dram__bytes_read.sum": "18458112.0",
+        "dram__bytes_write.sum": "149681792.0",
         "dram__throughput.avg.pct_of_peak_sustained_elapsed": "91.530907",
         "sm__warps_active.avg.pct_of_peak_sustained_active": "85.056491",
         "lts__t_sector_hit_rate.pct": "88.901742",
-        "launch__registers_per_thread": "16",
-        "launch__occupancy_limit_registers": "16.000000",
-        "launch__occupancy_limit_warps": "6.000000",
-        "launch__occupancy_limit_blocks": "16.000000"
+        "launch__registers_per_thread": "16.0",
+        "launch__occupancy_limit_registers": "16.0",
+        "launch__occupancy_limit_warps": "6.0",
+        "launch__occupancy_limit_blocks": "16.0"
       }
     },
     {
       "run": "profile-original-134217728-none",
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Mbyte",
+        "dram__bytes_write.sum": "Mbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "lts__t_sector_hit_rate.pct": "%",
+        "launch__registers_per_thread": "register/thread",
+        "launch__occupancy_limit_registers": "block",
+        "launch__occupancy_limit_warps": "block",
+        "launch__occupancy_limit_blocks": "block"
+      },
       "metrics": {
-        "gpu__time_duration.sum": "306.816000",
-        "dram__bytes_read.sum": "18.467456",
-        "dram__bytes_write.sum": "149.684736",
+        "gpu__time_duration.sum": "306816.0",
+        "dram__bytes_read.sum": "18467456.0",
+        "dram__bytes_write.sum": "149684736.0",
         "dram__throughput.avg.pct_of_peak_sustained_elapsed": "91.427512",
         "sm__warps_active.avg.pct_of_peak_sustained_active": "85.117064",
         "lts__t_sector_hit_rate.pct": "88.854518",
-        "launch__registers_per_thread": "16",
-        "launch__occupancy_limit_registers": "16.000000",
-        "launch__occupancy_limit_warps": "6.000000",
-        "launch__occupancy_limit_blocks": "16.000000"
+        "launch__registers_per_thread": "16.0",
+        "launch__occupancy_limit_registers": "16.0",
+        "launch__occupancy_limit_warps": "6.0",
+        "launch__occupancy_limit_blocks": "16.0"
       }
     }
   ]

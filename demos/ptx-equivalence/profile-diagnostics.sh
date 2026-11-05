@@ -15,11 +15,13 @@ for name in original optimized matching; do
       ncu --target-processes application-only --kernel-name regex:unpack4\|matching \
         --launch-skip 10 --launch-count 1 --clock-control none --cache-control "$cache" \
         --metrics "$metrics" --csv --force-overwrite --export "$scratch/$tag" \
-        --log-file "$out/profile-$tag.csv" \
+        --log-file "$scratch/$tag.log" \
         "$E5R_DEMO_SCRATCH/venv/bin/python" "$here/profile.py" "$name" "$size"
+      ncu --import "$scratch/$tag.ncu-rep" --page raw --csv --print-units base > "$out/profile-$tag.csv"
       if [[ "$size" == 134217728 && "$cache" == none ]]; then
         ncu --import "$scratch/$tag.ncu-rep" --page source --print-source sass \
           > "$out/jit-$name.sass"
+        sed -i 's/[[:space:]]*$//' "$out/jit-$name.sass"
       fi
     done
   done

@@ -55,18 +55,18 @@ not substitutes for the ordinary seven-repeat benchmark.
 
 | Kernel / output / cache control | DRAM read MB | DRAM write MB | DRAM sustained % | Achieved occupancy % | L2 hit % |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| matching-1048576-all | 0.000 | 0.000 | 14.78 | 70.95 | 89.34 |
-| matching-1048576-none | 0.000 | 0.000 | 11.20 | 61.43 | 102.67 |
-| matching-134217728-all | 0.000 | 0.000 | 91.14 | 84.88 | 88.89 |
-| matching-134217728-none | 0.000 | 0.000 | 91.42 | 84.99 | 88.86 |
-| optimized-1048576-all | 0.000 | 0.000 | 14.43 | 71.69 | 89.81 |
-| optimized-1048576-none | 0.000 | 0.000 | 10.91 | 61.56 | 101.50 |
-| optimized-134217728-all | 0.000 | 0.000 | 90.94 | 84.79 | 88.90 |
-| optimized-134217728-none | 0.000 | 0.000 | 91.25 | 84.85 | 88.85 |
-| original-1048576-all | 0.000 | 0.000 | 13.50 | 72.36 | 89.69 |
-| original-1048576-none | 0.000 | 0.000 | 9.44 | 63.61 | 101.45 |
-| original-134217728-all | 0.000 | 0.000 | 91.53 | 85.06 | 88.90 |
-| original-134217728-none | 0.000 | 0.000 | 91.43 | 85.12 | 88.85 |
+| matching-1048576-all | 0.147 | 0.166 | 14.78 | 70.95 | 89.34 |
+| matching-1048576-none | 0.003 | 0.178 | 11.20 | 61.43 | 102.67 |
+| matching-134217728-all | 18.447 | 149.703 | 91.14 | 84.88 | 88.89 |
+| matching-134217728-none | 18.482 | 149.637 | 91.42 | 84.99 | 88.86 |
+| optimized-1048576-all | 0.146 | 0.153 | 14.43 | 71.69 | 89.81 |
+| optimized-1048576-none | 0.003 | 0.169 | 10.91 | 61.56 | 101.50 |
+| optimized-134217728-all | 18.410 | 149.842 | 90.94 | 84.79 | 88.90 |
+| optimized-134217728-none | 18.457 | 149.756 | 91.25 | 84.85 | 88.85 |
+| original-1048576-all | 0.147 | 0.138 | 13.50 | 72.36 | 89.69 |
+| original-1048576-none | 0.003 | 0.153 | 9.44 | 63.61 | 101.45 |
+| original-134217728-all | 18.458 | 149.682 | 91.53 | 85.06 | 88.90 |
+| original-134217728-none | 18.467 | 149.685 | 91.43 | 85.12 | 88.85 |
 
 DRAM metrics include transaction/ECC effects and differ from logical payload.
 NVIDIA's [profiling guide](https://docs.nvidia.com/nsight-compute/ProfilingGuide/)
