@@ -1,0 +1,15 @@
+{
+  "schema": "e5r.endian.replay.v1",
+  "date_utc": "2026-11-05T19:59:41Z",
+  "command": "lake env sh -c 'cd \"$E5R_ENDIAN_PROOF_DIR\" && LEAN_PATH=\"$LEAN_PATH:$E5R_ENDIAN_PROOF_DIR\" leanchecker E5rProof'",
+  "exit_code": 0,
+  "checker_binary": "/root/.elan/toolchains/leanprover--lean4---v4.35.0/bin/leanchecker",
+  "checker_binary_sha256": "12c38901cdbfab178f1bf6145dd30012e9a3b2c11ca695292a5884fa3cbaddb6",
+  "toolchain": "leanprover/lean4:v4.35.0",
+  "modules": {
+    "E5rSpec.lean": "8d3c19995d4970a469c7330a2da87bb5a4ea012ecff97c33c5dcc056910bb292",
+    "E5rSpec.olean": "e0cb7c7284ad10eb2bec312a13dc70b07f282f371cbd58da04f2b51e75b7115b",
+    "E5rProof.lean": "53c4556ad7cc2594029565daee1a4fad65435937f97d4d9289c09d7a08509ff1",
+    "E5rProof.olean": "04d3a5d1e413b21d240ecf42714c32f05e92d2d6e62422c54e82d12324424715"
+  }
+}

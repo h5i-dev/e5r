@@ -1,0 +1,30 @@
+{
+  "schema": "e5r.endian.wrapper.v1",
+  "wrapper_and_ptxas_cubin_lengths": [
+    0,
+    1,
+    3,
+    4,
+    31,
+    255,
+    256,
+    257,
+    1025,
+    65537
+  ],
+  "invalid_calls_rejected": [
+    "inplace",
+    "overlap",
+    "stride",
+    "misaligned",
+    "signed",
+    "multidim",
+    "mask_fractional",
+    "mask_negative",
+    "mask_overflow",
+    "wrong_out_shape"
+  ],
+  "non_default_stream": true,
+  "four_byte_not_sixteen_byte_alignment": true,
+  "passed": true
+}

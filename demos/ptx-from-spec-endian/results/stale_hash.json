@@ -1,0 +1,60 @@
+{
+  "class": "map32",
+  "counterexample": null,
+  "input": {
+    "ptx": {
+      "path": "/mnt/scratch/e5r-ptx-from-spec/controls/wrong_byte_order.ptx",
+      "sha256": "2fb184b679bc91a4552df1b3f791e34e0db25a081d15456deaf0c3cf201760f2"
+    },
+    "spec": {
+      "path": "/root/e5r-ptx-from-spec/demos/ptx-from-spec-endian/contract.json",
+      "sha256": "bf776281c41e45abecbf18130b156d7e9c0f56f111abb49e05f2f54012035366"
+    }
+  },
+  "kernel": "endian_xor",
+  "lean": {
+    "memory_cap_mb": 2500,
+    "timeout_seconds": 120,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "proof": {
+    "accepted": false,
+    "manifest": {
+      "ptx": "00a3aa3c8853ab99495822aa10c28f98a5e88867c43ac036c61ec57cb280587c",
+      "spec": "bf776281c41e45abecbf18130b156d7e9c0f56f111abb49e05f2f54012035366",
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "path": "/root/e5r-ptx-from-spec/demos/ptx-from-spec-endian/E5rProof.lean",
+    "sha256": "53c4556ad7cc2594029565daee1a4fad65435937f97d4d9289c09d7a08509ff1",
+    "supplied": true
+  },
+  "properties": {
+    "functional_correctness": "unknown",
+    "memory_safety": "unknown",
+    "race_freedom": "unknown",
+    "termination": "unknown"
+  },
+  "reasons": [
+    "supplied proof refused: written for a different ptx 00a3aa3c8853ab99495822aa10c28f98a5e88867c43ac036c61ec57cb280587c (the PTX is 2fb184b679bc91a4552df1b3f791e34e0db25a081d15456deaf0c3cf201760f2)"
+  ],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 1.34,
+  "spec": {
+    "arrays": [
+      "input",
+      "output"
+    ],
+    "element": "((input << 24) | ((input & 65280) << 8) | ((input >> 8) & 65280) | (input >> 24)) ^ mask",
+    "output": "output",
+    "schedule": {
+      "kind": "guarded",
+      "max_threads": "4294967296"
+    }
+  },
+  "theorem": null,
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "unknown"
+}

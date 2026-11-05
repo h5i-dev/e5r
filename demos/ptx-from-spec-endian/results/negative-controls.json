@@ -1,0 +1,28 @@
+[
+  {
+    "name": "stale_hash",
+    "verdict": "unknown",
+    "rejected": true
+  },
+  {
+    "name": "wrong_byte_order",
+    "ptx_sha256": "2fb184b679bc91a4552df1b3f791e34e0db25a081d15456deaf0c3cf201760f2",
+    "counterexample_verdict": "refuted",
+    "counterexample_kind": "wrong_value",
+    "replayed_in_lean": true
+  },
+  {
+    "name": "wrong_index",
+    "ptx_sha256": "d325b6ec9d8584f12a10aa12e96afee17674cf54f8f84f965de7df05eb763960",
+    "counterexample_verdict": "refuted",
+    "counterexample_kind": "wrong_value",
+    "replayed_in_lean": true
+  },
+  {
+    "name": "dropped_tail",
+    "ptx_sha256": "1de596892f3207f29be8620e903b2e855435990fb77f3fbf01c6e142b0859e65",
+    "counterexample_verdict": "refuted",
+    "counterexample_kind": "fault",
+    "replayed_in_lean": true
+  }
+]

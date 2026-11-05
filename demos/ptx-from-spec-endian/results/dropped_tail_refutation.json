@@ -1,0 +1,99 @@
+{
+  "class": "map32",
+  "counterexample": {
+    "detail": {
+      "after_steps": 14,
+      "fault": "load of 4 bytes at Global 0x20000",
+      "thread": {
+        "ctaid": 0,
+        "tid": 0
+      }
+    },
+    "initial_registers": "zero",
+    "kind": "fault",
+    "launch": {
+      "bases": {
+        "input": "0x20000",
+        "output": "0x30000"
+      },
+      "block": [
+        1,
+        1,
+        1
+      ],
+      "grid": [
+        1,
+        1,
+        1
+      ],
+      "n": 0,
+      "scalars": {
+        "mask": 38047
+      }
+    },
+    "replayed_in_lean": true,
+    "theorem": {
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "E5rCheck.refuted",
+      "statement": "¬ spec.Correct «endian_xor»"
+    }
+  },
+  "input": {
+    "ptx": {
+      "path": "/mnt/scratch/e5r-ptx-from-spec/controls/dropped_tail.ptx",
+      "sha256": "1de596892f3207f29be8620e903b2e855435990fb77f3fbf01c6e142b0859e65"
+    },
+    "spec": {
+      "path": "/root/e5r-ptx-from-spec/demos/ptx-from-spec-endian/contract.json",
+      "sha256": "bf776281c41e45abecbf18130b156d7e9c0f56f111abb49e05f2f54012035366"
+    }
+  },
+  "kernel": "endian_xor",
+  "lean": {
+    "memory_cap_mb": 2500,
+    "proof_file": "/mnt/scratch/e5r-ptx-from-spec/controls/dropped_tail_refutation/Proof.lean",
+    "proof_seconds": 12.27,
+    "refutation_file": "/mnt/scratch/e5r-ptx-from-spec/controls/dropped_tail_refutation/Refute.lean",
+    "refutation_seconds": 3.32,
+    "timeout_seconds": 120,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "lean_spec": "def spec : MapSpec where\n  arrays := [\"input\", \"output\"]\n  out := \"output\"\n  len := \"length\"\n  scalars := [\"mask\"]\n  f := fun s e => ((((((((((e \"input\") <<< (24 : Nat))) ||| (((((e \"input\") &&& ((65280#32)))) <<< (8 : Nat))))) ||| (((((e \"input\") >>> (8 : Nat))) &&& ((65280#32)))))) ||| (((e \"input\") >>> (24 : Nat))))) ^^^ (s \"mask\"))\n  sched := .guarded 4294967296\n  rel := (fun a b => a = b)",
+  "properties": {
+    "functional_correctness": "unknown",
+    "memory_safety": "refuted",
+    "race_freedom": "unknown",
+    "termination": "unknown"
+  },
+  "reasons": [
+    "proof did not check: error: Tactic `rewrite` failed: Did not find an occurrence of the pattern   rd32 (wr ?m ?a Size.b4 ?v) ?a in the target expression"
+  ],
+  "schema": "e5r.ptx.result.v1",
+  "search": {
+    "launches": 1,
+    "seconds": 0.0
+  },
+  "seconds": 16.29,
+  "spec": {
+    "arrays": [
+      "input",
+      "output"
+    ],
+    "element": "((input << 24) | ((input & 65280) << 8) | ((input >> 8) & 65280) | (input >> 24)) ^ mask",
+    "output": "output",
+    "schedule": {
+      "kind": "guarded",
+      "max_threads": "4294967296"
+    }
+  },
+  "theorem": null,
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "refuted"
+}

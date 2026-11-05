@@ -2,3 +2,23 @@
 2026-11-05T19:44:37Z candidate v1 authored: swap adjacent bytes, then halfwords; one uint32 per thread; no tuning or CUDA baseline yet.
 00a3aa3c8853ab99495822aa10c28f98a5e88867c43ac036c61ec57cb280587c  demos/ptx-from-spec-endian/endian_xor.ptx
 bf776281c41e45abecbf18130b156d7e9c0f56f111abb49e05f2f54012035366  demos/ptx-from-spec-endian/contract.json
+2026-11-05T19:46:39Z first CUDA baseline authored/compiled AFTER candidate freeze; candidate unchanged.
+d51dabe1818e9bffdd7837de2068b79d7aa58d427e4b9b96974f5fbe27da4bff  demos/ptx-from-spec-endian/baseline.cu
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2026 NVIDIA Corporation
+Built on Mon_Mar_02_09:52:23_PM_PST_2026
+Cuda compilation tools, release 13.2, V13.2.51
+Build cuda_13.2.r13.2/compiler.37434383_0
+2026-11-05 API pin correction before any timings: CuPy 13.6.0 empirically has no ndarray.byteswap (AttributeError). Original frozen SPEC.md referenced v13.6.0 docs incorrectly. Verified official v14.2.0 docs, repinned actual OSS to cupy-cuda13x==14.2.0. Mathematical specification, candidate, contract and predeclared sweep unchanged. Preserve original SPEC.md and its hash; see API-PIN.md and the authorship disclosure below for the correction and incidental search excerpt.
+2026-11-05T19:52:06Z benchmark run1 complete, nine randomized batches, 100 repetitions each, no tuning revisions. All predeclared shapes retained. GPU held shared flock and foreign PID checks throughout.
+bc30dd91ec8c38f5b44c7fc6d933d607911ec155301ffd5c64735b8fcf76930c  demos/ptx-from-spec-endian/gpu.py
+4ace9222b96ecfa08aaf75936ad0a7e68511179dc395fbffce31d64151d14d0c  demos/ptx-from-spec-endian/results/benchmark-run1.json
+6e418b8353ba2fccf8a5c5ebf62e9349be8ed94d64a9dcc4704b2e5c1faa1379  /mnt/scratch/e5r-ptx-from-spec/baseline.cubin
+f5eaeec65b84bf64727c8d1656ced2b14225d65ffba6d920df3f4e1a33c77b55  /mnt/scratch/e5r-ptx-from-spec/endian_xor.cubin
+Authorship disclosure: initial API web search incidentally surfaced a main-branch CuPy core.pyx wrapper excerpt (dtype/itemsize handling and documented API), not the byte-transform kernel algorithm. No upstream transform kernel or other worker candidate was opened/copied. Direct PTX byte algebra was derived independently from the frozen bit permutation. Official pinned API docs and executable CuPy 14.2.0 behavior supply the final API reference.
+2026-11-05 verification experiment: an extra attempt to apply the supplied proof to a semantic mutant exhausted the 30s launcher timeout; the existing checker's shell descendant continued and held its output pipe open. Only this experiment's identified orphan was stopped. No foreign process was killed and no verifier changes were made. Final reproducible controls use stale-manifest rejection plus three automatic Lean-replayed semantic refutations with a 120s budget, avoiding redundant invalid supplied-proof elaborations. Positive accepted proof unchanged.
+2026-11-05T20:02:20Z final positive proof, exact dependency audit, standalone leanchecker replay and all four negative controls accepted; candidate v1 unchanged. Setup script and wrapper (including 4-byte alignment and ten rejected call forms) checked.
+53c4556ad7cc2594029565daee1a4fad65435937f97d4d9289c09d7a08509ff1  demos/ptx-from-spec-endian/E5rProof.lean
+24face6bfed5479f9aec4d1e5e8833a3f685d96be00e21bebf179eaa63fdf4a6  demos/ptx-from-spec-endian/results/proof.json
+e3bf1f2e7d9c87baca05423ee7ba100feb01323e7d4119df55cb351863eb11fa  demos/ptx-from-spec-endian/results/replay.json
+feed113cb58ca35dbe2b5fba44e6d89d9fdb5d916baff38893f729f815df18ec  demos/ptx-from-spec-endian/results/negative-controls.json

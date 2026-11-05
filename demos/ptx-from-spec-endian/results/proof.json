@@ -1,0 +1,80 @@
+{
+  "class": "map32",
+  "counterexample": null,
+  "input": {
+    "ptx": {
+      "path": "/root/e5r-ptx-from-spec/demos/ptx-from-spec-endian/endian_xor.ptx",
+      "sha256": "00a3aa3c8853ab99495822aa10c28f98a5e88867c43ac036c61ec57cb280587c"
+    },
+    "spec": {
+      "path": "/root/e5r-ptx-from-spec/demos/ptx-from-spec-endian/contract.json",
+      "sha256": "bf776281c41e45abecbf18130b156d7e9c0f56f111abb49e05f2f54012035366"
+    }
+  },
+  "kernel": "endian_xor",
+  "lean": {
+    "memory_cap_mb": 2500,
+    "proof_check_seconds": 23.5,
+    "proof_seconds": 11.83,
+    "timeout_seconds": 600,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "proof": {
+    "accepted": true,
+    "check": {
+      "axioms": [
+        "propext",
+        "Quot.sound",
+        "Classical.choice"
+      ],
+      "declarations": 71,
+      "ok": true
+    },
+    "manifest": {
+      "ptx": "00a3aa3c8853ab99495822aa10c28f98a5e88867c43ac036c61ec57cb280587c",
+      "spec": "bf776281c41e45abecbf18130b156d7e9c0f56f111abb49e05f2f54012035366",
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "path": "/root/e5r-ptx-from-spec/demos/ptx-from-spec-endian/E5rProof.lean",
+    "sha256": "53c4556ad7cc2594029565daee1a4fad65435937f97d4d9289c09d7a08509ff1",
+    "supplied": true
+  },
+  "properties": {
+    "functional_correctness": "proved",
+    "memory_safety": "proved",
+    "race_freedom": "proved",
+    "termination": "proved"
+  },
+  "reasons": [],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 40.58,
+  "spec": {
+    "arrays": [
+      "input",
+      "output"
+    ],
+    "element": "((input << 24) | ((input & 65280) << 8) | ((input >> 8) & 65280) | (input >> 24)) ^ mask",
+    "output": "output",
+    "schedule": {
+      "kind": "guarded",
+      "max_threads": "4294967296"
+    }
+  },
+  "theorem": {
+    "axioms": [
+      "propext",
+      "Quot.sound",
+      "Classical.choice"
+    ],
+    "checked_by": "proofcheck: kernel replay of every declaration of the proof",
+    "definition": "Ptx.Auto.MapSpec.Correct",
+    "generated": false,
+    "name": "E5rProof.correct",
+    "statement": "spec.Correct «endian_xor»"
+  },
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "proved"
+}
