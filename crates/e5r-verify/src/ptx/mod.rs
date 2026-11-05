@@ -11,7 +11,9 @@
 pub mod accum;
 pub mod block;
 pub mod blocksearch;
+pub mod equivalence;
 pub mod leangen;
+pub mod packing;
 pub mod search;
 pub mod spec;
 pub mod supplied;
@@ -272,6 +274,18 @@ pub fn check(o: &Options) -> (Verdict, Value) {
         Ok(t) => t,
         Err(e) => return finish(doc, Verdict::Error, Some(format!("spec malformed: {e}"))),
     };
+    if serde_json::from_str::<Value>(&stext)
+        .ok()
+        .is_some_and(|v| v["class"] == "packing")
+    {
+        return packing::check(o, doc, started, &module, &stext, &phash, &shash);
+    }
+    if serde_json::from_str::<Value>(&stext)
+        .ok()
+        .is_some_and(|v| v["class"] == "equivalence-unpack4")
+    {
+        return equivalence::check(o, doc, started, &module, &stext, &phash, &shash);
+    }
     if let Some(class) = block_class(&stext) {
         return check_block(o, doc, started, &module, &stext, &class, &phash, &shash);
     }

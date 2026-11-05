@@ -184,3 +184,79 @@ fn proved_and_refuted_end_to_end() {
     assert_eq!(doc["counterexample"]["replayed_in_lean"], true);
     assert_eq!(doc["properties"]["memory_safety"], "refuted");
 }
+
+#[test]
+fn packing_contract_is_strict_and_needs_proof() {
+    let ptx = tmp(
+        "packing.ptx",
+        ".version 8.0\n.target sm_86\n.address_size 64\n.visible .entry pack(.param .u64 input, .param .u64 output, .param .u32 n) { ret; }\n",
+    );
+    let base = serde_json::json!({"schema":"e5r.ptx.spec.v1", "class":"packing",
+        "kernel":"pack", "op":"pack", "input":"input", "output":"output", "length":"n"});
+    let run = |tag: &str, v: &Value| {
+        let sp = tmp(&format!("packing-{tag}.json"), &v.to_string());
+        check(&ptx, &sp, &[])
+    };
+    let (code, result) = run("no-proof", &base);
+    assert_eq!(code, 3);
+    assert_eq!(result["verdict"], "unknown");
+    assert!(
+        result["reasons"]
+            .to_string()
+            .contains("requires a supplied proof")
+    );
+    let mut bad = base.clone();
+    bad["op"] = "big_endian".into();
+    assert_eq!(run("op", &bad).0, 2);
+    bad = base.clone();
+    bad["output"] = "input".into();
+    assert_eq!(run("alias-param", &bad).0, 4);
+    bad = base.clone();
+    bad["bitorder"] = "big".into();
+    assert_eq!(run("unrecognized-field", &bad).0, 4);
+    bad = base;
+    bad["length"] = "input".into();
+    assert_eq!(run("length", &bad).0, 4);
+}
+
+#[test]
+fn direct_equivalence_requires_bound_original_and_strict_contract() {
+    let ptx = tmp(
+        "relational.ptx",
+        ".version 8.0\n.target sm_86\n.address_size 64\n.visible .entry k(.param .u64 input, .param .u64 output, .param .u32 n) { ret; }\n",
+    );
+    let hash = String::from_utf8(Command::new("sha256sum").arg(&ptx).output().unwrap().stdout)
+        .unwrap()
+        .split_whitespace()
+        .next()
+        .unwrap()
+        .to_string();
+    let base = serde_json::json!({"schema":"e5r.ptx.spec.v1", "class":"equivalence-unpack4",
+        "kernel":"k", "original_ptx":ptx, "original_sha256":hash,
+        "input":"input", "output":"output", "length":"n"});
+    let run = |tag: &str, v: &Value| {
+        let sp = tmp(&format!("relational-{tag}.json"), &v.to_string());
+        check(&ptx, &sp, &[])
+    };
+    let (code, result) = run("no-proof", &base);
+    assert_eq!(code, 3, "{result}");
+    assert!(
+        result["reasons"]
+            .to_string()
+            .contains("requires a supplied proof")
+    );
+    let mut bad = base.clone();
+    bad["original_sha256"] = "0".repeat(64).into();
+    let (code, result) = run("stale-reference", &bad);
+    assert_eq!(code, 3, "{result}");
+    assert!(result["reasons"].to_string().contains("hash mismatch"));
+    bad = base.clone();
+    bad["output"] = "input".into();
+    assert_eq!(run("alias", &bad).0, 4);
+    bad = base.clone();
+    bad["input"] = "missing".into();
+    assert_eq!(run("param", &bad).0, 2);
+    bad = base;
+    bad["assume_equal"] = true.into();
+    assert_eq!(run("unknown-field", &bad).0, 4);
+}

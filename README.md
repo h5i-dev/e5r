@@ -15,6 +15,12 @@ functional correctness for every launch, input and thread interleaving the
 spec allows. If the proof fails, it looks for a counterexample and has Lean
 replay it.
 
+A concrete [CUDA → PTX → edited PTX demo](demos/ptx-equivalence/README.md)
+proves direct universal equivalence of two frozen programs, including safety
+and termination, with strict proof replay and honest GPU timings. The
+complementary [unpack demo](demos/verified-packing/README.md) proves directly
+authored PTX against an independent operator specification.
+
 ## Supported assembly
 
 | Assembly | What is proved | Not yet | Docs |

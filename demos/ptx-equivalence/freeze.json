@@ -1,0 +1,18 @@
+{
+  "frozen_utc": "2026-11-05T20:02:29.290335+00:00",
+  "command": [
+    "nvcc",
+    "-O3",
+    "-arch=sm_86",
+    "--ptx",
+    "original.cu",
+    "-o",
+    "original.ptx"
+  ],
+  "nvcc": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2026 NVIDIA Corporation\nBuilt on Mon_Mar_02_09:52:23_PM_PST_2026\nCuda compilation tools, release 13.2, V13.2.51\nBuild cuda_13.2.r13.2/compiler.37434383_0\n",
+  "sha256": {
+    "original.cu": "8b57d36703613f0ba5f93c7c1cd56f210a64102d422e81da4aca00a2dc2d1f18",
+    "original.ptx": "d0a6ce1610ddc40d2aa286d1d9baf23683386d28f1368bb0517905e62af4f6cb"
+  },
+  "candidate_provenance": "Candidate directly edited from frozen PTX; no candidate CUDA compilation."
+}

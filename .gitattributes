@@ -1,2 +1,6 @@
 *.e5r-patch merge=union
 *.e5r-proj  merge=union
+
+# Preserve exact nvcc-emitted/frozen PTX bytes, including final blank lines.
+demos/ptx-equivalence/original.ptx whitespace=-blank-at-eof
+demos/ptx-equivalence/optimized.ptx whitespace=-blank-at-eof

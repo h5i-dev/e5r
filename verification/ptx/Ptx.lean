@@ -30,3 +30,6 @@ import Ptx.Logic.CellAlgs
 import Ptx.Auto.Accum
 import Ptx.Auto.FloatMap
 import Ptx.Logic.Schedule
+import Ptx.Auto.Packing
+
+import Ptx.Auto.Equivalence

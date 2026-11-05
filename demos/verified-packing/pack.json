@@ -1,0 +1,9 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "pack",
+  "class": "packing",
+  "op": "pack",
+  "input": "input",
+  "output": "output",
+  "length": "n"
+}

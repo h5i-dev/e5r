@@ -71,6 +71,9 @@ pub fn instr(i: &Instr) -> String {
         Instr::MadLo(t, d, a, b, c) => {
             format!("mad.lo.{} \t{d}, {}, {}, {}", t.name(), o(a), o(b), o(c))
         }
+        Instr::Bfi32(d, a, b, pos, len) => {
+            format!("bfi.b32 \t{d}, {}, {}, {pos}, {len}", o(a), o(b))
+        }
         Instr::Not(t, d, a) => format!("not.{} \t{d}, {}", t.name(), o(a)),
         Instr::Mov(t, d, a) => format!("mov.{} \t{d}, {}", t.name(), o(a)),
         Instr::Setp(c, t, d, a, b) => {

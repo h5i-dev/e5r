@@ -45,6 +45,9 @@ fn forms() -> Vec<String> {
         "4294967296",
         "-2147483649",
     ];
+    v.push("bfi.b32 %r1, %r2, %r3, 14, 4".into());
+    v.push("bfi.b32 %r1, %r2, %r3, 32, 0".into());
+    v.push("bfi.b32 %r1, %r2, %r3, 0, 32".into());
     for t in TYS {
         let (d, a, b, c) = (reg(t, 1), reg(t, 2), reg(t, 3), reg(t, 4));
         for op in ["add", "sub", "mul.lo", "and", "or", "xor"] {

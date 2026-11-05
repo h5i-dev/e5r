@@ -82,6 +82,7 @@ fn instr(i: &Instr) -> String {
         Instr::MadLo(t, d, a, b, c) => {
             format!(".madLo {} {} {} {} {}", ty(*t), s(d), o(a), o(b), o(c))
         }
+        Instr::Bfi32(d, a, b, pos, len) => format!(".bfi32 {} {} {} {pos} {len}", s(d), o(a), o(b)),
         Instr::Not(t, d, a) => format!(".not {} {} {}", ty(*t), s(d), o(a)),
         Instr::Mov(t, d, a) => format!(".mov {} {} {}", ty(*t), s(d), o(a)),
         Instr::Setp(c, t, d, a, b) => {

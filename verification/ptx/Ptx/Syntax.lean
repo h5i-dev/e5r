@@ -99,6 +99,7 @@ inductive Instr where
   | shr (t : Ty) (d : String) (a b : Operand)
   | mov (t : Ty) (d : String) (a : Operand)
   | setp (c : CmpOp) (t : Ty) (p : String) (a b : Operand)
+  | bfi32 (d : String) (a b : Operand) (pos len : Nat)
   | selp (t : Ty) (d : String) (a b : Operand) (p : String)
   /-- `cvt.dt.st`: integer conversion (no rounding modifiers in the subset). -/
   | cvt (dt st : Ty) (d : String) (a : Operand)

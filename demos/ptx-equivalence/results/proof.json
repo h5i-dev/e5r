@@ -1,0 +1,74 @@
+{
+  "class": "equivalence-unpack4",
+  "counterexample": null,
+  "input": {
+    "original_ptx": {
+      "path": "/root/e5r-ptx-demo/demos/ptx-equivalence/original.ptx",
+      "sha256": "d0a6ce1610ddc40d2aa286d1d9baf23683386d28f1368bb0517905e62af4f6cb"
+    },
+    "ptx": {
+      "path": "/root/e5r-ptx-demo/demos/ptx-equivalence/optimized.ptx",
+      "sha256": "c3c6482c6b1ef57291f94e316ddae0741c096cd6c354f55f6d296f2691685c23"
+    },
+    "spec": {
+      "path": "/root/e5r-ptx-demo/demos/ptx-equivalence/equivalence.json",
+      "sha256": "fa5b1d93e0c1d7d3c5917bd4ae5df27c63b7860a4de9dbc7d89474ab6094ff11"
+    }
+  },
+  "kernel": "unpack4",
+  "lean": {
+    "memory_cap_mb": 4096,
+    "proof_check_seconds": 12.48,
+    "proof_seconds": 15.9,
+    "timeout_seconds": 600,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "lean_spec": "def domain : Equivalence.Spec := ⟨\"unpack4_param_0\", \"unpack4_param_1\", \"unpack4_param_2\"⟩\n",
+  "proof": {
+    "accepted": true,
+    "check": {
+      "axioms": [
+        "propext",
+        "Quot.sound",
+        "Classical.choice"
+      ],
+      "declarations": 65,
+      "ok": true
+    },
+    "manifest": {
+      "ptx": "c3c6482c6b1ef57291f94e316ddae0741c096cd6c354f55f6d296f2691685c23",
+      "spec": "fa5b1d93e0c1d7d3c5917bd4ae5df27c63b7860a4de9dbc7d89474ab6094ff11",
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "path": "/root/e5r-ptx-demo/demos/ptx-equivalence/equivalence.lean",
+    "sha256": "9ffb12aa9cfd42305e5edebee7d93f22254b106038f858b953dcbdce06c6065e",
+    "supplied": true
+  },
+  "properties": {
+    "direct_observable_equivalence": "proved",
+    "functional_correctness": "not_claimed",
+    "memory_safety": "proved",
+    "race_freedom": "proved",
+    "termination": "proved"
+  },
+  "reasons": [],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 125.8,
+  "theorem": {
+    "axioms": [
+      "propext",
+      "Quot.sound",
+      "Classical.choice"
+    ],
+    "checked_by": "proofcheck: kernel replay of every declaration of the proof",
+    "definition": "Ptx.Auto.Equivalence.Spec.Equivalent",
+    "generated": false,
+    "name": "E5rProof.correct",
+    "statement": "Equivalence.Spec.Equivalent domain Original.«unpack4» Optimized.«unpack4»"
+  },
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "proved"
+}

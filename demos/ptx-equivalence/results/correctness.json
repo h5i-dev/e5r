@@ -1,0 +1,16 @@
+{
+  "bfi": {
+    "cases": 89760,
+    "lean_output": "bfi Lean vectors passed: 89760",
+    "probe_sha256": "d5e38aa6ce387707cbb1943411ba9c266333c532116982203f4ab5787516d624"
+  },
+  "unpack_program_cases": 2616,
+  "ptx_sha256": {
+    "original": "d0a6ce1610ddc40d2aa286d1d9baf23683386d28f1368bb0517905e62af4f6cb",
+    "optimized": "c3c6482c6b1ef57291f94e316ddae0741c096cd6c354f55f6d296f2691685c23"
+  },
+  "gpu": "NVIDIA A10G, GPU-7e5ae9e3-0b19-7ed6-8641-c17e13519a08, 595.112.07",
+  "seed": 6041,
+  "lock": "/mnt/scratch/e5r-gpu-benchmark.lock",
+  "foreign_processes_observed": false
+}

@@ -1,0 +1,30 @@
+[
+  {
+    "case": "stale-candidate",
+    "verdict": "unknown",
+    "reasons": [
+      "supplied proof refused: written for a different ptx c3c6482c6b1ef57291f94e316ddae0741c096cd6c354f55f6d296f2691685c23 (the PTX is 5482189101a05a42d4b6ca6a33f586bfd2aa4edf865b37e254e0da9a4cb9bdbb)"
+    ]
+  },
+  {
+    "case": "wrong-multiply",
+    "verdict": "unknown",
+    "reasons": [
+      "supplied proof refused: it does not compile: error: maximum recursion depth has been reached use `set_option maxRecDepth <num>` to increase limit use `set_option diagnostics true` to get diagnostic information"
+    ]
+  },
+  {
+    "case": "wrong-input-index",
+    "verdict": "unknown",
+    "reasons": [
+      "supplied proof refused: it does not compile: error: Tactic `introN` failed: There are no additional binders or `let` bindings in the goal to introduce  case isFalse.refine_2.refine_2.refine_2.refine_2.isFalse.refine_1"
+    ]
+  },
+  {
+    "case": "wrong-tail-guard",
+    "verdict": "unknown",
+    "reasons": [
+      "supplied proof refused: it does not compile: error: Tactic `introN` failed: There are no additional binders or `let` bindings in the goal to introduce  case isTrue.isFalse.refine_1"
+    ]
+  }
+]

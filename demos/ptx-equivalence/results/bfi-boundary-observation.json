@@ -1,0 +1,13 @@
+{
+  "status": "excluded_from_frontend_subset",
+  "gpu": "NVIDIA A10G",
+  "nvcc": "13.2.51",
+  "driver": "595.112.07",
+  "a": 0,
+  "b": 4294967295,
+  "position": 1,
+  "length": 32,
+  "documented_per_bit_reference": 1,
+  "gpu_observed": 4294967295,
+  "decision": "Refuse position+length>32. The frozen original uses position=14,length=4. No claim diagnosing whether assembler/JIT/hardware caused this discrepancy."
+}

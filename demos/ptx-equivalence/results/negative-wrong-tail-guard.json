@@ -1,0 +1,54 @@
+{
+  "class": "equivalence-unpack4",
+  "counterexample": null,
+  "input": {
+    "original_ptx": {
+      "path": "/root/e5r-ptx-demo/demos/ptx-equivalence/original.ptx",
+      "sha256": "d0a6ce1610ddc40d2aa286d1d9baf23683386d28f1368bb0517905e62af4f6cb"
+    },
+    "ptx": {
+      "path": "/mnt/scratch/e5r-ptx-demo/negative-equivalence/wrong-tail-guard/kernel.ptx",
+      "sha256": "49c46816251393e40f18cebcc6a68fcc033b729498136ff095e1bbe40565ecc9"
+    },
+    "spec": {
+      "path": "/mnt/scratch/e5r-ptx-demo/negative-equivalence/wrong-tail-guard/contract.json",
+      "sha256": "b7410413053c8be285719f7cef39ba04c3c42ad4c37f35b0f3feda8fb0245622"
+    }
+  },
+  "kernel": "unpack4",
+  "lean": {
+    "memory_cap_mb": 3072,
+    "proof_seconds": 20.53,
+    "timeout_seconds": 180,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "lean_spec": "def domain : Equivalence.Spec := ⟨\"unpack4_param_0\", \"unpack4_param_1\", \"unpack4_param_2\"⟩\n",
+  "proof": {
+    "accepted": false,
+    "manifest": {
+      "ptx": "49c46816251393e40f18cebcc6a68fcc033b729498136ff095e1bbe40565ecc9",
+      "spec": "b7410413053c8be285719f7cef39ba04c3c42ad4c37f35b0f3feda8fb0245622",
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "path": "/mnt/scratch/e5r-ptx-demo/negative-equivalence/wrong-tail-guard/proof.lean",
+    "sha256": "eaf21accabce9b570184112ee87262922759c14dc23f9f4f3fdef654b7881666",
+    "supplied": true
+  },
+  "properties": {
+    "functional_correctness": "unknown",
+    "memory_safety": "unknown",
+    "race_freedom": "unknown",
+    "termination": "unknown"
+  },
+  "reasons": [
+    "supplied proof refused: it does not compile: error: Tactic `introN` failed: There are no additional binders or `let` bindings in the goal to introduce  case isTrue.isFalse.refine_1"
+  ],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 23.98,
+  "theorem": null,
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "unknown"
+}

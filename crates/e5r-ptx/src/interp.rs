@@ -425,6 +425,19 @@ pub fn step(k: &Kernel, al: &Allocs, c: &Ctx, s: &mut TState, g: &mut Mem, sh: &
             let v = at_width(w, u64::wrapping_add, p, s.op(c, z));
             s.set(d, v);
         }
+        Bfi32(d, a, b, pos, len) => {
+            let (pos, len) = (*pos as u32, *len as u32);
+            let mask = if pos >= 32 || len == 0 {
+                0
+            } else {
+                (u32::MAX >> (32 - len.min(32)))
+                    .checked_shl(pos)
+                    .unwrap_or(0)
+            };
+            let v = ((s.op(c, a) as u32).checked_shl(pos).unwrap_or(0) & mask)
+                | ((s.op(c, b) as u32) & !mask);
+            s.set(d, v as u64);
+        }
         Not(t, d, a) => {
             let v = fit(*t, !s.op(c, a));
             s.set(d, v);

@@ -1,0 +1,60 @@
+{
+  "class": "map32",
+  "counterexample": null,
+  "input": {
+    "ptx": {
+      "path": "demos/verified-packing/torchao_pack.ptx",
+      "sha256": "eb581438eb3781d0e2ef53366aecc80e09d342e9a92a3083279fde1a2edf0540"
+    },
+    "spec": {
+      "path": "demos/verified-packing/torchao_pack.json",
+      "sha256": "1f661463c65c74fce2732ee9b7e7d98d35a55c20f0d2dfa01091d9f2a7d33522"
+    }
+  },
+  "kernel": "torchao_pack",
+  "lean": {
+    "memory_cap_mb": 6144,
+    "proof_file": "/mnt/scratch/e5r-ptx-demo/accepted/torchao/Proof.lean",
+    "proof_seconds": 8.6,
+    "timeout_seconds": 600,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "lean_spec": "def spec : MapSpec where\n  arrays := [\"low\", \"high\", \"output\"]\n  out := \"output\"\n  len := \"n\"\n  scalars := []\n  f := fun s e => ((((e \"low\") &&& ((252645135#32)))) ||| (((((e \"high\") &&& ((252645135#32)))) <<< (4 : Nat))))\n  sched := .guarded 2147483648\n  rel := (fun a b => a = b)",
+  "properties": {
+    "functional_correctness": "proved",
+    "memory_safety": "proved",
+    "race_freedom": "proved",
+    "termination": "proved"
+  },
+  "reasons": [],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 9.9,
+  "spec": {
+    "arrays": [
+      "low",
+      "high",
+      "output"
+    ],
+    "element": "(low & 252645135) | ((high & 252645135) << 4)",
+    "output": "output",
+    "schedule": {
+      "kind": "guarded",
+      "max_threads": "2147483648"
+    }
+  },
+  "theorem": {
+    "axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ],
+    "definition": "Ptx.Auto.MapSpec.Correct",
+    "name": "E5rCheck.correct",
+    "statement": "spec.Correct «torchao_pack»"
+  },
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "proved"
+}

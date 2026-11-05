@@ -373,6 +373,8 @@ pub enum CvtRnd {
 pub enum Instr {
     Bin(BinOp, Ty, String, Operand, Operand),
     MadLo(Ty, String, Operand, Operand, Operand),
+    /// bfi.b32 with immediate position + length <= 32 only.
+    Bfi32(String, Operand, Operand, u8, u8),
     Not(Ty, String, Operand),
     Mov(Ty, String, Operand),
     Setp(CmpOp, Ty, String, Operand, Operand),

@@ -1,0 +1,10 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "class": "equivalence-unpack4",
+  "kernel": "unpack4",
+  "original_ptx": "original.ptx",
+  "original_sha256": "d0a6ce1610ddc40d2aa286d1d9baf23683386d28f1368bb0517905e62af4f6cb",
+  "input": "unpack4_param_0",
+  "output": "unpack4_param_1",
+  "length": "unpack4_param_2"
+}

@@ -1,0 +1,9 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "threshold",
+  "class": "packing",
+  "op": "threshold",
+  "input": "input",
+  "output": "output",
+  "length": "n"
+}

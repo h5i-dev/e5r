@@ -1,0 +1,11 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "class": "map32",
+  "kernel": "torchao_pack",
+  "arrays": ["low", "high", "output"],
+  "output": "output",
+  "length": "n",
+  "scalars": [],
+  "element": "(low & 252645135) | ((high & 252645135) << 4)",
+  "schedule": {"kind": "guarded", "max_threads": "2147483648"}
+}

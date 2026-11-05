@@ -9,8 +9,9 @@ written in Lean:
 - data-race freedom;
 - functional correctness.
 
-No CUDA C++, Triton or Rust source, no reference kernel and no equivalence
-check is part of a proof. The input is PTX and a specification. The output is
+No CUDA C++, Triton or Rust source is part of a proof. The input is PTX
+and a specification, or two concrete PTX programs and an equivalence domain.
+The output is
 a theorem the Lean kernel has checked, or a counterexample the Lean kernel has
 replayed, or a verdict that says neither was obtained.
 
@@ -1174,3 +1175,34 @@ Not in scope, and not to be described as done:
 - the PTX memory model beyond the data-race-free fragment;
 - warp-level instructions, tensor cores, texture or surface memory;
 - any kernel the theorems or a `check` result do not name.
+
+## Direct concrete-program equivalence demo
+
+[demos/ptx-equivalence](../../demos/ptx-equivalence/README.md) freezes CUDA,
+nvcc flags/version and original PTX hashes, then directly edits PTX and proves
+universal observable equivalence by nested symbolic execution. The main proof
+does not pass through a common algorithm specification. Both sides satisfy
+safety, progress, bounded termination, race freedom and existence of a final
+run. Complete final global memory agrees for every independent pair of
+completed schedules, and bytes outside all output footprints are preserved.
+
+The supplied-proof-only JSON class `equivalence-unpack4` describes the exact
+allocation/launch domain of this example. `original_ptx` is resolved relative
+to the contract; `original_sha256` must match. The checker exports both kernels
+itself with identical parameter signatures, then strictly replays the proof
+against `Equivalence.Spec.Equivalent`. The result reports
+`direct_observable_equivalence: proved` and `functional_correctness:
+not_claimed`, because equivalence alone does not prove an independent operator
+specification. Unsupported forms, stale bindings and failed proofs are never
+accepted. The original and candidate benchmark show essentially equal speed;
+this is a negative optimization result with a completed relational proof.
+
+The related `packing` class supports unequal input/output allocation sizes
+through `Packing.Spec.Correct`. Only the unpack candidate has accepted replay;
+pack/fusion proof drafts remain experimental. See the [packing report](../../demos/verified-packing/README.md).
+
+The only added instruction is immediate `bfi.b32` with position + length <= 32.
+All 561 admitted ranges have Lean/Rust/GPU reference checks in the demo;
+other forms remain unsupported. Boundary observations and trust limits are
+recorded alongside the evidence. The extension does not treat unsupported
+instructions as successful execution or strengthen the allowed axiom set.

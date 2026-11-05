@@ -275,6 +275,13 @@ def cvtFloat (c : Ctx) (s : TState) (dt st : Ty) (r : CvtRnd) (ftz sat : Bool) (
     else none
   | _, _, _ => none
 
+/-- Immediate bfi.b32; the frontend admits position+length <= 32.
+NVIDIA PTX ISA 9.2, bfi: copy low source bits into the
+clipped destination interval, preserving all other bits. -/
+def bfi32 (a b : BitVec 32) (pos len : Nat) : BitVec 32 :=
+  let mask := ((-1 : BitVec 32) >>> (32 - min len 32)) <<< pos
+  ((a <<< pos) &&& mask) ||| (b &&& ~~~mask)
+
 /-- The effect of one (unguarded) instruction. -/
 def exec (K : Kernel) (c : Ctx) (s : TState) : Instr → Action
   | .add t d a b => .next (s.set d (atWidth t.width (fun _ x y => x + y) (opVal c s a) (opVal c s b)))
@@ -301,6 +308,8 @@ def exec (K : Kernel) (c : Ctx) (s : TState) : Instr → Action
     match cmpVal op t (opVal c s a) (opVal c s b) with
     | some v => .next (s.setp p v)
     | none => .fault
+  | .bfi32 d a b pos len =>
+    .next (s.set d (ext32 (bfi32 (lo32 (opVal c s a)) (lo32 (opVal c s b)) pos len)))
   | .selp t d a b p => .next (s.set d (fit t (if s.p p then opVal c s a else opVal c s b)))
   | .cvt dt st d a => .next (s.set d (convert dt st (opVal c s a)))
   | .cvtaGlobal d a => .next (s.set d (opVal c s a))

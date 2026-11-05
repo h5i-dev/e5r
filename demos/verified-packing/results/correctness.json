@@ -1,0 +1,13 @@
+{
+  "cases": 604,
+  "seed": 6041,
+  "correctness": "passed",
+  "cupy": "13.6.0",
+  "ptx_sha256": {
+    "pack": "ff7e9262515c41f477f89523a6bf6491c7c596b6c528a0874f2d15bb99d58e70",
+    "unpack": "e7793391a8cbc1a491c456f2ae1b25c6ba4bf2dac4a7ec5eebe7a3801d30263e",
+    "threshold": "b9e3891749dcf4ef8df8ab909c75f56e9cd70f4154a3801b84e68c37ab2ab7aa"
+  },
+  "lock": "/mnt/scratch/e5r-gpu-benchmark.lock",
+  "foreign_processes_observed": false
+}

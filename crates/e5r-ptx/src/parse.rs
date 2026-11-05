@@ -607,6 +607,25 @@ fn stmt(p: &mut P) -> R<Stmt> {
             comma(p)?;
             Instr::MadLo(t, d, a, b, operand(p)?)
         }
+        ["bfi", "b32"] => {
+            let d = reg(p)?;
+            comma(p)?;
+            let a = operand(p)?;
+            comma(p)?;
+            let b = operand(p)?;
+            comma(p)?;
+            let Operand::Imm(pos @ 0..=255) = operand(p)? else {
+                return p.err("bfi position requires an immediate in 0..255");
+            };
+            comma(p)?;
+            let Operand::Imm(len @ 0..=255) = operand(p)? else {
+                return p.err("bfi length requires an immediate in 0..255");
+            };
+            if pos + len > 32 {
+                return p.err("bfi subset requires position + length <= 32");
+            }
+            Instr::Bfi32(d, a, b, pos as u8, len as u8)
+        }
         ["not", t] => {
             let t = ty(t, p)?;
             let d = reg(p)?;
@@ -757,6 +776,7 @@ fn types_ok(i: &Instr) -> Result<(), String> {
             CmpOp::Lt | CmpOp::Le | CmpOp::Gt | CmpOp::Ge => arith(t),
             CmpOp::Lo | CmpOp::Ls | CmpOp::Hi | CmpOp::Hs => matches!(t, U32 | U64),
         },
+        Instr::Bfi32(..) => true,
         Instr::Cvt(dt, st, ..) => arith(dt) && arith(st),
         Instr::CvtaGlobal(..) | Instr::Ld(..) | Instr::St(..) => true,
         Instr::Bra(..) | Instr::Ret | Instr::Exit | Instr::Bar => true,
@@ -855,6 +875,13 @@ fn operands_ok(i: &Instr) -> Result<(), String> {
             nosreg(y)?;
             imm(x, wx)?;
             imm(y, wy)
+        }
+        Instr::Bfi32(_, a, b, _, _) => {
+            for o in [a, b] {
+                nosreg(o)?;
+                imm(o, 32)?;
+            }
+            Ok(())
         }
         Instr::MadLo(t, _, a, b, c) => {
             for o in [a, b, c] {
@@ -971,6 +998,11 @@ fn typed_uses(i: &Instr) -> Vec<(&str, Ty)> {
             v.push((d.as_str(), *t));
             o(a, *t, &mut v);
             o(b, *t, &mut v);
+        }
+        Instr::Bfi32(d, a, b, _, _) => {
+            v.push((d.as_str(), Ty::B32));
+            o(a, Ty::B32, &mut v);
+            o(b, Ty::B32, &mut v);
         }
         Instr::MadLo(t, d, a, b, c) => {
             v.push((d.as_str(), *t));
@@ -1202,6 +1234,11 @@ fn check(k: &Kernel, lines: &[usize]) -> R<()> {
                 data(d, w(*t))?;
                 src(a, w(*t))?;
                 src(b, w(*t))?;
+            }
+            Instr::Bfi32(d, a, b, _, _) => {
+                data(d, 32)?;
+                src(a, 32)?;
+                src(b, 32)?;
             }
             Instr::MadLo(t, d, a, b, c) => {
                 data(d, w(*t))?;

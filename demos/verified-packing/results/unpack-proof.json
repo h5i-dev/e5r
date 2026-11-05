@@ -1,0 +1,69 @@
+{
+  "class": "packing",
+  "counterexample": null,
+  "input": {
+    "ptx": {
+      "path": "demos/verified-packing/unpack.ptx",
+      "sha256": "e7793391a8cbc1a491c456f2ae1b25c6ba4bf2dac4a7ec5eebe7a3801d30263e"
+    },
+    "spec": {
+      "path": "demos/verified-packing/unpack.json",
+      "sha256": "ba6465b85f46da4071311de702f57052e58fe56c846a7aea5c54a606637277cc"
+    }
+  },
+  "kernel": "unpack",
+  "lean": {
+    "memory_cap_mb": 4096,
+    "proof_check_seconds": 7.77,
+    "proof_seconds": 7.09,
+    "timeout_seconds": 600,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "lean_spec": "def spec : Packing.Spec := ⟨.unpack, \"input\", \"output\", \"n\"⟩\n",
+  "proof": {
+    "accepted": true,
+    "check": {
+      "axioms": [
+        "propext",
+        "Quot.sound",
+        "Classical.choice"
+      ],
+      "declarations": 67,
+      "ok": true
+    },
+    "manifest": {
+      "ptx": "e7793391a8cbc1a491c456f2ae1b25c6ba4bf2dac4a7ec5eebe7a3801d30263e",
+      "spec": "ba6465b85f46da4071311de702f57052e58fe56c846a7aea5c54a606637277cc",
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "path": "demos/verified-packing/unpack.lean",
+    "sha256": "3037605d0d6013d4397198f0f9ae7b48b388296f3bdfdb878ab87d4e375990b8",
+    "supplied": true
+  },
+  "properties": {
+    "functional_correctness": "proved",
+    "memory_safety": "proved",
+    "race_freedom": "proved",
+    "termination": "proved"
+  },
+  "reasons": [],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 277.32,
+  "theorem": {
+    "axioms": [
+      "propext",
+      "Quot.sound",
+      "Classical.choice"
+    ],
+    "checked_by": "proofcheck: kernel replay of every declaration of the proof",
+    "definition": "Ptx.Auto.Packing.Spec.Correct",
+    "generated": false,
+    "name": "E5rProof.correct",
+    "statement": "Packing.Spec.Correct spec «unpack»"
+  },
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "proved"
+}

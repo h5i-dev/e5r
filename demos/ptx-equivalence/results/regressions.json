@@ -1,0 +1,20 @@
+{
+  "commands_passed": [
+    "cargo test --release -p e5r-ptx (unit, bfi, fuzz, assembler agreement, roundtrip, doc tests)",
+    "cargo test --release -p e5r-verify --test ptx_cli -- --test-threads=1 (9 tests)",
+    "cargo clippy --release -p e5r-ptx -p e5r-verify --all-targets -- -D warnings",
+    "python3 -m py_compile demos/ptx-equivalence/*.py demos/verified-packing/*.py",
+    "bash -n demos/ptx-equivalence/run.sh demos/verified-packing/setup.sh demos/verified-packing/env.sh",
+    "git diff --check",
+    "python3 demos/ptx-equivalence/verify-freeze.py"
+  ],
+  "scope": "Focused regressions for touched PTX frontend/verifier. Entire workspace Rust suite and all historical PTX result rechecks not run.",
+  "gpu_lock": "/mnt/scratch/e5r-gpu-benchmark.lock",
+  "artifacts": {
+    "demos/ptx-equivalence/original.ptx": "d0a6ce1610ddc40d2aa286d1d9baf23683386d28f1368bb0517905e62af4f6cb",
+    "demos/ptx-equivalence/optimized.ptx": "c3c6482c6b1ef57291f94e316ddae0741c096cd6c354f55f6d296f2691685c23",
+    "demos/ptx-equivalence/equivalence.lean": "9ffb12aa9cfd42305e5edebee7d93f22254b106038f858b953dcbdce06c6065e",
+    "demos/verified-packing/unpack.ptx": "e7793391a8cbc1a491c456f2ae1b25c6ba4bf2dac4a7ec5eebe7a3801d30263e",
+    "demos/verified-packing/unpack.lean": "3037605d0d6013d4397198f0f9ae7b48b388296f3bdfdb878ab87d4e375990b8"
+  }
+}

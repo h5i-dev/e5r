@@ -1,0 +1,54 @@
+{
+  "class": "equivalence-unpack4",
+  "counterexample": null,
+  "input": {
+    "original_ptx": {
+      "path": "/root/e5r-ptx-demo/demos/ptx-equivalence/original.ptx",
+      "sha256": "d0a6ce1610ddc40d2aa286d1d9baf23683386d28f1368bb0517905e62af4f6cb"
+    },
+    "ptx": {
+      "path": "/mnt/scratch/e5r-ptx-demo/negative-equivalence/wrong-multiply/kernel.ptx",
+      "sha256": "5482189101a05a42d4b6ca6a33f586bfd2aa4edf865b37e254e0da9a4cb9bdbb"
+    },
+    "spec": {
+      "path": "/mnt/scratch/e5r-ptx-demo/negative-equivalence/wrong-multiply/contract.json",
+      "sha256": "b7410413053c8be285719f7cef39ba04c3c42ad4c37f35b0f3feda8fb0245622"
+    }
+  },
+  "kernel": "unpack4",
+  "lean": {
+    "memory_cap_mb": 3072,
+    "proof_seconds": 12.45,
+    "timeout_seconds": 180,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "lean_spec": "def domain : Equivalence.Spec := ⟨\"unpack4_param_0\", \"unpack4_param_1\", \"unpack4_param_2\"⟩\n",
+  "proof": {
+    "accepted": false,
+    "manifest": {
+      "ptx": "5482189101a05a42d4b6ca6a33f586bfd2aa4edf865b37e254e0da9a4cb9bdbb",
+      "spec": "b7410413053c8be285719f7cef39ba04c3c42ad4c37f35b0f3feda8fb0245622",
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "path": "/mnt/scratch/e5r-ptx-demo/negative-equivalence/wrong-multiply/proof.lean",
+    "sha256": "730d786e3779d02323bb0d5cfacbd086d9194bc20131db571fa3b86aa90e48a0",
+    "supplied": true
+  },
+  "properties": {
+    "functional_correctness": "unknown",
+    "memory_safety": "unknown",
+    "race_freedom": "unknown",
+    "termination": "unknown"
+  },
+  "reasons": [
+    "supplied proof refused: it does not compile: error: maximum recursion depth has been reached use `set_option maxRecDepth <num>` to increase limit use `set_option diagnostics true` to get diagnostic information"
+  ],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 15.28,
+  "theorem": null,
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "unknown"
+}
