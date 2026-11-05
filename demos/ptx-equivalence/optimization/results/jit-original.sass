@@ -1,0 +1,40 @@
+------------------ ---------------------------------------------------- ------
+Kernel Name        unpack4                                                    
+------------------ ---------------------------------------------------- ------
+Address            Source                                               launch
+                                                                        __regi
+                                                                        sters_
+                                                                        per_th
+                                                                        read  
+0x7f49e9289900           IMAD.MOV.U32 R1, RZ, RZ, c[0x0][0x28]          0     
+0x7f49e9289910           S2R R4, SR_CTAID.X                             0     
+0x7f49e9289920           S2R R3, SR_TID.X                               0     
+0x7f49e9289930           IMAD R4, R4, c[0x0][0x0], R3                   0     
+0x7f49e9289940           ISETP.GE.U32.AND P0, PT, R4, c[0x0][0x170], PT 0     
+0x7f49e9289950     @P0   EXIT                                           0     
+0x7f49e9289960           SHF.R.U32.HI R2, RZ, 0x3, R4                   0     
+0x7f49e9289970           IMAD.MOV.U32 R5, RZ, RZ, 0x4                   0     
+0x7f49e9289980           ULDC.64 UR4, c[0x0][0x118]                     0     
+0x7f49e9289990           IMAD.WIDE.U32 R2, R2, R5, c[0x0][0x160]        0     
+0x7f49e92899a0           LDG.E R3, [R2.64]                              0     
+0x7f49e92899b0           SHF.L.U32 R0, R4, 0x2, RZ                      0     
+0x7f49e92899c0           IMAD.WIDE.U32 R4, R4, R5, c[0x0][0x168]        0     
+0x7f49e92899d0           LOP3.LUT R0, R0, 0x1c, RZ, 0xc0, !PT           0     
+0x7f49e92899e0           SHF.R.U32.HI R0, RZ, R0, R3                    0     
+0x7f49e92899f0           LOP3.LUT R0, R0, 0xf, RZ, 0xc0, !PT            0     
+0x7f49e9289a00           IMAD.SHL.U32 R7, R0, 0x4000, RZ                0     
+0x7f49e9289a10           LOP3.LUT R0, R7, 0x3c000, R0, 0xe2, !PT        0     
+0x7f49e9289a20           SHF.L.U32 R7, R0, 0x7, RZ                      0     
+0x7f49e9289a30           LOP3.LUT R7, R7, 0x1010101, R0, 0xc8, !PT      0     
+0x7f49e9289a40           STG.E [R4.64], R7                              0     
+0x7f49e9289a50           EXIT                                           0     
+0x7f49e9289a60           BRA `(.L_x_0) 0x7f49e9289a60                   0     
+0x7f49e9289a70           NOP                                            0     
+0x7f49e9289a80           NOP                                            0     
+0x7f49e9289a90           NOP                                            0     
+0x7f49e9289aa0           NOP                                            0     
+0x7f49e9289ab0           NOP                                            0     
+0x7f49e9289ac0           NOP                                            0     
+0x7f49e9289ad0           NOP                                            0     
+0x7f49e9289ae0           NOP                                            0     
+0x7f49e9289af0           NOP                                            0     

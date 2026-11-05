@@ -1,0 +1,10 @@
+[
+  {
+    "url": "https://developer.download.nvidia.com/compute/cuda/redist/cuda_cuobjdump/linux-x86_64/cuda_cuobjdump-linux-x86_64-13.2.51-archive.tar.xz",
+    "sha256": "f0fb475dfc5b08a0e77cdcd05e7ea15402756ad8418898f4e93ada8b19661271"
+  },
+  {
+    "url": "https://developer.download.nvidia.com/compute/cuda/redist/cuda_nvdisasm/linux-x86_64/cuda_nvdisasm-linux-x86_64-13.2.51-archive.tar.xz",
+    "sha256": "0eff70c711a579efa95e141d6e7476a0c041dfb9976a545afca20b555a9fb4a4"
+  }
+]
