@@ -46,7 +46,9 @@ replays both the generated statement module and every supplied declaration,
 rejects declared axioms, requires the theorem to belong to the supplied module
 and have exactly the generated statement constant as its type, then audits its
 transitive axioms. The statement source and compiled bytes must remain unchanged
-during supplied elaboration and replay. Compiled project model dependencies are
+during supplied elaboration and replay. The checker executable is fingerprinted
+before elaboration and must remain unchanged before and after replay. Compiled
+project model dependencies are
 snapshotted before acceptance and must remain unchanged. A JSON success line
 cannot override a failed or resource-limited checker process.
 
@@ -148,7 +150,7 @@ proof. The output ELF and theorem subject are nevertheless pinned directly.
 | `refuted` | Reserved checked counterexample | `refuted` / 1 |
 | `inconclusive` | `failed` / 10 | `unknown` / 3 |
 | `unsupported` | `unsupported` / 11 | `unsupported` / 2 |
-| `resource_exhausted` | `resource_exhausted` / 12 | Existing `unknown` / 3 or build `error` / 4 |
+| `resource_exhausted` | `resource_exhausted` / 12 | Existing `unknown` / 3, build `error` / 4, or class `unsupported` / 2 |
 | `error` | `error` / 13 | `error` / 4 |
 
 A failed proof is inconclusive. A refutation requires a checked Lean replay;

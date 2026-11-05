@@ -226,7 +226,7 @@ jobs:
           sh elan-init.sh -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       # The Lean proof build is the one thing `rust-cache` does not cover.
-      # `verification/ptx` has no fetched dependencies (core Lean only), so
+      # PTX and its local common checker use Lean core only, so
       # `.lake/build` is a function of the pinned toolchain and the Lean sources
       # alone: key the cache on both and `lake build` is a near-no-op on a hit.
       # The key changes whenever any proof, kernel module or the toolchain does,
@@ -240,9 +240,17 @@ jobs:
         id: lake
         uses: actions/cache/restore@v4
         with:
-          path: verification/ptx/.lake/build
-          key: ptx-lake-${{ runner.os }}-${{ hashFiles('verification/ptx/lean-toolchain', 'verification/ptx/lakefile.lean', 'verification/ptx/lake-manifest.json', 'verification/ptx/**/*.lean') }}
+          path: |
+            verification/ptx/.lake/build
+            verification/common/.lake/build
+          key: ptx-lake-${{ runner.os }}-${{ hashFiles('verification/ptx/lean-toolchain', 'verification/ptx/lakefile.lean', 'verification/ptx/lake-manifest.json', 'verification/ptx/**/*.lean', 'verification/common/**/*.lean', 'verification/common/lean-toolchain', 'verification/common/lake-manifest.json') }}
       - run: cargo build -p e5r-verify
+      - name: Shared proof acceptance and process controls
+        env:
+          E5R_REQUIRE_LEAN: "1"
+        run: |
+          (cd verification/common && lean --version)
+          cargo test -p e5r-verify --test shared_core -- --test-threads=1
       - name: Lean proofs, axiom audit and benchmark verdicts
         env:
           E5R_VERIFY: target/debug/e5r
@@ -253,5 +261,7 @@ jobs:
         if: always() && steps.lake.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: verification/ptx/.lake/build
+          path: |
+            verification/ptx/.lake/build
+            verification/common/.lake/build
           key: ${{ steps.lake.outputs.cache-primary-key }}

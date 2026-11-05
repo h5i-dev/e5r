@@ -15,6 +15,20 @@ fn common() -> PathBuf {
         .canonicalize()
         .unwrap()
 }
+fn pinned_lean_available() -> bool {
+    let mut command = Command::new("lean");
+    command.current_dir(common()).arg("--version");
+    let available = process::run(command, Limits::new(Duration::from_secs(10), 512))
+        .is_ok_and(|r| r.success && r.output.contains("version 4.35.0"));
+    assert!(
+        available || std::env::var_os("E5R_REQUIRE_LEAN").is_none(),
+        "pinned Lean 4.35.0 is required for these controls"
+    );
+    if !available {
+        eprintln!("pinned Lean 4.35.0 unavailable: skipping Lean-dependent controls");
+    }
+    available
+}
 fn run(
     project: &Path,
     program: impl AsRef<std::ffi::OsStr>,
@@ -32,6 +46,9 @@ fn run(
 }
 #[test]
 fn generic_checker_rejects_wrong_statements_axioms_imports_and_kernel_bypass() {
+    if !pinned_lean_available() {
+        return;
+    }
     let project = common();
     assert!(run(&project, "lake", &["build", "-q", "proofcheck"], None).success);
     let work = Workspace::new(None).unwrap();
@@ -144,6 +161,9 @@ fn generic_checker_rejects_wrong_statements_axioms_imports_and_kernel_bypass() {
 }
 #[test]
 fn provenance_detects_program_spec_model_dependency_additions_and_tool_policy() {
+    if !pinned_lean_available() {
+        return;
+    }
     let project = common();
     let work = Workspace::new(None).unwrap();
     let root = work.path();

@@ -57,11 +57,12 @@ oracle does not establish agreement. The final report will replace pending rows.
 | Complete PTX model library and shared axiom audit | Passed, 5162 declarations, standard axioms only |
 | A10G differential test | Passed: 1693 launches, 856 kernels including 311 float forms; JIT, cubin, Lean model and Rust interpreter identical |
 | GPU negative controls | 10 misaligned launches faulted in the model and were refused by the GPU |
-| Relocated source bundles | Flash, RAM and cold PTX proof replay passed; final refutation/legacy replay rerun pending |
-| Firmware jobs | Clamp and duty passed earlier; final three-job run pending |
+| Relocated source bundles | Flash, RAM, cold PTX proof and checked-refutation bundles passed; legacy Lean-only replay passed |
+| Firmware jobs | All three standard jobs proved and passed freshness checks on the immutable final suite binary |
 | Firmware import, proof, input and memory controls | Final run pending |
 | All PTX benchmark verdicts and exit codes | Final run pending |
 | PTX mutation and supplied-proof controls | Final run pending |
+| Required-Lean CI mode | 4 shared integration tests passed; workflow YAML parsed locally, GitHub execution not claimed |
 | Final release Rust/clippy after all changes | Queued |
 | Firmware QEMU differential/replay | Not executed: QEMU and RISC-V binutils unavailable |
 | Optional RMK jobs and rounding cross-check project | Not executed: external fixtures/dependencies not prepared; production isolation retained |
