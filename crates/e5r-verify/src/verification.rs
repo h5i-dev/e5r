@@ -214,6 +214,12 @@ pub fn attach_ptx(
     }
     dependencies(&doc["lean"], &mut identity)?;
     let canonical = |p: &Path| p.canonicalize().map_err(|e| e.to_string());
+    if let Some(hash) = doc["proof"]["checker_sha256"].as_str() {
+        identity.pin_file(
+            &canonical(&o.project)?.join(".lake/build/bin/proofcheck"),
+            hash,
+        )?;
+    }
     let invocation = Invocation::Ptx {
         program: canonical(&o.ptx)?,
         spec: canonical(&o.spec)?,

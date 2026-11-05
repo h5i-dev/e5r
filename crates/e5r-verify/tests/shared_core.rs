@@ -194,6 +194,12 @@ fn provenance_detects_program_spec_model_dependency_additions_and_tool_policy() 
     std::fs::write(&added, b"new").unwrap();
     assert!(!id.stale(&project).unwrap().is_empty());
     std::fs::remove_file(&added).unwrap();
+    let mut pinned = id.clone();
+    assert!(pinned.pin_file(&model, "wrong").is_err());
+    pinned
+        .pin_file(&model, &e5r_verify::sha256::hex(b"model"))
+        .unwrap();
+    assert!(pinned.stale(&project).unwrap().is_empty());
     let mut forged = id.clone();
     forged
         .toolchain

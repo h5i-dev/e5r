@@ -145,10 +145,19 @@ PTX kernels (docs/verification/ptx.md):
 RISC-V firmware binaries (docs/verification/firmware.md):
   e5r check JOB.json [--resume] [--out RESULT.json]
       rebuild and recheck a verification job; exit status 0 only for proved
-  e5r bundle-result RESULT.json --out DIR\n  e5r replay-result RESULT.json\n  e5r replay-bundle DIR\n  e5r verify-result RESULT.json
-      say whether a stored result still describes the current inputs
   e5r bundle JOB.json --out DIR
       write a directory whose recheck.sh needs only the pinned Lean
+
+Shared evidence for PTX and firmware (docs/verification/unified-core.md):
+  e5r verify-result RESULT.json
+      check current input identities and evidence consistency
+  e5r replay-result RESULT.json
+      rerun and reproduce the recorded claim
+  e5r bundle-result RESULT.json --out DIR
+  e5r replay-bundle DIR
+      snapshot or recheck a relocatable source bundle
+  e5r exec [--timeout SECS] [--memory-mib MIB] [--cwd DIR] -- COMMAND ARGS...
+      run a command under the shared process-group limits
 
 Exporting a binary to Lean:
   e5r flash --board BOARD.json [--namespace NS] IMAGE.elf
@@ -406,7 +415,6 @@ fn exec_limited(args: &[String]) -> Result<String, String> {
             "e5r exec: {exhaustion:?} limit exceeded ({} MiB sampled group RSS)",
             r.peak_rss_mib
         );
-        std::process::exit(124);
     }
-    std::process::exit(if r.success { 0 } else { r.code.unwrap_or(1) });
+    std::process::exit(r.command_exit_code());
 }

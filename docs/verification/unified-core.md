@@ -47,7 +47,8 @@ rejects declared axioms, requires the theorem to belong to the supplied module
 and have exactly the generated statement constant as its type, then audits its
 transitive axioms. The statement source and compiled bytes must remain unchanged
 during supplied elaboration and replay. The checker executable is fingerprinted
-before elaboration and must remain unchanged before and after replay. Compiled
+before elaboration and must remain unchanged before and after replay. Its
+fingerprint also enters the accepted result identity for later freshness checks. Compiled
 project model dependencies are
 snapshotted before acceptance and must remain unchanged. A JSON success line
 cannot override a failed or resource-limited checker process.

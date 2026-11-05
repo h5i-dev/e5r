@@ -168,6 +168,36 @@ impl Identity {
             toolchain,
         })
     }
+    /// Add an artifact produced after the initial source snapshot, requiring the
+    /// exact bytes used during acceptance and preserving its logical lookup path.
+    pub fn pin_file(&mut self, path: &Path, expected_sha256: &str) -> Result<(), String> {
+        let file = digest(path)?;
+        if file.sha256 != expected_sha256 {
+            return Err(format!("acceptance artifact changed: {}", path.display()));
+        }
+        let canonical = path.canonicalize().map_err(|e| e.to_string())?;
+        let absolute = std::path::absolute(path).map_err(|e| e.to_string())?;
+        let mut logical = PathBuf::new();
+        for component in absolute.components() {
+            match component {
+                std::path::Component::ParentDir => {
+                    logical.pop();
+                }
+                std::path::Component::CurDir => {}
+                other => logical.push(other.as_os_str()),
+            }
+        }
+        for path in [logical, canonical] {
+            if path.to_str().is_none() {
+                return Err("verification identities require UTF-8 paths".into());
+            }
+            self.files.insert(path.clone(), file.clone());
+            self.explicit_files.push(path);
+        }
+        self.explicit_files.sort();
+        self.explicit_files.dedup();
+        Ok(())
+    }
     pub fn stale(&self, project: &Path) -> Result<Vec<String>, String> {
         let now = Self::capture(&self.source_roots, &self.explicit_files, project)?;
         let mut changed: Vec<_> = self

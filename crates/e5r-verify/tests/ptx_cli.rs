@@ -157,7 +157,7 @@ fn proved_and_refuted_end_to_end() {
         return;
     }
     let spec = root().join("benchmarks/specs/vadd.json");
-    let (code, doc) = check(&vadd(), &spec, &[]);
+    let (code, doc) = check(&vadd(), &spec, &["--timeout", "18446744073709551615"]);
     assert_eq!(
         (code, doc["verdict"].as_str()),
         (0, Some("proved")),

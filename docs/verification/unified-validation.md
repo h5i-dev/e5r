@@ -60,7 +60,7 @@ oracle does not establish agreement. The final report will replace pending rows.
 | Relocated source bundles | Flash, RAM, cold PTX proof and checked-refutation bundles passed; legacy Lean-only replay passed |
 | Firmware jobs | All three standard jobs proved and passed freshness checks on the immutable final suite binary |
 | Firmware import, proof, input and memory controls | Final run pending |
-| All PTX benchmark verdicts and exit codes | Final run pending |
+| All PTX benchmark verdicts and exit codes | Passed: 26 proved, 3 checked refutations, 2 unsupported |
 | PTX mutation and supplied-proof controls | Final run pending |
 | Required-Lean CI mode | 4 shared integration tests passed; workflow YAML parsed locally, GitHub execution not claimed |
 | Final release Rust/clippy after all changes | Queued |

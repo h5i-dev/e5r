@@ -369,7 +369,7 @@ fn check_backend(o: &Options) -> (Verdict, Value) {
     let warm = run_lean(
         &proj,
         &["build", "-q", "Ptx.Auto.FloatMap", "Ptx.Logic.Refute"],
-        o.timeout * 4,
+        o.timeout.saturating_mul(4),
         o.memory_mb,
     );
     doc["lean"]["build_execution"] = warm.execution.clone();
@@ -728,7 +728,7 @@ fn check_block(
     }
     let mut warm_args = vec!["build", "-q"];
     warm_args.extend(plan.warm.iter().copied());
-    let warm = run_lean(&proj, &warm_args, o.timeout * 4, o.memory_mb);
+    let warm = run_lean(&proj, &warm_args, o.timeout.saturating_mul(4), o.memory_mb);
     doc["lean"]["build_execution"] = warm.execution.clone();
     if !warm.ok {
         return finish(
@@ -861,7 +861,7 @@ fn supplied_route(
     let warm = run_lean(
         proj,
         &["build", "-q", "Ptx", "proofcheck"],
-        o.timeout * 6,
+        o.timeout.saturating_mul(6),
         o.memory_mb,
     );
     doc["lean"]["build_execution"] = warm.execution.clone();

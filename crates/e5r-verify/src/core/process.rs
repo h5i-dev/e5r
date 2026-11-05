@@ -70,6 +70,18 @@ pub struct Run {
     pub peak_rss_mib: u64,
     pub memory_monitor: &'static str,
 }
+impl Run {
+    /// Exit convention for generic commands, independent of backend verdicts.
+    pub fn command_exit_code(&self) -> i32 {
+        if self.exhaustion.is_some() {
+            124
+        } else if self.success {
+            0
+        } else {
+            self.code.filter(|code| *code > 0).unwrap_or(1)
+        }
+    }
+}
 struct Guard {
     child: Child,
     terminated: bool,
@@ -320,6 +332,19 @@ mod tests {
         std::fs::read_to_string(format!("/proc/{pid}/stat")).map_or(true, |s| {
             s.rsplit_once(") ").is_some_and(|(_, s)| s.starts_with('Z'))
         })
+    }
+    #[test]
+    fn cleanup_failure_cannot_be_a_successful_command_exit() {
+        let mut r = shell("true", limits());
+        assert_eq!(r.command_exit_code(), 0);
+        r.success = false;
+        r.cleanup_complete = false;
+        assert_eq!(r.code, Some(0));
+        assert_eq!(r.command_exit_code(), 1);
+        r.code = Some(7);
+        assert_eq!(r.command_exit_code(), 7);
+        r.exhaustion = Some(Exhaustion::Time);
+        assert_eq!(r.command_exit_code(), 124);
     }
     #[test]
     fn captures_both_streams_and_nonzero_exit() {
