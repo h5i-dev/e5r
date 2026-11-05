@@ -29,7 +29,7 @@ pub fn check(
     shash: &str,
 ) -> (Verdict, Value) {
     let finish = |doc, v, r| finish_at(started, doc, v, r);
-    doc["class"] = json!("equivalence-unpack4");
+    doc["class"] = json!("equivalence");
     let sp: Spec = match serde_json::from_str(text) {
         Ok(s) => s,
         Err(e) => {
@@ -40,13 +40,24 @@ pub fn check(
             );
         }
     };
-    if sp.schema != super::spec::SCHEMA || sp.class != "equivalence-unpack4" {
+    if sp.schema != super::spec::SCHEMA
+        || !matches!(
+            sp.class.as_str(),
+            "equivalence-unpack4" | "equivalence-stencil17"
+        )
+    {
         return finish(
             doc,
             Verdict::Error,
             Some("invalid equivalence schema/class".into()),
         );
     }
+    doc["class"] = json!(sp.class);
+    let family = if sp.class == "equivalence-stencil17" {
+        "Stencil"
+    } else {
+        "Equivalence"
+    };
     if sp.input == sp.output || sp.input == sp.length || sp.output == sp.length {
         return finish(
             doc,
@@ -110,18 +121,18 @@ pub fn check(
     doc["kernel"] = json!(sp.kernel);
     let q = |s: &str| serde_json::to_string(s).unwrap();
     let definition = format!(
-        "def domain : Equivalence.Spec := ⟨{}, {}, {}⟩\n",
+        "def domain : {family}.Spec := ⟨{}, {}, {}⟩\n",
         q(&sp.input),
         q(&sp.output),
         q(&sp.length)
     );
     doc["lean_spec"] = json!(definition);
     let statement = format!(
-        "Equivalence.Spec.Equivalent domain Original.«{}» Optimized.«{}»",
+        "{family}.Spec.Equivalent domain Original.«{}» Optimized.«{}»",
         sp.kernel, sp.kernel
     );
     let pre = format!(
-        "import Ptx.Auto.Equivalence\nnamespace E5rSpec\nopen Ptx Ptx.Auto\nnamespace Original\n{}\nend Original\nnamespace Optimized\n{}\nend Optimized\n{}",
+        "import Ptx.Auto.{family}\nnamespace E5rSpec\nopen Ptx Ptx.Auto\nnamespace Original\n{}\nend Original\nnamespace Optimized\n{}\nend Optimized\n{}",
         e5r_ptx::lean::kernel_def(k0),
         e5r_ptx::lean::kernel_def(k1),
         definition
@@ -154,7 +165,7 @@ pub fn check(
         pf,
         &stmtmod,
         &statement,
-        "Ptx.Auto.Equivalence.Spec.Equivalent",
+        &format!("Ptx.Auto.{family}.Spec.Equivalent"),
         phash,
         shash,
         &proj,

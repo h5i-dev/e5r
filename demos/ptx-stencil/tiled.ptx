@@ -1,0 +1,101 @@
+// Agent-authored direct PTX, 17-tap uint32 stencil, four outputs/thread.
+.version 9.2
+.target sm_86
+.address_size 64
+.visible .entry stencil17(
+ .param .u64 stencil17_param_0,
+ .param .u64 stencil17_param_1,
+ .param .u32 stencil17_param_2
+) {
+.reg .pred %p<8>;
+.reg .b32 %r<90>;
+.reg .b64 %rd<30>;
+.shared .align 4 .b8 stage[2112];
+ld.param.u64 %rd1, [stencil17_param_0];
+ld.param.u64 %rd2, [stencil17_param_1];
+ld.param.u32 %r2, [stencil17_param_2];
+mov.u32 %r3, %ntid.x;
+mov.u32 %r4, %ctaid.x;
+mov.u32 %r5, %tid.x;
+mul.wide.u32 %rd10, %r4, %r3;
+cvt.u64.u32 %rd11, %r5;
+add.u64 %rd10, %rd10, %rd11;
+cvt.u64.u32 %rd12, %r2;
+add.u64 %rd15, %rd12, 16;
+cvt.u64.u32 %rd13, %r3;
+mov.u32 %r70, stage;
+mov.u32 %r71, %r5;
+mov.u32 %r40, 0;
+setp.ge.u64 %p1, %rd10, %rd15;
+@%p1 bra LOAD_0_END;
+shl.b64 %rd14, %rd10, 2;
+add.u64 %rd6, %rd1, %rd14;
+ld.global.u32 %r40, [%rd6];
+LOAD_0_END:
+shl.b32 %r72, %r71, 2;
+add.u32 %r72, %r70, %r72;
+st.shared.u32 [%r72], %r40;
+add.u64 %rd10, %rd10, %rd13;
+add.u32 %r71, %r71, %r3;
+setp.ge.u32 %p1, %r5, 16;
+@%p1 bra LOADED;
+mov.u32 %r40, 0;
+setp.ge.u64 %p1, %rd10, %rd15;
+@%p1 bra HALO_END;
+shl.b64 %rd14, %rd10, 2;
+add.u64 %rd6, %rd1, %rd14;
+ld.global.u32 %r40, [%rd6];
+HALO_END:
+shl.b32 %r72, %r71, 2;
+add.u32 %r72, %r70, %r72;
+st.shared.u32 [%r72], %r40;
+LOADED:
+bar.sync 0;
+mul.wide.u32 %rd10, %r4, %r3;
+add.u64 %rd10, %rd10, %rd11;
+mov.u32 %r71, %r5;
+setp.ge.u64 %p1, %rd10, %rd12;
+@%p1 bra DONE;
+shl.b32 %r72, %r71, 2;
+add.u32 %r72, %r70, %r72;
+mov.u32 %r40, 0;
+ld.shared.u32 %r10, [%r72+0];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+4];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+8];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+12];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+16];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+20];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+24];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+28];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+32];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+36];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+40];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+44];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+48];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+52];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+56];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+60];
+add.u32 %r40, %r40, %r10;
+ld.shared.u32 %r10, [%r72+64];
+add.u32 %r40, %r40, %r10;
+shl.b64 %rd14, %rd10, 2;
+add.u64 %rd7, %rd2, %rd14;
+st.global.u32 [%rd7], %r40;
+DONE:
+ret;
+}

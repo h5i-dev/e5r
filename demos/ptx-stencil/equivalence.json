@@ -1,0 +1,10 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "class": "equivalence-stencil17",
+  "kernel": "stencil17",
+  "original_ptx": "original.ptx",
+  "original_sha256": "4b5fb28f02ee7c024eb18e8813f8f5c1a49512a06a7579f9a94fe67ffcddd79c",
+  "input": "stencil17_param_0",
+  "output": "stencil17_param_1",
+  "length": "stencil17_param_2"
+}

@@ -1,0 +1,17 @@
+{
+  "cases": 10656,
+  "seed": 1717,
+  "alignment": "input and output offsets 0/4/8/12 bytes; all only 4-byte alignment",
+  "ptx_sha256": {
+    "original": "4b5fb28f02ee7c024eb18e8813f8f5c1a49512a06a7579f9a94fe67ffcddd79c",
+    "tiled": "b4522d80233205f4fbdea650fd9eb43f2eee126b548e467dc8a1a585107460b9",
+    "tiled4": "4dc912a8c981fd71aa40fd5090a9c2317ec94133f62f8518f7b6b87e9a401dd9"
+  },
+  "foreign_processes_observed": false,
+  "lock": "/mnt/scratch/e5r-gpu-benchmark.lock",
+  "cuda_sha256": {
+    "tiled.cu": "85a361c6b68f2149b51882bc77b93769d065ab8b155d70be97ebfbb59b740174",
+    "matching.cu": "5eca4dbdefcd72967216b9ab8e04c72759a3e2fd0f6546fd8ac90453a3990d28"
+  },
+  "scope": "cooperative contiguous input+halo staging, one barrier, coalesced output; 16<=block<=512; one/four outputs per thread"
+}

@@ -1,0 +1,16 @@
+{
+  "cases": 8880,
+  "seed": 1717,
+  "alignment": "input and output offsets 0/4/8/12 bytes; all only 4-byte alignment",
+  "ptx_sha256": {
+    "original": "4b5fb28f02ee7c024eb18e8813f8f5c1a49512a06a7579f9a94fe67ffcddd79c",
+    "paired2": "625bd86836e923619bc49a19afee7883c9d6d9fc6844bd124fe00a90217979d4",
+    "scalar2": "5de84f86cbfbb8d6b0aef8a3d913c9cb6275383bcda18757a4047458ddc17d41"
+  },
+  "foreign_processes_observed": false,
+  "lock": "/mnt/scratch/e5r-gpu-benchmark.lock",
+  "cuda_sha256": {
+    "paired2.cu": "eb270210f06577be93fbc074ded231a327026ce156ba712042b974c9150ee75b"
+  },
+  "scope": "two adjacent rolling outputs; paired u64 versus scalar stores, 4-byte alignment with dynamic 8-byte fallback"
+}

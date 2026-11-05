@@ -1197,6 +1197,18 @@ specification. Unsupported forms, stale bindings and failed proofs are never
 accepted. The original and candidate benchmark show essentially equal speed;
 this is a negative optimization result with a completed relational proof.
 
+The [concrete stencil edit](../../demos/ptx-stencil/README.md) extends this
+track to different thread ownership and independent original/edited launches.
+The `equivalence-stencil17` supplied-proof class checks
+`Stencil.Spec.Equivalent`: universal final output-word equality for every pair
+of completed interleavings, external-byte preservation, and separate safety,
+progress, bounded termination, race freedom and nonvacuous completion. The
+accepted scalar rolling edit uses a continuation-parametric symbolic execution
+of the frozen original, with no shared operator-spec correctness premise.
+Its performance regresses; the paired-store and later coalesced-ownership GPU
+experiments do not inherit its proof. See the demo for exact artifact binding,
+launch/allocation assumptions and the complete retained timing sweep.
+
 The related `packing` class supports unequal input/output allocation sizes
 through `Packing.Spec.Correct`. Only the unpack candidate has accepted replay;
 pack/fusion proof drafts remain experimental. See the [packing report](../../demos/verified-packing/README.md).

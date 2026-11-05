@@ -1,0 +1,54 @@
+{
+  "class": "equivalence-stencil17",
+  "counterexample": null,
+  "input": {
+    "original_ptx": {
+      "path": "/root/e5r-ptx-demo/demos/ptx-stencil/original.ptx",
+      "sha256": "4b5fb28f02ee7c024eb18e8813f8f5c1a49512a06a7579f9a94fe67ffcddd79c"
+    },
+    "ptx": {
+      "path": "/mnt/scratch/e5r-ptx-demo/negative-stencil/wrong-window-load/kernel.ptx",
+      "sha256": "b38c32765043d555f538fb0b2a278b59ec57f700e1d00e874fe819c2cdc7d17d"
+    },
+    "spec": {
+      "path": "/mnt/scratch/e5r-ptx-demo/negative-stencil/wrong-window-load/contract.json",
+      "sha256": "fcea417646260002128ffea424fa23e430b96fa73ea805a5adc106e80cfd4331"
+    }
+  },
+  "kernel": "stencil17",
+  "lean": {
+    "memory_cap_mb": 5120,
+    "proof_seconds": 200.98,
+    "timeout_seconds": 300,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "lean_spec": "def domain : Stencil.Spec := ⟨\"stencil17_param_0\", \"stencil17_param_1\", \"stencil17_param_2\"⟩\n",
+  "proof": {
+    "accepted": false,
+    "manifest": {
+      "ptx": "b38c32765043d555f538fb0b2a278b59ec57f700e1d00e874fe819c2cdc7d17d",
+      "spec": "fcea417646260002128ffea424fa23e430b96fa73ea805a5adc106e80cfd4331",
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "path": "/mnt/scratch/e5r-ptx-demo/negative-stencil/wrong-window-load/proof.lean",
+    "sha256": "1af12a8435e1a4a1c04c3ebfdbdf5cd570d2818697d91e74df88160a6488dd90",
+    "supplied": true
+  },
+  "properties": {
+    "functional_correctness": "unknown",
+    "memory_safety": "unknown",
+    "race_freedom": "unknown",
+    "termination": "unknown"
+  },
+  "reasons": [
+    "supplied proof refused: it does not compile: error: `grind` failed case grind.1.1.1.1.1.1.1.1.1.2.1.1.1.2.1.1.2.2.1.1.1.2.1.1 A : Stencil.Args"
+  ],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 203.64,
+  "theorem": null,
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "unknown"
+}

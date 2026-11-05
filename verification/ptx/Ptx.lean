@@ -33,3 +33,4 @@ import Ptx.Logic.Schedule
 import Ptx.Auto.Packing
 
 import Ptx.Auto.Equivalence
+import Ptx.Auto.Stencil

@@ -280,10 +280,12 @@ pub fn check(o: &Options) -> (Verdict, Value) {
     {
         return packing::check(o, doc, started, &module, &stext, &phash, &shash);
     }
-    if serde_json::from_str::<Value>(&stext)
-        .ok()
-        .is_some_and(|v| v["class"] == "equivalence-unpack4")
-    {
+    if serde_json::from_str::<Value>(&stext).ok().is_some_and(|v| {
+        matches!(
+            v["class"].as_str(),
+            Some("equivalence-unpack4" | "equivalence-stencil17")
+        )
+    }) {
         return equivalence::check(o, doc, started, &module, &stext, &phash, &shash);
     }
     if let Some(class) = block_class(&stext) {

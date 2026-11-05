@@ -1,0 +1,17 @@
+{
+  "cases": 10656,
+  "seed": 1717,
+  "alignment": "input and output offsets 0/4/8/12 bytes; all only 4-byte alignment",
+  "ptx_sha256": {
+    "original": "4b5fb28f02ee7c024eb18e8813f8f5c1a49512a06a7579f9a94fe67ffcddd79c",
+    "striped": "9dab43d65f2d95897232e39a26319d9d6b7e59c20e5ede6f5365b92b782d4f3d",
+    "staged": "068a95cfd993fbe5caa6029fd95531b97a845305b403cb0f14eeab4fbb1c98c9"
+  },
+  "foreign_processes_observed": false,
+  "lock": "/mnt/scratch/e5r-gpu-benchmark.lock",
+  "cuda_sha256": {
+    "coalesced.cu": "d0ed0852a2ee71f4272cee2e0828897b2ca1b6a9b6c9dc2c043fdcffab72fec6",
+    "matching.cu": "5eca4dbdefcd72967216b9ab8e04c72759a3e2fd0f6546fd8ac90453a3990d28"
+  },
+  "scope": "block-striped independent accumulators; rolling sums with shared staging/bar.sync; block<=512"
+}

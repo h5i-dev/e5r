@@ -1,0 +1,11 @@
+{
+  "cases": 5328,
+  "seed": 1717,
+  "alignment": "input and output offsets 0/4/8/12 bytes; all only 4-byte alignment",
+  "ptx_sha256": {
+    "original": "4b5fb28f02ee7c024eb18e8813f8f5c1a49512a06a7579f9a94fe67ffcddd79c",
+    "edited": "a79f34aabc16683894018aa13556720f045e7dcc09e1bff21f4dc05990c0fbc5"
+  },
+  "foreign_processes_observed": false,
+  "lock": "/mnt/scratch/e5r-gpu-benchmark.lock"
+}

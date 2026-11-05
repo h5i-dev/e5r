@@ -238,25 +238,29 @@ fn direct_equivalence_requires_bound_original_and_strict_contract() {
         let sp = tmp(&format!("relational-{tag}.json"), &v.to_string());
         check(&ptx, &sp, &[])
     };
-    let (code, result) = run("no-proof", &base);
-    assert_eq!(code, 3, "{result}");
-    assert!(
-        result["reasons"]
-            .to_string()
-            .contains("requires a supplied proof")
-    );
-    let mut bad = base.clone();
-    bad["original_sha256"] = "0".repeat(64).into();
-    let (code, result) = run("stale-reference", &bad);
-    assert_eq!(code, 3, "{result}");
-    assert!(result["reasons"].to_string().contains("hash mismatch"));
-    bad = base.clone();
-    bad["output"] = "input".into();
-    assert_eq!(run("alias", &bad).0, 4);
-    bad = base.clone();
-    bad["input"] = "missing".into();
-    assert_eq!(run("param", &bad).0, 2);
-    bad = base;
-    bad["assume_equal"] = true.into();
-    assert_eq!(run("unknown-field", &bad).0, 4);
+    for class in ["equivalence-unpack4", "equivalence-stencil17"] {
+        let mut base = base.clone();
+        base["class"] = class.into();
+        let (code, result) = run("no-proof", &base);
+        assert_eq!(code, 3, "{result}");
+        assert!(
+            result["reasons"]
+                .to_string()
+                .contains("requires a supplied proof")
+        );
+        let mut bad = base.clone();
+        bad["original_sha256"] = "0".repeat(64).into();
+        let (code, result) = run("stale-reference", &bad);
+        assert_eq!(code, 3, "{result}");
+        assert!(result["reasons"].to_string().contains("hash mismatch"));
+        bad = base.clone();
+        bad["output"] = "input".into();
+        assert_eq!(run("alias", &bad).0, 4);
+        bad = base.clone();
+        bad["input"] = "missing".into();
+        assert_eq!(run("param", &bad).0, 2);
+        bad = base.clone();
+        bad["assume_equal"] = true.into();
+        assert_eq!(run("unknown-field", &bad).0, 4);
+    }
 }

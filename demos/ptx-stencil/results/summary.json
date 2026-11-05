@@ -1,0 +1,199 @@
+{
+  "fixed_block_graph_geomeans": {
+    "128": {
+      "edited": 0.8940337814362176,
+      "edited64": 0.9324375294311201,
+      "matching_cuda": 0.9081055837045836,
+      "matching64_cuda": 0.9291573565300848
+    },
+    "256": {
+      "edited": 0.8277022225256252,
+      "edited64": 0.8947545227203026,
+      "matching_cuda": 0.858047248246703,
+      "matching64_cuda": 0.8880466820899612
+    },
+    "512": {
+      "edited": 0.7941239505785799,
+      "edited64": 0.8623729585494682,
+      "matching_cuda": 0.8189422976809161,
+      "matching64_cuda": 0.8586889264640029
+    }
+  },
+  "profiles": [
+    {
+      "run": "profile-edited",
+      "metrics": {
+        "gpu__time_duration.sum": 641152.0,
+        "dram__bytes_read.sum": 187133184.0,
+        "dram__bytes_write.sum": 163004160.0,
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": 91.09415,
+        "sm__warps_active.avg.pct_of_peak_sustained_active": 86.64772,
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum": 16777216.0,
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum": 85983232.0,
+        "smsp__inst_executed.sum": 15466496.0,
+        "launch__registers_per_thread": 26.0
+      },
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Mbyte",
+        "dram__bytes_write.sum": "Mbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum": "sector",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum": "sector",
+        "smsp__inst_executed.sum": "inst",
+        "launch__registers_per_thread": "register/thread"
+      }
+    },
+    {
+      "run": "profile-edited64",
+      "metrics": {
+        "gpu__time_duration.sum": 600704.0,
+        "dram__bytes_read.sum": 166156160.0,
+        "dram__bytes_write.sum": 156360832.0,
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": 89.566271,
+        "sm__warps_active.avg.pct_of_peak_sustained_active": 83.328095,
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum": 8388608.0,
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum": 85983232.0,
+        "smsp__inst_executed.sum": 15728640.0,
+        "launch__registers_per_thread": 26.0
+      },
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Mbyte",
+        "dram__bytes_write.sum": "Mbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum": "sector",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum": "sector",
+        "smsp__inst_executed.sum": "inst",
+        "launch__registers_per_thread": "register/thread"
+      }
+    },
+    {
+      "run": "profile-matching17-no-restrict",
+      "metrics": {
+        "gpu__time_duration.sum": 636288.0,
+        "dram__bytes_read.sum": 185024768.0,
+        "dram__bytes_write.sum": 162072704.0,
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": 91.001497,
+        "sm__warps_active.avg.pct_of_peak_sustained_active": 86.791685,
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum": 16777216.0,
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum": 98566144.0,
+        "smsp__inst_executed.sum": 19398656.0,
+        "launch__registers_per_thread": 30.0
+      },
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Mbyte",
+        "dram__bytes_write.sum": "Mbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum": "sector",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum": "sector",
+        "smsp__inst_executed.sum": "inst",
+        "launch__registers_per_thread": "register/thread"
+      }
+    },
+    {
+      "run": "profile-matching17",
+      "metrics": {
+        "gpu__time_duration.sum": 624224.0,
+        "dram__bytes_read.sum": 180050944.0,
+        "dram__bytes_write.sum": 161076480.0,
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": 91.165206,
+        "sm__warps_active.avg.pct_of_peak_sustained_active": 85.14144,
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum": 16777216.0,
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum": 85983232.0,
+        "smsp__inst_executed.sum": 17039360.0,
+        "launch__registers_per_thread": 30.0
+      },
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Mbyte",
+        "dram__bytes_write.sum": "Mbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum": "sector",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum": "sector",
+        "smsp__inst_executed.sum": "inst",
+        "launch__registers_per_thread": "register/thread"
+      }
+    },
+    {
+      "run": "profile-matching64-no-restrict",
+      "metrics": {
+        "gpu__time_duration.sum": 592032.0,
+        "dram__bytes_read.sum": 163678080.0,
+        "dram__bytes_write.sum": 155625728.0,
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": 89.963338,
+        "sm__warps_active.avg.pct_of_peak_sustained_active": 82.46385,
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum": 8388608.0,
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum": 94371840.0,
+        "smsp__inst_executed.sum": 20447232.0,
+        "launch__registers_per_thread": 30.0
+      },
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Mbyte",
+        "dram__bytes_write.sum": "Mbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum": "sector",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum": "sector",
+        "smsp__inst_executed.sum": "inst",
+        "launch__registers_per_thread": "register/thread"
+      }
+    },
+    {
+      "run": "profile-matching64",
+      "metrics": {
+        "gpu__time_duration.sum": 592384.0,
+        "dram__bytes_read.sum": 163636352.0,
+        "dram__bytes_write.sum": 155508864.0,
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": 89.873019,
+        "sm__warps_active.avg.pct_of_peak_sustained_active": 82.247193,
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum": 8388608.0,
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum": 85983232.0,
+        "smsp__inst_executed.sum": 19922944.0,
+        "launch__registers_per_thread": 29.0
+      },
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Mbyte",
+        "dram__bytes_write.sum": "Mbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum": "sector",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum": "sector",
+        "smsp__inst_executed.sum": "inst",
+        "launch__registers_per_thread": "register/thread"
+      }
+    },
+    {
+      "run": "profile-original",
+      "metrics": {
+        "gpu__time_duration.sum": 540064.0,
+        "dram__bytes_read.sum": 147749632.0,
+        "dram__bytes_write.sum": 152866304.0,
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": 92.850264,
+        "sm__warps_active.avg.pct_of_peak_sustained_active": 83.757492,
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum": 4194304.0,
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum": 85819144.0,
+        "smsp__inst_executed.sum": 72351744.0,
+        "launch__registers_per_thread": 34.0
+      },
+      "source_units": {
+        "gpu__time_duration.sum": "us",
+        "dram__bytes_read.sum": "Mbyte",
+        "dram__bytes_write.sum": "Mbyte",
+        "dram__throughput.avg.pct_of_peak_sustained_elapsed": "%",
+        "sm__warps_active.avg.pct_of_peak_sustained_active": "%",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_st.sum": "sector",
+        "l1tex__t_sectors_pipe_lsu_mem_global_op_ld.sum": "sector",
+        "smsp__inst_executed.sum": "inst",
+        "launch__registers_per_thread": "register/thread"
+      }
+    }
+  ]
+}
