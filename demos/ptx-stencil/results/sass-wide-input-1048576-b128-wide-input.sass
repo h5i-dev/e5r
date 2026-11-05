@@ -1,0 +1,88 @@
+------------------ ---------------------------------------------------- ------
+Kernel Name        stencil17
+------------------ ---------------------------------------------------- ------
+Address            Source                                               launch
+                                                                        __regi
+                                                                        sters_
+                                                                        per_th
+                                                                        read
+0x7fcfbb289900           IMAD.MOV.U32 R1, RZ, RZ, c[0x0][0x28]          0
+0x7fcfbb289910           S2R R22, SR_CTAID.X                            0
+0x7fcfbb289920           UMOV UR4, 0x1                                  0
+0x7fcfbb289930           ULDC UR5, c[0x0][0x170]                        0
+0x7fcfbb289940           S2R R3, SR_TID.X                               0
+0x7fcfbb289950           UIADD3 UR4, UR4, UR5, URZ                      0
+0x7fcfbb289960           USHF.R.U32.HI UR4, URZ, 0x1, UR4               0
+0x7fcfbb289970           IMAD R0, R22, c[0x0][0x0], R3                  0
+0x7fcfbb289980           ISETP.GE.U32.AND P0, PT, R0, UR4, PT           0
+0x7fcfbb289990     @P0   EXIT                                           0
+0x7fcfbb2899a0           IMAD.SHL.U32 R0, R0, 0x2, RZ                   0
+0x7fcfbb2899b0           ULDC.64 UR4, c[0x0][0x118]                     0
+0x7fcfbb2899c0           IMAD.MOV.U32 R3, RZ, RZ, 0x4                   0
+0x7fcfbb2899d0           IMAD.WIDE.U32 R2, R0, R3, c[0x0][0x160]        0
+0x7fcfbb2899e0           IADD3 R0, R0, 0x1, RZ                          0
+0x7fcfbb2899f0           LOP3.LUT P0, RZ, R2, 0x7, RZ, 0xc0, !PT        0
+0x7fcfbb289a00           ISETP.GE.U32.OR P1, PT, R0, c[0x0][0x170], P0  0
+0x7fcfbb289a10     @!P1  LDG.E.64 R6, [R2.64]                           0
+0x7fcfbb289a20     @!P1  LDG.E.64 R14, [R2.64+0x8]                      0
+0x7fcfbb289a30     @!P1  LDG.E.64 R16, [R2.64+0x10]                     0
+0x7fcfbb289a40     @!P1  LDG.E.64 R18, [R2.64+0x18]                     0
+0x7fcfbb289a50     @!P1  LDG.E.64 R20, [R2.64+0x20]                     0
+0x7fcfbb289a60     @!P1  LDG.E.64 R12, [R2.64+0x28]                     0
+0x7fcfbb289a70     @!P1  LDG.E.64 R10, [R2.64+0x30]                     0
+0x7fcfbb289a80     @!P1  LDG.E.64 R8, [R2.64+0x38]                      0
+0x7fcfbb289a90     @!P1  LDG.E.64 R4, [R2.64+0x40]                      0
+0x7fcfbb289aa0     @P1   LDG.E R6, [R2.64]                              0
+0x7fcfbb289ab0     @P1   LDG.E R7, [R2.64+0x4]                          0
+0x7fcfbb289ac0     @P1   LDG.E R14, [R2.64+0x8]                         0
+0x7fcfbb289ad0     @P1   LDG.E R15, [R2.64+0xc]                         0
+0x7fcfbb289ae0     @P1   LDG.E R16, [R2.64+0x10]                        0
+0x7fcfbb289af0     @P1   LDG.E R17, [R2.64+0x14]                        0
+0x7fcfbb289b00     @P1   LDG.E R18, [R2.64+0x18]                        0
+0x7fcfbb289b10     @P1   LDG.E R19, [R2.64+0x1c]                        0
+0x7fcfbb289b20     @P1   LDG.E R20, [R2.64+0x20]                        0
+0x7fcfbb289b30     @P1   LDG.E R21, [R2.64+0x24]                        0
+0x7fcfbb289b40     @P1   LDG.E R12, [R2.64+0x28]                        0
+0x7fcfbb289b50     @P1   LDG.E R13, [R2.64+0x2c]                        0
+0x7fcfbb289b60     @P1   LDG.E R10, [R2.64+0x30]                        0
+0x7fcfbb289b70     @P1   LDG.E R11, [R2.64+0x34]                        0
+0x7fcfbb289b80     @P1   LDG.E R8, [R2.64+0x38]                         0
+0x7fcfbb289b90     @P1   LDG.E R9, [R2.64+0x3c]                         0
+0x7fcfbb289ba0     @P1   LDG.E R4, [R2.64+0x40]                         0
+0x7fcfbb289bb0           ISETP.GE.U32.AND P1, PT, R0, c[0x0][0x170], PT 0
+0x7fcfbb289bc0           S2R R23, SR_TID.X                              0
+0x7fcfbb289bd0           IMAD R23, R22, c[0x0][0x0], R23                0
+0x7fcfbb289be0           IADD3 R7, R14, R6, R7                          0
+0x7fcfbb289bf0           IADD3 R7, R16, R7, R15                         0
+0x7fcfbb289c00           IADD3 R7, R18, R7, R17                         0
+0x7fcfbb289c10           IADD3 R7, R20, R7, R19                         0
+0x7fcfbb289c20           IADD3 R7, R12, R7, R21                         0
+0x7fcfbb289c30           IADD3 R7, R10, R7, R13                         0
+0x7fcfbb289c40           IMAD.MOV.U32 R13, RZ, RZ, 0x4                  0
+0x7fcfbb289c50           IMAD.SHL.U32 R10, R23, 0x2, RZ                 0
+0x7fcfbb289c60           IADD3 R8, R8, R7, R11                          0
+0x7fcfbb289c70           IMAD.WIDE.U32 R10, R10, R13, c[0x0][0x168]     0
+0x7fcfbb289c80           IADD3 R8, R4, R8, R9                           0
+0x7fcfbb289c90     @P1   BRA 0x7fcfbb289d50                             0
+0x7fcfbb289ca0           BSSY B0, 0x7fcfbb289cf0                        0
+0x7fcfbb289cb0           LOP3.LUT P1, RZ, R10, 0x7, RZ, 0xc0, !PT       0
+0x7fcfbb289cc0     @!P0  BRA 0x7fcfbb289ce0                             0
+0x7fcfbb289cd0           LDG.E R5, [R2.64+0x44]                         0
+0x7fcfbb289ce0           BSYNC B0                                       0
+0x7fcfbb289cf0           IADD3 R9, R5, R8, -R6                          0
+0x7fcfbb289d00     @!P1  STG.E.64 [R10.64], R8                          0
+0x7fcfbb289d10     @!P1  EXIT                                           0
+0x7fcfbb289d20           STG.E [R10.64], R8                             0
+0x7fcfbb289d30           STG.E [R10.64+0x4], R9                         0
+0x7fcfbb289d40           EXIT                                           0
+0x7fcfbb289d50           STG.E [R10.64], R8                             0
+0x7fcfbb289d60           EXIT                                           0
+0x7fcfbb289d70           BRA `(.L_x_0) 0x7fcfbb289d70                   0
+0x7fcfbb289d80           NOP                                            0
+0x7fcfbb289d90           NOP                                            0
+0x7fcfbb289da0           NOP                                            0
+0x7fcfbb289db0           NOP                                            0
+0x7fcfbb289dc0           NOP                                            0
+0x7fcfbb289dd0           NOP                                            0
+0x7fcfbb289de0           NOP                                            0
+0x7fcfbb289df0           NOP                                            0

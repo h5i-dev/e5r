@@ -1,5 +1,5 @@
 {
-  "recorded_utc": "2026-11-05T22:14:51.345522+00:00",
+  "recorded_utc": "2026-11-05T22:42:18.930783+00:00",
   "checks": [
     {
       "command": "cargo test --release -p e5r-verify --test ptx_cli -- --test-threads=1",
@@ -44,21 +44,37 @@
         "Classical.choice"
       ],
       "seconds": 67.51
+    },
+    "wide-branch": {
+      "declarations": 204,
+      "axioms": [
+        "propext",
+        "Quot.sound",
+        "Classical.choice"
+      ],
+      "seconds": 88.12,
+      "public_runner_exit": 0
     }
   },
   "semantic_negative_controls": [
     "wrong-packed-shift",
-    "wrong-entry-guard"
+    "wrong-entry-guard",
+    "wrong-wide-index",
+    "wrong-wide-tail"
   ],
   "gpu_cases": {
     "coalesced": 10656,
     "tiled": 10656,
     "paired2": 8880,
-    "paired2-pointer": 8880
+    "paired2-pointer": 8880,
+    "wide-input": 35520,
+    "wide-branch": 42624
   },
   "limitations": [
-    "1.5x target missed; local cache gain and small GM only; large regressions retained",
-    "paired2 input scalar loads remain stride-two; aligned u64 output stores are contiguous",
-    "No PTX parser/exporter, CUDA compiler, ptxas/JIT or hardware correctness proof"
-  ]
+    "Full-sweep 1.5x target missed; wide-branch GM1.068x at block128, large regressions retained",
+    "Local 1MiB gain1.71x is a hot-buffer result;16 rotating pairs about1.08x",
+    "Wide input/output paths have checked alignment/full-pair guards; all4-byte alignment and tails retained",
+    "No proof of Rust parser/exporter, CUDA compiler, ptxas/JIT or hardware"
+  ],
+  "notes": "Rust verifier and Lean model sources are unchanged from 1568169, whose full CLI regression, release Clippy and model audit remain applicable. Final wide proof, public runner, negative controls, GPU correspondence and reports were checked separately."
 }

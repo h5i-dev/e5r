@@ -1212,8 +1212,13 @@ launches with edited coverage ceil(n/2), four-byte base alignment, checked
 eight-byte stores, scalar alignment/tail fallbacks, safety, termination and
 external-byte preservation. The paired edit has a local one-MiB gain and a
 small all-shape geometric-mean gain at block128; large workloads still regress
-and the 1.5x target was missed. Shared/striped/tiled GPU experiments do not
-inherit these proofs. See the demo for exact artifact binding and all timings.
+and the 1.5x target was missed. A separately accepted final edit also uses
+checked u64 input loads on complete aligned pairs, preserving the same
+four-byte-aligned full domain and scalar tails. Its 204-declaration replay
+uses only the three standard axioms. It measures a local 1.71x hot-buffer
+gain, 1.068x seven-shape geometric mean, and about 1.08x in a rotating-buffer
+diagnostic. Large workloads still regress. Shared/striped/tiled experiments
+do not inherit these proofs. See the demo for all bindings and timings.
 
 The related `packing` class supports unequal input/output allocation sizes
 through `Packing.Spec.Correct`. Only the unpack candidate has accepted replay;

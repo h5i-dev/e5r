@@ -1,4 +1,4 @@
-# Coalesced stencil edits: experimental results
+# Coalesced stencil edits: proofs and measurements
 
 All new variants are directly authored PTX. Each needs its own proof;
 GPU correspondence and timing are empirical.
@@ -13,6 +13,8 @@ each sweep. A ratio above 1 is faster than the frozen original.
 scalar2: strictly accepted, 144 declarations; axioms propext, Quot.sound, Classical.choice.
 
 paired2: strictly accepted, 175 declarations; axioms propext, Quot.sound, Classical.choice.
+
+wide-branch: strictly accepted, 204 declarations; axioms propext, Quot.sound, Classical.choice.
 
 ## coalesced sweep
 
@@ -190,6 +192,94 @@ All-shape geometric mean original/candidate: paired2 1.001x, scalar2 1.012x, pai
 
 All-shape geometric mean original/candidate: paired2 0.979x, scalar2 0.983x, paired2_cuda 0.968x, scalar2_cuda 0.970x.
 
+## wide-input sweep
+
+### 128 threads/block
+
+| Output bytes | original us | paired2 us | wide-input us | paired2_cuda us | wide_input_cuda us |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 32 | 1.062 | 1.082 | 1.084 | 1.085 | 1.094 |
+| 256 | 1.062 | 1.103 | 1.096 | 1.106 | 1.107 |
+| 4096 | 1.117 | 1.183 | 1.156 | 1.186 | 1.166 |
+| 65536 | 1.253 | 1.255 | 1.228 | 1.261 | 1.232 |
+| 1048576 | 3.641 | 2.827 | 3.085 | 2.951 | 2.201 |
+| 16777216 | 69.293 | 69.779 | 69.998 | 69.921 | 69.926 |
+| 134217728 | 544.003 | 548.716 | 551.223 | 549.975 | 551.062 |
+
+All-shape geometric mean original/candidate: paired2 1.018x, wide-input 1.011x, paired2_cuda 1.009x, wide_input_cuda 1.057x.
+
+### 256 threads/block
+
+| Output bytes | original us | paired2 us | wide-input us | paired2_cuda us | wide_input_cuda us |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 32 | 1.056 | 1.077 | 1.082 | 1.080 | 1.092 |
+| 256 | 1.056 | 1.099 | 1.092 | 1.102 | 1.103 |
+| 4096 | 1.166 | 1.233 | 1.228 | 1.240 | 1.182 |
+| 65536 | 1.244 | 1.309 | 1.293 | 1.317 | 1.253 |
+| 1048576 | 3.590 | 2.933 | 3.167 | 3.074 | 2.249 |
+| 16777216 | 68.625 | 69.554 | 69.957 | 69.735 | 69.874 |
+| 134217728 | 538.317 | 547.141 | 550.841 | 548.693 | 550.244 |
+
+All-shape geometric mean original/candidate: paired2 1.001x, wide-input 0.991x, paired2_cuda 0.991x, wide_input_cuda 1.048x.
+
+### 512 threads/block
+
+| Output bytes | original us | paired2 us | wide-input us | paired2_cuda us | wide_input_cuda us |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 32 | 1.055 | 1.083 | 1.086 | 1.085 | 1.096 |
+| 256 | 1.055 | 1.105 | 1.097 | 1.107 | 1.109 |
+| 4096 | 1.239 | 1.399 | 1.511 | 1.432 | 1.312 |
+| 65536 | 1.306 | 1.467 | 1.574 | 1.493 | 1.366 |
+| 1048576 | 3.624 | 2.950 | 3.439 | 3.066 | 2.340 |
+| 16777216 | 67.976 | 69.338 | 69.846 | 69.419 | 69.832 |
+| 134217728 | 533.035 | 545.263 | 549.555 | 546.087 | 549.212 |
+
+All-shape geometric mean original/candidate: paired2 0.979x, wide-input 0.936x, paired2_cuda 0.967x, wide_input_cuda 1.028x.
+
+## wide-branch sweep
+
+### 128 threads/block
+
+| Output bytes | original us | paired2 us | wide-input us | wide-branch us | paired2_cuda us | wide_input_cuda us |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 32 | 1.062 | 1.082 | 1.084 | 1.086 | 1.084 | 1.095 |
+| 256 | 1.072 | 1.101 | 1.093 | 1.093 | 1.102 | 1.103 |
+| 4096 | 1.117 | 1.185 | 1.159 | 1.159 | 1.189 | 1.167 |
+| 65536 | 1.254 | 1.256 | 1.228 | 1.226 | 1.260 | 1.233 |
+| 1048576 | 3.640 | 2.830 | 3.085 | 2.124 | 2.954 | 2.203 |
+| 16777216 | 69.299 | 69.780 | 70.012 | 69.906 | 69.924 | 69.942 |
+| 134217728 | 544.002 | 548.743 | 551.293 | 550.688 | 549.973 | 551.064 |
+
+All-shape geometric mean original/candidate: paired2 1.019x, wide-input 1.012x, wide-branch 1.068x, paired2_cuda 1.011x, wide_input_cuda 1.058x.
+
+### 256 threads/block
+
+| Output bytes | original us | paired2 us | wide-input us | wide-branch us | paired2_cuda us | wide_input_cuda us |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 32 | 1.058 | 1.077 | 1.079 | 1.081 | 1.080 | 1.092 |
+| 256 | 1.069 | 1.096 | 1.087 | 1.089 | 1.098 | 1.098 |
+| 4096 | 1.166 | 1.234 | 1.228 | 1.169 | 1.241 | 1.178 |
+| 65536 | 1.243 | 1.310 | 1.293 | 1.247 | 1.316 | 1.252 |
+| 1048576 | 3.590 | 2.936 | 3.167 | 2.137 | 3.076 | 2.249 |
+| 16777216 | 68.628 | 69.545 | 69.951 | 69.856 | 69.726 | 69.869 |
+| 134217728 | 538.310 | 547.169 | 550.795 | 549.969 | 548.675 | 550.262 |
+
+All-shape geometric mean original/candidate: paired2 1.003x, wide-input 0.994x, wide-branch 1.064x, paired2_cuda 0.993x, wide_input_cuda 1.052x.
+
+### 512 threads/block
+
+| Output bytes | original us | paired2 us | wide-input us | wide-branch us | paired2_cuda us | wide_input_cuda us |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 32 | 1.056 | 1.083 | 1.085 | 1.086 | 1.087 | 1.097 |
+| 256 | 1.067 | 1.102 | 1.093 | 1.095 | 1.103 | 1.104 |
+| 4096 | 1.238 | 1.401 | 1.510 | 1.304 | 1.428 | 1.314 |
+| 65536 | 1.305 | 1.468 | 1.573 | 1.357 | 1.492 | 1.366 |
+| 1048576 | 3.624 | 2.952 | 3.442 | 2.237 | 3.068 | 2.338 |
+| 16777216 | 67.973 | 69.336 | 69.849 | 69.835 | 69.416 | 69.818 |
+| 134217728 | 533.041 | 545.252 | 549.546 | 549.178 | 546.053 | 549.197 |
+
+All-shape geometric mean original/candidate: paired2 0.981x, wide-input 0.939x, wide-branch 1.041x, paired2_cuda 0.969x, wide_input_cuda 1.030x.
+
 ## Transaction profiles
 
 Default profiles use 128 MiB output and block=256. Additional sizes
@@ -225,6 +315,45 @@ The profiled single invocation does not replace repeated timing.
 | profile-pointer2-1048576-b128-paired2_pointer_cuda | 3.94 | 638976 | 32768 | n/a | n/a |
 | profile-pointer2-1048576-b128-scalar2 | 3.81 | 638976 | 65536 | n/a | n/a |
 | profile-pointer2-1048576-b128-scalar2_pointer_cuda | 3.90 | 638976 | 65536 | n/a | n/a |
+| profile-wide-input-1048576-b128-original | 4.54 | 670121 | 32768 | n/a | n/a |
+| profile-wide-input-1048576-b128-paired2 | 3.84 | 638976 | 32768 | n/a | n/a |
+| profile-wide-input-1048576-b128-paired2_pointer_cuda | 3.90 | 638976 | 32768 | n/a | n/a |
+| profile-wide-input-1048576-b128-wide-input | 3.94 | 319488 | 32768 | n/a | n/a |
+| profile-wide-input-1048576-b128-wide_input_cuda | 3.26 | 319488 | 32768 | n/a | n/a |
+| profile-wide-branch-1048576-b128-original | 4.58 | 670176 | 32768 | n/a | n/a |
+| profile-wide-branch-1048576-b128-paired2 | 3.78 | 638976 | 32768 | n/a | n/a |
+| profile-wide-branch-1048576-b128-paired2_pointer_cuda | 3.87 | 638976 | 32768 | n/a | n/a |
+| profile-wide-branch-1048576-b128-wide-branch | 3.20 | 319488 | 32768 | n/a | n/a |
+| profile-wide-branch-1048576-b128-wide-input | 3.97 | 319488 | 32768 | n/a | n/a |
+| profile-wide-branch-1048576-b128-wide_input_cuda | 3.30 | 319488 | 32768 | n/a | n/a |
+| profile-wide-branch-original | 539.58 | 85819347 | 4194304 | n/a | n/a |
+| profile-wide-branch-paired2 | 546.53 | 81788898 | 4194304 | n/a | n/a |
+| profile-wide-branch-paired2_pointer_cuda | 550.50 | 81788904 | 4194304 | n/a | n/a |
+| profile-wide-branch-wide-branch | 550.62 | 40894463 | 4194304 | n/a | n/a |
+| profile-wide-branch-wide-input | 551.52 | 40894464 | 4194304 | n/a | n/a |
+| profile-wide-branch-wide_input_cuda | 550.75 | 40894464 | 4194304 | n/a | n/a |
+
+## Cache-residency diagnostic
+
+Declared after observing the local one-MiB gain: compare one hot
+buffer pair with 16 rotating pairs (about 32 MiB total input/output).
+This exceeds L2 capacity; it does not promise a forced cold cache.
+Same one-MiB size, block128, graph replay, seven repeats.
+
+| Buffer pairs | Kernel | Median us | Working-set bytes |
+| ---: | --- | ---: | ---: |
+| 1 | original | 3.642 | 2097216 |
+| 1 | paired2 | 2.824 | 2097216 |
+| 1 | wide-input | 3.086 | 2097216 |
+| 1 | wide-branch | 2.125 | 2097216 |
+| 1 | paired2_cuda | 2.959 | 2097216 |
+| 1 | wide_input_cuda | 2.206 | 2097216 |
+| 16 | original | 5.667 | 33555456 |
+| 16 | paired2 | 5.341 | 33555456 |
+| 16 | wide-input | 5.304 | 33555456 |
+| 16 | wide-branch | 5.264 | 33555456 |
+| 16 | paired2_cuda | 5.349 | 33555456 |
+| 16 | wide_input_cuda | 5.276 | 33555456 |
 
 Striped independent accumulators restore coalesced stores but lose adjacent
 rolling reuse. Output staging retains rolling reuse and restores the original
@@ -251,6 +380,19 @@ with a cache-resident instruction-sequence benefit. It does not establish a
 general PTX-only advantage or a large-workload bandwidth improvement. The
 initial CUDA comparator's 80 loaded instructions and 31 registers are also
 preserved. Profiles are empirical; ptxas/JIT translation is outside Lean.
+
+The final wide-branch edit uses coalesced u64 input loads for aligned full
+pairs, with independent scalar input/output alignment and tail fallbacks.
+The initial wide-input attempt merged eighteen loaded values before summing;
+ptxas if-converted that load selection and issued predicated-off scalar slots
+alongside the wide loads. The final edit computes sums inside each branch
+and merges two output values. At one MiB/block128 its issued-instruction
+metric falls from 266240 to 184320, with 319488 load sectors in both versions;
+latency improves from 3.085 to 2.124 us. Original is 3.640 us, matching wide
+CUDA 2.203 us. The local speedup is 1.71x versus original, while the full
+seven-shape means are 1.068x/1.064x/1.041x at blocks128/256/512. Large workloads
+still regress; the full-sweep 1.5x target remains unmet. The rotating-buffer
+diagnostic above bounds how broadly the warm-buffer result should be used.
 
 All benchmark/test commands hold the shared GPU flock and check foreign GPU
 processes. coalesced-partial-contended.json retains the excluded first attempt,

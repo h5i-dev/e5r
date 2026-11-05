@@ -1,0 +1,35 @@
+[
+  {
+    "case": "wrong-wide-index",
+    "verdict": "unknown",
+    "reasons": [
+      "supplied proof refused: it does not compile: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   0 \u2264 o \u2264 4294967295"
+    ],
+    "gpu_witness": {
+      "n": 8,
+      "differing_word_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    }
+  },
+  {
+    "case": "wrong-wide-tail",
+    "verdict": "unknown",
+    "reasons": [
+      "supplied proof refused: it does not compile: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   0 \u2264 o \u2264 4294967295"
+    ],
+    "gpu_witness": {
+      "n": 7,
+      "differing_word_indices": [
+        7
+      ]
+    }
+  }
+]

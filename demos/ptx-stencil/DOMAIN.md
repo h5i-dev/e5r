@@ -48,3 +48,10 @@ remain. An odd final output uses a scalar store. The paired path additionally
 checks actual output-address alignment modulo8 before each u64 store; failure
 uses scalar stores. No stronger base alignment or divisibility assumption.
 The current proofs and all-shape results are linked from README.md.
+
+The final `wide-branch.ptx` uses this same two-output contract, without changing
+its assumptions. Its nine u64 input loads require a complete pair and the
+actual input address aligned modulo8; each b8 footprint covers two valid input
+words. The input is scalar-loaded otherwise. Output alignment is checked
+independently. All16 combinations of input/output offsets0/4/8/12 are tested;
+the proof universally quantifies over valid four-byte-aligned disjoint bases.

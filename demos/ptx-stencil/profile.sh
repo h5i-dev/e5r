@@ -27,11 +27,19 @@ if [[ "${1:-}" == pointer2 ]]; then
  names=(original paired2 scalar2 paired2_pointer_cuda scalar2_pointer_cuda)
  prefix=pointer2-
 fi
+if [[ "${1:-}" == wide-input ]]; then
+ names=(original paired2 wide-input paired2_pointer_cuda wide_input_cuda)
+ prefix=wide-input-
+fi
+if [[ "${1:-}" == wide-branch ]]; then
+ names=(original paired2 wide-input wide-branch paired2_pointer_cuda wide_input_cuda)
+ prefix=wide-branch-
+fi
 size=${2:-134217728}
 block=${3:-256}
 if [[ $# -gt 1 ]]; then prefix+="$size-b$block-"; fi
 for name in "${names[@]}"; do
- ncu --target-processes application-only --kernel-name regex:stencil17\|matching\|striped17\|staged17\|tiled\|paired2_cuda\|scalar2_cuda \
+ ncu --target-processes application-only --kernel-name regex:stencil17\|matching\|striped17\|staged17\|tiled\|paired2_cuda\|scalar2_cuda\|wide_input_cuda \
   --launch-skip 10 --launch-count 1 --cache-control none --clock-control none \
   --metrics "$metrics" --force-overwrite --export "$scratch/$prefix$name" \
   --log-file "$scratch/$prefix$name.log" "$E5R_DEMO_SCRATCH/venv/bin/python" "$here/profile.py" "$name" "$size" "$block"

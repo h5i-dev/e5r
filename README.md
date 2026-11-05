@@ -21,9 +21,10 @@ and termination, with strict proof replay and honest GPU timings. The
 complementary [unpack demo](demos/verified-packing/README.md) proves directly
 authored PTX against an independent operator specification.
 
-The [direct stencil edit](demos/ptx-stencil/README.md) also proves changed
-thread ownership and aligned paired stores with safe tails. Its gain is
-local to a cache-resident workload; all measured regressions are retained.
+The [direct stencil edit](demos/ptx-stencil/README.md) proves changed thread
+ownership and checked u64 input/output paths with safe tails. It measures
+1.71x at one cache-resident size and 1.068x across the seven-size sweep;
+all large-workload regressions and tuned CUDA comparisons are retained.
 
 ## Supported assembly
 

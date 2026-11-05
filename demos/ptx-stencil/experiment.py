@@ -17,7 +17,7 @@ def functions():
 
 def launch_items(name,n):
  if name in ['original','tiled','tiled_cuda']:return n
- if name in ['paired2','scalar2','paired2_cuda','scalar2_cuda']:return (n+1)//2
+ if name in ['paired2','scalar2','paired2_cuda','scalar2_cuda','wide-input','wide-branch','wide_input_cuda']:return (n+1)//2
  return (n+3)//4
 
 def await_gpu_idle():
@@ -29,7 +29,7 @@ def await_gpu_idle():
    if attempt==39:raise
    time.sleep(.25)
 
-def test():
+def test(independent_offsets=False):
  timing.uncontended();f=functions();rng=np.random.default_rng(1717);count=0
  for n in list(range(21))+[31,32,33,127,128,129,255,256,257,511,512,513,1023,1024,1025,8193]:
   timing.uncontended()
@@ -39,16 +39,17 @@ def test():
    expected=np.convolve(a.astype(np.uint64),np.ones(17,dtype=np.uint64),'valid').astype(np.uint32) if n else np.empty(0,dtype=np.uint32)
    for offset in range(4):
     storage=cp.empty(n+20,dtype=cp.uint32);x=storage[offset:offset+n+16];x.set(a)
-    for name,kernel in f.items():
-     for block in [32,128,256]:
-      backing=cp.full(n+12,0xa5a5a5a5,dtype=cp.uint32);y=backing[4+offset:4+offset+n]
-      size=launch_items(name,n)
-      kernel((max(1,(size+block-1)//block+1),),(block,),(x,y,np.uint32(n)))
-      np.testing.assert_array_equal(y.get(),expected)
-      np.testing.assert_array_equal(backing[:4+offset].get(),0xa5a5a5a5)
-      np.testing.assert_array_equal(backing[4+offset+n:].get(),0xa5a5a5a5)
-      np.testing.assert_array_equal(x.get(),a);count+=1
- return dict(cases=count,seed=1717,alignment='input and output offsets 0/4/8/12 bytes; all only 4-byte alignment',
+    for output_offset in (range(4) if independent_offsets else [offset]):
+     for name,kernel in f.items():
+      for block in [32,128,256]:
+       backing=cp.full(n+12,0xa5a5a5a5,dtype=cp.uint32);y=backing[4+output_offset:4+output_offset+n]
+       size=launch_items(name,n)
+       kernel((max(1,(size+block-1)//block+1),),(block,),(x,y,np.uint32(n)))
+       np.testing.assert_array_equal(y.get(),expected)
+       np.testing.assert_array_equal(backing[:4+output_offset].get(),0xa5a5a5a5)
+       np.testing.assert_array_equal(backing[4+output_offset+n:].get(),0xa5a5a5a5)
+       np.testing.assert_array_equal(x.get(),a);count+=1
+ return dict(cases=count,seed=1717,alignment=('independent input/output offsets 0/4/8/12 bytes; all only 4-byte alignment' if independent_offsets else 'input and output offsets 0/4/8/12 bytes; all only 4-byte alignment'),
   ptx_sha256={name:hashlib.sha256((D/(name+'.ptx')).read_bytes()).hexdigest() for name in ['original','edited','edited64']},
   foreign_processes_observed=False,lock='/mnt/scratch/e5r-gpu-benchmark.lock')
 

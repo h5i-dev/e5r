@@ -10,15 +10,17 @@ import sys
 
 D = Path(__file__).resolve().parent
 PAIR = '--paired2' in sys.argv
-PREFIX = 'paired2-' if PAIR else ''
-W = Path(os.environ.get('E5R_DEMO_SCRATCH', '/mnt/scratch/e5r-ptx-demo')) / ('negative-stencil-paired2' if PAIR else 'negative-stencil')
+WIDE = '--wide-branch' in sys.argv
+VARIANT = 'wide-branch' if WIDE else 'paired2' if PAIR else ''
+PREFIX = VARIANT+'-' if VARIANT else ''
+W = Path(os.environ.get('E5R_DEMO_SCRATCH', '/mnt/scratch/e5r-ptx-demo')) / ('negative-stencil-'+VARIANT if VARIANT else 'negative-stencil')
 EXE = os.environ.get('E5R_VERIFY', '/mnt/scratch/e5r-ptx-demo/cargo/release/e5r')
 
 
 def main():
-    source = (D / ('paired2.ptx' if PAIR else 'edited.ptx')).read_text()
-    proof = (D / ('paired2-equivalence.lean' if PAIR else 'equivalence.lean')).read_text()
-    contract = json.loads((D / ('paired2-equivalence.json' if PAIR else 'equivalence.json')).read_text())
+    source = (D / (VARIANT+'.ptx' if VARIANT else 'edited.ptx')).read_text()
+    proof = (D / (VARIANT+'-equivalence.lean' if VARIANT else 'equivalence.lean')).read_text()
+    contract = json.loads((D / (VARIANT+'-equivalence.json' if VARIANT else 'equivalence.json')).read_text())
     contract['original_ptx'] = str(D / 'original.ptx')
     mutations = {
         'wrong-window-load': source.replace('ld.global.u32 %r26, [%rd6+64];',
@@ -32,6 +34,13 @@ def main():
                                                  'shl.b64 %rd11, %rd11, 31;'),
             'wrong-entry-guard': source.replace('setp.ge.u32 %p1, %r1, %r6;',
                                                 'setp.gt.u32 %p1, %r1, %r6;'),
+        }
+    if WIDE:
+        mutations = {
+            'wrong-wide-index': source.replace('ld.global.u64 %rd15, [%rd6+64];',
+                                               'ld.global.u64 %rd15, [%rd6+72];'),
+            'wrong-wide-tail': source.replace('setp.ge.u32 %p1, %r7, %r2;',
+                                              'setp.gt.u32 %p1, %r7, %r2;',1),
         }
     summary = []
     for name, text in mutations.items():
@@ -81,11 +90,12 @@ def main():
             bad = cp.RawModule(path=str(W / row['case'] / 'kernel.ptx')).get_function('stencil17')
             y = cp.full(128, 0xa5a5a5a5, dtype=cp.uint32)
             z = cp.full_like(y, 0xa5a5a5a5)
-            original((1,), (32,), (x, y, np.uint32(8)))
-            bad((1,), (32,), (x, z, np.uint32(8)))
+            witness_n = 7 if row['case']=='wrong-wide-tail' else 8
+            original((1,), (32,), (x, y, np.uint32(witness_n)))
+            bad((1,), (32,), (x, z, np.uint32(witness_n)))
             diffs = np.flatnonzero(y.get() != z.get())
             assert len(diffs), row['case']
-            row['gpu_witness'] = dict(n=8, differing_word_indices=diffs.tolist())
+            row['gpu_witness'] = dict(n=witness_n, differing_word_indices=diffs.tolist())
         uncontended()
     (D / f'results/{PREFIX}negative-controls.json').write_text(json.dumps(summary, indent=2) + '\n')
 

@@ -13,7 +13,7 @@ def main():
     freeze=json.loads((D/'freeze.json').read_text())
     for name,expected in freeze['sha256'].items():
         assert hashlib.sha256((D/name).read_bytes()).hexdigest()==expected,name
-    text=['# Coalesced stencil edits: experimental results','',
+    text=['# Coalesced stencil edits: proofs and measurements','',
           'All new variants are directly authored PTX. Each needs its own proof;',
           'GPU correspondence and timing are empirical.',
           'All seven predeclared shapes and fixed block sizes are retained;',
@@ -23,11 +23,13 @@ def main():
           'each sweep. A ratio above 1 is faster than the frozen original.','']
     summaries={}
     text += ['## Proof acceptance','']
-    for name in ['scalar2','paired2']:
+    for name in ['scalar2','paired2','wide-branch']:
         path=D/f'results/{name}-proof.json'
         proof=json.loads(path.read_text()) if path.exists() else None
         if proof and proof['verdict']=='proved':
             assert proof['input']['ptx']['sha256']==hashlib.sha256((D/(name+'.ptx')).read_bytes()).hexdigest()
+            assert proof['input']['spec']['sha256']==hashlib.sha256((D/(name+'-equivalence.json')).read_bytes()).hexdigest()
+            assert proof['input']['original_ptx']['sha256']==freeze['sha256']['original.ptx']
             assert proof['proof']['sha256']==hashlib.sha256((D/(name+'-equivalence.lean')).read_bytes()).hexdigest()
             check=proof['proof']['check']
             assert set(check['axioms']) <= {'propext','Quot.sound','Classical.choice'}
@@ -35,7 +37,7 @@ def main():
                      'axioms '+', '.join(check['axioms'])+'.','']
         else:
             text += [f'{name}: strict acceptance pending.','']
-    for stem in ['coalesced','tiled','paired2','paired2-pointer']:
+    for stem in ['coalesced','tiled','paired2','paired2-pointer','wide-input','wide-branch']:
         path=D/f'results/{stem}-performance.json'
         if not path.exists():continue
         data=json.loads(path.read_text());rows=data['rows']
@@ -68,7 +70,7 @@ def main():
              'The profiled single invocation does not replace repeated timing.','',
              '| Profile | Time us | Global load sectors | Global store sectors | Shared store bank conflicts | Shared load bank conflicts |',
              '| --- | ---: | ---: | ---: | ---: | ---: |']
-    for stem in ['coalesced','tiled','paired2','pointer2']:
+    for stem in ['coalesced','tiled','paired2','pointer2','wide-input','wide-branch']:
         for path in sorted((D/'results').glob(f'profile-{stem}-*.csv')):
             records=list(csv.DictReader(path.open()));units=records[0]
             r=next(r for r in records if r['ID'])
@@ -79,6 +81,22 @@ def main():
             counts=[f"{metric('l1tex__t_sectors_pipe_lsu_mem_global_op_'+op+'.sum'):.0f}" for op in ['ld','st']]
             banks=[r.get('l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_'+op+'.sum','n/a') for op in ['st','ld']]
             text.append('| '+path.stem+' | '+f'{duration:.2f}'+' | '+' | '.join(counts+banks)+' |')
+    regimes=D/'results/cache-regimes.json'
+    if regimes.exists():
+        cache=json.loads(regimes.read_text())
+        for name,expected in cache['metadata']['ptx_sha256'].items():
+            assert hashlib.sha256((D/(name+'.ptx')).read_bytes()).hexdigest()==expected,name
+        for name,expected in cache['metadata']['cuda_sha256'].items():
+            assert hashlib.sha256((D/name).read_bytes()).hexdigest()==expected,name
+        text += ['','## Cache-residency diagnostic','',
+                 'Declared after observing the local one-MiB gain: compare one hot',
+                 'buffer pair with 16 rotating pairs (about 32 MiB total input/output).',
+                 'This exceeds L2 capacity; it does not promise a forced cold cache.',
+                 'Same one-MiB size, block128, graph replay, seven repeats.','',
+                 '| Buffer pairs | Kernel | Median us | Working-set bytes |',
+                 '| ---: | --- | ---: | ---: |']
+        for row in cache['rows']:
+            text.append(f"| {row['buffer_pairs']} | {row['name']} | {row['median_us']:.3f} | {row['working_set_bytes']} |")
     text += ['', '''Striped independent accumulators restore coalesced stores but lose adjacent
 rolling reuse. Output staging retains rolling reuse and restores the original
 store-sector count, but leaves global-load sectors roughly unchanged and adds
@@ -104,6 +122,19 @@ with a cache-resident instruction-sequence benefit. It does not establish a
 general PTX-only advantage or a large-workload bandwidth improvement. The
 initial CUDA comparator's 80 loaded instructions and 31 registers are also
 preserved. Profiles are empirical; ptxas/JIT translation is outside Lean.
+
+The final wide-branch edit uses coalesced u64 input loads for aligned full
+pairs, with independent scalar input/output alignment and tail fallbacks.
+The initial wide-input attempt merged eighteen loaded values before summing;
+ptxas if-converted that load selection and issued predicated-off scalar slots
+alongside the wide loads. The final edit computes sums inside each branch
+and merges two output values. At one MiB/block128 its issued-instruction
+metric falls from 266240 to 184320, with 319488 load sectors in both versions;
+latency improves from 3.085 to 2.124 us. Original is 3.640 us, matching wide
+CUDA 2.203 us. The local speedup is 1.71x versus original, while the full
+seven-shape means are 1.068x/1.064x/1.041x at blocks128/256/512. Large workloads
+still regress; the full-sweep 1.5x target remains unmet. The rotating-buffer
+diagnostic above bounds how broadly the warm-buffer result should be used.
 
 All benchmark/test commands hold the shared GPU flock and check foreign GPU
 processes. coalesced-partial-contended.json retains the excluded first attempt,

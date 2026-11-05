@@ -31,9 +31,9 @@ def hashes():
     return {name: hashlib.sha256((D / (name + '.ptx')).read_bytes()).hexdigest() for name in PTX}
 
 
-def test():
+def test(independent_offsets=False):
     experiment.functions = functions
-    result = experiment.test()
+    result = experiment.test(independent_offsets=independent_offsets)
     result['ptx_sha256'] = hashes()
     result['cuda_sha256'] = {p: hashlib.sha256((D / p).read_bytes()).hexdigest()
                             for p in CUDA_SOURCES}
