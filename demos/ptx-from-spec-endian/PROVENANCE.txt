@@ -1,0 +1,4 @@
+70d9fd935a0a25a72ab711b1ab5ecd2918fb2e9e70ee9f3dff2992c251ecba42  demos/ptx-from-spec-endian/SPEC.md
+2026-11-05T19:44:37Z candidate v1 authored: swap adjacent bytes, then halfwords; one uint32 per thread; no tuning or CUDA baseline yet.
+00a3aa3c8853ab99495822aa10c28f98a5e88867c43ac036c61ec57cb280587c  demos/ptx-from-spec-endian/endian_xor.ptx
+bf776281c41e45abecbf18130b156d7e9c0f56f111abb49e05f2f54012035366  demos/ptx-from-spec-endian/contract.json

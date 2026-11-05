@@ -1,0 +1,40 @@
+// Direct authored from SPEC.md, 2026-11-05. No CUDA-generated candidate.
+.version 8.0
+.target sm_86
+.address_size 64
+.visible .entry endian_xor(
+    .param .u64 input,
+    .param .u64 output,
+    .param .u32 length,
+    .param .u32 mask)
+{
+    .reg .pred %p;
+    .reg .b32 %r<16>;
+    .reg .b64 %d<6>;
+    ld.param.u64 %d0, [input];
+    ld.param.u64 %d1, [output];
+    ld.param.u32 %r0, [length];
+    ld.param.u32 %r1, [mask];
+    mov.u32 %r2, %ctaid.x;
+    mov.u32 %r3, %ntid.x;
+    mov.u32 %r4, %tid.x;
+    mad.lo.u32 %r5, %r2, %r3, %r4;
+    setp.ge.u32 %p, %r5, %r0;
+    @%p bra DONE;
+    mul.wide.u32 %d2, %r5, 4;
+    add.u64 %d3, %d0, %d2;
+    add.u64 %d4, %d1, %d2;
+    ld.global.u32 %r6, [%d3];
+    and.b32 %r7, %r6, 16711935;
+    shl.b32 %r8, %r7, 8;
+    shr.u32 %r9, %r6, 8;
+    and.b32 %r10, %r9, 16711935;
+    or.b32 %r11, %r8, %r10;
+    shl.b32 %r12, %r11, 16;
+    shr.u32 %r13, %r11, 16;
+    or.b32 %r14, %r12, %r13;
+    xor.b32 %r15, %r14, %r1;
+    st.global.u32 [%d4], %r15;
+DONE:
+    ret;
+}

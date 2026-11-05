@@ -1,0 +1,11 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "kernel": "endian_xor",
+  "class": "map32",
+  "arrays": ["input", "output"],
+  "output": "output",
+  "length": "length",
+  "scalars": ["mask"],
+  "element": "((input << 24) | ((input & 65280) << 8) | ((input >> 8) & 65280) | (input >> 24)) ^ mask",
+  "schedule": {"kind": "guarded", "max_threads": "4294967296"}
+}
