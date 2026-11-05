@@ -1,0 +1,89 @@
+Recorded 2026-11-05, pin bf6fa4c4e981e9a18052517370f66699f2261cf4
+Toolchain nightly-2026-06-30
+Regenerate with lake env lean Audit.lean and lake env lean ArithmeticAudit.lean
+
+accepted: 293 Ptx/Crosscheck declarations, standard axioms only
+upstream inventory: 3301 declarations, 14 with nonstandard dependencies (NOT accepted)
+excluded _private.Fp.Unpacking.0.PackedFloat.isNaN_pack_unpack_example: [propext,
+ Classical.choice,
+ Quot.sound,
+ _private.Fp.Unpacking.0.PackedFloat.isNaN_pack_unpack_example._native.bv_decide.ax_1_5]
+excluded _private.Fp.Unpacking.0.PackedFloat.isInfinite_pack_unpack_example._native.bv_decide.ax_1_5: [propext,
+ Classical.choice,
+ Quot.sound,
+ _private.Fp.Unpacking.0.PackedFloat.isInfinite_pack_unpack_example._native.bv_decide.ax_1_5]
+excluded _private.Fp.Unpacking.0.PackedFloat.isInfinite_pack_unpack_example: [propext,
+ Classical.choice,
+ Quot.sound,
+ _private.Fp.Unpacking.0.PackedFloat.isInfinite_pack_unpack_example._native.bv_decide.ax_1_5]
+excluded _private.Fp.Unpacking.0.PackedFloat.pack_unpack_e1m0_example._native.bv_decide.ax_1_5: [propext,
+ Classical.choice,
+ Quot.sound,
+ _private.Fp.Unpacking.0.PackedFloat.pack_unpack_e1m0_example._native.bv_decide.ax_1_5]
+excluded _private.Fp.Unpacking.0.PackedFloat.pack_unpack_example._native.bv_decide.ax_1_5: [propext,
+ Classical.choice,
+ Quot.sound,
+ _private.Fp.Unpacking.0.PackedFloat.pack_unpack_example._native.bv_decide.ax_1_5]
+excluded flsLog_eq_fls: [propext, Classical.choice, Quot.sound, flsLog_eq_fls._native.bv_decide.ax_1_5]
+excluded _private.Fp.Unpacking.0.PackedFloat.pack_unpack_e0m1_example._native.bv_decide.ax_1_5: [propext,
+ Classical.choice,
+ Quot.sound,
+ _private.Fp.Unpacking.0.PackedFloat.pack_unpack_e0m1_example._native.bv_decide.ax_1_5]
+excluded _private.Fp.Unpacking.0.PackedFloat.pack_unpack_e0m1_example: [propext,
+ Classical.choice,
+ Quot.sound,
+ _private.Fp.Unpacking.0.PackedFloat.pack_unpack_e0m1_example._native.bv_decide.ax_1_5]
+excluded _private.Fp.Unpacking.0.PackedFloat.isNaN_pack_unpack_example._native.bv_decide.ax_1_5: [propext,
+ Classical.choice,
+ Quot.sound,
+ _private.Fp.Unpacking.0.PackedFloat.isNaN_pack_unpack_example._native.bv_decide.ax_1_5]
+excluded flsLog_eq_fls._native.bv_decide.ax_1_5: [propext,
+ Classical.choice,
+ Quot.sound,
+ flsLog_eq_fls._native.bv_decide.ax_1_5]
+excluded _private.Fp.Unpacking.0.PackedFloat.pack_unpack_e1m0_example: [propext,
+ Classical.choice,
+ Quot.sound,
+ _private.Fp.Unpacking.0.PackedFloat.pack_unpack_e1m0_example._native.bv_decide.ax_1_5]
+excluded square_sqrt_is_id._native.bv_decide.ax_1_5: [propext,
+ Classical.choice,
+ Quot.sound,
+ square_sqrt_is_id._native.bv_decide.ax_1_5]
+excluded _private.Fp.Unpacking.0.PackedFloat.pack_unpack_example: [propext,
+ Classical.choice,
+ Quot.sound,
+ _private.Fp.Unpacking.0.PackedFloat.pack_unpack_example._native.bv_decide.ax_1_5]
+excluded square_sqrt_is_id: [propext, Classical.choice, Quot.sound, square_sqrt_is_id._native.bv_decide.ax_1_5]
+used arithmetic definition PackedFloat.add: [propext, Classical.choice, Quot.sound]
+used arithmetic definition PackedFloat.sub: [propext, Classical.choice, Quot.sound]
+used arithmetic definition PackedFloat.mul: [propext, Quot.sound]
+used arithmetic definition PackedFloat.div: [propext, Quot.sound]
+used arithmetic definition PackedFloat.fma: [propext, Classical.choice, Quot.sound]
+used arithmetic definition sqrt: [propext, Quot.sound]
+'Crosscheck.observe_equiv' depends on axioms: [propext, Quot.sound]
+'Crosscheck.observe_neg_neg' depends on axioms: [propext, Quot.sound]
+'Crosscheck.production_add_nan' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Crosscheck.f32_subnormal_add' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Crosscheck.f64_subnormal_add' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Crosscheck.f32_tie_even' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Crosscheck.f64_tie_even' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Crosscheck.f32_fma_cancellation' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Crosscheck.f32_signed_zero_add' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Crosscheck.f64_signed_zero_add' depends on axioms: [propext, Classical.choice, Quot.sound]
+
+Fp.add_eq_add: [propext, Classical.choice, Quot.sound]
+Fp.sub_eq_sub: [propext, Classical.choice, Quot.sound]
+Fp.mul_eq_mul: [propext, Classical.choice, Quot.sound]
+Fp.div_eq_div: [propext, Classical.choice, Quot.sound]
+Fp.fma_eq_fma: [propext, Classical.choice, Quot.sound]
+Fp.sqrt_eq_sqrt: [propext, Classical.choice, Quot.sound]
+Crosscheck.mul_intermediate_roundtrip: [propext, Classical.choice, Quot.sound]
+Crosscheck.mul_chain: [propext, Classical.choice, Quot.sound]
+Crosscheck.reference_eq_upstream: [propext, Classical.choice, Quot.sound]
+Crosscheck.f32_reference: [propext, Classical.choice, Quot.sound]
+Crosscheck.f64_reference: [propext, Classical.choice, Quot.sound]
+Crosscheck.agrees_iff_reference: [propext, Classical.choice, Quot.sound]
+REJECTED normalization theorem EUnpackedFloat.pack_unpack: [propext,
+ Classical.choice,
+ Quot.sound,
+ _private.Fp.PackUnpackNormalize.0.EUnpackedFloat.Canonical_all]

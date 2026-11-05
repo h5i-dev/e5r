@@ -1,0 +1,16 @@
+{"version": "1.2.0",
+ "packagesDir": ".lake/packages",
+ "packages":
+ [{"url": "https://github.com/opencompl/fp-lean",
+   "type": "git",
+   "subDir": null,
+   "scope": "",
+   "rev": "bf6fa4c4e981e9a18052517370f66699f2261cf4",
+   "name": "«fp-lean»",
+   "manifestFile": "lake-manifest.json",
+   "inputRev": "bf6fa4c4e981e9a18052517370f66699f2261cf4",
+   "inherited": false,
+   "configFile": "lakefile.toml"}],
+ "name": "«ptx-fp-crosscheck»",
+ "lakeDir": ".lake",
+ "fixedToolchain": false}

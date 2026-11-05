@@ -114,7 +114,9 @@ Lean is core v4.35.0, the toolchain `verification/rv32` already uses. The
 project has no `require`, so nothing is downloaded. Mathlib is not used.
 The cross-check (`verification/ptx-ieee-crosscheck`) is a separate project
 on lean-ieee754's toolchain (v4.33.1) with Mathlib; nothing in
-`verification/ptx` depends on it.
+`verification/ptx` depends on it. The separate fp-lean evaluation
+(`verification/ptx-fp-crosscheck`) similarly isolates its exact upstream nightly;
+run `scripts/check-ptx-fp-crosscheck.sh` explicitly for that evaluation.
 
 Lean is capped on purpose: a Lean process was OOM-killed at 15 GB on the
 development machine. The scripts run Lean with `LEAN_NUM_THREADS=2` under a
@@ -563,7 +565,8 @@ formats. Its axiom audit covers the 838 declarations involved; all of
 lean-ieee754 (3697 declarations, built at 529ed78 under a 7 GB cap in 4
 minutes) uses only the three standard axioms. The bit-pattern layer
 (decoding, encoding, special operands, zero signs, NaNs, `.sat`) is not
-cross-checked; the difftest checks it.
+covered by that formal cross-check; the GPU difftest checks it. The fp-lean
+evaluation below also compares arithmetic bit patterns empirically.
 
 The decision on lean-ieee754
 (https://github.com/tunnellm/lean-ieee754, Apache-2.0, 529ed78): use it
@@ -589,6 +592,23 @@ only as an independent cross-check, not as a dependency and not vendored.
   expert review, so agreement is evidence from a second, independently
   written statement, not an authority; the A10G difftest stays the
   hardware check.
+
+**Independent fp-lean evaluation.**
+[`verification/ptx-fp-crosscheck`](../../verification/ptx-fp-crosscheck/README.md)
+pins opencompl/fp-lean at `bf6fa4c4e981e9a18052517370f66699f2261cf4`
+(Apache-2.0, no external Lake dependencies), on `nightly-2026-06-30`.
+It compiles the actual production `FloatCore.lean` and `Float.lean` on that
+nightly and compares f32/f64 add, sub, mul, div, fma and sqrt in all four
+rounding modes, up to NaN payloads. All 916,352 executable comparisons passed;
+signed zero must match exactly. Kernel-checked certificates cover subnormal
+addition, ties to even, signed-zero addition and one fused cancellation.
+These checks do not prove generic packed arithmetic equivalence. `Agrees` in
+the adapter states the remaining obligation explicitly.
+
+The PTX `.ftz`, `.sat`, NaN oracle, min/max and conversions remain in the PTX
+adapter. Neither this project nor its dependency is imported by production.
+The evaluation's README records exact theorem axiom results, symbolic-proof
+coverage, reproducible commands and the recommendation on eventual adoption.
 
 **Automation.** `Ptx/Auto/FloatMap.lean`. The map class theorem is
 unchanged except that the output relation is a parameter (`MapSpec.rel`,

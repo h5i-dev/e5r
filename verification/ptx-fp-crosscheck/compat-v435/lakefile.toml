@@ -1,0 +1,7 @@
+# Diagnostic only: use the parent project's already fetched, pinned source.
+name = "fp-compat"
+
+[[lean_lib]]
+name = "Fp"
+srcDir = "../.lake/packages/fp-lean"
+globs = ["Fp.+"]

@@ -1,0 +1,28 @@
+name = "ptx-fp-crosscheck"
+defaultTargets = ["Crosscheck", "crosscheck-runner"]
+
+[[require]]
+name = "fp-lean"
+git = "https://github.com/opencompl/fp-lean"
+rev = "bf6fa4c4e981e9a18052517370f66699f2261cf4"
+
+[[lean_lib]]
+name = "PtxFloat"
+srcDir = "../ptx"
+roots = ["Ptx.Semantics.FloatCore", "Ptx.Semantics.Float"]
+
+[[lean_lib]]
+name = "Crosscheck"
+
+[[lean_exe]]
+name = "crosscheck-runner"
+root = "Main"
+
+[[lean_lib]]
+name = "ArithmeticAudit"
+
+[[lean_lib]]
+name = "Symbolic"
+
+[[lean_lib]]
+name = "SpecBridge"
