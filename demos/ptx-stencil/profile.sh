@@ -23,10 +23,21 @@ if [[ "${1:-}" == paired2 ]]; then
  names=(original paired2 scalar2 paired2_cuda scalar2_cuda)
  prefix=paired2-
 fi
+if [[ "${1:-}" == pointer2 ]]; then
+ names=(original paired2 scalar2 paired2_pointer_cuda scalar2_pointer_cuda)
+ prefix=pointer2-
+fi
+size=${2:-134217728}
+block=${3:-256}
+if [[ $# -gt 1 ]]; then prefix+="$size-b$block-"; fi
 for name in "${names[@]}"; do
  ncu --target-processes application-only --kernel-name regex:stencil17\|matching\|striped17\|staged17\|tiled\|paired2_cuda\|scalar2_cuda \
   --launch-skip 10 --launch-count 1 --cache-control none --clock-control none \
   --metrics "$metrics" --force-overwrite --export "$scratch/$prefix$name" \
-  --log-file "$scratch/$prefix$name.log" "$E5R_DEMO_SCRATCH/venv/bin/python" "$here/profile.py" "$name"
+  --log-file "$scratch/$prefix$name.log" "$E5R_DEMO_SCRATCH/venv/bin/python" "$here/profile.py" "$name" "$size" "$block"
  ncu --import "$scratch/$prefix$name.ncu-rep" --page raw --csv --print-units base > "$here/results/profile-$prefix$name.csv"
+ if [[ $# -gt 1 ]]; then
+  ncu --import "$scratch/$prefix$name.ncu-rep" --page source --print-source sass > "$here/results/sass-$prefix$name.sass"
+  sed -i 's/[[:space:]]*$//' "$here/results/sass-$prefix$name.sass"
+ fi
 done

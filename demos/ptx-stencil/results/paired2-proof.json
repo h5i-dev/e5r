@@ -1,0 +1,74 @@
+{
+  "class": "equivalence-stencil17-pair2",
+  "counterexample": null,
+  "input": {
+    "original_ptx": {
+      "path": "/root/e5r-ptx-demo/demos/ptx-stencil/original.ptx",
+      "sha256": "4b5fb28f02ee7c024eb18e8813f8f5c1a49512a06a7579f9a94fe67ffcddd79c"
+    },
+    "ptx": {
+      "path": "/root/e5r-ptx-demo/demos/ptx-stencil/paired2.ptx",
+      "sha256": "625bd86836e923619bc49a19afee7883c9d6d9fc6844bd124fe00a90217979d4"
+    },
+    "spec": {
+      "path": "/root/e5r-ptx-demo/demos/ptx-stencil/paired2-equivalence.json",
+      "sha256": "d52c056cfe0cd1195a2afe63b3e85bb904d57227fefbdddc8e5ff7fed4fbe66d"
+    }
+  },
+  "kernel": "stencil17",
+  "lean": {
+    "memory_cap_mb": 5120,
+    "proof_check_seconds": 13.11,
+    "proof_seconds": 51.93,
+    "timeout_seconds": 900,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "lean_spec": "def domain : StencilPair.Spec := ⟨\"stencil17_param_0\", \"stencil17_param_1\", \"stencil17_param_2\"⟩\n",
+  "proof": {
+    "accepted": true,
+    "check": {
+      "axioms": [
+        "propext",
+        "Quot.sound",
+        "Classical.choice"
+      ],
+      "declarations": 175,
+      "ok": true
+    },
+    "manifest": {
+      "ptx": "625bd86836e923619bc49a19afee7883c9d6d9fc6844bd124fe00a90217979d4",
+      "spec": "d52c056cfe0cd1195a2afe63b3e85bb904d57227fefbdddc8e5ff7fed4fbe66d",
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "path": "/root/e5r-ptx-demo/demos/ptx-stencil/paired2-equivalence.lean",
+    "sha256": "17b95d3b49ad90fa67b29c551c4c1ebd86dc01fa4808860eecf3aaf2e3aa831e",
+    "supplied": true
+  },
+  "properties": {
+    "direct_observable_equivalence": "proved",
+    "functional_correctness": "not_claimed",
+    "memory_safety": "proved",
+    "race_freedom": "proved",
+    "termination": "proved"
+  },
+  "reasons": [],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 67.51,
+  "theorem": {
+    "axioms": [
+      "propext",
+      "Quot.sound",
+      "Classical.choice"
+    ],
+    "checked_by": "proofcheck: kernel replay of every declaration of the proof",
+    "definition": "Ptx.Auto.StencilPair.Spec.Equivalent",
+    "generated": false,
+    "name": "E5rProof.correct",
+    "statement": "StencilPair.Spec.Equivalent domain Original.«stencil17» Optimized.«stencil17»"
+  },
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "proved"
+}

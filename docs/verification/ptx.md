@@ -1205,9 +1205,15 @@ of completed interleavings, external-byte preservation, and separate safety,
 progress, bounded termination, race freedom and nonvacuous completion. The
 accepted scalar rolling edit uses a continuation-parametric symbolic execution
 of the frozen original, with no shared operator-spec correctness premise.
-Its performance regresses; the paired-store and later coalesced-ownership GPU
-experiments do not inherit its proof. See the demo for exact artifact binding,
-launch/allocation assumptions and the complete retained timing sweep.
+Its performance regresses. The later `equivalence-stencil17-pair2` class has
+separate accepted proofs against `StencilPair.Spec.Equivalent` for both the
+two-output scalar and aligned-u64 edits. It covers arbitrary n<=2^31, independent
+launches with edited coverage ceil(n/2), four-byte base alignment, checked
+eight-byte stores, scalar alignment/tail fallbacks, safety, termination and
+external-byte preservation. The paired edit has a local one-MiB gain and a
+small all-shape geometric-mean gain at block128; large workloads still regress
+and the 1.5x target was missed. Shared/striped/tiled GPU experiments do not
+inherit these proofs. See the demo for exact artifact binding and all timings.
 
 The related `packing` class supports unequal input/output allocation sizes
 through `Packing.Spec.Correct`. Only the unpack candidate has accepted replay;

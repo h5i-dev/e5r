@@ -1,12 +1,18 @@
 # Coalesced stencil edits: experimental results
 
-All new variants are directly authored PTX. None inherits the accepted
-scalar rolling proof. GPU correspondence and timing are empirical.
+All new variants are directly authored PTX. Each needs its own proof;
+GPU correspondence and timing are empirical.
 All seven predeclared shapes and fixed block sizes are retained;
 these tables use graph medians. Raw JSON includes all seven repeats,
 variance, host times and ordinary event measurements at block=256.
 The original and each matching CUDA comparator are measured again in
 each sweep. A ratio above 1 is faster than the frozen original.
+
+## Proof acceptance
+
+scalar2: strictly accepted, 144 declarations; axioms propext, Quot.sound, Classical.choice.
+
+paired2: strictly accepted, 175 declarations; axioms propext, Quot.sound, Classical.choice.
 
 ## coalesced sweep
 
@@ -140,8 +146,54 @@ All-shape geometric mean original/candidate: paired2 1.003x, scalar2 1.013x, pai
 
 All-shape geometric mean original/candidate: paired2 0.981x, scalar2 0.984x, paired2_cuda 0.969x, scalar2_cuda 0.970x.
 
-## Transactions at 128 MiB, block=256
+## paired2-pointer sweep
 
+### 128 threads/block
+
+| Output bytes | original us | paired2 us | scalar2 us | paired2_cuda us | scalar2_cuda us |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 32 | 1.065 | 1.086 | 1.062 | 1.091 | 1.083 |
+| 256 | 1.063 | 1.106 | 1.085 | 1.110 | 1.105 |
+| 4096 | 1.120 | 1.188 | 1.165 | 1.190 | 1.187 |
+| 65536 | 1.258 | 1.260 | 1.244 | 1.264 | 1.261 |
+| 1048576 | 3.644 | 2.830 | 2.895 | 2.950 | 2.994 |
+| 16777216 | 69.302 | 69.792 | 69.801 | 69.921 | 69.919 |
+| 134217728 | 544.003 | 548.733 | 549.506 | 549.973 | 551.220 |
+
+All-shape geometric mean original/candidate: paired2 1.017x, scalar2 1.024x, paired2_cuda 1.009x, scalar2_cuda 1.009x.
+
+### 256 threads/block
+
+| Output bytes | original us | paired2 us | scalar2 us | paired2_cuda us | scalar2_cuda us |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 32 | 1.061 | 1.080 | 1.057 | 1.084 | 1.079 |
+| 256 | 1.059 | 1.103 | 1.081 | 1.105 | 1.101 |
+| 4096 | 1.171 | 1.236 | 1.222 | 1.243 | 1.243 |
+| 65536 | 1.247 | 1.313 | 1.299 | 1.320 | 1.321 |
+| 1048576 | 3.593 | 2.935 | 2.891 | 3.075 | 3.097 |
+| 16777216 | 68.631 | 69.551 | 69.647 | 69.736 | 69.695 |
+| 134217728 | 538.311 | 547.132 | 548.069 | 548.667 | 549.888 |
+
+All-shape geometric mean original/candidate: paired2 1.001x, scalar2 1.012x, paired2_cuda 0.991x, scalar2_cuda 0.991x.
+
+### 512 threads/block
+
+| Output bytes | original us | paired2 us | scalar2 us | paired2_cuda us | scalar2_cuda us |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 32 | 1.059 | 1.087 | 1.065 | 1.086 | 1.085 |
+| 256 | 1.058 | 1.108 | 1.086 | 1.107 | 1.106 |
+| 4096 | 1.243 | 1.400 | 1.403 | 1.435 | 1.426 |
+| 65536 | 1.309 | 1.473 | 1.461 | 1.496 | 1.490 |
+| 1048576 | 3.625 | 2.954 | 3.015 | 3.069 | 3.058 |
+| 16777216 | 67.977 | 69.325 | 69.379 | 69.415 | 69.441 |
+| 134217728 | 533.038 | 545.233 | 545.752 | 546.161 | 548.403 |
+
+All-shape geometric mean original/candidate: paired2 0.979x, scalar2 0.983x, paired2_cuda 0.968x, scalar2_cuda 0.970x.
+
+## Transaction profiles
+
+Default profiles use 128 MiB output and block=256. Additional sizes
+and blocks are explicit in profile filenames (bytes-bBLOCK).
 Separate Nsight invocations, cache control none, clock control none.
 The profiled single invocation does not replace repeated timing.
 
@@ -158,11 +210,21 @@ The profiled single invocation does not replace repeated timing.
 | profile-tiled-tiled17 | 523.84 | 4456448 | 4194304 | 33441 | 97468 |
 | profile-tiled-tiled4 | 552.70 | 4259840 | 4194304 | 0 | 0 |
 | profile-tiled-tiled417 | 552.10 | 4259840 | 4194304 | 0 | 0 |
+| profile-paired2-1048576-b128-original | 4.54 | 670105 | 32768 | n/a | n/a |
+| profile-paired2-1048576-b128-paired2 | 3.78 | 638976 | 32768 | n/a | n/a |
+| profile-paired2-1048576-b128-paired2_cuda | 3.94 | 638976 | 32768 | n/a | n/a |
+| profile-paired2-1048576-b128-scalar2 | 3.84 | 638976 | 65536 | n/a | n/a |
+| profile-paired2-1048576-b128-scalar2_cuda | 4.16 | 638976 | 65536 | n/a | n/a |
 | profile-paired2-original | 539.10 | 85818684 | 4194304 | n/a | n/a |
 | profile-paired2-paired2 | 547.65 | 81788892 | 4194304 | n/a | n/a |
 | profile-paired2-paired2_cuda | 551.07 | 81788906 | 4194304 | n/a | n/a |
 | profile-paired2-scalar2 | 549.06 | 81788928 | 8388608 | n/a | n/a |
 | profile-paired2-scalar2_cuda | 550.56 | 81788904 | 8388608 | n/a | n/a |
+| profile-pointer2-1048576-b128-original | 4.58 | 670081 | 32768 | n/a | n/a |
+| profile-pointer2-1048576-b128-paired2 | 3.78 | 638976 | 32768 | n/a | n/a |
+| profile-pointer2-1048576-b128-paired2_pointer_cuda | 3.94 | 638976 | 32768 | n/a | n/a |
+| profile-pointer2-1048576-b128-scalar2 | 3.81 | 638976 | 65536 | n/a | n/a |
+| profile-pointer2-1048576-b128-scalar2_pointer_cuda | 3.90 | 638976 | 65536 | n/a | n/a |
 
 Striped independent accumulators restore coalesced stores but lose adjacent
 rolling reuse. Output staging retains rolling reuse and restores the original
@@ -173,6 +235,22 @@ barrier. One-output and four-output variants are measured separately.
 Two-output rolling isolates scalar versus aligned-u64 global stores; its
 dynamic alignment check and scalar/tail paths retain four-byte base alignment.
 No unsupported shuffle or vector instruction is assumed successful.
+
+The paired2-pointer sweep strengthens the CUDA comparator by hoisting input
+and output pointers before the unrolled loads, avoiding repeated u32 index
+address arithmetic. The earlier comparison is retained separately. At one MiB
+and block=128 the new sweep measures 3.644 us original, 2.830 us PTX and
+2.950 us stronger CUDA. Its all-seven-shape geometric means are 1.017x PTX
+and 1.009x CUDA versus original. Block=256 is approximately parity; block=512
+regresses. Large workloads still regress; the 1.5x target was missed.
+
+At one MiB/block128 the loaded PTX and stronger CUDA each contain 64 SASS
+instructions and use 26 registers. Nsight smsp__inst_executed.sum is 196608
+versus 217088, with the same global load/store sectors. This is consistent
+with a cache-resident instruction-sequence benefit. It does not establish a
+general PTX-only advantage or a large-workload bandwidth improvement. The
+initial CUDA comparator's 80 loaded instructions and 31 registers are also
+preserved. Profiles are empirical; ptxas/JIT translation is outside Lean.
 
 All benchmark/test commands hold the shared GPU flock and check foreign GPU
 processes. coalesced-partial-contended.json retains the excluded first attempt,

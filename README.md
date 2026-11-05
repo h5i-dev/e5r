@@ -21,6 +21,10 @@ and termination, with strict proof replay and honest GPU timings. The
 complementary [unpack demo](demos/verified-packing/README.md) proves directly
 authored PTX against an independent operator specification.
 
+The [direct stencil edit](demos/ptx-stencil/README.md) also proves changed
+thread ownership and aligned paired stores with safe tails. Its gain is
+local to a cache-resident workload; all measured regressions are retained.
+
 ## Supported assembly
 
 | Assembly | What is proved | Not yet | Docs |

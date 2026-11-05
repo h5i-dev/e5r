@@ -9,14 +9,16 @@ import subprocess
 import sys
 
 D = Path(__file__).resolve().parent
-W = Path(os.environ.get('E5R_DEMO_SCRATCH', '/mnt/scratch/e5r-ptx-demo')) / 'negative-stencil'
+PAIR = '--paired2' in sys.argv
+PREFIX = 'paired2-' if PAIR else ''
+W = Path(os.environ.get('E5R_DEMO_SCRATCH', '/mnt/scratch/e5r-ptx-demo')) / ('negative-stencil-paired2' if PAIR else 'negative-stencil')
 EXE = os.environ.get('E5R_VERIFY', '/mnt/scratch/e5r-ptx-demo/cargo/release/e5r')
 
 
 def main():
-    source = (D / 'edited.ptx').read_text()
-    proof = (D / 'equivalence.lean').read_text()
-    contract = json.loads((D / 'equivalence.json').read_text())
+    source = (D / ('paired2.ptx' if PAIR else 'edited.ptx')).read_text()
+    proof = (D / ('paired2-equivalence.lean' if PAIR else 'equivalence.lean')).read_text()
+    contract = json.loads((D / ('paired2-equivalence.json' if PAIR else 'equivalence.json')).read_text())
     contract['original_ptx'] = str(D / 'original.ptx')
     mutations = {
         'wrong-window-load': source.replace('ld.global.u32 %r26, [%rd6+64];',
@@ -24,6 +26,13 @@ def main():
         'wrong-entry-guard': source.replace('setp.ge.u32 %p1, %r1, %r6;',
                                             'setp.gt.u32 %p1, %r1, %r6;'),
     }
+    if PAIR:
+        mutations = {
+            'wrong-packed-shift': source.replace('shl.b64 %rd11, %rd11, 32;',
+                                                 'shl.b64 %rd11, %rd11, 31;'),
+            'wrong-entry-guard': source.replace('setp.ge.u32 %p1, %r1, %r6;',
+                                                'setp.gt.u32 %p1, %r1, %r6;'),
+        }
     summary = []
     for name, text in mutations.items():
         assert text != source, name
@@ -37,7 +46,7 @@ def main():
         rebound = re.sub(r'spec=[0-9a-f]{64}',
                          'spec=' + hashlib.sha256(spec.encode()).hexdigest(), rebound, count=1)
         (out / 'proof.lean').write_text(rebound)
-        result = D / 'results' / f'negative-{name}.json'
+        result = D / 'results' / f'{PREFIX}negative-{name}.json'
         command = [EXE, 'ptx', 'check', str(out / 'kernel.ptx'), '--spec',
                               str(out / 'contract.json'), '--proof', str(out / 'proof.lean'),
                               '--keep', str(out / 'check'), '--out', str(result),
@@ -78,7 +87,7 @@ def main():
             assert len(diffs), row['case']
             row['gpu_witness'] = dict(n=8, differing_word_indices=diffs.tolist())
         uncontended()
-    (D / 'results/negative-controls.json').write_text(json.dumps(summary, indent=2) + '\n')
+    (D / f'results/{PREFIX}negative-controls.json').write_text(json.dumps(summary, indent=2) + '\n')
 
 
 if __name__ == '__main__':

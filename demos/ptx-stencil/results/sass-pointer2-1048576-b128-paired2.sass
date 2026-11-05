@@ -1,0 +1,72 @@
+------------------ ---------------------------------------------------- ------
+Kernel Name        stencil17
+------------------ ---------------------------------------------------- ------
+Address            Source                                               launch
+                                                                        __regi
+                                                                        sters_
+                                                                        per_th
+                                                                        read
+0x7f3d97289900           IMAD.MOV.U32 R1, RZ, RZ, c[0x0][0x28]          0
+0x7f3d97289910           S2R R0, SR_CTAID.X                             0
+0x7f3d97289920           UMOV UR4, 0x1                                  0
+0x7f3d97289930           ULDC UR5, c[0x0][0x170]                        0
+0x7f3d97289940           S2R R3, SR_TID.X                               0
+0x7f3d97289950           UIADD3 UR4, UR4, UR5, URZ                      0
+0x7f3d97289960           USHF.R.U32.HI UR4, URZ, 0x1, UR4               0
+0x7f3d97289970           IMAD R0, R0, c[0x0][0x0], R3                   0
+0x7f3d97289980           ISETP.GE.U32.AND P0, PT, R0, UR4, PT           0
+0x7f3d97289990     @P0   EXIT                                           0
+0x7f3d972899a0           IMAD.SHL.U32 R0, R0, 0x2, RZ                   0
+0x7f3d972899b0           ULDC.64 UR4, c[0x0][0x118]                     0
+0x7f3d972899c0           IMAD.MOV.U32 R23, RZ, RZ, 0x4                  0
+0x7f3d972899d0           IMAD.WIDE.U32 R2, R0, R23, c[0x0][0x160]       0
+0x7f3d972899e0           LDG.E R7, [R2.64]                              0
+0x7f3d972899f0           LDG.E R4, [R2.64+0x4]                          0
+0x7f3d97289a00           LDG.E R5, [R2.64+0x8]                          0
+0x7f3d97289a10           LDG.E R6, [R2.64+0xc]                          0
+0x7f3d97289a20           LDG.E R9, [R2.64+0x10]                         0
+0x7f3d97289a30           LDG.E R8, [R2.64+0x14]                         0
+0x7f3d97289a40           LDG.E R11, [R2.64+0x18]                        0
+0x7f3d97289a50           LDG.E R10, [R2.64+0x1c]                        0
+0x7f3d97289a60           LDG.E R13, [R2.64+0x20]                        0
+0x7f3d97289a70           LDG.E R12, [R2.64+0x24]                        0
+0x7f3d97289a80           LDG.E R15, [R2.64+0x28]                        0
+0x7f3d97289a90           LDG.E R14, [R2.64+0x2c]                        0
+0x7f3d97289aa0           LDG.E R17, [R2.64+0x30]                        0
+0x7f3d97289ab0           LDG.E R16, [R2.64+0x34]                        0
+0x7f3d97289ac0           LDG.E R19, [R2.64+0x38]                        0
+0x7f3d97289ad0           LDG.E R18, [R2.64+0x3c]                        0
+0x7f3d97289ae0           LDG.E R21, [R2.64+0x40]                        0
+0x7f3d97289af0           IADD3 R4, R5, R7, R4                           0
+0x7f3d97289b00           IADD3 R5, R0, 0x1, RZ                          0
+0x7f3d97289b10           ISETP.GE.U32.AND P0, PT, R5, c[0x0][0x170], PT 0
+0x7f3d97289b20           IADD3 R4, R9, R4, R6                           0
+0x7f3d97289b30           IADD3 R4, R11, R4, R8                          0
+0x7f3d97289b40           IADD3 R4, R13, R4, R10                         0
+0x7f3d97289b50           IADD3 R4, R15, R4, R12                         0
+0x7f3d97289b60           IADD3 R4, R17, R4, R14                         0
+0x7f3d97289b70           IADD3 R16, R19, R4, R16                        0
+0x7f3d97289b80           IMAD.WIDE.U32 R4, R0, R23, c[0x0][0x168]       0
+0x7f3d97289b90           IADD3 R6, R21, R16, R18                        0
+0x7f3d97289ba0     @P0   BRA 0x7f3d97289c30                             0
+0x7f3d97289bb0           LDG.E R2, [R2.64+0x44]                         0
+0x7f3d97289bc0           LOP3.LUT P0, RZ, R4, 0x7, RZ, 0xc0, !PT        0
+0x7f3d97289bd0           IADD3 R7, R2, R6, -R7                          0
+0x7f3d97289be0     @!P0  STG.E.64 [R4.64], R6                           0
+0x7f3d97289bf0     @!P0  EXIT                                           0
+0x7f3d97289c00           STG.E [R4.64], R6                              0
+0x7f3d97289c10           STG.E [R4.64+0x4], R7                          0
+0x7f3d97289c20           EXIT                                           0
+0x7f3d97289c30           STG.E [R4.64], R6                              0
+0x7f3d97289c40           EXIT                                           0
+0x7f3d97289c50           BRA `(.L_x_0) 0x7f3d97289c50                   0
+0x7f3d97289c60           NOP                                            0
+0x7f3d97289c70           NOP                                            0
+0x7f3d97289c80           NOP                                            0
+0x7f3d97289c90           NOP                                            0
+0x7f3d97289ca0           NOP                                            0
+0x7f3d97289cb0           NOP                                            0
+0x7f3d97289cc0           NOP                                            0
+0x7f3d97289cd0           NOP                                            0
+0x7f3d97289ce0           NOP                                            0
+0x7f3d97289cf0           NOP                                            0

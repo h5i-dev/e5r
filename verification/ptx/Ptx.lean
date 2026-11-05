@@ -34,3 +34,4 @@ import Ptx.Auto.Packing
 
 import Ptx.Auto.Equivalence
 import Ptx.Auto.Stencil
+import Ptx.Auto.StencilPair

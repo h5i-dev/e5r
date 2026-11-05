@@ -1,0 +1,54 @@
+{
+  "class": "equivalence-stencil17-pair2",
+  "counterexample": null,
+  "input": {
+    "original_ptx": {
+      "path": "/root/e5r-ptx-demo/demos/ptx-stencil/original.ptx",
+      "sha256": "4b5fb28f02ee7c024eb18e8813f8f5c1a49512a06a7579f9a94fe67ffcddd79c"
+    },
+    "ptx": {
+      "path": "/mnt/scratch/e5r-ptx-demo/negative-stencil-paired2/wrong-entry-guard/kernel.ptx",
+      "sha256": "07480c609bcadec81ca21ae783141bdb19dc00082e0c5bbb8340a9cd1a0475c3"
+    },
+    "spec": {
+      "path": "/mnt/scratch/e5r-ptx-demo/negative-stencil-paired2/wrong-entry-guard/contract.json",
+      "sha256": "74e8a0c2dc595bfe722e9e4cdae1fdb433b04fc5ee7573a2ca1c57a2688e5e1c"
+    }
+  },
+  "kernel": "stencil17",
+  "lean": {
+    "memory_cap_mb": 5120,
+    "proof_seconds": 50.8,
+    "timeout_seconds": 300,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "lean_spec": "def domain : StencilPair.Spec := ⟨\"stencil17_param_0\", \"stencil17_param_1\", \"stencil17_param_2\"⟩\n",
+  "proof": {
+    "accepted": false,
+    "manifest": {
+      "ptx": "07480c609bcadec81ca21ae783141bdb19dc00082e0c5bbb8340a9cd1a0475c3",
+      "spec": "74e8a0c2dc595bfe722e9e4cdae1fdb433b04fc5ee7573a2ca1c57a2688e5e1c",
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "path": "/mnt/scratch/e5r-ptx-demo/negative-stencil-paired2/wrong-entry-guard/proof.lean",
+    "sha256": "ac25e0171d5e93ace997a1d86099a792e08fbdc3fe3568ae8891d0287fcc5d7a",
+    "supplied": true
+  },
+  "properties": {
+    "functional_correctness": "unknown",
+    "memory_safety": "unknown",
+    "race_freedom": "unknown",
+    "termination": "unknown"
+  },
+  "reasons": [
+    "supplied proof refused: it does not compile: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   k ≥ 0"
+  ],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 53.25,
+  "theorem": null,
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "unknown"
+}

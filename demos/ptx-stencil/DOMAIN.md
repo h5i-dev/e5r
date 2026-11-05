@@ -36,3 +36,15 @@ direct PTX and tuned matching CUDA, preallocated buffers and graph/event
 measurements. Report every shape and geometric means, misses and regressions.
 No performance/proof acceptance claims before execution and strict replay.
 Compiler/JIT/hardware correspondence remains empirical.
+
+## Accepted two-output follow-up
+
+`scalar2.ptx` and `paired2.ptx` assign outputs2*g and2*g+1 to edited threadg.
+Their supplied-proof contract is `equivalence-stencil17-pair2` and the direct
+statement is `StencilPair.Spec.Equivalent`. The original remains byte-for-byte
+frozen. Replace edited coverage ceil(n/4)<=G1*B1 above with ceil(n/2)<=G1*B1;
+all other allocation, n<=2^31, initial-memory, alignment and launch assumptions
+remain. An odd final output uses a scalar store. The paired path additionally
+checks actual output-address alignment modulo8 before each u64 store; failure
+uses scalar stores. No stronger base alignment or divisibility assumption.
+The current proofs and all-shape results are linked from README.md.

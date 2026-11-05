@@ -43,7 +43,7 @@ pub fn check(
     if sp.schema != super::spec::SCHEMA
         || !matches!(
             sp.class.as_str(),
-            "equivalence-unpack4" | "equivalence-stencil17"
+            "equivalence-unpack4" | "equivalence-stencil17" | "equivalence-stencil17-pair2"
         )
     {
         return finish(
@@ -53,7 +53,9 @@ pub fn check(
         );
     }
     doc["class"] = json!(sp.class);
-    let family = if sp.class == "equivalence-stencil17" {
+    let family = if sp.class == "equivalence-stencil17-pair2" {
+        "StencilPair"
+    } else if sp.class == "equivalence-stencil17" {
         "Stencil"
     } else {
         "Equivalence"

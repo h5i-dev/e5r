@@ -1,0 +1,64 @@
+{
+  "recorded_utc": "2026-11-05T22:14:51.345522+00:00",
+  "checks": [
+    {
+      "command": "cargo test --release -p e5r-verify --test ptx_cli -- --test-threads=1",
+      "result": "9 passed"
+    },
+    {
+      "command": "cargo clippy --release -p e5r-verify --all-targets -- -D warnings",
+      "result": "passed"
+    },
+    {
+      "command": "LEAN_NUM_THREADS=2 lake build Ptx",
+      "result": "passed"
+    },
+    {
+      "command": "LEAN_NUM_THREADS=2 lake env lean Audit.lean",
+      "result": "5459 Ptx declarations; standard axioms only"
+    },
+    {
+      "command": "python3 demos/ptx-stencil/coalesced-report.py",
+      "result": "complete sweeps and exact source/proof hashes checked"
+    },
+    {
+      "command": "python3 -m py_compile demos/ptx-stencil/*.py; bash -n demos/ptx-stencil/*.sh; git diff --check",
+      "result": "passed"
+    }
+  ],
+  "strict_proofs": {
+    "scalar2": {
+      "declarations": 144,
+      "axioms": [
+        "propext",
+        "Quot.sound",
+        "Classical.choice"
+      ],
+      "seconds": 76.19
+    },
+    "paired2": {
+      "declarations": 175,
+      "axioms": [
+        "propext",
+        "Quot.sound",
+        "Classical.choice"
+      ],
+      "seconds": 67.51
+    }
+  },
+  "semantic_negative_controls": [
+    "wrong-packed-shift",
+    "wrong-entry-guard"
+  ],
+  "gpu_cases": {
+    "coalesced": 10656,
+    "tiled": 10656,
+    "paired2": 8880,
+    "paired2-pointer": 8880
+  },
+  "limitations": [
+    "1.5x target missed; local cache gain and small GM only; large regressions retained",
+    "paired2 input scalar loads remain stride-two; aligned u64 output stores are contiguous",
+    "No PTX parser/exporter, CUDA compiler, ptxas/JIT or hardware correctness proof"
+  ]
+}

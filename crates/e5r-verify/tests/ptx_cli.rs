@@ -238,7 +238,11 @@ fn direct_equivalence_requires_bound_original_and_strict_contract() {
         let sp = tmp(&format!("relational-{tag}.json"), &v.to_string());
         check(&ptx, &sp, &[])
     };
-    for class in ["equivalence-unpack4", "equivalence-stencil17"] {
+    for class in [
+        "equivalence-unpack4",
+        "equivalence-stencil17",
+        "equivalence-stencil17-pair2",
+    ] {
         let mut base = base.clone();
         base["class"] = class.into();
         let (code, result) = run("no-proof", &base);

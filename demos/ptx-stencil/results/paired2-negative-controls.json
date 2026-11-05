@@ -1,0 +1,35 @@
+[
+  {
+    "case": "wrong-packed-shift",
+    "verdict": "unknown",
+    "reasons": [
+      "supplied proof refused: it does not compile: error: `grind` failed case grind.1.1.1.1.1.1.1.1.1.2.1.1.1.2.1.1.2.1.1.1.1.2.1 A : StencilPair.Args"
+    ],
+    "gpu_witness": {
+      "n": 8,
+      "differing_word_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ]
+    }
+  },
+  {
+    "case": "wrong-entry-guard",
+    "verdict": "unknown",
+    "reasons": [
+      "supplied proof refused: it does not compile: error: omega could not prove the goal: a possible counterexample may satisfy the constraints   k \u2265 0"
+    ],
+    "gpu_witness": {
+      "n": 8,
+      "differing_word_indices": [
+        8
+      ]
+    }
+  }
+]

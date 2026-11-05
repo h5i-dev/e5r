@@ -283,7 +283,7 @@ pub fn check(o: &Options) -> (Verdict, Value) {
     if serde_json::from_str::<Value>(&stext).ok().is_some_and(|v| {
         matches!(
             v["class"].as_str(),
-            Some("equivalence-unpack4" | "equivalence-stencil17")
+            Some("equivalence-unpack4" | "equivalence-stencil17" | "equivalence-stencil17-pair2")
         )
     }) {
         return equivalence::check(o, doc, started, &module, &stext, &phash, &shash);
