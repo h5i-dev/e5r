@@ -1,0 +1,6 @@
+{
+  "status": "rejected before timing",
+  "error": "GPU illegal shared-memory access in initial candidate",
+  "fix": "column advance8 words rather than row advance8*33 words",
+  "sha256": "c815e484c6796be28ba49661b643e410d8c7df83b56aa3e46655bcb4c4608156"
+}

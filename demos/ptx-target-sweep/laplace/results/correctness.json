@@ -1,0 +1,13 @@
+{
+  "cases": 768,
+  "reference": "independent NumPy operator; iterative LCG/CRC, axis XOR, transpose, direct padded Laplacian",
+  "input_output_offsets": "all16 independent combinations0/4/8/12 bytes",
+  "ptx_sha256": {
+    "original": "ad565de01c1c2fd750e67a0847ef86532ab0a6c5748ee2f1e7f06dff109750ab",
+    "candidate": "48ebb566d029d49b28bc14a719448c125de951627eeea5ac077b69a3745598cb",
+    "tuned": "f7fce28d75fad7ae46cb39e09b44660d61789d133adc4e7f58b5e50b4f3cf8f1"
+  },
+  "seed": 29177,
+  "lock": "/mnt/scratch/e5r-gpu-benchmark.lock",
+  "foreign_processes_observed": false
+}

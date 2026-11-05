@@ -1,0 +1,9 @@
+{
+  "authored_utc": "2026-11-05T23:12:30.571909+00:00",
+  "method": "concrete PTX instruction template; no candidate CUDA compilation",
+  "sha256": {
+    "candidate.ptx": "48ebb566d029d49b28bc14a719448c125de951627eeea5ac077b69a3745598cb",
+    "tuned.cu": "e5ec72a46943cdbe21fb0e72bbccfbb9a9cd5c4d47df177954330c95906a8a5e",
+    "tuned.ptx": "f7fce28d75fad7ae46cb39e09b44660d61789d133adc4e7f58b5e50b4f3cf8f1"
+  }
+}

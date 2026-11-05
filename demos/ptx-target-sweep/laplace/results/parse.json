@@ -1,0 +1,10 @@
+{
+  "original": {
+    "supported": false,
+    "error": "e5r: demos/ptx-target-sweep/laplace/original.ptx: line 39: unsupported type .pred in or.pred"
+  },
+  "candidate": {
+    "supported": true,
+    "error": ""
+  }
+}

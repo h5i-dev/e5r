@@ -1,0 +1,16 @@
+{
+  "authored_utc": "2026-11-05T23:12:29.705334+00:00",
+  "method": "concrete PTX instruction template; no candidate CUDA compilation",
+  "sha256": {
+    "candidate.ptx": "b5b23ae1c6e9043f2501f3ae781cc2eb0314cc3d5b27cde73a74ec9ab9281e19",
+    "tuned.cu": "9808829cef76592c5ca914fcb207539f32f8630018268789d87307546196772a",
+    "tuned.ptx": "497c549e98e0c2348cbd1ca6ee7a38908b0225f97bfa17651d24c4a02276d475"
+  },
+  "revisions": [
+    {
+      "previous_sha256": "c815e484c6796be28ba49661b643e410d8c7df83b56aa3e46655bcb4c4608156",
+      "reason": "independent GPU test caught out-of-bounds shared reads: transpose read row stays tx, column advances by8; fixed byte stride1056 to32",
+      "retained": "initial-invalid.ptx"
+    }
+  ]
+}

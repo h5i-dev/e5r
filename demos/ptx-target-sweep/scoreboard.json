@@ -1,0 +1,110 @@
+[
+  {
+    "target": "advance256",
+    "cases": 3072,
+    "parse": {
+      "original": {
+        "supported": true,
+        "error": ""
+      },
+      "candidate": {
+        "supported": true,
+        "error": ""
+      }
+    },
+    "gm": 0.9995075466663118,
+    "large": 0.9999474941469938,
+    "tuned_gm": 0.9998409285795711,
+    "status": "measured miss / timeboxed; UNPROVED"
+  },
+  {
+    "target": "transpose",
+    "cases": 768,
+    "parse": {
+      "original": {
+        "supported": false,
+        "error": "e5r: demos/ptx-target-sweep/transpose/original.ptx: line 39: unsupported type .pred in or.pred"
+      },
+      "candidate": {
+        "supported": true,
+        "error": ""
+      }
+    },
+    "gm": 2.0371418679576347,
+    "large": 1.854549988258614,
+    "tuned_gm": 0.9995528278242038,
+    "status": "promising, UNPROVED; original outside current parser"
+  },
+  {
+    "target": "laplace",
+    "cases": 768,
+    "parse": {
+      "original": {
+        "supported": false,
+        "error": "e5r: demos/ptx-target-sweep/laplace/original.ptx: line 39: unsupported type .pred in or.pred"
+      },
+      "candidate": {
+        "supported": true,
+        "error": ""
+      }
+    },
+    "gm": 0.8608941693258544,
+    "large": 1.0137408698773394,
+    "tuned_gm": 0.9984711954879052,
+    "status": "measured miss / timeboxed; UNPROVED; original outside current parser"
+  },
+  {
+    "target": "xor8",
+    "cases": 3072,
+    "parse": {
+      "original": {
+        "supported": true,
+        "error": ""
+      },
+      "candidate": {
+        "supported": true,
+        "error": ""
+      }
+    },
+    "gm": 1.0484192496486873,
+    "large": 0.9991452758501145,
+    "tuned_gm": 1.0065216650262145,
+    "status": "measured miss / timeboxed; UNPROVED"
+  },
+  {
+    "target": "crc32word",
+    "cases": 3072,
+    "parse": {
+      "original": {
+        "supported": true,
+        "error": ""
+      },
+      "candidate": {
+        "supported": true,
+        "error": ""
+      }
+    },
+    "gm": 1.258750473587536,
+    "large": 1.088192905529195,
+    "tuned_gm": 1.039840245346189,
+    "status": "measured miss / timeboxed; UNPROVED"
+  },
+  {
+    "target": "xorshift32x64",
+    "cases": 5120,
+    "parse": {
+      "original": {
+        "supported": true,
+        "error": ""
+      },
+      "candidate": {
+        "supported": true,
+        "error": ""
+      }
+    },
+    "gm": 1.968616259149981,
+    "large": 1.9412052769523425,
+    "tuned_gm": 0.956844970900873,
+    "status": "promising, UNPROVED"
+  }
+]

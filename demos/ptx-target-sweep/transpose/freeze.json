@@ -1,0 +1,22 @@
+{
+  "frozen_utc": "2026-11-05T23:12:29.226916+00:00",
+  "nvcc": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2026 NVIDIA Corporation\nBuilt on Mon_Mar_02_09:52:23_PM_PST_2026\nCuda compilation tools, release 13.2, V13.2.51\nBuild cuda_13.2.r13.2/compiler.37434383_0\n",
+  "flags": [
+    "-O3",
+    "-arch=sm_86",
+    "-std=c++17",
+    "--ptx"
+  ],
+  "operator": {
+    "tile": 32,
+    "block": [
+      32,
+      8
+    ],
+    "shared_stride": 33
+  },
+  "sha256": {
+    "original.cu": "5bba7c8992b256d42a2f997ff91acb3de0973eb2f68992949f3b079db1b8a2f9",
+    "original.ptx": "f33ec9e81a2dfd2c8cdbe26b540237259bdb67d07f7b1185c9fb8712edbf5ae1"
+  }
+}
