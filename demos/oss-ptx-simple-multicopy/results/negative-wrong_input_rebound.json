@@ -1,0 +1,54 @@
+{
+  "class": "equivalence-oss-inc",
+  "counterexample": null,
+  "input": {
+    "original_ptx": {
+      "path": "/mnt/scratch/e5r-oss-ptx/negatives/wrong_input_rebound/original.ptx",
+      "sha256": "5e1ec770041d17de34da744350311d3bbcfa6a17a49d3d061b9c969d9c3a8746"
+    },
+    "ptx": {
+      "path": "/mnt/scratch/e5r-oss-ptx/negatives/wrong_input_rebound/edited.ptx",
+      "sha256": "180f9126a539389ad1787297f95a9c49d2219727477ceccdd82a1895bfabbacf"
+    },
+    "spec": {
+      "path": "/mnt/scratch/e5r-oss-ptx/negatives/wrong_input_rebound/equivalence.json",
+      "sha256": "7bc6eda04200f678cee3c5f88425d1597a48c622bfa1aa3715caff957f3e8a16"
+    }
+  },
+  "kernel": "_Z9incKernelPiS_ii",
+  "lean": {
+    "memory_cap_mb": 4096,
+    "proof_seconds": 13.97,
+    "timeout_seconds": 180,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "lean_spec": "def domain : OssInc.Spec := ⟨\"_Z9incKernelPiS_ii_param_1\", \"_Z9incKernelPiS_ii_param_0\", \"_Z9incKernelPiS_ii_param_2\", \"_Z9incKernelPiS_ii_param_3\"⟩\n",
+  "proof": {
+    "accepted": false,
+    "manifest": {
+      "ptx": "180f9126a539389ad1787297f95a9c49d2219727477ceccdd82a1895bfabbacf",
+      "spec": "7bc6eda04200f678cee3c5f88425d1597a48c622bfa1aa3715caff957f3e8a16",
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "path": "/mnt/scratch/e5r-oss-ptx/negatives/wrong_input_rebound/equivalence.lean",
+    "sha256": "867eb65b4a15993a0f8dddbca0dfa98179088988e5d6c51bfe58d3acb6bfdf19",
+    "supplied": true
+  },
+  "properties": {
+    "functional_correctness": "unknown",
+    "memory_safety": "unknown",
+    "race_freedom": "unknown",
+    "termination": "unknown"
+  },
+  "reasons": [
+    "supplied proof refused: it does not compile: error: Tactic `introN` failed: There are no additional binders or `let` bindings in the goal to introduce  case isFalse.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.isFalse.refine_2.refine_1"
+  ],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 16.29,
+  "theorem": null,
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "unknown"
+}

@@ -1,0 +1,3 @@
+[ 50%] Building CUDA object CMakeFiles/simpleMultiCopy.dir/simpleMultiCopy.cu.o
+[100%] Linking CUDA executable simpleMultiCopy
+[100%] Built target simpleMultiCopy

@@ -26,6 +26,12 @@ ownership and checked u64 input/output paths with safe tails. It measures
 1.71x at one cache-resident size and 1.068x across the seven-size sweep;
 all large-workload regressions and tuned CUDA comparisons are retained.
 
+The [real OSS kernel demo](demos/oss-ptx-simple-multicopy/README.md) freezes the
+normal NVIDIA CUDA Samples build and proves a direct PTX repetition edit under
+explicit nonalias/default-repeat conditions. Small cache-hot shapes improve up
+to 1.345x; the normal default shape regresses to 0.965x and matches restrict
+CUDA. Raw AOT/JIT measurements and rebound semantic negatives are retained.
+
 ## Supported assembly
 
 | Assembly | What is proved | Not yet | Docs |

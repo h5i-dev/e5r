@@ -1,0 +1,42 @@
+{
+  "lock": "/mnt/scratch/e5r-gpu-benchmark.lock",
+  "foreign_processes_observed": false,
+  "witnesses": [
+    {
+      "name": "wrong_increment_rebound",
+      "ptx_sha256": "8f2e86f6fcafb19cc6a6be51731db05f7fa0f7a8281f2ed796e550126958073b",
+      "expected_first": 1,
+      "actual_first": 2,
+      "expected_tail": 42,
+      "actual_tail": 42,
+      "mismatch": true
+    },
+    {
+      "name": "wrong_tail_rebound",
+      "ptx_sha256": "bd78a2e638e2a1d31b43cadf90d8dd8f5bf73998ab5efa9803149787fdee3e54",
+      "expected_first": 1,
+      "actual_first": 1,
+      "expected_tail": 42,
+      "actual_tail": 1,
+      "mismatch": true
+    },
+    {
+      "name": "wrong_input_rebound",
+      "ptx_sha256": "180f9126a539389ad1787297f95a9c49d2219727477ceccdd82a1895bfabbacf",
+      "expected_first": 1,
+      "actual_first": 43,
+      "expected_tail": 42,
+      "actual_tail": 42,
+      "mismatch": true
+    },
+    {
+      "name": "wrong_original_rebound",
+      "ptx_sha256": "ae8b4ec35dd78277d50f29611b69e91b08b896638abfd9cb95b3e58f96fbca47",
+      "expected_first": 1,
+      "actual_first": 2,
+      "expected_tail": 42,
+      "actual_tail": 42,
+      "mismatch": true
+    }
+  ]
+}

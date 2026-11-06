@@ -1,0 +1,33 @@
+-- The C compiler identification is GNU 11.5.0
+-- The CXX compiler identification is GNU 11.5.0
+-- The CUDA compiler identification is NVIDIA 13.2.51
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting CUDA compiler ABI info
+-- Detecting CUDA compiler ABI info - done
+-- Check for working CUDA compiler: /usr/local/cuda/bin/nvcc - skipped
+-- Detecting CUDA compile features
+-- Detecting CUDA compile features - done
+-- Found CUDAToolkit: /usr/local/cuda/include (found version "13.2.51") 
+-- Looking for pthread.h
+-- Looking for pthread.h - found
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE  
+-- CUDA Samples installation configured:
+--   Architecture: x86_64
+--   OS: linux
+--   Build Type: release
+--   Install Prefix: /mnt/scratch/e5r-oss-ptx/upstream-install
+--   Install Directory: /mnt/scratch/e5r-oss-ptx/upstream-install/x86_64/linux/release
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /mnt/scratch/e5r-oss-ptx/upstream-build

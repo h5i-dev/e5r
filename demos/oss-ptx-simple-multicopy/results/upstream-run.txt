@@ -1,0 +1,32 @@
+[simpleMultiCopy] - Starting...
+> Using CUDA device [0]: NVIDIA A10G
+[NVIDIA A10G] has 80 MP(s) x 128 (Cores/MP) = 10240 (Cores)
+> Device name: NVIDIA A10G
+> CUDA Capability 8.6 hardware with 80 multi-processors
+> scale_factor = 1.00
+> array_size   = 4194304
+
+
+Relevant properties of this CUDA device
+(X) Can overlap one CPU<>GPU data transfer with GPU kernel execution (device property "cudaDevAttrGpuOverlap")
+(X) Can overlap two CPU<>GPU data transfers with GPU kernel execution
+    (Compute Capability >= 2.0 AND (Tesla product OR Quadro 4000/5000/6000/K5000)
+
+Measured timings (throughput):
+ Memcpy host to device	: 1.252960 ms (13.390065 GB/s)
+ Memcpy device to host	: 1.248096 ms (13.442248 GB/s)
+ Kernel			: 0.078816 ms (2128.656201 GB/s)
+
+Theoretical limits for speedup gained from overlapped data transfers:
+No overlap at all (transfer-kernel-transfer): 2.579872 ms 
+Compute can overlap with one transfer: 2.501056 ms
+Compute can overlap with both data transfers: 1.252960 ms
+
+Average measured timings over 10 repetitions:
+ Avg. time when execution fully serialized	: 8.511385 ms
+ Avg. time when overlapped using 4 streams	: 1.430016 ms
+ Avg. speedup gained (serialized - overlapped)	: 7.081369 ms
+
+Measured throughput:
+ Fully serialized execution		: 3.942300 GB/s
+ Overlapped using 4 streams		: 23.464375 GB/s

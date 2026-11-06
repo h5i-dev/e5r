@@ -1,0 +1,35 @@
+{
+  "all_refused": true,
+  "rows": [
+    {
+      "name": "stale_candidate",
+      "hashes_rebound": false,
+      "verdict": "unknown",
+      "reason": "supplied proof refused: written for a different ptx fcf5f87efb33363196b9578518bc9d63d7eb3054bf96ee58023a9bdb60b22a89 (the PTX is 8f2e86f6fcafb19cc6a6be51731db05f7fa0f7a8281f2ed796e550126958073b)"
+    },
+    {
+      "name": "wrong_increment_rebound",
+      "hashes_rebound": true,
+      "verdict": "unknown",
+      "reason": "supplied proof refused: it does not compile: error: unsolved goals case isFalse.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.isFalse.refine_2.refine_2.refine_2.refine_2 A : Args"
+    },
+    {
+      "name": "wrong_tail_rebound",
+      "hashes_rebound": true,
+      "verdict": "unknown",
+      "reason": "supplied proof refused: it does not compile: error: Tactic `introN` failed: There are no additional binders or `let` bindings in the goal to introduce  case isTrue.isFalse.refine_1"
+    },
+    {
+      "name": "wrong_input_rebound",
+      "hashes_rebound": true,
+      "verdict": "unknown",
+      "reason": "supplied proof refused: it does not compile: error: Tactic `introN` failed: There are no additional binders or `let` bindings in the goal to introduce  case isFalse.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.isFalse.refine_2.refine_1"
+    },
+    {
+      "name": "wrong_original_rebound",
+      "hashes_rebound": true,
+      "verdict": "unknown",
+      "reason": "supplied proof refused: it does not compile: error: unsolved goals case isFalse.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.isFalse.refine_2.refine_2.refine_2.refine_2 A : Args"
+    }
+  ]
+}

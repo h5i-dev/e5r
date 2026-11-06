@@ -1,0 +1,20 @@
+{
+  "frontend_tests": "frontend-tests.txt",
+  "whole_lean_build": "lake build Ptx proofcheck: passed57 jobs, LEAN_NUM_THREADS=2",
+  "predicate_example": "lake build Ptx.Examples.PredicateOr: passed; por-lean.txt",
+  "main_replay": {
+    "accepted": true,
+    "declarations": 68,
+    "axioms": [
+      "propext",
+      "Quot.sound",
+      "Classical.choice"
+    ]
+  },
+  "prior_direct_equivalence_regression": "regression-equivalence.json: proved/accepted",
+  "bindings": "verify-freeze.py: passed",
+  "gpu_cases": 2016,
+  "semantic_negatives": 4,
+  "stale_hash_negative": 1,
+  "performance_default_target": "failed"
+}

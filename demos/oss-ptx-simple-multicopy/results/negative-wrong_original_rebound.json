@@ -1,0 +1,54 @@
+{
+  "class": "equivalence-oss-inc",
+  "counterexample": null,
+  "input": {
+    "original_ptx": {
+      "path": "/mnt/scratch/e5r-oss-ptx/negatives/wrong_original_rebound/original.ptx",
+      "sha256": "ae8b4ec35dd78277d50f29611b69e91b08b896638abfd9cb95b3e58f96fbca47"
+    },
+    "ptx": {
+      "path": "/mnt/scratch/e5r-oss-ptx/negatives/wrong_original_rebound/edited.ptx",
+      "sha256": "fcf5f87efb33363196b9578518bc9d63d7eb3054bf96ee58023a9bdb60b22a89"
+    },
+    "spec": {
+      "path": "/mnt/scratch/e5r-oss-ptx/negatives/wrong_original_rebound/equivalence.json",
+      "sha256": "42e6148b3556cd7616fc22a934d26ff08a1983494685487dfde55c422aa433b2"
+    }
+  },
+  "kernel": "_Z9incKernelPiS_ii",
+  "lean": {
+    "memory_cap_mb": 4096,
+    "proof_seconds": 14.13,
+    "timeout_seconds": 180,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "lean_spec": "def domain : OssInc.Spec := ⟨\"_Z9incKernelPiS_ii_param_1\", \"_Z9incKernelPiS_ii_param_0\", \"_Z9incKernelPiS_ii_param_2\", \"_Z9incKernelPiS_ii_param_3\"⟩\n",
+  "proof": {
+    "accepted": false,
+    "manifest": {
+      "ptx": "fcf5f87efb33363196b9578518bc9d63d7eb3054bf96ee58023a9bdb60b22a89",
+      "spec": "42e6148b3556cd7616fc22a934d26ff08a1983494685487dfde55c422aa433b2",
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "path": "/mnt/scratch/e5r-oss-ptx/negatives/wrong_original_rebound/equivalence.lean",
+    "sha256": "820d5477c1bfc10c324a5bbf0f0f212864b9b7b62297f133810f21addcf5da58",
+    "supplied": true
+  },
+  "properties": {
+    "functional_correctness": "unknown",
+    "memory_safety": "unknown",
+    "race_freedom": "unknown",
+    "termination": "unknown"
+  },
+  "reasons": [
+    "supplied proof refused: it does not compile: error: unsolved goals case isFalse.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.isFalse.refine_2.refine_2.refine_2.refine_2 A : Args"
+  ],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 16.47,
+  "theorem": null,
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "unknown"
+}

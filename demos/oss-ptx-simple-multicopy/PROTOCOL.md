@@ -34,3 +34,10 @@ Independent NumPy uint32 reference, original/candidate/tuned differential,
 edge/random/adversarial/canary/4-byte offset buffers, positive-tail lengths,
 hash-rebound semantic proof negatives. Tests supplement the Lean theorem.
 NVIDIA CUDA compiler/JIT/SASS/hardware and Rust exporter remain outside theorem.
+
+Follow-up declared before AOT runs: the first experiment used driver JIT for all
+three PTX programs. The ordinary upstream executable instead loads its nvcc
+ptxas sm_86 cubin. Retain the first dataset as performance-jit.json, and also
+measure the exact normal-build cubin plus candidate/tuned cubins assembled with
+the same nvcc13.2 ptxas, alongside the JIT variants. This checks whether the
+normal upstream compilation path changes the comparison. Same shapes/protocol.

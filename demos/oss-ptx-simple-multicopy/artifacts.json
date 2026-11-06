@@ -1,0 +1,15 @@
+{
+  "sha256": {
+    "original.ptx": "5e1ec770041d17de34da744350311d3bbcfa6a17a49d3d061b9c969d9c3a8746",
+    "edited.ptx": "fcf5f87efb33363196b9578518bc9d63d7eb3054bf96ee58023a9bdb60b22a89",
+    "tuned.ptx": "636cf231e88ab1562e317e71278269f3643786067091624470429d5d78fe96b0",
+    "tuned.cu": "42b890d10d5c94202fc83967a9ffa63806f714e545d7d61bf15c9b8b93e14409",
+    "equivalence.json": "7bc6eda04200f678cee3c5f88425d1597a48c622bfa1aa3715caff957f3e8a16",
+    "equivalence.lean": "6bba01a68b1bdc7d04693fcbde79e34c4e73412712fd3bd605bb7152f53b8653",
+    "PROTOCOL.md": "40ef390d41b7b808adb262557f8e494d1525ef0785733e2e1615856359e6ba13"
+  },
+  "frozen_before_edit": "freeze.json",
+  "direct_author": "author-edit.py",
+  "dependency_commit": "16cbf0d",
+  "proof_result": "results/proof.json"
+}

@@ -1,0 +1,3393 @@
+{
+  "metadata": {
+    "gpu": "NVIDIA A10G, GPU-7e5ae9e3-0b19-7ed6-8641-c17e13519a08, 595.112.07, 23028 MiB, 1710 MHz, 6251 MHz",
+    "python": "3.12.15",
+    "cupy": "13.6.0",
+    "numpy": "2.2.6",
+    "runtime": 12090,
+    "driver": 13020,
+    "nvcc": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2026 NVIDIA Corporation\nBuilt on Mon_Mar_02_09:52:23_PM_PST_2026\nCuda compilation tools, release 13.2, V13.2.51\nBuild cuda_13.2.r13.2/compiler.37434383_0\n",
+    "ptx_sha256": {
+      "original": "5e1ec770041d17de34da744350311d3bbcfa6a17a49d3d061b9c969d9c3a8746",
+      "edited": "fcf5f87efb33363196b9578518bc9d63d7eb3054bf96ee58023a9bdb60b22a89",
+      "tuned": "636cf231e88ab1562e317e71278269f3643786067091624470429d5d78fe96b0"
+    },
+    "lock": "/mnt/scratch/e5r-gpu-benchmark.lock",
+    "foreign_processes_observed": false,
+    "seed": 936,
+    "inner_reps": 5,
+    "proof_status": "consult results/proof.json; GPU runs are tests, not proofs",
+    "block": 512,
+    "repeats": 7,
+    "warmups": 20,
+    "graph_nodes": 64,
+    "graph_replays": 4,
+    "l2_bytes": 6291456,
+    "scope": "kernel only, no sample/API/end-to-end claim"
+  },
+  "rows": [
+    {
+      "n": 1,
+      "regime": "hot",
+      "implementation": "original",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 8,
+      "device_us": [
+        1.4039999805390835,
+        1.2636249884963036,
+        1.2600000482052565,
+        1.272000023163855,
+        1.2760000536218286,
+        1.2639999622479081,
+        1.2760000536218286
+      ],
+      "median_us": 1.272000023163855,
+      "stdev_us": 0.05156567396838904,
+      "min_us": 1.2600000482052565,
+      "max_us": 1.4039999805390835,
+      "variant_orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 1,
+      "regime": "hot",
+      "implementation": "edited",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 8,
+      "device_us": [
+        1.2039999710395932,
+        1.0679999832063913,
+        1.0839999886229634,
+        1.088000019080937,
+        1.0720000136643648,
+        1.0720000136643648,
+        1.07999995816499
+      ],
+      "median_us": 1.07999995816499,
+      "stdev_us": 0.048410930076692706,
+      "min_us": 1.0679999832063913,
+      "max_us": 1.2039999710395932,
+      "variant_orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 1,
+      "regime": "hot",
+      "implementation": "tuned",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 8,
+      "device_us": [
+        1.2080000014975667,
+        1.07999995816499,
+        1.0920000495389104,
+        1.0839999886229634,
+        1.0839999886229634,
+        1.0760000441223383,
+        1.0920000495389104
+      ],
+      "median_us": 1.0839999886229634,
+      "stdev_us": 0.046981250208839274,
+      "min_us": 1.0760000441223383,
+      "max_us": 1.2080000014975667,
+      "variant_orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 31,
+      "regime": "hot",
+      "implementation": "original",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 248,
+      "device_us": [
+        1.4680000022053719,
+        1.2760000536218286,
+        1.2760000536218286,
+        1.2758750235661864,
+        1.2639999622479081,
+        1.2760000536218286,
+        1.2799999676644802
+      ],
+      "median_us": 1.2760000536218286,
+      "stdev_us": 0.0732507209955375,
+      "min_us": 1.2639999622479081,
+      "max_us": 1.4680000022053719,
+      "variant_orders": [
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 31,
+      "regime": "hot",
+      "implementation": "edited",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 248,
+      "device_us": [
+        1.2120000319555402,
+        1.088000019080937,
+        1.088000019080937,
+        1.088000019080937,
+        1.088000019080937,
+        1.0760000441223383,
+        1.0920000495389104
+      ],
+      "median_us": 1.088000019080937,
+      "stdev_us": 0.04763352260607039,
+      "min_us": 1.0760000441223383,
+      "max_us": 1.2120000319555402,
+      "variant_orders": [
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 31,
+      "regime": "hot",
+      "implementation": "tuned",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 248,
+      "device_us": [
+        1.2600000482052565,
+        1.0920000495389104,
+        1.0920000495389104,
+        1.0920000495389104,
+        1.088000019080937,
+        1.0839999886229634,
+        1.0920000495389104
+      ],
+      "median_us": 1.0920000495389104,
+      "stdev_us": 0.06432655422886185,
+      "min_us": 1.0839999886229634,
+      "max_us": 1.2600000482052565,
+      "variant_orders": [
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 32,
+      "regime": "hot",
+      "implementation": "original",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 256,
+      "device_us": [
+        1.4799999771639705,
+        1.2679999927058816,
+        1.256000017747283,
+        1.2679999927058816,
+        1.272000023163855,
+        1.2679999927058816,
+        1.2600000482052565
+      ],
+      "median_us": 1.2679999927058816,
+      "stdev_us": 0.08132239013060963,
+      "min_us": 1.256000017747283,
+      "max_us": 1.4799999771639705,
+      "variant_orders": [
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 32,
+      "regime": "hot",
+      "implementation": "edited",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 256,
+      "device_us": [
+        1.287874998524785,
+        1.0839999886229634,
+        1.0679999832063913,
+        1.0720000136643648,
+        1.0839999886229634,
+        1.088000019080937,
+        1.07999995816499
+      ],
+      "median_us": 1.0839999886229634,
+      "stdev_us": 0.07913928529647406,
+      "min_us": 1.0679999832063913,
+      "max_us": 1.287874998524785,
+      "variant_orders": [
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 32,
+      "regime": "hot",
+      "implementation": "tuned",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 256,
+      "device_us": [
+        1.1997499968856573,
+        1.07999995816499,
+        1.0679999832063913,
+        1.088000019080937,
+        1.0720000136643648,
+        1.088000019080937,
+        1.07999995816499
+      ],
+      "median_us": 1.07999995816499,
+      "stdev_us": 0.046119510209993754,
+      "min_us": 1.0679999832063913,
+      "max_us": 1.1997499968856573,
+      "variant_orders": [
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 255,
+      "regime": "hot",
+      "implementation": "original",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 2040,
+      "device_us": [
+        1.5079999575391412,
+        1.3119999784976244,
+        1.3160000089555979,
+        1.3000000035390258,
+        1.3000000035390258,
+        1.3160000089555979,
+        1.3119999784976244
+      ],
+      "median_us": 1.3119999784976244,
+      "stdev_us": 0.07539608191677201,
+      "min_us": 1.3000000035390258,
+      "max_us": 1.5079999575391412,
+      "variant_orders": [
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 255,
+      "regime": "hot",
+      "implementation": "edited",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 2040,
+      "device_us": [
+        1.2240000069141388,
+        1.104000024497509,
+        1.104000024497509,
+        1.104000024497509,
+        1.0999999940395355,
+        1.0918750194832683,
+        1.104000024497509
+      ],
+      "median_us": 1.104000024497509,
+      "stdev_us": 0.04658608973591019,
+      "min_us": 1.0918750194832683,
+      "max_us": 1.2240000069141388,
+      "variant_orders": [
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 255,
+      "regime": "hot",
+      "implementation": "tuned",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 2040,
+      "device_us": [
+        1.2760000536218286,
+        1.088000019080937,
+        1.104000024497509,
+        1.1080000549554825,
+        1.0999999940395355,
+        1.104000024497509,
+        1.104000024497509
+      ],
+      "median_us": 1.104000024497509,
+      "stdev_us": 0.06632676457530406,
+      "min_us": 1.088000019080937,
+      "max_us": 1.2760000536218286,
+      "variant_orders": [
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 256,
+      "regime": "hot",
+      "implementation": "original",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 2048,
+      "device_us": [
+        1.500000013038516,
+        1.3119999784976244,
+        1.3119999784976244,
+        1.3119999784976244,
+        1.3119999784976244,
+        1.3078750343993306,
+        1.307999948039651
+      ],
+      "median_us": 1.3119999784976244,
+      "stdev_us": 0.07159478591674555,
+      "min_us": 1.3078750343993306,
+      "max_us": 1.500000013038516,
+      "variant_orders": [
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 256,
+      "regime": "hot",
+      "implementation": "edited",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 2048,
+      "device_us": [
+        1.3000000035390258,
+        1.0999999940395355,
+        1.0839999886229634,
+        1.0999999940395355,
+        1.0999999940395355,
+        1.104000024497509,
+        1.104000024497509
+      ],
+      "median_us": 1.0999999940395355,
+      "stdev_us": 0.07639995111311439,
+      "min_us": 1.0839999886229634,
+      "max_us": 1.3000000035390258,
+      "variant_orders": [
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 256,
+      "regime": "hot",
+      "implementation": "tuned",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 2048,
+      "device_us": [
+        1.2600000482052565,
+        1.0999999940395355,
+        1.0999999940395355,
+        1.0999999940395355,
+        1.0920000495389104,
+        1.104000024497509,
+        1.0999999940395355
+      ],
+      "median_us": 1.0999999940395355,
+      "stdev_us": 0.06083233654158483,
+      "min_us": 1.0920000495389104,
+      "max_us": 1.2600000482052565,
+      "variant_orders": [
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 511,
+      "regime": "hot",
+      "implementation": "original",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 4088,
+      "device_us": [
+        1.5399999683722854,
+        1.3599999947473407,
+        1.3640000252053142,
+        1.3640000252053142,
+        1.3640000252053142,
+        1.3640000252053142,
+        1.3640000252053142
+      ],
+      "median_us": 1.3640000252053142,
+      "stdev_us": 0.06679034213353038,
+      "min_us": 1.3599999947473407,
+      "max_us": 1.5399999683722854,
+      "variant_orders": [
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 511,
+      "regime": "hot",
+      "implementation": "edited",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 4088,
+      "device_us": [
+        1.3200000394135714,
+        1.119874999858439,
+        1.120000029914081,
+        1.120000029914081,
+        1.120000029914081,
+        1.120000029914081,
+        1.120000029914081
+      ],
+      "median_us": 1.120000029914081,
+      "stdev_us": 0.07560078870502204,
+      "min_us": 1.119874999858439,
+      "max_us": 1.3200000394135714,
+      "variant_orders": [
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 511,
+      "regime": "hot",
+      "implementation": "tuned",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 4088,
+      "device_us": [
+        1.3119999784976244,
+        1.1279999744147062,
+        1.1279999744147062,
+        1.120000029914081,
+        1.1239999439567327,
+        1.120000029914081,
+        1.120000029914081
+      ],
+      "median_us": 1.1239999439567327,
+      "stdev_us": 0.07139960481701825,
+      "min_us": 1.120000029914081,
+      "max_us": 1.3119999784976244,
+      "variant_orders": [
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 512,
+      "regime": "hot",
+      "implementation": "original",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 4096,
+      "device_us": [
+        1.560000004246831,
+        1.3517499901354313,
+        1.3439999893307686,
+        1.3599999947473407,
+        1.3599999947473407,
+        1.3559999642893672,
+        1.3559999642893672
+      ],
+      "median_us": 1.3559999642893672,
+      "stdev_us": 0.0778203712114729,
+      "min_us": 1.3439999893307686,
+      "max_us": 1.560000004246831,
+      "variant_orders": [
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 512,
+      "regime": "hot",
+      "implementation": "edited",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 4096,
+      "device_us": [
+        1.3119999784976244,
+        1.1159999994561076,
+        1.1038749944418669,
+        1.1119999689981341,
+        1.1119999689981341,
+        1.1159999994561076,
+        1.1159999994561076
+      ],
+      "median_us": 1.1159999994561076,
+      "stdev_us": 0.0754720180037547,
+      "min_us": 1.1038749944418669,
+      "max_us": 1.3119999784976244,
+      "variant_orders": [
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 512,
+      "regime": "hot",
+      "implementation": "tuned",
+      "grid": 1,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 4096,
+      "device_us": [
+        1.2919999426230788,
+        1.120000029914081,
+        1.1159999994561076,
+        1.120000029914081,
+        1.120000029914081,
+        1.120000029914081,
+        1.1159999994561076
+      ],
+      "median_us": 1.120000029914081,
+      "stdev_us": 0.0655409435512103,
+      "min_us": 1.1159999994561076,
+      "max_us": 1.2919999426230788,
+      "variant_orders": [
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 513,
+      "regime": "hot",
+      "implementation": "original",
+      "grid": 2,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 4104,
+      "device_us": [
+        1.5640000347048044,
+        1.3680000556632876,
+        1.3599999947473407,
+        1.3439999893307686,
+        1.3640000252053142,
+        1.3640000252053142,
+        1.3640000252053142
+      ],
+      "median_us": 1.3640000252053142,
+      "stdev_us": 0.07724790790043942,
+      "min_us": 1.3439999893307686,
+      "max_us": 1.5640000347048044,
+      "variant_orders": [
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 513,
+      "regime": "hot",
+      "implementation": "edited",
+      "grid": 2,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 4104,
+      "device_us": [
+        1.3279999839141965,
+        1.0999999940395355,
+        1.1080000549554825,
+        1.1077499948441982,
+        1.119874999858439,
+        1.1080000549554825,
+        1.120000029914081
+      ],
+      "median_us": 1.1080000549554825,
+      "stdev_us": 0.08248005666401234,
+      "min_us": 1.0999999940395355,
+      "max_us": 1.3279999839141965,
+      "variant_orders": [
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 513,
+      "regime": "hot",
+      "implementation": "tuned",
+      "grid": 2,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 4104,
+      "device_us": [
+        1.2880000285804272,
+        1.1159999994561076,
+        1.1080000549554825,
+        1.1078750248998404,
+        1.104000024497509,
+        1.1159999994561076,
+        1.120000029914081
+      ],
+      "median_us": 1.1159999994561076,
+      "stdev_us": 0.06677094879111006,
+      "min_us": 1.104000024497509,
+      "max_us": 1.2880000285804272,
+      "variant_orders": [
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 4096,
+      "regime": "hot",
+      "implementation": "original",
+      "grid": 8,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 32768,
+      "device_us": [
+        1.5960000455379486,
+        1.3920000055804849,
+        1.408000010997057,
+        1.4039999805390835,
+        1.4038749504834414,
+        1.408000010997057,
+        1.3920000055804849
+      ],
+      "median_us": 1.4039999805390835,
+      "stdev_us": 0.07389764674742073,
+      "min_us": 1.3920000055804849,
+      "max_us": 1.5960000455379486,
+      "variant_orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 4096,
+      "regime": "hot",
+      "implementation": "edited",
+      "grid": 8,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 32768,
+      "device_us": [
+        1.3640000252053142,
+        1.155999954789877,
+        1.1480000102892518,
+        1.1520000407472253,
+        1.1520000407472253,
+        1.1520000407472253,
+        1.155999954789877
+      ],
+      "median_us": 1.1520000407472253,
+      "stdev_us": 0.07992377917937912,
+      "min_us": 1.1480000102892518,
+      "max_us": 1.3640000252053142,
+      "variant_orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 4096,
+      "regime": "hot",
+      "implementation": "tuned",
+      "grid": 8,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 32768,
+      "device_us": [
+        1.3279999839141965,
+        1.1520000407472253,
+        1.1599999852478504,
+        1.1520000407472253,
+        1.155999954789877,
+        1.164000015705824,
+        1.155999954789877
+      ],
+      "median_us": 1.155999954789877,
+      "stdev_us": 0.06489844926298201,
+      "min_us": 1.1520000407472253,
+      "max_us": 1.3279999839141965,
+      "variant_orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 65536,
+      "regime": "hot",
+      "implementation": "original",
+      "grid": 128,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 524288,
+      "device_us": [
+        2.099999925121665,
+        1.787999994121492,
+        1.787999994121492,
+        1.7920000245794654,
+        1.7800000496208668,
+        1.7719999887049198,
+        1.7719999887049198
+      ],
+      "median_us": 1.787999994121492,
+      "stdev_us": 0.12045308246312796,
+      "min_us": 1.7719999887049198,
+      "max_us": 2.099999925121665,
+      "variant_orders": [
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 65536,
+      "regime": "hot",
+      "implementation": "edited",
+      "grid": 128,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 524288,
+      "device_us": [
+        1.5439999988302588,
+        1.3279999839141965,
+        1.3360000448301435,
+        1.33200001437217,
+        1.323999953456223,
+        1.3200000394135714,
+        1.3279999839141965
+      ],
+      "median_us": 1.3279999839141965,
+      "stdev_us": 0.0818034800151891,
+      "min_us": 1.3200000394135714,
+      "max_us": 1.5439999988302588,
+      "variant_orders": [
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 65536,
+      "regime": "hot",
+      "implementation": "tuned",
+      "grid": 128,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 524288,
+      "device_us": [
+        1.5117500443011522,
+        1.339999958872795,
+        1.323999953456223,
+        1.323999953456223,
+        1.3200000394135714,
+        1.323999953456223,
+        1.3238750398159027
+      ],
+      "median_us": 1.323999953456223,
+      "stdev_us": 0.0705091237011852,
+      "min_us": 1.3200000394135714,
+      "max_us": 1.5117500443011522,
+      "variant_orders": [
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 65536,
+      "regime": "rotating",
+      "implementation": "original",
+      "grid": 128,
+      "block": 512,
+      "ring_buffers": 64,
+      "total_buffer_bytes": 33554432,
+      "device_us": [
+        2.4240000639110804,
+        2.2879999596625566,
+        2.251999918371439,
+        2.3159999400377274,
+        2.240000059828162,
+        2.2360000293701887,
+        2.3240000009536743
+      ],
+      "median_us": 2.2879999596625566,
+      "stdev_us": 0.0662002880485379,
+      "min_us": 2.2360000293701887,
+      "max_us": 2.4240000639110804,
+      "variant_orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 65536,
+      "regime": "rotating",
+      "implementation": "edited",
+      "grid": 128,
+      "block": 512,
+      "ring_buffers": 64,
+      "total_buffer_bytes": 33554432,
+      "device_us": [
+        2.580000087618828,
+        2.3960000835359097,
+        2.400000113993883,
+        2.392000053077936,
+        2.3960000835359097,
+        2.3960000835359097,
+        2.392000053077936
+      ],
+      "median_us": 2.3960000835359097,
+      "stdev_us": 0.06985154753877199,
+      "min_us": 2.392000053077936,
+      "max_us": 2.580000087618828,
+      "variant_orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 65536,
+      "regime": "rotating",
+      "implementation": "tuned",
+      "grid": 128,
+      "block": 512,
+      "ring_buffers": 64,
+      "total_buffer_bytes": 33554432,
+      "device_us": [
+        2.5839998852461576,
+        2.400000113993883,
+        2.420000033453107,
+        2.400000113993883,
+        2.3799999617040157,
+        2.399750053882599,
+        2.41199997253716
+      ],
+      "median_us": 2.400000113993883,
+      "stdev_us": 0.06991185639336128,
+      "min_us": 2.3799999617040157,
+      "max_us": 2.5839998852461576,
+      "variant_orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 1048576,
+      "regime": "hot",
+      "implementation": "original",
+      "grid": 2048,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 8388608,
+      "device_us": [
+        17.799999564886093,
+        17.640000209212303,
+        17.607999965548515,
+        17.588000744581223,
+        17.59999990463257,
+        17.56799966096878,
+        17.616000026464462
+      ],
+      "median_us": 17.607999965548515,
+      "stdev_us": 0.07764615928054298,
+      "min_us": 17.56799966096878,
+      "max_us": 17.799999564886093,
+      "variant_orders": [
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 1048576,
+      "regime": "hot",
+      "implementation": "edited",
+      "grid": 2048,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 8388608,
+      "device_us": [
+        14.51599970459938,
+        14.33200016617775,
+        14.360000379383564,
+        14.348000288009644,
+        14.32000007480383,
+        14.312000013887882,
+        14.32000007480383
+      ],
+      "median_us": 14.33200016617775,
+      "stdev_us": 0.07158597312834744,
+      "min_us": 14.312000013887882,
+      "max_us": 14.51599970459938,
+      "variant_orders": [
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 1048576,
+      "regime": "hot",
+      "implementation": "tuned",
+      "grid": 2048,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 8388608,
+      "device_us": [
+        14.519999735057354,
+        14.303999952971935,
+        14.303999952971935,
+        14.35600034892559,
+        14.348000288009644,
+        14.328000135719776,
+        14.33200016617775
+      ],
+      "median_us": 14.33200016617775,
+      "stdev_us": 0.07497544341975483,
+      "min_us": 14.303999952971935,
+      "max_us": 14.519999735057354,
+      "variant_orders": [
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 1048576,
+      "regime": "rotating",
+      "implementation": "original",
+      "grid": 2048,
+      "block": 512,
+      "ring_buffers": 16,
+      "total_buffer_bytes": 134217728,
+      "device_us": [
+        17.75199919939041,
+        17.607999965548515,
+        17.59600080549717,
+        17.60387420654297,
+        17.612000927329063,
+        17.604000866413116,
+        17.59600080549717
+      ],
+      "median_us": 17.604000866413116,
+      "stdev_us": 0.05650154795497379,
+      "min_us": 17.59600080549717,
+      "max_us": 17.75199919939041,
+      "variant_orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 1048576,
+      "regime": "rotating",
+      "implementation": "edited",
+      "grid": 2048,
+      "block": 512,
+      "ring_buffers": 16,
+      "total_buffer_bytes": 134217728,
+      "device_us": [
+        17.867999151349068,
+        17.7839994430542,
+        17.920000478625298,
+        17.815999686717987,
+        17.855625599622726,
+        17.896000295877457,
+        17.81587488949299
+      ],
+      "median_us": 17.855625599622726,
+      "stdev_us": 0.048380451154264065,
+      "min_us": 17.7839994430542,
+      "max_us": 17.920000478625298,
+      "variant_orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 1048576,
+      "regime": "rotating",
+      "implementation": "tuned",
+      "grid": 2048,
+      "block": 512,
+      "ring_buffers": 16,
+      "total_buffer_bytes": 134217728,
+      "device_us": [
+        18.0440004914999,
+        17.815999686717987,
+        17.812000587582588,
+        17.812000587582588,
+        17.80799962580204,
+        17.828000709414482,
+        17.88399927318096
+      ],
+      "median_us": 17.815999686717987,
+      "stdev_us": 0.08628198655366419,
+      "min_us": 17.80799962580204,
+      "max_us": 18.0440004914999,
+      "variant_orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 4194304,
+      "regime": "hot",
+      "implementation": "original",
+      "grid": 8192,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 33554432,
+      "device_us": [
+        66.70399755239487,
+        66.4680004119873,
+        66.51200354099274,
+        66.56000018119812,
+        66.51599705219269,
+        66.4760023355484,
+        66.58799946308136
+      ],
+      "median_us": 66.51599705219269,
+      "stdev_us": 0.0816110283200799,
+      "min_us": 66.4680004119873,
+      "max_us": 66.70399755239487,
+      "variant_orders": [
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 4194304,
+      "regime": "hot",
+      "implementation": "edited",
+      "grid": 8192,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 33554432,
+      "device_us": [
+        69.14400309324265,
+        68.91600042581558,
+        68.8840001821518,
+        68.87199729681015,
+        68.86374950408936,
+        68.8840001821518,
+        68.82400065660477
+      ],
+      "median_us": 68.8840001821518,
+      "stdev_us": 0.1057352188019417,
+      "min_us": 68.82400065660477,
+      "max_us": 69.14400309324265,
+      "variant_orders": [
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 4194304,
+      "regime": "hot",
+      "implementation": "tuned",
+      "grid": 8192,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 33554432,
+      "device_us": [
+        69.10400092601776,
+        68.94399970769882,
+        68.8600018620491,
+        68.87199729681015,
+        68.89200210571289,
+        68.8600018620491,
+        68.93199682235718
+      ],
+      "median_us": 68.89200210571289,
+      "stdev_us": 0.08639218280119432,
+      "min_us": 68.8600018620491,
+      "max_us": 69.10400092601776,
+      "variant_orders": [
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 4194304,
+      "regime": "rotating",
+      "implementation": "original",
+      "grid": 8192,
+      "block": 512,
+      "ring_buffers": 4,
+      "total_buffer_bytes": 134217728,
+      "device_us": [
+        66.69999659061432,
+        66.50800257921219,
+        66.48000329732895,
+        66.54799729585648,
+        66.53600186109543,
+        66.50800257921219,
+        66.54399633407593
+      ],
+      "median_us": 66.53600186109543,
+      "stdev_us": 0.07195544636679711,
+      "min_us": 66.48000329732895,
+      "max_us": 66.69999659061432,
+      "variant_orders": [
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 4194304,
+      "regime": "rotating",
+      "implementation": "edited",
+      "grid": 8192,
+      "block": 512,
+      "ring_buffers": 4,
+      "total_buffer_bytes": 134217728,
+      "device_us": [
+        69.53199952840805,
+        69.36799734830856,
+        69.37199831008911,
+        69.34399902820587,
+        69.38000023365021,
+        69.39200311899185,
+        69.36000287532806
+      ],
+      "median_us": 69.37199831008911,
+      "stdev_us": 0.06330571367583342,
+      "min_us": 69.34399902820587,
+      "max_us": 69.53199952840805,
+      "variant_orders": [
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 4194304,
+      "regime": "rotating",
+      "implementation": "tuned",
+      "grid": 8192,
+      "block": 512,
+      "ring_buffers": 4,
+      "total_buffer_bytes": 134217728,
+      "device_us": [
+        69.48000192642212,
+        69.33599710464478,
+        69.38400119543076,
+        69.36799734830856,
+        69.37599927186966,
+        69.39200311899185,
+        69.36000287532806
+      ],
+      "median_us": 69.37599927186966,
+      "stdev_us": 0.04559149574676248,
+      "min_us": 69.33599710464478,
+      "max_us": 69.48000192642212,
+      "variant_orders": [
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 16777216,
+      "regime": "hot",
+      "implementation": "original",
+      "grid": 32768,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 134217728,
+      "device_us": [
+        266.5197551250458,
+        266.3159966468811,
+        266.34401082992554,
+        266.2239968776703,
+        266.2839889526367,
+        266.2320137023926,
+        266.27999544143677
+      ],
+      "median_us": 266.2839889526367,
+      "stdev_us": 0.10009883007090867,
+      "min_us": 266.2239968776703,
+      "max_us": 266.5197551250458,
+      "variant_orders": [
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 16777216,
+      "regime": "hot",
+      "implementation": "edited",
+      "grid": 32768,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 134217728,
+      "device_us": [
+        272.9560136795044,
+        272.77201414108276,
+        272.6599872112274,
+        272.7760076522827,
+        272.66401052474976,
+        272.60398864746094,
+        272.81999588012695
+      ],
+      "median_us": 272.77201414108276,
+      "stdev_us": 0.11924575828979951,
+      "min_us": 272.60398864746094,
+      "max_us": 272.9560136795044,
+      "variant_orders": [
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 16777216,
+      "regime": "hot",
+      "implementation": "tuned",
+      "grid": 32768,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 134217728,
+      "device_us": [
+        272.81999588012695,
+        272.6520001888275,
+        272.6440131664276,
+        272.7639973163605,
+        272.5600004196167,
+        272.82774448394775,
+        272.7760076522827
+      ],
+      "median_us": 272.7639973163605,
+      "stdev_us": 0.10220607536150317,
+      "min_us": 272.5600004196167,
+      "max_us": 272.82774448394775,
+      "variant_orders": [
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 16777216,
+      "regime": "rotating",
+      "implementation": "original",
+      "grid": 32768,
+      "block": 512,
+      "ring_buffers": 2,
+      "total_buffer_bytes": 268435456,
+      "device_us": [
+        266.3640081882477,
+        266.1519944667816,
+        266.18000864982605,
+        266.1519944667816,
+        266.0920023918152,
+        266.24399423599243,
+        266.17199182510376
+      ],
+      "median_us": 266.17199182510376,
+      "stdev_us": 0.08757300985409179,
+      "min_us": 266.0920023918152,
+      "max_us": 266.3640081882477,
+      "variant_orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 16777216,
+      "regime": "rotating",
+      "implementation": "edited",
+      "grid": 32768,
+      "block": 512,
+      "ring_buffers": 2,
+      "total_buffer_bytes": 268435456,
+      "device_us": [
+        273.07599782943726,
+        272.8919982910156,
+        272.8320062160492,
+        272.5920081138611,
+        272.6520001888275,
+        272.6840078830719,
+        272.6680040359497
+      ],
+      "median_us": 272.6840078830719,
+      "stdev_us": 0.17115330928881675,
+      "min_us": 272.5920081138611,
+      "max_us": 273.07599782943726,
+      "variant_orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 16777216,
+      "regime": "rotating",
+      "implementation": "tuned",
+      "grid": 32768,
+      "block": 512,
+      "ring_buffers": 2,
+      "total_buffer_bytes": 268435456,
+      "device_us": [
+        272.99201488494873,
+        272.84398674964905,
+        272.78798818588257,
+        272.72799611091614,
+        272.8239893913269,
+        272.8480100631714,
+        272.92400598526
+      ],
+      "median_us": 272.84398674964905,
+      "stdev_us": 0.08669065872876326,
+      "min_us": 272.72799611091614,
+      "max_us": 272.99201488494873,
+      "variant_orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 33554432,
+      "regime": "hot",
+      "implementation": "original",
+      "grid": 65536,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 268435456,
+      "device_us": [
+        532.5679779052734,
+        532.2359800338745,
+        532.2840213775635,
+        532.2160124778748,
+        532.2719812393188,
+        532.2200059890747,
+        532.3039889335632
+      ],
+      "median_us": 532.2719812393188,
+      "stdev_us": 0.1227598863659377,
+      "min_us": 532.2160124778748,
+      "max_us": 532.5679779052734,
+      "variant_orders": [
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 33554432,
+      "regime": "hot",
+      "implementation": "edited",
+      "grid": 65536,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 268435456,
+      "device_us": [
+        544.3999767303467,
+        544.1759824752808,
+        544.0120100975037,
+        544.0999865531921,
+        543.8079833984375,
+        544.0800189971924,
+        544.2000031471252
+      ],
+      "median_us": 544.0999865531921,
+      "stdev_us": 0.1818199012938846,
+      "min_us": 543.8079833984375,
+      "max_us": 544.3999767303467,
+      "variant_orders": [
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 33554432,
+      "regime": "hot",
+      "implementation": "tuned",
+      "grid": 65536,
+      "block": 512,
+      "ring_buffers": 1,
+      "total_buffer_bytes": 268435456,
+      "device_us": [
+        543.9040064811707,
+        543.615996837616,
+        544.1840291023254,
+        544.0638661384583,
+        543.9760088920593,
+        544.044017791748,
+        543.8799858093262
+      ],
+      "median_us": 543.9760088920593,
+      "stdev_us": 0.18063803567966563,
+      "min_us": 543.615996837616,
+      "max_us": 544.1840291023254,
+      "variant_orders": [
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 33554432,
+      "regime": "rotating",
+      "implementation": "original",
+      "grid": 65536,
+      "block": 512,
+      "ring_buffers": 2,
+      "total_buffer_bytes": 536870912,
+      "device_us": [
+        532.3439836502075,
+        532.1400165557861,
+        532.0839881896973,
+        532.0680141448975,
+        532.2480201721191,
+        532.1320295333862,
+        532.1360230445862
+      ],
+      "median_us": 532.1360230445862,
+      "stdev_us": 0.09784880481993494,
+      "min_us": 532.0680141448975,
+      "max_us": 532.3439836502075,
+      "variant_orders": [
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 33554432,
+      "regime": "rotating",
+      "implementation": "edited",
+      "grid": 65536,
+      "block": 512,
+      "ring_buffers": 2,
+      "total_buffer_bytes": 536870912,
+      "device_us": [
+        544.4719791412354,
+        544.4239974021912,
+        544.219970703125,
+        544.1359877586365,
+        544.5680022239685,
+        544.4440245628357,
+        544.1960096359253
+      ],
+      "median_us": 544.4239974021912,
+      "stdev_us": 0.1648877396038146,
+      "min_us": 544.1359877586365,
+      "max_us": 544.5680022239685,
+      "variant_orders": [
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 33554432,
+      "regime": "rotating",
+      "implementation": "tuned",
+      "grid": 65536,
+      "block": 512,
+      "ring_buffers": 2,
+      "total_buffer_bytes": 536870912,
+      "device_us": [
+        544.5680022239685,
+        544.1759824752808,
+        544.4679856300354,
+        544.215977191925,
+        544.2320108413696,
+        544.372022151947,
+        544.1880226135254
+      ],
+      "median_us": 544.2320108413696,
+      "stdev_us": 0.15425949117355398,
+      "min_us": 544.1759824752808,
+      "max_us": 544.5680022239685,
+      "variant_orders": [
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ]
+      ]
+    }
+  ]
+}

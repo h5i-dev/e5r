@@ -1,0 +1,44 @@
+{
+  "metadata": {
+    "gpu": "NVIDIA A10G, GPU-7e5ae9e3-0b19-7ed6-8641-c17e13519a08, 595.112.07, 23028 MiB, 1710 MHz, 6251 MHz",
+    "python": "3.12.15",
+    "cupy": "13.6.0",
+    "numpy": "2.2.6",
+    "runtime": 12090,
+    "driver": 13020,
+    "nvcc": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2026 NVIDIA Corporation\nBuilt on Mon_Mar_02_09:52:23_PM_PST_2026\nCuda compilation tools, release 13.2, V13.2.51\nBuild cuda_13.2.r13.2/compiler.37434383_0\n",
+    "aot_sha256": {
+      "original_aot": "ec4969dd62f8c46a81b7aca03c5e98155d6522d3348c19a0f1c0cc288c19bc6a",
+      "edited_aot": "d2be775e7d149fc2cf504addb8bc2dbacf6e844b56cfc889fbdc9830c6121726",
+      "tuned_aot": "937fd2828eae6be24f951d50607a160d0eff1c689941faa2fc6de2247c92ab0d"
+    },
+    "ptx_sha256": {
+      "original": "5e1ec770041d17de34da744350311d3bbcfa6a17a49d3d061b9c969d9c3a8746",
+      "edited": "fcf5f87efb33363196b9578518bc9d63d7eb3054bf96ee58023a9bdb60b22a89",
+      "tuned": "636cf231e88ab1562e317e71278269f3643786067091624470429d5d78fe96b0"
+    },
+    "lock": "/mnt/scratch/e5r-gpu-benchmark.lock",
+    "foreign_processes_observed": false,
+    "seed": 936,
+    "inner_reps": 5,
+    "proof_status": "consult results/proof.json; GPU runs are tests, not proofs"
+  },
+  "cases": 2016,
+  "all_passed": true,
+  "canaries": true,
+  "input_preserved": true,
+  "word_offset_buffers": [
+    1,
+    4
+  ],
+  "blocks": [
+    32,
+    256,
+    512
+  ],
+  "alias_outside_domain_witness": {
+    "original": 5,
+    "edited": 1
+  },
+  "upstream_exit": 0
+}

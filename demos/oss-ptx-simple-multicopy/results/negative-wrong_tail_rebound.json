@@ -1,0 +1,54 @@
+{
+  "class": "equivalence-oss-inc",
+  "counterexample": null,
+  "input": {
+    "original_ptx": {
+      "path": "/mnt/scratch/e5r-oss-ptx/negatives/wrong_tail_rebound/original.ptx",
+      "sha256": "5e1ec770041d17de34da744350311d3bbcfa6a17a49d3d061b9c969d9c3a8746"
+    },
+    "ptx": {
+      "path": "/mnt/scratch/e5r-oss-ptx/negatives/wrong_tail_rebound/edited.ptx",
+      "sha256": "bd78a2e638e2a1d31b43cadf90d8dd8f5bf73998ab5efa9803149787fdee3e54"
+    },
+    "spec": {
+      "path": "/mnt/scratch/e5r-oss-ptx/negatives/wrong_tail_rebound/equivalence.json",
+      "sha256": "7bc6eda04200f678cee3c5f88425d1597a48c622bfa1aa3715caff957f3e8a16"
+    }
+  },
+  "kernel": "_Z9incKernelPiS_ii",
+  "lean": {
+    "memory_cap_mb": 4096,
+    "proof_seconds": 14.93,
+    "timeout_seconds": 180,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "lean_spec": "def domain : OssInc.Spec := ⟨\"_Z9incKernelPiS_ii_param_1\", \"_Z9incKernelPiS_ii_param_0\", \"_Z9incKernelPiS_ii_param_2\", \"_Z9incKernelPiS_ii_param_3\"⟩\n",
+  "proof": {
+    "accepted": false,
+    "manifest": {
+      "ptx": "bd78a2e638e2a1d31b43cadf90d8dd8f5bf73998ab5efa9803149787fdee3e54",
+      "spec": "7bc6eda04200f678cee3c5f88425d1597a48c622bfa1aa3715caff957f3e8a16",
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "path": "/mnt/scratch/e5r-oss-ptx/negatives/wrong_tail_rebound/equivalence.lean",
+    "sha256": "a9602619962d345e21ff089721b74cc4cc3ac571f02de3b38a4c94614b87a0ad",
+    "supplied": true
+  },
+  "properties": {
+    "functional_correctness": "unknown",
+    "memory_safety": "unknown",
+    "race_freedom": "unknown",
+    "termination": "unknown"
+  },
+  "reasons": [
+    "supplied proof refused: it does not compile: error: Tactic `introN` failed: There are no additional binders or `let` bindings in the goal to introduce  case isTrue.isFalse.refine_1"
+  ],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 17.25,
+  "theorem": null,
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "unknown"
+}
