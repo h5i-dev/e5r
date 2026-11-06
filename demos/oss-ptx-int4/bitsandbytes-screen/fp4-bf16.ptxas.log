@@ -1,0 +1,5 @@
+ptxas info    : Compiling entry function '_Z20kDequantizeBlockwiseI13__nv_bfloat16Li512ELi64ELi8ELi1EEvPfPhS1_PT_ii' for 'sm_86'
+ptxas info    : Function properties for _Z20kDequantizeBlockwiseI13__nv_bfloat16Li512ELi64ELi8ELi1EEvPfPhS1_PT_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 48 registers, used 1 barriers, 2656 bytes smem, 392 bytes cmem[0]
+ptxas info    : Compile time = 38.990 ms

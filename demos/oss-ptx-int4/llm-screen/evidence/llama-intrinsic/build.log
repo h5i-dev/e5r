@@ -1,0 +1,446 @@
+ptxas info    : 26792 bytes gmem, 88 bytes cmem[4]
+ptxas info    : Compiling entry function '_Z13convert_unaryI13__nv_bfloat16fEvPKvPT0_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z13convert_unaryI13__nv_bfloat16fEvPKvPT0_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 21.958 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi32ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q8_0EPKvliR6float2EEfEvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi32ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q8_0EPKvliR6float2EEfEvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 18.248 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q5_1EPKvliR6float2EEfEvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q5_1EPKvliR6float2EEfEvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 29 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 7.098 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q5_0EPKvliR6float2EEfEvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q5_0EPKvliR6float2EEfEvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 24.102 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q4_1EPKvliR6float2EEfEvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q4_1EPKvliR6float2EEfEvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 18.751 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q4_0EPKvliR6float2EEfEvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q4_0EPKvliR6float2EEfEvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 6.272 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi64ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q2_0EPKvliR6float2EEfEvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi64ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q2_0EPKvliR6float2EEfEvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 15.738 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi128ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q1_0EPKvliR6float2EEfEvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi128ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q1_0EPKvliR6float2EEfEvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 6.525 ms
+ptxas info    : Compiling entry function '_Z13convert_unaryI6__halffEvPKvPT0_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z13convert_unaryI6__halffEvPKvPT0_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 14.756 ms
+ptxas info    : Compiling entry function '_Z13convert_unaryI6__half13__nv_bfloat16EvPKvPT0_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z13convert_unaryI6__half13__nv_bfloat16EvPKvPT0_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 5.429 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi32ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q8_0EPKvliR6float2EE13__nv_bfloat16EvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi32ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q8_0EPKvliR6float2EE13__nv_bfloat16EvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 15.819 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q5_1EPKvliR6float2EE13__nv_bfloat16EvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q5_1EPKvliR6float2EE13__nv_bfloat16EvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 16.726 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q5_0EPKvliR6float2EE13__nv_bfloat16EvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q5_0EPKvliR6float2EE13__nv_bfloat16EvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 6.765 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q4_1EPKvliR6float2EE13__nv_bfloat16EvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q4_1EPKvliR6float2EE13__nv_bfloat16EvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 16.386 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q4_0EPKvliR6float2EE13__nv_bfloat16EvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q4_0EPKvliR6float2EE13__nv_bfloat16EvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 13.305 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi64ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q2_0EPKvliR6float2EE13__nv_bfloat16EvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi64ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q2_0EPKvliR6float2EE13__nv_bfloat16EvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 7.023 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi128ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q1_0EPKvliR6float2EE13__nv_bfloat16EvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi128ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q1_0EPKvliR6float2EE13__nv_bfloat16EvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 31 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 17.319 ms
+ptxas info    : Compiling entry function '_Z13convert_unaryIf13__nv_bfloat16EvPKvPT0_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z13convert_unaryIf13__nv_bfloat16EvPKvPT0_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 8.380 ms
+ptxas info    : Compiling entry function '_Z13convert_unaryI13__nv_bfloat166__halfEvPKvPT0_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z13convert_unaryI13__nv_bfloat166__halfEvPKvPT0_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 12.311 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi32ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q8_0EPKvliR6float2EE6__halfEvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi32ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q8_0EPKvliR6float2EE6__halfEvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 8.457 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q5_1EPKvliR6float2EE6__halfEvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q5_1EPKvliR6float2EE6__halfEvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 13.672 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q5_0EPKvliR6float2EE6__halfEvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q5_0EPKvliR6float2EE6__halfEvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 10.662 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q4_1EPKvliR6float2EE6__halfEvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q4_1EPKvliR6float2EE6__halfEvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 23.997 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q4_0EPKvliR6float2EE6__halfEvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi32ELi2EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q4_0EPKvliR6float2EE6__halfEvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 6.480 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi64ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q2_0EPKvliR6float2EE6__halfEvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi64ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q2_0EPKvliR6float2EE6__halfEvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 17.317 ms
+ptxas info    : Compiling entry function '_Z16dequantize_blockILi128ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q1_0EPKvliR6float2EE6__halfEvS2_PT2_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z16dequantize_blockILi128ELi1EXadL_ZN41_INTERNAL_4ff6a468_10_convert_cu_ecf1720215dequantize_q1_0EPKvliR6float2EE6__halfEvS2_PT2_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 31 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 10.411 ms
+ptxas info    : Compiling entry function '_Z13convert_unaryIf6__halfEvPKvPT0_lll5uint3lll' for 'sm_86'
+ptxas info    : Function properties for _Z13convert_unaryIf6__halfEvPKvPT0_lll5uint3lll
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 432 bytes cmem[0]
+ptxas info    : Compile time = 11.995 ms
+ptxas info    : Compiling entry function '_Z23convert_unary_cont_vec4I13__nv_bfloat16fEvPKvPT0_l' for 'sm_86'
+ptxas info    : Function properties for _Z23convert_unary_cont_vec4I13__nv_bfloat16fEvPKvPT0_l
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 1.784 ms
+ptxas info    : Compiling entry function '_Z23convert_unary_cont_vec4I6__halffEvPKvPT0_l' for 'sm_86'
+ptxas info    : Function properties for _Z23convert_unary_cont_vec4I6__halffEvPKvPT0_l
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 5.164 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_nvfp4IfEvPKvPT_l' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_nvfp4IfEvPKvPT_l
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 18 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 9.963 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_mxfp4IfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_mxfp4IfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 11.265 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_iq3_sIfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_iq3_sIfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 22 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 12.597 ms
+ptxas info    : Compiling entry function '_Z23dequantize_block_iq4_xsIfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z23dequantize_block_iq4_xsIfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 9.846 ms
+ptxas info    : Compiling entry function '_Z23dequantize_block_iq4_nlIfEvPKvPT_i' for 'sm_86'
+ptxas info    : Function properties for _Z23dequantize_block_iq4_nlIfEvPKvPT_i
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 11.395 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_iq1_mIfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_iq1_mIfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 27 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 8.888 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_iq1_sIfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_iq1_sIfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 21 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 10.293 ms
+ptxas info    : Compiling entry function '_Z24dequantize_block_iq3_xxsIfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z24dequantize_block_iq3_xxsIfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 24 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 14.208 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_iq2_sIfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_iq2_sIfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 22 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 11.983 ms
+ptxas info    : Compiling entry function '_Z23dequantize_block_iq2_xsIfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z23dequantize_block_iq2_xsIfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 22 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 10.727 ms
+ptxas info    : Compiling entry function '_Z24dequantize_block_iq2_xxsIfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z24dequantize_block_iq2_xxsIfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 13.534 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q6_KIfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q6_KIfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 22 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 4.339 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q5_KIfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q5_KIfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 13.820 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q4_KIfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q4_KIfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 16.288 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q3_KIfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q3_KIfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 25 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 12.641 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q2_KIfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q2_KIfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 25 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 9.730 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q4_1IfEvPKvPT_i' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q4_1IfEvPKvPT_i
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 9.892 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q4_0IfEvPKvPT_i' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q4_0IfEvPKvPT_i
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 8.654 ms
+ptxas info    : Compiling entry function '_Z23convert_unary_cont_vec4I13__nv_bfloat166__halfEvPKvPT0_l' for 'sm_86'
+ptxas info    : Function properties for _Z23convert_unary_cont_vec4I13__nv_bfloat166__halfEvPKvPT0_l
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 10 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 5.546 ms
+ptxas info    : Compiling entry function '_Z23convert_unary_cont_vec4If6__halfEvPKvPT0_l' for 'sm_86'
+ptxas info    : Function properties for _Z23convert_unary_cont_vec4If6__halfEvPKvPT0_l
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 1.629 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_nvfp4I6__halfEvPKvPT_l' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_nvfp4I6__halfEvPKvPT_l
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 18 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 11.633 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_mxfp4I6__halfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_mxfp4I6__halfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 24 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 14.093 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_iq3_sI6__halfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_iq3_sI6__halfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 10.577 ms
+ptxas info    : Compiling entry function '_Z23dequantize_block_iq4_xsI6__halfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z23dequantize_block_iq4_xsI6__halfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 17.392 ms
+ptxas info    : Compiling entry function '_Z23dequantize_block_iq4_nlI6__halfEvPKvPT_i' for 'sm_86'
+ptxas info    : Function properties for _Z23dequantize_block_iq4_nlI6__halfEvPKvPT_i
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 12.894 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_iq1_mI6__halfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_iq1_mI6__halfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 12.901 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_iq1_sI6__halfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_iq1_sI6__halfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 7.337 ms
+ptxas info    : Compiling entry function '_Z24dequantize_block_iq3_xxsI6__halfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z24dequantize_block_iq3_xxsI6__halfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 14.296 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_iq2_sI6__halfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_iq2_sI6__halfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 12.391 ms
+ptxas info    : Compiling entry function '_Z23dequantize_block_iq2_xsI6__halfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z23dequantize_block_iq2_xsI6__halfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 25 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 8.007 ms
+ptxas info    : Compiling entry function '_Z24dequantize_block_iq2_xxsI6__halfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z24dequantize_block_iq2_xxsI6__halfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 8.707 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q6_KI6__halfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q6_KI6__halfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 22 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 12.976 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q5_KI6__halfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q5_KI6__halfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 21.998 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q4_KI6__halfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q4_KI6__halfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 25 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 14.350 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q3_KI6__halfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q3_KI6__halfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 23 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 15.699 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q2_KI6__halfEvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q2_KI6__halfEvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 23 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 11.734 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q4_1I6__halfEvPKvPT_i' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q4_1I6__halfEvPKvPT_i
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 9.391 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q4_0I6__halfEvPKvPT_i' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q4_0I6__halfEvPKvPT_i
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 10.152 ms
+ptxas info    : Compiling entry function '_Z23convert_unary_cont_vec4I6__half13__nv_bfloat16EvPKvPT0_l' for 'sm_86'
+ptxas info    : Function properties for _Z23convert_unary_cont_vec4I6__half13__nv_bfloat16EvPKvPT0_l
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 12 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 7.528 ms
+ptxas info    : Compiling entry function '_Z23convert_unary_cont_vec4If13__nv_bfloat16EvPKvPT0_l' for 'sm_86'
+ptxas info    : Function properties for _Z23convert_unary_cont_vec4If13__nv_bfloat16EvPKvPT0_l
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 14 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 3.120 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_nvfp4I13__nv_bfloat16EvPKvPT_l' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_nvfp4I13__nv_bfloat16EvPKvPT_l
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 18 registers, used 0 barriers, 376 bytes cmem[0]
+ptxas info    : Compile time = 13.797 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_mxfp4I13__nv_bfloat16EvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_mxfp4I13__nv_bfloat16EvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 24 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 14.263 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_iq3_sI13__nv_bfloat16EvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_iq3_sI13__nv_bfloat16EvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 20.742 ms
+ptxas info    : Compiling entry function '_Z23dequantize_block_iq4_xsI13__nv_bfloat16EvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z23dequantize_block_iq4_xsI13__nv_bfloat16EvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 28 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 7.139 ms
+ptxas info    : Compiling entry function '_Z23dequantize_block_iq4_nlI13__nv_bfloat16EvPKvPT_i' for 'sm_86'
+ptxas info    : Function properties for _Z23dequantize_block_iq4_nlI13__nv_bfloat16EvPKvPT_i
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 12.285 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_iq1_mI13__nv_bfloat16EvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_iq1_mI13__nv_bfloat16EvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 6.654 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_iq1_sI13__nv_bfloat16EvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_iq1_sI13__nv_bfloat16EvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 4.961 ms
+ptxas info    : Compiling entry function '_Z24dequantize_block_iq3_xxsI13__nv_bfloat16EvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z24dequantize_block_iq3_xxsI13__nv_bfloat16EvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 6.157 ms
+ptxas info    : Compiling entry function '_Z22dequantize_block_iq2_sI13__nv_bfloat16EvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z22dequantize_block_iq2_sI13__nv_bfloat16EvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 5.992 ms
+ptxas info    : Compiling entry function '_Z23dequantize_block_iq2_xsI13__nv_bfloat16EvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z23dequantize_block_iq2_xsI13__nv_bfloat16EvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 25 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 6.681 ms
+ptxas info    : Compiling entry function '_Z24dequantize_block_iq2_xxsI13__nv_bfloat16EvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z24dequantize_block_iq2_xxsI13__nv_bfloat16EvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 5.555 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q6_KI13__nv_bfloat16EvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q6_KI13__nv_bfloat16EvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 22 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 8.281 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q5_KI13__nv_bfloat16EvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q5_KI13__nv_bfloat16EvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 14.186 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q4_KI13__nv_bfloat16EvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q4_KI13__nv_bfloat16EvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 25 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 7.096 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q3_KI13__nv_bfloat16EvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q3_KI13__nv_bfloat16EvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 23 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 9.286 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q2_KI13__nv_bfloat16EvPKvPT_' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q2_KI13__nv_bfloat16EvPKvPT_
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 23 registers, used 0 barriers, 368 bytes cmem[0]
+ptxas info    : Compile time = 4.073 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q4_1I13__nv_bfloat16EvPKvPT_i' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q4_1I13__nv_bfloat16EvPKvPT_i
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 4.701 ms
+ptxas info    : Compiling entry function '_Z21dequantize_block_q4_0I13__nv_bfloat16EvPKvPT_i' for 'sm_86'
+ptxas info    : Function properties for _Z21dequantize_block_q4_0I13__nv_bfloat16EvPKvPT_i
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 372 bytes cmem[0]
+ptxas info    : Compile time = 14.726 ms
+ptxas info    : Compiling entry function '_Z25dequantize_block_q8_0_f16ILb1EEvPKvP6__halfl' for 'sm_86'
+ptxas info    : Function properties for _Z25dequantize_block_q8_0_f16ILb1EEvPKvP6__halfl
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 16 registers, used 1 barriers, 2176 bytes smem, 376 bytes cmem[0]
+ptxas info    : Compile time = 47.950 ms
+ptxas info    : Compiling entry function '_Z25dequantize_block_q8_0_f16ILb0EEvPKvP6__halfl' for 'sm_86'
+ptxas info    : Function properties for _Z25dequantize_block_q8_0_f16ILb0EEvPKvP6__halfl
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 2176 bytes smem, 376 bytes cmem[0]
+ptxas info    : Compile time = 26.760 ms

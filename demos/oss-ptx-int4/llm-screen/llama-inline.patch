@@ -1,0 +1,24 @@
+--- original
++++ adapted
+@@ -183,6 +183,12 @@
+     }
+ }
+ 
++__device__ __forceinline__ float screen_high_nibble(uint8_t x) {
++    unsigned y;
++    asm("shr.u32 %0, %1, 4;" : "=r"(y) : "r"(static_cast<unsigned>(x)));
++    return __uint2float_rn(y);
++}
++
+ template<typename dst_t>
+ static __device__ __forceinline__ void dequantize_q4_K(const void * vx, const int64_t ib, dst_t * yy, const int tid) {
+     const block_q4_K * x = (const block_q4_K *) vx;
+@@ -207,7 +213,7 @@
+     const float d2 = dall * sc; const float m2 = dmin * m;
+     for (int l = 0; l < n; ++l) {
+         y[l + 0] = ggml_cuda_cast<dst_t>(d1 * (q[l] & 0xF) - m1);
+-        y[l +32] = ggml_cuda_cast<dst_t>(d2 * (q[l] >>  4) - m2);
++        y[l +32] = ggml_cuda_cast<dst_t>(d2 * screen_high_nibble(q[l]) - m2);
+     }
+ }
+ 

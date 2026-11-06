@@ -1,0 +1,51 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi4ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi4ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 254 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 1099.456 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi4ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi4ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 255 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 1206.141 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi3ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi3ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 228 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 1109.598 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi3ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi3ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 239 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 1361.201 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi2ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi2ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 170 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 2099.147 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi2ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi2ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 170 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 2039.105 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi1ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi1ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 126 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 1384.449 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi1ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi1ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 128 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 922.654 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi1ELi8ELi8ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi1ELi8ELi8ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 130 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 1002.279 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi1ELi8ELi8ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi1ELi8ELi8ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 128 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 773.409 ms

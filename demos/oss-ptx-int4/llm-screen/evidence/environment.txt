@@ -1,0 +1,7 @@
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2026 NVIDIA Corporation
+Built on Mon_Mar_02_09:52:23_PM_PST_2026
+Cuda compilation tools, release 13.2, V13.2.51
+Build cuda_13.2.r13.2/compiler.37434383_0
+NVIDIA A10G, 595.112.07, 23028 MiB
+nvdisasm archive sha256 0eff70c711a579efa95e141d6e7476a0c041dfb9976a545afca20b555a9fb4a4

@@ -1,0 +1,4 @@
+# Preserve exact disassembler output, compiler logs, and upstream patch context.
+*.sass -whitespace
+*.log -whitespace
+*.patch -whitespace

@@ -1,0 +1,11 @@
+--- original
++++ adapted
+@@ -207,7 +207,7 @@
+     const float d2 = dall * sc; const float m2 = dmin * m;
+     for (int l = 0; l < n; ++l) {
+         y[l + 0] = ggml_cuda_cast<dst_t>(d1 * (q[l] & 0xF) - m1);
+-        y[l +32] = ggml_cuda_cast<dst_t>(d2 * (q[l] >>  4) - m2);
++        y[l +32] = ggml_cuda_cast<dst_t>(d2 * __uint2float_rn(static_cast<unsigned>(q[l]) >> 4) - m2);
+     }
+ }
+ 

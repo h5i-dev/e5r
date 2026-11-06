@@ -1,0 +1,20 @@
+[
+  {
+    "name": ".text._Z21dequantize_block_q4_KIfEvPKvPT_",
+    "registers": 26,
+    "non_nop_instructions": 103,
+    "ffff_masks": 0
+  },
+  {
+    "name": ".text._Z21dequantize_block_q4_KI6__halfEvPKvPT_",
+    "registers": 25,
+    "non_nop_instructions": 116,
+    "ffff_masks": 4
+  },
+  {
+    "name": ".text._Z21dequantize_block_q4_KI13__nv_bfloat16EvPKvPT_",
+    "registers": 25,
+    "non_nop_instructions": 116,
+    "ffff_masks": 4
+  }
+]

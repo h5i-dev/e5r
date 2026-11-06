@@ -1,0 +1,107 @@
+/mnt/scratch/e5r-oss-ptx/int4/llm/marlin/marlin/marlin_cuda_kernel.cu(780): warning #177-D: variable "cols" was declared but never referenced
+    int cols = prob_n / thread_n;
+        ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/mnt/scratch/e5r-oss-ptx/int4/llm/marlin/marlin/marlin_cuda_kernel.cu(405): warning #179-D: right operand of "%" is zero
+        if (group_blocks != -1 && pipe % (group_blocks / thread_k_blocks) == 0) {
+                                         ^
+          detected during instantiation of "void Marlin<threads,thread_m_blocks,thread_n_blocks,thread_k_blocks,stages,group_blocks>(const int4 *, const int4 *, int4 *, const int4 *, int, int, int, int *) [with threads=256, thread_m_blocks=1, thread_n_blocks=8, thread_k_blocks=8, stages=4, group_blocks=-1]" at line 801
+
+/mnt/scratch/e5r-oss-ptx/int4/llm/marlin/marlin/marlin_cuda_kernel.cu(430): warning #39-D: division by zero
+        int4* sh_s_stage = sh_s + s_sh_stage * ((group_blocks / thread_k_blocks) * (pipe / (group_blocks / thread_k_blocks)));
+                                                                                           ^
+          detected during instantiation of "void Marlin<threads,thread_m_blocks,thread_n_blocks,thread_k_blocks,stages,group_blocks>(const int4 *, const int4 *, int4 *, const int4 *, int, int, int, int *) [with threads=256, thread_m_blocks=1, thread_n_blocks=8, thread_k_blocks=8, stages=4, group_blocks=-1]" at line 801
+
+/mnt/scratch/e5r-oss-ptx/int4/llm/marlin/marlin/marlin_cuda_kernel.cu(405): warning #179-D: right operand of "%" is zero
+        if (group_blocks != -1 && pipe % (group_blocks / thread_k_blocks) == 0) {
+                                         ^
+          detected during instantiation of "void Marlin<threads,thread_m_blocks,thread_n_blocks,thread_k_blocks,stages,group_blocks>(const int4 *, const int4 *, int4 *, const int4 *, int, int, int, int *) [with threads=256, thread_m_blocks=1, thread_n_blocks=16, thread_k_blocks=4, stages=4, group_blocks=-1]" at line 803
+
+/mnt/scratch/e5r-oss-ptx/int4/llm/marlin/marlin/marlin_cuda_kernel.cu(430): warning #39-D: division by zero
+        int4* sh_s_stage = sh_s + s_sh_stage * ((group_blocks / thread_k_blocks) * (pipe / (group_blocks / thread_k_blocks)));
+                                                                                           ^
+          detected during instantiation of "void Marlin<threads,thread_m_blocks,thread_n_blocks,thread_k_blocks,stages,group_blocks>(const int4 *, const int4 *, int4 *, const int4 *, int, int, int, int *) [with threads=256, thread_m_blocks=1, thread_n_blocks=16, thread_k_blocks=4, stages=4, group_blocks=-1]" at line 803
+
+/mnt/scratch/e5r-oss-ptx/int4/llm/marlin/marlin/marlin_cuda_kernel.cu(405): warning #179-D: right operand of "%" is zero
+        if (group_blocks != -1 && pipe % (group_blocks / thread_k_blocks) == 0) {
+                                         ^
+          detected during instantiation of "void Marlin<threads,thread_m_blocks,thread_n_blocks,thread_k_blocks,stages,group_blocks>(const int4 *, const int4 *, int4 *, const int4 *, int, int, int, int *) [with threads=256, thread_m_blocks=2, thread_n_blocks=16, thread_k_blocks=4, stages=4, group_blocks=-1]" at line 805
+
+/mnt/scratch/e5r-oss-ptx/int4/llm/marlin/marlin/marlin_cuda_kernel.cu(430): warning #39-D: division by zero
+        int4* sh_s_stage = sh_s + s_sh_stage * ((group_blocks / thread_k_blocks) * (pipe / (group_blocks / thread_k_blocks)));
+                                                                                           ^
+          detected during instantiation of "void Marlin<threads,thread_m_blocks,thread_n_blocks,thread_k_blocks,stages,group_blocks>(const int4 *, const int4 *, int4 *, const int4 *, int, int, int, int *) [with threads=256, thread_m_blocks=2, thread_n_blocks=16, thread_k_blocks=4, stages=4, group_blocks=-1]" at line 805
+
+/mnt/scratch/e5r-oss-ptx/int4/llm/marlin/marlin/marlin_cuda_kernel.cu(405): warning #179-D: right operand of "%" is zero
+        if (group_blocks != -1 && pipe % (group_blocks / thread_k_blocks) == 0) {
+                                         ^
+          detected during instantiation of "void Marlin<threads,thread_m_blocks,thread_n_blocks,thread_k_blocks,stages,group_blocks>(const int4 *, const int4 *, int4 *, const int4 *, int, int, int, int *) [with threads=256, thread_m_blocks=3, thread_n_blocks=16, thread_k_blocks=4, stages=4, group_blocks=-1]" at line 807
+
+/mnt/scratch/e5r-oss-ptx/int4/llm/marlin/marlin/marlin_cuda_kernel.cu(430): warning #39-D: division by zero
+        int4* sh_s_stage = sh_s + s_sh_stage * ((group_blocks / thread_k_blocks) * (pipe / (group_blocks / thread_k_blocks)));
+                                                                                           ^
+          detected during instantiation of "void Marlin<threads,thread_m_blocks,thread_n_blocks,thread_k_blocks,stages,group_blocks>(const int4 *, const int4 *, int4 *, const int4 *, int, int, int, int *) [with threads=256, thread_m_blocks=3, thread_n_blocks=16, thread_k_blocks=4, stages=4, group_blocks=-1]" at line 807
+
+/mnt/scratch/e5r-oss-ptx/int4/llm/marlin/marlin/marlin_cuda_kernel.cu(405): warning #179-D: right operand of "%" is zero
+        if (group_blocks != -1 && pipe % (group_blocks / thread_k_blocks) == 0) {
+                                         ^
+          detected during instantiation of "void Marlin<threads,thread_m_blocks,thread_n_blocks,thread_k_blocks,stages,group_blocks>(const int4 *, const int4 *, int4 *, const int4 *, int, int, int, int *) [with threads=256, thread_m_blocks=4, thread_n_blocks=16, thread_k_blocks=4, stages=4, group_blocks=-1]" at line 809
+
+/mnt/scratch/e5r-oss-ptx/int4/llm/marlin/marlin/marlin_cuda_kernel.cu(430): warning #39-D: division by zero
+        int4* sh_s_stage = sh_s + s_sh_stage * ((group_blocks / thread_k_blocks) * (pipe / (group_blocks / thread_k_blocks)));
+                                                                                           ^
+          detected during instantiation of "void Marlin<threads,thread_m_blocks,thread_n_blocks,thread_k_blocks,stages,group_blocks>(const int4 *, const int4 *, int4 *, const int4 *, int, int, int, int *) [with threads=256, thread_m_blocks=4, thread_n_blocks=16, thread_k_blocks=4, stages=4, group_blocks=-1]" at line 809
+
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi4ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi4ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 254 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 1533.416 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi4ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi4ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 255 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 1815.861 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi3ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi3ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 228 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 1362.188 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi3ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi3ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 239 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 825.907 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi2ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi2ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 170 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 690.675 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi2ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi2ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 170 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 1002.896 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi1ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi1ELi16ELi4ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 126 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 512.177 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi1ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi1ELi16ELi4ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 128 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 435.437 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi1ELi8ELi8ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi1ELi8ELi8ELi4ELi8EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 130 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 782.817 ms
+ptxas info    : Compiling entry function '_Z6MarlinILi256ELi1ELi8ELi8ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi' for 'sm_86'
+ptxas info    : Function properties for _Z6MarlinILi256ELi1ELi8ELi8ELi4ELin1EEvPK4int4S2_PS0_S2_iiiPi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 128 registers, used 1 barriers, 408 bytes cmem[0]
+ptxas info    : Compile time = 507.852 ms

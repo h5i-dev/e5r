@@ -1,0 +1,17 @@
+--- original
++++ adapted
+@@ -117,12 +117,8 @@
+ // automatically recognize it in all cases. 
+ template <int lut>
+ __device__ inline int lop3(int a, int b, int c) {
+-  int res;
+-  asm volatile(
+-    "lop3.b32 %0, %1, %2, %3, %4;\n"
+-    : "=r"(res) : "r"(a), "r"(b), "r"(c), "n"(lut)
+-  );
+-  return res;
++  static_assert(lut == ((0xf0 & 0xcc) | 0xaa), "screen covers actual dequant LUT only");
++  return (a & b) | c;
+ }
+ 
+ // Efficiently dequantize an int32 value into a full B-fragment of 4 fp16 values.

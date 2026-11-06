@@ -1,0 +1,33 @@
+{
+  "entry": "_Z21dequantize_block_q4_KIfEvPKvPT_",
+  "pairs": [
+    [
+      "shr.u16 \t%rs52, %rs50, 4;",
+      "cvt.rn.f32.u16 \t%f16, %rs52;",
+      "%rs50",
+      "%rs52",
+      "%f16"
+    ],
+    [
+      "shr.u16 \t%rs56, %rs54, 4;",
+      "cvt.rn.f32.u16 \t%f22, %rs56;",
+      "%rs54",
+      "%rs56",
+      "%f22"
+    ],
+    [
+      "shr.u16 \t%rs60, %rs58, 4;",
+      "cvt.rn.f32.u16 \t%f28, %rs60;",
+      "%rs58",
+      "%rs60",
+      "%f28"
+    ],
+    [
+      "shr.u16 \t%rs64, %rs62, 4;",
+      "cvt.rn.f32.u16 \t%f34, %rs64;",
+      "%rs62",
+      "%rs64",
+      "%f34"
+    ]
+  ]
+}

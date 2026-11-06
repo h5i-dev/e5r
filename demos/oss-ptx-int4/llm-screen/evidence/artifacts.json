@@ -1,0 +1,90 @@
+{
+  "llama/convert.ptx": {
+    "sha256": "6b534675c3b2146a0cbb946eb5373dd1255d8ca496341421a4c23bdbc6dc31d6",
+    "bytes": 544209
+  },
+  "llama/convert.sm_86.cubin": {
+    "sha256": "c688b32e1a54f153641a1a9b0894363a3ce2475ae511784286d24f500eebf629",
+    "bytes": 355528
+  },
+  "llama/convert.o": {
+    "sha256": "2638dc4288801270fa5df973cb86d4f1c23a11aab05865403f40472506205152",
+    "bytes": 387744
+  },
+  "llama/convert.sass": {
+    "sha256": "37c8a2fba3260fddcdc91c87c857c0193d222af013fd677293bfd6782a19c6e9",
+    "bytes": 726101
+  },
+  "marlin/marlin_cuda_kernel.ptx": {
+    "sha256": "d34d5921ceb126376db87dbc2acb8f2250fe87e976ee508567ac73ee60a98ce8",
+    "bytes": 1406509
+  },
+  "marlin/marlin_cuda_kernel.sm_86.cubin": {
+    "sha256": "7696b2187fbb28283b5cdf6154ea0ff0adbb0a612196cecca6dcc8f03e5d53db",
+    "bytes": 345632
+  },
+  "marlin/marlin.o": {
+    "sha256": "aac5793318256692c487edcf414c3d3c4f6f2f2db0be3eafef9f1f27f36a4496",
+    "bytes": 531024
+  },
+  "marlin/marlin.sass": {
+    "sha256": "2e6b86c73964bc310db2db96e8a86979a24f2ffdc2e16ce16125ccd7eccf36c0",
+    "bytes": 1363259
+  },
+  "marlin-plain/marlin.ptx": {
+    "sha256": "57069b4a7c11641a75a7ffa6668271c378f6f6fcd8195b776365c10ceadb1602",
+    "bytes": 1384388
+  },
+  "marlin-plain/marlin.cubin": {
+    "sha256": "b93293fb410b6be811de0feee93986b56a52d011ce8676d5296dacc91af367b2",
+    "bytes": 364448
+  },
+  "marlin-plain/marlin.sass": {
+    "sha256": "36600f4f99b37cb79586ab047a28fb42ff653d49c9e7dfdfe8f7367afe4f7864",
+    "bytes": 1444471
+  },
+  "llama-intrinsic/convert.ptx": {
+    "sha256": "2a7eef60e2db1390bd7bc456e4f4974ae6b597b00745374d2108d66417b7fe9c",
+    "bytes": 544521
+  },
+  "llama-intrinsic/convert.sm_86.cubin": {
+    "sha256": "50ab2b4b654e647835f2fc7d978951e601eb66bda59c4a36f930d1eaf97bc7b3",
+    "bytes": 355528
+  },
+  "llama-intrinsic/convert.o": {
+    "sha256": "a17dc29dd434c662cbab2aa36bf9d8d1a9e9382e3e51eb02063c9fe28b03d79a",
+    "bytes": 387776
+  },
+  "llama-intrinsic/convert.sass": {
+    "sha256": "202755cd7d536f02531cfa4175d551fba9bfa771f7f8fa16f1681415518779b9",
+    "bytes": 726101
+  },
+  "llama-inline/convert.ptx": {
+    "sha256": "b9567f049525a8a32fbb98c480952a03dd1edfa3f37676efb80cc3b1712f5ed9",
+    "bytes": 544965
+  },
+  "llama-inline/convert.sm_86.cubin": {
+    "sha256": "7bcf79b8d279be448a9f00f849e046361b1b80e6b7549a1b700e11a384a1295e",
+    "bytes": 355400
+  },
+  "llama-inline/convert.sass": {
+    "sha256": "ef1b99d78f26d04d94e1c7b835aa1d7b84cd5e5b8a4cb9be9fd507c9d95cbf80",
+    "bytes": 725385
+  },
+  "llama-inline/convert.o": {
+    "sha256": "f475e55c2e03819292b26e0ef508c46caf1dd42da594a62f423f66059ed4fb6b",
+    "bytes": 387744
+  },
+  "llama-edited/convert.ptx": {
+    "sha256": "3dbb92183d14a6c7623a1ca6c307244cf705b540883ff026f6a84405fe7dc1a7",
+    "bytes": 544346
+  },
+  "llama-edited/convert.cubin": {
+    "sha256": "ae8ebe9b9093f97a8ea999d5a1597d61ac680a29f0ac385f1979c611319b7762",
+    "bytes": 355400
+  },
+  "llama-edited/convert.sass": {
+    "sha256": "c9d066887820f9642eb90cf92bd8a77a197ce1092bd6210e92629610e60150ed",
+    "bytes": 725655
+  }
+}
