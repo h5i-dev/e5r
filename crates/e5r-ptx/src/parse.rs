@@ -123,12 +123,103 @@ fn sreg(w: &str) -> Option<Sreg> {
     })
 }
 
+// Only these non-executable directives are recognized. Keeping their tokens and
+// positions prevents the round trip from silently dropping unknown PTX syntax.
+type Metadata = Vec<(usize, String)>;
+
+fn metadata_tokens(toks: Vec<Token>) -> R<(Vec<Token>, Metadata)> {
+    let mut core = Vec::<Token>::new();
+    let mut metadata = Vec::new();
+    let mut files = HashMap::new();
+    let mut locations = Vec::new();
+    let mut depth = 0i32;
+    let mut kernel_open = false;
+    let mut at = 0;
+    while at < toks.len() {
+        let end = toks[at..]
+            .iter()
+            .position(|t| t.line != toks[at].line)
+            .map_or(toks.len(), |n| at + n);
+        let line = &toks[at..end];
+        let name = match &line[0].tok {
+            Tok::Word(w) => w.as_str(),
+            _ => "",
+        };
+        if matches!(name, ".loc" | ".file" | ".pragma") {
+            let ts: Vec<_> = line.iter().map(|t| &t.tok).collect();
+            let number = |t: &Tok| matches!(t, Tok::Int(n) if *n >= 0 && *n <= u32::MAX as i128);
+            let boundary = core
+                .last()
+                .is_some_and(|t| matches!(t.tok, Tok::Punct(';' | ':' | '{')));
+            // The required version/target/address_size header is six tokens.
+            let module_scope = depth == 0 && !kernel_open && core.len() >= 6;
+            let text = match ts.as_slice() {
+                [_, Tok::Int(f), Tok::Int(l), Tok::Int(c)]
+                    if name == ".loc"
+                        && depth == 1
+                        && boundary
+                        && *f > 0
+                        && number(ts[1])
+                        && number(ts[2])
+                        && number(ts[3]) =>
+                {
+                    locations.push((*f, toks[at].line));
+                    format!(".loc {f} {l} {c}")
+                }
+                [_, Tok::Int(f), Tok::Quoted(path)]
+                    if name == ".file" && module_scope && *f > 0 && number(ts[1]) =>
+                {
+                    if files.insert(*f, path.clone()).is_some() {
+                        return Err(format!(
+                            "line {}: duplicate .file identifier",
+                            toks[at].line
+                        ));
+                    }
+                    format!(".file {f} {path}")
+                }
+                [_, Tok::Quoted(value), Tok::Punct(';')]
+                    if name == ".pragma" && depth == 1 && boundary && value == "\"nounroll\"" =>
+                {
+                    ".pragma \"nounroll\";".to_owned()
+                }
+                _ => {
+                    return Err(format!(
+                        "line {}: unsupported {name} metadata",
+                        toks[at].line
+                    ));
+                }
+            };
+            metadata.push((core.len(), text));
+        } else {
+            for t in line {
+                match t.tok {
+                    Tok::Word(ref w) if w == ".entry" => kernel_open = true,
+                    Tok::Punct('{') => depth += 1,
+                    Tok::Punct('}') => {
+                        depth -= 1;
+                        if depth == 0 {
+                            kernel_open = false;
+                        }
+                    }
+                    _ => {}
+                }
+                core.push(t.clone());
+            }
+        }
+        at = end;
+    }
+    for (f, line) in locations {
+        if !files.contains_key(&f) {
+            return Err(format!("line {line}: .loc references missing .file {f}"));
+        }
+    }
+    Ok((core, metadata))
+}
+
 /// Parse and type-check a module.
 pub fn parse_module(src: &str) -> R<Module> {
-    let mut p = P {
-        toks: lex(src)?,
-        pos: 0,
-    };
+    let (toks, metadata) = metadata_tokens(lex(src)?)?;
+    let mut p = P { toks, pos: 0 };
     p.keyword(".version")?;
     let version = match p.next()? {
         Tok::Num(v) => v,
@@ -151,12 +242,31 @@ pub fn parse_module(src: &str) -> R<Module> {
     if kernels.is_empty() {
         return p.err("no .entry");
     }
-    Ok(Module {
+    let mut module = Module {
+        metadata,
         version,
         target,
         address_size: 64,
         kernels,
-    })
+    };
+    if module.metadata.is_empty() {
+        return Ok(module);
+    }
+    // Metadata must occur at a canonical line boundary, never inside a core
+    // instruction or parameter. This also makes reinsertion unambiguous.
+    let metadata = std::mem::take(&mut module.metadata);
+    let printed = print::module(&module);
+    let mut count = 0;
+    let mut boundaries = vec![0];
+    for line in printed.lines() {
+        count += lex(line)?.len();
+        boundaries.push(count);
+    }
+    if metadata.iter().any(|(at, _)| !boundaries.contains(at)) {
+        return Err("metadata is not at a supported core line boundary".into());
+    }
+    module.metadata = metadata;
+    Ok(module)
 }
 
 fn kernel(p: &mut P) -> R<Kernel> {
@@ -588,6 +698,13 @@ fn stmt(p: &mut P) -> R<Stmt> {
         Ok(Instr::Bin(b, t, d, a, operand(p)?))
     };
     let instr = match parts.as_slice() {
+        ["or", "pred"] => {
+            let d = reg(p)?;
+            comma(p)?;
+            let a = reg(p)?;
+            comma(p)?;
+            Instr::Por(d, a, reg(p)?)
+        }
         ["add", t] => bin(BinOp::Add, t, p)?,
         ["sub", t] => bin(BinOp::Sub, t, p)?,
         ["mul", "lo", t] => bin(BinOp::MulLo, t, p)?,
@@ -763,6 +880,7 @@ fn types_ok(i: &Instr) -> Result<(), String> {
     let arith = |t: &Ty| matches!(t, U32 | S32 | U64 | S64);
     let bits = |t: &Ty| matches!(t, B32 | B64);
     let ok = match i {
+        Instr::Por(..) => true,
         Instr::Bin(BinOp::Add | BinOp::Sub | BinOp::MulLo, t, ..) | Instr::MadLo(t, ..) => arith(t),
         Instr::Bin(BinOp::MulWide, t, ..) => matches!(t, U32 | S32),
         Instr::Bin(BinOp::And | BinOp::Or | BinOp::Xor | BinOp::Shl, t, ..) | Instr::Not(t, ..) => {
@@ -865,6 +983,7 @@ fn operands_ok(i: &Instr) -> Result<(), String> {
     };
     let w = |t: &Ty| t.width().unwrap_or(32);
     match i {
+        Instr::Por(..) => Ok(()),
         Instr::Bin(b, t, _, x, y) => {
             let (wx, wy) = match b {
                 BinOp::MulWide => (32, 32),
@@ -984,6 +1103,7 @@ fn typed_uses(i: &Instr) -> Vec<(&str, Ty)> {
     }
     let mut v: Vec<(&str, Ty)> = Vec::new();
     match i {
+        Instr::Por(..) => {}
         Instr::Bin(BinOp::MulWide, t, d, a, b) => {
             v.push((d.as_str(), Ty::U64));
             o(a, *t, &mut v);
@@ -1217,6 +1337,11 @@ fn check(k: &Kernel, lines: &[usize]) -> R<()> {
             return Err(e("predicated bra.uni".into()));
         }
         match &s.instr {
+            Instr::Por(d, a, b) => {
+                pred(d)?;
+                pred(a)?;
+                pred(b)?;
+            }
             Instr::Bin(BinOp::MulWide, t, d, a, b) => {
                 if !matches!(t, Ty::U32 | Ty::S32) {
                     return Err(e("mul.wide is supported for .u32 and .s32".into()));

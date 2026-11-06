@@ -1,0 +1,93 @@
+Frontend extension validation, 2026-11-06 UTC
+
+Scope: retain validated .loc/.file/.pragma "nounroll" metadata at unchanged
+core-token offsets; support only or.pred of three declared predicate registers.
+Core instruction indices and labels do not include metadata directives.
+
+Actual pre-extension command:
+  /mnt/scratch/e5r-oss-ptx/cargo/release/e5r ptx export /mnt/scratch/e5r-oss-ptx/upstream-build/simpleMultiCopy.ptx
+Exit 1; actual diagnostic:
+  e5r: /mnt/scratch/e5r-oss-ptx/upstream-build/simpleMultiCopy.ptx: line 83: unexpected character '\"'
+
+After metadata support, before predicate OR support, actual command:
+  CARGO_TARGET_DIR=/mnt/scratch/e5r-oss-ptx/cargo CARGO_BUILD_JOBS=2 E5R_PTX_METADATA_FIXTURE=/mnt/scratch/e5r-oss-ptx/upstream-build/simpleMultiCopy.ptx cargo test --release -p e5r-ptx --test metadata
+Exit 101; actual failing fixture parse/roundtrip diagnostic:
+  line 42: unsupported type .pred in or.pred
+
+After both narrow extensions, command:
+  CARGO_TARGET_DIR=/mnt/scratch/e5r-oss-ptx/cargo CARGO_BUILD_JOBS=2 E5R_PTX_METADATA_FIXTURE=/mnt/scratch/e5r-oss-ptx/upstream-build/simpleMultiCopy.ptx cargo test --release -p e5r-ptx --test metadata --test por --test roundtrip --test bfi --test fuzz
+Exit 0. Tests passed:
+  bfi:       2 passed, 0 failed
+  fuzz:      3 passed, 0 failed
+  metadata:  6 passed, 0 failed
+  por:       2 passed, 0 failed
+  roundtrip: 6 passed, 0 failed
+  Total:    19 passed, 0 failed
+
+Metadata tests include exact frozen normal CMake-generated PTX roundtrip;
+ptxas assembly of a decorated canonical module; unchanged kernels/labels/Lean
+export after metadata decoration; rejection of unknown pragmas, .loc options,
+invalid/missing/duplicate file identifiers, over-wide numbers, escaped newlines,
+unterminated quotes, instruction injection, and directives splitting core code.
+Quoted strings retain their exact source spelling, including supported escapes.
+
+Rust or.pred tests exhaust the four Boolean inputs, positive and negative guards,
+old destination values, source/destination aliases, unchanged other predicates
+and data registers. Parser negatives reject data-register operands, immediates,
+source negation, undeclared predicates, non-predicate guards, and unsupported
+and.pred/xor.pred forms. No original PTX was simplified or rewritten to pass.
+
+Lean tests are in Ptx.Examples.PredicateOr (four-case by-decide execution through
+stepMem and ret, guards, aliases, and universal frame equation). Their build and
+transitive axiom audit are recorded separately by the parent validation run.
+
+No GPU execution was performed by these frontend tests. The ptxas assembler
+oracle uses no GPU. Separate GPU results are in por-gpu.json.
+
+Final frontend review and broader regression checks, 2026-11-06 UTC
+
+Formatting:
+  cargo fmt --all --check
+  Exit 0. Formatting changes applied only to intended Rust checker files.
+  git diff --check also exits 0.
+
+Clippy:
+  CARGO_TARGET_DIR=/mnt/scratch/e5r-oss-ptx/cargo CARGO_BUILD_JOBS=2 cargo clippy --release -p e5r-ptx -p e5r-verify --all-targets -- -D warnings
+  Exit 0 on the final source and tests; no warnings.
+
+Complete PTX crate tests:
+  CARGO_TARGET_DIR=/mnt/scratch/e5r-oss-ptx/cargo CARGO_BUILD_JOBS=2 E5R_PTX_METADATA_FIXTURE=/mnt/scratch/e5r-oss-ptx/upstream-build/simpleMultiCopy.ptx cargo test --release -p e5r-ptx
+  Exit 0. 21 tests pass: fp unit1, bfi2, fuzz3, metadata6, por2,
+  ptxas_agreement1, roundtrip6; no ignored or failed tests; doctests0.
+  The assembler oracle additionally covers plain or.pred, source/destination
+  aliasing, and a guard predicate that aliases the destination.
+
+Focused verifier CLI regressions (no Lean proof execution):
+  CARGO_TARGET_DIR=/mnt/scratch/e5r-oss-ptx/cargo CARGO_BUILD_JOBS=2 cargo test --release -p e5r-verify --test ptx_cli -- --skip a_tiny_timeout_is_unknown_not_proved --skip proved_and_refuted_end_to_end --test-threads=1
+  Exit 0. 8 passed, 0 failed, 2 explicitly filtered Lean-launch tests.
+  The new OSS-increment contract test rejects missing/aliased/undeclared repeat
+  parameters, repeats on another class, unknown fields, stale original hashes;
+  a valid contract without a supplied proof remains unknown.
+
+Focused verifier PTX unit tests:
+  CARGO_TARGET_DIR=/mnt/scratch/e5r-oss-ptx/cargo CARGO_BUILD_JOBS=2 cargo test --release -p e5r-verify --lib ptx:: -- --test-threads=1
+  Exit 0. 2 passed, 0 failed, 24 unrelated unit tests filtered.
+
+Security review follow-up:
+  Actual ptxas rejects .file before .version, between .version/.target,
+  and between .target/.address_size. Parser now also rejects these placements,
+  as well as .file inside an entry parameter list or body; negative tests cover
+  these positions. Module metadata is accepted only after the six-token required
+  header and outside the kernel. .loc/nounroll remain at core statement/label/
+  declaration boundaries inside kernels. Exact token roundtrip and unchanged
+  kernel/label equality are asserted.
+  Resource-capped ptxas probes also accepted source line0 and max-u32 line,
+  column and file indices, matching the admitted numeric range (512MB/5s caps).
+
+Remaining deliberate frontend limits:
+  Only ASCII single-line file strings with escaped quote/backslash; only the
+  three supported metadata directive forms; no optional .loc attributes,
+  .file timestamp/size attributes, unknown pragmas, or other predicate ops.
+  Metadata is retained for token roundtrip and hashing but has no execution PC.
+  No remaining frontend blocker was found. No GPU or Lean proof processes were
+  launched by these final regression runs.

@@ -297,6 +297,7 @@ def exec (K : Kernel) (c : Ctx) (s : TState) : Instr → Action
       (atWidth t.width (fun _ x y => x * y) (opVal c s a) (opVal c s b)) (opVal c s e)))
   | .and t d a b => .next (s.set d (atWidth t.width (fun _ x y => x &&& y) (opVal c s a) (opVal c s b)))
   | .or t d a b => .next (s.set d (atWidth t.width (fun _ x y => x ||| y) (opVal c s a) (opVal c s b)))
+  | .por d a b => .next (s.setp d (s.p a || s.p b))
   | .xor t d a b => .next (s.set d (atWidth t.width (fun _ x y => x ^^^ y) (opVal c s a) (opVal c s b)))
   | .not t d a => .next (s.set d (fit t (~~~ (opVal c s a))))
   | .shl t d a b => .next (s.set d (shiftBy t.width (fun _ x n => x <<< n) (opVal c s a) (opVal c s b)))

@@ -1,0 +1,7 @@
+ℹ [7/7] Replayed Ptx.Examples.PredicateOr
+info: Ptx/Examples/PredicateOr.lean:67:0: 'Ptx.Examples.PredicateOr.truth_table' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: Ptx/Examples/PredicateOr.lean:68:0: 'Ptx.Examples.PredicateOr.guarded_truth_table' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: Ptx/Examples/PredicateOr.lean:69:0: 'Ptx.Examples.PredicateOr.false_guard_skips' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: Ptx/Examples/PredicateOr.lean:70:0: 'Ptx.Examples.PredicateOr.source_destination_alias' depends on axioms: [propext, Classical.choice, Quot.sound]
+info: Ptx/Examples/PredicateOr.lean:71:0: 'Ptx.Examples.PredicateOr.por_step' depends on axioms: [propext, Classical.choice, Quot.sound]
+Build completed successfully (7 jobs).

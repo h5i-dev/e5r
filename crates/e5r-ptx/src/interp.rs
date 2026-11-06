@@ -398,6 +398,11 @@ pub fn step(k: &Kernel, al: &Allocs, c: &Ctx, s: &mut TState, g: &mut Mem, sh: &
     }
     use Instr::*;
     match &st.instr {
+        Por(d, a, b) => {
+            let v = s.pred(a) || s.pred(b);
+            s.p.insert(d.clone(), v);
+            s.pc += 1;
+        }
         Bin(b, t, d, x, y) => {
             let (a, bb) = (s.op(c, x), s.op(c, y));
             let w = width(*t);

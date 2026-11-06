@@ -65,6 +65,7 @@ fn address(a: &Address) -> String {
 pub fn instr(i: &Instr) -> String {
     let o = operand;
     match i {
+        Instr::Por(d, a, b) => format!("or.pred \t{d}, {a}, {b}"),
         Instr::Bin(b, t, d, x, y) => {
             format!("{}.{} \t{d}, {}, {}", b.opcode(), t.name(), o(x), o(y))
         }
@@ -238,5 +239,23 @@ pub fn module(m: &Module) -> String {
         }
         s.push_str("}\n");
     }
-    s
+    if m.metadata.is_empty() {
+        return s;
+    }
+    let mut out = String::new();
+    let mut metadata = m.metadata.iter().peekable();
+    let mut count = 0;
+    for line in s.lines() {
+        while metadata.peek().is_some_and(|(at, _)| *at == count) {
+            writeln!(out, "{}", metadata.next().unwrap().1).unwrap();
+        }
+        writeln!(out, "{line}").unwrap();
+        count += crate::lex::lex(line)
+            .expect("canonical core PTX must lex")
+            .len();
+    }
+    for (_, text) in metadata {
+        writeln!(out, "{text}").unwrap();
+    }
+    out
 }

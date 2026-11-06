@@ -85,6 +85,8 @@ inductive CvtRnd where
   deriving Repr, DecidableEq, Inhabited
 
 inductive Instr where
+  /-- `or.pred d, a, b`: Boolean OR of predicate registers. -/
+  | por (d a b : String)
   | add (t : Ty) (d : String) (a b : Operand)
   | sub (t : Ty) (d : String) (a b : Operand)
   | mulLo (t : Ty) (d : String) (a b : Operand)

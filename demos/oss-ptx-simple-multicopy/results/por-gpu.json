@@ -1,0 +1,17 @@
+{
+  "actual": [
+    0,
+    1,
+    1,
+    1
+  ],
+  "expected": [
+    0,
+    1,
+    1,
+    1
+  ],
+  "all_passed": true,
+  "lock": "/mnt/scratch/e5r-gpu-benchmark.lock",
+  "foreign_processes_observed": false
+}

@@ -1,0 +1,20 @@
+.version 9.2
+.target sm_86
+.address_size 64
+.visible .entry probe(.param .u64 output) {
+.reg .pred %p<4>;
+.reg .u32 %r<5>;
+.reg .u64 %rd<3>;
+ld.param.u64 %rd1,[output];
+mov.u32 %r1,%tid.x;
+and.b32 %r2,%r1,1;
+and.b32 %r3,%r1,2;
+setp.ne.u32 %p1,%r2,0;
+setp.ne.u32 %p2,%r3,0;
+or.pred %p3,%p1,%p2;
+selp.u32 %r4,1,0,%p3;
+mul.wide.u32 %rd2,%r1,4;
+add.u64 %rd2,%rd1,%rd2;
+st.global.u32 [%rd2],%r4;
+ret;
+}

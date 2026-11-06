@@ -78,6 +78,7 @@ fn instr(i: &Instr) -> String {
     let o = operand;
     let s = string;
     match i {
+        Instr::Por(d, a, b) => format!(".por {} {} {}", s(d), s(a), s(b)),
         Instr::Bin(b, t, d, x, y) => format!(".{} {} {} {} {}", b.lean(), ty(*t), s(d), o(x), o(y)),
         Instr::MadLo(t, d, a, b, c) => {
             format!(".madLo {} {} {} {} {}", ty(*t), s(d), o(a), o(b), o(c))

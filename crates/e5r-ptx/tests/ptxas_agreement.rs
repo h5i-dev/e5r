@@ -37,6 +37,9 @@ fn reg(t: &str, i: u32) -> String {
 
 fn forms() -> Vec<String> {
     let mut v = Vec::new();
+    v.push("or.pred %p0, %p1, %p2".into());
+    v.push("or.pred %p1, %p1, %p2".into());
+    v.push("@%p0 or.pred %p0, %p1, %p2".into());
     let imms = [
         "0",
         "-1",

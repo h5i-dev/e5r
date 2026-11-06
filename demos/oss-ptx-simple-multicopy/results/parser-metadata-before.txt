@@ -1,0 +1,12 @@
+Before metadata extension:
+Command: CARGO_TARGET_DIR=/mnt/scratch/e5r-oss-ptx/cargo /mnt/scratch/e5r-oss-ptx/cargo/release/e5r ptx export /mnt/scratch/e5r-oss-ptx/upstream-build/simpleMultiCopy.ptx
+Exit: 1
+Actual stderr: e5r: /mnt/scratch/e5r-oss-ptx/upstream-build/simpleMultiCopy.ptx: line 83: unexpected character '"'
+
+After metadata extension, before or.pred extension:
+Command: CARGO_TARGET_DIR=/mnt/scratch/e5r-oss-ptx/cargo CARGO_BUILD_JOBS=2 E5R_PTX_METADATA_FIXTURE=/mnt/scratch/e5r-oss-ptx/upstream-build/simpleMultiCopy.ptx cargo test --release -p e5r-ptx --test metadata
+Exit: 101
+Actual error from external-fixture parse/roundtrip: line 42: unsupported type .pred in or.pred
+
+After narrow metadata and or.pred extensions:
+Same exact frozen normal PTX fixture roundtrip passes. No original PTX edits.

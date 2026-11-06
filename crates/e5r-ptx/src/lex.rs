@@ -11,6 +11,8 @@ pub enum Tok {
     Int(i128),
     /// A numeric literal that is not an integer, as written (`9.2`).
     Num(String),
+    /// A quoted metadata string, including its quotes and supported escapes.
+    Quoted(String),
     /// A floating-point literal by its bits and width: `0f3F800000` (32),
     /// `0d3FF0000000000000` (64). Case of the hex digits does not matter.
     Float(u64, u32),
@@ -92,6 +94,28 @@ pub fn lex(src: &str) -> Result<Vec<Token>, String> {
                 }
                 i += 1;
             }
+        } else if c == '"' {
+            let start = i;
+            i += 1;
+            loop {
+                match chars.get(i) {
+                    Some('"') => {
+                        i += 1;
+                        break;
+                    }
+                    Some('\\') if matches!(chars.get(i + 1), Some('\\' | '"')) => i += 2,
+                    Some(c) if c.is_ascii() && !c.is_ascii_control() && *c != '\\' => i += 1,
+                    _ => {
+                        return Err(format!(
+                            "line {line}: invalid or unterminated metadata string"
+                        ));
+                    }
+                }
+            }
+            out.push(Token {
+                tok: Tok::Quoted(chars[start..i].iter().collect()),
+                line,
+            });
         } else if word_start(c) {
             let s = i;
             while i < chars.len() && word_char(chars[i]) {

@@ -371,6 +371,8 @@ pub enum CvtRnd {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub enum Instr {
+    /// `or.pred d, a, b`: logical OR of predicate registers.
+    Por(String, String, String),
     Bin(BinOp, Ty, String, Operand, Operand),
     MadLo(Ty, String, Operand, Operand, Operand),
     /// bfi.b32 with immediate position + length <= 32 only.
@@ -515,6 +517,8 @@ pub struct Kernel {
 /// A module: header directives and its kernels.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Module {
+    /// Validated non-executable metadata, indexed by preceding core-token count.
+    pub metadata: Vec<(usize, String)>,
     /// `.version`, as written.
     pub version: String,
     /// `.target`.
