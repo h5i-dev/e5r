@@ -1,0 +1,86 @@
+1 58 Ptx.Semantics.FloatCore
+2 58 Ptx.Semantics.Float
+3 58 Ptx.Syntax
+4 58 Ptx.Semantics.Memory
+5 58 Ptx.Semantics.Instruction
+6 58 Ptx.Semantics.SIMT
+7 58 Ptx.Semantics.Globals
+'Ptx.GlobalVar.Initialized.read32' depends on axioms: [propext, Quot.sound]
+'Ptx.Module.globalsReady_install' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.installGlobals_frame' depends on axioms: [propext]
+'Ptx.installGlobals_initialized' depends on axioms: [propext, Quot.sound]
+'Ptx.GlobalVar.Initialized.store_frame' depends on axioms: [propext]
+8 58 Ptx.Logic.Hoare
+9 58 Ptx.Logic.RaceFreedom
+10 58 Ptx.Logic.Regions
+11 58 Ptx.Tactics.Attr
+12 58 Ptx.Tactics.Eval
+13 58 Ptx.Logic.Launch1D
+14 58 Ptx.Kernels.VAddNvcc
+15 58 Ptx.Examples.VectorAdd
+16 58 Ptx.Kernels.Sum
+17 58 Ptx.Examples.Sum
+18 58 Ptx.Kernels.Saxpy
+19 58 Ptx.Examples.Map
+20 58 Ptx.Logic.Refute
+21 58 Ptx.Kernels.VAddNoBound
+22 58 Ptx.Kernels.VAddTid
+23 58 Ptx.Kernels.VAddSub
+24 58 Ptx.Examples.Buggy
+25 58 Ptx.Auto.Map
+26 58 Ptx.Auto.Tactic
+27 58 Ptx.Logic.Phases
+28 58 Ptx.Logic.Narrow
+29 58 Ptx.Logic.FP4Forms
+'Ptx.default_bin_rn' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.cvt_u16_f32_oracle_independent' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.public_block_shift' depends on axioms: [propext]
+'Ptx.laneid_oneD' depends on axioms: [propext, Classical.choice, Quot.sound]
+30 58 Ptx.Logic.CellAlgs
+31 58 Ptx.Logic.PhaseSound
+32 58 Ptx.Logic.PhaseWp
+33 58 Ptx.Logic.Cells
+34 58 Ptx.Tactics.EvalR
+35 58 Ptx.Auto.Tactic4
+36 58 Ptx.Kernels.ReduceNvcc
+37 58 Ptx.Examples.Reduce
+38 58 Ptx.Kernels.ScanNvcc
+39 58 Ptx.Examples.Scan
+/root/e5r-oss-ptx/verification/ptx/Ptx/Examples/Scan.lean:264:38: warning: Variable name `hi` is not explicitly referenced.
+
+Hint: The binding can be removed (if unused) or named `_` (if used implicitly). Alternatively, prefix the name with `_` to silence this warning:
+  [apply] _hi
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+/root/e5r-oss-ptx/verification/ptx/Ptx/Examples/Scan.lean:762:8: warning: `if_pos` has been deprecated: Use `ite_eq_left` instead
+
+Hint: Replace the deprecated name:
+  i̵f̵_̵p̵o̵s̵i̲t̲e̲_̲e̲q̲_̲l̲e̲f̲t̲
+40 58 Ptx.Logic.Sums
+41 58 Ptx.Kernels.ReduceAtomicNvcc
+42 58 Ptx.Examples.ReduceAtomic
+43 58 Ptx.Auto.Block
+44 58 Ptx.Auto.Reduce32
+45 58 Ptx.Auto.Scan32
+46 58 Ptx.Auto.Accum
+/root/e5r-oss-ptx/verification/ptx/Ptx/Auto/Accum.lean:157:52: warning: Variable name `hv` is not explicitly referenced.
+
+Hint: The binding can be removed (if unused) or named `_` (if used implicitly). Alternatively, prefix the name with `_` to silence this warning:
+  [apply] _hv
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+47 58 Ptx.Auto.FloatMap
+48 58 Ptx.Logic.Schedule
+49 58 Ptx.Auto.Packing
+50 58 Ptx.Logic.Relational
+51 58 Ptx.Auto.Equivalence
+52 58 Ptx.Auto.Stencil
+53 58 Ptx.Auto.StencilPair
+54 58 Ptx.Auto.OssInc
+55 58 Ptx
+56 58 Ptx.Logic.RelationalPhases
+'Ptx.Relational.shared_equivalent_of_phases' depends on axioms: [propext, Classical.choice, Quot.sound]
+57 58 Ptx.Examples.RelationalPhases
+'Ptx.Examples.RelationalPhases.concrete_shared_reduction' depends on axioms: [propext, Classical.choice, Quot.sound]
+58 58 Checker.ProofCheck
+all direct serial modules passed

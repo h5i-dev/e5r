@@ -1,0 +1,4 @@
+'Ptx.default_bin_rn' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.cvt_u16_f32_oracle_independent' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.public_block_shift' depends on axioms: [propext]
+'Ptx.laneid_oneD' depends on axioms: [propext, Classical.choice, Quot.sound]

@@ -254,6 +254,13 @@ impl TState {
             Operand::Imm(v) => imm(*v),
             Operand::Sreg(s) => {
                 (match s {
+                    Sreg::Laneid => {
+                        c.tid.x.wrapping_add(
+                            c.ntid
+                                .x
+                                .wrapping_mul(c.tid.y.wrapping_add(c.ntid.y.wrapping_mul(c.tid.z))),
+                        ) & 31
+                    }
                     Sreg::Tid(d) => c.tid.get(*d),
                     Sreg::Ntid(d) => c.ntid.get(*d),
                     Sreg::Ctaid(d) => c.ctaid.get(*d),
@@ -594,6 +601,22 @@ pub fn step(k: &Kernel, al: &Allocs, c: &Ctx, s: &mut TState, g: &mut Mem, sh: &
             None => return Res::Fault(format!("missing label {l}")),
         },
         Ret | Exit => return Res::Halted,
+        Clz32(d, a) => s.set(d, (s.op(c, a) as u32).leading_zeros() as u64),
+        MinS32(d, a, b) => s.set(
+            d,
+            (s.op(c, a) as u32 as i32).min(s.op(c, b) as u32 as i32) as u32 as u64,
+        ),
+        FBinDefault(op, ftz, sat, t, d, a, b) => {
+            let f = t.fmt();
+            let (x, y) = (fbits(*t, s.op(c, a)), fbits(*t, s.op(c, b)));
+            let r = match op {
+                crate::ast::FBin::Add => fp::fadd(f, RMode::Rn, *ftz, *sat, x, y),
+                crate::ast::FBin::Sub => fp::fsub(f, RMode::Rn, *ftz, *sat, x, y),
+                crate::ast::FBin::Mul => fp::fmul(f, RMode::Rn, *ftz, *sat, x, y),
+                crate::ast::FBin::Div => fp::fdiv(f, RMode::Rn, *ftz, x, y),
+            };
+            s.set(d, fres(*t, r));
+        }
         FBin(op, m, ftz, sat, t, d, a, b) => {
             let f = t.fmt();
             let (x, y) = (fbits(*t, s.op(c, a)), fbits(*t, s.op(c, b)));
@@ -673,7 +696,9 @@ fn fres(t: Ty, r: Option<u64>) -> u64 {
 
 /// `Ptx.intOf`.
 fn int_of(t: Ty, v: u64) -> i128 {
-    match (width(t), matches!(t, Ty::S32 | Ty::S64)) {
+    match (width(t), matches!(t, Ty::S16 | Ty::S32 | Ty::S64)) {
+        (16, true) => v as u16 as i16 as i128,
+        (16, false) => v as u16 as i128,
         (32, true) => v as u32 as i32 as i128,
         (32, false) => v as u32 as i128,
         (_, true) => v as i64 as i128,
@@ -687,7 +712,7 @@ fn cvt_float(dt: Ty, st: Ty, r: CvtRnd, ftz: bool, sat: bool, a: u64) -> Option<
     match (dt.is_float(), st.is_float(), r) {
         (false, true, CvtRnd::I(m)) => {
             let w = width(dt);
-            let signed = matches!(dt, Ty::S32 | Ty::S64);
+            let signed = matches!(dt, Ty::S16 | Ty::S32 | Ty::S64);
             Some(fit(
                 dt,
                 fp::to_int(sf, m, ftz && st == Ty::F32, signed, w, fbits(st, a)),

@@ -41,8 +41,10 @@ fn operand(o: &Operand) -> String {
     match o {
         Operand::Reg(r) => format!("(.reg {})", string(r)),
         Operand::Imm(v) => format!("(.imm {})", int(*v)),
+        Operand::Sreg(Sreg::Laneid) => "(.sreg .laneid)".into(),
         Operand::Sreg(s) => {
             let (c, d) = match s {
+                Sreg::Laneid => unreachable!(),
                 Sreg::Tid(d) => ("tid", d),
                 Sreg::Ntid(d) => ("ntid", d),
                 Sreg::Ctaid(d) => ("ctaid", d),
@@ -78,6 +80,17 @@ fn instr(i: &Instr) -> String {
     let o = operand;
     let s = string;
     match i {
+        Instr::Clz32(d, a) => format!(".clz32 {} {}", s(d), o(a)),
+        Instr::MinS32(d, a, b) => format!(".minS32 {} {} {}", s(d), o(a), o(b)),
+        Instr::FBinDefault(op, ftz, sat, t, d, a, b) => format!(
+            ".fbinDefault .{} {ftz} {sat} {} {} {} {}",
+            op.name(),
+            ty(*t),
+            s(d),
+            o(a),
+            o(b)
+        ),
+
         Instr::Por(d, a, b) => format!(".por {} {} {}", s(d), s(a), s(b)),
         Instr::Bin(b, t, d, x, y) => format!(".{} {} {} {} {}", b.lean(), ty(*t), s(d), o(x), o(y)),
         Instr::MadLo(t, d, a, b, c) => {

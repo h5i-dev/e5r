@@ -1,0 +1,21 @@
+{
+  "kind": "semantic regression only; no benchmark or FP4 whole-kernel proof",
+  "launches": 18,
+  "forms": 9,
+  "threads_per_form": [
+    64,
+    128
+  ],
+  "comparisons": [
+    "independent Python",
+    "Rust",
+    "actual Lean exec/tstep",
+    "GPU JIT",
+    "ptxas cubin"
+  ],
+  "canaries": "all44 bytes outside each4-byte output in each48-byte record retained",
+  "ptx_sha256": "c5248d181dcd1ffee0b86c2666268685728ee146efc4b13e97a4b7482fb2107a",
+  "expected_sha256": "93831961f193f5329fcb41db7b87b9f351d9a574ccebbad513a78c6a50fc13ff",
+  "GPU_lock": "exclusive shared flock and empty foreign-PID check before GPU child launches",
+  "status": "pass"
+}

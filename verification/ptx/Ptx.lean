@@ -17,6 +17,7 @@ import Ptx.Auto.Map
 import Ptx.Auto.Tactic
 import Ptx.Logic.Phases
 import Ptx.Logic.Narrow
+import Ptx.Logic.FP4Forms
 import Ptx.Logic.PhaseSound
 import Ptx.Logic.PhaseWp
 import Ptx.Logic.Cells

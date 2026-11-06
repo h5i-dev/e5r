@@ -1,0 +1,117 @@
+   Compiling e5r-ptx v0.1.0 (/root/e5r-oss-ptx/crates/e5r-ptx)
+    Finished `release` profile [optimized] target(s) in 1m 43s
+     Running unittests src/lib.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/e5r_ptx-9992dcdaaa35d8a1)
+
+running 1 test
+test fp::tests::known_values ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/aggregate_params.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/aggregate_params-9714b2db15bee6b7)
+
+running 5 tests
+test bad_bounds_alignment_declarations_and_scalar_offsets_are_refused ... ok
+test byte_loads_are_little_endian_and_scalar_bits_are_independent ... ok
+test mixed_abi_order_and_every_byte_survive_roundtrip ... ok
+test aggregate_abi_roundtrip_assembles_with_ptxas ... ok
+test exported_aggregate_loads_replay_in_lean ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.32s
+
+     Running tests/bfi.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/bfi-6103773410b6d921)
+
+running 2 tests
+test unsupported_forms_fail_closed ... ok
+test all_admitted_fields_preserve_other_bits_and_handle_empty_ranges ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/fp4_forms.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/fp4_forms-400105d90da8551b)
+
+running 6 tests
+test grouped_declarations_and_default_rounding_remain_distinct ... ok
+test laneid_linearizes_all_three_dimensions ... ok
+test clz_and_signed_min_ignore_upper_bits_and_cover_zero ... ok
+test invalid_widths_and_unimplemented_variants_still_reject ... ok
+test unsigned_and_signed_u16_float_conversions_chop_the_source ... ok
+test prerequisite_forms_assemble_with_ptxas ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/fuzz.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/fuzz-e47bdaa47a52a57f)
+
+running 3 tests
+test token_soup_never_panics ... ok
+test mutated_kernels_are_refused_with_a_line_or_round_trip ... ok
+test grammar_kernels_round_trip_and_export_deterministically ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.61s
+
+     Running tests/globals.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/globals-0263d7dd352a85b1)
+
+running 4 tests
+test exact_table_bytes_and_zero_data_reach_the_exporter ... ok
+test malformed_definitions_and_symbol_aliases_fail_closed ... ok
+test unsafe_placements_reject_without_partial_initialization ... ok
+test module_load_image_roundtrip_has_an_external_assembler_oracle ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/metadata.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/metadata-0196808544e54892)
+
+running 9 tests
+test frozen_normal_ptx_roundtrips_when_requested ... ok
+test debug_extensions_and_unknown_pragmas_are_rejected ... ok
+test metadata_cannot_hide_or_split_core_instructions ... ok
+test globals_reject_wrong_widths_relocations_duplicates_and_hidden_code ... ok
+test metadata_retains_tokens_and_leaves_instructions_and_labels_unchanged ... ok
+test quoted_paths_preserve_supported_escapes ... ok
+test unused_scalar_globals_keep_all_tokens_and_initializers ... ok
+test metadata_roundtrip_assembles_with_ptxas_when_available ... ok
+test unused_globals_assemble_after_token_roundtrip ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/narrow.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/narrow-06ed3c860220c872)
+
+running 4 tests
+test aggregate_byte_and_half_loads_keep_alignment_and_bounds ... ok
+test unsupported_narrow_forms_fail_closed ... ok
+test unsigned_loads_zero_extend_and_stores_touch_only_their_bytes ... ok
+test narrow_operations_truncate_before_comparing_shifting_and_converting ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/por.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/por-5f5f97ec97ecd327)
+
+running 2 tests
+test predicate_or_refuses_data_immediates_negations_and_undeclared_registers ... ok
+test predicate_or_truth_table_and_guards ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/ptxas_agreement.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/ptxas_agreement-8e3bc613340ba3b5)
+
+running 1 test
+test parser_acceptance_implies_ptxas_acceptance ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.31s
+
+     Running tests/roundtrip.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/roundtrip-56207839c17eece4)
+
+running 6 tests
+test shared_declarations ... ok
+test subset_edges_are_refused ... ok
+test written_offsets_survive ... ok
+test every_benchmark_round_trips ... ok
+test lean_export_names_every_statement ... ok
+test malformed_input_never_panics ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
+
+   Doc-tests e5r_ptx
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

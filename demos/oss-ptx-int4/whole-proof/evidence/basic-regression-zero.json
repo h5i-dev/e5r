@@ -1,0 +1,74 @@
+{
+  "class": "equivalence-zero-segments",
+  "counterexample": null,
+  "input": {
+    "original_ptx": {
+      "path": "demos/oss-ptx-catboost/zero_segments/original.ptx",
+      "sha256": "a2dea8659ab71d33b1fa3377ddcf5867105980684a9eb8847b971f8ec1cb5753"
+    },
+    "ptx": {
+      "path": "demos/oss-ptx-catboost/zero_segments/edited.ptx",
+      "sha256": "96e5da6355319cc83fe1a89c4faa72a145b8249f22f3eced208b6acdc3cb7b42"
+    },
+    "spec": {
+      "path": "demos/oss-ptx-catboost/zero_segments/equivalence.json",
+      "sha256": "c649e95400f87122a5574ce3654846e3ed4d48215daa0667315c91dae14989a3"
+    }
+  },
+  "kernel": "_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT_",
+  "lean": {
+    "memory_cap_mb": 3072,
+    "proof_check_seconds": 9.18,
+    "proof_seconds": 12.21,
+    "timeout_seconds": 600,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "lean_spec": "def domain : ZeroSegments.Spec := ⟨\"_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT__param_0\", \"_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT__param_3\", \"_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT__param_2\", \"_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT__param_1\"⟩\n",
+  "proof": {
+    "accepted": true,
+    "check": {
+      "axioms": [
+        "propext",
+        "Quot.sound",
+        "Classical.choice"
+      ],
+      "declarations": 63,
+      "ok": true
+    },
+    "manifest": {
+      "ptx": "96e5da6355319cc83fe1a89c4faa72a145b8249f22f3eced208b6acdc3cb7b42",
+      "spec": "c649e95400f87122a5574ce3654846e3ed4d48215daa0667315c91dae14989a3",
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "path": "demos/oss-ptx-catboost/zero_segments/equivalence.lean",
+    "sha256": "f2230c899e3dd90a8494618f7568b399d13360d5a6e0202a15800f24463e8212",
+    "supplied": true
+  },
+  "properties": {
+    "direct_observable_equivalence": "proved",
+    "functional_correctness": "not_claimed",
+    "memory_safety": "proved",
+    "race_freedom": "proved",
+    "termination": "proved"
+  },
+  "reasons": [],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 25.98,
+  "theorem": {
+    "axioms": [
+      "propext",
+      "Quot.sound",
+      "Classical.choice"
+    ],
+    "checked_by": "proofcheck: kernel replay of every declaration of the proof",
+    "definition": "Ptx.Auto.ZeroSegments.Spec.Equivalent",
+    "generated": false,
+    "name": "E5rProof.correct",
+    "statement": "ZeroSegments.Spec.Equivalent domain Original.«_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT_» Optimized.«_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT_»"
+  },
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "proved"
+}

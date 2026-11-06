@@ -14,8 +14,10 @@ quantify over it.
 
 The modifiers, as the ISA states them:
 
-* `.rn .rz .rm .rp` (§4.3 rounding attributes); add, sub and mul without
-  one may be fused into an fma by ptxas, so the parser refuses them;
+* `.rn .rz .rm .rp` (§4.3 rounding attributes); default-RN add, sub and mul
+  retain a distinct instruction constructor because ptxas may contract them
+  into fma. Their instruction semantics is RN; proving a particular compiler
+  contraction or SASS implementation correct is outside this PTX model;
 * `.ftz` flushes subnormal inputs and results to sign-preserving zero. A
   result is flushed when it is tiny after rounding (§7.5), the test the A10G
   applies (`fma.rn.ftz` of a value just below the smallest normal that rounds

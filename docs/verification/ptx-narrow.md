@@ -5,9 +5,10 @@ The executable subset admits `.u8` unsigned loads/stores and 16-bit
 instruction width; comparison interprets the low 16 bits according to the
 instruction signedness. Selection and movement keep the low 16 result bits.
 Integer conversions truncate or extend according to source signedness.
-Eight-bit arithmetic, narrow atomics, signed narrow loads, floating-point
-conversions involving 16-bit integers, and signed 16-bit conversion destinations
-in wider registers remain refused. Sixteen-bit add/sub/mul also remain outside
+Eight-bit arithmetic, narrow atomics, signed narrow loads, and signed 16-bit
+integer conversion destinations in wider registers remain refused. Explicitly
+rounded conversions between 16-bit integers and f32/f64 are now supported;
+FP16/BF16 floating-point formats are still outside the model. Sixteen-bit add/sub/mul also remain outside
 this deliberately limited extension.
 
 The public specification is NVIDIA's [PTX ISA 8.8, operand type

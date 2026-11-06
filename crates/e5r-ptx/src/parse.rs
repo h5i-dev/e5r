@@ -112,6 +112,9 @@ impl P {
 }
 
 fn sreg(w: &str) -> Option<Sreg> {
+    if w == "%laneid" {
+        return Some(Sreg::Laneid);
+    }
     let (base, d) = w.rsplit_once('.')?;
     let d = match d {
         "x" => Dim::X,
@@ -461,24 +464,30 @@ fn kernel(p: &mut P, globals: &[GlobalDecl]) -> R<Kernel> {
         if p.peek() == Some(&Tok::Word(".reg".into())) {
             p.pos += 1;
             let ty = p.ty_directive()?;
-            let name = p.word()?;
-            let count = if p.is_punct('<') {
-                p.pos += 1;
-                let n = p.int()?;
-                p.punct('>')?;
-                Some(
-                    u32::try_from(n)
-                        .map_err(|_| format!("line {}: bad register count", p.line()))?,
-                )
-            } else {
-                None
-            };
-            if p.is_punct(',') {
-                return p.err("one register declaration per .reg");
+            let start = regs.len();
+            loop {
+                let name = p.word()?;
+                let count = if p.is_punct('<') {
+                    p.punct('<')?;
+                    let n = p.uint()?;
+                    p.punct('>')?;
+                    Some(n)
+                } else {
+                    None
+                };
+                regs.push(RegDecl { ty, name, count });
+                if !p.is_punct(',') {
+                    break;
+                }
+                p.punct(',')?;
             }
             p.punct(';')?;
-            decls.push(Decl::Reg(regs.len()));
-            regs.push(RegDecl { ty, name, count });
+            let len = regs.len() - start;
+            decls.push(if len == 1 {
+                Decl::Reg(start)
+            } else {
+                Decl::RegGroup(start, len)
+            });
         } else if p.peek() == Some(&Tok::Word(".shared".into())) {
             p.pos += 1;
             decls.push(Decl::Shared(shared.len()));
@@ -718,12 +727,9 @@ fn float_instr(p: &mut P, op: &str, parts: &[&str]) -> Option<R<Instr>> {
                 Err(e) => return Some(unsup(e)),
             };
             let rounded = matches!(opc, "add" | "sub" | "mul" | "fma" | "div" | "sqrt" | "rcp");
-            if rounded && r.is_none() {
-                return Some(unsup(if matches!(opc, "add" | "sub" | "mul") {
-                    "no rounding modifier: ptxas may fuse it with a mul into an fma (PTX ISA), so its result is not determined; write .rn".into()
-                } else {
-                    "a rounding modifier is required".into()
-                }));
+            let implicit = r.is_none() && matches!(opc, "add" | "sub" | "mul");
+            if rounded && r.is_none() && !implicit {
+                return Some(unsup("a rounding modifier is required".into()));
             }
             let m = r.map(|r| rmode(&r)).unwrap_or(RMode::Rn);
             Some((|| {
@@ -751,7 +757,11 @@ fn float_instr(p: &mut P, op: &str, parts: &[&str]) -> Option<R<Instr>> {
                                     "mul" => FBin::Mul,
                                     _ => FBin::Div,
                                 };
-                                Instr::FBin(f, m, ftz, sat, ty, d, a, b)
+                                if implicit {
+                                    Instr::FBinDefault(f, ftz, sat, ty, d, a, b)
+                                } else {
+                                    Instr::FBin(f, m, ftz, sat, ty, d, a, b)
+                                }
                             }
                         }
                     }
@@ -1014,6 +1024,18 @@ fn stmt(p: &mut P) -> R<Stmt> {
             }
             Instr::Bar
         }
+        ["clz", "b32"] => {
+            let d = reg(p)?;
+            comma(p)?;
+            Instr::Clz32(d, operand(p)?)
+        }
+        ["min", "s32"] => {
+            let d = reg(p)?;
+            comma(p)?;
+            let a = operand(p)?;
+            comma(p)?;
+            Instr::MinS32(d, a, operand(p)?)
+        }
         ["bra"] => Instr::Bra(false, p.word()?),
         ["bra", "uni"] => Instr::Bra(true, p.word()?),
         ["ret"] => Instr::Ret,
@@ -1037,7 +1059,7 @@ fn types_ok(i: &Instr) -> Result<(), String> {
     let bits = |t: &Ty| matches!(t, B32 | B64);
     let narrow_int = |t: &Ty| matches!(t, U16 | S16);
     let ok = match i {
-        Instr::Por(..) => true,
+        Instr::Por(..) | Instr::Clz32(..) | Instr::MinS32(..) => true,
         Instr::Bin(BinOp::Add | BinOp::Sub | BinOp::MulLo, t, ..) | Instr::MadLo(t, ..) => arith(t),
         Instr::Bin(BinOp::MulWide, t, ..) => matches!(t, U32 | S32),
         Instr::Bin(BinOp::And | BinOp::Or | BinOp::Xor | BinOp::Shl, t, ..) | Instr::Not(t, ..) => {
@@ -1065,7 +1087,8 @@ fn types_ok(i: &Instr) -> Result<(), String> {
         },
         Instr::Cas(_, t, ..) => bits(t),
         // float forms: modifiers and types were checked by `float_instr`
-        Instr::FBin(..)
+        Instr::FBinDefault(..)
+        | Instr::FBin(..)
         | Instr::Ffma(..)
         | Instr::Fsqrt(..)
         | Instr::Frcp(..)
@@ -1143,6 +1166,16 @@ fn operands_ok(i: &Instr) -> Result<(), String> {
     let w = |t: &Ty| t.width().unwrap_or(32);
     match i {
         Instr::Por(..) => Ok(()),
+        Instr::Clz32(_, a) => {
+            nosreg(a)?;
+            src_at(a, Ty::B32)
+        }
+        Instr::MinS32(_, a, b) => {
+            nosreg(a)?;
+            nosreg(b)?;
+            src_at(a, Ty::S32)?;
+            src_at(b, Ty::S32)
+        }
         Instr::Bin(b, t, _, x, y) => {
             let (wx, wy) = match b {
                 BinOp::MulWide => (32, 32),
@@ -1224,7 +1257,8 @@ fn operands_ok(i: &Instr) -> Result<(), String> {
             off(a)
         }
         Instr::Bra(..) | Instr::Ret | Instr::Exit | Instr::Bar => Ok(()),
-        Instr::FBin(.., t, _, a, b)
+        Instr::FBinDefault(.., t, _, a, b)
+        | Instr::FBin(.., t, _, a, b)
         | Instr::Fminmax(.., t, _, a, b)
         | Instr::Fsetp(_, _, t, _, a, b) => {
             fsrc(a, *t)?;
@@ -1262,6 +1296,16 @@ fn typed_uses(i: &Instr) -> Vec<(&str, Ty)> {
     }
     let mut v: Vec<(&str, Ty)> = Vec::new();
     match i {
+        Instr::Clz32(d, a) => {
+            v.push((d.as_str(), Ty::U32));
+            o(a, Ty::B32, &mut v);
+        }
+        Instr::MinS32(d, a, b) => {
+            v.push((d.as_str(), Ty::S32));
+            o(a, Ty::S32, &mut v);
+            o(b, Ty::S32, &mut v);
+        }
+
         Instr::Por(..) => {}
         Instr::Bin(BinOp::MulWide, t, d, a, b) => {
             v.push((d.as_str(), Ty::U64));
@@ -1343,7 +1387,9 @@ fn typed_uses(i: &Instr) -> Vec<(&str, Ty)> {
                 addr(a, &mut v);
             }
         }
-        Instr::FBin(.., t, d, a, b) | Instr::Fminmax(.., t, d, a, b) => {
+        Instr::FBinDefault(.., t, d, a, b)
+        | Instr::FBin(.., t, d, a, b)
+        | Instr::Fminmax(.., t, d, a, b) => {
             v.push((d.as_str(), *t));
             o(a, *t, &mut v);
             o(b, *t, &mut v);
@@ -1495,7 +1541,10 @@ fn check(k: &Kernel, lines: &[usize], globals: &[GlobalDecl]) -> R<()> {
                 Operand::Sreg(_) => Err(e("special registers are 32-bit".into())),
                 Operand::Sym(n) if shared.contains(n.as_str()) => Ok(()),
                 Operand::Sym(n) if globals.iter().any(|g| g.name == *n) && w == 64 => Ok(()),
-                Operand::Sym(n) => Err(e(format!("{n} is not an addressable symbol at width {w}"))),
+                Operand::Sym(n) if globals.iter().any(|g| g.name == *n) => {
+                    Err(e(format!("{n} is not an addressable symbol at width {w}")))
+                }
+                Operand::Sym(n) => Err(e(format!("{n} is not a .shared variable"))),
                 Operand::FImm(_, fw) if *fw == w => Ok(()),
                 Operand::FImm(..) => Err(e("float literal of the wrong width".into())),
             }
@@ -1699,6 +1748,15 @@ fn check(k: &Kernel, lines: &[usize], globals: &[GlobalDecl]) -> R<()> {
                 src(b, w(*t))?;
                 addr(*sp, a)?;
             }
+            Instr::Clz32(d, a) => {
+                data(d, 32)?;
+                src(a, 32)?;
+            }
+            Instr::MinS32(d, a, b) => {
+                data(d, 32)?;
+                src(a, 32)?;
+                src(b, 32)?;
+            }
             Instr::Bar => {}
             Instr::Bra(_, l) => {
                 if !k.labels.iter().any(|(m, _)| m == l) {
@@ -1706,7 +1764,9 @@ fn check(k: &Kernel, lines: &[usize], globals: &[GlobalDecl]) -> R<()> {
                 }
             }
             Instr::Ret | Instr::Exit => {}
-            Instr::FBin(.., t, d, a, b) | Instr::Fminmax(.., t, d, a, b) => {
+            Instr::FBinDefault(.., t, d, a, b)
+            | Instr::FBin(.., t, d, a, b)
+            | Instr::Fminmax(.., t, d, a, b) => {
                 data(d, w(*t))?;
                 src(a, w(*t))?;
                 src(b, w(*t))?;

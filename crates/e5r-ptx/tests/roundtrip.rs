@@ -63,7 +63,7 @@ fn refused(body: &str, why: &str) {
 
 #[test]
 fn subset_edges_are_refused() {
-    refused("\tadd.f32 %r1, %r2, %r3;\n\tret;", "no rounding modifier");
+    refused("\tadd.f32 %r1, %r2, %r3;\n\tret;", "used at .f32");
     refused("\tadd.rn.f32 %r1, %r2, %r3;\n\tret;", "used at .f32");
     refused(
         "\tdiv.approx.f32 %r1, %r2, %r3;\n\tret;",
@@ -126,8 +126,8 @@ fn subset_edges_are_refused() {
     );
     refused("\tadd.u64 %r1, %r2, %r3;\n\tret;", "not a 64-bit register");
     refused(
-        "\tmov.u32 %r1, %laneid;\n\tret;",
-        "undeclared register %laneid",
+        "\tmov.u32 %r1, %lanemask_eq;\n\tret;",
+        "undeclared register %lanemask_eq",
     );
     refused(
         "\tmov.u64 %rd1, %tid.x;\n\tret;",

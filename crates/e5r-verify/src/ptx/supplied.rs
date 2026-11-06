@@ -120,7 +120,8 @@ pub fn check(
                 "sh",
                 "-c",
                 &format!(
-                    "cd \"$E5R_PROOF_DIR\" && LEAN_PATH=\"$LEAN_PATH:$E5R_PROOF_DIR\" lean -o {m}.olean {m}.lean"
+                    "cd \"$E5R_PROOF_DIR\" && LEAN_PATH=\"$LEAN_PATH:$E5R_PROOF_DIR\" lean -j1 -M{} -o {m}.olean {m}.lean",
+                    o.memory_mb
                 ),
             ],
             o.timeout,

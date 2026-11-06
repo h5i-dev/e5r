@@ -1,0 +1,55 @@
+{
+  "kind": "semantic regression only; no benchmark or FP4 whole-kernel proof",
+  "launches": 18,
+  "forms": 9,
+  "threads_per_form": [
+    64,
+    128
+  ],
+  "comparisons": [
+    "independent Python",
+    "Rust",
+    "actual Lean exec/tstep",
+    "GPU JIT",
+    "ptxas cubin"
+  ],
+  "canaries": "all 44 bytes outside each 4-byte output in each 48-byte record retained",
+  "ptx_sha256": "c5248d181dcd1ffee0b86c2666268685728ee146efc4b13e97a4b7482fb2107a",
+  "expected_sha256": "93831961f193f5329fcb41db7b87b9f351d9a574ccebbad513a78c6a50fc13ff",
+  "GPU_lock": "exclusive shared flock and empty foreign-PID check before GPU child launches",
+  "status": "pass",
+  "artifacts": {
+    "diff.ptx": {
+      "sha256": "c5248d181dcd1ffee0b86c2666268685728ee146efc4b13e97a4b7482fb2107a",
+      "bytes": 8466
+    },
+    "cases.txt": {
+      "sha256": "1ae0e0f6b711e24d88ae09bca5043aa962943d1ea0f04142360ab6499d9b6410",
+      "bytes": 83609
+    },
+    "expected.txt": {
+      "sha256": "93831961f193f5329fcb41db7b87b9f351d9a574ccebbad513a78c6a50fc13ff",
+      "bytes": 166238
+    },
+    "diff.cubin": {
+      "sha256": "7c5b3ac925195d998146e805acdcb05fa07971c6243fa59137071c3587d088de",
+      "bytes": 16168
+    },
+    "rust.txt": {
+      "sha256": "93831961f193f5329fcb41db7b87b9f351d9a574ccebbad513a78c6a50fc13ff",
+      "bytes": 166238
+    },
+    "lean.txt": {
+      "sha256": "93831961f193f5329fcb41db7b87b9f351d9a574ccebbad513a78c6a50fc13ff",
+      "bytes": 166238
+    },
+    "gpu-jit.txt": {
+      "sha256": "93831961f193f5329fcb41db7b87b9f351d9a574ccebbad513a78c6a50fc13ff",
+      "bytes": 166238
+    },
+    "gpu-cubin.txt": {
+      "sha256": "93831961f193f5329fcb41db7b87b9f351d9a574ccebbad513a78c6a50fc13ff",
+      "bytes": 166238
+    }
+  }
+}

@@ -1,0 +1,292 @@
+[
+  {
+    "module": "Ptx.Semantics.FloatCore",
+    "source_sha256": "84a6a18cb1729410de9efdc5b3f2280a2b101585e60612dda9aad72eda264f0d",
+    "olean_sha256": "32e2d7376320378327ef6ae519c005df6f7b88bd0aea7577c10a129af4e107bd"
+  },
+  {
+    "module": "Ptx.Semantics.Float",
+    "source_sha256": "e4cc3e4cfe06d23b4a78a6f730f65210bff20cfb2076ee4d05882a0fd2181b8a",
+    "olean_sha256": "7e488310d764fde26baeb6dc5eaeb08d018fc10f23b5239800099b1cad01e6b2"
+  },
+  {
+    "module": "Ptx.Syntax",
+    "source_sha256": "6f4278255aa7af6b04151aca14d0a5d3128b302c1e2e9fabe6852a9c7954c3a5",
+    "olean_sha256": "c818192a43304514378e022a8056e90219ef6ecc1c93f25de2b049c963e82a0c"
+  },
+  {
+    "module": "Ptx.Semantics.Memory",
+    "source_sha256": "25127430a150bd013b396ccfee69cb3dc7e35495ff5a7986be55fac27f69f59b",
+    "olean_sha256": "b55ca482287327a1c89d9a643381a32fbdefa5e9211e79216f7cb67f7c7fb8b6"
+  },
+  {
+    "module": "Ptx.Semantics.Instruction",
+    "source_sha256": "8529a873d03fa76a7e2cc2a1b56de0ad0405a6f28f177faaabccf36693b983da",
+    "olean_sha256": "4bc8cd43149ee3676d8af6a7e051a2598b8d854d1cda6cc77350a45fd003bde0"
+  },
+  {
+    "module": "Ptx.Semantics.SIMT",
+    "source_sha256": "2a37f6bacaeb0d9acea9ef1da1558090ea8f3b1dbb013ecabb63e0e31e8d9199",
+    "olean_sha256": "6515644f082bc2d2e601a9761d026490b27bd86830674116612d5e3255621a7c"
+  },
+  {
+    "module": "Ptx.Semantics.Globals",
+    "source_sha256": "dd9d98433f57b799e3eda39113cd13cb4ea006bfdf3687407d5d488593b733fb",
+    "olean_sha256": "6d92a06baafe64625206340870af795e131ea999141aad1b9946f2332ecaa649"
+  },
+  {
+    "module": "Ptx.Logic.Hoare",
+    "source_sha256": "e3386fcc766bfb44ba9324b99349b41f1d257e7e80fe9a97f00f859987bc9c4b",
+    "olean_sha256": "75b2a564bb30f7c8f93ecc6f9f818b5be51c3fe5b9acce88c4d1dadf75fbc5f5"
+  },
+  {
+    "module": "Ptx.Logic.RaceFreedom",
+    "source_sha256": "ba39e83ca806fbe31e63586f68ae93376ada543ee489ccda44951c62b5c64dab",
+    "olean_sha256": "b9fa97cd2433400c49058899a2be0598c0ef967972cb5133a6d6620080d2e1cc"
+  },
+  {
+    "module": "Ptx.Logic.Regions",
+    "source_sha256": "3bec9649b260b5669a1d7e2b0c43b024794318165ac8b382fe62013f26b65f45",
+    "olean_sha256": "a098ee16f3ffad9b32832859dda4aafb7494c579fff2b7ff49901c003e614f7e"
+  },
+  {
+    "module": "Ptx.Tactics.Attr",
+    "source_sha256": "8bfcae4c0ceed173be83ab727a65391ef543de2b51987abbae6b995f4a4b1afa",
+    "olean_sha256": "11f57fee823ef1b2dddfea8b676aa9fdd4ba1ff52cb159de76ba48012d8abbc6"
+  },
+  {
+    "module": "Ptx.Tactics.Eval",
+    "source_sha256": "420ed1b210726d44b2b10d04356129f34d168b234c833ae4998b80cee30c9f35",
+    "olean_sha256": "c428cb8e4a42fc01291ecec643079ddd2e13d369ab9213f303a611599c613ed4"
+  },
+  {
+    "module": "Ptx.Logic.Launch1D",
+    "source_sha256": "328572b98461490e279e547e64b5b623aef49334f9f77cdab819ac4673a4c60e",
+    "olean_sha256": "72c77479de3f27b9a9f7c5bc6efebe9e08781b723969dd1e8ec2e6c667bffbeb"
+  },
+  {
+    "module": "Ptx.Kernels.VAddNvcc",
+    "source_sha256": "8ec2bd37ce874af215b1d01b24ab541086ccf172c600bf21469090540e6e6ec6",
+    "olean_sha256": "ef29a448421098d56b1ff7b0ea62adddcc18e0f8a3d3c8da19b3e1a0fae78e52"
+  },
+  {
+    "module": "Ptx.Examples.VectorAdd",
+    "source_sha256": "3ed64857fa59eaf9de46570f481e1d501d52f9cbf8960a644f543fc31edc8480",
+    "olean_sha256": "e1a3899c91282e56fe019901115de022b5532e6274a7c7237689fca712f32f3d"
+  },
+  {
+    "module": "Ptx.Kernels.Sum",
+    "source_sha256": "048ce640c616c359642f41414d68558c48f81dce196dc35b396cccf991593a24",
+    "olean_sha256": "b4f9b5962768d70a36691ba3b3022d2518373ec6219ab1af29b128d6d66ddcd3"
+  },
+  {
+    "module": "Ptx.Examples.Sum",
+    "source_sha256": "063e3461b054f74d4d055b932110a441026188da2375ea2565fff6fa6f7367c6",
+    "olean_sha256": "6c9e374ff8854a75518ffbca915fa889ab94592c542ce859df01f98d85082e25"
+  },
+  {
+    "module": "Ptx.Kernels.Saxpy",
+    "source_sha256": "68bb288d0002c0890af887f88eb6eefc718b4bb2ddc089a2761375c4823699f1",
+    "olean_sha256": "1ee3ab51a95421cae10d988c982d596b9e1949d14b181a41c57e492357737420"
+  },
+  {
+    "module": "Ptx.Examples.Map",
+    "source_sha256": "d3d495fefaf00be03b4aba994b911aac496281722598f33cacd5d4e5d4ece8d5",
+    "olean_sha256": "49ab95fdf32afc85b75b0ed0ae639032da5140a02743b8d787c359fa517d8473"
+  },
+  {
+    "module": "Ptx.Logic.Refute",
+    "source_sha256": "fd2f483e59cc16df180222e124d17f1d47d17c055796f5466a38001bee2e9c28",
+    "olean_sha256": "54e9bb39d5ebf221f3b090bb9313589e0955c15099a5b4c105a116e325e3e894"
+  },
+  {
+    "module": "Ptx.Kernels.VAddNoBound",
+    "source_sha256": "4d13d24d631dc0222aafe79154368c698d2f2790159ac5b954cae61667942d62",
+    "olean_sha256": "f11c05cc958c625bb2aa7dc7fedaf8c90319678a0d96e449cbb66c1005512e47"
+  },
+  {
+    "module": "Ptx.Kernels.VAddTid",
+    "source_sha256": "6bb33f35596b970b8ab2cb7764c3a21bfc8488640e96cc142efa2dd2fe662542",
+    "olean_sha256": "e1ad39877f75f6907626af6b11ba46e7aee4e2a1d2585b2828dca265836c8da8"
+  },
+  {
+    "module": "Ptx.Kernels.VAddSub",
+    "source_sha256": "54d3b3f53e15d153dddc03f4351cd7fa6c6c88e004815ce694bc682faeda5a3c",
+    "olean_sha256": "81b06b6355071769af9687949d6913c03f802404bf10d1b6def11cb6df071064"
+  },
+  {
+    "module": "Ptx.Examples.Buggy",
+    "source_sha256": "a69a2080cf40c09190359f83c8aa12f319fda79f2ff18eb29d731c9ecd24c444",
+    "olean_sha256": "c8c8189c2d3964f8b92a4fb4b3fc9f778162bb01749315fd1bcd357de453fdd2"
+  },
+  {
+    "module": "Ptx.Auto.Map",
+    "source_sha256": "972667aace8cba1777742565c06688e90f27d1956a1ccb665b85f1ccf1263ed9",
+    "olean_sha256": "0842a4a814949b6ee41914087c510ee815db1f3ada6dcf911381a3a088f8a809"
+  },
+  {
+    "module": "Ptx.Auto.Tactic",
+    "source_sha256": "18e3c459c6052ccaf704e3579d925410ead46fd7497890ba7aea32e5ca0ee51e",
+    "olean_sha256": "c25fa4928486d59525a4de12217e5c097998f0905e0d1ad10070c70822cdbc5d"
+  },
+  {
+    "module": "Ptx.Logic.Phases",
+    "source_sha256": "8ff1ad415b0bbb57e3075de28743da6289068b20b853039d3c5d4a1cce97ddf2",
+    "olean_sha256": "8c00b3b85df2e50cb5fa83aa294a0ffa1946094646e9f61966b1369f9c579659"
+  },
+  {
+    "module": "Ptx.Logic.Narrow",
+    "source_sha256": "ac0dc5a2ce8b8189d89e4ca3f83d6c1456b79e2dc60dec38a2c02e85c295aa9c",
+    "olean_sha256": "37dd1d322075e82801af6ce134c085e32137bc811256a297337366105f7f3138"
+  },
+  {
+    "module": "Ptx.Logic.FP4Forms",
+    "source_sha256": "917629e0f11a80dd8de4621019d62f04464a32287630c5c8997d75cbc9d6f1bb",
+    "olean_sha256": "0a6d6aef74045103d8fed3f96d6b29046617cac26b51853d019c3efe1e6bc309"
+  },
+  {
+    "module": "Ptx.Logic.CellAlgs",
+    "source_sha256": "1040ef2460ace01f2b26fc627e4c3d86ff1983585a0c2fe55f60be622715d087",
+    "olean_sha256": "b9575830f5b9088bc264c8f7904b412859dda0de761802ba65085be21232c720"
+  },
+  {
+    "module": "Ptx.Logic.PhaseSound",
+    "source_sha256": "7e146b6deb0a2260a5328a14b3a0d46688e237a0029d3fa0417359f178e165d4",
+    "olean_sha256": "cb8ee21e5736dc81aefcf08285c2ff3c898515d8147dec81a6d31db258dcb614"
+  },
+  {
+    "module": "Ptx.Logic.PhaseWp",
+    "source_sha256": "1eebec0dfc564c38fa8150e67afa680c74eda4ef5b7f6fc0f74a60dd57c4cfd2",
+    "olean_sha256": "841ea76b5c9a9c05d04c72bf08a6aaa128fd281bf26344af73c1fc37c9351cf8"
+  },
+  {
+    "module": "Ptx.Logic.Cells",
+    "source_sha256": "3141605151ea490cdce0a9e4c085e5d319dfab11b2d197831f25bb23543e5a7d",
+    "olean_sha256": "f6847cc1690c1cf6ddfafe66ab6367b21702e4fba782acf2045ab916e17f2d4a"
+  },
+  {
+    "module": "Ptx.Tactics.EvalR",
+    "source_sha256": "172a0b146738f107b9fd0638c761dc4f880777b2e3b30140561e9b1831d82da2",
+    "olean_sha256": "b86775b1e50024a621b65f9d2fdeb4ab68f40827f2fac3abbafcee19d1b330e1"
+  },
+  {
+    "module": "Ptx.Auto.Tactic4",
+    "source_sha256": "dca2d133aa12bdfd411c19060ff7a45462ae8279157cd1b37c7e6d930f2bb461",
+    "olean_sha256": "26a4473b78fd946f996fa35ffb21157a036709cc2c54b3237b0a0ba4e0eec9fc"
+  },
+  {
+    "module": "Ptx.Kernels.ReduceNvcc",
+    "source_sha256": "a7975e27e598bcb49c592f4d4472fc3fb99352175ed95cab7246919aa83a7a8d",
+    "olean_sha256": "e24c3cac5ac385a452816aa696bcbcbde336d31e89b4f3cca86726e22fb6b650"
+  },
+  {
+    "module": "Ptx.Examples.Reduce",
+    "source_sha256": "7423f9ac20e9fa4f0bec7bd1db16beab884a125eb65270bd35719d201f5c32a7",
+    "olean_sha256": "6ce6feb9597574567c08ee5b81a93062179de05cf34694dedb9618e74e23f076"
+  },
+  {
+    "module": "Ptx.Kernels.ScanNvcc",
+    "source_sha256": "37d3c247064281b14a55c1e8322eaa66dfeb0815091ff1a9936bc21763e1bb7b",
+    "olean_sha256": "aac8eaaf23781288322775677b64f39183289461843bf4e3b4467d3b7fcafc05"
+  },
+  {
+    "module": "Ptx.Examples.Scan",
+    "source_sha256": "b72aeb295d682b9fc91b17730e8ee8ff2be342a82b8a57b1192483695de51967",
+    "olean_sha256": "322c1ae89ba8f830660806c35299cd5a77eec936745674d7f2d2dddff8700b1e"
+  },
+  {
+    "module": "Ptx.Logic.Sums",
+    "source_sha256": "b83b5d1ff96b7933ced23459663fd37be0f510903333e254a09a73e2664edb56",
+    "olean_sha256": "5f73946a5b4aba2cbbc919ccf9083f15526a84a3c80abec4901fd14da31f9c97"
+  },
+  {
+    "module": "Ptx.Kernels.ReduceAtomicNvcc",
+    "source_sha256": "90a7c4424ca66fe4ae4a45e7d81498256151756ea62b0213aa1fe2d545a4009c",
+    "olean_sha256": "3f37f52cb1ea1b27f48d3e973c988b623d93f1c5144bcaaa72cf316a6a7ebf7a"
+  },
+  {
+    "module": "Ptx.Examples.ReduceAtomic",
+    "source_sha256": "9bc108025b9d07ce1965d9ff1ed11aab55310985fc703d92bc861dbe72e9c6a2",
+    "olean_sha256": "648fd0a139ff338347c9907ee8ff759afd1ab3a46e47d45cb87a54239908901b"
+  },
+  {
+    "module": "Ptx.Auto.Block",
+    "source_sha256": "1f246197708c689f8cc667d83c36c13c2c17164b1203fce599b8a670ff9a19d7",
+    "olean_sha256": "b4f647968ae37b229efaf536558693da40fcb53287e0ad6d0b2b0942a7019e97"
+  },
+  {
+    "module": "Ptx.Auto.Reduce32",
+    "source_sha256": "86960a395c9cd73a40a3453474376e984fc5c533366dcd561d3c69dfa046bf01",
+    "olean_sha256": "6b729bb0a35a3345b0e409bfe5fd41f718ddc2f45febc69689a8de3464a9a864"
+  },
+  {
+    "module": "Ptx.Auto.Scan32",
+    "source_sha256": "7d5eb1c15e82ba532784f74b3e3f11efb1832ebdf6a42b36aa2fdc56ea72992a",
+    "olean_sha256": "aa0b252d980f26ae19bdba505ea6fbe0e9193b7944994e657ca0dde71b0c898e"
+  },
+  {
+    "module": "Ptx.Auto.Accum",
+    "source_sha256": "84caf32ef9eb4ebe596ff5ad83f4001d37615419d9141127186ab5e699734607",
+    "olean_sha256": "c1feddef10ef88c06438bcc7d9b4ecc2ae5474302397a03aebf3b79c1efddfb0"
+  },
+  {
+    "module": "Ptx.Auto.FloatMap",
+    "source_sha256": "f0b3aa29d5c8f22388ad574f47ef3775e88ef13d1010713ae81e28014d72be70",
+    "olean_sha256": "b6bb74a8569b2d895ac886d186f408c3dd12137201ce42e7c979e180d17e2e12"
+  },
+  {
+    "module": "Ptx.Logic.Schedule",
+    "source_sha256": "9561b709b68d7126c02ba2db6070d6ca29c1cd6116adde0def08ddb73e2626d4",
+    "olean_sha256": "c9a6eb9b40df987c7a3d046b91258c604ad52622e036331f8c5d41e55b914738"
+  },
+  {
+    "module": "Ptx.Auto.Packing",
+    "source_sha256": "93813c393ea46d90bc72d53aba2d79bf9df87e9bdbc5638034e11d9f3e7fc4a2",
+    "olean_sha256": "0ac2820a73bcfb2512f32c5e0edac8f02c929ee94817b1cc4d5181db1898440e"
+  },
+  {
+    "module": "Ptx.Logic.Relational",
+    "source_sha256": "c764789e33f025a76607a071fe381ead842727bdfb8ebf7b05e38b4486157e14",
+    "olean_sha256": "a752b335387de9a081439d410382848dd893b51f3a7c9c2f22304b76cfa0a986"
+  },
+  {
+    "module": "Ptx.Auto.Equivalence",
+    "source_sha256": "ad4e1dee89be2fba8fd6f0f21de25cf4752aab283f67a9aa9b042d1466999ed7",
+    "olean_sha256": "fb2735b11d8958e3df0e938292a52101946e74731bc6e4daaeb94e7347bb48a3"
+  },
+  {
+    "module": "Ptx.Auto.Stencil",
+    "source_sha256": "78383241250d112b45095c9a14cce7b0b7f10868bb80f99b2e591d5739fac03f",
+    "olean_sha256": "da1c653204f3a6934731a0f708d392aaa75969dae60f0aa449b4759cc969b43e"
+  },
+  {
+    "module": "Ptx.Auto.StencilPair",
+    "source_sha256": "114667a7b0b4c46656dd44d7eef2161612946eaa088d46ddc87d4c2eaceb0379",
+    "olean_sha256": "b6fedbf920468dce58ed192e5e3bc89edb284b94e84a3d6198adc1628c899c25"
+  },
+  {
+    "module": "Ptx.Auto.OssInc",
+    "source_sha256": "bda658038ea217e7dfe97e4515ad77e97b9c4b1b8ef742991a587e317d0a943e",
+    "olean_sha256": "344fd583e0af7ca5d0146168b3abde06c35f6fdbd73b4e576a6e653e8eaef544"
+  },
+  {
+    "module": "Ptx",
+    "source_sha256": "893d3b1d5b1190519e501a7ba656b45395c9e11dab9775c2ced8d8f6d85be45c",
+    "olean_sha256": "c56a7e0a959ac04025a89c6dfaa30b110c0d0de122fe162a9195782ec62ae151"
+  },
+  {
+    "module": "Ptx.Logic.RelationalPhases",
+    "source_sha256": "8205d2c91ddeeb1b778cd20ab1ed8de620d6fbcd8f068f617044bd31258b0aca",
+    "olean_sha256": "8b2d2c36e9d35ec8d5e32c52f2b1733113f461fc4846265ede3667235d9e4ea4"
+  },
+  {
+    "module": "Ptx.Examples.RelationalPhases",
+    "source_sha256": "132ffc931483ad2c1df80764bdb581f8a78f5eaa98220f7f9891b9beca0757bd",
+    "olean_sha256": "6f991d56550d9456e5a49c1f5889cc381aadab7a568b378ab3c85eae99ed3532"
+  },
+  {
+    "module": "Checker.ProofCheck",
+    "source_sha256": "6c1833809a28e852075ab371611b7096b81e66634a754aa8d625657d3ddb1aca",
+    "olean_sha256": "09c1f2be6eb28803b1b1e4519887cbf7c8c450665091dadcb06c7bca6c7fb57b"
+  }
+]

@@ -15,6 +15,7 @@ fn dim(d: Dim) -> &'static str {
 /// `%tid.x` etc.
 pub fn sreg(s: Sreg) -> String {
     let (b, d) = match s {
+        Sreg::Laneid => return "%laneid".into(),
         Sreg::Tid(d) => ("%tid", d),
         Sreg::Ntid(d) => ("%ntid", d),
         Sreg::Ctaid(d) => ("%ctaid", d),
@@ -65,6 +66,17 @@ fn address(a: &Address) -> String {
 pub fn instr(i: &Instr) -> String {
     let o = operand;
     match i {
+        Instr::Clz32(d, a) => format!("clz.b32 \t{d}, {}", o(a)),
+        Instr::MinS32(d, a, b) => format!("min.s32 \t{d}, {}, {}", o(a), o(b)),
+        Instr::FBinDefault(op, ftz, sat, t, d, a, b) => format!(
+            "{}{}.{} \t{d}, {}, {}",
+            op.name(),
+            mods(*ftz, *sat),
+            t.name(),
+            o(a),
+            o(b)
+        ),
+
         Instr::Por(d, a, b) => format!("or.pred \t{d}, {a}, {b}"),
         Instr::Bin(b, t, d, x, y) => {
             format!("{}.{} \t{d}, {}, {}", b.opcode(), t.name(), o(x), o(y))
@@ -232,6 +244,17 @@ pub fn module(m: &Module) -> String {
                         }
                         None => writeln!(s, "\t.reg .{} \t{};", r.ty.name(), r.name).unwrap(),
                     }
+                }
+                Decl::RegGroup(start, len) => {
+                    let regs = &k.regs[start..start + len];
+                    let names: Vec<_> = regs
+                        .iter()
+                        .map(|r| {
+                            r.count
+                                .map_or_else(|| r.name.clone(), |n| format!("{}<{n}>", r.name))
+                        })
+                        .collect();
+                    writeln!(s, "\t.reg .{} \t{};", regs[0].ty.name(), names.join(", ")).unwrap();
                 }
                 Decl::Shared(i) => writeln!(s, "\t{}", shared_decl(&k.shared[i])).unwrap(),
             }

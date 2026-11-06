@@ -96,9 +96,12 @@ impl Ty {
         matches!(self, Ty::F32 | Ty::F64)
     }
 
-    /// Integer types admitted for floating-point conversions (32/64 bits).
+    /// Integer types admitted for floating-point conversions (16/32/64 bits).
     pub fn is_int(self) -> bool {
-        matches!(self, Ty::U32 | Ty::S32 | Ty::U64 | Ty::S64)
+        matches!(
+            self,
+            Ty::U16 | Ty::S16 | Ty::U32 | Ty::S32 | Ty::U64 | Ty::S64
+        )
     }
 
     /// The floating-point format of `.f32`/`.f64`.
@@ -125,6 +128,8 @@ pub enum Dim {
 /// The special registers of the subset.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Sreg {
+    /// `%laneid`, linear thread index modulo the NVIDIA warp size 32.
+    Laneid,
     /// `%tid`
     Tid(Dim),
     /// `%ntid`
@@ -389,6 +394,13 @@ pub enum CvtRnd {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub enum Instr {
+    /// `clz.b32 d, a`, a 32-bit count including clz(0)=32.
+    Clz32(String, Operand),
+    /// `min.s32 d, a, b`, a signed comparison of low 32 bits.
+    MinS32(String, Operand, Operand),
+    /// Default-RN add/sub/mul, preserving the absent modifier and its compiler
+    /// contraction permission separately from explicitly rounded instructions.
+    FBinDefault(FBin, bool, bool, Ty, String, Operand, Operand),
     /// `or.pred d, a, b`: logical OR of predicate registers.
     Por(String, String, String),
     Bin(BinOp, Ty, String, Operand, Operand),
@@ -507,6 +519,8 @@ impl SharedDecl {
 pub enum Decl {
     /// Index into [`Kernel::regs`].
     Reg(usize),
+    /// Contiguous same-type declarations written in one comma-separated .reg.
+    RegGroup(usize, usize),
     /// Index into [`Kernel::shared`].
     Shared(usize),
 }

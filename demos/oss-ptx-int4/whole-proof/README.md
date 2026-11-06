@@ -72,8 +72,7 @@ also an additional restriction, not a fact about finite user input.
 
 Remaining hard obligations include actual `bar.warp.sync -1` semantics (two
 warp barriers with 64 threads/CTA), volatile shared publication, cache-qualified
-scale reads and their immutability condition, `%laneid`, `clz.b32`, `min.s32`,
-grouped register declarations, default FP rounding, narrow FP conversions,
+scale reads and their immutability condition,
 whole-thread/phase relations, safety/races/progress/termination/frame, exact
 checker statement binding and a rebound whole-kernel semantic negative.
 The old relational theorem requires empty shared declarations and cannot be
@@ -118,3 +117,37 @@ not a modified checker. A Lake target build stalled on a generated 68-line
 kernel and was terminated after its 600-second cap; that log is retained.
 Direct source compilation succeeded and the subsequent official checker build
 and regressions completed. No GPU measurements were repeated in this phase.
+
+## Instruction milestone
+
+Grouped register declarations, `clz.b32`, `min.s32`, `%laneid`, explicit
+16-bit integer/f32/f64 conversions and absent-modifier add/sub/mul are now
+implemented in parser, printer, exporter and Rust/Lean execution. The missing
+rounding modifier is retained as `fbinDefault`; its per-instruction semantics
+is RN, while its compiler contraction permission remains distinct from an
+explicit `.rn`. See NVIDIA [PTX ISA 9.2 Table 29](https://docs.nvidia.com/cuda/archive/13.2.2/parallel-thread-execution/index.html#floating-point-instructions).
+This is not a theorem about ptxas contraction or final SASS.
+
+`Ptx.Logic.FP4Forms` proves the default-RN execution identity, arbitrary-PC
+NaN-oracle independence for narrow integer conversions, the exact clz-derived
+shift for all eight public block sizes, and one-dimensional lane numbering.
+The actual original and edited entry hashes are still unchanged; both now
+reach `ld.global.nc.f32` as the first unsupported operation. Warp, noncoherent
+read and volatile-shared support remain separate obligations.
+
+`semantic_regression.py` checks nine forms, each with 64 or 128 threads and
+1D/3D geometry: 18 launches, 1,728 thread records. Independent Python results,
+Rust, the actual Lean exec/tstep definitions, GPU JIT and ptxas cubin match
+all bytes. Each 48-byte output record keeps 44 canary bytes. GPU execution
+holds the shared flock and checks foreign compute PIDs. This is an ISA
+regression fixture, not an optimization baseline, benchmark, FP4 execution
+proof or a rerun of the published FP4 measurements.
+
+The complete Rust PTX suite, strict release clippy, all 14 CLI regressions,
+and the official simpleMultiCopy / ZeroSegments supplied-proof checks pass.
+All 58 imported model/checker modules compile serially. Explicit `-j1` now
+controls both package builds and supplied-proof compilation; the latter also
+passes the requested heap cap. These are resource controls only; expected
+theorem, kernel replay, import and axiom policies are unchanged. The old
+warm-up finished before an attempted stop; no process was killed. Bounded
+replays were then run and retained separately.

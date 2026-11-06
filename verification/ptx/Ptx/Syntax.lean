@@ -41,6 +41,7 @@ inductive Dim where
 
 /-- Special registers of the subset: `%tid`, `%ntid`, `%ctaid`, `%nctaid`. -/
 inductive Sreg where
+  | laneid
   | tid (d : Dim) | ntid (d : Dim) | ctaid (d : Dim) | nctaid (d : Dim)
   deriving Repr, DecidableEq, Inhabited
 
@@ -87,6 +88,11 @@ inductive CvtRnd where
   deriving Repr, DecidableEq, Inhabited
 
 inductive Instr where
+  | clz32 (d : String) (a : Operand)
+  | minS32 (d : String) (a b : Operand)
+  /-- Default RN instruction semantics; original absent modifier and compiler
+  contraction permission are retained separately from explicit rounding. -/
+  | fbinDefault (op : FBin) (ftz sat : Bool) (t : Ty) (d : String) (a b : Operand)
   /-- `or.pred d, a, b`: Boolean OR of predicate registers. -/
   | por (d a b : String)
   | add (t : Ty) (d : String) (a b : Operand)

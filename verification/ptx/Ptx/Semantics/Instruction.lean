@@ -61,6 +61,7 @@ structure Ctx where
   nan : TState → Val := fun _ => 0
 
 def Ctx.sreg (c : Ctx) : Sreg → BitVec 32
+  | .laneid => (c.tid.x + c.ntid.x * (c.tid.y + c.ntid.y * c.tid.z)) &&& 31
   | .tid d => c.tid.get d
   | .ntid d => c.ntid.get d
   | .ctaid d => c.ctaid.get d
@@ -395,6 +396,21 @@ def exec (K : Kernel) (c : Ctx) (s : TState) : Instr → Action
   | .bar => .bar
   | .bra _ l => jump K s l
   | .ret | .exit => .done
+  | .clz32 d a => .next (s.set d (ext32 (lo32 (opVal c s a)).clz))
+  | .minS32 d a b =>
+    let x := lo32 (opVal c s a)
+    let y := lo32 (opVal c s b)
+    .next (s.set d (ext32 (if x.slt y then x else y)))
+  | .fbinDefault op ftz sat t d a b =>
+    let F := t.fmt
+    let x := fbits t (opVal c s a)
+    let y := fbits t (opVal c s b)
+    let r := match op with
+      | .add => Fp.fadd F .rn ftz sat x y
+      | .sub => Fp.fsub F .rn ftz sat x y
+      | .mul => Fp.fmul F .rn ftz sat x y
+      | .div => Fp.fdiv F .rn ftz x y
+    .next (s.set d (fres c s t r))
   | .fbin op m ftz sat t d a b =>
     let F := t.fmt
     let x := fbits t (opVal c s a)

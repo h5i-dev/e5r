@@ -25,7 +25,10 @@ new optimization or a new speed claim. No whole-kernel proof is accepted yet.
 - [ ] Remaining FP32 forms: `%laneid`, `clz.b32`, `min.s32`, multiple register
   declarations in one `.reg` (edited entry), `ld.global.nc.f32`, volatile
   shared ld/st, `bar.warp.sync -1`, `cvt.rn.f32.u16`, implicit-rounding sub/mul.
-  Inventory must be checked against real parser errors, not source rewriting.
+  Grouped registers, laneid, clz, min, explicit 16-bit FP conversions and
+  default-RN instructions are now implemented and differentially tested.
+  Both exact entries reach nc loads next. Volatile and warp semantics remain.
+  Inventory is checked against real parser errors, not source rewriting.
 - [ ] Implicit rounding/FTZ: preserve original syntax and distinguish default RN
   instruction semantics from explicitly rounded instructions and compiler
   contraction permissions. Reuse exact finite-table and signed-zero lemmas.
