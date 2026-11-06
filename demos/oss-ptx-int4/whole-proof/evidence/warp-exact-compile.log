@@ -1,0 +1,31 @@
+{
+  "scope": "exact entry AST and initialized-table bridge, not whole-kernel acceptance",
+  "rows": [
+    {
+      "variant": "original",
+      "namespace": "FP4Original",
+      "entry_sha256": "ea210ee92fb2c104abbc9256b5ac3b11c18a643c7e96b4624821e86d29a8ee29",
+      "export_sha256": "1c265406a2b10b51f7c597b0585052724327828f2c422156d5ed883e5d9e09cc",
+      "status": "whole entry AST compiled, not equivalence accepted"
+    },
+    {
+      "variant": "edited",
+      "namespace": "FP4Edited",
+      "entry_sha256": "bea226c117624d7c2f33b0a2b0ae6becbface97717fe71cdd4d5175fd87e75ef",
+      "export_sha256": "3dc24cd0d77da5d923cf77d51e8467e2d34d382ce9209ad154617bb9826771e6",
+      "status": "whole entry AST compiled, not equivalence accepted"
+    }
+  ]
+}
+'FP4Whole.exact_table_access' depends on axioms: [propext, Classical.choice, Quot.sound]
+'FP4Whole.original_first_table_step' depends on axioms: [propext, Classical.choice, Quot.sound]
+'FP4Whole.edited_first_table_step' depends on axioms: [propext, Classical.choice, Quot.sound]
+'FP4Whole.exact_globals_identical' does not depend on any axioms
+'FP4Whole.exact_initialized_load' depends on axioms: [propext, Quot.sound]
+'FP4Whole.exact_reachable_load' depends on axioms: [propext, Classical.choice, Quot.sound]
+'FP4Whole.actual_table_sign' depends on axioms: [propext, Classical.choice, Quot.sound]
+'FP4Sign.finite_mul_some' depends on axioms: [propext, Classical.choice, Quot.sound]
+'FP4Sign.scale_oracle_independent' depends on axioms: [propext, Classical.choice, Quot.sound]
+'FP4Whole.FP32.eager_scale_bound' depends on axioms: [propext, Quot.sound]
+'WarpSharedRegression.actual_shared_execution' depends on axioms: [propext, Classical.choice, Quot.sound]
+

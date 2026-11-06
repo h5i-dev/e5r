@@ -393,6 +393,17 @@ def exec (K : Kernel) (c : Ctx) (s : TState) : Instr → Action
     atomic c s sp t a (fun old => if fit t old = fit t (opVal c s b) then opVal c s e else old)
       (fun old => s.set d (fit t old))
   | .red sp op t a b => atomic c s sp t a (fun old => atomVal op t old (opVal c s b)) (fun _ => s.skip)
+  -- Warp and NC instructions require Ptx.Warp's launch-wide obligations.
+  | .warpBar | .ldGlobalNCF32 .. => .fault
+  -- Volatile accesses remain individual memory actions in this SC model.
+  | .ldVolatileShared32 d a =>
+    match dataAddr c s .shared a with
+    | some (.shared, x) => .load .shared x .b4 (fun v => s.set d v)
+    | _ => .fault
+  | .stVolatileShared32 a v =>
+    match dataAddr c s .shared a with
+    | some (.shared, x) => .store .shared x .b4 (opVal c s v) s.skip
+    | _ => .fault
   | .bar => .bar
   | .bra _ l => jump K s l
   | .ret | .exit => .done

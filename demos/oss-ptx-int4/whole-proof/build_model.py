@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Compile actual model/checker modules serially with Lean heap/CPU/wall caps.
-Updates OLean imports, never model source or checker policy. Native proofcheck
+Updates OLean imports, never model source or checker policy.
+Run sequentially with Rust aggregate tests and official checks: those invoke
+Lake and share this worktree cache. Native proofcheck
 imports only Lean and must already be built using the pinned toolchain.
 """
 import os,re,subprocess,sys,signal,resource,hashlib,json
@@ -18,7 +20,7 @@ def visit(name):
  for line in re.findall(r'^import\s+([^\n]+)',p.read_text(),re.M):
   for dep in line.split():visit(dep)
  order.append(name)
-for name in ['Ptx','Ptx.Logic.RelationalPhases','Ptx.Examples.RelationalPhases','Checker.ProofCheck']:visit(name)
+for name in ['Ptx','Ptx.Logic.RelationalPhases','Ptx.Examples.RelationalPhases','Ptx.Examples.Warp','Checker.ProofCheck']:visit(name)
 env=dict(os.environ,LEAN_NUM_THREADS='1',LEAN_PATH=str(OUT))
 record=[]
 def limits():resource.setrlimit(resource.RLIMIT_CPU,(480,490))

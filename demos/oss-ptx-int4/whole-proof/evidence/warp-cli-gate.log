@@ -1,0 +1,9 @@
+   Compiling e5r-verify v0.1.0 (/root/e5r-oss-ptx/crates/e5r-verify)
+    Finished `release` profile [optimized] target(s) in 10.29s
+     Running tests/ptx_cli.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/ptx_cli-3f31ecdb7ef909a0)
+
+running 1 test
+test warp_and_nc_forms_cannot_enter_legacy_proof_or_run_domains ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.02s
+

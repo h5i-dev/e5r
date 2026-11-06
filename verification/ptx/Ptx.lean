@@ -3,6 +3,8 @@ import Ptx.Semantics.Memory
 import Ptx.Semantics.Instruction
 import Ptx.Semantics.SIMT
 import Ptx.Semantics.Globals
+import Ptx.Semantics.Warp
+import Ptx.Logic.WarpSchedule
 import Ptx.Logic.Hoare
 import Ptx.Logic.RaceFreedom
 import Ptx.Logic.Regions

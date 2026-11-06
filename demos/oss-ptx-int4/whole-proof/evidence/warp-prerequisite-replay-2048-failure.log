@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/root/e5r-oss-ptx/demos/oss-ptx-int4/whole-proof/compile_entries.py", line 31, in <module>
+    replay=run([LEAN,'-j1','-M2048','--run',HERE/'ReplayPrerequisites.lean','Ptx.Semantics.Warp','Ptx.Logic.WarpSchedule','Ptx.Examples.Warp','FP4Original','FP4Edited','TableSign','FiniteScale','ExactTable','FP32Domain'])
+  File "/root/e5r-oss-ptx/demos/oss-ptx-int4/whole-proof/compile_entries.py", line 17, in run
+    if p.returncode:raise RuntimeError((cmd,p.returncode,o.decode()[-4000:],e.decode()[-4000:]))
+RuntimeError: (['/root/.elan/toolchains/leanprover--lean4---v4.35.0/bin/lean', '-j1', '-M2048', '--run', PosixPath('/root/e5r-oss-ptx/demos/oss-ptx-int4/whole-proof/ReplayPrerequisites.lean'), 'Ptx.Semantics.Warp', 'Ptx.Logic.WarpSchedule', 'Ptx.Examples.Warp', 'FP4Original', 'FP4Edited', 'TableSign', 'FiniteScale', 'ExactTable', 'FP32Domain'], 1, '', "replay failed for Ptx.Semantics.Warp: while replaying declaration 'Ptx.Warp.res.match_1':\n(kernel) excessive memory consumption detected\n")

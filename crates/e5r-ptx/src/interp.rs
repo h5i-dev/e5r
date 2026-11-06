@@ -443,7 +443,21 @@ pub fn step(k: &Kernel, al: &Allocs, c: &Ctx, s: &mut TState, g: &mut Mem, sh: &
         }
     }
     use Instr::*;
-    match &st.instr {
+    // Volatile accesses are still executed as memory actions; the qualifier
+    // is retained in the AST/export and never licenses eliminating an access.
+    let normalized = match &st.instr {
+        LdVolatileShared32(d, a) => Some(Ld(Space::Shared, Ty::U32, d.clone(), a.clone())),
+        StVolatileShared32(a, v) => Some(St(Space::Shared, Ty::U32, a.clone(), v.clone())),
+        _ => None,
+    };
+    match normalized.as_ref().unwrap_or(&st.instr) {
+        WarpBar(_) | LdGlobalNCF32(..) => {
+            return Res::Fault(
+                "warp-aware readonly execution domain required; unsupported by legacy interpreter"
+                    .into(),
+            );
+        }
+        LdVolatileShared32(..) | StVolatileShared32(..) => unreachable!("volatile normalization"),
         Por(d, a, b) => {
             let v = s.pred(a) || s.pred(b);
             s.p.insert(d.clone(), v);

@@ -1,0 +1,92 @@
+{
+  "stage": "warp/NC/volatile semantics and exact-table execution prerequisites; FP4 whole theorem OPEN",
+  "base_commit": "a337b5581992e6ff1a23df2182256ac9d7d9a864",
+  "whole_fp4_checker_accepted": false,
+  "whole_fp4_semantic_negative": "OPEN; isolated model mutation is a separate prerequisite regression",
+  "official_accepted_regressions": [
+    "simpleMultiCopy",
+    "CatBoost ZeroSegments"
+  ],
+  "source_model_modules_rebuilt": 61,
+  "library_standard_axiom_audit_declarations": 6180,
+  "independent_prerequisite_replay_modules": 10,
+  "independent_prerequisite_replay_declarations": 663,
+  "rust_ptx_suite": "complete release suite including ptxas oracle passed",
+  "cli_regressions": 15,
+  "strict_release_clippy": "both crates all targets passed",
+  "gpu_semantic_regression": {
+    "kind": "semantic regression, not whole-kernel proof or performance measurement",
+    "launches": 4,
+    "geometries": [
+      [
+        1,
+        64
+      ],
+      [
+        2,
+        64
+      ],
+      [
+        1,
+        128
+      ],
+      [
+        2,
+        128
+      ]
+    ],
+    "threads": 576,
+    "barriers": [
+      "2 full-mask warp barriers",
+      "2 CTA barriers"
+    ],
+    "operations": [
+      "volatile shared warp permutation",
+      "volatile CTA scalar publication",
+      "NC f32 bit-preserving readonly input load incl NaNs"
+    ],
+    "comparisons": [
+      "independent Python",
+      "actual Lean Warp.res/action",
+      "GPU JIT",
+      "GPU cubin"
+    ],
+    "canaries": "36 retained bytes per48-byte output record",
+    "ptx_sha256": "0820d1308c0dfc36112899988a27b9bea65c6d0bae1d8dcb1808901d1f3b9a92",
+    "expected_sha256": "bb8de325849989f8206ec3012bfbe32f2eaf83011fc6b26b00f5eb0ddd5a6fb7",
+    "status": "pass"
+  },
+  "scope": "exact unchanged FP32 entries, blocksize1024, positive n<2^31 arbitrary tails, finite scales, initialized module and explicit valid/disjoint allocations; proposed target unproved",
+  "main_open_infrastructure": "warp/CTA phase total-correctness composition for all interleavings; current concrete schedules prove existence only",
+  "main_open_target": "real CUB permutations, footprints/races/bounds/termination, finite-scale reachable invariants, all16 sign rewrites, official exact-module domain and acceptance; FP16/BF16 later",
+  "published_artifacts_unchanged": 183,
+  "performance": "all published timings and negative conclusion unchanged; no new candidate or performance measurement",
+  "resource_events": [
+    "initial concurrent direct/Lake build cache collision retained; sequential rebuild passed",
+    "2GiB prerequisite replay memory limit retained; isolated3GiB replay passed"
+  ],
+  "exporter_sha256": "fe359a412f29d7352e4a1246089d0baeb7731e8f87e40a78f135dfaa776cda29",
+  "checker_sha256": "8ba62e271aff84dc33582f685b882b8a47474cd899897377862ed5b6cea278ab",
+  "source_sha256": {
+    "demos/oss-ptx-int4/whole-proof/Domain.lean": "d1fcfc72d471085f9d5e7cf9ec3bf2633069c0ef80a54de2d6c22734cb75395c",
+    "demos/oss-ptx-int4/whole-proof/ExactTable.lean": "b172c7470d79f76d4b5c4bc3f127fc3df98915c8ebe427d26385848f9c1492be",
+    "demos/oss-ptx-int4/whole-proof/FP32Domain.lean": "aced9e0cda209ecee092e53645de4130bb0b8cd0811213504bd84ec73c9b3649",
+    "demos/oss-ptx-int4/whole-proof/FiniteScale.lean": "c98c349a5ec5481a140fe353b8ef81af7ba7c7750dd223bda5248d9a1c3009a4",
+    "demos/oss-ptx-int4/whole-proof/ReplayPrerequisites.lean": "30786aa8bb2ad00cfcaf52644408de65b16ffec673c56fc8106e7e5274080c8c",
+    "demos/oss-ptx-int4/whole-proof/SharedWarp.lean": "370439c5699ec8ff193f1a2edf1d8f7db0b629c8afb256aac22a1e5bbc73e87d",
+    "demos/oss-ptx-int4/whole-proof/WarpDiff.lean": "e80148ba28524dd0016b66c0c3de9205ef84ac74ecbac8d827aab37cd8c6fea9",
+    "demos/oss-ptx-int4/whole-proof/build_model.py": "fb80de6697b436ccbe802de6d96a743021e2debe10f7a45e4961266088a9764a",
+    "demos/oss-ptx-int4/whole-proof/compile_entries.py": "a069bdf5803fbef5459906ea6a376f720171e1d8447b3ef078e794a3c469cc9b",
+    "demos/oss-ptx-int4/whole-proof/extract.py": "1387adc3a4af1ed63c5b2c7b7b8ea9249e76b4954855706cc2146e57597c6313",
+    "demos/oss-ptx-int4/whole-proof/inventory_variants.py": "73b9b0171646c5e35bab802479e23f742331084b0e31b017d52dcd2b1925af90",
+    "demos/oss-ptx-int4/whole-proof/model_mutation.py": "3b3be0b4cb2aaa72c7844cd831fa9bc0b603272f85de3b767fed03b8f02855ba",
+    "demos/oss-ptx-int4/whole-proof/semantic_regression.py": "7ca11f4f429b39ac37f33d6f20f0747a8e00bad72c88426558437be8b7c66699",
+    "demos/oss-ptx-int4/whole-proof/warp_regression.py": "8deb817ff3e6dadeac9886e6855f28c787d6b82ef8eb672113cd487846a2cd7e",
+    "verification/ptx/Ptx/Examples/Warp.lean": "80564dc26d61e2051d58d266e4b15266a27cfc8d0879e45256b05f4aeb8143dd",
+    "verification/ptx/Ptx/Logic/WarpSchedule.lean": "116832f64d670dc23414d679b61ea18905a04e3e033fb0f6da5ee5d643b2d178",
+    "verification/ptx/Ptx/Semantics/Instruction.lean": "7df6df80c819a5cd8b273551f74dc756209153740f1eb2237656bfc84eeda286",
+    "verification/ptx/Ptx/Semantics/Warp.lean": "a1d792ae1b994f97016292e90df43524c365d45e4e393b72d514a506fe9bfec6",
+    "verification/ptx/Ptx/Syntax.lean": "b6c69bcc8f26c71f831ceb3559ec50aa5301f61b32242f61ad1ec4093b367b46",
+    "verification/ptx/Ptx.lean": "cbc9e393f81877b3097ff49ab0495755d698b7be17bab8376207711fccf65791"
+  }
+}

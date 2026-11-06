@@ -115,6 +115,15 @@ pub fn check(
     let Some(k1) = module.kernels.iter().find(|k| k.name == sp.kernel) else {
         return finish(doc, Verdict::Error, Some("candidate kernel missing".into()));
     };
+    if k0.requires_warp_domain() || k1.requires_warp_domain() {
+        return finish(
+            doc,
+            Verdict::Unsupported,
+            Some(
+                "warp barriers or nc loads require a warp-aware readonly equivalence domain".into(),
+            ),
+        );
+    }
     if original.uses_globals(k0) || module.uses_globals(k1) {
         return finish(
             doc,

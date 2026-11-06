@@ -1,0 +1,138 @@
+{
+  "algorithm": "sha256",
+  "paths_relative_to": "demos/oss-ptx-int4/whole-proof/evidence",
+  "artifacts": {
+    "warp-admission.json": {
+      "sha256": "f24a6b03273a839895041d4686a6af6ef373b1f70015673e5cf7bcb7301bb388",
+      "bytes": 1113
+    },
+    "warp-build-modules.json": {
+      "sha256": "bd1cd75aab90b12eaadc4d4cf3b0cad3c32f3b224d7225bbe56a044cbd3d78e0",
+      "bytes": 13486
+    },
+    "warp-cases.txt.gz": {
+      "sha256": "7e3c407ba96ea77f755bb5f2b56c055654765eb62ed9fcfb2a3b512e9e9b62ca",
+      "bytes": 14370
+    },
+    "warp-cli-all.log": {
+      "sha256": "fb3bc72133b20c18289f9bb57e4ace32d1a3460265dd63520a923b6d7f87436c",
+      "bytes": 1161
+    },
+    "warp-cli-gate.log": {
+      "sha256": "16f42e5616d94dd66c1f268c95c53eca5b15952bee30604d7e42ee158ee31c0a",
+      "bytes": 417
+    },
+    "warp-clippy.log": {
+      "sha256": "fa25e6fc7d19633cca98cc18a7a59ef835670ac141075eda417930eb9bcc5cf5",
+      "bytes": 249
+    },
+    "warp-diff.cubin.gz": {
+      "sha256": "a97276fc5b56dcda8379dfaf3e9adab859ab0f1dd634cb24f283ba6633d1e03b",
+      "bytes": 1057
+    },
+    "warp-diff.log": {
+      "sha256": "2bc7da57a11f04dad120595f6f9f63e65382cefb455509a5704b50028f81f2c3",
+      "bytes": 874
+    },
+    "warp-diff.ptx.gz": {
+      "sha256": "f65fd74b31fcfaacdfefb12b2386d178981c5a5b1e81ff78ed3f844890ecaeba",
+      "bytes": 524
+    },
+    "warp-differential.json": {
+      "sha256": "2bc7da57a11f04dad120595f6f9f63e65382cefb455509a5704b50028f81f2c3",
+      "bytes": 874
+    },
+    "warp-exact-compile.log": {
+      "sha256": "e76d03d9dcf89676b66560fe363c1c21eb581591656eeb56f45fc397dabf5160",
+      "bytes": 1714
+    },
+    "warp-expected.txt.gz": {
+      "sha256": "2128d9b9486229922a7648cbac72848f156f2b5e0cbf8b23ecc37e354a2838b7",
+      "bytes": 6207
+    },
+    "warp-fp32-edited.lean.gz": {
+      "sha256": "444d2093268ad97bbb0962660267142d1842a415eb04a2612d441abe09e94521",
+      "bytes": 8297
+    },
+    "warp-fp32-edited.ptx.gz": {
+      "sha256": "96857b515959b4466d17036014e677821afcb20d745e41e66a133e382b59b248",
+      "bytes": 5429
+    },
+    "warp-fp32-original.lean.gz": {
+      "sha256": "f9134e65c1c4ad2620f2ac4287201cf7e055023ee3b1f0989a2e2582de7ec666",
+      "bytes": 8303
+    },
+    "warp-fp32-original.ptx.gz": {
+      "sha256": "1c852c58e6ec38012a5ceae65305121bc6967b36b69eff3597c22d8327319f67",
+      "bytes": 5345
+    },
+    "warp-full-rust.log": {
+      "sha256": "afae5b6b2888e56e8579b3fa23ac3ac75fe665e4e6ec47c7ca5d01f144a8f594",
+      "bytes": 5750
+    },
+    "warp-gpu-cubin.txt.gz": {
+      "sha256": "2128d9b9486229922a7648cbac72848f156f2b5e0cbf8b23ecc37e354a2838b7",
+      "bytes": 6207
+    },
+    "warp-gpu-jit.txt.gz": {
+      "sha256": "2128d9b9486229922a7648cbac72848f156f2b5e0cbf8b23ecc37e354a2838b7",
+      "bytes": 6207
+    },
+    "warp-lean.txt.gz": {
+      "sha256": "2128d9b9486229922a7648cbac72848f156f2b5e0cbf8b23ecc37e354a2838b7",
+      "bytes": 6207
+    },
+    "warp-library-audit.log": {
+      "sha256": "d4ef930a79ee0aaf66e6822a9f75cb1ef613a97579fd9d59c96727cd578ba3ab",
+      "bytes": 2306
+    },
+    "warp-milestone.json": {
+      "sha256": "e94a8c0ef348e67d516371e49c41307e36ac086216b0fdebfce829d4c9d5ebcb",
+      "bytes": 5269
+    },
+    "warp-model-build-overlap.log": {
+      "sha256": "27c7b03f639d92131abb134e317a224ab1d0da997f318d0a1088d30bf7bb9ea3",
+      "bytes": 3308
+    },
+    "warp-model-build.log": {
+      "sha256": "7ba4abf1b8d132ab38ca48cc1275c2fddb42faedcac06e47ee5063c962bac698",
+      "bytes": 4405
+    },
+    "warp-model-mutation.log": {
+      "sha256": "cd253c1225f9ed196e4432dd7a62edbd88f0340d1a2a10af04102ae117f0e568",
+      "bytes": 436
+    },
+    "warp-model-negative.json": {
+      "sha256": "cd253c1225f9ed196e4432dd7a62edbd88f0340d1a2a10af04102ae117f0e568",
+      "bytes": 436
+    },
+    "warp-model-negative.log": {
+      "sha256": "3e60dd7d7d07e4f4963876f004e9c9ca8152e66325264287804d3eebc1054efa",
+      "bytes": 2588
+    },
+    "warp-prerequisite-replay-2048-failure.log": {
+      "sha256": "967724ea42e2ad327261f279911a68b18bc5e5d2c3e23cdf89ea03e274c0d2f5",
+      "bytes": 1044
+    },
+    "warp-prerequisite-replay.jsonl": {
+      "sha256": "b4760a5bd195f784d99206c41eb3cc289f867934f28e47e15f9e8b66fd314f39",
+      "bytes": 1464
+    },
+    "warp-regression-inc.json": {
+      "sha256": "8263a4d7de3947782c4382146a8919f24354414658a9f3db1a2b02cffccd4d3d",
+      "bytes": 2415
+    },
+    "warp-regression-zero.json": {
+      "sha256": "4c56101c1fdf0218b742aff264cfc770b5c878d92d489ec95178c4f8df26e421",
+      "bytes": 2664
+    },
+    "warp-variant-inventory.json": {
+      "sha256": "851866df065dc2f4969bd018409717c2c4b9d1c10f4cdd6b2fcacd2af5653901",
+      "bytes": 3141
+    },
+    "warp-variant-inventory.log": {
+      "sha256": "851866df065dc2f4969bd018409717c2c4b9d1c10f4cdd6b2fcacd2af5653901",
+      "bytes": 3141
+    }
+  }
+}

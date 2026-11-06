@@ -1,0 +1,25 @@
+{
+  "stage": "precise admission status, not whole-kernel acceptance",
+  "rows": [
+    {
+      "variant": "original",
+      "full_sha256": "30a95604710e82a0052ca435185983520ade5cdf8de89f5daa2d7d4d5ae5d3f7",
+      "entry_sha256": "ea210ee92fb2c104abbc9256b5ac3b11c18a643c7e96b4624821e86d29a8ee29",
+      "global_declarations": 67,
+      "byte_correspondence": "entire body and all original module globals; existing frozen extraction hash unchanged",
+      "exporter_sha256": "fe359a412f29d7352e4a1246089d0baeb7731e8f87e40a78f135dfaa776cda29",
+      "export_returncode": 0,
+      "error": ""
+    },
+    {
+      "variant": "edited",
+      "full_sha256": "dbd277b5fabaee8f8f0b3fa354f3e00b67db343905ee3b85184cc3291dda9210",
+      "entry_sha256": "bea226c117624d7c2f33b0a2b0ae6becbface97717fe71cdd4d5175fd87e75ef",
+      "global_declarations": 67,
+      "byte_correspondence": "entire body and all original module globals; existing frozen extraction hash unchanged",
+      "exporter_sha256": "fe359a412f29d7352e4a1246089d0baeb7731e8f87e40a78f135dfaa776cda29",
+      "export_returncode": 0,
+      "error": ""
+    }
+  ]
+}

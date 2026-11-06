@@ -1,0 +1,8 @@
+{
+  "scope": "warp-model regression negative, NOT FP4 whole-kernel negative",
+  "mutation": "same-CTA threads incorrectly advanced by warp release",
+  "original_model_sha256": "a1d792ae1b994f97016292e90df43524c365d45e4e393b72d514a506fe9bfec6",
+  "mutated_model_sha256": "f72c41ee2c5b477146abd35a24a6b0d5c7345ac289ed840a71f6176f6c60d1c0",
+  "result": "rejected at actual universal other-thread semantic frame proof",
+  "returncode": 1
+}

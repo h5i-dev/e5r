@@ -70,9 +70,9 @@ large blocks or complete tiles avoid that extra-storage assumption. Inactive
 lanes may read otherwise uninitialized padding, so assuming finite padding is
 also an additional restriction, not a fact about finite user input.
 
-Remaining hard obligations include actual `bar.warp.sync -1` semantics (two
-warp barriers with 64 threads/CTA), volatile shared publication, cache-qualified
-scale reads and their immutability condition,
+Remaining hard obligations include proving this entry in the new warp/NC model
+(two warp barriers with 64 threads/CTA), volatile shared publication and
+cache-qualified scale-read immutability,
 whole-thread/phase relations, safety/races/progress/termination/frame, exact
 checker statement binding and a rebound whole-kernel semantic negative.
 The old relational theorem requires empty shared declarations and cannot be
@@ -151,3 +151,118 @@ passes the requested heap cap. These are resource controls only; expected
 theorem, kernel replay, import and axiom policies are unchanged. The old
 warm-up finished before an attempted stop; no process was killed. Bounded
 replays were then run and retained separately.
+
+## Warp and initialized-table milestone
+
+Both exact FP32 entries now export and compile as complete Lean ASTs. Their
+bodies, all 67 module globals and published hashes are unchanged.
+`compile_entries.py` regenerates those ASTs directly from the frozen entry
+bytes. `ExactTable.lean` checks that both global lists are identical, identifies
+the actual 32-byte LUT, derives its exact loads from `Module.GlobalsReady`,
+proves preservation under actual reachable write exclusion, and connects those
+loads to the existing immutable `TableSign.lean`. Reachable write exclusion is
+still an obligation of the complete kernel, not an assumed write protection.
+
+`Ptx.Semantics.Warp` adds a separate execution relation over the original AST:
+full-mask barriers require 32 actual warp members at the same PC; their release
+advances only those members. CTA synchronization is separate. Partially
+populated full-mask warps and different-PC same-mask rendezvous are outside this
+supported subset, even where hardware can execute them. This is deliberately
+stricter than sm86's general barrier behavior. Volatile shared loads/stores
+remain individual SC memory actions. See NVIDIA [warp barrier semantics](https://docs.nvidia.com/cuda/archive/13.2.2/parallel-thread-execution/index.html#parallel-synchronization-and-communication-instructions-bar-warp-sync).
+
+NC loads read an explicit launch snapshot. The new `Total` contract includes
+snapshot identity and a **proved** readonly obligation excluding all reachable
+global writes/atomics from every NC load footprint, including same-thread
+writes. Universal frame and reachability lemmas establish snapshot/current
+load equality under that obligation; mutable NC kernels cannot satisfy it.
+Hardware correspondence for readonly NC loads remains a stated model boundary:
+NVIDIA explicitly [excludes NC from the PTX memory consistency model](https://docs.nvidia.com/cuda/archive/13.2.2/parallel-thread-execution/index.html#scope-and-applicability-of-the-model).
+No assumption about coupling different-PC NaN oracles is introduced.
+
+`WarpSchedule` proves that its checked executable schedules are actual grid
+executions. `Ptx.Examples.Warp` kernel-checks a completed 64-thread warp/CTA
+schedule, confirms that a fast warp at the CTA barrier can coexist with the
+other warp at its local barrier, and refuses partial full-mask release. The
+isolated `model_mutation.py` replaces warp release by CTA release and reaches
+an actual semantic frame-theorem failure. It is a model regression negative;
+the required rebound FP4 whole-kernel negative remains outstanding.
+
+`warp_regression.py` compares independent Python, actual Lean Warp.res/action,
+GPU JIT and ptxas cubin for four launches (576 threads), 64/128-thread CTAs and
+one/two CTAs. It covers volatile warp permutation, CTA scalar publication,
+readonly NC f32 loads including NaN payloads, and 36 canary bytes per output
+record. All agree. GPU execution holds the shared lock and checks foreign PIDs.
+These are semantic tests, not measurements; published timing is unchanged.
+
+`FP32Domain.lean` makes the proposed first scope concrete over the exact real
+entries: blocksize 1024, positive `n < 2^31`, block(64,1,1), grid ceil(n/1024),
+packed ceil(n/2) input bytes, exactly ceil(n/1024) finite scale values, aligned
+float outputs/scales, nonwrapping/disjoint caller/module allocations, valid
+shared placement and actual initialized module bytes. Shared bytes and all
+registers/predicates are arbitrary. It checks both real entries' parameter ABI,
+shared declarations and unused codebook parameter. Its `Obligation` is explicitly
+an **unproved target proposition**, not an accepted result. Its preconditions
+assume no execution property; finite-scale reachability and eager-load coverage
+must still be connected to the actual instructions. Smaller block sizes and
+NaN/infinity scales are outside this first scope.
+
+The existing official checker and simple differential runner **refuse** warp
+and NC instructions until the initialized-module warp-aware domain is bound.
+The new execution contract does not replace any old checker statement. No real
+FP4 whole-kernel theorem, official acceptance or qualifying speedup is claimed.
+The remaining specific obligations are listed in [CHECKLIST.md](CHECKLIST.md).
+
+Additional reproduction after the serial model build:
+
+```sh
+python3 demos/oss-ptx-int4/whole-proof/extract.py
+python3 demos/oss-ptx-int4/whole-proof/compile_entries.py
+python3 demos/oss-ptx-int4/whole-proof/model_mutation.py
+python3 demos/oss-ptx-int4/whole-proof/warp_regression.py
+```
+
+Prerequisite replay checks every declaration of the new model/scheduler/regression,
+both exact entry ASTs, reused table/finite-scale lemmas, exact table bridge and
+proposed domain: 663 declarations across ten modules, standard axioms only.
+This uses the unmodified Lean kernel replay API in `ReplayPrerequisites.lean`;
+it does not claim the official checker accepted FP4. Compilation uses `-j1
+-M2048`; independent replay uses isolated `-j1 -M3072` processes after a retained
+2 GiB replay memory-limit failure. CPU/wall caps and private process-group cleanup
+remain enabled. Run direct model builds sequentially with Rust aggregate tests
+and official checks because those invoke Lake against the same worktree cache.
+An initial overlapping build's transient missing-olean failure is retained.
+
+`inventory_variants.py` records precise exact-byte admission: FP32 original and
+edited succeed; FP16/BF16 first encounter their real braced inline assembly
+blocks containing `cvt.rn.f16.f32` / `cvt.rn.bf16.f32`, whose formats/conversions
+are not yet modeled. Full translation units still reject unrelated predicate
+destination `|` syntax. These remain explicit gaps; no entry is simplified.
+
+`SharedWarp.lean` adds a separate kernel-checked concrete execution with 64
+threads, nonzero fixture register/predicate/shared initialization,
+per-warp single-lane volatile publication and every lane reading its warp ID.
+The checked scheduler gives actual Reach and completion; the result is also
+independently replayed. It validates shared execution infrastructure, not FP4.
+The principal remaining infrastructure gap is a compositional total-correctness
+rule for warp/CTA phases under all interleavings. Existing CTA `phase_sound`
+cannot be applied to these warp barriers; concrete schedules prove existence
+only. The exact FP4 phase invariants, read/write footprints, stuttering relation
+and official initialized-module contract must then be supplied.
+
+New exact PTX/AST evidence is derived from the pinned bitsandbytes source under
+[its MIT license](../bitsandbytes-screen/LICENSE.bitsandbytes); the unchanged
+upstream/build/dispatch provenance remains in the frozen screen/sign reports.
+The table-load cut-point lemmas refer to the actual exported load statements
+(original PC203, edited PC202), prove allocation/alignment from module readiness,
+and execute `Warp.res` into the actual `%f22` register. Reaching those cut points
+with the required address invariant remains open; these rules do not establish
+whole-entry reachability, safety or equivalence.
+
+Final validation of this milestone: complete release PTX suite including ptxas
+oracle, strict all-target clippy for both crates, 15 CLI regressions, 61 direct
+model/checker modules, library-wide audit of 6,180 declarations, 663 independently
+replayed prerequisite declarations and official simpleMultiCopy/ZeroSegments
+acceptance all pass. [Evidence summary](evidence/warp-milestone.json) and
+[artifact hashes](evidence/warp-artifacts.json) retain raw semantic test outputs
+and both resolved resource failures. FP4 whole-kernel acceptance remains false.

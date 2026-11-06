@@ -285,6 +285,13 @@ pub fn check(o: &Options) -> (Verdict, Value) {
             );
         }
     };
+    if module.kernels.iter().any(|k| k.requires_warp_domain()) {
+        return finish(
+            doc,
+            Verdict::Unsupported,
+            Some("warp barriers or nc loads require a warp-aware readonly proof domain".into()),
+        );
+    }
     if module.kernels.iter().any(|k| module.uses_globals(k)) {
         return finish(
             doc,

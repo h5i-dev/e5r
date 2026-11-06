@@ -88,6 +88,12 @@ inductive CvtRnd where
   deriving Repr, DecidableEq, Inhabited
 
 inductive Instr where
+  /-- Full-mask warp barrier, interpreted by Ptx.Warp, not by CTA-only SIMT. -/
+  | warpBar
+  /-- Readonly-kernel cache-qualified load, interpreted by Ptx.Warp. -/
+  | ldGlobalNCF32 (d : String) (a : Address)
+  | ldVolatileShared32 (d : String) (a : Address)
+  | stVolatileShared32 (a : Address) (v : Operand)
   | clz32 (d : String) (a : Operand)
   | minS32 (d : String) (a b : Operand)
   /-- Default RN instruction semantics; original absent modifier and compiler

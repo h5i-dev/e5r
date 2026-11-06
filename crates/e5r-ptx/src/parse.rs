@@ -1024,6 +1024,28 @@ fn stmt(p: &mut P) -> R<Stmt> {
             }
             Instr::Bar
         }
+        ["bar", "warp", "sync"] => {
+            let mask = p.int()?;
+            if !matches!(mask, -1 | 4294967295) {
+                return p.err("only full-mask bar.warp.sync is supported");
+            }
+            Instr::WarpBar(mask)
+        }
+        ["ld", "global", "nc", "f32"] => {
+            let d = reg(p)?;
+            comma(p)?;
+            Instr::LdGlobalNCF32(d, address(p)?)
+        }
+        ["ld", "volatile", "shared", "u32"] => {
+            let d = reg(p)?;
+            comma(p)?;
+            Instr::LdVolatileShared32(d, address(p)?)
+        }
+        ["st", "volatile", "shared", "u32"] => {
+            let a = address(p)?;
+            comma(p)?;
+            Instr::StVolatileShared32(a, operand(p)?)
+        }
         ["clz", "b32"] => {
             let d = reg(p)?;
             comma(p)?;
@@ -1059,7 +1081,13 @@ fn types_ok(i: &Instr) -> Result<(), String> {
     let bits = |t: &Ty| matches!(t, B32 | B64);
     let narrow_int = |t: &Ty| matches!(t, U16 | S16);
     let ok = match i {
-        Instr::Por(..) | Instr::Clz32(..) | Instr::MinS32(..) => true,
+        Instr::Por(..)
+        | Instr::Clz32(..)
+        | Instr::MinS32(..)
+        | Instr::WarpBar(..)
+        | Instr::LdGlobalNCF32(..)
+        | Instr::LdVolatileShared32(..)
+        | Instr::StVolatileShared32(..) => true,
         Instr::Bin(BinOp::Add | BinOp::Sub | BinOp::MulLo, t, ..) | Instr::MadLo(t, ..) => arith(t),
         Instr::Bin(BinOp::MulWide, t, ..) => matches!(t, U32 | S32),
         Instr::Bin(BinOp::And | BinOp::Or | BinOp::Xor | BinOp::Shl, t, ..) | Instr::Not(t, ..) => {
@@ -1165,7 +1193,13 @@ fn operands_ok(i: &Instr) -> Result<(), String> {
     };
     let w = |t: &Ty| t.width().unwrap_or(32);
     match i {
-        Instr::Por(..) => Ok(()),
+        Instr::Por(..) | Instr::WarpBar(..) => Ok(()),
+        Instr::LdGlobalNCF32(_, a) | Instr::LdVolatileShared32(_, a) => off(a),
+        Instr::StVolatileShared32(a, v) => {
+            nosreg(v)?;
+            src_at(v, Ty::U32)?;
+            off(a)
+        }
         Instr::Clz32(_, a) => {
             nosreg(a)?;
             src_at(a, Ty::B32)
@@ -1296,6 +1330,14 @@ fn typed_uses(i: &Instr) -> Vec<(&str, Ty)> {
     }
     let mut v: Vec<(&str, Ty)> = Vec::new();
     match i {
+        Instr::WarpBar(..) => {}
+        Instr::LdGlobalNCF32(d, a) => {
+            v.push((d.as_str(), Ty::F32));
+            addr(a, &mut v);
+        }
+        Instr::LdVolatileShared32(d, _) => v.push((d.as_str(), Ty::U32)),
+        Instr::StVolatileShared32(_, v0) => o(v0, Ty::U32, &mut v),
+
         Instr::Clz32(d, a) => {
             v.push((d.as_str(), Ty::U32));
             o(a, Ty::B32, &mut v);
@@ -1606,6 +1648,9 @@ fn check(k: &Kernel, lines: &[usize], globals: &[GlobalDecl]) -> R<()> {
                 }
             }
         }
+        if s.guard.is_some() && matches!(s.instr, Instr::WarpBar(_)) {
+            return Err(e("predicated bar.warp.sync is outside the subset".into()));
+        }
         if s.guard.is_some() && matches!(s.instr, Instr::Bar) {
             // bar.sync is .aligned: every thread of the CTA must execute it
             return Err(e("predicated bar.sync".into()));
@@ -1747,6 +1792,19 @@ fn check(k: &Kernel, lines: &[usize], globals: &[GlobalDecl]) -> R<()> {
             Instr::Red(sp, _, t, a, b) => {
                 src(b, w(*t))?;
                 addr(*sp, a)?;
+            }
+            Instr::WarpBar(_) => {}
+            Instr::LdGlobalNCF32(d, a) => {
+                data(d, 32)?;
+                addr(Space::Global, a)?;
+            }
+            Instr::LdVolatileShared32(d, a) => {
+                data(d, 32)?;
+                addr(Space::Shared, a)?;
+            }
+            Instr::StVolatileShared32(a, v) => {
+                src(v, 32)?;
+                addr(Space::Shared, a)?;
             }
             Instr::Clz32(d, a) => {
                 data(d, 32)?;

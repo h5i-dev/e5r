@@ -1,0 +1,10 @@
+{"axioms":["Quot.sound","Classical.choice","propext"],"declarations":130,"fp4_whole_kernel_acceptance":false,"kernel_replay":true,"module":"Ptx.Semantics.Warp"}
+{"axioms":["Quot.sound","Classical.choice","propext"],"declarations":99,"fp4_whole_kernel_acceptance":false,"kernel_replay":true,"module":"Ptx.Logic.WarpSchedule"}
+{"axioms":["Quot.sound","Classical.choice","propext"],"declarations":156,"fp4_whole_kernel_acceptance":false,"kernel_replay":true,"module":"Ptx.Examples.Warp"}
+{"axioms":[],"declarations":2,"fp4_whole_kernel_acceptance":false,"kernel_replay":true,"module":"FP4Original"}
+{"axioms":[],"declarations":2,"fp4_whole_kernel_acceptance":false,"kernel_replay":true,"module":"FP4Edited"}
+{"axioms":["Quot.sound","Classical.choice","propext"],"declarations":9,"fp4_whole_kernel_acceptance":false,"kernel_replay":true,"module":"TableSign"}
+{"axioms":["Quot.sound","Classical.choice","propext"],"declarations":15,"fp4_whole_kernel_acceptance":false,"kernel_replay":true,"module":"FiniteScale"}
+{"axioms":["Quot.sound","Classical.choice","propext"],"declarations":198,"fp4_whole_kernel_acceptance":false,"kernel_replay":true,"module":"ExactTable"}
+{"axioms":["Quot.sound","Classical.choice","propext"],"declarations":44,"fp4_whole_kernel_acceptance":false,"kernel_replay":true,"module":"FP32Domain"}
+{"axioms":["Quot.sound","Classical.choice","propext"],"declarations":8,"fp4_whole_kernel_acceptance":false,"kernel_replay":true,"module":"SharedWarp"}

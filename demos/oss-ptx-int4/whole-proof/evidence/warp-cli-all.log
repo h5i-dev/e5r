@@ -1,0 +1,22 @@
+    Finished `release` profile [optimized] target(s) in 0.14s
+     Running tests/ptx_cli.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/ptx_cli-3f31ecdb7ef909a0)
+
+running 15 tests
+test a_tiny_timeout_is_unknown_not_proved ... ok
+test aggregate_abi_requires_a_matching_proof_domain ... ok
+test direct_equivalence_requires_bound_original_and_strict_contract ... ok
+test global_symbols_cannot_escape_the_module_initialization_domain ... ok
+test malformed_spec_is_an_error ... ok
+test missing_lean_project_is_an_error_not_a_proof ... ok
+test oss_increment_equivalence_requires_distinct_typed_repeats_parameter ... ok
+test packing_contract_is_strict_and_needs_proof ... ok
+test proved_and_refuted_end_to_end ... ok
+test ptx_outside_the_subset_is_unsupported ... ok
+test scalar_equivalence_rejects_frozen_original_aggregate_abi ... ok
+test spec_outside_the_class_is_unsupported ... ok
+test usage_errors_exit_64 ... ok
+test warp_and_nc_forms_cannot_enter_legacy_proof_or_run_domains ... ok
+test zero_segments_equivalence_requires_arbitrary_distinct_typed_scalar ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.77s
+

@@ -20,6 +20,9 @@ fn unhex(s: &str) -> Vec<u8> {
 
 /// Run every case line of `text` and print one result line per case.
 pub fn run_cases(m: &Module, text: &str) -> Result<String, String> {
+    if m.kernels.iter().any(|k| k.requires_warp_domain()) {
+        return Err("warp-aware readonly execution domain required by this kernel".into());
+    }
     if m.kernels.iter().any(|k| m.uses_globals(k)) {
         return Err("referenced globals require explicit module placement and initialization; the differential case format has no such domain".into());
     }

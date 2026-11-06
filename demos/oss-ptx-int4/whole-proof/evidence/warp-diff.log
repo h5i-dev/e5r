@@ -1,0 +1,42 @@
+{
+  "kind": "semantic regression, not whole-kernel proof or performance measurement",
+  "launches": 4,
+  "geometries": [
+    [
+      1,
+      64
+    ],
+    [
+      2,
+      64
+    ],
+    [
+      1,
+      128
+    ],
+    [
+      2,
+      128
+    ]
+  ],
+  "threads": 576,
+  "barriers": [
+    "2 full-mask warp barriers",
+    "2 CTA barriers"
+  ],
+  "operations": [
+    "volatile shared warp permutation",
+    "volatile CTA scalar publication",
+    "NC f32 bit-preserving readonly input load incl NaNs"
+  ],
+  "comparisons": [
+    "independent Python",
+    "actual Lean Warp.res/action",
+    "GPU JIT",
+    "GPU cubin"
+  ],
+  "canaries": "36 retained bytes per48-byte output record",
+  "ptx_sha256": "0820d1308c0dfc36112899988a27b9bea65c6d0bae1d8dcb1808901d1f3b9a92",
+  "expected_sha256": "bb8de325849989f8206ec3012bfbe32f2eaf83011fc6b26b00f5eb0ddd5a6fb7",
+  "status": "pass"
+}

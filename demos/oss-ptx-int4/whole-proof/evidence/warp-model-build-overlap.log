@@ -1,0 +1,71 @@
+1 61 Ptx.Semantics.FloatCore
+2 61 Ptx.Semantics.Float
+3 61 Ptx.Syntax
+4 61 Ptx.Semantics.Memory
+5 61 Ptx.Semantics.Instruction
+6 61 Ptx.Semantics.SIMT
+7 61 Ptx.Semantics.Globals
+'Ptx.GlobalVar.Initialized.read32' depends on axioms: [propext, Quot.sound]
+'Ptx.Module.globalsReady_install' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.installGlobals_frame' depends on axioms: [propext]
+'Ptx.installGlobals_initialized' depends on axioms: [propext, Quot.sound]
+'Ptx.GlobalVar.Initialized.store_frame' depends on axioms: [propext]
+8 61 Ptx.Semantics.Warp
+'Ptx.Warp.res_global_frame' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.Warp.reach_global_frame' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.Warp.nc_read_current_eq_initial' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.Warp.nc_snapshot_eq_current' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.Warp.action_ordinary' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.Warp.res_ordinary' depends on axioms: [propext, Classical.choice, Quot.sound]
+9 61 Ptx.Logic.WarpSchedule
+'Ptx.Warp.warpReadyB_spec' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.Warp.ctaReadyB_spec' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.Warp.execute_reach' depends on axioms: [propext, Classical.choice, Quot.sound]
+10 61 Ptx.Logic.Hoare
+11 61 Ptx.Logic.RaceFreedom
+12 61 Ptx.Logic.Regions
+13 61 Ptx.Tactics.Attr
+14 61 Ptx.Tactics.Eval
+15 61 Ptx.Logic.Launch1D
+16 61 Ptx.Kernels.VAddNvcc
+17 61 Ptx.Examples.VectorAdd
+18 61 Ptx.Kernels.Sum
+19 61 Ptx.Examples.Sum
+20 61 Ptx.Kernels.Saxpy
+21 61 Ptx.Examples.Map
+22 61 Ptx.Logic.Refute
+23 61 Ptx.Kernels.VAddNoBound
+24 61 Ptx.Kernels.VAddTid
+25 61 Ptx.Kernels.VAddSub
+26 61 Ptx.Examples.Buggy
+27 61 Ptx.Auto.Map
+28 61 Ptx.Auto.Tactic
+29 61 Ptx.Logic.Phases
+30 61 Ptx.Logic.Narrow
+31 61 Ptx.Logic.FP4Forms
+'Ptx.default_bin_rn' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.cvt_u16_f32_oracle_independent' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.public_block_shift' depends on axioms: [propext]
+'Ptx.laneid_oneD' depends on axioms: [propext, Classical.choice, Quot.sound]
+32 61 Ptx.Logic.CellAlgs
+33 61 Ptx.Logic.PhaseSound
+34 61 Ptx.Logic.PhaseWp
+35 61 Ptx.Logic.Cells
+36 61 Ptx.Tactics.EvalR
+37 61 Ptx.Auto.Tactic4
+38 61 Ptx.Kernels.ReduceNvcc
+39 61 Ptx.Examples.Reduce
+40 61 Ptx.Kernels.ScanNvcc
+41 61 Ptx.Examples.Scan
+/root/e5r-oss-ptx/verification/ptx/Ptx/Examples/Scan.lean:264:38: warning: Variable name `hi` is not explicitly referenced.
+
+Hint: The binding can be removed (if unused) or named `_` (if used implicitly). Alternatively, prefix the name with `_` to silence this warning:
+  [apply] _hi
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+/root/e5r-oss-ptx/verification/ptx/Ptx/Examples/Scan.lean:762:8: warning: `if_pos` has been deprecated: Use `ite_eq_left` instead
+
+Hint: Replace the deprecated name:
+  i̵f̵_̵p̵o̵s̵i̲t̲e̲_̲e̲q̲_̲l̲e̲f̲t̲
+42 61 Ptx.Logic.Sums
+/root/e5r-oss-ptx/verification/ptx/Ptx/Logic/Sums.lean:9:0: error: object file '/root/e5r-oss-ptx/verification/ptx/.lake/build/lib/lean/Ptx/Semantics/Instruction.olean' of module Ptx.Semantics.Instruction does not exist

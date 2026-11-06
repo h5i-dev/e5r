@@ -66,6 +66,13 @@ fn address(a: &Address) -> String {
 pub fn instr(i: &Instr) -> String {
     let o = operand;
     match i {
+        Instr::WarpBar(mask) => format!("bar.warp.sync \t{mask}"),
+        Instr::LdGlobalNCF32(d, a) => format!("ld.global.nc.f32 \t{d}, {}", address(a)),
+        Instr::LdVolatileShared32(d, a) => format!("ld.volatile.shared.u32 \t{d}, {}", address(a)),
+        Instr::StVolatileShared32(a, v) => {
+            format!("st.volatile.shared.u32 \t{}, {}", address(a), o(v))
+        }
+
         Instr::Clz32(d, a) => format!("clz.b32 \t{d}, {}", o(a)),
         Instr::MinS32(d, a, b) => format!("min.s32 \t{d}, {}, {}", o(a), o(b)),
         Instr::FBinDefault(op, ftz, sat, t, d, a, b) => format!(

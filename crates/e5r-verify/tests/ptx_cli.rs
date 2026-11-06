@@ -483,3 +483,53 @@ fn global_symbols_cannot_escape_the_module_initialization_domain() {
             .contains("module placement")
     );
 }
+
+#[test]
+fn warp_and_nc_forms_cannot_enter_legacy_proof_or_run_domains() {
+    let candidate_source = ".version 9.2\n.target sm_86\n.address_size 64\n.visible .entry k(.param .u64 input, .param .u64 output, .param .u32 n) { ret; }\n";
+    let candidate = tmp("warp-domain-candidate.ptx", candidate_source);
+    for (tag, body) in [
+        ("warp", "bar.warp.sync -1;"),
+        (
+            "nc",
+            ".reg .b64 %rd; .reg .f32 %f; ld.global.nc.f32 %f, [%rd];",
+        ),
+    ] {
+        let original = tmp(
+            &format!("{tag}-domain-original.ptx"),
+            &candidate_source.replace("ret;", &format!("{body} ret;")),
+        );
+        let ordinary_spec = tmp(
+            &format!("{tag}-ordinary-spec.json"),
+            r#"{"schema":"e5r.ptx.spec.v1","class":"map32","kernel":"k"}"#,
+        );
+        let (code, doc) = check(&original, &ordinary_spec, &[]);
+        assert_eq!((code, doc["verdict"].as_str()), (2, Some("unsupported")));
+        assert!(doc["reasons"].to_string().contains("warp-aware readonly"));
+        let hash = String::from_utf8(
+            Command::new("sha256sum")
+                .arg(&original)
+                .output()
+                .unwrap()
+                .stdout,
+        )
+        .unwrap()
+        .split_whitespace()
+        .next()
+        .unwrap()
+        .to_string();
+        let spec = tmp(&format!("{tag}-original-domain.json"), &serde_json::json!({"schema":"e5r.ptx.spec.v1","class":"equivalence-unpack4","kernel":"k","original_ptx":original,"original_sha256":hash,"input":"input","output":"output","length":"n"}).to_string());
+        let (code, doc) = check(&candidate, &spec, &[]);
+        assert_eq!((code, doc["verdict"].as_str()), (2, Some("unsupported")));
+        assert!(doc["reasons"].to_string().contains("warp-aware readonly"));
+        let cases = tmp(&format!("{tag}-domain-cases.txt"), "");
+        let result = Command::new(bin())
+            .args(["ptx", "run", "--cases"])
+            .arg(cases)
+            .arg(original)
+            .output()
+            .unwrap();
+        assert!(!result.status.success());
+        assert!(String::from_utf8_lossy(&result.stderr).contains("warp-aware readonly"));
+    }
+}

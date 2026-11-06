@@ -80,6 +80,11 @@ fn instr(i: &Instr) -> String {
     let o = operand;
     let s = string;
     match i {
+        Instr::WarpBar(_) => ".warpBar".into(),
+        Instr::LdGlobalNCF32(d, a) => format!(".ldGlobalNCF32 {} {}", s(d), address(a)),
+        Instr::LdVolatileShared32(d, a) => format!(".ldVolatileShared32 {} {}", s(d), address(a)),
+        Instr::StVolatileShared32(a, v) => format!(".stVolatileShared32 {} {}", address(a), o(v)),
+
         Instr::Clz32(d, a) => format!(".clz32 {} {}", s(d), o(a)),
         Instr::MinS32(d, a, b) => format!(".minS32 {} {} {}", s(d), o(a), o(b)),
         Instr::FBinDefault(op, ftz, sat, t, d, a, b) => format!(

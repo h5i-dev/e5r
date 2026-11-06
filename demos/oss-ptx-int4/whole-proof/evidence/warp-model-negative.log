@@ -1,0 +1,54 @@
+/mnt/scratch/e5r-oss-ptx/int4/whole-proof/model-negative/WarpBad.lean:75:17: warning: Variable name `L` is not explicitly referenced.
+
+Hint: The binding can be removed (if unused) or named `_` (if used implicitly). Alternatively, prefix the name with `_` to silence this warning:
+  [apply] _L
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+/mnt/scratch/e5r-oss-ptx/int4/whole-proof/model-negative/WarpBad.lean:172:74: error: unsolved goals
+L : Launch
+c : State
+w : Id
+t : Tid
+outside : id L t ≠ w
+⊢ (if t.ctaid = w.ctaid then (c.cfg.ts t).skip else c.cfg.ts t) = c.cfg.ts t
+/mnt/scratch/e5r-oss-ptx/int4/whole-proof/model-negative/WarpBad.lean:173:26: warning: This simp argument is unused:
+  outside
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [releaseWarp, ↓reduceIte]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+/mnt/scratch/e5r-oss-ptx/int4/whole-proof/model-negative/WarpBad.lean:173:35: warning: This simp argument is unused:
+  ↓reduceIte
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [releaseWarp, outside]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+/mnt/scratch/e5r-oss-ptx/int4/whole-proof/model-negative/WarpBad.lean:176:80: error: unsolved goals
+L : Launch
+c : State
+w : Id
+t : Tid
+inside : id L t = w
+⊢ (if t.ctaid = w.ctaid then (c.cfg.ts t).skip else c.cfg.ts t) = (c.cfg.ts t).skip
+/mnt/scratch/e5r-oss-ptx/int4/whole-proof/model-negative/WarpBad.lean:177:26: warning: This simp argument is unused:
+  inside
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [releaseWarp, ↓reduceIte]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+/mnt/scratch/e5r-oss-ptx/int4/whole-proof/model-negative/WarpBad.lean:177:34: warning: This simp argument is unused:
+  ↓reduceIte
+
+Hint: Omit it from the simp argument list.
+  [apply] simp only [releaseWarp, inside]
+
+Note: This linter can be disabled with `set_option linter.unusedSimpArgs false`
+'Ptx.Warp.res_global_frame' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.Warp.reach_global_frame' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.Warp.nc_read_current_eq_initial' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.Warp.nc_snapshot_eq_current' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.Warp.action_ordinary' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.Warp.res_ordinary' depends on axioms: [propext, Classical.choice, Quot.sound]

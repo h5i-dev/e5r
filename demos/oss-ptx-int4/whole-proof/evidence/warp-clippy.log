@@ -1,0 +1,4 @@
+    Blocking waiting for file lock on build directory
+    Checking e5r-ptx v0.1.0 (/root/e5r-oss-ptx/crates/e5r-ptx)
+    Checking e5r-verify v0.1.0 (/root/e5r-oss-ptx/crates/e5r-verify)
+    Finished `release` profile [optimized] target(s) in 25.31s

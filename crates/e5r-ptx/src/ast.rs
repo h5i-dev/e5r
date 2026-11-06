@@ -394,6 +394,15 @@ pub enum CvtRnd {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub enum Instr {
+    /// Full-mask aligned warp barrier. Only -1/u32::MAX spellings are admitted;
+    /// it requires the warp-aware execution model, never CTA substitution.
+    WarpBar(i128),
+    /// Readonly-kernel noncoherent float load; requires the warp/cache domain.
+    LdGlobalNCF32(String, Address),
+    /// Explicit volatile shared 32-bit load, retaining its source qualifier.
+    LdVolatileShared32(String, Address),
+    /// Explicit volatile shared 32-bit store, retaining its source qualifier.
+    StVolatileShared32(Address, Operand),
     /// `clz.b32 d, a`, a 32-bit count including clz(0)=32.
     Clz32(String, Operand),
     /// `min.s32 d, a, b`, a signed comparison of low 32 bits.
@@ -612,5 +621,15 @@ impl Module {
             matches!(&s.instr, Instr::Mov(_, _, Operand::Sym(name))
                 if self.globals.iter().any(|g| g.name == *name))
         })
+    }
+}
+
+impl Kernel {
+    /// Instructions the legacy SC/CTA model cannot certify. Parsing/exporting
+    /// them does not grant permission to use a legacy checker domain.
+    pub fn requires_warp_domain(&self) -> bool {
+        self.body
+            .iter()
+            .any(|s| matches!(s.instr, Instr::WarpBar(_) | Instr::LdGlobalNCF32(..)))
     }
 }

@@ -1,0 +1,81 @@
+{
+  "scope": "model admission only, exact-byte extraction not baseline substitution",
+  "rows": [
+    {
+      "variant": "original",
+      "dtype": "fp32",
+      "entry_sha256": "ea210ee92fb2c104abbc9256b5ac3b11c18a643c7e96b4624821e86d29a8ee29",
+      "globals": 67,
+      "exact_body_correspondence": true,
+      "export_returncode": 0,
+      "error": "",
+      "whole_kernel_accepted": false
+    },
+    {
+      "variant": "original",
+      "dtype": "fp16",
+      "entry_sha256": "384ea6fd08569bdac63fe3030c4cd0d6861036ac26c96ff5e0e069f748bee651",
+      "globals": 67,
+      "exact_body_correspondence": true,
+      "export_returncode": 1,
+      "error": "e5r: /mnt/scratch/e5r-oss-ptx/int4/whole-proof/variant-inventory/original-fp16.ptx: line 335: expected a name, found Punct('{')",
+      "whole_kernel_accepted": false
+    },
+    {
+      "variant": "original",
+      "dtype": "bf16",
+      "entry_sha256": "8a8b597a24983d28c807ff746415a8325ec208fb68bac5446aa0bb33e557d1ad",
+      "globals": 67,
+      "exact_body_correspondence": true,
+      "export_returncode": 1,
+      "error": "e5r: /mnt/scratch/e5r-oss-ptx/int4/whole-proof/variant-inventory/original-bf16.ptx: line 335: expected a name, found Punct('{')",
+      "whole_kernel_accepted": false
+    },
+    {
+      "variant": "original",
+      "dtype": "full-TU",
+      "entry_sha256": "30a95604710e82a0052ca435185983520ade5cdf8de89f5daa2d7d4d5ae5d3f7",
+      "export_returncode": 1,
+      "error": "e5r: /mnt/scratch/e5r-oss-ptx/int4/whole-proof/variant-inventory/original-full.ptx: line 4649: unexpected character '|'",
+      "whole_kernel_accepted": false
+    },
+    {
+      "variant": "edited",
+      "dtype": "fp32",
+      "entry_sha256": "bea226c117624d7c2f33b0a2b0ae6becbface97717fe71cdd4d5175fd87e75ef",
+      "globals": 67,
+      "exact_body_correspondence": true,
+      "export_returncode": 0,
+      "error": "",
+      "whole_kernel_accepted": false
+    },
+    {
+      "variant": "edited",
+      "dtype": "fp16",
+      "entry_sha256": "e6737a76cf0bfdb78e19e158426bcb979d6aac0892596556fd80e36a17c4152a",
+      "globals": 67,
+      "exact_body_correspondence": true,
+      "export_returncode": 1,
+      "error": "e5r: /mnt/scratch/e5r-oss-ptx/int4/whole-proof/variant-inventory/edited-fp16.ptx: line 339: expected a name, found Punct('{')",
+      "whole_kernel_accepted": false
+    },
+    {
+      "variant": "edited",
+      "dtype": "bf16",
+      "entry_sha256": "50953845e34cfbb55ab7e2371afc60ffd85703ee9a70e0f5a003e6d33fe056a5",
+      "globals": 67,
+      "exact_body_correspondence": true,
+      "export_returncode": 1,
+      "error": "e5r: /mnt/scratch/e5r-oss-ptx/int4/whole-proof/variant-inventory/edited-bf16.ptx: line 339: expected a name, found Punct('{')",
+      "whole_kernel_accepted": false
+    },
+    {
+      "variant": "edited",
+      "dtype": "full-TU",
+      "entry_sha256": "dbd277b5fabaee8f8f0b3fa354f3e00b67db343905ee3b85184cc3291dda9210",
+      "export_returncode": 1,
+      "error": "e5r: /mnt/scratch/e5r-oss-ptx/int4/whole-proof/variant-inventory/edited-full.ptx: line 4649: unexpected character '|'",
+      "whole_kernel_accepted": false
+    }
+  ]
+}
