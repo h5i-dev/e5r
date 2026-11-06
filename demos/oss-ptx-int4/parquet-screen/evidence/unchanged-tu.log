@@ -1,0 +1,14 @@
+In file included from /mnt/scratch/e5r-oss-ptx/int4/rmm/cpp/include/rmm/aligned.hpp:8,
+                 from /mnt/scratch/e5r-oss-ptx/int4/rmm/cpp/include/rmm/device_buffer.hpp:7,
+                 from /mnt/scratch/e5r-oss-ptx/int4/cudf/cpp/include/cudf/utilities/span.hpp:11,
+                 from /mnt/scratch/e5r-oss-ptx/int4/cudf/cpp/include/cudf/detail/utilities/cuda_memcpy.hpp:11,
+                 from /mnt/scratch/e5r-oss-ptx/int4/cudf/cpp/src/io/utilities/hostdevice_span.hpp:8,
+                 from /mnt/scratch/e5r-oss-ptx/int4/cudf/cpp/src/io/utilities/hostdevice_vector.hpp:8,
+                 from /mnt/scratch/e5r-oss-ptx/int4/cudf/cpp/src/io/parquet/error.hpp:8,
+                 from /mnt/scratch/e5r-oss-ptx/int4/cudf/cpp/src/io/parquet/page_decode.cuh:8,
+                 from /mnt/scratch/e5r-oss-ptx/int4/cudf/cpp/src/io/parquet/page_data.cuh:9,
+                 from /mnt/scratch/e5r-oss-ptx/int4/cudf/cpp/src/io/parquet/decode_fixed.cu:5:
+/mnt/scratch/e5r-oss-ptx/int4/rmm/cpp/include/rmm/detail/export.hpp:8:10: fatal error: rmm/version_config.hpp: No such file or directory
+    8 | #include <rmm/version_config.hpp>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.

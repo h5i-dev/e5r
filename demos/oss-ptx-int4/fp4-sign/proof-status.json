@@ -1,0 +1,68 @@
+{
+  "artifact_replay": "exact hashes and deterministic direct edit pass",
+  "table_bits": [
+    "0x0",
+    "0x3baaaaab",
+    "0x3f2aaaab",
+    "0x3f800000",
+    "0x3eaaaaab",
+    "0x3f000000",
+    "0x3e2aaaab",
+    "0x3e800000"
+  ],
+  "local_lemma": "kernel-reduced decide +kernel; table_sign and scaled_sign; standard axioms only",
+  "local_semantic_negative": "kernel-proved zero-table counterexample to wrong bit30 insertion after candidate expression replacement",
+  "exports": {
+    "original": {
+      "command": [
+        "/mnt/scratch/e5r-oss-ptx/cargo/release/e5r",
+        "ptx",
+        "export",
+        "/mnt/scratch/e5r-oss-ptx/int4/fp4-sign/proof/original.ptx"
+      ],
+      "returncode": 1,
+      "sha256": "30a95604710e82a0052ca435185983520ade5cdf8de89f5daa2d7d4d5ae5d3f7",
+      "error": "e5r: /mnt/scratch/e5r-oss-ptx/int4/fp4-sign/proof/original.ptx: line 4649: unexpected character '|'"
+    },
+    "edited": {
+      "command": [
+        "/mnt/scratch/e5r-oss-ptx/cargo/release/e5r",
+        "ptx",
+        "export",
+        "/mnt/scratch/e5r-oss-ptx/int4/fp4-sign/proof/edited.ptx"
+      ],
+      "returncode": 1,
+      "sha256": "dbd277b5fabaee8f8f0b3fa354f3e00b67db343905ee3b85184cc3291dda9210",
+      "error": "e5r: /mnt/scratch/e5r-oss-ptx/int4/fp4-sign/proof/edited.ptx: line 4649: unexpected character '|'"
+    },
+    "entry-original": {
+      "command": [
+        "/mnt/scratch/e5r-oss-ptx/cargo/release/e5r",
+        "ptx",
+        "export",
+        "/mnt/scratch/e5r-oss-ptx/int4/fp4-sign/proof/entry-original.ptx"
+      ],
+      "returncode": 1,
+      "sha256": "ea210ee92fb2c104abbc9256b5ac3b11c18a643c7e96b4624821e86d29a8ee29",
+      "error": "e5r: /mnt/scratch/e5r-oss-ptx/int4/fp4-sign/proof/entry-original.ptx: line 4: unsupported module global declaration"
+    },
+    "entry-edited": {
+      "command": [
+        "/mnt/scratch/e5r-oss-ptx/cargo/release/e5r",
+        "ptx",
+        "export",
+        "/mnt/scratch/e5r-oss-ptx/int4/fp4-sign/proof/entry-edited.ptx"
+      ],
+      "returncode": 1,
+      "sha256": "bea226c117624d7c2f33b0a2b0ae6becbface97717fe71cdd4d5175fd87e75ef",
+      "error": "e5r: /mnt/scratch/e5r-oss-ptx/int4/fp4-sign/proof/entry-edited.ptx: line 4: unsupported module global declaration"
+    }
+  },
+  "accepted_whole_kernel_proof": false,
+  "remaining": [
+    "full TU lexer rejects unrelated predicate | syntax; extracted exact FP4 entries reject initialized global data",
+    "implicit rounding FP operations require explicit model justification",
+    "barrier/shared-memory execution and FP16/BF16 conversions need whole-kernel proof",
+    "no whole-kernel hash-rebound semantic negative admitted through parser"
+  ]
+}

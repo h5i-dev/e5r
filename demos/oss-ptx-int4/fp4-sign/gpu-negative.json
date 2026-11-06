@@ -1,0 +1,10 @@
+{
+  "kind": "GPU execution semantic negative only",
+  "candidate_sha256": "b11541ade807ba600ec2f7ec402ad8508670ff2e86d2f7a33ff18161a5b34ef3",
+  "changed_sign_masks": 48,
+  "mismatching_outputs": 768,
+  "outputs": 1024,
+  "canaries": "pass",
+  "proof_negative": false,
+  "note": "Candidate hash rebound for execution. Whole-kernel exporter/proof admission is still blocked; do not count this as a strict proof negative."
+}

@@ -1,0 +1,50 @@
+{
+  "accepted_whole_kernel_wins": 0,
+  "measured_direct_edit_families": 2,
+  "measured_fp4_versions": 2,
+  "local_proof_families": 1,
+  "entries": [
+    {
+      "family": "llama.cpp Q4_K conversion",
+      "path": "llm-screen",
+      "stage": "direct PTX edit; actual GPU differential/timing; no accepted proof",
+      "result": "107->103 SASS, 26 registers; mixed 0.959-1.018 ratios; no useful speedup",
+      "inherited_completed_screen": true
+    },
+    {
+      "family": "Marlin",
+      "path": "llm-screen",
+      "stage": "compiler and source controls",
+      "result": "existing inline LOP3/half2 already strong; no new win",
+      "inherited_completed_screen": true
+    },
+    {
+      "family": "llama.cpp Q4_0/Q4_1",
+      "path": "llm-screen",
+      "stage": "compiler screen only",
+      "result": "nibble decode already simple mask/shift",
+      "inherited_completed_screen": true
+    },
+    {
+      "family": "bitsandbytes NF4",
+      "path": "bitsandbytes-screen",
+      "stage": "compiler screen only",
+      "result": "bounded integer unpack already optimized",
+      "inherited_completed_screen": true
+    },
+    {
+      "family": "bitsandbytes FP4",
+      "path": "fp4-sign",
+      "stage": "two direct PTX versions; strongest source control; local Lean lemmas; adversarial GPU; two timing sessions",
+      "result": "56 fewer SASS; localized gains around 4-5%; missed adjacent-size success criterion; whole-kernel proof blocked",
+      "accepted_proof": false
+    },
+    {
+      "family": "cuDF Parquet",
+      "path": "parquet-screen",
+      "stage": "source/dependency compiler screen; no emitted normal PTX",
+      "result": "existing funnelshift and literal load fast path; normal configure and unchanged-TU dependency failures",
+      "accepted_proof": false
+    }
+  ]
+}

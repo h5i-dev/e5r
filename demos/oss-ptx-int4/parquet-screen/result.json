@@ -1,0 +1,72 @@
+{
+  "repository": "https://github.com/rapidsai/cudf",
+  "commit": "d71b3b743ca6fc9d8d4b1718d845eec4bc63dee6",
+  "license": "Apache-2.0",
+  "source_hashes": {
+    "LICENSE": "e180a98d609b60c90c4055b8ec95eca2b64b39a3fde7b1f098fea81d6dbf9e03",
+    "cpp/CMakeLists.txt": "e0b8af6976f27d8ba6f24782ac1d44e6e4cbae74fc989b2dcbfffbf1821b7b5a",
+    "cpp/src/io/parquet/decode_fixed.cu": "7f5833a2fb20cd7aa4dd6a7875b8b18148530883e45a385a971c1ce97dc1e77e",
+    "cpp/src/io/parquet/rle_stream.cuh": "77d36eb9c1936f8f26720488ead059beff9e91be576463e643492033a43be1ee",
+    "cpp/src/io/parquet/parquet_gpu.hpp": "a80054758528b226594bcd80859ab9c457b39b9dc54ece2917c49a71e95e5dec",
+    "cpp/src/io/parquet/page_data.cuh": "34698534da78fa4173eb4bd559e78665d344d768821256edb553f4f8b257f164",
+    "cpp/cmake/thirdparty/get_cccl.cmake": "5de967802fe8db5e0d1e718534c77962b1ae97b9c0948104f3ad23bea53fae7d",
+    "cpp/cmake/thirdparty/get_rmm.cmake": "49e952ad577cc8121cc55f6b74307926592f6b4b50ac1108b34a5d00ae220b79"
+  },
+  "rmm_attempt_pin": "cd54ddc5a7905df21b02ac88497d6dfda26b4249",
+  "normal_kernel": "decode_page_data_generic in cpp/src/io/parquet/decode_fixed.cu; actual host template launches retained",
+  "lead": "cross-word integer extraction; existing __funnelshift_r in page_data.cuh, existing guarded unaligned 32-bit literal path in rle_stream.cuh",
+  "commands": [
+    {
+      "name": "normal-cmake",
+      "command": [
+        "cmake",
+        "-S",
+        "/mnt/scratch/e5r-oss-ptx/int4/cudf/cpp",
+        "-B",
+        "/mnt/scratch/e5r-oss-ptx/int4/cudf-build/normal",
+        "-DCMAKE_CUDA_ARCHITECTURES=86",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DBUILD_TESTS=OFF",
+        "-DBUILD_BENCHMARKS=OFF",
+        "-DCUDF_BUILD_TESTUTIL=OFF",
+        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+      ],
+      "returncode": 1,
+      "log_sha256": "f44a77d43041fd165bd98a54efc0d2e155379242ddfd62ff1674a115c230c3ad"
+    },
+    {
+      "name": "unchanged-tu",
+      "command": [
+        "/usr/local/cuda/bin/nvcc",
+        "-std=c++20",
+        "-O3",
+        "-DNDEBUG",
+        "-arch=sm_86",
+        "--threads",
+        "1",
+        "-ptx",
+        "-I",
+        "/mnt/scratch/e5r-oss-ptx/int4/rmm/cpp/include",
+        "-I",
+        "/mnt/scratch/e5r-oss-ptx/int4/cudf/cpp/include",
+        "-I",
+        "/mnt/scratch/e5r-oss-ptx/int4/cudf/cpp/src",
+        "/mnt/scratch/e5r-oss-ptx/int4/cudf/cpp/src/io/parquet/decode_fixed.cu",
+        "-o",
+        "/mnt/scratch/e5r-oss-ptx/int4/cudf-build/decode_fixed.ptx"
+      ],
+      "returncode": 1,
+      "log_sha256": "771353925e0e09d4dcf1430db9da68a2c8c2c1754215bd789df6e60e828e3411"
+    }
+  ],
+  "frozen_normal_build": false,
+  "direct_edit": false,
+  "gpu_executed": false,
+  "accepted_proof": false,
+  "status": "incomplete compiler screen, dependency/configuration rejection; source inspection establishes existing techniques only; no production performance conclusion",
+  "rmm_selected_evidence_sha256": {
+    "RMM.LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "rmm-export.hpp": "0d23a7a08344c908912cb067fc3481927605ee962213d3447acd22d28923eb57",
+    "rmm-CMakeLists.txt": "19e33fdd1830481520482c45f870cd6f21938cb125b0c06e619e97a87143589d"
+  }
+}

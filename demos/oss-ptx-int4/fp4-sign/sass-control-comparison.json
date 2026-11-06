@@ -1,0 +1,17 @@
+[
+  {
+    "dtype": "fp32",
+    "edited_cuda_instruction_stream_equal": false,
+    "comparison": "instruction text including physical registers; disassembler headers/encodings excluded"
+  },
+  {
+    "dtype": "fp16",
+    "edited_cuda_instruction_stream_equal": true,
+    "comparison": "instruction text including physical registers; disassembler headers/encodings excluded"
+  },
+  {
+    "dtype": "bf16",
+    "edited_cuda_instruction_stream_equal": true,
+    "comparison": "instruction text including physical registers; disassembler headers/encodings excluded"
+  }
+]

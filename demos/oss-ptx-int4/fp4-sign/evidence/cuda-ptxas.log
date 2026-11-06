@@ -1,0 +1,761 @@
+ptxas info    : 161 bytes gmem, 536 bytes cmem[4]
+ptxas info    : Compiling entry function '_ZN3cub16_V_300200_SM_8606detail11EmptyKernelIvEEvv' for 'sm_86'
+ptxas info    : Function properties for _ZN3cub16_V_300200_SM_8606detail11EmptyKernelIvEEvv
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 4 registers, used 0 barriers, 352 bytes cmem[0]
+ptxas info    : Compile time = 5.873 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit1StateBlockwiseI13__nv_bfloat16Li4ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit1StateBlockwiseI13__nv_bfloat16Li4ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 2644 bytes smem, 432 bytes cmem[0]
+ptxas info    : Compile time = 43.598 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit1StateBlockwiseI6__halfLi4ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit1StateBlockwiseI6__halfLi4ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 2644 bytes smem, 432 bytes cmem[0]
+ptxas info    : Compile time = 54.179 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit1StateBlockwiseIfLi4ELi256ELi1EEvPT_S1_PhfffifPfS3_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit1StateBlockwiseIfLi4ELi256ELi1EEvPT_S1_PhfffifPfS3_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 3156 bytes smem, 432 bytes cmem[0]
+ptxas info    : Compile time = 43.683 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit1StateBlockwiseI13__nv_bfloat16Li5ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit1StateBlockwiseI13__nv_bfloat16Li5ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 2644 bytes smem, 432 bytes cmem[0]
+ptxas info    : Compile time = 37.344 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit1StateBlockwiseI6__halfLi5ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit1StateBlockwiseI6__halfLi5ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 2644 bytes smem, 432 bytes cmem[0]
+ptxas info    : Compile time = 26.354 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit1StateBlockwiseIfLi5ELi256ELi1EEvPT_S1_PhfffifPfS3_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit1StateBlockwiseIfLi5ELi256ELi1EEvPT_S1_PhfffifPfS3_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 3156 bytes smem, 432 bytes cmem[0]
+ptxas info    : Compile time = 27.377 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit1StateBlockwiseI13__nv_bfloat16Li2ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit1StateBlockwiseI13__nv_bfloat16Li2ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 2644 bytes smem, 432 bytes cmem[0]
+ptxas info    : Compile time = 27.432 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit1StateBlockwiseI6__halfLi2ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit1StateBlockwiseI6__halfLi2ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 2644 bytes smem, 432 bytes cmem[0]
+ptxas info    : Compile time = 48.816 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit1StateBlockwiseIfLi2ELi256ELi1EEvPT_S1_PhfffifPfS3_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit1StateBlockwiseIfLi2ELi256ELi1EEvPT_S1_PhfffifPfS3_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 3156 bytes smem, 432 bytes cmem[0]
+ptxas info    : Compile time = 41.199 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit1StateBlockwiseI13__nv_bfloat16Li1ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit1StateBlockwiseI13__nv_bfloat16Li1ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 2644 bytes smem, 432 bytes cmem[0]
+ptxas info    : Compile time = 27.112 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit1StateBlockwiseI6__halfLi1ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit1StateBlockwiseI6__halfLi1ELi256ELi1EEvPT_S2_PhfffifPfS4_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 2644 bytes smem, 432 bytes cmem[0]
+ptxas info    : Compile time = 27.409 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit1StateBlockwiseIfLi1ELi256ELi1EEvPT_S1_PhfffifPfS3_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit1StateBlockwiseIfLi1ELi256ELi1EEvPT_S1_PhfffifPfS3_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 3156 bytes smem, 432 bytes cmem[0]
+ptxas info    : Compile time = 28.488 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit2StateBlockwiseI13__nv_bfloat16Li6ELi256ELi1EEvPT_S2_PhS3_fffffifPfS4_S4_S4_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit2StateBlockwiseI13__nv_bfloat16Li6ELi256ELi1EEvPT_S2_PhS3_fffffifPfS4_S4_S4_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 55 registers, used 1 barriers, 4796 bytes smem, 464 bytes cmem[0]
+ptxas info    : Compile time = 71.713 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit2StateBlockwiseI6__halfLi6ELi256ELi1EEvPT_S2_PhS3_fffffifPfS4_S4_S4_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit2StateBlockwiseI6__halfLi6ELi256ELi1EEvPT_S2_PhS3_fffffifPfS4_S4_S4_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 55 registers, used 1 barriers, 4796 bytes smem, 464 bytes cmem[0]
+ptxas info    : Compile time = 53.680 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit2StateBlockwiseIfLi6ELi256ELi1EEvPT_S1_PhS2_fffffifPfS3_S3_S3_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit2StateBlockwiseIfLi6ELi256ELi1EEvPT_S1_PhS2_fffffifPfS3_S3_S3_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 56 registers, used 1 barriers, 5308 bytes smem, 464 bytes cmem[0]
+ptxas info    : Compile time = 52.501 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit2StateBlockwiseI13__nv_bfloat16Li0ELi256ELi1EEvPT_S2_PhS3_fffffifPfS4_S4_S4_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit2StateBlockwiseI13__nv_bfloat16Li0ELi256ELi1EEvPT_S2_PhS3_fffffifPfS4_S4_S4_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 52 registers, used 1 barriers, 4744 bytes smem, 464 bytes cmem[0]
+ptxas info    : Compile time = 37.762 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit2StateBlockwiseI6__halfLi0ELi256ELi1EEvPT_S2_PhS3_fffffifPfS4_S4_S4_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit2StateBlockwiseI6__halfLi0ELi256ELi1EEvPT_S2_PhS3_fffffifPfS4_S4_S4_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 52 registers, used 1 barriers, 4744 bytes smem, 464 bytes cmem[0]
+ptxas info    : Compile time = 41.630 ms
+ptxas info    : Compiling entry function '_Z35kOptimizerStatic8bit2StateBlockwiseIfLi0ELi256ELi1EEvPT_S1_PhS2_fffffifPfS3_S3_S3_ffbi' for 'sm_86'
+ptxas info    : Function properties for _Z35kOptimizerStatic8bit2StateBlockwiseIfLi0ELi256ELi1EEvPT_S1_PhS2_fffffifPfS3_S3_S3_ffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 52 registers, used 1 barriers, 5256 bytes smem, 464 bytes cmem[0]
+ptxas info    : Compile time = 33.393 ms
+ptxas info    : Compiling entry function '_Z20kDequantizeBlockwiseI13__nv_bfloat16Li512ELi64ELi8ELi2EEvPfPhS1_PT_ii' for 'sm_86'
+ptxas info    : Function properties for _Z20kDequantizeBlockwiseI13__nv_bfloat16Li512ELi64ELi8ELi2EEvPfPhS1_PT_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 48 registers, used 1 barriers, 2656 bytes smem, 392 bytes cmem[0]
+ptxas info    : Compile time = 27.087 ms
+ptxas info    : Compiling entry function '_Z20kDequantizeBlockwiseI13__nv_bfloat16Li512ELi64ELi8ELi0EEvPfPhS1_PT_ii' for 'sm_86'
+ptxas info    : Function properties for _Z20kDequantizeBlockwiseI13__nv_bfloat16Li512ELi64ELi8ELi0EEvPfPhS1_PT_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 1600 bytes smem, 392 bytes cmem[0]
+ptxas info    : Compile time = 15.947 ms
+ptxas info    : Compiling entry function '_Z20kDequantizeBlockwiseI13__nv_bfloat16Li512ELi64ELi8ELi1EEvPfPhS1_PT_ii' for 'sm_86'
+ptxas info    : Function properties for _Z20kDequantizeBlockwiseI13__nv_bfloat16Li512ELi64ELi8ELi1EEvPfPhS1_PT_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 48 registers, used 1 barriers, 2656 bytes smem, 392 bytes cmem[0]
+ptxas info    : Compile time = 34.633 ms
+ptxas info    : Compiling entry function '_Z20kDequantizeBlockwiseIfLi512ELi64ELi8ELi2EEvPfPhS0_PT_ii' for 'sm_86'
+ptxas info    : Function properties for _Z20kDequantizeBlockwiseIfLi512ELi64ELi8ELi2EEvPfPhS0_PT_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 48 registers, used 1 barriers, 4768 bytes smem, 392 bytes cmem[0]
+ptxas info    : Compile time = 26.913 ms
+ptxas info    : Compiling entry function '_Z20kDequantizeBlockwiseIfLi512ELi64ELi8ELi0EEvPfPhS0_PT_ii' for 'sm_86'
+ptxas info    : Function properties for _Z20kDequantizeBlockwiseIfLi512ELi64ELi8ELi0EEvPfPhS0_PT_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 2656 bytes smem, 392 bytes cmem[0]
+ptxas info    : Compile time = 14.289 ms
+ptxas info    : Compiling entry function '_Z20kDequantizeBlockwiseIfLi512ELi64ELi8ELi1EEvPfPhS0_PT_ii' for 'sm_86'
+ptxas info    : Function properties for _Z20kDequantizeBlockwiseIfLi512ELi64ELi8ELi1EEvPfPhS0_PT_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 48 registers, used 1 barriers, 4768 bytes smem, 392 bytes cmem[0]
+ptxas info    : Compile time = 29.978 ms
+ptxas info    : Compiling entry function '_Z20kDequantizeBlockwiseI6__halfLi512ELi64ELi8ELi2EEvPfPhS1_PT_ii' for 'sm_86'
+ptxas info    : Function properties for _Z20kDequantizeBlockwiseI6__halfLi512ELi64ELi8ELi2EEvPfPhS1_PT_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 48 registers, used 1 barriers, 2656 bytes smem, 392 bytes cmem[0]
+ptxas info    : Compile time = 29.087 ms
+ptxas info    : Compiling entry function '_Z20kDequantizeBlockwiseI6__halfLi512ELi64ELi8ELi0EEvPfPhS1_PT_ii' for 'sm_86'
+ptxas info    : Function properties for _Z20kDequantizeBlockwiseI6__halfLi512ELi64ELi8ELi0EEvPfPhS1_PT_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 1600 bytes smem, 392 bytes cmem[0]
+ptxas info    : Compile time = 17.873 ms
+ptxas info    : Compiling entry function '_Z20kDequantizeBlockwiseI6__halfLi512ELi64ELi8ELi1EEvPfPhS1_PT_ii' for 'sm_86'
+ptxas info    : Function properties for _Z20kDequantizeBlockwiseI6__halfLi512ELi64ELi8ELi1EEvPfPhS1_PT_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 48 registers, used 1 barriers, 2656 bytes smem, 392 bytes cmem[0]
+ptxas info    : Compile time = 34.512 ms
+ptxas info    : Compiling entry function '_Z23kQuantizeBlockwiseSmallI13__nv_bfloat16Li64ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z23kQuantizeBlockwiseSmallI13__nv_bfloat16Li64ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 17 registers, used 1 barriers, 180 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 15.332 ms
+ptxas info    : Compiling entry function '_Z23kQuantizeBlockwiseSmallIfLi64ELi2EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z23kQuantizeBlockwiseSmallIfLi64ELi2EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 17 registers, used 1 barriers, 308 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 11.971 ms
+ptxas info    : Compiling entry function '_Z23kQuantizeBlockwiseSmallI6__halfLi64ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z23kQuantizeBlockwiseSmallI6__halfLi64ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 19 registers, used 1 barriers, 180 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 11.756 ms
+ptxas info    : Compiling entry function '_Z23kQuantizeBlockwiseSmallI13__nv_bfloat16Li64ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z23kQuantizeBlockwiseSmallI13__nv_bfloat16Li64ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 17 registers, used 1 barriers, 180 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 11.265 ms
+ptxas info    : Compiling entry function '_Z23kQuantizeBlockwiseSmallIfLi64ELi1EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z23kQuantizeBlockwiseSmallIfLi64ELi1EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 17 registers, used 1 barriers, 308 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 12.587 ms
+ptxas info    : Compiling entry function '_Z23kQuantizeBlockwiseSmallI6__halfLi64ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z23kQuantizeBlockwiseSmallI6__halfLi64ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 19 registers, used 1 barriers, 180 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 11.198 ms
+ptxas info    : Compiling entry function '_Z23kQuantizeBlockwiseSmallI13__nv_bfloat16Li32ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z23kQuantizeBlockwiseSmallI13__nv_bfloat16Li32ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 1 barriers, 184 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 16.738 ms
+ptxas info    : Compiling entry function '_Z23kQuantizeBlockwiseSmallIfLi32ELi2EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z23kQuantizeBlockwiseSmallIfLi32ELi2EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 21 registers, used 1 barriers, 312 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 22.545 ms
+ptxas info    : Compiling entry function '_Z23kQuantizeBlockwiseSmallI6__halfLi32ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z23kQuantizeBlockwiseSmallI6__halfLi32ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 1 barriers, 184 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 42.693 ms
+ptxas info    : Compiling entry function '_Z23kQuantizeBlockwiseSmallI13__nv_bfloat16Li32ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z23kQuantizeBlockwiseSmallI13__nv_bfloat16Li32ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 1 barriers, 184 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 30.862 ms
+ptxas info    : Compiling entry function '_Z23kQuantizeBlockwiseSmallIfLi32ELi1EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z23kQuantizeBlockwiseSmallIfLi32ELi1EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 21 registers, used 1 barriers, 312 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 17.629 ms
+ptxas info    : Compiling entry function '_Z23kQuantizeBlockwiseSmallI6__halfLi32ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z23kQuantizeBlockwiseSmallI6__halfLi32ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 1 barriers, 184 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 15.001 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li64ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li64ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 18 registers, used 1 barriers, 192 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 22.412 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li128ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li128ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 25 registers, used 1 barriers, 356 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 18.808 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li256ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li256ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 25 registers, used 1 barriers, 684 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 24.044 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li512ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li512ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 31 registers, used 1 barriers, 1344 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 21.669 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li1024ELi4ELi0ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li1024ELi4ELi0ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 35 registers, used 1 barriers, 2624 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 33.151 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li2048ELi4ELi0ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li2048ELi4ELi0ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 37 registers, used 1 barriers, 5224 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 33.315 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li4096ELi4ELi0ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li4096ELi4ELi0ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 37 registers, used 1 barriers, 10424 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 39.288 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li64ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li64ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 18 registers, used 1 barriers, 192 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 16.215 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li128ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li128ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 25 registers, used 1 barriers, 356 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 17.748 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li256ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li256ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 25 registers, used 1 barriers, 684 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 20.476 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li512ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li512ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 31 registers, used 1 barriers, 1344 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 21.568 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li1024ELi4ELi0ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li1024ELi4ELi0ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 36 registers, used 1 barriers, 2624 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 28.713 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li2048ELi4ELi0ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li2048ELi4ELi0ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 37 registers, used 1 barriers, 5224 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 26.966 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li4096ELi4ELi0ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li4096ELi4ELi0ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 37 registers, used 1 barriers, 10424 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 32.425 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li64ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li64ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 1248 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 29.821 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li128ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li128ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 1444 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 25.981 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li256ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li256ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 1836 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 30.231 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li512ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li512ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 2624 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 28.294 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li1024ELi4ELi0ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li1024ELi4ELi0ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 4160 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 43.536 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li2048ELi4ELi0ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li2048ELi4ELi0ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 7272 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 51.323 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li4096ELi4ELi1ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li4096ELi4ELi1ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 48 registers, used 1 barriers, 29880 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 55.481 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI13__nv_bfloat16Li4096ELi4ELi0ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI13__nv_bfloat16Li4096ELi4ELi0ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 13496 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 49.137 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi64ELi2ELi0ELi2EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi64ELi2ELi0ELi2EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 1 barriers, 320 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 19.974 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi128ELi2ELi0ELi2EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi128ELi2ELi0ELi2EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 1 barriers, 612 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 23.617 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi256ELi2ELi0ELi2EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi256ELi2ELi0ELi2EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 27 registers, used 1 barriers, 1196 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 21.410 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi512ELi2ELi0ELi2EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi512ELi2ELi0ELi2EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, used 1 barriers, 2368 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 35.303 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi1024ELi4ELi0ELi2EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi1024ELi4ELi0ELi2EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 35 registers, used 1 barriers, 4672 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 56.741 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi2048ELi4ELi0ELi2EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi2048ELi4ELi0ELi2EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 37 registers, used 1 barriers, 9320 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 60.802 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi4096ELi4ELi0ELi2EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi4096ELi4ELi0ELi2EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 18616 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 41.067 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi64ELi2ELi0ELi1EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi64ELi2ELi0ELi1EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 1 barriers, 320 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 15.757 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi128ELi2ELi0ELi1EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi128ELi2ELi0ELi1EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 27 registers, used 1 barriers, 612 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 16.628 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi256ELi2ELi0ELi1EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi256ELi2ELi0ELi1EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 1 barriers, 1196 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 26.122 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi512ELi2ELi0ELi1EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi512ELi2ELi0ELi1EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 31 registers, used 1 barriers, 2368 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 20.638 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi1024ELi4ELi0ELi1EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi1024ELi4ELi0ELi1EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 35 registers, used 1 barriers, 4672 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 40.599 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi2048ELi4ELi0ELi1EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi2048ELi4ELi0ELi1EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 37 registers, used 1 barriers, 9320 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 62.357 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi4096ELi4ELi0ELi1EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi4096ELi4ELi0ELi1EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 18616 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 68.766 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi64ELi2ELi0ELi0EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi64ELi2ELi0ELi0EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 38 registers, used 1 barriers, 1376 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 48.834 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi128ELi2ELi0ELi0EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi128ELi2ELi0ELi0EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 1700 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 53.646 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi256ELi2ELi0ELi0EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi256ELi2ELi0ELi0EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 2348 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 61.646 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi512ELi2ELi0ELi0EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi512ELi2ELi0ELi0EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 3648 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 48.493 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi1024ELi4ELi0ELi0EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi1024ELi4ELi0ELi0EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 6208 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 74.035 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi2048ELi4ELi0ELi0EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi2048ELi4ELi0ELi0EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 11368 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 57.790 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi4096ELi4ELi1ELi0EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi4096ELi4ELi1ELi0EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 47 registers, used 1 barriers, 38072 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 118.960 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseIfLi4096ELi4ELi0ELi0EEvPfPT_S0_PhS0_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseIfLi4096ELi4ELi0ELi0EEvPfPT_S0_PhS0_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 21688 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 61.919 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi64ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi64ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 1 barriers, 192 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 16.238 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi128ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi128ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 1 barriers, 356 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 16.958 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi256ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi256ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 1 barriers, 684 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 20.363 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi512ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi512ELi2ELi0ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 31 registers, used 1 barriers, 1344 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 19.780 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi1024ELi4ELi0ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi1024ELi4ELi0ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 35 registers, used 1 barriers, 2624 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 25.630 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi2048ELi4ELi0ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi2048ELi4ELi0ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 37 registers, used 1 barriers, 5224 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 27.438 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi4096ELi4ELi0ELi2EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi4096ELi4ELi0ELi2EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 37 registers, used 1 barriers, 10424 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 69.649 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi64ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi64ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 1 barriers, 192 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 32.842 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi128ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi128ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 1 barriers, 356 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 32.219 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi256ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi256ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 26 registers, used 1 barriers, 684 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 38.599 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi512ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi512ELi2ELi0ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 31 registers, used 1 barriers, 1344 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 41.132 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi1024ELi4ELi0ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi1024ELi4ELi0ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 36 registers, used 1 barriers, 2624 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 45.703 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi2048ELi4ELi0ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi2048ELi4ELi0ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 37 registers, used 1 barriers, 5224 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 53.575 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi4096ELi4ELi0ELi1EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi4096ELi4ELi0ELi1EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 37 registers, used 1 barriers, 10424 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 60.850 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi64ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi64ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 1248 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 43.150 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi128ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi128ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 1444 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 49.589 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi256ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi256ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 1836 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 57.547 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi512ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi512ELi2ELi0ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 2624 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 54.112 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi1024ELi4ELi0ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi1024ELi4ELi0ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 4160 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 72.513 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi2048ELi4ELi0ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi2048ELi4ELi0ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 7272 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 91.243 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi4096ELi4ELi1ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi4096ELi4ELi1ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 48 registers, used 1 barriers, 29880 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 78.480 ms
+ptxas info    : Compiling entry function '_Z18kQuantizeBlockwiseI6__halfLi4096ELi4ELi0ELi0EEvPfPT_S1_PhS1_ii' for 'sm_86'
+ptxas info    : Function properties for _Z18kQuantizeBlockwiseI6__halfLi4096ELi4ELi0ELi0EEvPfPT_S1_PhS1_ii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 13496 bytes smem, 400 bytes cmem[0]
+ptxas info    : Compile time = 51.883 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit2StateI13__nv_bfloat16Li6EEvPT_S2_PfS3_S3_ffffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit2StateI13__nv_bfloat16Li6EEvPT_S2_PfS3_S3_ffffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 55 registers, used 1 barriers, 16400 bytes smem, 444 bytes cmem[0]
+ptxas info    : Compile time = 34.141 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit2StateI6__halfLi6EEvPT_S2_PfS3_S3_ffffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit2StateI6__halfLi6EEvPT_S2_PfS3_S3_ffffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 55 registers, used 1 barriers, 16400 bytes smem, 444 bytes cmem[0]
+ptxas info    : Compile time = 34.436 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit2StateIfLi6EEvPT_S1_PfS2_S2_ffffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit2StateIfLi6EEvPT_S1_PfS2_S2_ffffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 51 registers, used 1 barriers, 16400 bytes smem, 444 bytes cmem[0]
+ptxas info    : Compile time = 62.129 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit2StateI13__nv_bfloat16Li0EEvPT_S2_PfS3_S3_ffffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit2StateI13__nv_bfloat16Li0EEvPT_S2_PfS3_S3_ffffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 48 registers, used 1 barriers, 16400 bytes smem, 444 bytes cmem[0]
+ptxas info    : Compile time = 33.807 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit2StateI6__halfLi0EEvPT_S2_PfS3_S3_ffffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit2StateI6__halfLi0EEvPT_S2_PfS3_S3_ffffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 48 registers, used 1 barriers, 16400 bytes smem, 444 bytes cmem[0]
+ptxas info    : Compile time = 34.230 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit2StateIfLi0EEvPT_S1_PfS2_S2_ffffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit2StateIfLi0EEvPT_S1_PfS2_S2_ffffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 46 registers, used 1 barriers, 16400 bytes smem, 444 bytes cmem[0]
+ptxas info    : Compile time = 30.092 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit2StateI13__nv_bfloat16Li6ELi4096ELi8EEvPT_S2_PfS3_S3_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit2StateI13__nv_bfloat16Li6ELi4096ELi8EEvPT_S2_PfS3_S3_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 16896 bytes smem, 424 bytes cmem[0]
+ptxas info    : Compile time = 24.819 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit2StateI6__halfLi6ELi4096ELi8EEvPT_S2_PfS3_S3_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit2StateI6__halfLi6ELi4096ELi8EEvPT_S2_PfS3_S3_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 16896 bytes smem, 424 bytes cmem[0]
+ptxas info    : Compile time = 22.719 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit2StateIfLi6ELi4096ELi8EEvPT_S1_PfS2_S2_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit2StateIfLi6ELi4096ELi8EEvPT_S1_PfS2_S2_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 16896 bytes smem, 424 bytes cmem[0]
+ptxas info    : Compile time = 36.289 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit2StateI13__nv_bfloat16Li0ELi4096ELi8EEvPT_S2_PfS3_S3_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit2StateI13__nv_bfloat16Li0ELi4096ELi8EEvPT_S2_PfS3_S3_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 56 registers, used 1 barriers, 16896 bytes smem, 424 bytes cmem[0]
+ptxas info    : Compile time = 64.706 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit2StateI6__halfLi0ELi4096ELi8EEvPT_S2_PfS3_S3_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit2StateI6__halfLi0ELi4096ELi8EEvPT_S2_PfS3_S3_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 56 registers, used 1 barriers, 16896 bytes smem, 424 bytes cmem[0]
+ptxas info    : Compile time = 44.485 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit2StateIfLi0ELi4096ELi8EEvPT_S1_PfS2_S2_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit2StateIfLi0ELi4096ELi8EEvPT_S1_PfS2_S2_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 56 registers, used 1 barriers, 16896 bytes smem, 424 bytes cmem[0]
+ptxas info    : Compile time = 45.400 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit1StateI13__nv_bfloat16Li4EEvPT_S2_PfS3_ffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit1StateI13__nv_bfloat16Li4EEvPT_S2_PfS3_ffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 38 registers, used 1 barriers, 16400 bytes smem, 428 bytes cmem[0]
+ptxas info    : Compile time = 44.369 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit1StateIfLi4EEvPT_S1_PfS2_ffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit1StateIfLi4EEvPT_S1_PfS2_ffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 16400 bytes smem, 428 bytes cmem[0]
+ptxas info    : Compile time = 48.550 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit1StateI6__halfLi4EEvPT_S2_PfS3_ffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit1StateI6__halfLi4EEvPT_S2_PfS3_ffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 16400 bytes smem, 428 bytes cmem[0]
+ptxas info    : Compile time = 30.736 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit1StateI13__nv_bfloat16Li5EEvPT_S2_PfS3_ffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit1StateI13__nv_bfloat16Li5EEvPT_S2_PfS3_ffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 42 registers, used 1 barriers, 16400 bytes smem, 428 bytes cmem[0]
+ptxas info    : Compile time = 29.053 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit1StateIfLi5EEvPT_S1_PfS2_ffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit1StateIfLi5EEvPT_S1_PfS2_ffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 16400 bytes smem, 428 bytes cmem[0]
+ptxas info    : Compile time = 28.554 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit1StateI6__halfLi5EEvPT_S2_PfS3_ffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit1StateI6__halfLi5EEvPT_S2_PfS3_ffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 47 registers, used 1 barriers, 16400 bytes smem, 428 bytes cmem[0]
+ptxas info    : Compile time = 29.274 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit1StateI13__nv_bfloat16Li2EEvPT_S2_PfS3_ffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit1StateI13__nv_bfloat16Li2EEvPT_S2_PfS3_ffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 16400 bytes smem, 428 bytes cmem[0]
+ptxas info    : Compile time = 34.426 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit1StateIfLi2EEvPT_S1_PfS2_ffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit1StateIfLi2EEvPT_S1_PfS2_ffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 38 registers, used 1 barriers, 16400 bytes smem, 428 bytes cmem[0]
+ptxas info    : Compile time = 25.022 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit1StateI6__halfLi2EEvPT_S2_PfS3_ffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit1StateI6__halfLi2EEvPT_S2_PfS3_ffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 16400 bytes smem, 428 bytes cmem[0]
+ptxas info    : Compile time = 24.605 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit1StateI13__nv_bfloat16Li1EEvPT_S2_PfS3_ffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit1StateI13__nv_bfloat16Li1EEvPT_S2_PfS3_ffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 16400 bytes smem, 428 bytes cmem[0]
+ptxas info    : Compile time = 22.840 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit1StateIfLi1EEvPT_S1_PfS2_ffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit1StateIfLi1EEvPT_S1_PfS2_ffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 38 registers, used 1 barriers, 16400 bytes smem, 428 bytes cmem[0]
+ptxas info    : Compile time = 18.802 ms
+ptxas info    : Compiling entry function '_Z21kOptimizer32bit1StateI6__halfLi1EEvPT_S2_PfS3_ffffffiffbi' for 'sm_86'
+ptxas info    : Function properties for _Z21kOptimizer32bit1StateI6__halfLi1EEvPT_S2_PfS3_ffffffiffbi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 16400 bytes smem, 428 bytes cmem[0]
+ptxas info    : Compile time = 25.254 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit1StateI13__nv_bfloat16Li4ELi4096ELi8EEvPT_S2_PfS3_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit1StateI13__nv_bfloat16Li4ELi4096ELi8EEvPT_S2_PfS3_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 46 registers, used 1 barriers, 16896 bytes smem, 416 bytes cmem[0]
+ptxas info    : Compile time = 43.282 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit1StateIfLi4ELi4096ELi8EEvPT_S1_PfS2_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit1StateIfLi4ELi4096ELi8EEvPT_S1_PfS2_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 42 registers, used 1 barriers, 16896 bytes smem, 416 bytes cmem[0]
+ptxas info    : Compile time = 45.408 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit1StateI6__halfLi4ELi4096ELi8EEvPT_S2_PfS3_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit1StateI6__halfLi4ELi4096ELi8EEvPT_S2_PfS3_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 46 registers, used 1 barriers, 16896 bytes smem, 416 bytes cmem[0]
+ptxas info    : Compile time = 28.223 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit1StateI13__nv_bfloat16Li5ELi4096ELi8EEvPT_S2_PfS3_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit1StateI13__nv_bfloat16Li5ELi4096ELi8EEvPT_S2_PfS3_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 46 registers, used 1 barriers, 16896 bytes smem, 416 bytes cmem[0]
+ptxas info    : Compile time = 53.259 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit1StateIfLi5ELi4096ELi8EEvPT_S1_PfS2_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit1StateIfLi5ELi4096ELi8EEvPT_S1_PfS2_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 44 registers, used 1 barriers, 16896 bytes smem, 416 bytes cmem[0]
+ptxas info    : Compile time = 45.628 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit1StateI6__halfLi5ELi4096ELi8EEvPT_S2_PfS3_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit1StateI6__halfLi5ELi4096ELi8EEvPT_S2_PfS3_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 46 registers, used 1 barriers, 16896 bytes smem, 416 bytes cmem[0]
+ptxas info    : Compile time = 59.680 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit1StateI13__nv_bfloat16Li2ELi4096ELi8EEvPT_S2_PfS3_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit1StateI13__nv_bfloat16Li2ELi4096ELi8EEvPT_S2_PfS3_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 46 registers, used 1 barriers, 16896 bytes smem, 416 bytes cmem[0]
+ptxas info    : Compile time = 61.896 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit1StateIfLi2ELi4096ELi8EEvPT_S1_PfS2_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit1StateIfLi2ELi4096ELi8EEvPT_S1_PfS2_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 43 registers, used 1 barriers, 16896 bytes smem, 416 bytes cmem[0]
+ptxas info    : Compile time = 38.840 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit1StateI6__halfLi2ELi4096ELi8EEvPT_S2_PfS3_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit1StateI6__halfLi2ELi4096ELi8EEvPT_S2_PfS3_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 46 registers, used 1 barriers, 16896 bytes smem, 416 bytes cmem[0]
+ptxas info    : Compile time = 29.506 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit1StateI13__nv_bfloat16Li1ELi4096ELi8EEvPT_S2_PfS3_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit1StateI13__nv_bfloat16Li1ELi4096ELi8EEvPT_S2_PfS3_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 46 registers, used 1 barriers, 16896 bytes smem, 416 bytes cmem[0]
+ptxas info    : Compile time = 29.304 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit1StateIfLi1ELi4096ELi8EEvPT_S1_PfS2_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit1StateIfLi1ELi4096ELi8EEvPT_S1_PfS2_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 45 registers, used 1 barriers, 16896 bytes smem, 416 bytes cmem[0]
+ptxas info    : Compile time = 26.170 ms
+ptxas info    : Compiling entry function '_Z33kPreconditionOptimizer32bit1StateI6__halfLi1ELi4096ELi8EEvPT_S2_PfS3_ffffiffi' for 'sm_86'
+ptxas info    : Function properties for _Z33kPreconditionOptimizer32bit1StateI6__halfLi1ELi4096ELi8EEvPT_S2_PfS3_ffffiffi
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 46 registers, used 1 barriers, 16896 bytes smem, 416 bytes cmem[0]
+ptxas info    : Compile time = 38.079 ms
+ptxas info    : Compiling entry function '_Z22kdequant_mm_int32_fp16ILi4ELi512EEvPiPfS1_P6__halfS3_iii' for 'sm_86'
+ptxas info    : Function properties for _Z22kdequant_mm_int32_fp16ILi4ELi512EEvPiPfS1_P6__halfS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 0 barriers, 404 bytes cmem[0]
+ptxas info    : Compile time = 41.609 ms
+ptxas info    : Compiling entry function '_Z26kgemm_4bit_inference_naiveIfLi128ELi32EEviiiPT_PhPfPKfS1_iiii' for 'sm_86'
+ptxas info    : Function properties for _Z26kgemm_4bit_inference_naiveIfLi128ELi32EEviiiPT_PhPfPKfS1_iiii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 1 barriers, 64 bytes smem, 424 bytes cmem[0]
+ptxas info    : Compile time = 88.613 ms
+ptxas info    : Compiling entry function '_Z26kgemm_4bit_inference_naiveI13__nv_bfloat16Li128ELi16EEviiiPT_PhPfPKfS2_iiii' for 'sm_86'
+ptxas info    : Function properties for _Z26kgemm_4bit_inference_naiveI13__nv_bfloat16Li128ELi16EEviiiPT_PhPfPKfS2_iiii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 32 bytes smem, 424 bytes cmem[0]
+ptxas info    : Compile time = 110.498 ms
+ptxas info    : Compiling entry function '_Z26kgemm_4bit_inference_naiveI6__halfLi128ELi16EEviiiPT_PhPfPKfS2_iiii' for 'sm_86'
+ptxas info    : Function properties for _Z26kgemm_4bit_inference_naiveI6__halfLi128ELi16EEviiiPT_PhPfPKfS2_iiii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 39 registers, used 1 barriers, 32 bytes smem, 424 bytes cmem[0]
+ptxas info    : Compile time = 79.411 ms
+ptxas info    : Compiling entry function '_Z5kfuncIfLi2EEvPT_S1_S0_l' for 'sm_86'
+ptxas info    : Function properties for _Z5kfuncIfLi2EEvPT_S1_S0_l
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 24 registers, used 0 barriers, 384 bytes cmem[0]
+ptxas info    : Compile time = 15.704 ms
+ptxas info    : Compiling entry function '_Z5kfuncIfLi1EEvPT_S1_S0_l' for 'sm_86'
+ptxas info    : Function properties for _Z5kfuncIfLi1EEvPT_S1_S0_l
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 30 registers, used 0 barriers, 384 bytes cmem[0]
+ptxas info    : Compile time = 12.291 ms
+ptxas info    : Compiling entry function '_Z5kfuncIhLi0EEvPT_S1_S0_l' for 'sm_86'
+ptxas info    : Function properties for _Z5kfuncIhLi0EEvPT_S1_S0_l
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 384 bytes cmem[0]
+ptxas info    : Compile time = 16.512 ms
+ptxas info    : Compiling entry function '_Z5kfuncIfLi0EEvPT_S1_S0_l' for 'sm_86'
+ptxas info    : Function properties for _Z5kfuncIfLi0EEvPT_S1_S0_l
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 0 barriers, 384 bytes cmem[0]
+ptxas info    : Compile time = 10.991 ms
+ptxas info    : Compiling entry function '_Z16kInt8VectorQuantI6__halfLi1024ELi1EEvPT_PaPffii' for 'sm_86'
+ptxas info    : Function properties for _Z16kInt8VectorQuantI6__halfLi1024ELi1EEvPT_PaPffii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 20 registers, used 1 barriers, 100 bytes smem, 388 bytes cmem[0]
+ptxas info    : Compile time = 35.962 ms
+ptxas info    : Compiling entry function '_Z16kInt8VectorQuantI6__halfLi1024ELi0EEvPT_PaPffii' for 'sm_86'
+ptxas info    : Function properties for _Z16kInt8VectorQuantI6__halfLi1024ELi0EEvPT_PaPffii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 25 registers, used 1 barriers, 100 bytes smem, 388 bytes cmem[0]
+ptxas info    : Compile time = 51.208 ms

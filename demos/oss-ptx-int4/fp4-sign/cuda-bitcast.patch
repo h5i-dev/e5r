@@ -1,0 +1,13 @@
+--- a/csrc/kernels.cu
++++ b/csrc/kernels.cu
+@@ -57,8 +57,8 @@
+ #endif // !BNB_HIP
+ 
+ __device__ __forceinline__ float dDequantizeFP4Tree(unsigned char val) {
+-    float sign = 1.0f - 2 * ((val & 0b1000) >> 3);
+-    return fp4_dequantization_lut[val & 0b111] * sign;
++    unsigned int magnitude = __float_as_uint(fp4_dequantization_lut[val & 0b111]);
++    return __uint_as_float(magnitude | (static_cast<unsigned int>(val & 8) << 28));
+ }
+ 
+ __device__ unsigned char dQuantizeFP4(float x) {

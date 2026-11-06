@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/root/e5r-oss-ptx/demos/oss-ptx-int4/fp4-sign/check.py", line 50, in <module>
+    assert p.returncode==0,p.stdout.decode()
+AssertionError: failed to create thread: Resource temporarily unavailable
+

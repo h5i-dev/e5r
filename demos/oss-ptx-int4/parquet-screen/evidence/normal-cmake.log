@@ -1,0 +1,5 @@
+CMake Error at CMakeLists.txt:8 (cmake_minimum_required):
+  CMake 4.0 or higher is required.  You are running version 3.22.2
+
+
+-- Configuring incomplete, errors occurred!

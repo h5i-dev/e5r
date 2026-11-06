@@ -1,0 +1,19 @@
+{
+  "git_base": "870754e8a3bbe7db0420256773746831fec14fd0",
+  "branch": "oss-ptx-optimization",
+  "nvcc": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2026 NVIDIA Corporation\nBuilt on Mon_Mar_02_09:52:23_PM_PST_2026\nCuda compilation tools, release 13.2, V13.2.51\nBuild cuda_13.2.r13.2/compiler.37434383_0",
+  "exporter_binary_sha256": "b4f1c1de1d574384b3f65be2ce2ff04971762053205c883fa58124beb747d325",
+  "model_sources_sha256": {
+    "verification/ptx/Ptx/Semantics/Float.lean": "910de10f7b7da0c0a78511d00fc7b41b3559a54cc1a5d8e27ab81c3a6e62f759",
+    "verification/ptx/Ptx/Semantics/FloatCore.lean": "84a6a18cb1729410de9efdc5b3f2280a2b101585e60612dda9aad72eda264f0d",
+    "verification/ptx/lean-toolchain": "ca5f1f601d34c49079e38d7e7041eb0f2a9c227fbc1df0f404820069a052330c"
+  },
+  "model_sources_at_base": {
+    "verification/ptx/Ptx/Semantics/Float.lean": true,
+    "verification/ptx/Ptx/Semantics/FloatCore.lean": true,
+    "verification/ptx/lean-toolchain": true
+  },
+  "note": "No Rust/Lean semantic extension in this INT4 deliverable. Existing uncommitted narrow semantics and other demos remain separate; exporter admission failures recorded, no whole-kernel proof acceptance.",
+  "root_shell_lean": "Lean (version 4.31.0, x86_64-unknown-linux-gnu, commit 68218e876d2a38b1985b8590fff244a83c321783, Release)",
+  "proof_lean": "Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release)"
+}
