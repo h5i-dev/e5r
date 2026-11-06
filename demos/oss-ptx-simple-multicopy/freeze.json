@@ -1,0 +1,20 @@
+{
+  "upstream": "https://github.com/NVIDIA/cuda-samples",
+  "commit": "0ec046d5e99d7214cc8e9fbac2cc1e66f3019878",
+  "path": "cpp/0_Introduction/simpleMultiCopy/simpleMultiCopy.cu",
+  "function": "incKernel",
+  "lines": [
+    58,
+    67
+  ],
+  "license": "BSD-3-Clause",
+  "source_adaptation": "none; complete unmodified upstream TU built with normal Release CMake, --keep added only to retain PTX",
+  "compiler": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2026 NVIDIA Corporation\nBuilt on Mon_Mar_02_09:52:23_PM_PST_2026\nCuda compilation tools, release 13.2, V13.2.51\nBuild cuda_13.2.r13.2/compiler.37434383_0\n",
+  "hashes": {
+    "original.ptx": "5e1ec770041d17de34da744350311d3bbcfa6a17a49d3d061b9c969d9c3a8746",
+    "upstream/simpleMultiCopy.cu": "b3b6d8d2f204f5871e8bc278e7a9de924a7dc9850e026934b954bdfa9d4103b0",
+    "upstream/LICENSE": "b3e40c5bfed1fca5c62d2c1f2208bf51f8d2c910219f94c443f657ace9001be3",
+    "upstream/CMakeLists.txt": "fafb4f0139f932063f835d735ae9b410b5546471980a3a41631e100f2f379f5f",
+    "upstream/flags.make": "3b37466883504ea113925b51324d23abce4a6b7ba5356faff372683710c9dabb"
+  }
+}

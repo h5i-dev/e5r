@@ -1,0 +1,37 @@
+{
+  "class": "map32",
+  "counterexample": null,
+  "input": {
+    "ptx": {
+      "path": "demos/oss-ptx-simple-multicopy/original.ptx",
+      "sha256": "91b5a40e8ddeeb3912ec2a6b1bd9aed64ff3b51718648031cdf7308000de3795"
+    },
+    "spec": {
+      "path": "demos/ptx-equivalence/equivalence.json",
+      "sha256": "fa5b1d93e0c1d7d3c5917bd4ae5df27c63b7860a4de9dbc7d89474ab6094ff11"
+    }
+  },
+  "kernel": null,
+  "lean": {
+    "memory_cap_mb": 6144,
+    "timeout_seconds": 600,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "properties": {
+    "functional_correctness": "unsupported",
+    "memory_safety": "unsupported",
+    "race_freedom": "unsupported",
+    "termination": "unsupported"
+  },
+  "reasons": [
+    "PTX outside the subset: line 74: unexpected character '\"'"
+  ],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 0.0,
+  "theorem": null,
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "unsupported"
+}
