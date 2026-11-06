@@ -1,0 +1,162 @@
+[
+  {
+    "id": "catboost-compute_group_ids",
+    "project": "CatBoost",
+    "repository": "https://github.com/catboost/catboost",
+    "commit": "5686f8c6cc9def4b0df343488d2f887ec5609d1f",
+    "source": "catboost/cuda/gpu_data/kernel/query_helper.cu",
+    "function": "ComputeGroupIdsImpl<128>",
+    "line": 12,
+    "license": "Apache-2.0",
+    "phase": "edited_gpu_timed_proof_pending",
+    "optimization_attempt": true,
+    "completed_optimization_proof_attempt": false,
+    "strict_proof_accepted": false,
+    "normal_path_runtime_check": false,
+    "hashes": {
+      "original": "2347d3402a0d78a64f4a3ca1ea44e6d28316605ecaec7fe857d1cac8b6e72f1e",
+      "edited": "56f73b157abaaed5c6a7bda0ee23720356b4cfa9b3e4d72d3a86a042135072fd",
+      "tuned": "07f67a7dfc5161bc9f4ff6d98d557b92c0c5205308d102edd387171fe095b28c"
+    },
+    "artifacts": "demos/oss-ptx-catboost/compute_group_ids",
+    "gpu_cases": 234,
+    "timing_rows": 20,
+    "median_speedup": 0.9230443925330106,
+    "min_speedup": 0.8809769421043571,
+    "max_speedup": 1.0053856005530957,
+    "domain": "Normal block128 grid ceil(qCount/4); 0<=qCount<2^29; query sizes<=2^31-128; valid offsetsBias and disjoint in-bounds per-query destination ranges, 4-byte aligned nonwrapping arrays; read inputs disjoint output.",
+    "caveats": [
+      "Extracted unchanged upstream body; normal full TU runtime equivalence not validated",
+      "No meaningful speedup demonstrated",
+      "No accepted universal direct equivalence proof"
+    ]
+  },
+  {
+    "id": "catboost-fill_query_end_mask",
+    "project": "CatBoost",
+    "repository": "https://github.com/catboost/catboost",
+    "commit": "5686f8c6cc9def4b0df343488d2f887ec5609d1f",
+    "source": "catboost/cuda/gpu_data/kernel/query_helper.cu",
+    "function": "FillQueryEndMaskImpl",
+    "line": 45,
+    "license": "Apache-2.0",
+    "phase": "edited_gpu_timed_proof_pending",
+    "optimization_attempt": true,
+    "completed_optimization_proof_attempt": false,
+    "strict_proof_accepted": false,
+    "normal_path_runtime_check": false,
+    "hashes": {
+      "original": "1aa74b5993354437837b6b58b1752422dd94ccc9b228b9306736ff85b5ed009a",
+      "edited": "9dbae60d0bdd61ba1769d310142127c512a004a9ea62cd1f2aaafb17cf05e4cb",
+      "tuned": "0eee9da2308acea64986eeb04b433eef7740ee8e1fdbde42ffa323a4e5427c52"
+    },
+    "artifacts": "demos/oss-ptx-catboost/fill_query_end_mask",
+    "gpu_cases": 234,
+    "timing_rows": 10,
+    "median_speedup": 1.0000560012508037,
+    "min_speedup": 0.9935483380351666,
+    "max_speedup": 1.0142212437000253,
+    "domain": "4-byte aligned disjoint qids/docs/masks; docCount<=2^31; docs entries valid qids indices; covering 1D launch<=2^31; no wrapping byte ranges; all qids unrestricted.",
+    "caveats": [
+      "Extracted unchanged upstream body; normal full TU runtime equivalence not validated",
+      "No meaningful speedup demonstrated",
+      "No accepted universal direct equivalence proof"
+    ]
+  },
+  {
+    "id": "catboost-reverse",
+    "project": "CatBoost",
+    "repository": "https://github.com/catboost/catboost",
+    "commit": "5686f8c6cc9def4b0df343488d2f887ec5609d1f",
+    "source": "catboost/cuda/cuda_util/kernel/transform.cu",
+    "function": "ReverseImpl<ui32>",
+    "line": 277,
+    "license": "Apache-2.0",
+    "phase": "edited_gpu_timed_proof_pending",
+    "optimization_attempt": true,
+    "completed_optimization_proof_attempt": false,
+    "strict_proof_accepted": false,
+    "normal_path_runtime_check": false,
+    "hashes": {
+      "original": "ed780dfd9f206dfd28addd618e75c39c96ec88aeb605c1e5d0dcd72d4df26c89",
+      "edited": "6db10fa7e80c6ac024e697c4c901f8b5ff5f75232d9a0741796c8f5990ed7e90",
+      "tuned": "44046eb576535ecbfc655e971ab775a15e20f78ccfa26594c033759d10fa257f"
+    },
+    "artifacts": "demos/oss-ptx-catboost/reverse",
+    "gpu_cases": 234,
+    "timing_rows": 10,
+    "median_speedup": 1.0029939911048589,
+    "min_speedup": 0.9713261551534591,
+    "max_speedup": 1.0152671815082694,
+    "domain": "4-byte aligned in-place uint32 array; size<2^63; covering 1D launch grid*block>=floor(size/2), grid*block<=2^32; no wrapping byte range. Normal uncapped dispatch covers this. Loop-elision specialized launch; all values unrestricted.",
+    "caveats": [
+      "Extracted unchanged upstream body; normal full TU runtime equivalence not validated",
+      "No meaningful speedup demonstrated",
+      "No accepted universal direct equivalence proof"
+    ]
+  },
+  {
+    "id": "catboost-zero_partitions",
+    "project": "CatBoost",
+    "repository": "https://github.com/catboost/catboost",
+    "commit": "5686f8c6cc9def4b0df343488d2f887ec5609d1f",
+    "source": "catboost/cuda/cuda_util/kernel/partitions.cu",
+    "function": "ZeroPartitions",
+    "line": 110,
+    "license": "Apache-2.0",
+    "phase": "edited_gpu_timed_proof_pending",
+    "optimization_attempt": true,
+    "completed_optimization_proof_attempt": false,
+    "strict_proof_accepted": false,
+    "normal_path_runtime_check": false,
+    "hashes": {
+      "original": "3ea1cdcd0739a6430264f07fb6532df9de817d9f21aa0397cbce7e630a06383e",
+      "edited": "b1aaaad9476c59dd8d2d4eb2492e75d9b6bc61f59d6e018c7606e0cecd6c976a",
+      "tuned": "1e77182f45f408deb40492703be06129994e6b488d052bdace24adabbe0821bc"
+    },
+    "artifacts": "demos/oss-ptx-catboost/zero_partitions",
+    "gpu_cases": 234,
+    "timing_rows": 10,
+    "median_speedup": 1.0102338475895967,
+    "min_speedup": 1.0,
+    "max_speedup": 1.022512449258957,
+    "domain": "4-byte aligned TDataPartition array (8-byte struct); 0<=partCount<=2^31; covering 1D grid*block>=partCount and <=2^31. 4-byte alignment retained with guarded 64-bit stores and scalar fallback; no wrapping byte range.",
+    "caveats": [
+      "Extracted unchanged upstream body; normal full TU runtime equivalence not validated",
+      "No meaningful speedup demonstrated",
+      "No accepted universal direct equivalence proof"
+    ]
+  },
+  {
+    "id": "catboost-zero_segments",
+    "project": "CatBoost",
+    "repository": "https://github.com/catboost/catboost",
+    "commit": "5686f8c6cc9def4b0df343488d2f887ec5609d1f",
+    "source": "catboost/cuda/cuda_util/kernel/segmented_scan.cu",
+    "function": "ZeroSegmentStartsImpl<ui32>",
+    "line": 11,
+    "license": "Apache-2.0",
+    "phase": "edited_gpu_timed_proof_pending",
+    "optimization_attempt": true,
+    "completed_optimization_proof_attempt": false,
+    "strict_proof_accepted": false,
+    "normal_path_runtime_check": false,
+    "hashes": {
+      "original": "a2dea8659ab71d33b1fa3377ddcf5867105980684a9eb8847b971f8ec1cb5753",
+      "edited": "96e5da6355319cc83fe1a89c4faa72a145b8249f22f3eced208b6acdc3cb7b42",
+      "tuned": "502a16cbf5c8b2be90a45842efc1aa7cf802969d4ce60af80436b644513fb87d"
+    },
+    "artifacts": "demos/oss-ptx-catboost/zero_segments",
+    "gpu_cases": 234,
+    "timing_rows": 10,
+    "median_speedup": 1.0000737694868385,
+    "min_speedup": 0.9921875541788837,
+    "max_speedup": 1.007575704960362,
+    "domain": "4-byte aligned disjoint flags/output arrays of size uint32; covering 1D grid*block<=2^32; no wrapping byte ranges; all flags, flagMask and initial output values unrestricted.",
+    "caveats": [
+      "Extracted unchanged upstream body; normal full TU runtime equivalence not validated",
+      "No meaningful speedup demonstrated",
+      "No accepted universal direct equivalence proof"
+    ]
+  }
+]

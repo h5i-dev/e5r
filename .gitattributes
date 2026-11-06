@@ -4,3 +4,8 @@
 # Preserve exact nvcc-emitted/frozen PTX bytes, including final blank lines.
 demos/ptx-equivalence/original.ptx whitespace=-blank-at-eof
 demos/ptx-equivalence/optimized.ptx whitespace=-blank-at-eof
+
+# OSS artifacts are hash-bound exact compiler output, including whitespace.
+demos/oss-ptx-catboost/*/*.ptx whitespace=-blank-at-eof
+demos/oss-ptx-cupy-packing/*/*.ptx whitespace=-blank-at-eof
+demos/oss-ptx-cupy-packing/*/original.cu whitespace=-blank-at-eol,-blank-at-eof

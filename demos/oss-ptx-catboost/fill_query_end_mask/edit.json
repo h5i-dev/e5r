@@ -1,0 +1,8 @@
+{
+  "method": "direct frozen PTX text edit",
+  "original_sha256": "1aa74b5993354437837b6b58b1752422dd94ccc9b228b9306736ff85b5ed009a",
+  "edited_sha256": "9dbae60d0bdd61ba1769d310142127c512a004a9ea62cd1f2aaafb17cf05e4cb",
+  "domain": "4-byte aligned disjoint qids/docs/masks; docCount<=2^31; docs entries valid qids indices; covering 1D launch<=2^31; no wrapping byte ranges; all qids unrestricted.",
+  "strict_proof_accepted": false,
+  "full_upstream_runtime_verified": false
+}

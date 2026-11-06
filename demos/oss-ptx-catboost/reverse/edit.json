@@ -1,0 +1,8 @@
+{
+  "method": "direct frozen PTX text edit",
+  "original_sha256": "ed780dfd9f206dfd28addd618e75c39c96ec88aeb605c1e5d0dcd72d4df26c89",
+  "edited_sha256": "6db10fa7e80c6ac024e697c4c901f8b5ff5f75232d9a0741796c8f5990ed7e90",
+  "domain": "4-byte aligned in-place uint32 array; size<2^63; covering 1D launch grid*block>=floor(size/2), grid*block<=2^32; no wrapping byte range. Normal uncapped dispatch covers this. Loop-elision specialized launch; all values unrestricted.",
+  "strict_proof_accepted": false,
+  "full_upstream_runtime_verified": false
+}

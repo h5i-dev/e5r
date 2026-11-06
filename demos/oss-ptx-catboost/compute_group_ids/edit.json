@@ -1,0 +1,8 @@
+{
+  "method": "direct frozen PTX text edit",
+  "original_sha256": "2347d3402a0d78a64f4a3ca1ea44e6d28316605ecaec7fe857d1cac8b6e72f1e",
+  "edited_sha256": "56f73b157abaaed5c6a7bda0ee23720356b4cfa9b3e4d72d3a86a042135072fd",
+  "domain": "Normal block128 grid ceil(qCount/4); 0<=qCount<2^29; query sizes<=2^31-128; valid offsetsBias and disjoint in-bounds per-query destination ranges, 4-byte aligned nonwrapping arrays; read inputs disjoint output.",
+  "strict_proof_accepted": false,
+  "full_upstream_runtime_verified": false
+}

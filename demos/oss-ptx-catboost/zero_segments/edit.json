@@ -1,0 +1,8 @@
+{
+  "method": "direct frozen PTX text edit",
+  "original_sha256": "a2dea8659ab71d33b1fa3377ddcf5867105980684a9eb8847b971f8ec1cb5753",
+  "edited_sha256": "96e5da6355319cc83fe1a89c4faa72a145b8249f22f3eced208b6acdc3cb7b42",
+  "domain": "4-byte aligned disjoint flags/output arrays of size uint32; covering 1D grid*block<=2^32; no wrapping byte ranges; all flags, flagMask and initial output values unrestricted.",
+  "strict_proof_accepted": false,
+  "full_upstream_runtime_verified": false
+}

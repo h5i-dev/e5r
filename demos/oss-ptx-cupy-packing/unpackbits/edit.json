@@ -1,0 +1,7 @@
+{
+  "method": "direct frozen PTX text edit",
+  "sha256": "8c952adae6bc16cc698752174c5cc8737baa9d654ce7600eda7640b06fc0eced",
+  "domain": "uint8 contiguous nonaliasing, output8-aligned, output size=input size*8 below2^31; normal block128, candidate grid ceil(input bytes/128)",
+  "strict_accepted": false,
+  "proof_status": "pending original frontend export"
+}

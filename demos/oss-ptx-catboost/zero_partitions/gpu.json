@@ -1,0 +1,821 @@
+{
+  "metadata": {
+    "gpu": "NVIDIA A10G, GPU-7e5ae9e3-0b19-7ed6-8641-c17e13519a08, 595.112.07, 1710 MHz, 6251 MHz",
+    "cupy": "13.6.0",
+    "numpy": "2.2.6",
+    "runtime": 12090,
+    "driver": 13020,
+    "seed": 174,
+    "lock": "/mnt/scratch/e5r-gpu-benchmark.lock",
+    "compiler": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2026 NVIDIA Corporation\nBuilt on Mon_Mar_02_09:52:23_PM_PST_2026\nCuda compilation tools, release 13.2, V13.2.51\nBuild cuda_13.2.r13.2/compiler.37434383_0\n",
+    "ptxas": "ptxas: NVIDIA (R) Ptx optimizing assembler\nCopyright (c) 2005-2026 NVIDIA Corporation\nBuilt on Mon_Mar_02_09:52:23_PM_PST_2026\nCuda compilation tools, release 13.2, V13.2.51\nBuild cuda_13.2.r13.2/compiler.37434383_0\n",
+    "strict_proof_accepted": false,
+    "full_upstream_runtime_verified": false
+  },
+  "correctness_cases": 234,
+  "canaries": true,
+  "input_preservation": true,
+  "offset_words": [
+    1,
+    4
+  ],
+  "scope": "extracted exact upstream body AOT kernel only; no API claim; tuned CUDA is separate comparator",
+  "proof": "pending direct universal equivalence, no accepted theorem yet",
+  "hashes": {
+    "original": "3ea1cdcd0739a6430264f07fb6532df9de817d9f21aa0397cbce7e630a06383e",
+    "edited": "b1aaaad9476c59dd8d2d4eb2492e75d9b6bc61f59d6e018c7606e0cecd6c976a",
+    "tuned": "1e77182f45f408deb40492703be06129994e6b488d052bdace24adabbe0821bc"
+  },
+  "rows": [
+    {
+      "n": 1,
+      "max_query_size": null,
+      "regime": "hot",
+      "ring": 1,
+      "samples_us": {
+        "original": [
+          1.0479999473318458,
+          0.8960000122897327,
+          0.8960000122897327,
+          0.9040000149980187,
+          0.9040000149980187,
+          0.8960000122897327,
+          0.8880000095814466
+        ],
+        "edited": [
+          0.9759999811649323,
+          0.8960000122897327,
+          0.8960000122897327,
+          0.8880000095814466,
+          0.8960000122897327,
+          0.8960000122897327,
+          0.8880000095814466
+        ],
+        "tuned": [
+          0.9759999811649323,
+          0.8960000122897327,
+          0.9040000149980187,
+          0.8960000122897327,
+          0.9040000149980187,
+          0.9040000149980187,
+          0.9040000149980187
+        ]
+      },
+      "median_us": {
+        "original": 0.8960000122897327,
+        "edited": 0.8960000122897327,
+        "tuned": 0.9040000149980187
+      },
+      "speedup_original_over_edited": 1.0,
+      "speedup_tuned_over_edited": 1.0089285743287457,
+      "orders": [
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 31,
+      "max_query_size": null,
+      "regime": "hot",
+      "ring": 1,
+      "samples_us": {
+        "original": [
+          1.0079999919980764,
+          0.9040000149980187,
+          0.9120000177063048,
+          0.9200000204145908,
+          0.9040000149980187,
+          0.9117500158026814,
+          0.9120000177063048
+        ],
+        "edited": [
+          1.0639999527484179,
+          0.9120000177063048,
+          0.9120000177063048,
+          0.9200000204145908,
+          0.9040000149980187,
+          0.9040000149980187,
+          0.9120000177063048
+        ],
+        "tuned": [
+          1.0079999919980764,
+          0.9200000204145908,
+          0.9280000231228769,
+          0.9280000231228769,
+          0.9280000231228769,
+          0.9120000177063048,
+          0.9280000231228769
+        ]
+      },
+      "median_us": {
+        "original": 0.9120000177063048,
+        "edited": 0.9120000177063048,
+        "tuned": 0.9280000231228769
+      },
+      "speedup_original_over_edited": 1.0,
+      "speedup_tuned_over_edited": 1.0175438652477358,
+      "orders": [
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 256,
+      "max_query_size": null,
+      "regime": "hot",
+      "ring": 1,
+      "samples_us": {
+        "original": [
+          1.0319999419152737,
+          0.9120000177063048,
+          0.8960000122897327,
+          0.8960000122897327,
+          0.9040000149980187,
+          0.9040000149980187,
+          0.9040000149980187
+        ],
+        "edited": [
+          0.9759999811649323,
+          0.9040000149980187,
+          0.9040000149980187,
+          0.9120000177063048,
+          0.9040000149980187,
+          0.9120000177063048,
+          0.9040000149980187
+        ],
+        "tuned": [
+          0.9840000420808792,
+          0.9200000204145908,
+          0.9040000149980187,
+          0.9200000204145908,
+          0.9200000204145908,
+          0.9280000231228769,
+          0.9200000204145908
+        ]
+      },
+      "median_us": {
+        "original": 0.9040000149980187,
+        "edited": 0.9040000149980187,
+        "tuned": 0.9200000204145908
+      },
+      "speedup_original_over_edited": 1.0,
+      "speedup_tuned_over_edited": 1.0176991207423898,
+      "orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ]
+      ]
+    },
+    {
+      "n": 257,
+      "max_query_size": null,
+      "regime": "hot",
+      "ring": 1,
+      "samples_us": {
+        "original": [
+          0.9677499765530229,
+          0.8960000122897327,
+          0.8880000095814466,
+          0.8880000095814466,
+          0.8880000095814466,
+          0.8960000122897327,
+          0.8960000122897327
+        ],
+        "edited": [
+          0.9599999757483602,
+          0.8960000122897327,
+          0.8960000122897327,
+          0.8880000095814466,
+          0.8960000122897327,
+          0.8960000122897327,
+          0.8960000122897327
+        ],
+        "tuned": [
+          1.0400000028312206,
+          0.9040000149980187,
+          0.9200000204145908,
+          0.9040000149980187,
+          0.9120000177063048,
+          0.9117500158026814,
+          0.9040000149980187
+        ]
+      },
+      "median_us": {
+        "original": 0.8960000122897327,
+        "edited": 0.8960000122897327,
+        "tuned": 0.9117500158026814
+      },
+      "speedup_original_over_edited": 1.0,
+      "speedup_tuned_over_edited": 1.0175781286795962,
+      "orders": [
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ]
+      ]
+    },
+    {
+      "n": 4096,
+      "max_query_size": null,
+      "regime": "hot",
+      "ring": 1,
+      "samples_us": {
+        "original": [
+          1.0479999473318458,
+          0.9599999757483602,
+          0.9519999730400741,
+          0.9519999730400741,
+          0.9519999730400741,
+          0.9679999784566462,
+          0.9599999757483602
+        ],
+        "edited": [
+          1.0400000028312206,
+          0.9519999730400741,
+          0.9519999730400741,
+          0.9519999730400741,
+          0.9599999757483602,
+          0.9519999730400741,
+          0.9759999811649323
+        ],
+        "tuned": [
+          1.1119999689981341,
+          0.9679999784566462,
+          0.9679999784566462,
+          0.9599999757483602,
+          0.9599999757483602,
+          0.9679999784566462,
+          0.9679999784566462
+        ]
+      },
+      "median_us": {
+        "original": 0.9599999757483602,
+        "edited": 0.9519999730400741,
+        "tuned": 0.9679999784566462
+      },
+      "speedup_original_over_edited": 1.0084033644273531,
+      "speedup_tuned_over_edited": 1.0168067288547062,
+      "orders": [
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 65536,
+      "max_query_size": null,
+      "regime": "hot",
+      "ring": 1,
+      "samples_us": {
+        "original": [
+          1.3279999839141965,
+          1.1919999960809946,
+          1.1919999960809946,
+          1.2000000569969416,
+          1.2000000569969416,
+          1.1840000515803695,
+          1.1919999960809946
+        ],
+        "edited": [
+          1.247999956831336,
+          1.1759999906644225,
+          1.1680000461637974,
+          1.1759999906644225,
+          1.1759999906644225,
+          1.1680000461637974,
+          1.1599999852478504
+        ],
+        "tuned": [
+          1.2880000285804272,
+          1.2080000014975667,
+          1.2159999459981918,
+          1.2159999459981918,
+          1.2080000014975667,
+          1.2080000014975667,
+          1.2000000569969416
+        ]
+      },
+      "median_us": {
+        "original": 1.1919999960809946,
+        "edited": 1.1759999906644225,
+        "tuned": 1.2080000014975667
+      },
+      "speedup_original_over_edited": 1.0136054468908051,
+      "speedup_tuned_over_edited": 1.0272108937816102,
+      "orders": [
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 1048576,
+      "max_query_size": null,
+      "regime": "hot",
+      "ring": 1,
+      "samples_us": {
+        "original": [
+          18.191499635577202,
+          18.087999895215034,
+          18.09599995613098,
+          18.12800019979477,
+          18.247999250888824,
+          18.09599995613098,
+          18.120000138878822
+        ],
+        "edited": [
+          17.967749387025833,
+          17.887750640511513,
+          17.904000356793404,
+          17.904000356793404,
+          17.88800023496151,
+          17.847999930381775,
+          17.896000295877457
+        ],
+        "tuned": [
+          17.91200041770935,
+          17.896000295877457,
+          17.83199980854988,
+          17.855999991297722,
+          17.88800023496151,
+          17.839500680565834,
+          17.847999930381775
+        ]
+      },
+      "median_us": {
+        "original": 18.120000138878822,
+        "edited": 17.896000295877457,
+        "tuned": 17.855999991297722
+      },
+      "speedup_original_over_edited": 1.0125167545427995,
+      "speedup_tuned_over_edited": 0.9977648466742064,
+      "orders": [
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 1048576,
+      "max_query_size": null,
+      "regime": "rotating",
+      "ring": 8,
+      "samples_us": {
+        "original": [
+          18.23199912905693,
+          18.120000138878822,
+          18.087999895215034,
+          18.09599995613098,
+          18.143750727176666,
+          18.12800019979477,
+          18.112000077962875
+        ],
+        "edited": [
+          17.960000783205032,
+          17.91200041770935,
+          17.88800023496151,
+          17.904000356793404,
+          17.88800023496151,
+          17.91200041770935,
+          17.86400005221367
+        ],
+        "tuned": [
+          18.136000260710716,
+          17.880000174045563,
+          17.904000356793404,
+          17.872000113129616,
+          17.847999930381775,
+          17.872000113129616,
+          17.839999869465828
+        ]
+      },
+      "median_us": {
+        "original": 18.120000138878822,
+        "edited": 17.904000356793404,
+        "tuned": 17.872000113129616
+      },
+      "speedup_original_over_edited": 1.01206433075184,
+      "speedup_tuned_over_edited": 0.998212676327855,
+      "orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 4194304,
+      "max_query_size": null,
+      "regime": "hot",
+      "ring": 1,
+      "samples_us": {
+        "original": [
+          72.67200201749802,
+          72.64800369739532,
+          72.7357491850853,
+          72.62399792671204,
+          72.66400009393692,
+          72.69600033760071,
+          72.69600033760071
+        ],
+        "edited": [
+          71.30400091409683,
+          71.07950001955032,
+          71.07199728488922,
+          71.07999920845032,
+          71.06400281190872,
+          71.05600088834763,
+          71.07199728488922
+        ],
+        "tuned": [
+          70.93600183725357,
+          70.72000205516815,
+          70.81600278615952,
+          70.69599628448486,
+          70.72000205516815,
+          70.64799964427948,
+          70.67199796438217
+        ]
+      },
+      "median_us": {
+        "original": 72.67200201749802,
+        "edited": 71.07199728488922,
+        "tuned": 70.72000205516815
+      },
+      "speedup_original_over_edited": 1.022512449258957,
+      "speedup_tuned_over_edited": 0.9950473429315612,
+      "orders": [
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ]
+      ]
+    },
+    {
+      "n": 4194304,
+      "max_query_size": null,
+      "regime": "rotating",
+      "ring": 8,
+      "samples_us": {
+        "original": [
+          72.76800274848938,
+          72.62399792671204,
+          72.59999960660934,
+          72.67200201749802,
+          72.67999649047852,
+          72.63199985027313,
+          72.7119967341423
+        ],
+        "edited": [
+          71.24800235033035,
+          71.06400281190872,
+          71.07999920845032,
+          71.08800113201141,
+          71.07199728488922,
+          71.00799679756165,
+          71.05600088834763
+        ],
+        "tuned": [
+          70.872001349926,
+          70.65600156784058,
+          70.67199796438217,
+          70.71200013160706,
+          70.66400349140167,
+          70.5839991569519,
+          70.61599940061569
+        ]
+      },
+      "median_us": {
+        "original": 72.67200201749802,
+        "edited": 71.07199728488922,
+        "tuned": 70.66400349140167
+      },
+      "speedup_original_over_edited": 1.022512449258957,
+      "speedup_tuned_over_edited": 0.9942594297462597,
+      "orders": [
+        [
+          "original",
+          "tuned",
+          "edited"
+        ],
+        [
+          "tuned",
+          "original",
+          "edited"
+        ],
+        [
+          "tuned",
+          "edited",
+          "original"
+        ],
+        [
+          "original",
+          "edited",
+          "tuned"
+        ],
+        [
+          "edited",
+          "tuned",
+          "original"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ],
+        [
+          "edited",
+          "original",
+          "tuned"
+        ]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "repository": "https://github.com/cupy/cupy",
+  "commit": "25e552d5d679dcdc6f7cc3d81310a9b265463137",
+  "license": "MIT",
+  "source": "cupy/_binary/packing.py",
+  "cupy": "13.6.0",
+  "nvrtc": [
+    12,
+    9
+  ],
+  "source_sha256": "c0b601465e85dd3f8b07617e691549b8ead7485a10f23d980c9f570025ca6ebd",
+  "kernels": [
+    {
+      "id": "cupy/packbits",
+      "options": [
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/cub",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/thrust",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/libcudacxx",
+        "--std=c++11",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include",
+        "-I/usr/local/cuda/include",
+        "-ftz=true",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/nvidia/cuda_runtime/include"
+      ],
+      "normal_arch": "-arch=sm_86",
+      "ptx_options": [
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/cub",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/thrust",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/libcudacxx",
+        "--std=c++11",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include",
+        "-I/usr/local/cuda/include",
+        "-ftz=true",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/nvidia/cuda_runtime/include",
+        "-arch=compute_86",
+        "--device-as-default-execution-space"
+      ],
+      "hashes": {
+        "original.cu": "6a6b103747afe3ee8280e39d3de69fdd62f26069bdaab4e99bb4feaa9a54e799",
+        "normal.cubin": "5886902c9e5922a1d2eb1b6aac953efbfeca6612f621e7091dccace46a1af86a",
+        "original.ptx": "cae6fc71c2491945df9b793b0d73aa8c7027c2b31ba529fb7c5b66a00deff31f"
+      }
+    },
+    {
+      "id": "cupy/unpackbits",
+      "options": [
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/cub",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/thrust",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/libcudacxx",
+        "--std=c++11",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include",
+        "-I/usr/local/cuda/include",
+        "-ftz=true",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/nvidia/cuda_runtime/include"
+      ],
+      "normal_arch": "-arch=sm_86",
+      "ptx_options": [
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/cub",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/thrust",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/libcudacxx",
+        "--std=c++11",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include",
+        "-I/usr/local/cuda/include",
+        "-ftz=true",
+        "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/nvidia/cuda_runtime/include",
+        "-arch=compute_86",
+        "--device-as-default-execution-space"
+      ],
+      "hashes": {
+        "original.cu": "fd0a3e09117aa4bacf501b9f6d4391cb253b94d2dcc3acb98d99fc9037207011",
+        "normal.cubin": "3a3cb10fdb6620a8d4814f96e33acde940ddf5fbaabf3e05bb4c19547bd98af0",
+        "original.ptx": "514e5c40617b38f698faf731074c161f2b7c0ec118f46bcc9cf95f652d4c72f5"
+      }
+    }
+  ],
+  "adaptation": "No upstream body changes. Capture normal API NVRTC cubin and separately emit optimized PTX from identical generated source/options. API ordinary cubin remains strongest baseline.",
+  "dispatch": "packbits/unpackbits default big order, uint8 contiguous; ElementwiseKernel block128 grid-stride normal launch",
+  "domain": "Contiguous uint8 arrays, default big bitorder; 1D nonaliasing arrays, normal launch; packbits output initialized to zero by normal API.",
+  "predeclared_sizes": [
+    1,
+    7,
+    8,
+    31,
+    128,
+    1024,
+    65536,
+    1048576,
+    4194304,
+    16777216
+  ],
+  "success": ">=1.10x geometric mean kernel latency over 65536..16777216 vs normal cubin, plus strongest matching tuned baseline; report every shape/regression",
+  "proof_status": "not attempted; freeze only"
+}

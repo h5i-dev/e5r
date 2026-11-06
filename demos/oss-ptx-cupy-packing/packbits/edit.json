@@ -1,0 +1,7 @@
+{
+  "method": "direct frozen PTX text edit",
+  "sha256": "8d429d4ca7aa76f0eee3d750af5c2273b9e8efc33f867ff1eb6d625350882adf",
+  "domain": "uint8 contiguous nonaliasing, size positive multiple8 below2^31; output stride1, indexer size=size/8; normal launch",
+  "strict_accepted": false,
+  "proof_status": "pending original frontend export"
+}
