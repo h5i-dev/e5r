@@ -1,0 +1,11 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "class": "equivalence-oss-inc",
+  "kernel": "_Z9incKernelPiS_ii",
+  "original_ptx": "original.ptx",
+  "original_sha256": "5e1ec770041d17de34da744350311d3bbcfa6a17a49d3d061b9c969d9c3a8746",
+  "input": "_Z9incKernelPiS_ii_param_1",
+  "output": "_Z9incKernelPiS_ii_param_0",
+  "length": "_Z9incKernelPiS_ii_param_2",
+  "repeats": "_Z9incKernelPiS_ii_param_3"
+}

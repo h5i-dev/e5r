@@ -16,6 +16,8 @@ struct Spec {
     input: String,
     output: String,
     length: String,
+    #[serde(default)]
+    repeats: Option<String>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -43,7 +45,10 @@ pub fn check(
     if sp.schema != super::spec::SCHEMA
         || !matches!(
             sp.class.as_str(),
-            "equivalence-unpack4" | "equivalence-stencil17" | "equivalence-stencil17-pair2"
+            "equivalence-unpack4"
+                | "equivalence-stencil17"
+                | "equivalence-stencil17-pair2"
+                | "equivalence-oss-inc"
         )
     {
         return finish(
@@ -53,7 +58,9 @@ pub fn check(
         );
     }
     doc["class"] = json!(sp.class);
-    let family = if sp.class == "equivalence-stencil17-pair2" {
+    let family = if sp.class == "equivalence-oss-inc" {
+        "OssInc"
+    } else if sp.class == "equivalence-stencil17-pair2" {
         "StencilPair"
     } else if sp.class == "equivalence-stencil17" {
         "Stencil"
@@ -103,13 +110,36 @@ pub fn check(
     let Some(k1) = module.kernels.iter().find(|k| k.name == sp.kernel) else {
         return finish(doc, Verdict::Error, Some("candidate kernel missing".into()));
     };
-    let expected = [
+    let mut expected = vec![
         (&sp.input, Ty::U64),
         (&sp.output, Ty::U64),
         (&sp.length, Ty::U32),
     ];
+    if sp.class == "equivalence-oss-inc" {
+        let Some(repeats) = sp.repeats.as_ref() else {
+            return finish(
+                doc,
+                Verdict::Error,
+                Some("requires repeats parameter".into()),
+            );
+        };
+        if [&sp.input, &sp.output, &sp.length].contains(&repeats) {
+            return finish(
+                doc,
+                Verdict::Error,
+                Some("parameter names must differ".into()),
+            );
+        }
+        expected.push((repeats, Ty::U32));
+    } else if sp.repeats.is_some() {
+        return finish(
+            doc,
+            Verdict::Error,
+            Some("unexpected repeats parameter".into()),
+        );
+    }
     if k0.params != k1.params
-        || k0.params.len() != 3
+        || k0.params.len() != expected.len()
         || !expected
             .iter()
             .all(|(n, t)| k0.params.iter().any(|p| &p.0 == *n && p.1 == *t))
@@ -122,11 +152,17 @@ pub fn check(
     }
     doc["kernel"] = json!(sp.kernel);
     let q = |s: &str| serde_json::to_string(s).unwrap();
+    let extra = sp
+        .repeats
+        .as_ref()
+        .map(|r| format!(", {}", q(r)))
+        .unwrap_or_default();
     let definition = format!(
-        "def domain : {family}.Spec := ⟨{}, {}, {}⟩\n",
+        "def domain : {family}.Spec := ⟨{}, {}, {}{}⟩\n",
         q(&sp.input),
         q(&sp.output),
-        q(&sp.length)
+        q(&sp.length),
+        extra
     );
     doc["lean_spec"] = json!(definition);
     let statement = format!(

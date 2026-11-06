@@ -268,3 +268,84 @@ fn direct_equivalence_requires_bound_original_and_strict_contract() {
         assert_eq!(run("unknown-field", &bad).0, 4);
     }
 }
+
+#[test]
+fn oss_increment_equivalence_requires_distinct_typed_repeats_parameter() {
+    let ptx = tmp(
+        "oss-relational.ptx",
+        ".version 9.2\n.target sm_86\n.address_size 64\n.visible .entry k(.param .u64 input, .param .u64 output, .param .u32 n, .param .u32 repeats) { ret; }\n",
+    );
+    let hash = String::from_utf8(Command::new("sha256sum").arg(&ptx).output().unwrap().stdout)
+        .unwrap()
+        .split_whitespace()
+        .next()
+        .unwrap()
+        .to_string();
+    let base = serde_json::json!({"schema":"e5r.ptx.spec.v1", "class":"equivalence-oss-inc",
+        "kernel":"k", "original_ptx":ptx, "original_sha256":hash,
+        "input":"input", "output":"output", "length":"n", "repeats":"repeats"});
+    let run = |tag: &str, v: &Value| {
+        let sp = tmp(&format!("oss-relational-{tag}.json"), &v.to_string());
+        check(&ptx, &sp, &[])
+    };
+    let (code, result) = run("no-proof", &base);
+    assert_eq!(code, 3, "{result}");
+    assert!(
+        result["reasons"]
+            .to_string()
+            .contains("requires a supplied proof")
+    );
+    assert!(
+        result["lean_spec"]
+            .as_str()
+            .unwrap()
+            .contains("OssInc.Spec")
+    );
+    assert!(
+        result["lean_spec"]
+            .as_str()
+            .unwrap()
+            .contains("\"repeats\"")
+    );
+
+    let mut bad = base.clone();
+    bad.as_object_mut().unwrap().remove("repeats");
+    let (code, result) = run("missing-repeats", &bad);
+    assert_eq!(code, 4, "{result}");
+    assert!(
+        result["reasons"]
+            .to_string()
+            .contains("requires repeats parameter")
+    );
+    for alias in ["input", "output", "n"] {
+        let mut bad = base.clone();
+        bad["repeats"] = alias.into();
+        let (code, result) = run(alias, &bad);
+        assert_eq!(code, 4, "{result}");
+        assert!(
+            result["reasons"]
+                .to_string()
+                .contains("parameter names must differ")
+        );
+    }
+    bad = base.clone();
+    bad["repeats"] = "missing".into();
+    assert_eq!(run("undeclared-repeats", &bad).0, 2);
+    bad = base.clone();
+    bad["class"] = "equivalence-unpack4".into();
+    let (code, result) = run("unexpected-repeats", &bad);
+    assert_eq!(code, 4, "{result}");
+    assert!(
+        result["reasons"]
+            .to_string()
+            .contains("unexpected repeats parameter")
+    );
+    bad = base.clone();
+    bad["assume_nonalias"] = true.into();
+    assert_eq!(run("unknown-field", &bad).0, 4);
+    bad = base;
+    bad["original_sha256"] = "0".repeat(64).into();
+    let (code, result) = run("stale-original", &bad);
+    assert_eq!(code, 3, "{result}");
+    assert!(result["reasons"].to_string().contains("hash mismatch"));
+}
