@@ -203,9 +203,23 @@ pub fn module(m: &Module) -> String {
         s.push('\n');
         let vis = if k.visible { ".visible " } else { "" };
         writeln!(s, "{vis}.entry {}(", k.name).unwrap();
-        for (i, (n, t)) in k.params.iter().enumerate() {
-            let sep = if i + 1 < k.params.len() { "," } else { "" };
-            writeln!(s, "\t.param .{} {n}{sep}", t.name()).unwrap();
+        for (i, d) in k.param_decls.iter().enumerate() {
+            let sep = if i + 1 < k.param_decls.len() { "," } else { "" };
+            match *d {
+                ParamDecl::Scalar(j) => {
+                    let (n, t) = &k.params[j];
+                    writeln!(s, "\t.param .{} {n}{sep}", t.name()).unwrap();
+                }
+                ParamDecl::Aggregate(j) => {
+                    let p = &k.aggregate_params[j];
+                    writeln!(
+                        s,
+                        "\t.param .align {} .b8 {}[{}]{sep}",
+                        p.align, p.name, p.size
+                    )
+                    .unwrap();
+                }
+            }
         }
         s.push_str(")\n{\n");
         for d in &k.decls {

@@ -52,6 +52,8 @@ structure Ctx where
   ctaid : Dim3
   nctaid : Dim3
   params : String → Val
+  /-- Aggregate arguments retain all ABI bytes, independently of scalar bits. -/
+  byteParams : String → Nat → BitVec 8 := fun _ _ => 0
   sym : String → Val := fun _ => 0
   /-- The NaN oracle (`Launch.nan`): the bits of a NaN result, from the
   state of the thread at the instruction. -/
@@ -282,6 +284,30 @@ def bfi32 (a b : BitVec 32) (pos len : Nat) : BitVec 32 :=
   let mask := ((-1 : BitVec 32) >>> (32 - min len 32)) <<< pos
   ((a <<< pos) &&& mask) ||| (b &&& ~~~mask)
 
+/-- Little-endian bytes at a natural parameter offset, without address wrapping. -/
+def paramRead32 (bytes : Nat → BitVec 8) (off : Nat) : BitVec 32 :=
+  bytes (off + 3) ++ bytes (off + 2) ++ bytes (off + 1) ++ bytes off
+
+def paramRead (bytes : Nat → BitVec 8) (off : Nat) : Size → Val
+  | .b4 => (paramRead32 bytes off).setWidth 64
+  | .b8 => paramRead32 bytes (off + 4) ++ paramRead32 bytes off
+
+/-- Read-only aggregate loads have declaration bounds and natural alignment.
+The scalar case retains its original bits and zero-offset behavior. -/
+def paramValue (K : Kernel) (c : Ctx) (t : Ty) (name : String) (off : Int) : Option Val :=
+  match K.aggregateParams.find? (fun p => p.name == name) with
+  | none => if off = 0 then some (fit t (c.params name)) else none
+  | some p =>
+    if 0 ≤ off ∧ off.toNat + t.size.bytes ≤ p.size ∧ t.size.bytes ≤ p.align ∧
+        p.align % t.size.bytes = 0 ∧ off.toNat % t.size.bytes = 0 then
+      some (paramRead (c.byteParams name) off.toNat t.size)
+    else none
+
+@[simp] theorem paramValue_scalar (K : Kernel) (c : Ctx) (t : Ty) (name : String)
+    (h : K.aggregateParams = []) :
+    paramValue K c t name 0 = some (fit t (c.params name)) := by
+  simp [paramValue, h]
+
 /-- The effect of one (unguarded) instruction. -/
 def exec (K : Kernel) (c : Ctx) (s : TState) : Instr → Action
   | .add t d a b => .next (s.set d (atWidth t.width (fun _ x y => x + y) (opVal c s a) (opVal c s b)))
@@ -314,7 +340,17 @@ def exec (K : Kernel) (c : Ctx) (s : TState) : Instr → Action
   | .selp t d a b p => .next (s.set d (fit t (if s.p p then opVal c s a else opVal c s b)))
   | .cvt dt st d a => .next (s.set d (convert dt st (opVal c s a)))
   | .cvtaGlobal d a => .next (s.set d (opVal c s a))
-  | .ld .param t d (.param n 0) => .next (s.set d (fit t (c.params n)))
+  | .ld .param t d (.param n 0) =>
+    match K.aggregateParams with
+    | [] => .next (s.set d (fit t (c.params n)))
+    | _ =>
+      match paramValue K c t n 0 with
+      | some v => .next (s.set d v)
+      | none => .fault
+  | .ld .param t d (.param n off) =>
+    match paramValue K c t n off with
+    | some v => .next (s.set d v)
+    | none => .fault
   | .ld .param .. | .st .param .. => .fault
   | .ld sp t d a =>
     match dataAddr c s sp a with

@@ -126,3 +126,91 @@ fn frozen_normal_ptx_roundtrips_when_requested() {
             .any(|(_, text)| text == ".pragma \"nounroll\";")
     );
 }
+
+fn with_globals(declarations: &str) -> String {
+    CORE.replace(
+        ".visible .entry",
+        &format!("{declarations}\n.visible .entry"),
+    )
+}
+
+#[test]
+fn unused_scalar_globals_keep_all_tokens_and_initializers() {
+    let src = with_globals(
+        ".global .align 2 .u16 nan;\n.global .align 1 .u8 contiguous;\n.global .align 4 .f32 epsilon = 0f34000000;\n.global .align 8 .f64 dmin = 0d0010000000000000;\n.global .align 4 .u32 exp = 128;\n.global .align 8 .s64 signed = -4;",
+    );
+    let m = roundtrip(&src).unwrap();
+    assert_eq!(m.kernels, roundtrip(CORE).unwrap().kernels);
+    assert_eq!(m.metadata.len(), 6);
+    assert!(e5r_ptx::print::module(&m).contains("epsilon = 0f34000000;"));
+}
+
+#[test]
+fn globals_reject_references_relocations_duplicates_and_hidden_code() {
+    for declaration in [
+        ".global .align 4 .u32 g = other;",
+        ".global .align 4 .u32 g = 1; ret;",
+        ".global .align 4 .u32 g;\n.global .align 4 .u32 g;",
+        ".global .align 4 .u32 g[4];",
+        ".global .align 3 .u32 g;",
+        ".global .align 2 .u32 g;",
+        ".global .align 4 .u32 g = 4294967296;",
+        ".global .align 4 .pred g;",
+        ".global .align 4 .f32 g = 0d0010000000000000;",
+        ".global .align 4 .u32 %g;",
+        ".global .align 4 .u32 .g;",
+    ] {
+        assert!(
+            roundtrip(&with_globals(declaration)).is_err(),
+            "accepted {declaration}"
+        );
+    }
+    for instruction in [
+        "mov.u32 %r1, g;",
+        "ld.global.u32 %r1, [g];",
+        "mov.u32 %r1, 1;\n.global .align 4 .u32 h;",
+    ] {
+        let src = with_globals(".global .align 4 .u32 g;").replace("mov.u32 %r1, 1;", instruction);
+        assert!(roundtrip(&src).is_err(), "accepted {instruction}");
+    }
+    // Symbol occurrence is refused irrespective of whether a particular opcode
+    // is supported or whether the symbol occurs before its declaration.
+    let src = CORE.replace("mov.u32 %r1, 1;", "mov.u32 %r1, g;") + ".global .align 4 .u32 g;\n";
+    assert!(
+        roundtrip(&src)
+            .unwrap_err()
+            .contains("referenced module global")
+    );
+}
+
+#[test]
+fn unused_globals_assemble_after_token_roundtrip() {
+    let assembler = std::env::var("PTXAS").unwrap_or_else(|_| "/usr/local/cuda/bin/ptxas".into());
+    if std::process::Command::new(&assembler)
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("ptxas unavailable; global assembler oracle not exercised");
+        return;
+    }
+    let src = with_globals(
+        ".global .align 2 .u16 nan;\n.global .align 4 .f32 epsilon = 0f34000000;\n.global .align 8 .f64 dmin = 0d0010000000000000;\n.global .align 4 .u32 exp = 128;",
+    );
+    let dir = std::env::temp_dir().join(format!("e5r-ptx-globals-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let input = dir.join("globals.ptx");
+    std::fs::write(&input, e5r_ptx::print::module(&roundtrip(&src).unwrap())).unwrap();
+    let result = std::process::Command::new(assembler)
+        .args(["-arch=sm_86", "-o"])
+        .arg(dir.join("globals.cubin"))
+        .arg(input)
+        .output()
+        .unwrap();
+    std::fs::remove_dir_all(dir).unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+}

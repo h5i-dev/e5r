@@ -493,6 +493,26 @@ pub enum Decl {
     Shared(usize),
 }
 
+/// A byte-array kernel argument passed by value, with its declared alignment.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AggregateParam {
+    /// Parameter symbol.
+    pub name: String,
+    /// Declared alignment in bytes.
+    pub align: u32,
+    /// Declared byte-array length.
+    pub size: u32,
+}
+
+/// Parameter declaration order, including aggregate arguments passed by value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ParamDecl {
+    /// Index into [`Kernel::params`].
+    Scalar(usize),
+    /// Index into [`Kernel::aggregate_params`].
+    Aggregate(usize),
+}
+
 /// One `.entry`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Kernel {
@@ -502,6 +522,10 @@ pub struct Kernel {
     pub name: String,
     /// Parameters, in order.
     pub params: Vec<(String, Ty)>,
+    /// Explicit byte-array arguments, without flattening their ABI.
+    pub aggregate_params: Vec<AggregateParam>,
+    /// The order scalar and aggregate parameters were declared.
+    pub param_decls: Vec<ParamDecl>,
     /// Register declarations, in order.
     pub regs: Vec<RegDecl>,
     /// `.shared` variable declarations, in order.
@@ -517,7 +541,9 @@ pub struct Kernel {
 /// A module: header directives and its kernels.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Module {
-    /// Validated non-executable metadata, indexed by preceding core-token count.
+    /// Validated non-executable directives and unreferenced scalar globals,
+    /// indexed by preceding core-token count. Global tokens/initializers are
+    /// preserved; resolving referenced global symbols is unsupported.
     pub metadata: Vec<(usize, String)>,
     /// `.version`, as written.
     pub version: String,

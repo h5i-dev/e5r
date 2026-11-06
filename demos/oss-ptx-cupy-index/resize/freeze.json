@@ -1,0 +1,41 @@
+{
+  "project": "CuPy",
+  "commit": "25e552d5d679dcdc6f7cc3d81310a9b265463137",
+  "tag": "v13.6.0",
+  "license": "MIT",
+  "source": "cupy/_manipulation/add_remove.py",
+  "normal_options": [
+    "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/cub",
+    "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/thrust",
+    "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/libcudacxx",
+    "--std=c++11",
+    "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include",
+    "-I/usr/local/cuda/include",
+    "-ftz=true",
+    "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/nvidia/cuda_runtime/include",
+    "-arch=sm_86",
+    "--device-as-default-execution-space"
+  ],
+  "ptx_options": [
+    "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/cub",
+    "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/thrust",
+    "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include/cupy/_cccl/libcudacxx",
+    "--std=c++11",
+    "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/cupy/_core/include",
+    "-I/usr/local/cuda/include",
+    "-ftz=true",
+    "-I/mnt/scratch/e5r-oss-ptx/venv/lib64/python3.12/site-packages/nvidia/cuda_runtime/include",
+    "-arch=compute_86",
+    "--device-as-default-execution-space"
+  ],
+  "cupy": "13.6.0",
+  "native_method": "cubin",
+  "hashes": {
+    "generated.cu": "23899efb4a9314dfddf4f10dcd37e2a76447cf9f483004680d8432e74bd51606",
+    "normal.cubin": "122005534b7088561138488a138cce3142738fb53ffaa1d43883e232cc179c2b",
+    "original.ptx": "acf80127ae5ee6dacbb1428513f9d65f52d42ec9d12ed1fb3c7253671543b543",
+    "upstream.py": "0f99f2e1ebb4e247fd41fbcdac6b4acf10d8d1252c478664823ef1a0c4da1647"
+  },
+  "phase": "source_build_frozen",
+  "proof_accepted": false
+}

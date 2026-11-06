@@ -1,0 +1,8 @@
+{
+  "kind": "direct_ptx_division_cfg_shift_mask",
+  "parameter": "cupy_putmask_kernel_param_2",
+  "value": 256,
+  "domain": "Exact stated parameter value; contiguous int32 arrays, disjoint input/output except putmask destination; nonnegative iteration count <2^29, valid 1D covering launch. Full memory/race/frame/termination proof pending.",
+  "sha256": "2f63714904300dd398a452dec459107641960db8d222a28c612a290d94919f17",
+  "proof_accepted": false
+}

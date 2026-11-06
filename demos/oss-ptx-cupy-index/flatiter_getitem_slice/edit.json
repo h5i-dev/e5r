@@ -1,0 +1,8 @@
+{
+  "kind": "direct_ptx_step_multiply_elimination",
+  "parameter": "cupy_flatiter_getitem_slice_param_2",
+  "value": 1,
+  "domain": "Exact stated parameter value; contiguous int32 arrays, disjoint input/output except putmask destination; nonnegative iteration count <2^29, valid 1D covering launch. Full memory/race/frame/termination proof pending.",
+  "sha256": "8401f610281308d98b235591185221d521ef9d2eacc2610be29a9c658d390486",
+  "proof_accepted": false
+}

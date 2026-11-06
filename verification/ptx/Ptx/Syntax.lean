@@ -163,11 +163,26 @@ structure SharedVar where
   size : Nat
   deriving Repr, DecidableEq, Inhabited
 
+/-- An explicit `.param .align align .b8 name[size]` argument passed by value. -/
+structure AggregateParam where
+  name : String
+  align : Nat
+  size : Nat
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Original mixed scalar/aggregate ABI declaration order. -/
+inductive ParamDecl where
+  | scalar (index : Nat)
+  | aggregate (index : Nat)
+  deriving Repr, DecidableEq, Inhabited
+
 /-- One `.entry` kernel. `labels` maps a label to the index of the statement
 that follows it. -/
 structure Kernel where
   name : String
   params : List (String × Ty)
+  aggregateParams : List AggregateParam := []
+  paramOrder : List ParamDecl := []
   regs : List RegDecl
   shared : List SharedVar := []
   body : List Stmt

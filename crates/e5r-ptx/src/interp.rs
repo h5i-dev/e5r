@@ -55,9 +55,39 @@ pub struct Ctx {
     pub nctaid: Dim3,
     /// Raw parameter bits, `.u32` zero-extended; missing names read 0.
     pub params: HashMap<String, u64>,
+    /// Aggregate argument bytes; absent bytes read zero, independently of scalars.
+    pub byte_params: HashMap<String, Vec<u8>>,
     /// Where each `.shared` variable is placed (`Launch.shared`); missing
     /// names read 0.
     pub sym: HashMap<String, u64>,
+}
+
+/// Parameter loads preserve scalar semantics and bound aggregate byte accesses
+/// by the declaration, rather than by a possibly incomplete supplied vector.
+pub fn param_value(k: &Kernel, c: &Ctx, t: Ty, name: &str, off: i128) -> Option<u64> {
+    if let Some(p) = k.aggregate_params.iter().find(|p| p.name == name) {
+        let bytes = t.width()? / 8;
+        let off = u32::try_from(off).ok()?;
+        if p.align < bytes
+            || p.align % bytes != 0
+            || off % bytes != 0
+            || off.checked_add(bytes)? > p.size
+        {
+            return None;
+        }
+        let data = c.byte_params.get(name);
+        Some((0..bytes).rev().fold(0, |v, i| {
+            (v << 8)
+                | data
+                    .and_then(|b| b.get((off + i) as usize))
+                    .copied()
+                    .unwrap_or(0) as u64
+        }))
+    } else if off == 0 {
+        Some(fit(t, c.params.get(name).copied().unwrap_or(0)))
+    } else {
+        None
+    }
 }
 
 /// Byte-addressed memory with a default of zero.
@@ -470,8 +500,10 @@ pub fn step(k: &Kernel, al: &Allocs, c: &Ctx, s: &mut TState, g: &mut Mem, sh: &
             let v = s.op(c, a);
             s.set(d, v);
         }
-        Ld(Space::Param, t, d, Address::Param(n, off)) if off.unwrap_or(0) == 0 => {
-            let v = fit(*t, c.params.get(n).copied().unwrap_or(0));
+        Ld(Space::Param, t, d, Address::Param(n, off)) => {
+            let Some(v) = param_value(k, c, *t, n, off.unwrap_or(0)) else {
+                return Res::Fault("out-of-bounds or unaligned parameter load".into());
+            };
             s.set(d, v);
         }
         Ld(Space::Param, ..) | St(Space::Param, ..) => {
@@ -749,6 +781,8 @@ pub struct Launch {
     pub block: Dim3,
     /// Parameter bits.
     pub params: HashMap<String, u64>,
+    /// Aggregate argument bytes, copied unchanged into every thread context.
+    pub byte_params: HashMap<String, Vec<u8>>,
     /// Shared variable placement.
     pub sym: HashMap<String, u64>,
     /// Global allocations.
@@ -795,6 +829,7 @@ impl Launch {
             ctaid: cta,
             nctaid: self.grid,
             params: self.params.clone(),
+            byte_params: self.byte_params.clone(),
             sym: self.sym.clone(),
         }
     }

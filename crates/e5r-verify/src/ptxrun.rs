@@ -77,6 +77,7 @@ pub fn run_cases(m: &Module, text: &str) -> Result<String, String> {
             grid,
             block,
             params,
+            byte_params: HashMap::new(),
             sym: layout(kern, 0),
             alloc: al.to_vec(),
         };

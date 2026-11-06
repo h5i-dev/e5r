@@ -18,6 +18,8 @@ struct Spec {
     length: String,
     #[serde(default)]
     repeats: Option<String>,
+    #[serde(default)]
+    scalar: Option<String>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -49,6 +51,7 @@ pub fn check(
                 | "equivalence-stencil17"
                 | "equivalence-stencil17-pair2"
                 | "equivalence-oss-inc"
+                | "equivalence-zero-segments"
         )
     {
         return finish(
@@ -58,7 +61,9 @@ pub fn check(
         );
     }
     doc["class"] = json!(sp.class);
-    let family = if sp.class == "equivalence-oss-inc" {
+    let family = if sp.class == "equivalence-zero-segments" {
+        "ZeroSegments"
+    } else if sp.class == "equivalence-oss-inc" {
         "OssInc"
     } else if sp.class == "equivalence-stencil17-pair2" {
         "StencilPair"
@@ -110,6 +115,13 @@ pub fn check(
     let Some(k1) = module.kernels.iter().find(|k| k.name == sp.kernel) else {
         return finish(doc, Verdict::Error, Some("candidate kernel missing".into()));
     };
+    if !k0.aggregate_params.is_empty() || !k1.aggregate_params.is_empty() {
+        return finish(
+            doc,
+            Verdict::Unsupported,
+            Some("scalar equivalence domains do not support aggregate parameter ABI".into()),
+        );
+    }
     let mut expected = vec![
         (&sp.input, Ty::U64),
         (&sp.output, Ty::U64),
@@ -138,6 +150,29 @@ pub fn check(
             Some("unexpected repeats parameter".into()),
         );
     }
+    if sp.class == "equivalence-zero-segments" {
+        let Some(scalar) = sp.scalar.as_ref() else {
+            return finish(
+                doc,
+                Verdict::Error,
+                Some("requires scalar parameter".into()),
+            );
+        };
+        if [&sp.input, &sp.output, &sp.length].contains(&scalar) {
+            return finish(
+                doc,
+                Verdict::Error,
+                Some("parameter names must differ".into()),
+            );
+        }
+        expected.push((scalar, Ty::U32));
+    } else if sp.scalar.is_some() {
+        return finish(
+            doc,
+            Verdict::Error,
+            Some("unexpected scalar parameter".into()),
+        );
+    }
     if k0.params != k1.params
         || k0.params.len() != expected.len()
         || !expected
@@ -155,6 +190,7 @@ pub fn check(
     let extra = sp
         .repeats
         .as_ref()
+        .or(sp.scalar.as_ref())
         .map(|r| format!(", {}", q(r)))
         .unwrap_or_default();
     let definition = format!(

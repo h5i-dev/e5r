@@ -222,6 +222,23 @@ pub fn kernel_def(k: &Kernel) -> String {
         .map(|(n, t)| format!("({}, {})", string(n), ty(*t)))
         .collect();
     writeln!(s, "  params := [{}]", params.join(", ")).unwrap();
+    if !k.aggregate_params.is_empty() {
+        let aggregates: Vec<_> = k
+            .aggregate_params
+            .iter()
+            .map(|p| format!("⟨{}, {}, {}⟩", string(&p.name), p.align, p.size))
+            .collect();
+        writeln!(s, "  aggregateParams := [{}]", aggregates.join(", ")).unwrap();
+        let order: Vec<_> = k
+            .param_decls
+            .iter()
+            .map(|d| match d {
+                ParamDecl::Scalar(i) => format!(".scalar {i}"),
+                ParamDecl::Aggregate(i) => format!(".aggregate {i}"),
+            })
+            .collect();
+        writeln!(s, "  paramOrder := [{}]", order.join(", ")).unwrap();
+    }
     let regs: Vec<String> = k
         .regs
         .iter()

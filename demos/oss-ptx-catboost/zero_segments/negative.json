@@ -1,0 +1,59 @@
+{
+  "exit_code": 3,
+  "mutant_sha256": "c50f970222eeedf85f3c8474b6345dac3842cd3e7f31c4b46b84a3e5ce667708",
+  "hash_rebound": true,
+  "result": {
+    "class": "equivalence-zero-segments",
+    "counterexample": null,
+    "input": {
+      "original_ptx": {
+        "path": "/mnt/scratch/e5r-oss-ptx/tmp/tmpjygikqu0/original.ptx",
+        "sha256": "a2dea8659ab71d33b1fa3377ddcf5867105980684a9eb8847b971f8ec1cb5753"
+      },
+      "ptx": {
+        "path": "/mnt/scratch/e5r-oss-ptx/tmp/tmpjygikqu0/edited.ptx",
+        "sha256": "c50f970222eeedf85f3c8474b6345dac3842cd3e7f31c4b46b84a3e5ce667708"
+      },
+      "spec": {
+        "path": "/mnt/scratch/e5r-oss-ptx/tmp/tmpjygikqu0/equivalence.json",
+        "sha256": "c649e95400f87122a5574ce3654846e3ed4d48215daa0667315c91dae14989a3"
+      }
+    },
+    "kernel": "_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT_",
+    "lean": {
+      "memory_cap_mb": 3072,
+      "proof_seconds": 17.37,
+      "timeout_seconds": 120,
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "lean_spec": "def domain : ZeroSegments.Spec := \u27e8\"_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT__param_0\", \"_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT__param_3\", \"_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT__param_2\", \"_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT__param_1\"\u27e9\n",
+    "proof": {
+      "accepted": false,
+      "manifest": {
+        "ptx": "c50f970222eeedf85f3c8474b6345dac3842cd3e7f31c4b46b84a3e5ce667708",
+        "spec": "c649e95400f87122a5574ce3654846e3ed4d48215daa0667315c91dae14989a3",
+        "toolchain": "leanprover/lean4:v4.35.0"
+      },
+      "path": "/mnt/scratch/e5r-oss-ptx/tmp/tmpjygikqu0/equivalence.lean",
+      "sha256": "e29bd000c74cb625a0f66f5f1852791db113992881e0f093cbe8e62b47dd91fb",
+      "supplied": true
+    },
+    "properties": {
+      "functional_correctness": "unknown",
+      "memory_safety": "unknown",
+      "race_freedom": "unknown",
+      "termination": "unknown"
+    },
+    "reasons": [
+      "supplied proof refused: it does not compile: error: unsolved goals case isFalse.isFalse.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2.refine_2 A : Args"
+    ],
+    "schema": "e5r.ptx.result.v1",
+    "seconds": 22.54,
+    "theorem": null,
+    "tool": {
+      "name": "e5r",
+      "version": "0.1.0"
+    },
+    "verdict": "unknown"
+  }
+}

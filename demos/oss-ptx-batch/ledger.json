@@ -209,7 +209,7 @@
       "purpose": "In-place reversal of GPU training buffers",
       "direct_ptx_edit_opportunity": "Eliminate grid-stride prologue/backedge when normal uncapped ceil launch covers half; retain fallback for capped grid. Also use32-bit element indexing under explicit physical-size bound.",
       "caveat": "No alternate kernel dispatch in wrapper; original accesses reverse coalesced segments. Matching vectorized/restrict-free tuned reversal needed.",
-      "phase": "direct_edit_gpu_extracted_timing_full_TU_and_proof_pending",
+      "phase": "edited_gpu_timed_proof_pending",
       "optimization_attempt": true,
       "gpu_tested": true,
       "proved": false,
@@ -355,7 +355,7 @@
       "purpose": "Zero starts after exclusive segmented scan",
       "direct_ptx_edit_opportunity": "Share the already-computed input byte offset for output instead of redundant cvt+shl; predicate the conditional store to replace inner branch, preserving inactive output bytes.",
       "caveat": "This is a fixup kernel; benchmark kernel separately and full scan separately; CUB scan implementation remains strongest overall scan baseline.",
-      "phase": "direct_edit_gpu_extracted_timing_full_TU_and_proof_pending",
+      "phase": "strict_direct_proof_accepted_normal_TU_pending",
       "optimization_attempt": true,
       "gpu_tested": true,
       "proved": false,
@@ -387,8 +387,8 @@
       "preferred_ptx": "/mnt/scratch/e5r-oss-ptx/screen/catboost-extract/zero_segments-no-unused-cub.ptx",
       "preferred_parser_exit": 0,
       "body_end_line": 19,
-      "proof_attempt": false,
-      "strict_accepted": false,
+      "proof_attempt": true,
+      "strict_accepted": true,
       "fair_timing": false,
       "accepted_win": false,
       "project": "CatBoost",
@@ -396,7 +396,7 @@
       "commit": "5686f8c6cc9def4b0df343488d2f887ec5609d1f",
       "line": 11,
       "completed_optimization_proof_attempt": false,
-      "strict_proof_accepted": false,
+      "strict_proof_accepted": true,
       "hashes": {
         "original": "a2dea8659ab71d33b1fa3377ddcf5867105980684a9eb8847b971f8ec1cb5753",
         "edited": "96e5da6355319cc83fe1a89c4faa72a145b8249f22f3eced208b6acdc3cb7b42",
@@ -411,8 +411,7 @@
       "domain": "4-byte aligned disjoint flags/output arrays of size uint32; covering 1D grid*block<=2^32; no wrapping byte ranges; all flags, flagMask and initial output values unrestricted.",
       "caveats": [
         "Extracted unchanged upstream body; normal full TU runtime equivalence not validated",
-        "No meaningful speedup demonstrated",
-        "No accepted universal direct equivalence proof"
+        "No meaningful speedup demonstrated"
       ],
       "extracted_kernel_timing": true
     },
@@ -452,7 +451,7 @@
       "purpose": "Clear structured Offset/Size partition descriptors for empty input",
       "direct_ptx_edit_opportunity": "Replace two adjacent u32 zero stores with one u64 store for8-aligned fast path; keep4-aligned fallback. Remove unused grid-stride overhead for normal uncapped launch.",
       "caveat": "Struct alignment is4, allocation usually cudaMalloc. Do not silently require8alignment; cudaMemset is an important tuned comparison.",
-      "phase": "direct_edit_gpu_extracted_timing_full_TU_and_proof_pending",
+      "phase": "edited_gpu_timed_proof_pending",
       "optimization_attempt": true,
       "gpu_tested": true,
       "proved": false,
@@ -622,7 +621,7 @@
       "purpose": "Mark boundaries between query groups in reordered document list",
       "direct_ptx_edit_opportunity": "Share original i*4 offset for docs[i], docs[i+1], output; replace next-doc address multiply with base+4; merge conversion/address chains. Tail must still avoid reading nextDoc.",
       "caveat": "Data-dependent gather; require docs valid indices and nonaliasing outputs. No alternative specialized dispatch exists in this wrapper.",
-      "phase": "direct_edit_gpu_extracted_timing_full_TU_and_proof_pending",
+      "phase": "edited_gpu_timed_proof_pending",
       "optimization_attempt": true,
       "gpu_tested": true,
       "proved": false,
@@ -719,7 +718,7 @@
       "purpose": "Expand query sizes/offsets into per-document query IDs",
       "direct_ptx_edit_opportunity": "Hoist single qid validity branch and merge two guarded size/offset load paths; simplify unrolled tail loop or specialize short-query path with exactfallback.",
       "caveat": "Disjoint valid query ranges, offsetsBias, int-sized query lengths required; multiple writes per thread. Likely heavier proof than other firstbatch.",
-      "phase": "direct_edit_gpu_extracted_timing_full_TU_and_proof_pending",
+      "phase": "edited_gpu_timed_proof_pending",
       "optimization_attempt": true,
       "gpu_tested": true,
       "proved": false,
@@ -1086,14 +1085,4074 @@
         "../oss-ptx-cupy-packing/results.json",
         "../oss-ptx-cupy-packing/results-rotating.json"
       ]
+    },
+    {
+      "id": "cupy/flatiter_getitem_slice",
+      "project": "CuPy",
+      "kernel": "flatiter_getitem_slice",
+      "source": "cupy/_indexing/iterate.py",
+      "commit": "25e552d5d679dcdc6f7cc3d81310a9b265463137",
+      "license": "MIT",
+      "phase": "direct_edit_gpu_timed_frontend_blocked",
+      "source_build_frozen": true,
+      "direct_edited": true,
+      "gpu_validated": true,
+      "fair_timing": false,
+      "universal_direct_equivalence": false,
+      "proof_accepted": false,
+      "negative_gpu_witness": true,
+      "negative_proof": false,
+      "hashes": {
+        "generated.cu": "d694566db7bd8b6ac39467a0281c760e097f8146dd8d34fe1fe7c8f8cb0225f3",
+        "normal.cubin": "e6fdae4b809fc4535fbcc50b1d044985a76874838238d19ac7ce2a2c93a921bb",
+        "original.ptx": "1b3a04a6398bfabb8dc7ed41785a32a52db23ee95b241ad658728ffbeea08d41",
+        "upstream.py": "1f597ddde9cafff512116ba4ff5fc48756aa12f469e8bc5c9f774a765ff3b1b6",
+        "edited.ptx": "8401f610281308d98b235591185221d521ef9d2eacc2610be29a9c658d390486"
+      },
+      "artifact_dir": "demos/oss-ptx-cupy-index/flatiter_getitem_slice",
+      "performance": [
+        {
+          "kernel": "flatiter_getitem_slice",
+          "n": 1,
+          "samples_us": {
+            "native": [
+              1.151749980635941,
+              1.07999995816499,
+              1.07999995816499,
+              1.0760000441223383,
+              1.07999995816499,
+              1.0760000441223383,
+              1.0760000441223383
+            ],
+            "original": [
+              1.1279999744147062,
+              1.0839999886229634,
+              1.0720000136643648,
+              1.0838749585673213,
+              1.0720000136643648,
+              1.0720000136643648,
+              1.0760000441223383
+            ],
+            "edited": [
+              1.1117500253021717,
+              1.0560000082477927,
+              1.0639999527484179,
+              1.0639999527484179,
+              1.0639999527484179,
+              1.0600000387057662,
+              1.0600000387057662
+            ],
+            "tuned": [
+              1.2597499880939722,
+              1.2039999710395932,
+              1.2039999710395932,
+              1.2080000014975667,
+              1.2039999710395932,
+              1.2000000569969416,
+              1.2039999710395932
+            ]
+          },
+          "median_us": {
+            "native": 1.07999995816499,
+            "original": 1.0760000441223383,
+            "edited": 1.0639999527484179,
+            "tuned": 1.2039999710395932
+          },
+          "order": [
+            [
+              "native",
+              "edited",
+              "tuned",
+              "original"
+            ],
+            [
+              "tuned",
+              "original",
+              "edited",
+              "native"
+            ],
+            [
+              "native",
+              "edited",
+              "original",
+              "tuned"
+            ],
+            [
+              "edited",
+              "tuned",
+              "native",
+              "original"
+            ],
+            [
+              "original",
+              "edited",
+              "tuned",
+              "native"
+            ],
+            [
+              "tuned",
+              "original",
+              "native",
+              "edited"
+            ],
+            [
+              "native",
+              "tuned",
+              "original",
+              "edited"
+            ]
+          ],
+          "speedup_native": 1.0150375997435361,
+          "speedup_original": 1.011278281867328,
+          "speedup_tuned": 1.1315789704027162
+        },
+        {
+          "kernel": "flatiter_getitem_slice",
+          "n": 31,
+          "samples_us": {
+            "native": [
+              1.1360000353306532,
+              1.0839999886229634,
+              1.07999995816499,
+              1.0720000136643648,
+              1.0720000136643648,
+              1.07999995816499,
+              1.0760000441223383
+            ],
+            "original": [
+              1.1279999744147062,
+              1.0839999886229634,
+              1.075749984011054,
+              1.0760000441223383,
+              1.0760000441223383,
+              1.0760000441223383,
+              1.0720000136643648
+            ],
+            "edited": [
+              1.1159999994561076,
+              1.0639999527484179,
+              1.0720000136643648,
+              1.0636249789968133,
+              1.0600000387057662,
+              1.0600000387057662,
+              1.0600000387057662
+            ],
+            "tuned": [
+              1.2558749876916409,
+              1.2000000569969416,
+              1.2120000319555402,
+              1.2080000014975667,
+              1.2080000014975667,
+              1.2000000569969416,
+              1.2000000569969416
+            ]
+          },
+          "median_us": {
+            "native": 1.07999995816499,
+            "original": 1.0760000441223383,
+            "edited": 1.0636249789968133,
+            "tuned": 1.2080000014975667
+          },
+          "order": [
+            [
+              "native",
+              "original",
+              "tuned",
+              "edited"
+            ],
+            [
+              "tuned",
+              "edited",
+              "native",
+              "original"
+            ],
+            [
+              "edited",
+              "native",
+              "tuned",
+              "original"
+            ],
+            [
+              "native",
+              "original",
+              "edited",
+              "tuned"
+            ],
+            [
+              "native",
+              "edited",
+              "original",
+              "tuned"
+            ],
+            [
+              "original",
+              "edited",
+              "native",
+              "tuned"
+            ],
+            [
+              "native",
+              "edited",
+              "original",
+              "tuned"
+            ]
+          ],
+          "speedup_native": 1.0153954443450746,
+          "speedup_original": 1.01163480114692,
+          "speedup_tuned": 1.1357386535213987
+        },
+        {
+          "kernel": "flatiter_getitem_slice",
+          "n": 255,
+          "samples_us": {
+            "native": [
+              1.1480000102892518,
+              1.0920000495389104,
+              1.095999963581562,
+              1.095999963581562,
+              1.0999999940395355,
+              1.0920000495389104,
+              1.0920000495389104
+            ],
+            "original": [
+              1.1599999852478504,
+              1.095999963581562,
+              1.1036250507459044,
+              1.0999999940395355,
+              1.095999963581562,
+              1.095999963581562,
+              1.095999963581562
+            ],
+            "edited": [
+              1.1399999493733048,
+              1.07999995816499,
+              1.0839999886229634,
+              1.0839999886229634,
+              1.07999995816499,
+              1.07999995816499,
+              1.0839999886229634
+            ],
+            "tuned": [
+              1.2799999676644802,
+              1.2280000373721123,
+              1.2240000069141388,
+              1.2240000069141388,
+              1.2240000069141388,
+              1.2240000069141388,
+              1.2240000069141388
+            ]
+          },
+          "median_us": {
+            "native": 1.095999963581562,
+            "original": 1.095999963581562,
+            "edited": 1.0839999886229634,
+            "tuned": 1.2240000069141388
+          },
+          "order": [
+            [
+              "original",
+              "tuned",
+              "native",
+              "edited"
+            ],
+            [
+              "original",
+              "edited",
+              "tuned",
+              "native"
+            ],
+            [
+              "native",
+              "original",
+              "edited",
+              "tuned"
+            ],
+            [
+              "edited",
+              "native",
+              "original",
+              "tuned"
+            ],
+            [
+              "edited",
+              "native",
+              "tuned",
+              "original"
+            ],
+            [
+              "edited",
+              "tuned",
+              "native",
+              "original"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ]
+          ],
+          "speedup_native": 1.0110700877163685,
+          "speedup_original": 1.0110700877163685,
+          "speedup_tuned": 1.1291513097421906
+        },
+        {
+          "kernel": "flatiter_getitem_slice",
+          "n": 256,
+          "samples_us": {
+            "native": [
+              1.1759999906644225,
+              1.1077499948441982,
+              1.0920000495389104,
+              1.088000019080937,
+              1.0999999940395355,
+              1.0920000495389104,
+              1.088000019080937
+            ],
+            "original": [
+              1.1796250473707914,
+              1.088000019080937,
+              1.088000019080937,
+              1.088000019080937,
+              1.095999963581562,
+              1.0920000495389104,
+              1.0920000495389104
+            ],
+            "edited": [
+              1.1480000102892518,
+              1.0920000495389104,
+              1.0760000441223383,
+              1.075749984011054,
+              1.07999995816499,
+              1.07999995816499,
+              1.07999995816499
+            ],
+            "tuned": [
+              1.3000000035390258,
+              1.2359999818727374,
+              1.2199999764561653,
+              1.2199999764561653,
+              1.2199999764561653,
+              1.2199999764561653,
+              1.2199999764561653
+            ]
+          },
+          "median_us": {
+            "native": 1.0920000495389104,
+            "original": 1.0920000495389104,
+            "edited": 1.07999995816499,
+            "tuned": 1.2199999764561653
+          },
+          "order": [
+            [
+              "tuned",
+              "original",
+              "edited",
+              "native"
+            ],
+            [
+              "tuned",
+              "edited",
+              "native",
+              "original"
+            ],
+            [
+              "original",
+              "edited",
+              "native",
+              "tuned"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "edited",
+              "native",
+              "tuned",
+              "original"
+            ],
+            [
+              "original",
+              "edited",
+              "native",
+              "tuned"
+            ],
+            [
+              "tuned",
+              "original",
+              "edited",
+              "native"
+            ]
+          ],
+          "speedup_native": 1.0111111961469976,
+          "speedup_original": 1.0111111961469976,
+          "speedup_tuned": 1.1296296515872528
+        },
+        {
+          "kernel": "flatiter_getitem_slice",
+          "n": 257,
+          "samples_us": {
+            "native": [
+              1.1320000048726797,
+              1.0839999886229634,
+              1.0920000495389104,
+              1.0839999886229634,
+              1.0839999886229634,
+              1.0839999886229634,
+              1.088000019080937
+            ],
+            "original": [
+              1.1480000102892518,
+              1.0839999886229634,
+              1.0920000495389104,
+              1.088000019080937,
+              1.0877499589696527,
+              1.0839999886229634,
+              1.0839999886229634
+            ],
+            "edited": [
+              1.120000029914081,
+              1.0760000441223383,
+              1.0760000441223383,
+              1.0720000136643648,
+              1.0720000136643648,
+              1.0760000441223383,
+              1.0760000441223383
+            ],
+            "tuned": [
+              1.2600000482052565,
+              1.2120000319555402,
+              1.2159999459981918,
+              1.2159999459981918,
+              1.2120000319555402,
+              1.2159999459981918,
+              1.2159999459981918
+            ]
+          },
+          "median_us": {
+            "native": 1.0839999886229634,
+            "original": 1.0877499589696527,
+            "edited": 1.0760000441223383,
+            "tuned": 1.2159999459981918
+          },
+          "order": [
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ],
+            [
+              "original",
+              "tuned",
+              "native",
+              "edited"
+            ],
+            [
+              "original",
+              "edited",
+              "native",
+              "tuned"
+            ],
+            [
+              "original",
+              "edited",
+              "native",
+              "tuned"
+            ],
+            [
+              "edited",
+              "native",
+              "tuned",
+              "original"
+            ],
+            [
+              "tuned",
+              "original",
+              "edited",
+              "native"
+            ],
+            [
+              "original",
+              "edited",
+              "tuned",
+              "native"
+            ]
+          ],
+          "speedup_native": 1.007434892353699,
+          "speedup_original": 1.0109199947634746,
+          "speedup_tuned": 1.1301114276347892
+        },
+        {
+          "kernel": "flatiter_getitem_slice",
+          "n": 4096,
+          "samples_us": {
+            "native": [
+              1.211875001899898,
+              1.1439999798312783,
+              1.1439999798312783,
+              1.1439999798312783,
+              1.1439999798312783,
+              1.1480000102892518,
+              1.1520000407472253
+            ],
+            "original": [
+              1.2120000319555402,
+              1.143750036135316,
+              1.1439999798312783,
+              1.1439999798312783,
+              1.1439999798312783,
+              1.1439999798312783,
+              1.1480000102892518
+            ],
+            "edited": [
+              1.196000026538968,
+              1.1279999744147062,
+              1.1320000048726797,
+              1.1320000048726797,
+              1.1279999744147062,
+              1.1279999744147062,
+              1.1360000353306532
+            ],
+            "tuned": [
+              1.3200000394135714,
+              1.272000023163855,
+              1.272000023163855,
+              1.272000023163855,
+              1.272000023163855,
+              1.272000023163855,
+              1.2760000536218286
+            ]
+          },
+          "median_us": {
+            "native": 1.1439999798312783,
+            "original": 1.1439999798312783,
+            "edited": 1.1320000048726797,
+            "tuned": 1.272000023163855
+          },
+          "order": [
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "tuned",
+              "native",
+              "original",
+              "edited"
+            ],
+            [
+              "tuned",
+              "edited",
+              "native",
+              "original"
+            ],
+            [
+              "original",
+              "edited",
+              "native",
+              "tuned"
+            ],
+            [
+              "original",
+              "tuned",
+              "native",
+              "edited"
+            ],
+            [
+              "edited",
+              "original",
+              "tuned",
+              "native"
+            ],
+            [
+              "original",
+              "tuned",
+              "edited",
+              "native"
+            ]
+          ],
+          "speedup_native": 1.010600684546771,
+          "speedup_original": 1.010600684546771,
+          "speedup_tuned": 1.1236749272867024
+        },
+        {
+          "kernel": "flatiter_getitem_slice",
+          "n": 65536,
+          "samples_us": {
+            "native": [
+              1.6080000204965472,
+              1.5160000184550881,
+              1.5160000184550881,
+              1.5200000489130616,
+              1.5160000184550881,
+              1.5160000184550881,
+              1.5160000184550881
+            ],
+            "original": [
+              1.5999999595806003,
+              1.5360000543296337,
+              1.5200000489130616,
+              1.5200000489130616,
+              1.5200000489130616,
+              1.5239999629557133,
+              1.5160000184550881
+            ],
+            "edited": [
+              1.5960000455379486,
+              1.531874993816018,
+              1.5239999629557133,
+              1.5200000489130616,
+              1.5239999629557133,
+              1.5200000489130616,
+              1.5239999629557133
+            ],
+            "tuned": [
+              1.8240000354126096,
+              1.744000008329749,
+              1.7437499482184649,
+              1.7477499786764383,
+              1.744000008329749,
+              1.7399999778717756,
+              1.7399999778717756
+            ]
+          },
+          "median_us": {
+            "native": 1.5160000184550881,
+            "original": 1.5200000489130616,
+            "edited": 1.5239999629557133,
+            "tuned": 1.744000008329749
+          },
+          "order": [
+            [
+              "original",
+              "tuned",
+              "edited",
+              "native"
+            ],
+            [
+              "original",
+              "edited",
+              "native",
+              "tuned"
+            ],
+            [
+              "original",
+              "tuned",
+              "native",
+              "edited"
+            ],
+            [
+              "edited",
+              "tuned",
+              "native",
+              "original"
+            ],
+            [
+              "tuned",
+              "original",
+              "native",
+              "edited"
+            ],
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ],
+            [
+              "original",
+              "native",
+              "edited",
+              "tuned"
+            ]
+          ],
+          "speedup_native": 0.9947506924572953,
+          "speedup_original": 0.9973753844226518,
+          "speedup_tuned": 1.1443569886624918
+        },
+        {
+          "kernel": "flatiter_getitem_slice",
+          "n": 1048576,
+          "samples_us": {
+            "native": [
+              14.188000001013279,
+              14.151999726891518,
+              14.139999635517597,
+              14.14399966597557,
+              14.120000414550304,
+              14.147999696433544,
+              14.147999696433544
+            ],
+            "original": [
+              14.2000000923872,
+              14.127999544143677,
+              14.151999726891518,
+              14.15175013244152,
+              14.112000353634357,
+              14.151999726891518,
+              14.13199957460165
+            ],
+            "edited": [
+              14.10400029271841,
+              14.055999927222729,
+              14.047999866306782,
+              14.076000079512596,
+              14.059999957680702,
+              14.047999866306782,
+              14.06800001859665
+            ],
+            "tuned": [
+              15.560000203549862,
+              15.491999685764313,
+              15.51199983805418,
+              15.515999868512154,
+              15.5239999294281,
+              15.503999777138233,
+              15.495999716222286
+            ]
+          },
+          "median_us": {
+            "native": 14.147999696433544,
+            "original": 14.15175013244152,
+            "edited": 14.059999957680702,
+            "tuned": 15.51199983805418
+          },
+          "order": [
+            [
+              "original",
+              "tuned",
+              "edited",
+              "native"
+            ],
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "tuned",
+              "native",
+              "edited",
+              "original"
+            ],
+            [
+              "tuned",
+              "native",
+              "original",
+              "edited"
+            ],
+            [
+              "edited",
+              "original",
+              "native",
+              "tuned"
+            ],
+            [
+              "native",
+              "original",
+              "tuned",
+              "edited"
+            ]
+          ],
+          "speedup_native": 1.0062588719073764,
+          "speedup_original": 1.0065256170012076,
+          "speedup_tuned": 1.1032716845479276
+        },
+        {
+          "kernel": "flatiter_getitem_slice",
+          "n": 4194304,
+          "samples_us": {
+            "native": [
+              70.24774700403214,
+              70.19975036382675,
+              70.19200176000595,
+              70.203997194767,
+              70.1880007982254,
+              70.20000368356705,
+              70.22400200366974
+            ],
+            "original": [
+              70.28000056743622,
+              70.17599791288376,
+              70.15600055456161,
+              70.24399936199188,
+              70.21600008010864,
+              70.24800032377243,
+              70.2119991183281
+            ],
+            "edited": [
+              70.27599960565567,
+              70.23199647665024,
+              70.2119991183281,
+              70.203997194767,
+              70.21600008010864,
+              70.29999792575836,
+              70.1960027217865
+            ],
+            "tuned": [
+              69.89999860525131,
+              69.8160007596016,
+              69.84400004148483,
+              69.85200196504593,
+              69.90399956703186,
+              69.86799836158752,
+              69.90800052881241
+            ]
+          },
+          "median_us": {
+            "native": 70.20000368356705,
+            "original": 70.21600008010864,
+            "edited": 70.21600008010864,
+            "tuned": 69.86799836158752
+          },
+          "order": [
+            [
+              "native",
+              "original",
+              "edited",
+              "tuned"
+            ],
+            [
+              "original",
+              "native",
+              "edited",
+              "tuned"
+            ],
+            [
+              "tuned",
+              "original",
+              "native",
+              "edited"
+            ],
+            [
+              "edited",
+              "original",
+              "native",
+              "tuned"
+            ],
+            [
+              "original",
+              "edited",
+              "tuned",
+              "native"
+            ],
+            [
+              "original",
+              "edited",
+              "tuned",
+              "native"
+            ],
+            [
+              "edited",
+              "native",
+              "original",
+              "tuned"
+            ]
+          ],
+          "speedup_native": 0.9997721830277523,
+          "speedup_original": 1.0,
+          "speedup_tuned": 0.9950438401771093
+        }
+      ],
+      "optimization_attempt": true,
+      "gpu_tested": true,
+      "proof_attempt": false,
+      "strict_accepted": false,
+      "accepted_win": false,
+      "hot_kernel_timing": true
+    },
+    {
+      "id": "cupy/flatiter_setitem_slice",
+      "project": "CuPy",
+      "kernel": "flatiter_setitem_slice",
+      "source": "cupy/_indexing/iterate.py",
+      "commit": "25e552d5d679dcdc6f7cc3d81310a9b265463137",
+      "license": "MIT",
+      "phase": "direct_edit_gpu_timed_frontend_blocked",
+      "source_build_frozen": true,
+      "direct_edited": true,
+      "gpu_validated": true,
+      "fair_timing": false,
+      "universal_direct_equivalence": false,
+      "proof_accepted": false,
+      "negative_gpu_witness": true,
+      "negative_proof": false,
+      "hashes": {
+        "generated.cu": "256f66b116e9074427b6fb825053d45c9c530d624b9ce40faabc0b29ff04290f",
+        "normal.cubin": "1cc13d7ef3356a7c7983585d75ad4fdb3cb9ee35d4f2974ccac0df538de88b54",
+        "original.ptx": "53375de7d8669766fd4a48741d73751d26e1b15c0f0db515914cb858b39d2dc7",
+        "upstream.py": "1f597ddde9cafff512116ba4ff5fc48756aa12f469e8bc5c9f774a765ff3b1b6",
+        "edited.ptx": "34f107931c09ad7ed165a5dd5f8896241e024a48a7b6a17cbc95dfa81413fe22"
+      },
+      "artifact_dir": "demos/oss-ptx-cupy-index/flatiter_setitem_slice",
+      "performance": [
+        {
+          "kernel": "flatiter_setitem_slice",
+          "n": 1,
+          "samples_us": {
+            "native": [
+              1.2077500578016043,
+              1.155999954789877,
+              1.155999954789877,
+              1.1680000461637974,
+              1.1680000461637974,
+              1.164000015705824,
+              1.155999954789877
+            ],
+            "original": [
+              1.2280000373721123,
+              1.155999954789877,
+              1.155999954789877,
+              1.155999954789877,
+              1.155999954789877,
+              1.2359999818727374,
+              1.1520000407472253
+            ],
+            "edited": [
+              1.1116249952465296,
+              1.0639999527484179,
+              1.0600000387057662,
+              1.0560000082477927,
+              1.0760000441223383,
+              1.0760000441223383,
+              1.0560000082477927
+            ],
+            "tuned": [
+              1.247999956831336,
+              1.2039999710395932,
+              1.196000026538968,
+              1.2000000569969416,
+              1.196000026538968,
+              1.2039999710395932,
+              1.2000000569969416
+            ]
+          },
+          "median_us": {
+            "native": 1.164000015705824,
+            "original": 1.155999954789877,
+            "edited": 1.0639999527484179,
+            "tuned": 1.2000000569969416
+          },
+          "order": [
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ],
+            [
+              "edited",
+              "original",
+              "tuned",
+              "native"
+            ],
+            [
+              "tuned",
+              "original",
+              "edited",
+              "native"
+            ],
+            [
+              "tuned",
+              "native",
+              "edited",
+              "original"
+            ],
+            [
+              "native",
+              "original",
+              "tuned",
+              "edited"
+            ],
+            [
+              "edited",
+              "native",
+              "original",
+              "tuned"
+            ],
+            [
+              "original",
+              "tuned",
+              "edited",
+              "native"
+            ]
+          ],
+          "speedup_native": 1.0939850257503263,
+          "speedup_original": 1.0864661711721075,
+          "speedup_tuned": 1.127819652526508
+        },
+        {
+          "kernel": "flatiter_setitem_slice",
+          "n": 31,
+          "samples_us": {
+            "native": [
+              1.231999951414764,
+              1.1759999906644225,
+              1.171999960206449,
+              1.1759999906644225,
+              1.171999960206449,
+              1.171999960206449,
+              1.171999960206449
+            ],
+            "original": [
+              1.2359999818727374,
+              1.180000021122396,
+              1.171999960206449,
+              1.180000021122396,
+              1.1759999906644225,
+              1.1759999906644225,
+              1.171999960206449
+            ],
+            "edited": [
+              1.1320000048726797,
+              1.0760000441223383,
+              1.07999995816499,
+              1.0760000441223383,
+              1.07999995816499,
+              1.0760000441223383,
+              1.07999995816499
+            ],
+            "tuned": [
+              1.2679999927058816,
+              1.2199999764561653,
+              1.2199999764561653,
+              1.2199999764561653,
+              1.2199999764561653,
+              1.2159999459981918,
+              1.2240000069141388
+            ]
+          },
+          "median_us": {
+            "native": 1.171999960206449,
+            "original": 1.1759999906644225,
+            "edited": 1.07999995816499,
+            "tuned": 1.2199999764561653
+          },
+          "order": [
+            [
+              "original",
+              "edited",
+              "tuned",
+              "native"
+            ],
+            [
+              "native",
+              "original",
+              "tuned",
+              "edited"
+            ],
+            [
+              "native",
+              "tuned",
+              "original",
+              "edited"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "edited",
+              "tuned",
+              "native",
+              "original"
+            ],
+            [
+              "tuned",
+              "original",
+              "native",
+              "edited"
+            ],
+            [
+              "edited",
+              "original",
+              "tuned",
+              "native"
+            ]
+          ],
+          "speedup_native": 1.0851851903751688,
+          "speedup_original": 1.088888922424168,
+          "speedup_tuned": 1.1296296515872528
+        },
+        {
+          "kernel": "flatiter_setitem_slice",
+          "n": 255,
+          "samples_us": {
+            "native": [
+              1.2440000427886844,
+              1.2000000569969416,
+              1.2000000569969416,
+              1.196000026538968,
+              1.195874996483326,
+              1.2120000319555402,
+              1.1998750269412994
+            ],
+            "original": [
+              1.256000017747283,
+              1.196000026538968,
+              1.2039999710395932,
+              1.196000026538968,
+              1.196000026538968,
+              1.2080000014975667,
+              1.196000026538968
+            ],
+            "edited": [
+              1.1480000102892518,
+              1.104000024497509,
+              1.0999999940395355,
+              1.0999999940395355,
+              1.1080000549554825,
+              1.104000024497509,
+              1.104000024497509
+            ],
+            "tuned": [
+              1.2919999426230788,
+              1.2440000427886844,
+              1.2400000123307109,
+              1.2400000123307109,
+              1.2440000427886844,
+              1.2400000123307109,
+              1.2400000123307109
+            ]
+          },
+          "median_us": {
+            "native": 1.2000000569969416,
+            "original": 1.196000026538968,
+            "edited": 1.104000024497509,
+            "tuned": 1.2400000123307109
+          },
+          "order": [
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ],
+            [
+              "edited",
+              "original",
+              "native",
+              "tuned"
+            ],
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ],
+            [
+              "original",
+              "edited",
+              "native",
+              "tuned"
+            ],
+            [
+              "original",
+              "native",
+              "edited",
+              "tuned"
+            ],
+            [
+              "edited",
+              "original",
+              "tuned",
+              "native"
+            ],
+            [
+              "native",
+              "original",
+              "edited",
+              "tuned"
+            ]
+          ],
+          "speedup_native": 1.0869565492474762,
+          "speedup_original": 1.0833333333333333,
+          "speedup_tuned": 1.1231883920429286
+        },
+        {
+          "kernel": "flatiter_setitem_slice",
+          "n": 256,
+          "samples_us": {
+            "native": [
+              1.256000017747283,
+              1.1919999960809946,
+              1.1879999656230211,
+              1.1919999960809946,
+              1.1919999960809946,
+              1.1919999960809946,
+              1.196000026538968
+            ],
+            "original": [
+              1.247999956831336,
+              1.1879999656230211,
+              1.1879999656230211,
+              1.1879999656230211,
+              1.1879999656230211,
+              1.1879999656230211,
+              1.2000000569969416
+            ],
+            "edited": [
+              1.1480000102892518,
+              1.0957500198855996,
+              1.0920000495389104,
+              1.095999963581562,
+              1.0920000495389104,
+              1.104000024497509,
+              1.104000024497509
+            ],
+            "tuned": [
+              1.2959999730810523,
+              1.2359999818727374,
+              1.2359999818727374,
+              1.235750038176775,
+              1.2359999818727374,
+              1.2440000427886844,
+              1.247999956831336
+            ]
+          },
+          "median_us": {
+            "native": 1.1919999960809946,
+            "original": 1.1879999656230211,
+            "edited": 1.095999963581562,
+            "tuned": 1.2359999818727374
+          },
+          "order": [
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "tuned",
+              "native",
+              "edited",
+              "original"
+            ],
+            [
+              "native",
+              "original",
+              "edited",
+              "tuned"
+            ],
+            [
+              "tuned",
+              "edited",
+              "native",
+              "original"
+            ],
+            [
+              "tuned",
+              "native",
+              "edited",
+              "original"
+            ],
+            [
+              "original",
+              "native",
+              "edited",
+              "tuned"
+            ],
+            [
+              "edited",
+              "original",
+              "native",
+              "tuned"
+            ]
+          ],
+          "speedup_native": 1.0875912734392061,
+          "speedup_original": 1.083941610491315,
+          "speedup_tuned": 1.1277372472109182
+        },
+        {
+          "kernel": "flatiter_setitem_slice",
+          "n": 257,
+          "samples_us": {
+            "native": [
+              1.235750038176775,
+              1.1840000515803695,
+              1.1918749660253525,
+              1.1879999656230211,
+              1.1877500219270587,
+              1.1879999656230211,
+              1.1879999656230211
+            ],
+            "original": [
+              1.231999951414764,
+              1.1877500219270587,
+              1.1879999656230211,
+              1.196000026538968,
+              1.1879999656230211,
+              1.1840000515803695,
+              1.1879999656230211
+            ],
+            "edited": [
+              1.1520000407472253,
+              1.088000019080937,
+              1.088000019080937,
+              1.0920000495389104,
+              1.088000019080937,
+              1.088000019080937,
+              1.0920000495389104
+            ],
+            "tuned": [
+              1.2880000285804272,
+              1.231999951414764,
+              1.2280000373721123,
+              1.2280000373721123,
+              1.231999951414764,
+              1.231999951414764,
+              1.2400000123307109
+            ]
+          },
+          "median_us": {
+            "native": 1.1879999656230211,
+            "original": 1.1879999656230211,
+            "edited": 1.088000019080937,
+            "tuned": 1.231999951414764
+          },
+          "order": [
+            [
+              "tuned",
+              "native",
+              "original",
+              "edited"
+            ],
+            [
+              "original",
+              "native",
+              "edited",
+              "tuned"
+            ],
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ],
+            [
+              "native",
+              "original",
+              "edited",
+              "tuned"
+            ],
+            [
+              "edited",
+              "native",
+              "original",
+              "tuned"
+            ],
+            [
+              "tuned",
+              "original",
+              "native",
+              "edited"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ]
+          ],
+          "speedup_native": 1.0919117139598553,
+          "speedup_original": 1.0919117139598553,
+          "speedup_tuned": 1.1323528766621416
+        },
+        {
+          "kernel": "flatiter_setitem_slice",
+          "n": 4096,
+          "samples_us": {
+            "native": [
+              1.3279999839141965,
+              1.2799999676644802,
+              1.272000023163855,
+              1.2760000536218286,
+              1.272000023163855,
+              1.2760000536218286,
+              1.2760000536218286
+            ],
+            "original": [
+              1.3279999839141965,
+              1.2679999927058816,
+              1.2760000536218286,
+              1.272000023163855,
+              1.272000023163855,
+              1.2679999927058816,
+              1.272000023163855
+            ],
+            "edited": [
+              1.235750038176775,
+              1.180000021122396,
+              1.1759999906644225,
+              1.180000021122396,
+              1.1759999906644225,
+              1.1759999906644225,
+              1.180000021122396
+            ],
+            "tuned": [
+              1.3640000252053142,
+              1.3160000089555979,
+              1.3160000089555979,
+              1.3160000089555979,
+              1.3160000089555979,
+              1.3160000089555979,
+              1.3200000394135714
+            ]
+          },
+          "median_us": {
+            "native": 1.2760000536218286,
+            "original": 1.272000023163855,
+            "edited": 1.180000021122396,
+            "tuned": 1.3160000089555979
+          },
+          "order": [
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ],
+            [
+              "original",
+              "tuned",
+              "native",
+              "edited"
+            ],
+            [
+              "tuned",
+              "native",
+              "edited",
+              "original"
+            ],
+            [
+              "original",
+              "edited",
+              "tuned",
+              "native"
+            ],
+            [
+              "native",
+              "edited",
+              "tuned",
+              "original"
+            ],
+            [
+              "original",
+              "native",
+              "edited",
+              "tuned"
+            ],
+            [
+              "tuned",
+              "edited",
+              "native",
+              "original"
+            ]
+          ],
+          "speedup_native": 1.081355958288983,
+          "speedup_original": 1.0779661020293458,
+          "speedup_tuned": 1.1152542249142003
+        },
+        {
+          "kernel": "flatiter_setitem_slice",
+          "n": 65536,
+          "samples_us": {
+            "native": [
+              2.1879998967051506,
+              2.124000107869506,
+              2.124000107869506,
+              2.131999935954809,
+              2.139999996870756,
+              2.1200000774115324,
+              2.1200000774115324
+            ],
+            "original": [
+              2.1720000077039003,
+              2.1279999054968357,
+              2.124000107869506,
+              2.1359999664127827,
+              2.1200000774115324,
+              2.116000046953559,
+              2.1200000774115324
+            ],
+            "edited": [
+              2.0439999643713236,
+              1.9920000340789557,
+              1.9920000340789557,
+              1.9920000340789557,
+              2.0039998926222324,
+              1.9960000645369291,
+              1.9880000036209822
+            ],
+            "tuned": [
+              2.268000040203333,
+              2.2239999379962683,
+              2.2120000794529915,
+              2.2278749383985996,
+              2.2279999684542418,
+              2.216000109910965,
+              2.2120000794529915
+            ]
+          },
+          "median_us": {
+            "native": 2.124000107869506,
+            "original": 2.124000107869506,
+            "edited": 1.9920000340789557,
+            "tuned": 2.2239999379962683
+          },
+          "order": [
+            [
+              "native",
+              "original",
+              "tuned",
+              "edited"
+            ],
+            [
+              "native",
+              "edited",
+              "original",
+              "tuned"
+            ],
+            [
+              "edited",
+              "original",
+              "tuned",
+              "native"
+            ],
+            [
+              "edited",
+              "tuned",
+              "original",
+              "native"
+            ],
+            [
+              "tuned",
+              "native",
+              "original",
+              "edited"
+            ],
+            [
+              "edited",
+              "tuned",
+              "native",
+              "original"
+            ],
+            [
+              "edited",
+              "native",
+              "tuned",
+              "original"
+            ]
+          ],
+          "speedup_native": 1.0662650961507556,
+          "speedup_original": 1.0662650961507556,
+          "speedup_tuned": 1.116465813227048
+        },
+        {
+          "kernel": "flatiter_setitem_slice",
+          "n": 1048576,
+          "samples_us": {
+            "native": [
+              7.35200010240078,
+              7.23200011998415,
+              7.2119999676942825,
+              7.203999906778336,
+              7.224000059068203,
+              7.2280000895261765,
+              7.2280000895261765
+            ],
+            "original": [
+              7.3640001937747,
+              7.2200000286102295,
+              7.199999876320362,
+              7.236000150442123,
+              7.2119999676942825,
+              7.24400021135807,
+              7.23200011998415
+            ],
+            "edited": [
+              7.139999885112047,
+              7.052000146359205,
+              7.040000054985285,
+              7.052000146359205,
+              7.052000146359205,
+              7.027999963611364,
+              7.063999772071838
+            ],
+            "tuned": [
+              8.531874977052212,
+              8.41199979186058,
+              8.456000126898289,
+              8.419999852776527,
+              8.440000005066395,
+              8.456000126898289,
+              8.435875177383423
+            ]
+          },
+          "median_us": {
+            "native": 7.2280000895261765,
+            "original": 7.23200011998415,
+            "edited": 7.052000146359205,
+            "tuned": 8.440000005066395
+          },
+          "order": [
+            [
+              "edited",
+              "tuned",
+              "original",
+              "native"
+            ],
+            [
+              "tuned",
+              "original",
+              "edited",
+              "native"
+            ],
+            [
+              "original",
+              "native",
+              "edited",
+              "tuned"
+            ],
+            [
+              "native",
+              "original",
+              "tuned",
+              "edited"
+            ],
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ],
+            [
+              "original",
+              "native",
+              "edited",
+              "tuned"
+            ],
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ]
+          ],
+          "speedup_native": 1.024957450299804,
+          "speedup_original": 1.0255246695815619,
+          "speedup_tuned": 1.1968235720221565
+        },
+        {
+          "kernel": "flatiter_setitem_slice",
+          "n": 4194304,
+          "samples_us": {
+            "native": [
+              35.75199842453003,
+              35.72399914264679,
+              35.71999818086624,
+              35.71999818086624,
+              35.73974967002869,
+              35.707999020814896,
+              35.732001066207886
+            ],
+            "original": [
+              35.760000348091125,
+              35.69599986076355,
+              35.704001784324646,
+              35.77600046992302,
+              35.732001066207886,
+              35.707999020814896,
+              35.7000008225441
+            ],
+            "edited": [
+              35.68800166249275,
+              35.51600128412247,
+              35.53599864244461,
+              35.5679988861084,
+              35.59599816799164,
+              35.53999960422516,
+              35.576000809669495
+            ],
+            "tuned": [
+              35.335998982191086,
+              35.24800017476082,
+              35.287998616695404,
+              35.32800078392029,
+              35.28387472033501,
+              35.24800017476082,
+              35.287998616695404
+            ]
+          },
+          "median_us": {
+            "native": 35.72399914264679,
+            "original": 35.707999020814896,
+            "edited": 35.5679988861084,
+            "tuned": 35.287998616695404
+          },
+          "order": [
+            [
+              "native",
+              "tuned",
+              "original",
+              "edited"
+            ],
+            [
+              "tuned",
+              "original",
+              "native",
+              "edited"
+            ],
+            [
+              "tuned",
+              "edited",
+              "native",
+              "original"
+            ],
+            [
+              "native",
+              "tuned",
+              "original",
+              "edited"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "original",
+              "tuned",
+              "edited",
+              "native"
+            ],
+            [
+              "tuned",
+              "original",
+              "native",
+              "edited"
+            ]
+          ],
+          "speedup_native": 1.004385972262255,
+          "speedup_original": 1.0039361262677382,
+          "speedup_tuned": 0.9921277474645235
+        }
+      ],
+      "optimization_attempt": true,
+      "gpu_tested": true,
+      "proof_attempt": false,
+      "strict_accepted": false,
+      "accepted_win": false,
+      "hot_kernel_timing": true
+    },
+    {
+      "id": "cupy/putmask",
+      "project": "CuPy",
+      "kernel": "putmask",
+      "source": "cupy/_indexing/insert.py",
+      "commit": "25e552d5d679dcdc6f7cc3d81310a9b265463137",
+      "license": "MIT",
+      "phase": "direct_edit_gpu_timed_frontend_blocked",
+      "source_build_frozen": true,
+      "direct_edited": true,
+      "gpu_validated": true,
+      "fair_timing": false,
+      "universal_direct_equivalence": false,
+      "proof_accepted": false,
+      "negative_gpu_witness": true,
+      "negative_proof": false,
+      "hashes": {
+        "generated.cu": "43e3be1906a43e9914cdc7d834d50a183f01baebfa313df12dff8900473f8932",
+        "normal.cubin": "db0790c3031606d0567e6d7cb06ce3b7f5377762b025daa64d0cc9a242fd5f5d",
+        "original.ptx": "4e6940f8d538326e87f963581e44489cfd5fd2fd3d16bd7f91c387b17ab5c0cf",
+        "upstream.py": "64bb5937f47eb43aba76c656a97810a4b5b5e755571f9d2749e3b37c4181f482",
+        "edited.ptx": "2f63714904300dd398a452dec459107641960db8d222a28c612a290d94919f17"
+      },
+      "artifact_dir": "demos/oss-ptx-cupy-index/putmask",
+      "performance": [
+        {
+          "kernel": "putmask",
+          "n": 1,
+          "samples_us": {
+            "native": [
+              1.4477500226348639,
+              1.3640000252053142,
+              1.3640000252053142,
+              1.3599999947473407,
+              1.3599999947473407,
+              1.3599999947473407,
+              1.3599999947473407
+            ],
+            "original": [
+              1.424000016413629,
+              1.3599999947473407,
+              1.3599999947473407,
+              1.3680000556632876,
+              1.3599999947473407,
+              1.3719999697059393,
+              1.3640000252053142
+            ],
+            "edited": [
+              1.307999948039651,
+              1.256000017747283,
+              1.256000017747283,
+              1.256000017747283,
+              1.2598750181496143,
+              1.256000017747283,
+              1.2639999622479081
+            ],
+            "tuned": [
+              1.4479999663308263,
+              1.3920000055804849,
+              1.3920000055804849,
+              1.39999995008111,
+              1.39999995008111,
+              1.4039999805390835,
+              1.3960000360384583
+            ]
+          },
+          "median_us": {
+            "native": 1.3599999947473407,
+            "original": 1.3640000252053142,
+            "edited": 1.256000017747283,
+            "tuned": 1.39999995008111
+          },
+          "order": [
+            [
+              "native",
+              "original",
+              "edited",
+              "tuned"
+            ],
+            [
+              "original",
+              "edited",
+              "tuned",
+              "native"
+            ],
+            [
+              "native",
+              "tuned",
+              "original",
+              "edited"
+            ],
+            [
+              "edited",
+              "tuned",
+              "original",
+              "native"
+            ],
+            [
+              "tuned",
+              "original",
+              "native",
+              "edited"
+            ],
+            [
+              "edited",
+              "native",
+              "tuned",
+              "original"
+            ],
+            [
+              "tuned",
+              "original",
+              "edited",
+              "native"
+            ]
+          ],
+          "speedup_native": 1.0828025282886447,
+          "speedup_original": 1.0859872658694194,
+          "speedup_tuned": 1.1146496260343215
+        },
+        {
+          "kernel": "putmask",
+          "n": 31,
+          "samples_us": {
+            "native": [
+              1.4600000577047467,
+              1.3920000055804849,
+              1.3960000360384583,
+              1.3920000055804849,
+              1.408000010997057,
+              1.3960000360384583,
+              1.3960000360384583
+            ],
+            "original": [
+              1.4519999967887998,
+              1.3960000360384583,
+              1.3960000360384583,
+              1.408000010997057,
+              1.39999995008111,
+              1.4039999805390835,
+              1.3960000360384583
+            ],
+            "edited": [
+              1.33200001437217,
+              1.2757499935105443,
+              1.272000023163855,
+              1.2839999981224537,
+              1.2799999676644802,
+              1.272000023163855,
+              1.272000023163855
+            ],
+            "tuned": [
+              1.484000007621944,
+              1.408000010997057,
+              1.4077499508857727,
+              1.4120000414550304,
+              1.4199999859556556,
+              1.4120000414550304,
+              1.408000010997057
+            ]
+          },
+          "median_us": {
+            "native": 1.3960000360384583,
+            "original": 1.39999995008111,
+            "edited": 1.2757499935105443,
+            "tuned": 1.4120000414550304
+          },
+          "order": [
+            [
+              "tuned",
+              "edited",
+              "original",
+              "native"
+            ],
+            [
+              "original",
+              "edited",
+              "native",
+              "tuned"
+            ],
+            [
+              "tuned",
+              "original",
+              "native",
+              "edited"
+            ],
+            [
+              "original",
+              "tuned",
+              "native",
+              "edited"
+            ],
+            [
+              "tuned",
+              "edited",
+              "native",
+              "original"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "tuned",
+              "native",
+              "edited",
+              "original"
+            ]
+          ],
+          "speedup_native": 1.094258313258553,
+          "speedup_original": 1.0973936564394258,
+          "speedup_tuned": 1.1067999597394158
+        },
+        {
+          "kernel": "putmask",
+          "n": 255,
+          "samples_us": {
+            "native": [
+              1.475999946705997,
+              1.4039999805390835,
+              1.408000010997057,
+              1.39999995008111,
+              1.4039999805390835,
+              1.39999995008111,
+              1.39999995008111
+            ],
+            "original": [
+              1.4720000326633453,
+              1.4039999805390835,
+              1.408000010997057,
+              1.39999995008111,
+              1.4039999805390835,
+              1.39999995008111,
+              1.39999995008111
+            ],
+            "edited": [
+              1.339999958872795,
+              1.2959999730810523,
+              1.2839999981224537,
+              1.2839999981224537,
+              1.2799999676644802,
+              1.2839999981224537,
+              1.2839999981224537
+            ],
+            "tuned": [
+              1.4799999771639705,
+              1.424000016413629,
+              1.4277499867603183,
+              1.424000016413629,
+              1.424000016413629,
+              1.4199999859556556,
+              1.4199999859556556
+            ]
+          },
+          "median_us": {
+            "native": 1.4039999805390835,
+            "original": 1.4039999805390835,
+            "edited": 1.2839999981224537,
+            "tuned": 1.424000016413629
+          },
+          "order": [
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "original",
+              "tuned",
+              "native",
+              "edited"
+            ],
+            [
+              "original",
+              "tuned",
+              "native",
+              "edited"
+            ],
+            [
+              "original",
+              "native",
+              "edited",
+              "tuned"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "tuned",
+              "edited",
+              "original",
+              "native"
+            ]
+          ],
+          "speedup_native": 1.0934579303676801,
+          "speedup_original": 1.0934579303676801,
+          "speedup_tuned": 1.109034282317673
+        },
+        {
+          "kernel": "putmask",
+          "n": 256,
+          "samples_us": {
+            "native": [
+              1.4799999771639705,
+              1.4039999805390835,
+              1.408000010997057,
+              1.4120000414550304,
+              1.4199999859556556,
+              1.4117499813437462,
+              1.39999995008111
+            ],
+            "original": [
+              1.500000013038516,
+              1.39999995008111,
+              1.4039999805390835,
+              1.4039999805390835,
+              1.4120000414550304,
+              1.4120000414550304,
+              1.4039999805390835
+            ],
+            "edited": [
+              1.339999958872795,
+              1.2837500544264913,
+              1.2839999981224537,
+              1.2799999676644802,
+              1.2839999981224537,
+              1.287874998524785,
+              1.2839999981224537
+            ],
+            "tuned": [
+              1.475999946705997,
+              1.4280000468716025,
+              1.4199999859556556,
+              1.424000016413629,
+              1.424000016413629,
+              1.424000016413629,
+              1.4280000468716025
+            ]
+          },
+          "median_us": {
+            "native": 1.4117499813437462,
+            "original": 1.4039999805390835,
+            "edited": 1.2839999981224537,
+            "tuned": 1.424000016413629
+          },
+          "order": [
+            [
+              "original",
+              "tuned",
+              "edited",
+              "native"
+            ],
+            [
+              "edited",
+              "native",
+              "tuned",
+              "original"
+            ],
+            [
+              "edited",
+              "native",
+              "tuned",
+              "original"
+            ],
+            [
+              "edited",
+              "original",
+              "tuned",
+              "native"
+            ],
+            [
+              "tuned",
+              "edited",
+              "original",
+              "native"
+            ],
+            [
+              "tuned",
+              "original",
+              "native",
+              "edited"
+            ],
+            [
+              "native",
+              "edited",
+              "original",
+              "tuned"
+            ]
+          ],
+          "speedup_native": 1.0994937565483618,
+          "speedup_original": 1.0934579303676801,
+          "speedup_tuned": 1.109034282317673
+        },
+        {
+          "kernel": "putmask",
+          "n": 257,
+          "samples_us": {
+            "native": [
+              1.4479999663308263,
+              1.3960000360384583,
+              1.3958750059828162,
+              1.3960000360384583,
+              1.3920000055804849,
+              1.3920000055804849,
+              1.3920000055804849
+            ],
+            "original": [
+              1.4519999967887998,
+              1.3960000360384583,
+              1.3920000055804849,
+              1.3920000055804849,
+              1.395749975927174,
+              1.3879999751225114,
+              1.3960000360384583
+            ],
+            "edited": [
+              1.3360000448301435,
+              1.272000023163855,
+              1.2760000536218286,
+              1.2760000536218286,
+              1.272000023163855,
+              1.2760000536218286,
+              1.2799999676644802
+            ],
+            "tuned": [
+              1.491999952122569,
+              1.415999955497682,
+              1.4120000414550304,
+              1.4120000414550304,
+              1.4120000414550304,
+              1.4120000414550304,
+              1.415999955497682
+            ]
+          },
+          "median_us": {
+            "native": 1.3958750059828162,
+            "original": 1.395749975927174,
+            "edited": 1.2760000536218286,
+            "tuned": 1.4120000414550304
+          },
+          "order": [
+            [
+              "tuned",
+              "original",
+              "edited",
+              "native"
+            ],
+            [
+              "tuned",
+              "original",
+              "edited",
+              "native"
+            ],
+            [
+              "original",
+              "edited",
+              "native",
+              "tuned"
+            ],
+            [
+              "tuned",
+              "edited",
+              "original",
+              "native"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "native",
+              "tuned",
+              "original",
+              "edited"
+            ],
+            [
+              "native",
+              "edited",
+              "tuned",
+              "original"
+            ]
+          ],
+          "speedup_native": 1.093945883482318,
+          "speedup_original": 1.093847897549412,
+          "speedup_tuned": 1.1065830580862253
+        },
+        {
+          "kernel": "putmask",
+          "n": 4096,
+          "samples_us": {
+            "native": [
+              1.5358750242739916,
+              1.4836250338703394,
+              1.4799999771639705,
+              1.4880000380799174,
+              1.4880000380799174,
+              1.484000007621944,
+              1.491999952122569
+            ],
+            "original": [
+              1.551999943330884,
+              1.4799999771639705,
+              1.484000007621944,
+              1.484000007621944,
+              1.4799999771639705,
+              1.4799999771639705,
+              1.4799999771639705
+            ],
+            "edited": [
+              1.408000010997057,
+              1.3680000556632876,
+              1.3559999642893672,
+              1.3640000252053142,
+              1.3599999947473407,
+              1.3599999947473407,
+              1.3599999947473407
+            ],
+            "tuned": [
+              1.560000004246831,
+              1.500000013038516,
+              1.4959999825805426,
+              1.500000013038516,
+              1.500000013038516,
+              1.500000013038516,
+              1.5040000434964895
+            ]
+          },
+          "median_us": {
+            "native": 1.4880000380799174,
+            "original": 1.4799999771639705,
+            "edited": 1.3599999947473407,
+            "tuned": 1.500000013038516
+          },
+          "order": [
+            [
+              "tuned",
+              "edited",
+              "native",
+              "original"
+            ],
+            [
+              "original",
+              "edited",
+              "native",
+              "tuned"
+            ],
+            [
+              "tuned",
+              "original",
+              "edited",
+              "native"
+            ],
+            [
+              "tuned",
+              "native",
+              "edited",
+              "original"
+            ],
+            [
+              "native",
+              "original",
+              "tuned",
+              "edited"
+            ],
+            [
+              "native",
+              "original",
+              "tuned",
+              "edited"
+            ],
+            [
+              "original",
+              "tuned",
+              "native",
+              "edited"
+            ]
+          ],
+          "speedup_native": 1.0941176792845182,
+          "speedup_original": 1.0882352815294851,
+          "speedup_tuned": 1.1029411903175665
+        },
+        {
+          "kernel": "putmask",
+          "n": 65536,
+          "samples_us": {
+            "native": [
+              2.3960000835359097,
+              2.328000031411648,
+              2.3320000618696213,
+              2.3320000618696213,
+              2.3399998899549246,
+              2.328000031411648,
+              2.328000031411648
+            ],
+            "original": [
+              2.3960000835359097,
+              2.3360000923275948,
+              2.3320000618696213,
+              2.343999920412898,
+              2.3320000618696213,
+              2.3399998899549246,
+              2.328000031411648
+            ],
+            "edited": [
+              2.2479998879134655,
+              2.1879998967051506,
+              2.1959999576210976,
+              2.191999927163124,
+              2.1959999576210976,
+              2.1879998967051506,
+              2.1959999576210976
+            ],
+            "tuned": [
+              2.463999902829528,
+              2.3799999617040157,
+              2.3799999617040157,
+              2.383999992161989,
+              2.392000053077936,
+              2.383999992161989,
+              2.383999992161989
+            ]
+          },
+          "median_us": {
+            "native": 2.3320000618696213,
+            "original": 2.3360000923275948,
+            "edited": 2.1959999576210976,
+            "tuned": 2.383999992161989
+          },
+          "order": [
+            [
+              "original",
+              "tuned",
+              "edited",
+              "native"
+            ],
+            [
+              "edited",
+              "original",
+              "tuned",
+              "native"
+            ],
+            [
+              "native",
+              "tuned",
+              "original",
+              "edited"
+            ],
+            [
+              "tuned",
+              "native",
+              "edited",
+              "original"
+            ],
+            [
+              "tuned",
+              "native",
+              "original",
+              "edited"
+            ],
+            [
+              "original",
+              "edited",
+              "tuned",
+              "native"
+            ],
+            [
+              "native",
+              "tuned",
+              "original",
+              "edited"
+            ]
+          ],
+          "speedup_native": 1.0619308319094192,
+          "speedup_original": 1.0637523394390944,
+          "speedup_tuned": 1.0856102177454274
+        },
+        {
+          "kernel": "putmask",
+          "n": 1048576,
+          "samples_us": {
+            "native": [
+              7.74399982765317,
+              7.720000110566616,
+              7.679999805986881,
+              7.708000019192696,
+              7.699999958276749,
+              7.683999836444855,
+              7.679999805986881
+            ],
+            "original": [
+              7.728000171482563,
+              7.672000210732222,
+              7.652000058442354,
+              7.651874795556068,
+              7.652000058442354,
+              7.49199977144599,
+              7.643999997526407
+            ],
+            "edited": [
+              7.387999910861254,
+              7.2200000286102295,
+              7.344000041484833,
+              7.344000041484833,
+              7.331999950110912,
+              7.335999980568886,
+              7.327999919652939
+            ],
+            "tuned": [
+              8.419999852776527,
+              8.37200041860342,
+              8.383999578654766,
+              8.364000357687473,
+              8.299999870359898,
+              8.368000388145447,
+              8.379999548196793
+            ]
+          },
+          "median_us": {
+            "native": 7.699999958276749,
+            "original": 7.652000058442354,
+            "edited": 7.335999980568886,
+            "tuned": 8.37200041860342
+          },
+          "order": [
+            [
+              "original",
+              "tuned",
+              "native",
+              "edited"
+            ],
+            [
+              "edited",
+              "original",
+              "tuned",
+              "native"
+            ],
+            [
+              "edited",
+              "original",
+              "native",
+              "tuned"
+            ],
+            [
+              "edited",
+              "original",
+              "native",
+              "tuned"
+            ],
+            [
+              "edited",
+              "native",
+              "tuned",
+              "original"
+            ],
+            [
+              "original",
+              "native",
+              "edited",
+              "tuned"
+            ],
+            [
+              "native",
+              "original",
+              "edited",
+              "tuned"
+            ]
+          ],
+          "speedup_native": 1.0496183177033809,
+          "speedup_original": 1.043075256094666,
+          "speedup_tuned": 1.1412214341301288
+        },
+        {
+          "kernel": "putmask",
+          "n": 4194304,
+          "samples_us": {
+            "native": [
+              84.47600156068802,
+              84.38800275325775,
+              84.40399914979935,
+              84.36799794435501,
+              84.33199673891068,
+              84.48000252246857,
+              84.33999866247177
+            ],
+            "original": [
+              84.5159962773323,
+              84.43199843168259,
+              84.45200324058533,
+              84.45200324058533,
+              84.34800058603287,
+              84.48000252246857,
+              84.44000035524368
+            ],
+            "edited": [
+              84.6719965338707,
+              84.49999988079071,
+              84.5080018043518,
+              84.51200276613235,
+              84.55999940633774,
+              84.53600108623505,
+              84.57999676465988
+            ],
+            "tuned": [
+              84.59600061178207,
+              84.42799746990204,
+              84.52799916267395,
+              84.5159962773323,
+              84.48000252246857,
+              84.44800227880478,
+              84.50400084257126
+            ]
+          },
+          "median_us": {
+            "native": 84.38800275325775,
+            "original": 84.45200324058533,
+            "edited": 84.53600108623505,
+            "tuned": 84.50400084257126
+          },
+          "order": [
+            [
+              "native",
+              "edited",
+              "tuned",
+              "original"
+            ],
+            [
+              "tuned",
+              "original",
+              "edited",
+              "native"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "native",
+              "edited",
+              "original",
+              "tuned"
+            ],
+            [
+              "tuned",
+              "edited",
+              "original",
+              "native"
+            ],
+            [
+              "edited",
+              "original",
+              "native",
+              "tuned"
+            ]
+          ],
+          "speedup_native": 0.998249286326824,
+          "speedup_original": 0.9990063659911707,
+          "speedup_tuned": 0.9996214601678267
+        }
+      ],
+      "optimization_attempt": true,
+      "gpu_tested": true,
+      "proof_attempt": false,
+      "strict_accepted": false,
+      "accepted_win": false,
+      "hot_kernel_timing": true
+    },
+    {
+      "id": "cupy/resize",
+      "project": "CuPy",
+      "kernel": "resize",
+      "source": "cupy/_manipulation/add_remove.py",
+      "commit": "25e552d5d679dcdc6f7cc3d81310a9b265463137",
+      "license": "MIT",
+      "phase": "direct_edit_gpu_timed_frontend_blocked",
+      "source_build_frozen": true,
+      "direct_edited": true,
+      "gpu_validated": true,
+      "fair_timing": false,
+      "universal_direct_equivalence": false,
+      "proof_accepted": false,
+      "negative_gpu_witness": true,
+      "negative_proof": false,
+      "hashes": {
+        "generated.cu": "23899efb4a9314dfddf4f10dcd37e2a76447cf9f483004680d8432e74bd51606",
+        "normal.cubin": "122005534b7088561138488a138cce3142738fb53ffaa1d43883e232cc179c2b",
+        "original.ptx": "acf80127ae5ee6dacbb1428513f9d65f52d42ec9d12ed1fb3c7253671543b543",
+        "upstream.py": "0f99f2e1ebb4e247fd41fbcdac6b4acf10d8d1252c478664823ef1a0c4da1647",
+        "edited.ptx": "6c352e59e34d0d9f68ef81f45f23f9dfb60bd065187de41ccdbfbeda6efe86f6"
+      },
+      "artifact_dir": "demos/oss-ptx-cupy-index/resize",
+      "performance": [
+        {
+          "kernel": "resize",
+          "n": 1,
+          "samples_us": {
+            "native": [
+              1.2000000569969416,
+              1.1399999493733048,
+              1.1480000102892518,
+              1.1480000102892518,
+              1.1399999493733048,
+              1.1399999493733048,
+              1.1399999493733048
+            ],
+            "original": [
+              1.2000000569969416,
+              1.1360000353306532,
+              1.1480000102892518,
+              1.1439999798312783,
+              1.1360000353306532,
+              1.1360000353306532,
+              1.1360000353306532
+            ],
+            "edited": [
+              1.1159999994561076,
+              1.0519999777898192,
+              1.0400000028312206,
+              1.044000033289194,
+              1.044000033289194,
+              1.0400000028312206,
+              1.0479999473318458
+            ],
+            "tuned": [
+              1.2679999927058816,
+              1.180000021122396,
+              1.1919999960809946,
+              1.1840000515803695,
+              1.180000021122396,
+              1.1759999906644225,
+              1.180000021122396
+            ]
+          },
+          "median_us": {
+            "native": 1.1399999493733048,
+            "original": 1.1360000353306532,
+            "edited": 1.044000033289194,
+            "tuned": 1.180000021122396
+          },
+          "order": [
+            [
+              "tuned",
+              "original",
+              "edited",
+              "native"
+            ],
+            [
+              "native",
+              "edited",
+              "original",
+              "tuned"
+            ],
+            [
+              "edited",
+              "native",
+              "tuned",
+              "original"
+            ],
+            [
+              "tuned",
+              "native",
+              "edited",
+              "original"
+            ],
+            [
+              "original",
+              "edited",
+              "native",
+              "tuned"
+            ],
+            [
+              "edited",
+              "original",
+              "tuned",
+              "native"
+            ],
+            [
+              "original",
+              "edited",
+              "tuned",
+              "native"
+            ]
+          ],
+          "speedup_native": 1.0919539396772397,
+          "speedup_original": 1.0881226045095103,
+          "speedup_tuned": 1.1302681834259378
+        },
+        {
+          "kernel": "resize",
+          "n": 31,
+          "samples_us": {
+            "native": [
+              1.2199999764561653,
+              1.1599999852478504,
+              1.155999954789877,
+              1.155999954789877,
+              1.155999954789877,
+              1.164000015705824,
+              1.1599999852478504
+            ],
+            "original": [
+              1.2159999459981918,
+              1.159750041551888,
+              1.159750041551888,
+              1.1520000407472253,
+              1.164000015705824,
+              1.1599999852478504,
+              1.1520000407472253
+            ],
+            "edited": [
+              1.120000029914081,
+              1.0600000387057662,
+              1.0600000387057662,
+              1.0679999832063913,
+              1.0638750391080976,
+              1.0600000387057662,
+              1.0639999527484179
+            ],
+            "tuned": [
+              1.2679999927058816,
+              1.196000026538968,
+              1.1996249668300152,
+              1.2000000569969416,
+              1.2000000569969416,
+              1.2039999710395932,
+              1.196000026538968
+            ]
+          },
+          "median_us": {
+            "native": 1.1599999852478504,
+            "original": 1.159750041551888,
+            "edited": 1.0638750391080976,
+            "tuned": 1.2000000569969416
+          },
+          "order": [
+            [
+              "tuned",
+              "native",
+              "edited",
+              "original"
+            ],
+            [
+              "tuned",
+              "native",
+              "edited",
+              "original"
+            ],
+            [
+              "tuned",
+              "edited",
+              "original",
+              "native"
+            ],
+            [
+              "native",
+              "tuned",
+              "original",
+              "edited"
+            ],
+            [
+              "tuned",
+              "edited",
+              "original",
+              "native"
+            ],
+            [
+              "tuned",
+              "native",
+              "edited",
+              "original"
+            ],
+            [
+              "tuned",
+              "native",
+              "original",
+              "edited"
+            ]
+          ],
+          "speedup_native": 1.0903536060215675,
+          "speedup_original": 1.0901186689408255,
+          "speedup_tuned": 1.1279520741486375
+        },
+        {
+          "kernel": "resize",
+          "n": 255,
+          "samples_us": {
+            "native": [
+              1.2519999872893095,
+              1.1879999656230211,
+              1.180000021122396,
+              1.1759999906644225,
+              1.1759999906644225,
+              1.1759999906644225,
+              1.1879999656230211
+            ],
+            "original": [
+              1.2359999818727374,
+              1.1919999960809946,
+              1.1759999906644225,
+              1.180000021122396,
+              1.180000021122396,
+              1.1918749660253525,
+              1.1878750519827008
+            ],
+            "edited": [
+              1.1399999493733048,
+              1.0839999886229634,
+              1.0838749585673213,
+              1.088000019080937,
+              1.0839999886229634,
+              1.0920000495389104,
+              1.0839999886229634
+            ],
+            "tuned": [
+              1.3000000035390258,
+              1.2199999764561653,
+              1.2240000069141388,
+              1.2159999459981918,
+              1.2199999764561653,
+              1.231999951414764,
+              1.2199999764561653
+            ]
+          },
+          "median_us": {
+            "native": 1.180000021122396,
+            "original": 1.1878750519827008,
+            "edited": 1.0839999886229634,
+            "tuned": 1.2199999764561653
+          },
+          "order": [
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "native",
+              "original",
+              "tuned",
+              "edited"
+            ],
+            [
+              "original",
+              "native",
+              "edited",
+              "tuned"
+            ],
+            [
+              "native",
+              "original",
+              "tuned",
+              "edited"
+            ],
+            [
+              "original",
+              "edited",
+              "tuned",
+              "native"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "native",
+              "original",
+              "tuned",
+              "edited"
+            ]
+          ],
+          "speedup_native": 1.0885609165193666,
+          "speedup_original": 1.095825705212131,
+          "speedup_tuned": 1.1254612447053312
+        },
+        {
+          "kernel": "resize",
+          "n": 256,
+          "samples_us": {
+            "native": [
+              1.2440000427886844,
+              1.171999960206449,
+              1.1759999906644225,
+              1.17575004696846,
+              1.171999960206449,
+              1.1759999906644225,
+              1.171999960206449
+            ],
+            "original": [
+              1.2280000373721123,
+              1.1759999906644225,
+              1.171999960206449,
+              1.1680000461637974,
+              1.171999960206449,
+              1.1759999906644225,
+              1.1759999906644225
+            ],
+            "edited": [
+              1.1399999493733048,
+              1.07999995816499,
+              1.0760000441223383,
+              1.07999995816499,
+              1.07999995816499,
+              1.0839999886229634,
+              1.088000019080937
+            ],
+            "tuned": [
+              1.2679999927058816,
+              1.2120000319555402,
+              1.2240000069141388,
+              1.2159999459981918,
+              1.2199999764561653,
+              1.2159999459981918,
+              1.2159999459981918
+            ]
+          },
+          "median_us": {
+            "native": 1.17575004696846,
+            "original": 1.1759999906644225,
+            "edited": 1.07999995816499,
+            "tuned": 1.2159999459981918
+          },
+          "order": [
+            [
+              "native",
+              "edited",
+              "original",
+              "tuned"
+            ],
+            [
+              "original",
+              "native",
+              "edited",
+              "tuned"
+            ],
+            [
+              "native",
+              "original",
+              "edited",
+              "tuned"
+            ],
+            [
+              "tuned",
+              "native",
+              "original",
+              "edited"
+            ],
+            [
+              "tuned",
+              "edited",
+              "original",
+              "native"
+            ],
+            [
+              "edited",
+              "tuned",
+              "original",
+              "native"
+            ],
+            [
+              "edited",
+              "original",
+              "native",
+              "tuned"
+            ]
+          ],
+          "speedup_native": 1.08865749306709,
+          "speedup_original": 1.088888922424168,
+          "speedup_tuned": 1.1259259195382536
+        },
+        {
+          "kernel": "resize",
+          "n": 257,
+          "samples_us": {
+            "native": [
+              1.2600000482052565,
+              1.171999960206449,
+              1.1680000461637974,
+              1.1759999906644225,
+              1.1680000461637974,
+              1.171999960206449,
+              1.1759999906644225
+            ],
+            "original": [
+              1.231999951414764,
+              1.171999960206449,
+              1.164000015705824,
+              1.1680000461637974,
+              1.171999960206449,
+              1.1680000461637974,
+              1.1680000461637974
+            ],
+            "edited": [
+              1.1320000048726797,
+              1.0720000136643648,
+              1.0760000441223383,
+              1.07999995816499,
+              1.0720000136643648,
+              1.0760000441223383,
+              1.07999995816499
+            ],
+            "tuned": [
+              1.272000023163855,
+              1.2120000319555402,
+              1.2080000014975667,
+              1.2120000319555402,
+              1.2120000319555402,
+              1.2120000319555402,
+              1.2120000319555402
+            ]
+          },
+          "median_us": {
+            "native": 1.171999960206449,
+            "original": 1.1680000461637974,
+            "edited": 1.0760000441223383,
+            "tuned": 1.2120000319555402
+          },
+          "order": [
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "original",
+              "tuned",
+              "edited",
+              "native"
+            ],
+            [
+              "original",
+              "edited",
+              "tuned",
+              "native"
+            ],
+            [
+              "original",
+              "edited",
+              "tuned",
+              "native"
+            ],
+            [
+              "tuned",
+              "original",
+              "native",
+              "edited"
+            ],
+            [
+              "edited",
+              "tuned",
+              "native",
+              "original"
+            ],
+            [
+              "edited",
+              "native",
+              "original",
+              "tuned"
+            ]
+          ],
+          "speedup_native": 1.0892192492077593,
+          "speedup_original": 1.0855018571272466,
+          "speedup_tuned": 1.1263940355542765
+        },
+        {
+          "kernel": "resize",
+          "n": 4096,
+          "samples_us": {
+            "native": [
+              1.3119999784976244,
+              1.2519999872893095,
+              1.256000017747283,
+              1.256000017747283,
+              1.2600000482052565,
+              1.256000017747283,
+              1.2600000482052565
+            ],
+            "original": [
+              1.3119999784976244,
+              1.2519999872893095,
+              1.256000017747283,
+              1.256000017747283,
+              1.2639999622479081,
+              1.2519999872893095,
+              1.256000017747283
+            ],
+            "edited": [
+              1.2159999459981918,
+              1.1599999852478504,
+              1.155999954789877,
+              1.155999954789877,
+              1.1599999852478504,
+              1.164000015705824,
+              1.1599999852478504
+            ],
+            "tuned": [
+              1.3719999697059393,
+              1.2959999730810523,
+              1.2959999730810523,
+              1.3040000339969993,
+              1.2919999426230788,
+              1.2997499434277415,
+              1.2959999730810523
+            ]
+          },
+          "median_us": {
+            "native": 1.256000017747283,
+            "original": 1.256000017747283,
+            "edited": 1.1599999852478504,
+            "tuned": 1.2959999730810523
+          },
+          "order": [
+            [
+              "tuned",
+              "original",
+              "edited",
+              "native"
+            ],
+            [
+              "original",
+              "edited",
+              "native",
+              "tuned"
+            ],
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ],
+            [
+              "edited",
+              "original",
+              "native",
+              "tuned"
+            ],
+            [
+              "tuned",
+              "original",
+              "native",
+              "edited"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "tuned",
+              "original",
+              "native",
+              "edited"
+            ]
+          ],
+          "speedup_native": 1.0827586497588797,
+          "speedup_original": 1.0827586497588797,
+          "speedup_tuned": 1.1172413703127277
+        },
+        {
+          "kernel": "resize",
+          "n": 65536,
+          "samples_us": {
+            "native": [
+              2.1440000273287296,
+              2.0719999447464943,
+              2.0719999447464943,
+              2.0800000056624413,
+              2.0719999447464943,
+              2.0719999447464943,
+              2.0758749451488256
+            ],
+            "original": [
+              2.1279999054968357,
+              2.0719999447464943,
+              2.0759999752044678,
+              2.0719999447464943,
+              2.0719999447464943,
+              2.0719999447464943,
+              2.0719999447464943
+            ],
+            "edited": [
+              2.032000105828047,
+              1.9759999122470617,
+              1.9880000036209822,
+              1.9759999122470617,
+              1.9998750649392605,
+              1.9880000036209822,
+              1.9839999731630087
+            ],
+            "tuned": [
+              2.2319999989122152,
+              2.176000038161874,
+              2.191999927163124,
+              2.1800000686198473,
+              2.1720000077039003,
+              2.1840000990778208,
+              2.1720000077039003
+            ]
+          },
+          "median_us": {
+            "native": 2.0719999447464943,
+            "original": 2.0719999447464943,
+            "edited": 1.9880000036209822,
+            "tuned": 2.1800000686198473
+          },
+          "order": [
+            [
+              "native",
+              "tuned",
+              "original",
+              "edited"
+            ],
+            [
+              "original",
+              "tuned",
+              "native",
+              "edited"
+            ],
+            [
+              "native",
+              "edited",
+              "tuned",
+              "original"
+            ],
+            [
+              "edited",
+              "original",
+              "tuned",
+              "native"
+            ],
+            [
+              "tuned",
+              "original",
+              "native",
+              "edited"
+            ],
+            [
+              "edited",
+              "tuned",
+              "native",
+              "original"
+            ],
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ]
+          ],
+          "speedup_native": 1.0422534914348658,
+          "speedup_original": 1.0422534914348658,
+          "speedup_tuned": 1.0965795093808615
+        },
+        {
+          "kernel": "resize",
+          "n": 1048576,
+          "samples_us": {
+            "native": [
+              7.3640001937747,
+              7.1840002201497555,
+              7.164000067859888,
+              7.172000128775835,
+              7.156000006943941,
+              7.151999976485968,
+              7.180000189691782
+            ],
+            "original": [
+              7.356000132858753,
+              7.151999976485968,
+              7.183750160038471,
+              7.160000037401915,
+              7.160000037401915,
+              7.191999815404415,
+              7.1760001592338085
+            ],
+            "edited": [
+              7.067999802529812,
+              7.007999811321497,
+              7.000000216066837,
+              7.007999811321497,
+              7.007999811321497,
+              7.007999811321497,
+              7.000000216066837
+            ],
+            "tuned": [
+              7.528000045567751,
+              7.379999849945307,
+              7.395999971777201,
+              7.340000011026859,
+              7.327999919652939,
+              7.37199978902936,
+              7.335999980568886
+            ]
+          },
+          "median_us": {
+            "native": 7.172000128775835,
+            "original": 7.1760001592338085,
+            "edited": 7.007999811321497,
+            "tuned": 7.37199978902936
+          },
+          "order": [
+            [
+              "tuned",
+              "native",
+              "edited",
+              "original"
+            ],
+            [
+              "original",
+              "edited",
+              "tuned",
+              "native"
+            ],
+            [
+              "edited",
+              "native",
+              "original",
+              "tuned"
+            ],
+            [
+              "edited",
+              "original",
+              "tuned",
+              "native"
+            ],
+            [
+              "original",
+              "tuned",
+              "native",
+              "edited"
+            ],
+            [
+              "native",
+              "edited",
+              "original",
+              "tuned"
+            ],
+            [
+              "edited",
+              "original",
+              "tuned",
+              "native"
+            ]
+          ],
+          "speedup_native": 1.0234018724129235,
+          "speedup_original": 1.0239726530301707,
+          "speedup_tuned": 1.0519406374868643
+        },
+        {
+          "kernel": "resize",
+          "n": 4194304,
+          "samples_us": {
+            "native": [
+              35.64399853348732,
+              35.631999373435974,
+              35.61199828982353,
+              35.61574965715408,
+              35.631999373435974,
+              35.631999373435974,
+              35.64000129699707
+            ],
+            "original": [
+              35.67200154066086,
+              35.63600033521652,
+              35.599999129772186,
+              35.67187488079071,
+              35.707999020814896,
+              35.68800166249275,
+              35.62000021338463
+            ],
+            "edited": [
+              35.55599972605705,
+              35.51600128412247,
+              35.52800044417381,
+              35.53599864244461,
+              35.53200140595436,
+              35.48400104045868,
+              35.496000200510025
+            ],
+            "tuned": [
+              35.74400022625923,
+              35.66399961709976,
+              35.679999738931656,
+              35.656001418828964,
+              35.67599877715111,
+              35.631999373435974,
+              35.679999738931656
+            ]
+          },
+          "median_us": {
+            "native": 35.631999373435974,
+            "original": 35.67187488079071,
+            "edited": 35.52800044417381,
+            "tuned": 35.67599877715111
+          },
+          "order": [
+            [
+              "tuned",
+              "original",
+              "edited",
+              "native"
+            ],
+            [
+              "native",
+              "edited",
+              "original",
+              "tuned"
+            ],
+            [
+              "native",
+              "tuned",
+              "original",
+              "edited"
+            ],
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ],
+            [
+              "native",
+              "edited",
+              "original",
+              "tuned"
+            ],
+            [
+              "original",
+              "tuned",
+              "edited",
+              "native"
+            ],
+            [
+              "tuned",
+              "edited",
+              "native",
+              "original"
+            ]
+          ],
+          "speedup_native": 1.0029272384587355,
+          "speedup_original": 1.0040496069246276,
+          "speedup_tuned": 1.0041656814660833
+        }
+      ],
+      "optimization_attempt": true,
+      "gpu_tested": true,
+      "proof_attempt": false,
+      "strict_accepted": false,
+      "accepted_win": false,
+      "hot_kernel_timing": true
+    },
+    {
+      "id": "cupy/tri",
+      "project": "CuPy",
+      "kernel": "tri",
+      "source": "cupy/_creation/matrix.py",
+      "commit": "25e552d5d679dcdc6f7cc3d81310a9b265463137",
+      "license": "MIT",
+      "phase": "direct_edit_gpu_timed_frontend_blocked",
+      "source_build_frozen": true,
+      "direct_edited": true,
+      "gpu_validated": true,
+      "fair_timing": false,
+      "universal_direct_equivalence": false,
+      "proof_accepted": false,
+      "negative_gpu_witness": true,
+      "negative_proof": false,
+      "hashes": {
+        "generated.cu": "4c15c7be4b2afd31d5c717cf11a16acd24918c59bc62ac2c85a7df6d1973d03b",
+        "normal.cubin": "75a6265d7d964e319a1f1d1f8b57f390446a0051386ce5f5b1217f59b072cdb0",
+        "original.ptx": "75a4a7200055318fe22b3734be17452a7532b2483f8833a87c93aad6ed23792d",
+        "upstream.py": "0be154e759e78aafcc5e73debe709cd3e01cf9da2ac7974a30e0ba73eabf0a7d",
+        "edited.ptx": "9401b6c6d087dfc95919ed39d197742fd83c01105f4850f5dc48e0c74eadb11a"
+      },
+      "artifact_dir": "demos/oss-ptx-cupy-index/tri",
+      "performance": [
+        {
+          "kernel": "tri",
+          "n": 256,
+          "samples_us": {
+            "native": [
+              1.0917499894276261,
+              1.0359999723732471,
+              1.0359999723732471,
+              1.0359999723732471,
+              1.0359999723732471,
+              1.0398749727755785,
+              1.043875003233552
+            ],
+            "original": [
+              1.0999999940395355,
+              1.0400000028312206,
+              1.0359999723732471,
+              1.035874942317605,
+              1.044000033289194,
+              1.044000033289194,
+              1.0319999419152737
+            ],
+            "edited": [
+              1.0238749673590064,
+              0.9360000258311629,
+              0.9319999953731894,
+              0.944000028539449,
+              0.9399999980814755,
+              0.9399999980814755,
+              0.9399999980814755
+            ],
+            "tuned": [
+              1.1279999744147062,
+              1.0760000441223383,
+              1.0760000441223383,
+              1.0720000136643648,
+              1.0760000441223383,
+              1.0760000441223383,
+              1.0839999886229634
+            ]
+          },
+          "median_us": {
+            "native": 1.0359999723732471,
+            "original": 1.0400000028312206,
+            "edited": 0.9399999980814755,
+            "tuned": 1.0760000441223383
+          },
+          "order": [
+            [
+              "edited",
+              "native",
+              "original",
+              "tuned"
+            ],
+            [
+              "edited",
+              "tuned",
+              "native",
+              "original"
+            ],
+            [
+              "edited",
+              "native",
+              "tuned",
+              "original"
+            ],
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ],
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ],
+            [
+              "edited",
+              "original",
+              "tuned",
+              "native"
+            ],
+            [
+              "original",
+              "edited",
+              "native",
+              "tuned"
+            ]
+          ],
+          "speedup_native": 1.10212763243373,
+          "speedup_original": 1.1063829839934505,
+          "speedup_tuned": 1.1446809003387624
+        },
+        {
+          "kernel": "tri",
+          "n": 7936,
+          "samples_us": {
+            "native": [
+              1.2159999459981918,
+              1.1360000353306532,
+              1.1360000353306532,
+              1.1320000048726797,
+              1.1480000102892518,
+              1.1360000353306532,
+              1.1360000353306532
+            ],
+            "original": [
+              1.1879999656230211,
+              1.1480000102892518,
+              1.1360000353306532,
+              1.1439999798312783,
+              1.1480000102892518,
+              1.1399999493733048,
+              1.1360000353306532
+            ],
+            "edited": [
+              1.095999963581562,
+              1.0359999723732471,
+              1.0357500286772847,
+              1.0519999777898192,
+              1.0359999723732471,
+              1.044000033289194,
+              1.0400000028312206
+            ],
+            "tuned": [
+              1.2278750073164701,
+              1.1759999906644225,
+              1.171999960206449,
+              1.1759999906644225,
+              1.180000021122396,
+              1.1759999906644225,
+              1.180000021122396
+            ]
+          },
+          "median_us": {
+            "native": 1.1360000353306532,
+            "original": 1.1439999798312783,
+            "edited": 1.0400000028312206,
+            "tuned": 1.1759999906644225
+          },
+          "order": [
+            [
+              "native",
+              "edited",
+              "tuned",
+              "original"
+            ],
+            [
+              "original",
+              "native",
+              "edited",
+              "tuned"
+            ],
+            [
+              "tuned",
+              "edited",
+              "original",
+              "native"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "native",
+              "tuned",
+              "original",
+              "edited"
+            ],
+            [
+              "native",
+              "tuned",
+              "edited",
+              "original"
+            ],
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ]
+          ],
+          "speedup_native": 1.092307723305855,
+          "speedup_original": 1.099999977612438,
+          "speedup_tuned": 1.1307692187143898
+        },
+        {
+          "kernel": "tri",
+          "n": 65536,
+          "samples_us": {
+            "native": [
+              1.5637499745935202,
+              1.5119999879971147,
+              1.5119999879971147,
+              1.5079999575391412,
+              1.5160000184550881,
+              1.5079999575391412,
+              1.5157499583438039
+            ],
+            "original": [
+              1.567999948747456,
+              1.5119999879971147,
+              1.5160000184550881,
+              1.5079999575391412,
+              1.5079999575391412,
+              1.5119999879971147,
+              1.5079999575391412
+            ],
+            "edited": [
+              1.4319999609142542,
+              1.348000019788742,
+              1.3559999642893672,
+              1.3520000502467155,
+              1.348000019788742,
+              1.3599999947473407,
+              1.3559999642893672
+            ],
+            "tuned": [
+              1.6039999900385737,
+              1.5480000292882323,
+              1.5439999988302588,
+              1.5399999683722854,
+              1.5439999988302588,
+              1.5480000292882323,
+              1.551999943330884
+            ]
+          },
+          "median_us": {
+            "native": 1.5119999879971147,
+            "original": 1.5119999879971147,
+            "edited": 1.3559999642893672,
+            "tuned": 1.5480000292882323
+          },
+          "order": [
+            [
+              "edited",
+              "tuned",
+              "original",
+              "native"
+            ],
+            [
+              "tuned",
+              "edited",
+              "original",
+              "native"
+            ],
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ],
+            [
+              "original",
+              "native",
+              "tuned",
+              "edited"
+            ],
+            [
+              "tuned",
+              "edited",
+              "original",
+              "native"
+            ],
+            [
+              "edited",
+              "original",
+              "native",
+              "tuned"
+            ],
+            [
+              "edited",
+              "tuned",
+              "original",
+              "native"
+            ]
+          ],
+          "speedup_native": 1.1150442683009227,
+          "speedup_original": 1.1150442683009227,
+          "speedup_tuned": 1.1415929720171385
+        },
+        {
+          "kernel": "tri",
+          "n": 1048576,
+          "samples_us": {
+            "native": [
+              7.075999863445759,
+              6.883999798446894,
+              6.912000011652708,
+              6.912000011652708,
+              6.887999828904867,
+              6.920000072568655,
+              6.887999828904867
+            ],
+            "original": [
+              7.075999863445759,
+              6.9160000421106815,
+              6.891999859362841,
+              6.9160000421106815,
+              6.9160000421106815,
+              6.907999981194735,
+              6.891999859362841
+            ],
+            "edited": [
+              6.800000090152025,
+              6.727749947458506,
+              6.723999977111816,
+              6.72800000756979,
+              6.72800000756979,
+              6.736000068485737,
+              6.719999946653843
+            ],
+            "tuned": [
+              7.271999958902597,
+              7.119750138372183,
+              7.120000198483467,
+              7.151999976485968,
+              7.147999946027994,
+              7.127999793738127,
+              7.147999946027994
+            ]
+          },
+          "median_us": {
+            "native": 6.912000011652708,
+            "original": 6.9160000421106815,
+            "edited": 6.72800000756979,
+            "tuned": 7.147999946027994
+          },
+          "order": [
+            [
+              "original",
+              "edited",
+              "native",
+              "tuned"
+            ],
+            [
+              "native",
+              "edited",
+              "tuned",
+              "original"
+            ],
+            [
+              "edited",
+              "original",
+              "tuned",
+              "native"
+            ],
+            [
+              "edited",
+              "original",
+              "tuned",
+              "native"
+            ],
+            [
+              "edited",
+              "native",
+              "original",
+              "tuned"
+            ],
+            [
+              "tuned",
+              "edited",
+              "native",
+              "original"
+            ],
+            [
+              "native",
+              "original",
+              "edited",
+              "tuned"
+            ]
+          ],
+          "speedup_native": 1.0273483953442177,
+          "speedup_original": 1.0279429301916423,
+          "speedup_tuned": 1.0624256744925171
+        },
+        {
+          "kernel": "tri",
+          "n": 4194304,
+          "samples_us": {
+            "native": [
+              35.42400151491165,
+              35.37200018763542,
+              35.35199910402298,
+              35.37999838590622,
+              35.332001745700836,
+              35.363998264074326,
+              35.360001027584076
+            ],
+            "original": [
+              35.42400151491165,
+              35.37999838590622,
+              35.363998264074326,
+              35.360001027584076,
+              35.34400090575218,
+              35.440001636743546,
+              35.35600006580353
+            ],
+            "edited": [
+              35.26400029659271,
+              35.19200161099434,
+              35.19599884748459,
+              35.21599993109703,
+              35.21599993109703,
+              35.19999980926514,
+              35.21199896931648
+            ],
+            "tuned": [
+              35.392001271247864,
+              35.2960005402565,
+              35.360001027584076,
+              35.34799814224243,
+              35.32399982213974,
+              35.34799814224243,
+              35.3039987385273
+            ]
+          },
+          "median_us": {
+            "native": 35.363998264074326,
+            "original": 35.363998264074326,
+            "edited": 35.21199896931648,
+            "tuned": 35.34799814224243
+          },
+          "order": [
+            [
+              "native",
+              "original",
+              "edited",
+              "tuned"
+            ],
+            [
+              "native",
+              "edited",
+              "original",
+              "tuned"
+            ],
+            [
+              "native",
+              "edited",
+              "tuned",
+              "original"
+            ],
+            [
+              "original",
+              "native",
+              "edited",
+              "tuned"
+            ],
+            [
+              "tuned",
+              "original",
+              "native",
+              "edited"
+            ],
+            [
+              "native",
+              "edited",
+              "original",
+              "tuned"
+            ],
+            [
+              "tuned",
+              "native",
+              "original",
+              "edited"
+            ]
+          ],
+          "speedup_native": 1.00431669031032,
+          "speedup_original": 1.00431669031032,
+          "speedup_tuned": 1.003862296288389
+        }
+      ],
+      "optimization_attempt": true,
+      "gpu_tested": true,
+      "proof_attempt": false,
+      "strict_accepted": false,
+      "accepted_win": false,
+      "hot_kernel_timing": true
     }
   ],
   "totals": {
-    "optimization_attempt": 7,
-    "gpu_tested": 7,
+    "optimization_attempt": 12,
+    "gpu_tested": 12,
     "fair_timing": 2,
-    "proof_attempt": 0,
-    "strict_accepted": 0,
+    "proof_attempt": 1,
+    "strict_accepted": 1,
     "accepted_win": 0
   }
 }

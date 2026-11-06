@@ -16,6 +16,7 @@ fn all_admitted_fields_preserve_other_bits_and_handle_empty_ranges() {
         ctaid: Dim3::default(),
         nctaid: Dim3::default(),
         params: HashMap::new(),
+        byte_params: HashMap::new(),
         sym: HashMap::new(),
     };
     let values = [0u32, 1, 0xffff_ffff, 0x1234_5678, 0xaaaa_5555];

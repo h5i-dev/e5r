@@ -1,0 +1,15 @@
+{
+  "command": [
+    "nvcc",
+    "-O3",
+    "-arch=sm_86",
+    "--cubin",
+    "demos/oss-ptx-cupy-index/tuned.cu",
+    "-o",
+    "/mnt/scratch/e5r-oss-ptx/cupy-index/tuned.cubin"
+  ],
+  "nvcc": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2026 NVIDIA Corporation\nBuilt on Mon_Mar_02_09:52:23_PM_PST_2026\nCuda compilation tools, release 13.2, V13.2.51\nBuild cuda_13.2.r13.2/compiler.37434383_0\n",
+  "source_sha256": "505c87d9855f0e85842b1047112d1e3d80170dd842c20f45abe37a92e2c9c0bb",
+  "cubin_sha256": "7278b4e216d6f334b0c34505617b2f838b45e712d9fb523716b5ef89e60399e1",
+  "trust": "unverified compiler/hardware boundary"
+}

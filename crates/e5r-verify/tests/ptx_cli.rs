@@ -90,6 +90,24 @@ fn spec_outside_the_class_is_unsupported() {
 }
 
 #[test]
+fn aggregate_abi_requires_a_matching_proof_domain() {
+    let src = std::fs::read_to_string(vadd()).unwrap().replace(
+        ".param .u64 vadd_param_0",
+        ".param .align 8 .b8 vadd_param_0[32]",
+    );
+    let (code, doc) = check(
+        &tmp("aggregate.ptx", &src),
+        &tmp("aggregate-spec.json", &vadd_spec()),
+        &[],
+    );
+    assert_eq!((code, doc["verdict"].as_str()), (2, Some("unsupported")));
+    assert!(doc["reasons"].as_array().unwrap().iter().any(|r| {
+        r.as_str()
+            .is_some_and(|s| s.contains("aggregate parameter ABI"))
+    }));
+}
+
+#[test]
 fn malformed_spec_is_an_error() {
     for (name, s) in [
         ("m1.json", "{".to_string()),
@@ -348,4 +366,83 @@ fn oss_increment_equivalence_requires_distinct_typed_repeats_parameter() {
     let (code, result) = run("stale-original", &bad);
     assert_eq!(code, 3, "{result}");
     assert!(result["reasons"].to_string().contains("hash mismatch"));
+}
+
+#[test]
+fn scalar_equivalence_rejects_frozen_original_aggregate_abi() {
+    let candidate = tmp(
+        "scalar-candidate.ptx",
+        ".version 9.2\n.target sm_86\n.address_size 64\n.visible .entry k(.param .u64 input, .param .u64 output, .param .u32 n) { ret; }\n",
+    );
+    let original = tmp(
+        "aggregate-original.ptx",
+        ".version 9.2\n.target sm_86\n.address_size 64\n.visible .entry k(.param .u64 input, .param .u64 output, .param .u32 n, .param .align 8 .b8 extra[32]) { ret; }\n",
+    );
+    let hash = String::from_utf8(
+        Command::new("sha256sum")
+            .arg(&original)
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap()
+    .split_whitespace()
+    .next()
+    .unwrap()
+    .to_string();
+    let sp = tmp("aggregate-original-spec.json", &serde_json::json!({"schema":"e5r.ptx.spec.v1", "class":"equivalence-unpack4", "kernel":"k", "original_ptx":original,"original_sha256":hash,"input":"input","output":"output","length":"n"}).to_string());
+    let (code, result) = check(&candidate, &sp, &[]);
+    assert_eq!(code, 2, "{result}");
+    assert!(
+        result["reasons"]
+            .to_string()
+            .contains("aggregate parameter ABI")
+    );
+}
+
+#[test]
+fn zero_segments_equivalence_requires_arbitrary_distinct_typed_scalar() {
+    let ptx = tmp(
+        "zero-segments-contract.ptx",
+        ".version 9.2\n.target sm_86\n.address_size 64\n.visible .entry k(.param .u64 input, .param .u64 output, .param .u32 n, .param .u32 mask) { ret; }\n",
+    );
+    let hash = String::from_utf8(Command::new("sha256sum").arg(&ptx).output().unwrap().stdout)
+        .unwrap()
+        .split_whitespace()
+        .next()
+        .unwrap()
+        .to_string();
+    let base = serde_json::json!({"schema":"e5r.ptx.spec.v1", "class":"equivalence-zero-segments", "kernel":"k","original_ptx":ptx,"original_sha256":hash,"input":"input","output":"output","length":"n","scalar":"mask"});
+    let run = |tag: &str, v: &Value| {
+        check(
+            &ptx,
+            &tmp(&format!("zero-segments-{tag}.json"), &v.to_string()),
+            &[],
+        )
+    };
+    let (code, result) = run("no-proof", &base);
+    assert_eq!(code, 3, "{result}");
+    assert!(
+        result["lean_spec"]
+            .as_str()
+            .unwrap()
+            .contains("ZeroSegments.Spec")
+    );
+    let mut bad = base.clone();
+    bad.as_object_mut().unwrap().remove("scalar");
+    assert_eq!(run("missing", &bad).0, 4);
+    for alias in ["input", "output", "n"] {
+        let mut bad = base.clone();
+        bad["scalar"] = alias.into();
+        assert_eq!(run(alias, &bad).0, 4);
+    }
+    bad = base.clone();
+    bad["scalar"] = "missing".into();
+    assert_eq!(run("undeclared", &bad).0, 2);
+    bad = base.clone();
+    bad["class"] = "equivalence-unpack4".into();
+    assert_eq!(run("other-class", &bad).0, 4);
+    bad = base;
+    bad["assume_equal"] = true.into();
+    assert_eq!(run("unknown-field", &bad).0, 4);
 }

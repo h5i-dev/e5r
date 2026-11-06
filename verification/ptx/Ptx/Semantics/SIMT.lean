@@ -45,6 +45,7 @@ structure Launch where
   grid : Dim3
   block : Dim3
   params : String → Val
+  byteParams : String → Nat → BitVec 8 := fun _ _ => 0
   alloc : List Region
   shared : String → Addr := fun _ => 0
   /-- The bits of every NaN a floating-point instruction produces, as a
@@ -55,7 +56,7 @@ structure Launch where
 
 def Launch.ctx (L : Launch) (t : Tid) : Ctx :=
   { tid := t.tid, ntid := L.block, ctaid := t.ctaid, nctaid := L.grid, params := L.params,
-    sym := L.shared, nan := L.nan t }
+    byteParams := L.byteParams, sym := L.shared, nan := L.nan t }
 
 /-- The shared variables of `K` as placed by the launch. -/
 def Launch.sregions (L : Launch) (K : Kernel) : List Region :=

@@ -104,6 +104,11 @@ impl P {
             }
         }
     }
+
+    fn uint(&mut self) -> R<u32> {
+        let n = self.int()?;
+        u32::try_from(n).map_err(|_| format!("line {}: expected u32 literal", self.line()))
+    }
 }
 
 fn sreg(w: &str) -> Option<Sreg> {
@@ -127,11 +132,86 @@ fn sreg(w: &str) -> Option<Sreg> {
 // positions prevents the round trip from silently dropping unknown PTX syntax.
 type Metadata = Vec<(usize, String)>;
 
+// Module globals are declarations, not ignored instructions. Only isolated
+// scalar definitions with literal initializers are retained here; every symbol
+// occurrence outside its declaration is refused before any Lean export. Their
+// storage, including initializer bytes, remains in the arbitrary global memory
+// of the execution model. Symbol resolution/relocations are not modeled.
+fn unused_global(line: &[Token]) -> R<(String, String)> {
+    let ts: Vec<_> = line.iter().map(|t| &t.tok).collect();
+    let fail = || {
+        format!(
+            "line {}: unsupported module global declaration",
+            line[0].line
+        )
+    };
+    let [
+        Tok::Word(directive),
+        Tok::Word(align),
+        Tok::Int(a),
+        Tok::Word(ty),
+        Tok::Word(symbol),
+        rest @ ..,
+    ] = ts.as_slice()
+    else {
+        return Err(fail());
+    };
+    let width = match ty.as_str() {
+        ".b8" | ".u8" | ".s8" => 8,
+        ".b16" | ".u16" | ".s16" => 16,
+        ".b32" | ".u32" | ".s32" | ".f32" => 32,
+        ".b64" | ".u64" | ".s64" | ".f64" => 64,
+        _ => return Err(fail()),
+    };
+    if directive != ".global"
+        || align != ".align"
+        || *a < width / 8
+        || *a > 128
+        || !(*a as u128).is_power_of_two()
+        || symbol.starts_with(['.', '%'])
+    {
+        return Err(fail());
+    }
+    let initializer = match rest {
+        [Tok::Punct(';')] => String::new(),
+        [Tok::Punct('='), Tok::Int(n), Tok::Punct(';')]
+            if !ty.starts_with(".f") && *n >= 0 && *n < (1i128 << width) =>
+        {
+            format!(" = {n}")
+        }
+        [
+            Tok::Punct('='),
+            Tok::Punct('-'),
+            Tok::Int(n),
+            Tok::Punct(';'),
+        ] if ty.starts_with(".s") && *n > 0 && *n <= (1i128 << (width - 1)) => {
+            format!(" = -{n}")
+        }
+        [
+            Tok::Punct('='),
+            Tok::Float(bits, bits_width),
+            Tok::Punct(';'),
+        ] if (ty == ".f32" && *bits_width == 32) || (ty == ".f64" && *bits_width == 64) => {
+            if *bits_width == 32 {
+                format!(" = 0f{bits:08X}")
+            } else {
+                format!(" = 0d{bits:016X}")
+            }
+        }
+        _ => return Err(fail()),
+    };
+    Ok((
+        symbol.to_string(),
+        format!(".global .align {a} {ty} {symbol}{initializer};"),
+    ))
+}
+
 fn metadata_tokens(toks: Vec<Token>) -> R<(Vec<Token>, Metadata)> {
     let mut core = Vec::<Token>::new();
     let mut metadata = Vec::new();
     let mut files = HashMap::new();
     let mut locations = Vec::new();
+    let mut globals = HashMap::new();
     let mut depth = 0i32;
     let mut kernel_open = false;
     let mut at = 0;
@@ -145,7 +225,19 @@ fn metadata_tokens(toks: Vec<Token>) -> R<(Vec<Token>, Metadata)> {
             Tok::Word(w) => w.as_str(),
             _ => "",
         };
-        if matches!(name, ".loc" | ".file" | ".pragma") {
+        if name == ".global" {
+            if depth != 0 || kernel_open || core.len() < 6 {
+                return Err(format!(
+                    "line {}: global outside module scope",
+                    toks[at].line
+                ));
+            }
+            let (symbol, text) = unused_global(line)?;
+            if globals.insert(symbol, toks[at].line).is_some() {
+                return Err(format!("line {}: duplicate module global", toks[at].line));
+            }
+            metadata.push((core.len(), text));
+        } else if matches!(name, ".loc" | ".file" | ".pragma") {
             let ts: Vec<_> = line.iter().map(|t| &t.tok).collect();
             let number = |t: &Tok| matches!(t, Tok::Int(n) if *n >= 0 && *n <= u32::MAX as i128);
             let boundary = core
@@ -207,6 +299,16 @@ fn metadata_tokens(toks: Vec<Token>) -> R<(Vec<Token>, Metadata)> {
             }
         }
         at = end;
+    }
+    for t in &core {
+        if let Tok::Word(symbol) = &t.tok {
+            if globals.contains_key(symbol) {
+                return Err(format!(
+                    "line {}: referenced module global {symbol} is unsupported",
+                    t.line
+                ));
+            }
+        }
     }
     for (f, line) in locations {
         if !files.contains_key(&f) {
@@ -278,19 +380,43 @@ fn kernel(p: &mut P) -> R<Kernel> {
     let name = p.word()?;
     p.punct('(')?;
     let mut params = Vec::new();
+    let mut aggregate_params = Vec::new();
+    let mut param_decls = Vec::new();
     if !p.is_punct(')') {
         loop {
             p.keyword(".param")?;
-            let ty = p.ty_directive()?;
-            if ty == Ty::Pred {
-                return p.err(".pred parameter");
+            if p.peek() == Some(&Tok::Word(".align".into())) {
+                p.pos += 1;
+                let align = p.uint()?;
+                if align == 0 || align > 128 || !align.is_power_of_two() {
+                    return p.err("unsupported aggregate parameter alignment");
+                }
+                p.keyword(".b8")?;
+                let name = p.word()?;
+                if name.starts_with(['.', '%']) {
+                    return p.err("unsupported aggregate parameter name");
+                }
+                p.punct('[')?;
+                let size = p.uint()?;
+                if size == 0 {
+                    return p.err("empty aggregate parameter");
+                }
+                p.punct(']')?;
+                param_decls.push(ParamDecl::Aggregate(aggregate_params.len()));
+                aggregate_params.push(AggregateParam { name, align, size });
+            } else {
+                let ty = p.ty_directive()?;
+                if ty == Ty::Pred {
+                    return p.err(".pred parameter");
+                }
+                let n = p.word()?;
+                if n.starts_with('.') {
+                    p.pos -= 1;
+                    return p.err(format!("unsupported parameter attribute {n}"));
+                }
+                param_decls.push(ParamDecl::Scalar(params.len()));
+                params.push((n, ty));
             }
-            let n = p.word()?;
-            if n.starts_with('.') {
-                p.pos -= 1;
-                return p.err(format!("unsupported parameter attribute {n}"));
-            }
-            params.push((n, ty));
             if p.is_punct(',') {
                 p.pos += 1;
             } else {
@@ -356,6 +482,8 @@ fn kernel(p: &mut P) -> R<Kernel> {
         visible,
         name,
         params,
+        aggregate_params,
+        param_decls,
         regs,
         shared,
         decls,
@@ -1235,9 +1363,50 @@ fn check(k: &Kernel, lines: &[usize]) -> R<()> {
         }
     }
     let params: HashMap<&str, Ty> = k.params.iter().map(|(n, t)| (n.as_str(), *t)).collect();
+    if !k.aggregate_params.is_empty() {
+        let mut footprint = 0u64;
+        for d in &k.param_decls {
+            let (align, size) = match *d {
+                ParamDecl::Scalar(i) => {
+                    let bytes = k.params[i].1.width().unwrap() as u64 / 8;
+                    (bytes, bytes)
+                }
+                ParamDecl::Aggregate(i) => {
+                    let p = &k.aggregate_params[i];
+                    (p.align as u64, p.size as u64)
+                }
+            };
+            footprint = footprint.div_ceil(align) * align + size;
+        }
+        if footprint > 4096 {
+            return Err(format!(
+                "{}: aggregate parameter ABI exceeds 4096 bytes",
+                k.name
+            ));
+        }
+    }
+    let aggregates: HashMap<&str, &AggregateParam> = k
+        .aggregate_params
+        .iter()
+        .map(|p| (p.name.as_str(), p))
+        .collect();
+    let mut param_names = std::collections::HashSet::new();
+    for n in k
+        .params
+        .iter()
+        .map(|(n, _)| n.as_str())
+        .chain(k.aggregate_params.iter().map(|p| p.name.as_str()))
+    {
+        if !param_names.insert(n) || regs.contains_key(n) {
+            return Err(format!(
+                "{}: parameter {n} declared twice or as register",
+                k.name
+            ));
+        }
+    }
     let mut shared = std::collections::HashSet::new();
     for d in &k.shared {
-        if !shared.insert(d.name.as_str()) || params.contains_key(d.name.as_str()) {
+        if !shared.insert(d.name.as_str()) || param_names.contains(d.name.as_str()) {
             return Err(format!("{}: name {} declared twice", k.name, d.name));
         }
         if regs.contains_key(&d.name) {
@@ -1400,6 +1569,21 @@ fn check(k: &Kernel, lines: &[usize]) -> R<()> {
             Instr::Ld(Space::Param, t, d, a) => {
                 data(d, w(*t))?;
                 match a {
+                    Address::Param(n, off) if aggregates.contains_key(n.as_str()) => {
+                        let p = aggregates[n.as_str()];
+                        let off = off.unwrap_or(0);
+                        let bytes = t.width().unwrap_or(0) / 8;
+                        if bytes == 0
+                            || off < 0
+                            || off > p.size as i128 - bytes as i128
+                            || p.align < bytes
+                            || off % bytes as i128 != 0
+                        {
+                            return Err(e(format!(
+                                "out-of-bounds or unaligned aggregate parameter load {n}"
+                            )));
+                        }
+                    }
                     Address::Param(n, off) if off.unwrap_or(0) == 0 => {
                         if params.get(n.as_str()) != Some(t) {
                             return Err(e(format!("ld.param.{} of parameter {n}", t.name())));

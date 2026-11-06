@@ -1,0 +1,52 @@
+[
+  {
+    "kernel": "tri",
+    "mutated_constant": 254,
+    "sha256": "1a2b16a94801f81d1393d25614ff408f52e397a9f59bd9222957028532b3dae5",
+    "first_difference": 1,
+    "actual": 1,
+    "expected": 0,
+    "gpu_witness": true,
+    "strict_semantic_proof_negative": "not reached: original parser unsupported"
+  },
+  {
+    "kernel": "resize",
+    "mutated_constant": 254,
+    "sha256": "a4d1fa93e75f3faaf9b05806b543856323204aef918538612dfc4aaa5ea53f7e",
+    "first_difference": 1,
+    "actual": 0,
+    "expected": 1,
+    "gpu_witness": true,
+    "strict_semantic_proof_negative": "not reached: original parser unsupported"
+  },
+  {
+    "kernel": "putmask",
+    "mutated_constant": 254,
+    "sha256": "7584831ebdf7d195e41bbfac96045a0ed6488364f198a0407468949643026c72",
+    "first_difference": 1,
+    "actual": 0,
+    "expected": 1,
+    "gpu_witness": true,
+    "strict_semantic_proof_negative": "not reached: original parser unsupported"
+  },
+  {
+    "kernel": "flatiter_setitem_slice",
+    "mutated_constant": 254,
+    "sha256": "15e82c8e6d26555ac272d723281d0d0c286c3e527f12386dcd4781db57f1e7f0",
+    "first_difference": 1,
+    "actual": 0,
+    "expected": 1,
+    "gpu_witness": true,
+    "strict_semantic_proof_negative": "not reached: original parser unsupported"
+  },
+  {
+    "kernel": "flatiter_getitem_slice",
+    "mutated_constant": 0,
+    "sha256": "9a8707178da71af2d21be81c4e814d741866c1a1885a4d201eef8cd167009f86",
+    "first_difference": 1,
+    "actual": 0,
+    "expected": 1,
+    "gpu_witness": true,
+    "strict_semantic_proof_negative": "not reached: original parser unsupported"
+  }
+]

@@ -2,7 +2,7 @@
 
 Five distinct real CatBoost kernels have frozen original builds, direct PTX
 edits, independent GPU differential tests and fair original/edit/tuned AOT
-measurements. These are **exploratory optimization attempts, not completed
+measurements. These are **exploratory optimization attempts, not completed production
 optimization+proof attempts or accepted wins**. No universal proof is accepted.
 
 Pinned CatBoost5686f8c6cc9def4b0df343488d2f887ec5609d1f, Apache-2.0
@@ -56,3 +56,27 @@ python3 demos/oss-ptx-catboost/report.py
 
 ledger-rows.json supplies explicit machine-readable phases and exact PTX hashes.
 NVIDIA compiler/JIT/SASS/hardware correspondence remains outside Lean's boundary.
+
+ZeroSegments now has a strict accepted direct universal equivalence proof:
+`zero_segments/proof-attempt.json`,60 independently replayed declarations,
+only propext/Quot.sound/Classical.choice. The theorem quantifies arbitrary
+initial memory/registers/predicates and arbitrary32bit flag mask, aligned
+nonwrapping disjoint input/output arrays, n<2^31 and a covering1D launch with
+at most2^31 launched threads. Zero/tails, mask-false unchanged output bytes,
+both-side safety/race freedom/progress/bounded termination/completed execution,
+entire final global memory equality and frame preservation are included.
+The exact source PTX is related directly to the exact edited PTX; no common
+operator spec substitutes for this relation. `zero_segments/negative.py` changes
+the stored zero to one and rebinds the candidate proof hash; `negative.json`
+records rejection on actual semantic obligations, rather than a stale hash.
+Other four kernels remain unproved. ZeroSegments has no meaningful performance
+win; normal full CatBoost TU/API baseline validation is still open. Thus this
+accepted theorem is a proof milestone on the exact extracted original, not a
+completed production optimization result. NVIDIA compilation/JIT/hardware and
+Rust export remain outside the Lean proof boundary.
+
+```sh
+source demos/oss-ptx-simple-multicopy/env.sh
+"$CARGO_TARGET_DIR/release/e5r" ptx check demos/oss-ptx-catboost/zero_segments/edited.ptx --spec demos/oss-ptx-catboost/zero_segments/equivalence.json --proof demos/oss-ptx-catboost/zero_segments/equivalence.lean --out "$E5R_OSS_SCRATCH/zero-proof.json" --timeout 600 --memory-mb 3072 --no-search
+"$E5R_OSS_SCRATCH/venv/bin/python" demos/oss-ptx-catboost/zero_segments/negative.py
+```

@@ -136,10 +136,10 @@
     "function": "ZeroSegmentStartsImpl<ui32>",
     "line": 11,
     "license": "Apache-2.0",
-    "phase": "edited_gpu_timed_proof_pending",
+    "phase": "strict_direct_proof_accepted_normal_TU_pending",
     "optimization_attempt": true,
     "completed_optimization_proof_attempt": false,
-    "strict_proof_accepted": false,
+    "strict_proof_accepted": true,
     "normal_path_runtime_check": false,
     "hashes": {
       "original": "a2dea8659ab71d33b1fa3377ddcf5867105980684a9eb8847b971f8ec1cb5753",
@@ -155,8 +155,8 @@
     "domain": "4-byte aligned disjoint flags/output arrays of size uint32; covering 1D grid*block<=2^32; no wrapping byte ranges; all flags, flagMask and initial output values unrestricted.",
     "caveats": [
       "Extracted unchanged upstream body; normal full TU runtime equivalence not validated",
-      "No meaningful speedup demonstrated",
-      "No accepted universal direct equivalence proof"
-    ]
+      "No meaningful speedup demonstrated"
+    ],
+    "proof_attempt": true
   }
 ]

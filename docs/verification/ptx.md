@@ -933,7 +933,40 @@ whose meaning is in doubt: an instruction type PTX does not define for the
 opcode (`and.u32`, `add.b32`, `setp.lo.s32`, `cvt` with `.b` types), a
 special register outside `mov` and the source of `cvt`, an immediate wider
 than its operand, an address offset beyond 32 signed bits, a predicated
-`bra.uni`, `-0`. `ld.param` must name a parameter of exactly its type.
+`bra.uni`, `-0`. Scalar `ld.param` must name a parameter of exactly its type
+and use offset zero.
+
+The frontend also retains unreferenced module scalar declarations in the exact
+token round trip: `.global .align N .{b,u,s}{8,16,32,64}` and `.f32`/`.f64`,
+with an optional width-checked integer or matching floating bit literal.
+Duplicate symbols, references anywhere in executable/core syntax, arrays,
+relocations and extra statements are refused. These declarations do not add
+instructions to the Lean execution. Their storage is part of arbitrary initial
+global memory; loader allocation and initializer execution remain outside the
+model, as does resolving a referenced module symbol. This is a narrow admission
+of compiler-emitted unused declarations, not support for accessing global
+variables. 8/16-bit executable types remain unsupported. Tests in `metadata.rs` check token
+preservation, refusal controls and assembly of the retained declarations.
+
+By-value aggregate arguments follow the public PTX ISA
+[kernel parameter declaration syntax](https://docs.nvidia.com/cuda/parallel-thread-execution/#kernel-function-parameters)
+and retain their explicit `.param .align A .b8 name[N]`
+declarations, byte lengths and mixed scalar/aggregate declaration order. The
+frontend admits positive byte lengths, power-of-two alignment up to 128, and
+an aligned ABI footprint up to 4096 bytes. Existing 32/64-bit `ld.param` types
+may read naturally aligned, bounded byte ranges at literal offsets, including
+zero and 24. No ABI flattening or invented scalar fields occurs. Each Rust
+and Lean launch carries a separate byte environment shared by all threads;
+multi-byte reads are little-endian, and unspecified bytes default to zero in
+concrete launches. Universal statements can quantify over every byte environment.
+Invalid bounds/alignment fault in both interpreters. Scalar parameter loads
+retain their previous semantics and ignore the byte environment.
+`AggregateParam.lean` proves scalar compatibility and a memory-framing aggregate
+step, and reports axioms; `aggregate_params.rs` checks round trips, ptxas,
+refusal controls and replay of exported declarations and reads in Lean.
+The current proof domains explicitly refuse aggregate kernels until their
+contracts describe the aggregate launch ABI. This frontend/semantics extension
+does not itself prove an aggregate kernel optimization.
 
 The parser is not trusted on its own. `roundtrip` requires the canonical
 printing of the parsed module to have exactly the tokens of the source, and

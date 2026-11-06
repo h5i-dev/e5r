@@ -1,0 +1,11 @@
+{
+  "schema": "e5r.ptx.spec.v1",
+  "class": "equivalence-zero-segments",
+  "kernel": "_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT_",
+  "original_ptx": "original.ptx",
+  "original_sha256": "a2dea8659ab71d33b1fa3377ddcf5867105980684a9eb8847b971f8ec1cb5753",
+  "input": "_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT__param_0",
+  "output": "_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT__param_3",
+  "length": "_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT__param_2",
+  "scalar": "_ZN7NKernel21ZeroSegmentStartsImplIjEEvPKjjjPT__param_1"
+}

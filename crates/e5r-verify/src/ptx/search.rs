@@ -116,6 +116,7 @@ impl World {
                 z: 1,
             },
             params,
+            byte_params: HashMap::new(),
             sym: HashMap::new(),
         }
     }

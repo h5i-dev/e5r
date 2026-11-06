@@ -270,6 +270,17 @@ pub fn check(o: &Options) -> (Verdict, Value) {
             );
         }
     };
+    if module
+        .kernels
+        .iter()
+        .any(|k| !k.aggregate_params.is_empty())
+    {
+        return finish(
+            doc,
+            Verdict::Unsupported,
+            Some("aggregate parameter ABI requires a matching proof domain".into()),
+        );
+    }
     let stext = match String::from_utf8(sbytes) {
         Ok(t) => t,
         Err(e) => return finish(doc, Verdict::Error, Some(format!("spec malformed: {e}"))),
@@ -288,6 +299,7 @@ pub fn check(o: &Options) -> (Verdict, Value) {
                     | "equivalence-stencil17"
                     | "equivalence-stencil17-pair2"
                     | "equivalence-oss-inc"
+                    | "equivalence-zero-segments"
             )
         )
     }) {

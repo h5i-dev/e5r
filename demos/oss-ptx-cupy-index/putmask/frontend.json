@@ -1,0 +1,12 @@
+{
+  "command": [
+    "/mnt/scratch/e5r-oss-ptx/cargo/release/e5r",
+    "ptx",
+    "export",
+    "demos/oss-ptx-cupy-index/putmask/original.ptx"
+  ],
+  "returncode": 1,
+  "stdout": "",
+  "stderr": "e5r: demos/oss-ptx-cupy-index/putmask/original.ptx: line 20: unexpected character '='\n",
+  "proof_accepted": false
+}

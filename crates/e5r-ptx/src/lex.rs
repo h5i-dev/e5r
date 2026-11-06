@@ -137,7 +137,7 @@ pub fn lex(src: &str) -> Result<Vec<Token>, String> {
                 (None, None) => Tok::Num(text),
             };
             out.push(Token { tok, line });
-        } else if "{}()[]<>,;:@!+-".contains(c) {
+        } else if "{}()[]<>,;:@!+-=".contains(c) {
             out.push(Token {
                 tok: Tok::Punct(c),
                 line,

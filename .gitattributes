@@ -9,3 +9,7 @@ demos/ptx-equivalence/optimized.ptx whitespace=-blank-at-eof
 demos/oss-ptx-catboost/*/*.ptx whitespace=-blank-at-eof
 demos/oss-ptx-cupy-packing/*/*.ptx whitespace=-blank-at-eof
 demos/oss-ptx-cupy-packing/*/original.cu whitespace=-blank-at-eol,-blank-at-eof
+demos/oss-ptx-cupy-index/*/*.ptx whitespace=-blank-at-eof
+demos/oss-ptx-cupy-index/*/generated.cu whitespace=-blank-at-eol,-blank-at-eof
+# Keep the exact independently replayed supplied proof bytes.
+demos/oss-ptx-catboost/zero_segments/equivalence.lean whitespace=-blank-at-eol

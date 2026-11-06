@@ -1,0 +1,8 @@
+{
+  "kind": "direct_ptx_division_cfg_shift_mask",
+  "parameter": "cupy_flatiter_setitem_slice_param_0+8",
+  "value": 256,
+  "domain": "Exact stated parameter value; contiguous int32 arrays, disjoint input/output except putmask destination; nonnegative iteration count <2^29, valid 1D covering launch. Full memory/race/frame/termination proof pending.",
+  "sha256": "34f107931c09ad7ed165a5dd5f8896241e024a48a7b6a17cbc95dfa81413fe22",
+  "proof_accepted": false
+}

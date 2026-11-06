@@ -16,6 +16,7 @@ fn predicate_or_truth_table_and_guards() {
         ctaid: Dim3::default(),
         nctaid: Dim3::default(),
         params: HashMap::new(),
+        byte_params: HashMap::new(),
         sym: HashMap::new(),
     };
     for a in [false, true] {

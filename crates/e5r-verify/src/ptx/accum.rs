@@ -339,6 +339,7 @@ fn launch(sp: &AccumSpec, w: &World) -> interp::Launch {
         grid: Dim3 { x: w.g, y: 1, z: 1 },
         block: Dim3 { x: w.b, y: 1, z: 1 },
         params,
+        byte_params: HashMap::new(),
         sym: HashMap::new(),
         alloc: vec![
             interp::Region {
