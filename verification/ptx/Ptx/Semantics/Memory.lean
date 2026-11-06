@@ -16,15 +16,19 @@ abbrev Val := BitVec 64
 abbrev Addr := BitVec 64
 abbrev Mem := Addr → BitVec 8
 
-/-- Access sizes of the subset: 4 and 8 bytes. -/
+/-- Access sizes of the subset: 1, 2, 4 and 8 bytes. -/
 inductive Size where
-  | b4 | b8
+  | b1 | b2 | b4 | b8
   deriving Repr, DecidableEq, Inhabited
 
 def Size.bytes : Size → Nat
+  | .b1 => 1
+  | .b2 => 2
   | .b4 => 4
   | .b8 => 8
 
+@[simp] theorem Size.bytes_b1 : Size.b1.bytes = 1 := rfl
+@[simp] theorem Size.bytes_b2 : Size.b2.bytes = 2 := rfl
 @[simp] theorem Size.bytes_b4 : Size.b4.bytes = 4 := rfl
 @[simp] theorem Size.bytes_b8 : Size.b8.bytes = 8 := rfl
 
@@ -34,12 +38,16 @@ def covers (a : Addr) (n : Nat) (x : Addr) : Prop := (x - a).toNat < n
 instance (a : Addr) (n : Nat) (x : Addr) : Decidable (covers a n x) := by
   unfold covers; infer_instance
 
+def rd16 (m : Mem) (a : Addr) : BitVec 16 := m (a + 1) ++ m a
+
 def rd32 (m : Mem) (a : Addr) : BitVec 32 := m (a + 3) ++ m (a + 2) ++ m (a + 1) ++ m a
 
 def rd64 (m : Mem) (a : Addr) : BitVec 64 := rd32 m (a + 4) ++ rd32 m a
 
 /-- A load: the bytes at `a`, zero-extended to 64 bits. -/
 def rd (m : Mem) (a : Addr) : Size → Val
+  | .b1 => (m a).setWidth 64
+  | .b2 => (rd16 m a).setWidth 64
   | .b4 => (rd32 m a).setWidth 64
   | .b8 => rd64 m a
 
@@ -68,6 +76,13 @@ def accessOk (al : List Region) (a : Addr) (sz : Size) : Bool :=
 Byte-assembly identities are proved bit by bit (`bytes32`, `bytes64`), not
 with `bv_decide`: its certificates are checked by native evaluation, which
 would add `Lean.ofReduceBool` to every theorem that uses them. -/
+
+theorem bytes16 (v : Val) :
+    (v >>> 8).setWidth 8 ++ v.setWidth 8 = v.setWidth 16 := by
+  ext i hi
+  simp only [BitVec.getElem_append, BitVec.getElem_setWidth, BitVec.getLsbD_ushiftRight]
+  repeat' split
+  all_goals (first | rfl | (congr 1; omega))
 
 theorem bytes32 (v : Val) :
     (v >>> 24).setWidth 8 ++ (v >>> 16).setWidth 8 ++ (v >>> 8).setWidth 8 ++ v.setWidth 8 =
@@ -102,6 +117,14 @@ theorem rd_congr {m₁ m₂ : Mem} {a : Addr} {sz : Size}
     (h : ∀ x, covers a sz.bytes x → m₁ x = m₂ x) : rd m₁ a sz = rd m₂ a sz := by
   unfold covers at h
   cases sz with
+  | b1 =>
+    simp only [Size.bytes_b1] at h
+    simp only [rd]
+    rw [h a (by bv_omega)]
+  | b2 =>
+    simp only [Size.bytes_b2] at h
+    simp only [rd, rd16]
+    rw [h a (by bv_omega), h (a + 1) (by bv_omega)]
   | b4 =>
     simp only [Size.bytes_b4] at h
     simp only [rd, rd32]
@@ -117,9 +140,16 @@ theorem rd_congr {m₁ m₂ : Mem} {a : Addr} {sz : Size}
 /-- A store overwrites exactly the bytes it covers, with the value stored. -/
 theorem rd_wr_same (m : Mem) (a : Addr) (sz : Size) (v : Val) :
     rd (wr m a sz v) a sz = match sz with
+      | .b1 => (v.setWidth 8).setWidth 64
+      | .b2 => (v.setWidth 16).setWidth 64
       | .b4 => (v.setWidth 32).setWidth 64
       | .b8 => v := by
   cases sz with
+  | b1 => simp [rd, wr, Size.bytes_b1]
+  | b2 =>
+    simp only [rd, rd16, wr, BitVec.sub_self, add_sub_left, Size.bytes_b2]
+    simp
+    rw [bytes16]
   | b4 =>
     simp only [rd, rd32, wr, BitVec.sub_self, add_sub_left, Size.bytes_b4]
     simp

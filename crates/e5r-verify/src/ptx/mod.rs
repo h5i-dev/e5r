@@ -121,6 +121,13 @@ pub fn run_lean_env(
         .envs(env.iter().copied())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    // `lake` can spawn the actual Lean/replay process. Keep that entire tree
+    // in a fresh group so timeout cleanup also closes inherited output pipes.
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
     let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(e) => {
@@ -150,6 +157,14 @@ pub fn run_lean_env(
             break Some(s);
         }
         if start.elapsed() > timeout {
+            #[cfg(unix)]
+            {
+                let _ = Command::new("kill")
+                    .args(["-KILL", "--", &format!("-{}", child.id())])
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status();
+            }
             let _ = child.kill();
             let _ = child.wait();
             limit = Some("timeout");
@@ -903,5 +918,51 @@ fn first_error(s: &str) -> String {
             .take(400)
             .collect(),
         None => tail(s),
+    }
+}
+
+#[cfg(all(test, unix))]
+mod timeout_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn timeout_stops_descendants_holding_output_pipes() {
+        let dir = std::env::temp_dir().join(format!("e5r-lean-descendant-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let fake = dir.join("lake");
+        std::fs::write(&fake, "#!/bin/sh\nsleep 30 &\necho $! > orphan.pid\nwait\n").unwrap();
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let path = format!(
+            "{}:{}",
+            dir.display(),
+            std::env::var("PATH").unwrap_or_default()
+        );
+        let start = Instant::now();
+        let result = run_lean_env(
+            &dir,
+            &[],
+            Duration::from_millis(500),
+            128,
+            &[("PATH", &path)],
+        );
+        assert_eq!(result.limit, Some("timeout"));
+        assert!(!result.ok);
+        assert!(
+            start.elapsed() < Duration::from_secs(10),
+            "orphan held pipes open"
+        );
+        let pid = std::fs::read_to_string(dir.join("orphan.pid")).unwrap();
+        if let Ok(stat) = std::fs::read_to_string(format!("/proc/{}/stat", pid.trim())) {
+            assert!(
+                stat.split(')')
+                    .nth(1)
+                    .unwrap()
+                    .trim_start()
+                    .starts_with('Z'),
+                "descendant still running: {stat}"
+            );
+        }
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

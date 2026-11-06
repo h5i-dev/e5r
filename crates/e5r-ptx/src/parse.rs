@@ -2,7 +2,7 @@
 //! naming the line, never a best-effort reading.
 
 use crate::ast::*;
-use crate::lex::{Tok, Token, lex};
+use crate::lex::{lex, Tok, Token};
 use crate::print;
 use std::collections::HashMap;
 
@@ -145,14 +145,8 @@ fn unused_global(line: &[Token]) -> R<(String, String)> {
             line[0].line
         )
     };
-    let [
-        Tok::Word(directive),
-        Tok::Word(align),
-        Tok::Int(a),
-        Tok::Word(ty),
-        Tok::Word(symbol),
-        rest @ ..,
-    ] = ts.as_slice()
+    let [Tok::Word(directive), Tok::Word(align), Tok::Int(a), Tok::Word(ty), Tok::Word(symbol), rest @ ..] =
+        ts.as_slice()
     else {
         return Err(fail());
     };
@@ -179,19 +173,14 @@ fn unused_global(line: &[Token]) -> R<(String, String)> {
         {
             format!(" = {n}")
         }
-        [
-            Tok::Punct('='),
-            Tok::Punct('-'),
-            Tok::Int(n),
-            Tok::Punct(';'),
-        ] if ty.starts_with(".s") && *n > 0 && *n <= (1i128 << (width - 1)) => {
+        [Tok::Punct('='), Tok::Punct('-'), Tok::Int(n), Tok::Punct(';')]
+            if ty.starts_with(".s") && *n > 0 && *n <= (1i128 << (width - 1)) =>
+        {
             format!(" = -{n}")
         }
-        [
-            Tok::Punct('='),
-            Tok::Float(bits, bits_width),
-            Tok::Punct(';'),
-        ] if (ty == ".f32" && *bits_width == 32) || (ty == ".f64" && *bits_width == 64) => {
+        [Tok::Punct('='), Tok::Float(bits, bits_width), Tok::Punct(';')]
+            if (ty == ".f32" && *bits_width == 32) || (ty == ".f64" && *bits_width == 64) =>
+        {
             if *bits_width == 32 {
                 format!(" = 0f{bits:08X}")
             } else {
@@ -1007,24 +996,27 @@ fn types_ok(i: &Instr) -> Result<(), String> {
     use Ty::*;
     let arith = |t: &Ty| matches!(t, U32 | S32 | U64 | S64);
     let bits = |t: &Ty| matches!(t, B32 | B64);
+    let narrow_int = |t: &Ty| matches!(t, U16 | S16);
     let ok = match i {
         Instr::Por(..) => true,
         Instr::Bin(BinOp::Add | BinOp::Sub | BinOp::MulLo, t, ..) | Instr::MadLo(t, ..) => arith(t),
         Instr::Bin(BinOp::MulWide, t, ..) => matches!(t, U32 | S32),
         Instr::Bin(BinOp::And | BinOp::Or | BinOp::Xor | BinOp::Shl, t, ..) | Instr::Not(t, ..) => {
-            bits(t)
+            bits(t) || *t == B16
         }
-        Instr::Bin(BinOp::Shr, t, ..) => arith(t) || bits(t),
-        Instr::Mov(t, ..) | Instr::Selp(t, ..) => *t != Pred,
+        Instr::Bin(BinOp::Shr, t, ..) => arith(t) || bits(t) || narrow_int(t) || *t == B16,
+        Instr::Mov(t, ..) | Instr::Selp(t, ..) => !matches!(t, Pred | U8),
         Instr::Setp(_, F32 | F64, ..) => false,
         Instr::Setp(c, t, ..) => match c {
-            CmpOp::Eq | CmpOp::Ne => true,
-            CmpOp::Lt | CmpOp::Le | CmpOp::Gt | CmpOp::Ge => arith(t),
-            CmpOp::Lo | CmpOp::Ls | CmpOp::Hi | CmpOp::Hs => matches!(t, U32 | U64),
+            CmpOp::Eq | CmpOp::Ne => *t != U8,
+            CmpOp::Lt | CmpOp::Le | CmpOp::Gt | CmpOp::Ge => arith(t) || narrow_int(t),
+            CmpOp::Lo | CmpOp::Ls | CmpOp::Hi | CmpOp::Hs => matches!(t, U16 | U32 | U64),
         },
         Instr::Bfi32(..) => true,
-        Instr::Cvt(dt, st, ..) => arith(dt) && arith(st),
-        Instr::CvtaGlobal(..) | Instr::Ld(..) | Instr::St(..) => true,
+        Instr::Cvt(dt, st, ..) => (arith(dt) || narrow_int(dt)) && (arith(st) || narrow_int(st)),
+        Instr::CvtaGlobal(..) => true,
+        Instr::Ld(_, t, ..) => *t != S16,
+        Instr::St(..) => true,
         Instr::Bra(..) | Instr::Ret | Instr::Exit | Instr::Bar => true,
         // PTX ISA, `atom` and `red`
         Instr::Atom(_, o, t, ..) | Instr::Red(_, o, t, ..) => match o {
@@ -1352,6 +1344,12 @@ fn compatible(declared: Ty, used: Ty) -> bool {
 fn check(k: &Kernel, lines: &[usize]) -> R<()> {
     let mut regs: HashMap<String, Ty> = HashMap::new();
     for d in &k.regs {
+        if d.ty == Ty::U8 {
+            return Err(format!(
+                "{}: 8-bit registers are outside the subset",
+                k.name
+            ));
+        }
         let names: Vec<String> = match d.count {
             Some(n) => (0..n).map(|i| format!("{}{i}", d.name)).collect(),
             None => vec![d.name.clone()],
@@ -1459,6 +1457,26 @@ fn check(k: &Kernel, lines: &[usize]) -> R<()> {
                 Operand::FImm(..) => Err(e("float literal of the wrong width".into())),
             }
         };
+        // PTX ISA §9.4.1 permits wider integer/bit registers for ld/st/cvt.
+        // Signed 16-bit destinations of cvt stay exact-width: wider signed
+        // destination extension is deliberately outside this subset.
+        let relaxed_data = |r: &str, t: Ty| -> R<()> {
+            let declared = width_of(r)?;
+            if !t.is_float()
+                && !declared.is_float()
+                && declared.width().is_some_and(|x| x >= t.width().unwrap())
+            {
+                Ok(())
+            } else {
+                data(r, t.width().unwrap())
+            }
+        };
+        let relaxed_src = |o: &Operand, t: Ty| -> R<()> {
+            match o {
+                Operand::Reg(r) => relaxed_data(r, t),
+                _ => src(o, t.width().unwrap()),
+            }
+        };
         // a data address in `sp`: global needs a 64-bit register; shared takes
         // a 32- or 64-bit register or a `.shared` variable
         let addr = |sp: Space, a: &Address| -> R<()> {
@@ -1559,15 +1577,29 @@ fn check(k: &Kernel, lines: &[usize]) -> R<()> {
                 pred(q)?;
             }
             Instr::Cvt(dt, st, d, a) => {
-                data(d, w(*dt))?;
-                src(a, w(*st))?;
+                if *dt == Ty::S16 {
+                    data(d, 16)?;
+                } else if w(*dt) < 32 {
+                    relaxed_data(d, *dt)?;
+                } else {
+                    data(d, w(*dt))?;
+                }
+                if w(*st) < 32 {
+                    relaxed_src(a, *st)?;
+                } else {
+                    src(a, w(*st))?;
+                }
             }
             Instr::CvtaGlobal(d, a) => {
                 data(d, 64)?;
                 src(a, 64)?;
             }
             Instr::Ld(Space::Param, t, d, a) => {
-                data(d, w(*t))?;
+                if w(*t) < 32 {
+                    relaxed_data(d, *t)?;
+                } else {
+                    data(d, w(*t))?;
+                }
                 match a {
                     Address::Param(n, off) if aggregates.contains_key(n.as_str()) => {
                         let p = aggregates[n.as_str()];
@@ -1593,12 +1625,20 @@ fn check(k: &Kernel, lines: &[usize]) -> R<()> {
                 }
             }
             Instr::Ld(sp, t, d, a) => {
-                data(d, w(*t))?;
+                if w(*t) < 32 {
+                    relaxed_data(d, *t)?;
+                } else {
+                    data(d, w(*t))?;
+                }
                 addr(*sp, a)?;
             }
             Instr::St(Space::Param, ..) => return Err(e("st.param".into())),
             Instr::St(sp, t, a, v) => {
-                src(v, w(*t))?;
+                if w(*t) < 32 {
+                    relaxed_src(v, *t)?;
+                } else {
+                    src(v, w(*t))?;
+                }
                 addr(*sp, a)?;
             }
             Instr::Atom(sp, _, t, d, a, b) => {

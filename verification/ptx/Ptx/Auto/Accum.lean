@@ -201,7 +201,7 @@ theorem tfold_oneD_gid {L : Launch} {G B : BitVec 32} (h1 : L.OneD G B) (A : Cel
   rw [h]
 
 theorem Spec.sz_bytes (S : Spec) : S.alg.sz.bytes = 4 * S.k := by
-  unfold Spec.k; cases S.alg.sz <;> rfl
+  rcases S.alg.atomicSize with h | h <;> simp [Spec.k, h, Size.bytes]
 
 /-- An aligned 64-bit element of an array of 64-bit elements that is one
 allocation of the list. -/
@@ -249,7 +249,7 @@ theorem ok (hO : Obligation S K N) (hpre : A.Pre) (m₀ : Mem) (sh₀ : Dim3 →
     subst ha
     rcases htc with ⟨-, hlt, hcv⟩ | h
     · have hk : S.k * gid A t < S.k * A.n.toNat := Nat.mul_lt_mul_of_pos_left hlt (by
-        unfold Spec.k; cases S.alg.sz <;> decide)
+        rcases S.alg.atomicSize with h | h <;> simp [Spec.k, h, Size.bytes])
       have h1 := toNat_elem fx hk
       have hle : S.k * gid A t + S.k ≤ S.k * A.n.toNat := by
         have := Nat.mul_le_mul_left S.k (show gid A t + 1 ≤ A.n.toNat by omega)

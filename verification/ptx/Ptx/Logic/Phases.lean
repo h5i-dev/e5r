@@ -40,6 +40,8 @@ def Foot.touches (F : Foot) (x : Loc) : Prop := F.r x ∨ F.w x
 
 /-- The value a load of `sz` bytes can return: the low `sz` bytes. -/
 def Size.trunc : Size → Val → Val
+  | .b1, v => (v.setWidth 8).setWidth 64
+  | .b2, v => (v.setWidth 16).setWidth 64
   | .b4, v => (v.setWidth 32).setWidth 64
   | .b8, v => v
 
@@ -48,20 +50,25 @@ theorem rd_wr_trunc (m : Mem) (a : Addr) (sz : Size) (v : Val) :
   cases sz <;> simp [rd_wr_same, Size.trunc]
 
 theorem trunc_rd (m : Mem) (a : Addr) (sz : Size) : sz.trunc (rd m a sz) = rd m a sz := by
-  cases sz
-  · simp only [Size.trunc, rd]
+  cases sz with
+  | b1 => simp [Size.trunc, rd, BitVec.setWidth_setWidth_of_le]
+  | b2 => simp [Size.trunc, rd, BitVec.setWidth_setWidth_of_le]
+  | b4 =>
+    simp only [Size.trunc, rd]
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.toNat_setWidth]
     have := (rd32 m a).isLt
     rw [Nat.mod_eq_of_lt (a := (rd32 m a).toNat) (by omega), Nat.mod_eq_of_lt (by omega),
       Nat.mod_eq_of_lt (by omega)]
-  · rfl
+  | b8 => rfl
 
 /-- The algebra of the accumulator cells: the access size, and a
 commutative, associative operation with a unit on the values of that size.
 An atomic on a cell must combine the old value with some `δ` by `op`. -/
 structure CellAlg where
   sz : Size
+  /-- The admitted atomic cell widths; byte/half memory accesses are non-atomic. -/
+  atomicSize : sz = .b4 ∨ sz = .b8
   op : Val → Val → Val
   e : Val
   comm : ∀ x y, op x y = op y x

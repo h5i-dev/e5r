@@ -9,10 +9,11 @@ or shared memory is a visible action with its space, address and size, so
 locality and race freedom can be stated over actions without re-deriving them
 from the instruction table.
 
-Registers are 64 bits wide in the model. A 32-bit operation reads the low 32
-bits of its operands and writes its result zero-extended; for a well-typed
-kernel (32-bit registers are only used at 32-bit types) this is exactly PTX's
-`.b32` register file. Arithmetic wraps (`add.u32 a b = (a + b) mod 2^32`).
+Registers are 64 bits wide in the model. An 8/16/32-bit operation reads the
+low bits of its operands and writes its result zero-extended. Logic and
+arithmetic require matching operand widths. The admitted integer ld/st/cvt
+forms may use wider registers: the instruction type determines truncation
+and conversion extension. Arithmetic wraps (`add.u32 a b = (a + b) mod 2^32`).
 
 A shared-memory address is the value of its register (plus offset), as for
 global memory. A 32-bit address register written by the kernel is
@@ -100,6 +101,8 @@ def opVal (c : Ctx) (s : TState) : Operand → Val
 /-- Result of a width-polymorphic operation, zero-extended into a register. -/
 def atWidth (w : Width) (f : (n : Nat) → BitVec n → BitVec n → BitVec n) (a b : Val) : Val :=
   match w with
+  | .w8 => (f 8 (a.setWidth 8) (b.setWidth 8)).setWidth 64
+  | .w16 => (f 16 (a.setWidth 16) (b.setWidth 16)).setWidth 64
   | .w32 => ext32 (f 32 (lo32 a) (lo32 b))
   | .w64 => f 64 a b
 
@@ -110,6 +113,8 @@ written out so the definition reads like the ISA, and so that executing it
 (the GPU differential test) does not build a 2^32-bit number. -/
 def shiftBy (w : Width) (f : (n : Nat) → BitVec n → Nat → BitVec n) (a b : Val) : Val :=
   match w with
+  | .w8 => (f 8 (a.setWidth 8) (min (lo32 b).toNat 8)).setWidth 64
+  | .w16 => (f 16 (a.setWidth 16) (min (lo32 b).toNat 16)).setWidth 64
   | .w32 => ext32 (f 32 (lo32 a) (min (lo32 b).toNat 32))
   | .w64 => f 64 a (min (lo32 b).toNat 64)
 
@@ -120,7 +125,7 @@ def cmpVal (c : CmpOp) (t : Ty) (a b : Val) : Option Bool :=
     | _, _, .f32 | _, _, .f64 => none
     | .eq, _, _ => some (x == y)
     | .ne, _, _ => some (x != y)
-    | _, _, .b32 | _, _, .b64 | _, _, .pred => none
+    | _, _, .b16 | _, _, .b32 | _, _, .b64 | _, _, .pred => none
     | .lt, true, _ => some (x.slt y)
     | .le, true, _ => some (x.sle y)
     | .gt, true, _ => some (y.slt x)
@@ -130,6 +135,8 @@ def cmpVal (c : CmpOp) (t : Ty) (a b : Val) : Option Bool :=
     | .gt, false, _ | .hi, _, _ => some (y.ult x)
     | .ge, false, _ | .hs, _, _ => some (y.ule x)
   match t.width with
+  | .w8 => go (a.setWidth 8) (b.setWidth 8)
+  | .w16 => go (a.setWidth 16) (b.setWidth 16)
   | .w32 => go (lo32 a) (lo32 b)
   | .w64 => go a b
 
@@ -141,13 +148,24 @@ def convert (dt st : Ty) (a : Val) : Val :=
   | .w64, .w64 => a
   | .w64, .w32 => ext32 (lo32 a)
   | .w32, .w64 => if st.signed then (lo32 a).signExtend 64 else ext32 (lo32 a)
+  | _, .w8 => (a.setWidth 8).setWidth 64
+  | _, .w16 => (a.setWidth 16).setWidth 64
+  | .w8, .w32 => (a.setWidth 8).setWidth 64
+  | .w8, .w64 => (a.setWidth 8).setWidth 64
+  | .w16, .w32 =>
+    if st.signed then ((a.setWidth 16).signExtend 32).setWidth 64
+    else (a.setWidth 16).setWidth 64
+  | .w16, .w64 =>
+    if st.signed then (a.setWidth 16).signExtend 64 else (a.setWidth 16).setWidth 64
 
 def Ty.size : Ty → Size
-  | t => match t.width with | .w32 => .b4 | .w64 => .b8
+  | t => match t.width with | .w8 => .b1 | .w16 => .b2 | .w32 => .b4 | .w64 => .b8
 
 /-- Truncate a value to the width of `t` (a register write of type `t`). -/
 def fit (t : Ty) (v : Val) : Val :=
   match t.width with
+  | .w8 => (v.setWidth 8).setWidth 64
+  | .w16 => (v.setWidth 16).setWidth 64
   | .w32 => ext32 (lo32 v)
   | .w64 => v
 
@@ -232,6 +250,8 @@ def Ty.fmt : Ty → Fp.Fmt
 /-- The bits of a float operand at the type's width. -/
 def fbits (t : Ty) (v : Val) : Nat :=
   match t.width with
+  | .w8 => (v.setWidth 8).toNat
+  | .w16 => (v.setWidth 16).toNat
   | .w32 => (lo32 v).toNat
   | .w64 => v.toNat
 
@@ -246,6 +266,10 @@ def fres (c : Ctx) (s : TState) (t : Ty) : Option Nat → Val
 /-- The integer an operand of an integer type holds. -/
 def intOf (t : Ty) (v : Val) : Int :=
   match t.width, t.signed with
+  | .w8, true => (v.setWidth 8).toInt
+  | .w8, false => (v.setWidth 8).toNat
+  | .w16, true => (v.setWidth 16).toInt
+  | .w16, false => (v.setWidth 16).toNat
   | .w32, true => (lo32 v).toInt
   | .w32, false => (lo32 v).toNat
   | .w64, true => v.toInt
@@ -261,7 +285,7 @@ refused by the parser and fault here. -/
 def cvtFloat (c : Ctx) (s : TState) (dt st : Ty) (r : CvtRnd) (ftz sat : Bool) (a : Val) : Option Val :=
   match dt.isFloat, st.isFloat, r with
   | false, true, .i m =>
-    let w := match dt.width with | .w32 => 32 | .w64 => 64
+    let w := match dt.width with | .w8 => 8 | .w16 => 16 | .w32 => 32 | .w64 => 64
     let v := Fp.toInt st.fmt m (ftz && st = .f32) dt.signed w (fbits st a)
     some (fit dt (BitVec.ofNat 64 v))
   | true, false, .f m =>
@@ -289,6 +313,8 @@ def paramRead32 (bytes : Nat → BitVec 8) (off : Nat) : BitVec 32 :=
   bytes (off + 3) ++ bytes (off + 2) ++ bytes (off + 1) ++ bytes off
 
 def paramRead (bytes : Nat → BitVec 8) (off : Nat) : Size → Val
+  | .b1 => (bytes off).setWidth 64
+  | .b2 => (bytes (off + 1) ++ bytes off).setWidth 64
   | .b4 => (paramRead32 bytes off).setWidth 64
   | .b8 => paramRead32 bytes (off + 4) ++ paramRead32 bytes off
 

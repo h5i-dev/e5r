@@ -7,6 +7,14 @@
 /// Scalar types of the subset.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ty {
+    /// `.u8`, admitted only for unsigned loads and stores.
+    U8,
+    /// `.u16`
+    U16,
+    /// `.s16`
+    S16,
+    /// `.b16`
+    B16,
     /// `.u32`
     U32,
     /// `.s32`
@@ -31,6 +39,10 @@ impl Ty {
     /// The PTX spelling without the dot.
     pub fn name(self) -> &'static str {
         match self {
+            Ty::U8 => "u8",
+            Ty::U16 => "u16",
+            Ty::S16 => "s16",
+            Ty::B16 => "b16",
             Ty::U32 => "u32",
             Ty::S32 => "s32",
             Ty::B32 => "b32",
@@ -46,6 +58,10 @@ impl Ty {
     /// Parse a spelling without the dot.
     pub fn from_name(s: &str) -> Option<Ty> {
         Some(match s {
+            "u8" => Ty::U8,
+            "u16" => Ty::U16,
+            "s16" => Ty::S16,
+            "b16" => Ty::B16,
             "u32" => Ty::U32,
             "s32" => Ty::S32,
             "b32" => Ty::B32,
@@ -62,6 +78,8 @@ impl Ty {
     /// Bit width, `None` for `.pred`.
     pub fn width(self) -> Option<u32> {
         match self {
+            Ty::U8 => Some(8),
+            Ty::U16 | Ty::S16 | Ty::B16 => Some(16),
             Ty::U32 | Ty::S32 | Ty::B32 | Ty::F32 => Some(32),
             Ty::U64 | Ty::S64 | Ty::B64 | Ty::F64 => Some(64),
             Ty::Pred => None,
@@ -70,7 +88,7 @@ impl Ty {
 
     /// `.bN` types: only `eq`/`ne` comparisons are defined on them.
     pub fn is_bits(self) -> bool {
-        matches!(self, Ty::B32 | Ty::B64)
+        matches!(self, Ty::B16 | Ty::B32 | Ty::B64)
     }
 
     /// `.f32` and `.f64`.
@@ -78,7 +96,7 @@ impl Ty {
         matches!(self, Ty::F32 | Ty::F64)
     }
 
-    /// `.uN` and `.sN`.
+    /// Integer types admitted for floating-point conversions (32/64 bits).
     pub fn is_int(self) -> bool {
         matches!(self, Ty::U32 | Ty::S32 | Ty::U64 | Ty::S64)
     }

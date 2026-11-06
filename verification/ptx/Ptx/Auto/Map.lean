@@ -317,8 +317,12 @@ inductive Role where
   deriving Repr, DecidableEq
 
 def Role.eval (A : Args) (i : Nat) : Role → Val
+  | .idx .w8 => BitVec.ofNat 64 (i % 2 ^ 8)
+  | .idx .w16 => BitVec.ofNat 64 (i % 2 ^ 16)
   | .idx .w64 => BitVec.ofNat 64 i
   | .idx .w32 => BitVec.ofNat 64 (i % 2 ^ 32)
+  | .stride .w8 => BitVec.ofNat 64 (A.G.toNat * A.B.toNat % 2 ^ 8)
+  | .stride .w16 => BitVec.ofNat 64 (A.G.toNat * A.B.toNat % 2 ^ 16)
   | .stride .w64 => BitVec.ofNat 64 (A.G.toNat * A.B.toNat)
   | .stride .w32 => BitVec.ofNat 64 (A.G.toNat * A.B.toNat % 2 ^ 32)
   | .len => ext32 A.n

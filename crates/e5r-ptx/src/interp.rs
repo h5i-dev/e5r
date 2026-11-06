@@ -271,31 +271,23 @@ impl TState {
 }
 
 fn at_width(w: u32, f: impl Fn(u64, u64) -> u64, a: u64, b: u64) -> u64 {
-    if w == 32 {
-        lo32(f(lo32(a), lo32(b)))
-    } else {
-        f(a, b)
-    }
+    let mask = if w == 64 { u64::MAX } else { (1u64 << w) - 1 };
+    f(a & mask, b & mask) & mask
 }
 
 fn fit(t: Ty, v: u64) -> u64 {
-    if width(t) == 32 { lo32(v) } else { v }
+    match width(t) {
+        8 => v & 0xff,
+        16 => v & 0xffff,
+        32 => lo32(v),
+        _ => v,
+    }
 }
 
 fn cmp(c: CmpOp, t: Ty, a: u64, b: u64) -> Option<bool> {
-    let (x, y, w) = if width(t) == 32 {
-        (lo32(a), lo32(b), 32)
-    } else {
-        (a, b, 64)
-    };
-    let s = |v: u64| {
-        if w == 32 {
-            v as u32 as i32 as i64
-        } else {
-            v as i64
-        }
-    };
-    let signed = matches!(t, Ty::S32 | Ty::S64);
+    let (x, y, w) = (fit(t, a), fit(t, b), width(t));
+    let s = |v: u64| ((v << (64 - w)) as i64) >> (64 - w);
+    let signed = matches!(t, Ty::S16 | Ty::S32 | Ty::S64);
     Some(match c {
         CmpOp::Eq => x == y,
         CmpOp::Ne => x != y,
@@ -312,22 +304,39 @@ fn cmp(c: CmpOp, t: Ty, a: u64, b: u64) -> Option<bool> {
 }
 
 fn convert(dt: Ty, st: Ty, a: u64) -> u64 {
-    match (width(st), width(dt)) {
-        (32, 32) | (64, 32) => lo32(a),
-        (64, 64) => a,
-        _ => {
-            if matches!(st, Ty::S32 | Ty::S64) {
-                sext32(a)
-            } else {
-                lo32(a)
-            }
-        }
-    }
+    let w = width(st);
+    let source = fit(st, a);
+    let extended = if matches!(st, Ty::S16 | Ty::S32 | Ty::S64) {
+        (((source << (64 - w)) as i64) >> (64 - w)) as u64
+    } else {
+        source
+    };
+    fit(dt, extended)
 }
 
 fn shift(w: u32, a: u64, b: u64, kind: u8) -> u64 {
     let n = lo32(b).min(w as u64) as u32;
-    if w == 32 {
+    if w < 32 {
+        let mask = (1u64 << w) - 1;
+        let x = a & mask;
+        match kind {
+            0 => {
+                if n >= w {
+                    0
+                } else {
+                    (x << n) & mask
+                }
+            }
+            1 => {
+                if n >= w {
+                    0
+                } else {
+                    x >> n
+                }
+            }
+            _ => ((((x << (64 - w)) as i64) >> (64 - w)) >> n.min(w - 1)) as u64 & mask,
+        }
+    } else if w == 32 {
         let x = lo32(a) as u32;
         lo32(match kind {
             0 => {
@@ -444,7 +453,7 @@ pub fn step(k: &Kernel, al: &Allocs, c: &Ctx, s: &mut TState, g: &mut Mem, sh: &
                 BinOp::Or => at_width(w, |x, y| x | y, a, bb),
                 BinOp::Xor => at_width(w, |x, y| x ^ y, a, bb),
                 BinOp::Shl => shift(w, a, bb, 0),
-                BinOp::Shr if matches!(t, Ty::S32 | Ty::S64) => shift(w, a, bb, 2),
+                BinOp::Shr if matches!(t, Ty::S16 | Ty::S32 | Ty::S64) => shift(w, a, bb, 2),
                 BinOp::Shr => shift(w, a, bb, 1),
                 BinOp::MulWide => match t {
                     Ty::U32 => lo32(a).wrapping_mul(lo32(bb)),

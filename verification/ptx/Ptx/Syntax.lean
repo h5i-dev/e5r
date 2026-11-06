@@ -17,20 +17,22 @@ open Ptx.Fp (RMode FCmp)
 /-- Scalar types of the subset. `pred` is only used by `.reg .pred`
 declarations; predicate registers live in their own file. -/
 inductive Ty where
-  | u32 | s32 | b32 | u64 | s64 | b64 | pred | f32 | f64
+  | u8 | u16 | s16 | b16 | u32 | s32 | b32 | u64 | s64 | b64 | pred | f32 | f64
   deriving Repr, DecidableEq, Inhabited
 
 /-- Operand width of a data type. -/
 inductive Width where
-  | w32 | w64
+  | w8 | w16 | w32 | w64
   deriving Repr, DecidableEq, Inhabited
 
 def Ty.width : Ty → Width
+  | .u8 => .w8
+  | .u16 | .s16 | .b16 => .w16
   | .u64 | .s64 | .b64 | .f64 => .w64
   | _ => .w32
 
 def Ty.signed : Ty → Bool
-  | .s32 | .s64 => true
+  | .s16 | .s32 | .s64 => true
   | _ => false
 
 inductive Dim where

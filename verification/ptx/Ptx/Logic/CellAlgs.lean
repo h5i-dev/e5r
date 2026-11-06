@@ -32,6 +32,7 @@ def alg32 (f : BitVec 32 → BitVec 32 → BitVec 32) (u : BitVec 32)
     (comm : ∀ x y, f x y = f y x) (assoc : ∀ x y z, f (f x y) z = f x (f y z))
     (unit : ∀ x, f x u = x) : CellAlg where
   sz := .b4
+  atomicSize := Or.inl rfl
   op x y := ext32 (f (lo32 x) (lo32 y))
   e := ext32 u
   comm x y := by rw [comm]
@@ -45,6 +46,7 @@ def alg64 (f : BitVec 64 → BitVec 64 → BitVec 64) (u : BitVec 64)
     (comm : ∀ x y, f x y = f y x) (assoc : ∀ x y z, f (f x y) z = f x (f y z))
     (unit : ∀ x, f x u = x) : CellAlg where
   sz := .b8
+  atomicSize := Or.inr rfl
   op := f
   e := u
   comm := comm
