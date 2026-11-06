@@ -1,0 +1,5 @@
+'Ptx.GlobalVar.Initialized.read32' depends on axioms: [propext, Quot.sound]
+'Ptx.Module.globalsReady_install' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.installGlobals_frame' depends on axioms: [propext]
+'Ptx.installGlobals_initialized' depends on axioms: [propext, Quot.sound]
+'Ptx.GlobalVar.Initialized.store_frame' depends on axioms: [propext]

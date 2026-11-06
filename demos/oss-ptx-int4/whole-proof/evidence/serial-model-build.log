@@ -1,0 +1,115 @@
+1 54 Ptx.Semantics.FloatCore
+Build completed successfully (2 jobs).
+2 54 Ptx.Semantics.Float
+Build completed successfully (3 jobs).
+3 54 Ptx.Syntax
+✔ [4/4] Built Ptx.Syntax (10s)
+Build completed successfully (4 jobs).
+4 54 Ptx.Semantics.Memory
+Build completed successfully (2 jobs).
+5 54 Ptx.Semantics.Instruction
+✔ [6/6] Built Ptx.Semantics.Instruction (4.5s)
+Build completed successfully (6 jobs).
+6 54 Ptx.Semantics.SIMT
+Build completed successfully (7 jobs).
+7 54 Ptx.Logic.Hoare
+✔ [8/8] Built Ptx.Logic.Hoare (2.1s)
+Build completed successfully (8 jobs).
+8 54 Ptx.Logic.RaceFreedom
+✔ [9/9] Built Ptx.Logic.RaceFreedom (3.1s)
+Build completed successfully (9 jobs).
+9 54 Ptx.Logic.Regions
+✔ [9/9] Built Ptx.Logic.Regions (2.0s)
+Build completed successfully (9 jobs).
+10 54 Ptx.Tactics.Attr
+Build completed successfully (2 jobs).
+11 54 Ptx.Tactics.Eval
+✔ [11/11] Built Ptx.Tactics.Eval (22s)
+Build completed successfully (11 jobs).
+12 54 Ptx.Logic.Launch1D
+✔ [11/11] Built Ptx.Logic.Launch1D (2.1s)
+Build completed successfully (11 jobs).
+13 54 Ptx.Kernels.VAddNvcc
+✔ [5/5] Built Ptx.Kernels.VAddNvcc (1.1s)
+Build completed successfully (5 jobs).
+14 54 Ptx.Examples.VectorAdd
+✔ [15/15] Built Ptx.Examples.VectorAdd (10s)
+Build completed successfully (15 jobs).
+15 54 Ptx.Kernels.Sum
+✔ [5/5] Built Ptx.Kernels.Sum (1.0s)
+Build completed successfully (5 jobs).
+16 54 Ptx.Examples.Sum
+✔ [6/11] Built Ptx.Semantics.SIMT (1.8s)
+✔ [8/15] Built Ptx.Logic.Hoare (2.1s)
+✔ [9/15] Built Ptx.Logic.Regions (2.1s)
+✔ [10/15] Built Ptx.Logic.RaceFreedom (3.0s)
+✔ [13/15] Built Ptx.Logic.Launch1D (1.9s)
+✔ [14/15] Built Ptx.Tactics.Eval (5.9s)
+✔ [15/15] Built Ptx.Examples.Sum (29s)
+Build completed successfully (15 jobs).
+17 54 Ptx.Kernels.Saxpy
+✔ [5/5] Built Ptx.Kernels.Saxpy (1.2s)
+Build completed successfully (5 jobs).
+18 54 Ptx.Examples.Map
+✔ [15/15] Built Ptx.Examples.Map (43s)
+Build completed successfully (15 jobs).
+19 54 Ptx.Logic.Refute
+✔ [10/10] Built Ptx.Logic.Refute (1.7s)
+Build completed successfully (10 jobs).
+20 54 Ptx.Kernels.VAddNoBound
+✔ [5/5] Built Ptx.Kernels.VAddNoBound (1.7s)
+Build completed successfully (5 jobs).
+21 54 Ptx.Kernels.VAddTid
+✔ [5/5] Built Ptx.Kernels.VAddTid (1.5s)
+Build completed successfully (5 jobs).
+22 54 Ptx.Kernels.VAddSub
+✔ [5/5] Built Ptx.Kernels.VAddSub (1.8s)
+Build completed successfully (5 jobs).
+23 54 Ptx.Examples.Buggy
+✔ [18/18] Built Ptx.Examples.Buggy (40s)
+Build completed successfully (18 jobs).
+24 54 Ptx.Auto.Map
+✔ [14/14] Built Ptx.Auto.Map (8.5s)
+Build completed successfully (14 jobs).
+25 54 Ptx.Auto.Tactic
+✔ [15/15] Built Ptx.Auto.Tactic (8.5s)
+Build completed successfully (15 jobs).
+26 54 Ptx.Logic.Phases
+✔ [9/9] Built Ptx.Logic.Phases (2.4s)
+Build completed successfully (9 jobs).
+27 54 Ptx.Logic.Narrow
+✔ [10/10] Built Ptx.Logic.Narrow (1.3s)
+Build completed successfully (10 jobs).
+28 54 Ptx.Logic.CellAlgs
+✔ [10/10] Built Ptx.Logic.CellAlgs (2.9s)
+Build completed successfully (10 jobs).
+29 54 Ptx.Logic.PhaseSound
+✔ [14/14] Built Ptx.Logic.PhaseSound (4.2s)
+Build completed successfully (14 jobs).
+30 54 Ptx.Logic.PhaseWp
+✔ [10/10] Built Ptx.Logic.PhaseWp (2.1s)
+Build completed successfully (10 jobs).
+31 54 Ptx.Logic.Cells
+✔ [10/10] Built Ptx.Logic.Cells (4.1s)
+Build completed successfully (10 jobs).
+32 54 Ptx.Tactics.EvalR
+✔ [15/15] Built Ptx.Tactics.EvalR (37s)
+Build completed successfully (15 jobs).
+33 54 Ptx.Auto.Tactic4
+✔ [21/21] Built Ptx.Auto.Tactic4 (3.1s)
+Build completed successfully (21 jobs).
+34 54 Ptx.Kernels.ReduceNvcc
+✔ [5/5] Built Ptx.Kernels.ReduceNvcc (541ms)
+Build completed successfully (5 jobs).
+35 54 Ptx.Examples.Reduce
+✔ [24/24] Built Ptx.Examples.Reduce (114s)
+Build completed successfully (24 jobs).
+36 54 Ptx.Kernels.ScanNvcc
+Traceback (most recent call last):
+  File "/mnt/scratch/e5r-oss-ptx/int4/whole-proof/build-serial.py", line 16, in <module>
+    try:r=p.wait(timeout=600)
+  File "/usr/lib64/python3.9/subprocess.py", line 1189, in wait
+    return self._wait(timeout=timeout)
+  File "/usr/lib64/python3.9/subprocess.py", line 1925, in _wait
+    raise TimeoutExpired(self.args, timeout)
+subprocess.TimeoutExpired: Command '['lake', 'build', '+Ptx.Kernels.ScanNvcc:olean']' timed out after 600 seconds

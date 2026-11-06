@@ -1,0 +1,19 @@
+{
+  "stage": "validated whole-proof prerequisites; FP4 whole theorem remains unaccepted",
+  "base": "14d8ee2",
+  "narrow_dependency": "0fde958a9c092629e458eb5d17f44995c0219dc9",
+  "global_image": "structured parser/exporter/interpreter; initialization/load/frame/existence/store-preservation lemmas",
+  "relational": "CTA shared-memory direct relational bridge with Total and actual completion; real existing reduction regression",
+  "nan_scope": "finite-scale result specified; arbitrary state/PC oracle irrelevant for proved arithmetic, full reachable invariant open",
+  "domain": "large public blocks arbitrary positive tails; small blocks full tiles; eager storage coverage required otherwise",
+  "current_admission": "original clz.b32; edited grouped reg declaration; all67 globals exact-byte checked",
+  "accepted_fp4_whole_kernel": false,
+  "accepted_regressions": [
+    "simpleMultiCopy",
+    "CatBoost ZeroSegments"
+  ],
+  "published_artifacts_unchanged": 183,
+  "gpu_activity_this_phase": false,
+  "exporter_sha256": "22b83c77df18a1ee161653d4984c33ec871dc34f7f06148cd15d7063a3c49b71",
+  "checker_sha256": "8ba62e271aff84dc33582f685b882b8a47474cd899897377862ed5b6cea278ab"
+}

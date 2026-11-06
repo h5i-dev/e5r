@@ -285,6 +285,13 @@ pub fn check(o: &Options) -> (Verdict, Value) {
             );
         }
     };
+    if module.kernels.iter().any(|k| module.uses_globals(k)) {
+        return finish(
+            doc,
+            Verdict::Unsupported,
+            Some("referenced globals require an initialized-module proof domain".into()),
+        );
+    }
     if module
         .kernels
         .iter()

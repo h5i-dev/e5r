@@ -198,10 +198,19 @@ pub fn module(m: &Module, ns: &str, header: &str) -> String {
     for k in &m.kernels {
         s.push_str(&kernel_def(k));
     }
+    let globals: Vec<String> = m
+        .globals
+        .iter()
+        .map(|g| {
+            let bytes: Vec<String> = g.bytes.iter().map(|b| b.to_string()).collect();
+            format!("⟨{}, {}, [{}]⟩", string(&g.name), g.align, bytes.join(", "))
+        })
+        .collect();
     let names: Vec<String> = m.kernels.iter().map(|k| format!("«{}»", k.name)).collect();
     writeln!(
         s,
-        "def module : Module where\n  version := {}\n  target := {}\n  addressSize := {}\n  kernels := [{}]\n\nend {ns}",
+        "def module : Module where\n  globals := [{}]\n  version := {}\n  target := {}\n  addressSize := {}\n  kernels := [{}]\n\nend {ns}",
+        globals.join(", "),
         string(&m.version),
         string(&m.target),
         m.address_size,

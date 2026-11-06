@@ -115,6 +115,13 @@ pub fn check(
     let Some(k1) = module.kernels.iter().find(|k| k.name == sp.kernel) else {
         return finish(doc, Verdict::Error, Some("candidate kernel missing".into()));
     };
+    if original.uses_globals(k0) || module.uses_globals(k1) {
+        return finish(
+            doc,
+            Verdict::Unsupported,
+            Some("referenced globals require an initialized-module equivalence domain".into()),
+        );
+    }
     if !k0.aggregate_params.is_empty() || !k1.aggregate_params.is_empty() {
         return finish(
             doc,

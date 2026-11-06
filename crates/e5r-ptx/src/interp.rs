@@ -935,3 +935,53 @@ pub fn run_grid(
     }
     (GridEnd::Done, events)
 }
+
+/// Install a validated module load image at explicit symbol addresses.
+/// Reject absent, unaligned, wrapping or overlapping definitions and any alias
+/// with caller-owned allocations before mutating a byte. Returned regions must
+/// be included in the interpreter's global allocations by the caller.
+pub fn initialize_globals(
+    module: &Module,
+    symbols: &HashMap<String, u64>,
+    existing: &[Region],
+    memory: &mut Mem,
+) -> Result<Vec<Region>, String> {
+    let mut regions = Vec::<Region>::new();
+    if existing.iter().any(|r| {
+        u128::from(r.base)
+            .checked_add(r.size)
+            .is_none_or(|end| end > 1u128 << 64)
+    }) {
+        return Err("wrapping caller allocation".into());
+    }
+    for g in &module.globals {
+        let base = *symbols
+            .get(&g.name)
+            .ok_or_else(|| format!("missing module symbol {}", g.name))?;
+        let end = u128::from(base) + g.bytes.len() as u128;
+        if g.align == 0
+            || !g.align.is_power_of_two()
+            || base % u64::from(g.align) != 0
+            || end > 1u128 << 64
+        {
+            return Err(format!("invalid placement of module global {}", g.name));
+        }
+        if existing
+            .iter()
+            .chain(&regions)
+            .any(|r| u128::from(base) < u128::from(r.base) + r.size && u128::from(r.base) < end)
+        {
+            return Err(format!("overlapping module global {}", g.name));
+        }
+        regions.push(Region {
+            base,
+            size: g.bytes.len() as u128,
+        });
+    }
+    for (g, r) in module.globals.iter().zip(&regions) {
+        for (i, byte) in g.bytes.iter().enumerate() {
+            memory.bytes.insert(r.base + i as u64, *byte);
+        }
+    }
+    Ok(regions)
+}

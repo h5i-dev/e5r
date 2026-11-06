@@ -20,6 +20,9 @@ fn unhex(s: &str) -> Vec<u8> {
 
 /// Run every case line of `text` and print one result line per case.
 pub fn run_cases(m: &Module, text: &str) -> Result<String, String> {
+    if m.kernels.iter().any(|k| m.uses_globals(k)) {
+        return Err("referenced globals require explicit module placement and initialization; the differential case format has no such domain".into());
+    }
     let mut out = String::new();
     for line in text.lines().filter(|l| !l.is_empty()) {
         let w: Vec<&str> = line.split(' ').collect();

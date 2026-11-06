@@ -47,6 +47,9 @@ structure Launch where
   params : String → Val
   byteParams : String → Nat → BitVec 8 := fun _ _ => 0
   alloc : List Region
+  /-- Module and shared symbols use one PTX namespace. Global placements may
+  be 64-bit; only the names declared in K.shared enter the shared window.
+  Module.GlobalsReady separately constrains initialized global storage. -/
   shared : String → Addr := fun _ => 0
   /-- The bits of every NaN a floating-point instruction produces, as a
   function of the thread and its state (PTX leaves them unspecified;

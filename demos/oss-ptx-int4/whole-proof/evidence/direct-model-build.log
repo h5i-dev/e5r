@@ -1,0 +1,77 @@
+1 55 Ptx.Semantics.FloatCore
+2 55 Ptx.Semantics.Float
+3 55 Ptx.Syntax
+4 55 Ptx.Semantics.Memory
+5 55 Ptx.Semantics.Instruction
+6 55 Ptx.Semantics.SIMT
+7 55 Ptx.Semantics.Globals
+'Ptx.GlobalVar.Initialized.read32' depends on axioms: [propext, Quot.sound]
+'Ptx.Module.globalsReady_install' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Ptx.installGlobals_frame' depends on axioms: [propext]
+'Ptx.installGlobals_initialized' depends on axioms: [propext, Quot.sound]
+'Ptx.GlobalVar.Initialized.store_frame' depends on axioms: [propext]
+8 55 Ptx.Logic.Hoare
+9 55 Ptx.Logic.RaceFreedom
+10 55 Ptx.Logic.Regions
+11 55 Ptx.Tactics.Attr
+12 55 Ptx.Tactics.Eval
+13 55 Ptx.Logic.Launch1D
+14 55 Ptx.Kernels.VAddNvcc
+15 55 Ptx.Examples.VectorAdd
+16 55 Ptx.Kernels.Sum
+17 55 Ptx.Examples.Sum
+18 55 Ptx.Kernels.Saxpy
+19 55 Ptx.Examples.Map
+20 55 Ptx.Logic.Refute
+21 55 Ptx.Kernels.VAddNoBound
+22 55 Ptx.Kernels.VAddTid
+23 55 Ptx.Kernels.VAddSub
+24 55 Ptx.Examples.Buggy
+25 55 Ptx.Auto.Map
+26 55 Ptx.Auto.Tactic
+27 55 Ptx.Logic.Phases
+28 55 Ptx.Logic.Narrow
+29 55 Ptx.Logic.CellAlgs
+30 55 Ptx.Logic.PhaseSound
+31 55 Ptx.Logic.PhaseWp
+32 55 Ptx.Logic.Cells
+33 55 Ptx.Tactics.EvalR
+34 55 Ptx.Auto.Tactic4
+35 55 Ptx.Kernels.ReduceNvcc
+36 55 Ptx.Examples.Reduce
+37 55 Ptx.Kernels.ScanNvcc
+38 55 Ptx.Examples.Scan
+/root/e5r-oss-ptx/verification/ptx/Ptx/Examples/Scan.lean:264:38: warning: Variable name `hi` is not explicitly referenced.
+
+Hint: The binding can be removed (if unused) or named `_` (if used implicitly). Alternatively, prefix the name with `_` to silence this warning:
+  [apply] _hi
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+/root/e5r-oss-ptx/verification/ptx/Ptx/Examples/Scan.lean:762:8: warning: `if_pos` has been deprecated: Use `ite_eq_left` instead
+
+Hint: Replace the deprecated name:
+  i̵f̵_̵p̵o̵s̵i̲t̲e̲_̲e̲q̲_̲l̲e̲f̲t̲
+39 55 Ptx.Logic.Sums
+40 55 Ptx.Kernels.ReduceAtomicNvcc
+41 55 Ptx.Examples.ReduceAtomic
+42 55 Ptx.Auto.Block
+43 55 Ptx.Auto.Reduce32
+44 55 Ptx.Auto.Scan32
+45 55 Ptx.Auto.Accum
+/root/e5r-oss-ptx/verification/ptx/Ptx/Auto/Accum.lean:157:52: warning: Variable name `hv` is not explicitly referenced.
+
+Hint: The binding can be removed (if unused) or named `_` (if used implicitly). Alternatively, prefix the name with `_` to silence this warning:
+  [apply] _hv
+
+Note: This linter can be disabled with `set_option linter.unusedVariables false`
+46 55 Ptx.Auto.FloatMap
+47 55 Ptx.Logic.Schedule
+48 55 Ptx.Auto.Packing
+49 55 Ptx.Logic.Relational
+50 55 Ptx.Auto.Equivalence
+51 55 Ptx.Auto.Stencil
+52 55 Ptx.Auto.StencilPair
+53 55 Ptx.Auto.OssInc
+54 55 Ptx
+55 55 Checker.ProofCheck
+all direct serial modules passed

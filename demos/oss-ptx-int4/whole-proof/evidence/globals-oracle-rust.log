@@ -1,0 +1,27 @@
+   Compiling e5r-ptx v0.1.0 (/root/e5r-oss-ptx/crates/e5r-ptx)
+    Finished `release` profile [optimized] target(s) in 36.71s
+     Running tests/globals.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/globals-0263d7dd352a85b1)
+
+running 4 tests
+test exact_table_bytes_and_zero_data_reach_the_exporter ... ok
+test malformed_definitions_and_symbol_aliases_fail_closed ... ok
+test unsafe_placements_reject_without_partial_initialization ... ok
+test module_load_image_roundtrip_has_an_external_assembler_oracle ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/metadata.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/metadata-0196808544e54892)
+
+running 9 tests
+test globals_reject_wrong_widths_relocations_duplicates_and_hidden_code ... ok
+test debug_extensions_and_unknown_pragmas_are_rejected ... ok
+test metadata_cannot_hide_or_split_core_instructions ... ok
+test frozen_normal_ptx_roundtrips_when_requested ... ok
+test metadata_retains_tokens_and_leaves_instructions_and_labels_unchanged ... ok
+test unused_scalar_globals_keep_all_tokens_and_initializers ... ok
+test quoted_paths_preserve_supported_escapes ... ok
+test metadata_roundtrip_assembles_with_ptxas_when_available ... ok
+test unused_globals_assemble_after_token_roundtrip ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+

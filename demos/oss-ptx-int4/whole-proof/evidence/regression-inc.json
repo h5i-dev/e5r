@@ -1,0 +1,74 @@
+{
+  "class": "equivalence-oss-inc",
+  "counterexample": null,
+  "input": {
+    "original_ptx": {
+      "path": "demos/oss-ptx-simple-multicopy/original.ptx",
+      "sha256": "5e1ec770041d17de34da744350311d3bbcfa6a17a49d3d061b9c969d9c3a8746"
+    },
+    "ptx": {
+      "path": "demos/oss-ptx-simple-multicopy/edited.ptx",
+      "sha256": "fcf5f87efb33363196b9578518bc9d63d7eb3054bf96ee58023a9bdb60b22a89"
+    },
+    "spec": {
+      "path": "demos/oss-ptx-simple-multicopy/equivalence.json",
+      "sha256": "7bc6eda04200f678cee3c5f88425d1597a48c622bfa1aa3715caff957f3e8a16"
+    }
+  },
+  "kernel": "_Z9incKernelPiS_ii",
+  "lean": {
+    "memory_cap_mb": 3072,
+    "proof_check_seconds": 17.82,
+    "proof_seconds": 14.94,
+    "timeout_seconds": 600,
+    "toolchain": "leanprover/lean4:v4.35.0"
+  },
+  "lean_spec": "def domain : OssInc.Spec := ⟨\"_Z9incKernelPiS_ii_param_1\", \"_Z9incKernelPiS_ii_param_0\", \"_Z9incKernelPiS_ii_param_2\", \"_Z9incKernelPiS_ii_param_3\"⟩\n",
+  "proof": {
+    "accepted": true,
+    "check": {
+      "axioms": [
+        "propext",
+        "Quot.sound",
+        "Classical.choice"
+      ],
+      "declarations": 69,
+      "ok": true
+    },
+    "manifest": {
+      "ptx": "fcf5f87efb33363196b9578518bc9d63d7eb3054bf96ee58023a9bdb60b22a89",
+      "spec": "7bc6eda04200f678cee3c5f88425d1597a48c622bfa1aa3715caff957f3e8a16",
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "path": "demos/oss-ptx-simple-multicopy/equivalence.lean",
+    "sha256": "6bba01a68b1bdc7d04693fcbde79e34c4e73412712fd3bd605bb7152f53b8653",
+    "supplied": true
+  },
+  "properties": {
+    "direct_observable_equivalence": "proved",
+    "functional_correctness": "not_claimed",
+    "memory_safety": "proved",
+    "race_freedom": "proved",
+    "termination": "proved"
+  },
+  "reasons": [],
+  "schema": "e5r.ptx.result.v1",
+  "seconds": 201.0,
+  "theorem": {
+    "axioms": [
+      "propext",
+      "Quot.sound",
+      "Classical.choice"
+    ],
+    "checked_by": "proofcheck: kernel replay of every declaration of the proof",
+    "definition": "Ptx.Auto.OssInc.Spec.Equivalent",
+    "generated": false,
+    "name": "E5rProof.correct",
+    "statement": "OssInc.Spec.Equivalent domain Original.«_Z9incKernelPiS_ii» Optimized.«_Z9incKernelPiS_ii»"
+  },
+  "tool": {
+    "name": "e5r",
+    "version": "0.1.0"
+  },
+  "verdict": "proved"
+}

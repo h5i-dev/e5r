@@ -191,8 +191,17 @@ structure Kernel where
   labels : List (String × Nat)
   deriving Repr, Inhabited
 
+/-- A module global's exact load image. Symbol placement is supplied by the
+launch; initialization and disjoint allocation are explicit preconditions. -/
+structure GlobalVar where
+  name : String
+  align : Nat
+  bytes : List (BitVec 8)
+  deriving Repr, DecidableEq, Inhabited
+
 /-- Module header (`.version`, `.target`, `.address_size`) and its kernels. -/
 structure Module where
+  globals : List GlobalVar := []
   version : String
   target : String
   addressSize : Nat

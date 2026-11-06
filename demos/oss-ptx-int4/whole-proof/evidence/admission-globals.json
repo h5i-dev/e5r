@@ -1,0 +1,25 @@
+{
+  "stage": "precise admission status, not whole-kernel acceptance",
+  "rows": [
+    {
+      "variant": "original",
+      "full_sha256": "30a95604710e82a0052ca435185983520ade5cdf8de89f5daa2d7d4d5ae5d3f7",
+      "entry_sha256": "ea210ee92fb2c104abbc9256b5ac3b11c18a643c7e96b4624821e86d29a8ee29",
+      "global_declarations": 67,
+      "byte_correspondence": "entire body and all original module globals; existing frozen extraction hash unchanged",
+      "exporter_sha256": "5f78dd43408a814eb448debad151c33d4335457a4bd5d7ad33efc2dd05b64642",
+      "export_returncode": 1,
+      "error": "e5r: /mnt/scratch/e5r-oss-ptx/int4/whole-proof/entries/original.ptx: line 109: unsupported instruction clz.b32"
+    },
+    {
+      "variant": "edited",
+      "full_sha256": "dbd277b5fabaee8f8f0b3fa354f3e00b67db343905ee3b85184cc3291dda9210",
+      "entry_sha256": "bea226c117624d7c2f33b0a2b0ae6becbface97717fe71cdd4d5175fd87e75ef",
+      "global_declarations": 67,
+      "byte_correspondence": "entire body and all original module globals; existing frozen extraction hash unchanged",
+      "exporter_sha256": "5f78dd43408a814eb448debad151c33d4335457a4bd5d7ad33efc2dd05b64642",
+      "export_returncode": 1,
+      "error": "e5r: /mnt/scratch/e5r-oss-ptx/int4/whole-proof/entries/edited.ptx: line 80: one register declaration per .reg"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+'FP4Sign.finite_mul_some' depends on axioms: [propext, Classical.choice, Quot.sound]
+'FP4Sign.scale_oracle_independent' depends on axioms: [propext, Classical.choice, Quot.sound]

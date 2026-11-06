@@ -446,3 +446,40 @@ fn zero_segments_equivalence_requires_arbitrary_distinct_typed_scalar() {
     bad["assume_equal"] = true.into();
     assert_eq!(run("unknown-field", &bad).0, 4);
 }
+
+#[test]
+fn global_symbols_cannot_escape_the_module_initialization_domain() {
+    let source = ".version 9.2\n.target sm_86\n.address_size 64\n.global .align 4 .u32 table=1;\n.visible .entry k(){\n.reg .b64 %rd;\nmov.u64 %rd, table;\nret;\n}\n";
+    let ptx = tmp("global-domain.ptx", source);
+    let spec = tmp(
+        "global-domain.json",
+        r#"{"schema":"e5r.ptx.spec.v1","class":"map32","kernel":"k"}"#,
+    );
+    let (_, doc) = check(&ptx, &spec, &[]);
+    assert_eq!(doc["verdict"], "unsupported");
+    assert!(doc["reasons"].to_string().contains("initialized-module"));
+    let exported = Command::new(bin())
+        .args(["ptx", "export"])
+        .arg(&ptx)
+        .output()
+        .unwrap();
+    assert!(exported.status.success());
+    assert!(
+        String::from_utf8(exported.stdout)
+            .unwrap()
+            .contains("globals := [⟨\"table\", 4, [1, 0, 0, 0]⟩]")
+    );
+    let cases = tmp("global-cases.txt", "");
+    let run = Command::new(bin())
+        .args(["ptx", "run", "--cases"])
+        .arg(cases)
+        .arg(ptx)
+        .output()
+        .unwrap();
+    assert!(!run.status.success());
+    assert!(
+        String::from_utf8(run.stderr)
+            .unwrap()
+            .contains("module placement")
+    );
+}

@@ -1,0 +1,9 @@
+   Compiling e5r-verify v0.1.0 (/root/e5r-oss-ptx/crates/e5r-verify)
+    Finished `release` profile [optimized] target(s) in 42.01s
+     Running unittests src/lib.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/e5r_verify-754ace582be25e54)
+
+running 1 test
+test ptx::timeout_tests::timeout_stops_descendants_holding_output_pipes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.52s
+

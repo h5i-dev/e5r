@@ -1,0 +1,10 @@
+   Compiling e5r-ptx v0.1.0 (/root/e5r-oss-ptx/crates/e5r-ptx)
+   Compiling e5r-verify v0.1.0 (/root/e5r-oss-ptx/crates/e5r-verify)
+    Finished `release` profile [optimized] target(s) in 49.05s
+     Running tests/ptx_cli.rs (/mnt/scratch/e5r-oss-ptx/cargo/release/deps/ptx_cli-3f31ecdb7ef909a0)
+
+running 1 test
+test global_symbols_cannot_escape_the_module_initialization_domain ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.01s
+

@@ -146,12 +146,11 @@ fn unused_scalar_globals_keep_all_tokens_and_initializers() {
 }
 
 #[test]
-fn globals_reject_references_relocations_duplicates_and_hidden_code() {
+fn globals_reject_wrong_widths_relocations_duplicates_and_hidden_code() {
     for declaration in [
         ".global .align 4 .u32 g = other;",
         ".global .align 4 .u32 g = 1; ret;",
         ".global .align 4 .u32 g;\n.global .align 4 .u32 g;",
-        ".global .align 4 .u32 g[4];",
         ".global .align 3 .u32 g;",
         ".global .align 2 .u32 g;",
         ".global .align 4 .u32 g = 4294967296;",
@@ -173,14 +172,10 @@ fn globals_reject_references_relocations_duplicates_and_hidden_code() {
         let src = with_globals(".global .align 4 .u32 g;").replace("mov.u32 %r1, 1;", instruction);
         assert!(roundtrip(&src).is_err(), "accepted {instruction}");
     }
-    // Symbol occurrence is refused irrespective of whether a particular opcode
-    // is supported or whether the symbol occurs before its declaration.
+    // A 64-bit module symbol cannot be narrowed to a 32-bit address,
+    // including forward references to declarations after an entry.
     let src = CORE.replace("mov.u32 %r1, 1;", "mov.u32 %r1, g;") + ".global .align 4 .u32 g;\n";
-    assert!(
-        roundtrip(&src)
-            .unwrap_err()
-            .contains("referenced module global")
-    );
+    assert!(roundtrip(&src).unwrap_err().contains("addressable symbol"));
 }
 
 #[test]

@@ -556,12 +556,26 @@ pub struct Kernel {
     pub labels: Vec<(String, usize)>,
 }
 
+/// One statically sized global definition with its exact load-time bytes.
+/// Relocations, extern storage and partial initializer lists are not admitted.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GlobalDecl {
+    /// Module-scoped symbol.
+    pub name: String,
+    /// Declared byte alignment.
+    pub align: u32,
+    /// Little-endian initializer bytes, including implicit zero initialization.
+    pub bytes: Vec<u8>,
+}
+
 /// A module: header directives and its kernels.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Module {
-    /// Validated non-executable directives and unreferenced scalar globals,
+    /// Global load image; symbol placement and allocation are launch preconditions.
+    pub globals: Vec<GlobalDecl>,
+    /// Validated non-executable directives and global declaration spellings,
     /// indexed by preceding core-token count. Global tokens/initializers are
-    /// preserved; resolving referenced global symbols is unsupported.
+    /// preserved separately from the structured load image.
     pub metadata: Vec<(usize, String)>,
     /// `.version`, as written.
     pub version: String,
@@ -571,4 +585,18 @@ pub struct Module {
     pub address_size: u32,
     /// The kernels, in order.
     pub kernels: Vec<Kernel>,
+}
+
+impl Module {
+    /// Whether a kernel materializes a declared module-global address. In the
+    /// admitted grammar, symbol operands occur only in mov; named global
+    /// memory operands and relocation expressions remain outside the subset.
+    /// Legacy proof domains must refuse these kernels until they bind a module
+    /// placement/initializer contract, rather than default symbols to zero.
+    pub fn uses_globals(&self, kernel: &Kernel) -> bool {
+        kernel.body.iter().any(|s| {
+            matches!(&s.instr, Instr::Mov(_, _, Operand::Sym(name))
+                if self.globals.iter().any(|g| g.name == *name))
+        })
+    }
 }

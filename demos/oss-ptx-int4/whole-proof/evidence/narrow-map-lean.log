@@ -1,0 +1,5 @@
+verification/ptx/Ptx/Auto/Map.lean:320:2: error: Missing cases:
+(idx Width.w8)
+(idx Width.w16)
+(stride Width.w8)
+(stride Width.w16)
