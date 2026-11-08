@@ -1,0 +1,81 @@
+import Projects.thermostat.I16LeadingZero
+import Projects.thermostat.I16LeadingPresent
+import Projects.thermostat.I16LeadingPrepare
+import Projects.thermostat.I16DigitStore
+import Projects.thermostat.I16PadReady
+import Projects.thermostat.BytesCons
+import Projects.thermostat.ViewFrame
+set_option maxRecDepth 3000
+set_option maxHeartbeats 2000000
+namespace E5R.Thermostat.I16AfterPair
+open E5R E5R.Thermostat
+
+theorem contract (B : Board) (c : Core) (ram : Word → BitVec 8) (sp fmt : Word) (v : BitVec 16) (n : Nat)
+    (hv : v.toInt.natAbs = n) (hn : 10 ≤ n) (hb : n < 1000)
+    (hp : c.pc = 0x80004f3c#32) (hs : c.get 2 = sp) (h10 : c.get 10 = SignedMagnitude.input v)
+    (h12 : c.get 12 = BitVec.ofNat 32 (n/100)) (h13 : c.get 13 = fmt) (h14 : c.get 14 = 3#32)
+    (hst : Memory.Block B sp 16)
+    (hpair : Bytes.Span B ram (sp+6#32) [DecimalDigits.digit ((n%100)/10),DecimalDigits.digit ((n%100)%10)])
+    (hunit : ReadBytes.Byte B img ram ((0x80005e10#32+BitVec.ofNat 32 (2*(n/100)))+1#32) (DecimalDigits.digit (n/100))) :
+    ∃ d k r, k ≤ 27 ∧ DetSteps B img k ⟨c,ram⟩ ⟨d,r⟩ ∧
+      I16Ready.Ready c d sp fmt v (if n < 100 then 6 else 5) (if n < 100 then 2 else 3) ∧
+      ReadBytes.Span B img r (sp+BitVec.ofNat 32 (if n < 100 then 6 else 5)) (ReplyJson.decimal n) ∧
+      ViewFrame.Region ram r (sp+8#32) 8 ∧
+      (∀ x, (∀ i : Fin 16, x ≠ sp+BitVec.ofNat 32 i.val) → r x = ram x) := by
+  have hvn : v.toInt.natAbs ≠ 0 := by omega
+  by_cases ht : n < 100
+  · have hq : n/100 = 0 := by omega
+    obtain ⟨a,ta,apc,a11,a12,a15,ar,ac⟩ := I16LeadingZero.contract B c ram v hvn h10 (by simpa only [hq] using h12) hp
+    have asp : a.get 2 = sp := (ar 2 (by decide) (by decide) (by decide)).trans hs
+    have a10 : a.get 10 = SignedMagnitude.input v := (ar 10 (by decide) (by decide) (by decide)).trans h10
+    have a13 : a.get 13 = fmt := (ar 13 (by decide) (by decide) (by decide)).trans h13
+    have a14 : a.get 14 = 3#32 := (ar 14 (by decide) (by decide) (by decide)).trans h14
+    have af : I16Protected.Frame c a := by
+      intro reg hr
+      exact ar reg (I16Protected.ne reg 11 hr (by decide) (by decide))
+        (I16Protected.ne reg 12 hr (by decide) (by decide)) (I16Protected.ne reg 15 hr (by decide) (by decide))
+    obtain ⟨d,td,hd⟩ := I16PadReady.contract B c a ram sp fmt v 3 (by decide) asp a10 a13 a14 apc ac af
+    refine ⟨d,17,ram,by decide,ta.trans td,?_,?_,fun _ => rfl,fun _ _ => rfl⟩
+    · simpa only [ite_eq_left ht] using hd
+    · rw [ite_eq_left ht,DecimalDigits.pair_two n hn ht]
+      exact ReadBytes.of_ram hpair
+  · have hq : 0 < n/100 := by omega
+    have hqb : n/100 < 10 := by omega
+    obtain ⟨a,ta,apc,a11,a12,a15,ar,ac⟩ := I16LeadingPresent.contract B c ram v (n/100) hq hqb hvn h10 h12 hp
+    have asp : a.get 2 = sp := (ar 2 (by decide) (by decide) (by decide)).trans hs
+    have a14 : a.get 14 = 3#32 := (ar 14 (by decide) (by decide) (by decide)).trans h14
+    obtain ⟨b,tb,bpc,b11,b12,b14,br,bc⟩ := I16LeadingPrepare.contract B a ram sp (n/100) 3 hqb (by decide) (by decide) asp a11 a14 hunit apc
+    have bsp : b.get 2 = sp := (br 2 (by decide) (by decide) (by decide)).trans asp
+    let rr := ramPut ram (sp+5#32) (DecimalDigits.digit (n/100))
+    let z := b.goto 0x80004f6a#32
+    have tz : DetStep B img ⟨b,ram⟩ ⟨z,rr⟩ :=
+      I16DigitStore.contract B b ram sp (n/100) 3 bpc b11 b12 hqb (by decide) (by decide) hst
+    have z10 : z.get 10 = SignedMagnitude.input v := (br 10 (by decide) (by decide) (by decide)).trans
+      ((ar 10 (by decide) (by decide) (by decide)).trans h10)
+    have z13 : z.get 13 = fmt := (br 13 (by decide) (by decide) (by decide)).trans
+      ((ar 13 (by decide) (by decide) (by decide)).trans h13)
+    have zf : I16Protected.Frame c z := by
+      intro reg hr
+      have ne (q : Reg) (hq : q.val < 18) (h9 : q ≠ 9) := I16Protected.ne reg q hr hq h9
+      exact (br reg (ne 11 (by decide) (by decide)) (ne 12 (by decide) (by decide)) (ne 14 (by decide) (by decide))).trans
+        (ar reg (ne 11 (by decide) (by decide)) (ne 12 (by decide) (by decide)) (ne 15 (by decide) (by decide)))
+    obtain ⟨d,td,hd⟩ := I16PadReady.contract B c z rr sp fmt v 2 (by decide) bsp z10 z13 b14 rfl (bc.trans ac) zf
+    have hpairs : Bytes.Span B rr (sp+6#32) [DecimalDigits.digit ((n%100)/10),DecimalDigits.digit ((n%100)%10)] := by
+      apply ViewFrame.span hpair
+      intro i
+      apply ramPut_ne
+      simpa only [BitVec.add_assoc,←BitVec.ofNat_add] using Bytes.offset_ne sp (6+i.val) 5
+        (by have := i.isLt;change i.val < 2 at this;omega) (by decide) (by omega)
+    have hbytes : Bytes.Span B rr (sp+5#32) (ReplyJson.decimal n) := by
+      rw [DecimalDigits.pair_three n (by omega) hb]
+      exact Bytes.cons_of_block hst (by decide) (by change 5+1+2 ≤ 16;decide) (ramPut_eq _ _ _) hpairs
+    refine ⟨d,27,rr,by decide,((ta.trans tb).trans (.single tz)).trans td,?_,?_,?_,?_⟩
+    · simpa only [ite_eq_right ht] using hd
+    · rw [ite_eq_right ht];exact ReadBytes.of_ram hbytes
+    · intro i
+      apply ramPut_ne
+      simpa only [BitVec.add_assoc,←BitVec.ofNat_add] using Bytes.offset_ne sp (8+i.val) 5
+        (by have := i.isLt;omega) (by decide) (by omega)
+    · intro x hx
+      exact ramPut_ne _ (hx ⟨5,by decide⟩)
+end E5R.Thermostat.I16AfterPair

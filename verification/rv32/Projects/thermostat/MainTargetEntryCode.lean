@@ -1,0 +1,26 @@
+-- Actual served counter and target slice guards from the pinned ELF.
+import Projects.thermostat.PackedFetch
+namespace E5R.Thermostat
+open E5R
+theorem re2147486544 : fetchDecode img 2147486544#32 = some (E5R.Instr.op (E5R.AluOp.add) 31 0 18, 2#32) := by exact PackedFetch.fetchDecode_of 2147486544#32 (by decide) (by decide) (bits := 0x00008fca#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486546 : fetchDecode img 2147486546#32 = some (E5R.Instr.load (E5R.Width.w) true 18 8 0x00000058#32, 4#32) := by exact PackedFetch.fetchDecode_of 2147486546#32 (by decide) (by decide) (bits := 0x05842903#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486550 : fetchDecode img 2147486550#32 = some (E5R.Instr.load (E5R.Width.w) true 12 8 0x0000003c#32, 2#32) := by exact PackedFetch.fetchDecode_of 2147486550#32 (by decide) (by decide) (bits := 0x00005c50#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486552 : fetchDecode img 2147486552#32 = some (E5R.Instr.opimm (E5R.AluOp.add) 18 18 0x00000001#32, 2#32) := by exact PackedFetch.fetchDecode_of 2147486552#32 (by decide) (by decide) (bits := 0x00000905#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486554 : fetchDecode img 2147486554#32 = some (E5R.Instr.store (E5R.Width.w) 8 18 0x00000058#32, 4#32) := by exact PackedFetch.fetchDecode_of 2147486554#32 (by decide) (by decide) (bits := 0x05242c23#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486558 : fetchDecode img 2147486558#32 = some (E5R.Instr.store (E5R.Width.w) 8 24 0x0000005c#32, 4#32) := by exact PackedFetch.fetchDecode_of 2147486558#32 (by decide) (by decide) (bits := 0x05842e23#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486562 : fetchDecode img 2147486562#32 = some (E5R.Instr.opimm (E5R.AluOp.add) 15 0 0x0000003f#32, 4#32) := by exact PackedFetch.fetchDecode_of 2147486562#32 (by decide) (by decide) (bits := 0x03f00793#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486566 : fetchDecode img 2147486566#32 = some (E5R.Instr.branch (E5R.BrCond.geu) 12 24 0x00000008#32, 4#32) := by exact PackedFetch.fetchDecode_of 2147486566#32 (by decide) (by decide) (bits := 0x01867463#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486570 : fetchDecode img 2147486570#32 = some (E5R.Instr.jal 0 0x000010f8#32, 4#32) := by exact PackedFetch.fetchDecode_of 2147486570#32 (by decide) (by decide) (bits := 0x0f80106f#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486574 : fetchDecode img 2147486574#32 = some (E5R.Instr.load (E5R.Width.w) true 29 2 0x00000024#32, 2#32) := by exact PackedFetch.fetchDecode_of 2147486574#32 (by decide) (by decide) (bits := 0x00005e92#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486576 : fetchDecode img 2147486576#32 = some (E5R.Instr.load (E5R.Width.w) true 30 2 0x00000020#32, 2#32) := by exact PackedFetch.fetchDecode_of 2147486576#32 (by decide) (by decide) (bits := 0x00005f02#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486578 : fetchDecode img 2147486578#32 = some (E5R.Instr.branch (E5R.BrCond.geu) 30 29 0x00000008#32, 4#32) := by exact PackedFetch.fetchDecode_of 2147486578#32 (by decide) (by decide) (bits := 0x01df7463#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486582 : fetchDecode img 2147486582#32 = some (E5R.Instr.jal 0 0x00001100#32, 4#32) := by exact PackedFetch.fetchDecode_of 2147486582#32 (by decide) (by decide) (bits := 0x1000106f#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486586 : fetchDecode img 2147486586#32 = some (E5R.Instr.branch (E5R.BrCond.geu) 24 30 0x00000008#32, 4#32) := by exact PackedFetch.fetchDecode_of 2147486586#32 (by decide) (by decide) (bits := 0x01ec7463#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486590 : fetchDecode img 2147486590#32 = some (E5R.Instr.jal 0 0x000010f8#32, 4#32) := by exact PackedFetch.fetchDecode_of 2147486590#32 (by decide) (by decide) (bits := 0x0f80106f#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486594 : fetchDecode img 2147486594#32 = some (E5R.Instr.opimm (E5R.AluOp.add) 5 0 0x00000006#32, 2#32) := by exact PackedFetch.fetchDecode_of 2147486594#32 (by decide) (by decide) (bits := 0x00004299#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486596 : fetchDecode img 2147486596#32 = some (E5R.Instr.opimm (E5R.AluOp.add) 17 0 0x00000005#32, 2#32) := by exact PackedFetch.fetchDecode_of 2147486596#32 (by decide) (by decide) (bits := 0x00004895#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486598 : fetchDecode img 2147486598#32 = some (E5R.Instr.load (E5R.Width.w) true 21 8 0x00000038#32, 4#32) := by exact PackedFetch.fetchDecode_of 2147486598#32 (by decide) (by decide) (bits := 0x03842a83#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486602 : fetchDecode img 2147486602#32 = some (E5R.Instr.op (E5R.AluOp.add) 10 21 29, 4#32) := by exact PackedFetch.fetchDecode_of 2147486602#32 (by decide) (by decide) (bits := 0x01da8533#32) (by decide +kernel) (by decide +kernel)
+theorem re2147486606 : fetchDecode img 2147486606#32 = some (E5R.Instr.branch (E5R.BrCond.ne) 30 29 0x00000042#32, 4#32) := by exact PackedFetch.fetchDecode_of 2147486606#32 (by decide) (by decide) (bits := 0x05df1163#32) (by decide +kernel) (by decide +kernel)
+
+end E5R.Thermostat

@@ -1,0 +1,18 @@
+[package]
+name = "thermostat-rv32"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+thermostat-app = { path = "../../../../../h5i/examples/embedded/thermostat/app" }
+h5i-app-embedded = { path = "../../../../../h5i/crates/h5i-app-embedded" }
+embedded-io-async = "0.7"
+critical-section = "1.2"
+
+[profile.release]
+opt-level = 2
+panic = "abort"
+codegen-units = 1

@@ -376,7 +376,8 @@ pub fn escapes(code: &str) -> Vec<&'static str> {
 /// the line that could not be understood.
 pub fn parse_axioms(out: &str) -> Result<BTreeMap<String, Vec<String>>, String> {
     let mut map = BTreeMap::new();
-    for line in out.lines().filter(|l| !l.trim().is_empty()) {
+    let mut lines = out.lines().filter(|l| !l.trim().is_empty());
+    while let Some(line) = lines.next() {
         // Split at the whole marker, not at the first quote: Lean names may
         // end in apostrophes (`recv_step'`).
         if let Some(rest) = line.strip_prefix('\'') {
@@ -384,14 +385,31 @@ pub fn parse_axioms(out: &str) -> Result<BTreeMap<String, Vec<String>>, String> 
                 map.insert(name.to_string(), vec![]);
                 continue;
             }
-            if let Some((name, list)) = rest
-                .split_once("' depends on axioms: [")
-                .and_then(|(n, t)| Some((n, t.strip_suffix(']')?)))
-            {
-                map.insert(
-                    name.to_string(),
-                    list.split(", ").map(str::to_string).collect(),
-                );
+            if let Some((name, first)) = rest.split_once("' depends on axioms: [") {
+                // Lean's pretty-printer wraps the list for long theorem names.
+                // Retain token boundaries and reject all non-report output.
+                let mut list = first.to_string();
+                while !list.ends_with(']') {
+                    let continuation = lines
+                        .next()
+                        .ok_or_else(|| format!("incomplete Lean axiom report: {line}"))?;
+                    list.push(' ');
+                    list.push_str(continuation.trim());
+                }
+                let used: Vec<String> = list[..list.len() - 1]
+                    .split(',')
+                    .map(str::trim)
+                    .map(str::to_string)
+                    .collect();
+                if used.iter().any(|a| {
+                    a.is_empty()
+                        || !a
+                            .chars()
+                            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '\''))
+                }) {
+                    return Err(format!("unexpected Lean axiom list: {list}"));
+                }
+                map.insert(name.to_string(), used);
                 continue;
             }
         }
@@ -1087,6 +1105,33 @@ mod tests {
         let m = parse_axioms(primes).unwrap();
         assert_eq!(m["A.f'"], ["propext"]);
         assert!(m["A.g''"].is_empty());
+    }
+
+    #[test]
+    fn wrapped_axiom_reports_preserve_the_policy() {
+        let wrapped = "'E5R.Thermostat.MainWriteRangeTransactionsWitness.tx_capacity' depends on axioms: [propext,\n  Classical.choice,\n  Quot.sound]\n'C' does not depend on any axioms\n";
+        let m = parse_axioms(wrapped).unwrap();
+        let used = &m["E5R.Thermostat.MainWriteRangeTransactionsWitness.tx_capacity"];
+        assert_eq!(used, &["propext", "Classical.choice", "Quot.sound"]);
+        assert!(used.iter().all(|a| ALLOWED_AXIOMS.contains(&a.as_str())));
+        assert!(m["C"].is_empty());
+
+        let untrusted = parse_axioms("'A' depends on axioms: [propext,\n  sorryAx]").unwrap();
+        assert!(
+            untrusted["A"]
+                .iter()
+                .any(|a| !ALLOWED_AXIOMS.contains(&a.as_str()))
+        );
+        for malformed in [
+            "'A' depends on axioms: [propext,",
+            "'A' depends on axioms: [propext,\nwarning: ignored]",
+            "'A' depends on axioms: [propext,\n'B' does not depend on any axioms",
+            "'A' depends on axioms: [propext,\n  Classical.\n  choice]",
+            "'A' depends on axioms: [propext,\n  ]",
+            "'A' depends on axioms: [propext,\n  Quot.sound] trailing output",
+        ] {
+            assert!(parse_axioms(malformed).is_err(), "accepted {malformed}");
+        }
     }
 
     #[test]

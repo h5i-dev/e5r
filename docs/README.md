@@ -12,6 +12,8 @@
 - [ram-image-export.md](verification/ram-image-export.md): exporting a RAM-resident ELF image to Lean
 - [rv32-research.md](verification/rv32-research.md): the RV32I research proofs the firmware work grew from
 
+- [thermostat.md](verification/thermostat.md): h5i kernel and engine-body ELF proofs, UART HTTP on the same QEMU ELF, remaining scope
+
 ## Toolkit (`e5rx`, development infrastructure)
 
 - [MANUAL.md](toolkit/MANUAL.md): command reference

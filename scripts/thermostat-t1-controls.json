@@ -1,0 +1,1796 @@
+[
+  [
+    "serve-next-serve-bank-register-increment",
+    "MainGprBank.lean",
+    "d.get r=c.get r",
+    "d.get r=c.get r+1#32"
+  ],
+  [
+    "serve-next-serve-boot-three-constant",
+    "MainBootConstants.lean",
+    ".core.get 26=3#32",
+    ".core.get 26=4#32"
+  ],
+  [
+    "serve-next-serve-init-two-bank",
+    "MainInitBank.lean",
+    "∧ d.get 18=2#32",
+    "∧ d.get 18=3#32"
+  ],
+  [
+    "serve-next-serve-layout-rx-capacity",
+    "MainServeLayout.lean",
+    "(fp+60#32) .w=2048#32",
+    "(fp+60#32) .w=2047#32"
+  ],
+  [
+    "serve-next-serve-count-word-protection",
+    "MainServeMemoryFrames.lean",
+    "(lo : 92≤flag)",
+    "(lo : 88≤flag)"
+  ],
+  [
+    "serve-next-serve-first-counter",
+    "MainHeaderFirstBank.lean",
+    "∧ MainServeLayout.At r 0 := by",
+    "∧ MainServeLayout.At r 1 := by"
+  ],
+  [
+    "serve-next-serve-header-flag-counter-alias",
+    "MainHeaderAppendServe.lean",
+    "(flag := 464)",
+    "(flag := 88)"
+  ],
+  [
+    "serve-next-serve-header-loop-counter-assumption",
+    "MainHeaderLoopRegs.lean",
+    "∧ MainServeLayout.Frame ram after",
+    "∧ MainServeLayout.At after 1"
+  ],
+  [
+    "serve-next-serve-header-stream-counter-assumption",
+    "MainHeaderStreamRegs.lean",
+    "∧ MainServeLayout.Frame ram after",
+    "∧ MainServeLayout.At after 1"
+  ],
+  [
+    "serve-next-serve-header-reset-counter",
+    "MainHeaderResetBank.lean",
+    "∧ MainServeLayout.At after 0 := by",
+    "∧ MainServeLayout.At after 1 := by"
+  ],
+  [
+    "serve-next-serve-header-copy-cost",
+    "MainHeaderToBodyRegs.lean",
+    "n≤417",
+    "n≤416"
+  ],
+  [
+    "serve-next-serve-header-body-reset-counter",
+    "MainHeaderResetBodyBank.lean",
+    "∧ MainServeLayout.At after 0 := by",
+    "∧ MainServeLayout.At after 1 := by"
+  ],
+  [
+    "serve-next-serve-length-prepare-cost",
+    "MainLengthPrepareRegs.lean",
+    "Quiet.Steps B img 11",
+    "Quiet.Steps B img 10"
+  ],
+  [
+    "serve-next-serve-length-enter-cost",
+    "MainLengthEnterRegs.lean",
+    "n≤17",
+    "n≤16"
+  ],
+  [
+    "serve-next-serve-length-loop-cost",
+    "MainLengthLoopRegs.lean",
+    "n≤25+4*pending.length",
+    "n≤24+4*pending.length"
+  ],
+  [
+    "serve-next-serve-length-stream-unread-byte",
+    "MainLengthStreamRegs.lean",
+    "(input++arrivals wire input.length fuel)",
+    "(input++arrivals wire input.length (fuel+1))"
+  ],
+  [
+    "serve-next-serve-length-body-return",
+    "MainLengthBodyRegs.lean",
+    "d.pc=0x80000c98#32",
+    "d.pc=0x80000c9c#32"
+  ],
+  [
+    "serve-next-serve-length-reset-counter",
+    "MainLengthResetBank.lean",
+    "∧ MainServeLayout.At after 0 := by",
+    "∧ MainServeLayout.At after 1 := by"
+  ],
+  [
+    "serve-next-serve-half-frame-last-byte",
+    "MainHalfMemory.lean",
+    "(bound : k+2≤n)",
+    "(bound : k+1≤n)"
+  ],
+  [
+    "serve-next-serve-next-payload-word",
+    "MainNextLengthPayloadWords.lean",
+    "word : ramRead ram (sp+5168#32) .w=0#32",
+    "word : ramRead ram (sp+5168#32) .w=1#32"
+  ],
+  [
+    "serve-next-serve-next-reset-counter",
+    "MainNextLengthResetBank.lean",
+    "∧ MainServeLayout.At after 0 ∧",
+    "∧ MainServeLayout.At after 1 ∧"
+  ],
+  [
+    "serve-next-serve-common-real-decoder",
+    "MainServeNextCode.lean",
+    "theorem sn2147486362 : fetchDecode img 2147486362#32 = some (E5R.Instr.load (E5R.Width.w) true 10 8 0x000007ac#32, 4#32) := by exact PackedFetch.fetchDecode_of 2147486362#32 (by decide) (by decide) (bits := 0x7ac42503#32) (by decide +kernel) (by decide +kernel)",
+    "theorem sn2147486362 : fetchDecode img 2147486362#32 = some (E5R.Instr.load (E5R.Width.w) true 11 8 0x000007ac#32, 4#32) := by exact PackedFetch.fetchDecode_of 2147486362#32 (by decide) (by decide) (bits := 0x7ac42503#32) (by decide +kernel) (by decide +kernel)"
+  ],
+  [
+    "serve-next-serve-common-real-poll-marker",
+    "MainServeNextFront.lean",
+    "(sp+3652#32) (1#32) .b",
+    "(sp+3652#32) (0#32) .b"
+  ],
+  [
+    "serve-next-serve-common-valid-test-value",
+    "MainServeNextPackOne.lean",
+    "d.get 13=0#32",
+    "d.get 13=1#32"
+  ],
+  [
+    "serve-next-serve-common-framing-high-word",
+    "MainServeNextZeroStage.lean",
+    "(sp+4512#32) (0#32) .w",
+    "(sp+4512#32) (1#32) .w"
+  ],
+  [
+    "serve-next-serve-common-ready-test-value",
+    "MainServeNextPackTwo.lean",
+    "d.get 10=0#32",
+    "d.get 10=1#32"
+  ],
+  [
+    "serve-next-serve-common-marker-frame-overlap",
+    "MainServeNextStoreFrames.lean",
+    "(apart0 : off+size≤3652",
+    "(apart0 : off+size≤3653"
+  ],
+  [
+    "serve-next-serve-common-copy-one-ra",
+    "MainServeNextCallOne.lean",
+    "d.get 1=0x80000aca#32",
+    "d.get 1=0x80000ace#32"
+  ],
+  [
+    "serve-next-serve-generic-copy264-cost",
+    "MainRamCopy264.lean",
+    "Quiet.Steps B img 354",
+    "Quiet.Steps B img 353"
+  ],
+  [
+    "serve-next-serve-call-certificate-composition-cost",
+    "MainRamCall264.lean",
+    "Quiet.Steps B img 362",
+    "Quiet.Steps B img 361"
+  ],
+  [
+    "serve-next-serve-common-copy-one-cost",
+    "MainServeNextCopyOne.lean",
+    "Quiet.Steps B img 362",
+    "Quiet.Steps B img 361"
+  ],
+  [
+    "serve-next-serve-common-copy-two-ra",
+    "MainServeNextCallTwo.lean",
+    "d.get 1=0x80000b1a#32",
+    "d.get 1=0x80000b1e#32"
+  ],
+  [
+    "serve-next-serve-common-copy-two-cost",
+    "MainServeNextCopyTwo.lean",
+    "Quiet.Steps B img 362",
+    "Quiet.Steps B img 361"
+  ],
+  [
+    "serve-next-serve-relocated-array-base",
+    "MainNextArrayRelocate.lean",
+    "MainNextArrayView.At after dst head := by",
+    "MainNextArrayView.At after (dst+4#32) head := by"
+  ],
+  [
+    "serve-next-serve-zero-payload-readback",
+    "MainServeNextMemory.lean",
+    "(sp+4232#32) .w=0#32 ∧",
+    "(sp+4232#32) .w=1#32 ∧"
+  ],
+  [
+    "serve-next-serve-common-discriminant-branch",
+    "MainServeNextValidBranch.lean",
+    "taken .ne a b=test",
+    "taken .eq a b=test"
+  ],
+  [
+    "serve-next-serve-common-ready-branch",
+    "MainServeNextReadyBranch.lean",
+    "taken .eq a b=test",
+    "taken .ne a b=test"
+  ],
+  [
+    "serve-next-serve-caller-saved-register-set",
+    "MainSavedGpr.lean",
+    "[2,8,9,18,19,20,21,22,23,24,25,26,27]",
+    "[2,8,9,10,18,19,20,21,22,23,24,25,26,27]"
+  ],
+  [
+    "serve-next-serve-common-full-execution-cost",
+    "MainServeNextCore.lean",
+    "Quiet.Steps B img 755",
+    "Quiet.Steps B img 754"
+  ],
+  [
+    "serve-next-serve-request-entry-pc",
+    "MainServeNext.lean",
+    "pc : c.pc=0x80000b50#32",
+    "pc : c.pc=0x80000b54#32"
+  ],
+  [
+    "serve-next-serve-reset-unread-byte",
+    "MainServeNextReset.lean",
+    "Observed.input reads=bytes := by",
+    "Observed.input reads=bytes++[0#8] := by"
+  ],
+  [
+    "serve-next-serve-reset-witness-counter",
+    "MainServeNextWitness.lean",
+    "Spec.initial (expected kind) (amount kind) 0 := by",
+    "Spec.initial (expected kind) (amount kind) 1 := by"
+  ],
+  [
+    "serve-next-serve-next-bank-witness-counter",
+    "MainNextLengthBankWitness.lean",
+    "∧ MainServeLayout.At after 0 ∧",
+    "∧ MainServeLayout.At after 1 ∧"
+  ],
+  [
+    "serve-next-serve-marker-not-preserved",
+    "MainServeNext.lean",
+    "fp 448 := by",
+    "fp 449 := by"
+  ],
+  [
+    "serve-next-serve-generic-copy-modular-alias",
+    "MainRamCopy264.lean",
+    "(destinationBound : 4*dst+264≤5232)",
+    "(destinationBound : 4*dst≤4294967296)"
+  ],
+  [
+    "serve-next-serve-served-is-not-filled",
+    "MainServeLayout.lean",
+    "servedWord : ramRead ram (fp+88#32)",
+    "servedWord : ramRead ram (fp+84#32)"
+  ],
+  [
+    "serve-next-serve-packed-half-not-zero",
+    "MainServeNextPackOne.lean",
+    "d.get 11=half",
+    "d.get 11=0#32"
+  ],
+  [
+    "target-query-request-counter-code-load-width",
+    "MainTargetEntryCode.lean",
+    "Width.w) true 18 8",
+    "Width.h) true 18 8"
+  ],
+  [
+    "target-query-request-counter-increment",
+    "MainRequestCounter.lean",
+    "d.get 18=count+1#32",
+    "d.get 18=count+2#32"
+  ],
+  [
+    "target-query-raw-capacity-branch",
+    "MainRequestCapacityBranch.lean",
+    "d.pc=(if test then 0x80000b6e#32",
+    "d.pc=(if test then 0x80000000#32"
+  ],
+  [
+    "target-query-target-order-branch",
+    "MainRequestTargetOrderBranch.lean",
+    "d.pc=(if test then 0x80000b7a#32",
+    "d.pc=(if test then 0x80000000#32"
+  ],
+  [
+    "target-query-target-used-branch",
+    "MainRequestTargetUsedBranch.lean",
+    "d.pc=(if test then 0x80000b82#32",
+    "d.pc=(if test then 0x80000000#32"
+  ],
+  [
+    "target-query-target-nonempty-branch",
+    "MainRequestTargetNonemptyBranch.lean",
+    "d.pc=(if test then 0x80000bd0#32",
+    "d.pc=(if test then 0x80000000#32"
+  ],
+  [
+    "target-query-target-start-load",
+    "MainRequestTargetLoad.lean",
+    "d.get 29=start",
+    "d.get 29=start+1#32"
+  ],
+  [
+    "target-query-target-pointer-setup",
+    "MainRequestTargetSetup.lean",
+    "d.get 10=rx+start",
+    "d.get 10=rx+start+1#32"
+  ],
+  [
+    "target-query-counter-frame-overlap",
+    "MainRequestCounterMemory.lean",
+    "off+size≤3292 ∨ 3300≤off",
+    "off+size≤3296 ∨ 3300≤off"
+  ],
+  [
+    "target-query-target-core-count",
+    "MainRequestTargetCore.lean",
+    "d.get 18=count+1#32",
+    "d.get 18=count+2#32"
+  ],
+  [
+    "target-query-target-wrapper-next-count",
+    "MainRequestTarget.lean",
+    "head amount (served+1) ∧",
+    "head amount (served+2) ∧"
+  ],
+  [
+    "target-query-target-reset-first-count",
+    "MainRequestTargetReset.lean",
+    "Spec.initial head amount 1 ∧",
+    "Spec.initial head amount 2 ∧"
+  ],
+  [
+    "target-query-target-reset-sat-count",
+    "MainRequestTargetWitness.lean",
+    "(amount kind) 1 := by",
+    "(amount kind) 2 := by"
+  ],
+  [
+    "target-query-query-first-byte-spec",
+    "MainQuerySpec.lean",
+    "g (position g start finish)=63 := by",
+    "g (position g start finish)=64 := by"
+  ],
+  [
+    "target-query-query-no-question-spec",
+    "MainQuerySpec.lean",
+    "position g finish finish=finish := by",
+    "position g finish finish=finish+1 := by"
+  ],
+  [
+    "target-query-query-code-byte-signed",
+    "MainQueryCode.lean",
+    "Width.b) false 13 12",
+    "Width.b) true 13 12"
+  ],
+  [
+    "target-query-query-setup-method-end",
+    "MainQuerySetup.lean",
+    "d.get 11=me ∧",
+    "d.get 11=ms ∧"
+  ],
+  [
+    "target-query-query-load-value",
+    "MainQueryLoad.lean",
+    "d.get 13=BitVec.ofNat 32 byte.toNat ∧",
+    "d.get 13=BitVec.ofNat 32 (byte.toNat+1) ∧"
+  ],
+  [
+    "target-query-query-loop-index-increment",
+    "MainQueryIncrement.lean",
+    "d.get 14=offset+1#32",
+    "d.get 14=offset+2#32"
+  ],
+  [
+    "target-query-query-found-path-length",
+    "MainQueryFound.lean",
+    "d.get 28=index ∧",
+    "d.get 28=index+1#32 ∧"
+  ],
+  [
+    "target-query-query-hit-branch",
+    "MainQueryHitBranch.lean",
+    "d.pc=(if test then 0x80000d44#32",
+    "d.pc=(if test then 0x80000d50#32"
+  ],
+  [
+    "target-query-query-continue-branch",
+    "MainQueryContinueBranch.lean",
+    "d.pc=(if test then 0x80000be0#32",
+    "d.pc=(if test then 0x80000be4#32"
+  ],
+  [
+    "target-query-query-absent-length",
+    "MainQueryAbsent.lean",
+    "d.get 13=0#32 ∧",
+    "d.get 13=1#32 ∧"
+  ],
+  [
+    "target-query-query-question-arithmetic",
+    "MainQueryMath.lean",
+    "decide (b.toNat=63) := by",
+    "decide (b.toNat=64) := by"
+  ],
+  [
+    "target-query-query-found-last-byte",
+    "MainQueryMath.lean",
+    "BitVec.ofNat 32 (finish-i-1) := by",
+    "BitVec.ofNat 32 (finish-i) := by"
+  ],
+  [
+    "target-query-query-loop-method-frame",
+    "MainQueryLoop.lean",
+    "d.pc=0x80000d50#32 ∧",
+    "d.pc=0x80000d54#32 ∧"
+  ],
+  [
+    "target-query-query-full-method-load",
+    "MainQuery.lean",
+    "d.get 7=ms ∧",
+    "d.get 7=me ∧"
+  ],
+  [
+    "target-query-query-wrapper-ram-csr",
+    "MainRequestQuery.lean",
+    "Ready d ram input s head amount served ∧",
+    "Ready d ram input s head amount (served+1) ∧"
+  ],
+  [
+    "target-query-query-reset-first-count",
+    "MainRequestQueryReset.lean",
+    "Spec.initial head amount 1 ∧",
+    "Spec.initial head amount 2 ∧"
+  ],
+  [
+    "target-query-query-reset-sat-first-question",
+    "MainRequestQueryWitness.lean",
+    "d.get 13=BitVec.ofNat 32 (if kind=0 then 3 else 0)",
+    "d.get 13=BitVec.ofNat 32 (if kind=0 then 1 else 0)"
+  ],
+  [
+    "method-method-spec-case-sensitive-token",
+    "MainMethodSpec.lean",
+    "if input=[71,69,84] then .get",
+    "if input=[71,69,84] then .put"
+  ],
+  [
+    "method-method-code-byte-load-signed",
+    "MainMethodDecodeCode.lean",
+    "Width.b) false 16 15",
+    "Width.b) true 16 15"
+  ],
+  [
+    "method-method-generic-branch-frame",
+    "QuietBranch.lean",
+    "d.get r=c.get r",
+    "d.get r=c.get r+1#32"
+  ],
+  [
+    "method-method-generic-byte-load",
+    "MainMethodByteTest.lean",
+    "d.get 16=BitVec.ofNat 32 byte.toNat",
+    "d.get 16=BitVec.ofNat 32 (byte.toNat+1)"
+  ],
+  [
+    "method-method-ordered-guard",
+    "MainMethodGuards.lean",
+    "(ordered : start≤finish)",
+    "(ordered : start≤finish+1)"
+  ],
+  [
+    "method-method-span-subtraction",
+    "MainMethodStart.lean",
+    "d.get 16=finish-start",
+    "d.get 16=start-finish"
+  ],
+  [
+    "method-method-byte-wrapping-literal",
+    "MainMethodByteMath.lean",
+    "literal≤255",
+    "literal≤2^32"
+  ],
+  [
+    "method-method-head-first-byte",
+    "MainMethodTests.lean",
+    "d.get 17=80#32",
+    "d.get 17=72#32"
+  ],
+  [
+    "method-method-last-character-fallback",
+    "MainMethodLast.lean",
+    "then candidate else 6#32",
+    "then candidate else 5#32"
+  ],
+  [
+    "method-method-select-head",
+    "MainMethodSelectHead.lean",
+    "d.get 14=1#32",
+    "d.get 14=2#32"
+  ],
+  [
+    "method-method-select-post",
+    "MainMethodSelectPost.lean",
+    "d.get 14=2#32",
+    "d.get 14=3#32"
+  ],
+  [
+    "method-method-select-patch",
+    "MainMethodSelectPatch.lean",
+    "d.get 14=4#32",
+    "d.get 14=5#32"
+  ],
+  [
+    "method-method-select-delete",
+    "MainMethodSelectDelete.lean",
+    "d.get 14=5#32",
+    "d.get 14=6#32"
+  ],
+  [
+    "method-method-select-get",
+    "MainMethodSelectGet.lean",
+    "d.get 14=0#32",
+    "d.get 14=1#32"
+  ],
+  [
+    "method-method-select-put",
+    "MainMethodSelectPut.lean",
+    "d.get 14=3#32",
+    "d.get 14=4#32"
+  ],
+  [
+    "method-method-three-last-offset",
+    "MainMethodLastSetup.lean",
+    "d.get 17=2#32",
+    "d.get 17=3#32"
+  ],
+  [
+    "method-method-chain-step-count",
+    "MainMethodChain.lean",
+    "n≤3*checks.length",
+    "n≤2*checks.length"
+  ],
+  [
+    "method-method-chain-checked-branch",
+    "MainMethodChain.lean",
+    "some (.branch .ne 16 17 branchOffset",
+    "some (.branch .eq 16 17 branchOffset"
+  ],
+  [
+    "method-method-chain-literal-certificate",
+    "MainMethodChains.lean",
+    "Node 0x80000d86#32 (1,69)",
+    "Node 0x80000d86#32 (1,70)"
+  ],
+  [
+    "method-method-suffix-fallback",
+    "MainMethodSuffix.lean",
+    "then BitVec.ofNat 32 candidate else 6#32",
+    "then BitVec.ofNat 32 candidate else 5#32"
+  ],
+  [
+    "method-method-selection-head-tag",
+    "MainMethodSelections.lean",
+    "d.get 14=1#32",
+    "d.get 14=2#32"
+  ],
+  [
+    "method-method-head-suffix-tag",
+    "MainMethodSuffixes.lean",
+    "then 1#32 else 6#32",
+    "then 2#32 else 6#32"
+  ],
+  [
+    "method-method-choice-target",
+    "MainMethodChoice.lean",
+    "then pc+4#32+off else pc+8#32",
+    "then pc+off else pc+8#32"
+  ],
+  [
+    "method-method-four-classification",
+    "MainMethodFour.lean",
+    "MainMethodSpec.classify 4",
+    "MainMethodSpec.classify 3"
+  ],
+  [
+    "method-method-three-classification",
+    "MainMethodThree.lean",
+    "MainMethodSpec.classify 3",
+    "MainMethodSpec.classify 4"
+  ],
+  [
+    "method-method-signed-wrap-bound",
+    "MainMethodLengthMath.lean",
+    "n≤2048",
+    "n≤2^32"
+  ],
+  [
+    "method-method-four-compare-constant",
+    "MainMethodSmallSetup.lean",
+    "d.get 17=4#32",
+    "d.get 17=5#32"
+  ],
+  [
+    "method-method-other-length-exit",
+    "MainMethodLength.lean",
+    "else 0x80001160#32",
+    "else 0x80001164#32"
+  ],
+  [
+    "method-method-body-result",
+    "MainMethodBody.lean",
+    "d.get 14=BitVec.ofNat 32 (MainMethodSpec.tag",
+    "d.get 14=1#32+BitVec.ofNat 32 (MainMethodSpec.tag"
+  ],
+  [
+    "method-method-full-frame",
+    "MainMethodDecode.lean",
+    "d.get r=c.get r",
+    "d.get r=c.get r+1#32"
+  ],
+  [
+    "method-method-full-result",
+    "MainMethodDecode.lean",
+    "d.get 14=BitVec.ofNat 32 (MainMethodSpec.tag",
+    "d.get 14=1#32+BitVec.ofNat 32 (MainMethodSpec.tag"
+  ],
+  [
+    "method-method-byte-slice-length",
+    "MainMethodBytes.lean",
+    "MainMethodSpec.decode (token input len) := by",
+    "MainMethodSpec.decode (token input (len+1)) := by"
+  ],
+  [
+    "method-method-request-counter",
+    "MainRequestMethod.lean",
+    "Ready d ram input s head amount served ∧",
+    "Ready d ram input s head amount (served+1) ∧"
+  ],
+  [
+    "method-method-reset-first-counter",
+    "MainRequestMethodReset.lean",
+    "Spec.initial head amount 1 ∧",
+    "Spec.initial head amount 2 ∧"
+  ],
+  [
+    "method-method-reset-lowercase-mismatch",
+    "MainRequestMethodWitness.lean",
+    "d.get 14=BitVec.ofNat 32 (if kind.val<6 then kind.val else 6)",
+    "d.get 14=BitVec.ofNat 32 (if kind.val<6 then kind.val else 0)"
+  ],
+  [
+    "request-build-request-high-payload-store",
+    "MainServeNextPayloadWords.lean",
+    "sp+4512#32) .w=0#32",
+    "sp+4512#32) .w=1#32"
+  ],
+  [
+    "request-build-request-reset-payload-counter",
+    "MainServeNextResetPayload.lean",
+    "Spec.initial head amount 0 ∧",
+    "Spec.initial head amount 1 ∧"
+  ],
+  [
+    "request-build-request-payload-counter-location",
+    "MainRequestPayloadWords.lean",
+    "used) (sp+4512#32) .w=0#32 :=",
+    "used) (sp+4512#32) .w=1#32 :="
+  ],
+  [
+    "request-build-request-reset-method-payload-counter",
+    "MainRequestMethodResetPayload.lean",
+    "Spec.initial head amount 1 ∧",
+    "Spec.initial head amount 2 ∧"
+  ],
+  [
+    "request-build-request-code-payload-store-width",
+    "MainRequestBuildCode.lean",
+    "Width.h) 8 27",
+    "Width.w) 8 27"
+  ],
+  [
+    "request-build-request-body-order-guard",
+    "MainRequestBodyGuards.lean",
+    "(ordered : start≤finish)",
+    "(ordered : start≤finish+1)"
+  ],
+  [
+    "request-build-request-head-copy-caller-dest",
+    "MainRequestHeadCall.lean",
+    "d.get 10=sp+3344#32",
+    "d.get 10=sp+3348#32"
+  ],
+  [
+    "request-build-request-head-copy-return-pc",
+    "MainRequestHeadCopy.lean",
+    "d.pc=0x800011e2#32",
+    "d.pc=0x800011e6#32"
+  ],
+  [
+    "request-build-request-zero-call-length",
+    "MainRequestZeroCall.lean",
+    "d.get 12=36#32",
+    "d.get 12=40#32"
+  ],
+  [
+    "request-build-request-zero-instruction-count",
+    "MainRequestZero.lean",
+    "Quiet.Steps B img 52",
+    "Quiet.Steps B img 51"
+  ],
+  [
+    "request-build-request-front-body-pointer",
+    "MainRequestFront.lean",
+    "d.get 20=start+rx",
+    "d.get 20=start+rx+1#32"
+  ],
+  [
+    "request-build-request-body-store-completion",
+    "MainRequestBodyStores.lean",
+    "d.pc=0x80001182#32",
+    "d.pc=0x80001186#32"
+  ],
+  [
+    "request-build-request-high-half-load",
+    "MainRequestHighLoad.lean",
+    "d.get 14=0#32",
+    "d.get 14=1#32"
+  ],
+  [
+    "request-build-request-metadata-payload-location",
+    "MainRequestMetadataStores.lean",
+    "d.get 10=sp+3322#32",
+    "d.get 10=sp+3324#32"
+  ],
+  [
+    "request-build-request-padding-read",
+    "MainRequestPaddingLoads.lean",
+    "d.get 16=b6",
+    "d.get 16=0#32"
+  ],
+  [
+    "request-build-request-padding-store-pointer",
+    "MainRequestPaddingStores.lean",
+    "d.get 17=sp+3609#32",
+    "d.get 17=sp+3610#32"
+  ],
+  [
+    "request-build-request-minor-load-register",
+    "MainRequestMinorRawStores.lean",
+    "d.get 9=minor",
+    "d.get 9=minor+1#32"
+  ],
+  [
+    "request-build-request-payload-half-value",
+    "MainRequestPayloadHalves.lean",
+    "sp+4514#32) .h)=0#32",
+    "sp+4514#32) .h)=1#32"
+  ],
+  [
+    "request-build-request-metadata-frame-overlap",
+    "MainRequestStoreFrames.lean",
+    "off+size≤3312 ∨ 3344≤off",
+    "off+size≤3316 ∨ 3344≤off"
+  ],
+  [
+    "request-build-request-prefix-body-register",
+    "MainRequestPrefixCore.lean",
+    "d.get 20=BitVec.ofNat 32 start+rx",
+    "d.get 20=BitVec.ofNat 32 start+rx+1#32"
+  ],
+  [
+    "request-build-request-prefix-frame-head-alias",
+    "MainRequestPrefixFrame.lean",
+    "off+size≤3312 ∨ 3685≤off",
+    "off+size≤3344 ∨ 3685≤off"
+  ],
+  [
+    "request-build-request-saved-register-increment",
+    "MainRequestSaved.lean",
+    "d.get r=c.get r",
+    "d.get r=c.get r+1#32"
+  ],
+  [
+    "request-build-request-tail-minor-register",
+    "MainRequestTailCore.lean",
+    "d.get 9=minor",
+    "d.get 9=minor+1#32"
+  ],
+  [
+    "request-build-request-whole-instruction-count",
+    "MainRequestBuildCore.lean",
+    "Quiet.Steps B img 460",
+    "Quiet.Steps B img 459"
+  ],
+  [
+    "request-build-request-stored-body-length",
+    "MainRequestStoreWords.lean",
+    "sp+3636#32) .w=bodyLen",
+    "sp+3636#32) .w=bodyLen+1#32"
+  ],
+  [
+    "request-build-request-tail-zero-frame",
+    "MainRequestTailFrame.lean",
+    "off+size≤3648 ∨ 3684≤off",
+    "off+size≤3684 ∨ 3684≤off"
+  ],
+  [
+    "request-build-request-whole-frame-overlap",
+    "MainRequestBuildFrame.lean",
+    "off+size≤3312 ∨ 3685≤off",
+    "off+size≤3344 ∨ 3685≤off"
+  ],
+  [
+    "request-build-request-byte-store-value",
+    "RamWriteBytes.lean",
+    "=byteOf v i.val := by",
+    "=byteOf v (i.val+1) := by"
+  ],
+  [
+    "request-build-request-packed-low-word",
+    "MainRequestPayloadStored.lean",
+    "sp+3320#32) .w=low := by",
+    "sp+3320#32) .w=low+1#32 := by"
+  ],
+  [
+    "request-build-request-memory-writes-erased",
+    "MainRequestMemory.lean",
+    "    after ram sp rx head amount method path pathLen query queryLen=",
+    "    ram="
+  ],
+  [
+    "request-build-request-head-length-framing-tag",
+    "MainRequestHeadAssemble.lean",
+    "(tag : ramRead ram dst .w=1#32)",
+    "(tag : ramRead ram dst .w=2#32)"
+  ],
+  [
+    "request-build-request-low-frame-overlaps-array",
+    "MainRequestMemoryFrames.lean",
+    "query queryLen) (sp+3312#32) 32 := by",
+    "query queryLen) (sp+3312#32) 36 := by"
+  ],
+  [
+    "request-build-request-method-enum-tag-bound",
+    "MainRequestByteValue.lean",
+    "MainMethodSpec.tag m≤6",
+    "MainMethodSpec.tag m≤5"
+  ],
+  [
+    "request-build-request-array-location",
+    "MainRequestMemoryArray.lean",
+    "sp+3600#32) .w=BitVec.ofNat 32 head.headers.length := by",
+    "sp+3600#32) .w=BitVec.ofNat 32 (head.headers.length+1) := by"
+  ],
+  [
+    "request-build-request-rebuilt-head-location",
+    "MainRequestMemoryHead.lean",
+    "sp+3600#32) .w=BitVec.ofNat 32 head.headers.length := by",
+    "sp+3600#32) .w=BitVec.ofNat 32 (head.headers.length+1) := by"
+  ],
+  [
+    "request-build-request-uri-frame-overlap",
+    "MainRequestAfterFrames.lean",
+    "off+size≤3616 ∨ 3632≤off",
+    "off+size≤3616 ∨ 3628≤off"
+  ],
+  [
+    "request-build-request-view-body-length",
+    "MainRequestMemoryViews.lean",
+    "sp+3636#32) .w=BitVec.ofNat 32 amount",
+    "sp+3636#32) .w=BitVec.ofNat 32 (amount+1)"
+  ],
+  [
+    "request-build-request-object-stack-escape",
+    "MainTransactionStable.lean",
+    "3312#32) 376 := by",
+    "3312#32) 2048 := by"
+  ],
+  [
+    "request-build-request-global-frame-overlap",
+    "MainRequestMemoryGlobalFrame.lean",
+    "off+size≤3312 ∨ 3685≤off",
+    "off+size≤3344 ∨ 3685≤off"
+  ],
+  [
+    "request-build-request-ready-pc",
+    "MainRequestBuild.lean",
+    "pc : c.pc=0x80001246#32",
+    "pc : c.pc=0x80001248#32"
+  ],
+  [
+    "request-build-request-reset-counter",
+    "MainRequestBuildReset.lean",
+    "Spec.initial head amount 1 ∧",
+    "Spec.initial head amount 2 ∧"
+  ],
+  [
+    "request-build-request-reset-stored-unknown-method",
+    "MainRequestBuildWitness.lean",
+    "BitVec.ofNat 8 (if kind.val<6 then kind.val else 6)",
+    "BitVec.ofNat 8 (if kind.val<6 then kind.val else 0)"
+  ],
+  [
+    "request-build-request-reset-body-witness-length",
+    "MainRequestBuildBodyWitness.lean",
+    "Spec.initial (expected kind) (amount kind) 1",
+    "Spec.initial (expected kind) (amount kind+1) 1"
+  ],
+  [
+    "request-build-request-corrupted-head-tag",
+    "MainRequestStoreWords.lean",
+    "sp+3312#32) .w=tag := by",
+    "sp+3312#32) .w=tag+1#32 := by"
+  ],
+  [
+    "request-build-request-corrupted-method-byte",
+    "MainRequestStoreWords.lean",
+    "sp+3684#32)=0#8 := by",
+    "sp+3684#32)=1#8 := by"
+  ],
+  [
+    "request-build-request-params-zero-value",
+    "MainRequestZero.lean",
+    "i.val)=0#8 := by",
+    "i.val)=1#8 := by"
+  ],
+  [
+    "request-build-request-saved-clobbered-minor",
+    "MainRequestSaved.lean",
+    "[2,8,18,19,20,21,22,23,24,25,26,27]",
+    "[2,8,9,18,19,20,21,22,23,24,25,26,27]"
+  ],
+  [
+    "router-frame-wrong-initial-state-pattern",
+    "MainRouterTable.lean",
+    "0x80005b83#32",
+    "0x80005b89#32"
+  ],
+  [
+    "router-frame-wrong-initial-get-method",
+    "MainRouterTable.lean",
+    "| 0 => 0#8",
+    "| 0 => 3#8"
+  ],
+  [
+    "router-frame-parser-claims-saved-stack-unchanged",
+    "MainRouterParserFrames.lean",
+    "ViewFrame.Region ram after (sp+384#32) 132",
+    "ViewFrame.Region ram after (sp+380#32) 136"
+  ],
+  [
+    "router-frame-reset-assumes-arbitrary-initial-table",
+    "MainRouterResetFrame.lean",
+    "Ready B d after ∧ InitRoutes.Layout after",
+    "Ready B d after ∧ InitRoutes.Layout ram"
+  ],
+  [
+    "router-frame-header-append-claims-rx-unchanged",
+    "MainRouterBankHeaderFrames.lean",
+    "ViewFrame.Region ram after 0x80ffeb90#32 132",
+    "ViewFrame.Region ram after 0x80ffeb90#32 2180"
+  ],
+  [
+    "router-frame-body-claims-rx-unchanged",
+    "MainRouterBankBodyFrames.lean",
+    "ViewFrame.Region ram after 0x80ffeb90#32 132",
+    "ViewFrame.Region ram after 0x80ffeb90#32 2180"
+  ],
+  [
+    "router-frame-wrong-last-route-method-byte",
+    "MainRouterCloseFrames.lean",
+    "d.sameCsr c ∧ MainRouterTable.At after := by",
+    "d.sameCsr c ∧ MainRouterTable.At after ∧ after 0x80ffec10#32=0#8 := by"
+  ],
+  [
+    "router-frame-reset-wrong-received-stream",
+    "MainRouterCloseReset.lean",
+    "Observed.input reads=bytes",
+    "Observed.input reads=[]"
+  ],
+  [
+    "router-frame-witness-inverts-selected-close",
+    "MainRouterCloseWitness.lean",
+    "(closes kind) ∧ MainRouterTable.At after := by",
+    "(!closes kind) ∧ MainRouterTable.At after := by"
+  ],
+  [
+    "close-request-header-wrong-start",
+    "MainCloseHeaderBounds.lean",
+    "d.get 15=BitVec.ofNat 32 e.nameStart",
+    "d.get 15=BitVec.ofNat 32 e.nameEnd"
+  ],
+  [
+    "close-request-name-wrong-skip",
+    "MainCloseFieldLayout.lean",
+    "else 0x80002474#32",
+    "else 0x8000247a#32"
+  ],
+  [
+    "close-request-empty-value-wrong-target",
+    "MainCloseFieldLayout.lean",
+    "if ve-vs=0 then 0x80002474#32 else 0x80002584#32",
+    "if ve-vs=0 then 0x80002584#32 else 0x80002474#32"
+  ],
+  [
+    "close-request-wrong-header-query",
+    "MainCloseField.lean",
+    "WireSpec.ascii \"connection\"",
+    "WireSpec.ascii \"authorization\""
+  ],
+  [
+    "close-request-wrong-cursor-stride",
+    "MainCloseHeaderNext.lean",
+    "d.get 13 = p+16#32",
+    "d.get 13 = p+32#32"
+  ],
+  [
+    "close-request-header-loop-wrong-false-target",
+    "MainCloseHeaderLoop.lean",
+    "else 0x8000267c#32",
+    "else 0x8000267e#32"
+  ],
+  [
+    "close-request-corrupt-saved-engine-register",
+    "MainCloseSave.lean",
+    "(origin.get 22)",
+    "(origin.get 23)"
+  ],
+  [
+    "close-request-wrong-token-length-register",
+    "MainCloseSetup.lean",
+    "d.get 18=5#32",
+    "d.get 18=6#32"
+  ],
+  [
+    "close-request-wrong-stack-restoration",
+    "MainCloseRestore.lean",
+    "d.get 2=sp+48#32",
+    "d.get 2=sp+44#32"
+  ],
+  [
+    "close-request-wrong-count-read",
+    "MainCloseCount.lean",
+    "d.get 11=BitVec.ofNat 32 count",
+    "d.get 11=BitVec.ofNat 32 (count+1)"
+  ],
+  [
+    "close-request-wrong-close-result",
+    "MainCloseResult.lean",
+    "d.get 10=(if answer then 1#32 else 0#32)",
+    "d.get 10=(if answer then 0#32 else 1#32)"
+  ],
+  [
+    "close-request-body-result-inverted",
+    "MainCloseBody.lean",
+    "d.get 10=(if MainCloseSpec.wantsClose raw entries then 1#32 else 0#32)",
+    "d.get 10=(if MainCloseSpec.wantsClose raw entries then 0#32 else 1#32)"
+  ],
+  [
+    "close-request-wrong-abi-return",
+    "MainWantsClose.lean",
+    "d.pc=c.get 1 &&& ~~~1",
+    "d.pc=(c.get 1+4#32) &&& ~~~1"
+  ],
+  [
+    "close-request-wrong-persisted-close-byte",
+    "MainCloseScanned.lean",
+    "let word : Word := if close then 1#32 else 0#32",
+    "let word : Word := if close then 0#32 else 1#32"
+  ],
+  [
+    "close-request-request-zero-instruction-bound",
+    "MainCloseRequest.lean",
+    "n≤(77+86*(MainRequestSpans.raw input head amount).length)*(MainRequestInputs.entries head).length+71",
+    "n≤0"
+  ],
+  [
+    "close-request-reset-wrong-received-stream",
+    "MainCloseRequestReset.lean",
+    "Observed.input reads=bytes",
+    "Observed.input reads=[]"
+  ],
+  [
+    "close-request-witness-inverted-close-policy",
+    "MainCloseRequestWitness.lean",
+    "decide (kind=1 ∨ kind=3)",
+    "decide (kind=0 ∨ kind=2)"
+  ],
+  [
+    "state-match-wrong-actual-get-future-capacity",
+    "MainRouterSetup.lean",
+    "| _ => 832#32",
+    "| _ => 831#32"
+  ],
+  [
+    "state-match-wrong-matcher-return-address",
+    "MainRouterFirstCall.lean",
+    "d.get 1=0x800013d2#32",
+    "d.get 1=0x800013d6#32"
+  ],
+  [
+    "state-match-wrong-actual-state-match-result",
+    "MainPathStateBody.lean",
+    "d.get 10=1#32",
+    "d.get 10=0#32"
+  ],
+  [
+    "state-match-wrong-state-abi-restored-stack",
+    "MainPathStateRestore.lean",
+    "d.get 2=0x80ffeb90#32",
+    "d.get 2=0x80ffeb50#32"
+  ],
+  [
+    "state-match-wrong-captured-parameter-count",
+    "MainPathState.lean",
+    "d.get 11=0#32",
+    "d.get 11=1#32"
+  ],
+  [
+    "state-match-caller-falsely-claims-match-failure",
+    "MainStateMatch.lean",
+    "result : c.get 10=1#32",
+    "result : c.get 10=0#32"
+  ],
+  [
+    "state-match-reset-wrong-actual-input",
+    "MainStateMatchReset.lean",
+    "Observed.input reads=bytes",
+    "Observed.input reads=[]"
+  ],
+  [
+    "read-reset-wrong-public-future-engine",
+    "MainStateRouteSetup.lean",
+    "d.get 9=2164255676#32",
+    "d.get 9=2164255680#32"
+  ],
+  [
+    "read-reset-wrong-public-actor-store",
+    "MainStateRouteSetup.lean",
+    "memory ram (sp+4824#32)=0#8",
+    "memory ram (sp+4824#32)=1#8"
+  ],
+  [
+    "read-reset-wrong-wire-return-read-tag",
+    "MainReadWireReturn.lean",
+    "tag : byteOf w 0=4#8",
+    "tag : byteOf w 0=3#8"
+  ],
+  [
+    "read-reset-wrong-derived-read-actor",
+    "MainReadRouteInput.lean",
+    "actor : ram 0x80fffe68#32=0#8",
+    "actor : ram 0x80fffe68#32=1#8"
+  ],
+  [
+    "read-reset-read-decoder-claims-borrow-owned",
+    "MainReadDecoded.lean",
+    "Ready d after input s served close ∧ d.sameCsr c",
+    "Ready d after input s served close ∧ ramRead after 0x80ffebbc#32 .w=0xffffffff#32 ∧ d.sameCsr c"
+  ],
+  [
+    "read-reset-reset-wrong-full-http-status",
+    "MainReadReset.lean",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes 200",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes 201"
+  ],
+  [
+    "read-reset-reset-inverts-completion-branch",
+    "MainReadReset.lean",
+    "d.pc=(if close then 0x80000978#32 else 0x800017be#32)",
+    "d.pc=(if close then 0x800017be#32 else 0x80000978#32)"
+  ],
+  [
+    "read-reset-complete-request-witness-wrong-rx",
+    "MainReadResetWitness.lean",
+    "Observed.input reads=header kind",
+    "Observed.input reads=[]"
+  ],
+  [
+    "write-return-wrong-shared-response-extra",
+    "MainWriteExtracted.lean",
+    "h13 : c.get 13=0#32",
+    "h13 : c.get 13=1#32"
+  ],
+  [
+    "write-return-wrong-shared-http-content-type",
+    "MainWriteExtractedReply.lean",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes status (WireSpec.ascii \"application/json\")",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes status (WireSpec.ascii \"text/plain\")"
+  ],
+  [
+    "write-return-wrong-actual-setpoint-ready-tag",
+    "MainSetpointReturn.lean",
+    "h18 : c.get 18=2#32",
+    "h18 : c.get 18=0#32"
+  ],
+  [
+    "write-return-wrong-actual-temp-return-target",
+    "MainTempReturn.lean",
+    "d.pc=0x80001710#32",
+    "d.pc=0x80001714#32"
+  ],
+  [
+    "write-return-wrong-actual-mode-ready-tag",
+    "MainModeReturn.lean",
+    "h18 : c.get 18=2#32",
+    "h18 : c.get 18=0#32"
+  ],
+  [
+    "write-return-wrong-actual-relay-mime-word",
+    "MainRelayReturn.lean",
+    "d.get 12=ct",
+    "d.get 12=ct+1#32"
+  ],
+  [
+    "write-return-wrong-write-return-kind-selection",
+    "MainWriteReturnJoin.lean",
+    "if kind=0 then 0x80001628#32",
+    "if kind=0 then 0x80001604#32"
+  ],
+  [
+    "write-return-wrong-write-response-committed-engine",
+    "MainWriteReturnJoin.lean",
+    "Engine.InvariantAt after 0x80ffebbc#32",
+    "Engine.InvariantAt after 0x80ffebc0#32"
+  ],
+  [
+    "status-empty-response-pointer",
+    "MainStatusResponse.lean",
+    "BodyMemory.At ram out 1#32 0#32 0#32 status",
+    "BodyMemory.At ram out 0#32 0#32 0#32 status"
+  ],
+  [
+    "status-response-continuation",
+    "MainStatusResponse.lean",
+    "d.pc=0x80001772#32",
+    "d.pc=0x80001776#32"
+  ],
+  [
+    "status-wrong-json-header",
+    "MainStatusReply.lean",
+    "ResponseHeadSpec.bytes status ([] : List (BitVec 8)) 0 close",
+    "ResponseHeadSpec.bytes status (WireSpec.ascii \"application/json\") 0 close"
+  ],
+  [
+    "status-wrong-keep-target",
+    "MainStatusReply.lean",
+    "else 0x800017be#32",
+    "else 0x800017c0#32"
+  ],
+  [
+    "status-omitted-refusal-done-store",
+    "MainStatusHandlersQuiet.lean",
+    "let r7 := ramWrite r6 (f+40#32) (1#32) .b",
+    "let r7 := ramWrite r6 (f+40#32) (0#32) .b"
+  ],
+  [
+    "status-wrong-auth-status",
+    "MainStatusHandlersQuiet.lean",
+    "StatusMemory.At (StatusResponse.memory ram out f status) out status",
+    "StatusMemory.At (StatusResponse.memory ram out f status) out 403#32"
+  ],
+  [
+    "status-wrong-401-uart",
+    "MainStatusAuth401.lean",
+    "ResponseHeadSpec.bytes 401 [] 0 close",
+    "ResponseHeadSpec.bytes 403 [] 0 close"
+  ],
+  [
+    "status-inverted-auth-priority",
+    "MainStatusAuth401.lean",
+    "(WireSpec.ascii \"dev-key\")=false",
+    "(WireSpec.ascii \"dev-key\")=true"
+  ],
+  [
+    "temp-success-reset-wrong-initialized-future-capacity",
+    "MainRouterFutures.lean",
+    "else 832#32",
+    "else 831#32"
+  ],
+  [
+    "temp-success-reset-wrong-matcher-restored-stack",
+    "MainPathReturn.lean",
+    "d.get 2=0x80ffeb90#32",
+    "d.get 2=0x80ffeb50#32"
+  ],
+  [
+    "temp-success-reset-state-falsely-matches-temp",
+    "MainStateTempBody.lean",
+    "d.get 10=0#32",
+    "d.get 10=1#32"
+  ],
+  [
+    "temp-success-reset-setpoint-falsely-matches-temp",
+    "MainSetpointTempBody.lean",
+    "d.get 10=0#32",
+    "d.get 10=1#32"
+  ],
+  [
+    "temp-success-reset-temp-falsely-fails-own-route",
+    "MainTempTempBody.lean",
+    "d.get 10=1#32",
+    "d.get 10=0#32"
+  ],
+  [
+    "temp-success-reset-wrong-actual-second-matcher-ret",
+    "MainTempSecondCall.lean",
+    "d.get 1=2147488802#32",
+    "d.get 1=2147488876#32"
+  ],
+  [
+    "temp-success-reset-wrong-actual-third-pattern-pointer",
+    "MainTempThirdCall.lean",
+    "d.get 10=2147507090#32",
+    "d.get 10=2147507081#32"
+  ],
+  [
+    "temp-success-reset-wrong-actual-write-fresh-byte",
+    "MainTempWriteSetup.lean",
+    "memory ram (sp+3868#32)=0#8",
+    "memory ram (sp+3868#32)=1#8"
+  ],
+  [
+    "temp-success-reset-header-frame-omits-raw-length",
+    "MainRouteInputs.lean",
+    "(ho : ViewFrame.Region before after req 336)",
+    "(ho : ViewFrame.Region before after req 332)"
+  ],
+  [
+    "temp-success-reset-wrong-derived-admin-principal",
+    "MainTempWriteInput.lean",
+    "(MainRequestInputs.entries head) none true s",
+    "(MainRequestInputs.entries head) none false s"
+  ],
+  [
+    "temp-success-reset-reset-falsely-preserves-initial-state",
+    "MainTempSuccessReset.lean",
+    "AppState.At after (Spec.commit Spec.initial (.ok res))",
+    "AppState.At after Spec.initial"
+  ],
+  [
+    "temp-success-reset-reset-wrong-actual-http-status",
+    "MainTempSuccessReset.lean",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes 200",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes 201"
+  ],
+  [
+    "temp-all-reset-wrong-renderer-continuation",
+    "MainResponseExtracted.lean",
+    "d.pc=0x80001772#32",
+    "d.pc=0x80001770#32"
+  ],
+  [
+    "temp-all-reset-wrong-empty-mime-pointer",
+    "MainResponseExtractedReply.lean",
+    "else 1#32",
+    "else 2#32"
+  ],
+  [
+    "temp-all-reset-wrong-auth-refusal-status",
+    "MainFutureAuthHandler.lean",
+    "StatusMemory.At r out 401#32",
+    "StatusMemory.At r out 400#32"
+  ],
+  [
+    "temp-all-reset-decode-borrow-remains-acquired",
+    "MainFutureDecodeHandler.lean",
+    "ramRead r eng .w = 0#32",
+    "ramRead r eng .w = 0xffffffff#32"
+  ],
+  [
+    "temp-all-reset-wrong-close-completion",
+    "MainStatusReturnJoin.lean",
+    "d.pc=(if close then 0x80000978#32 else 0x800017be#32)",
+    "d.pc=(if close then 0x800017be#32 else 0x80000978#32)"
+  ],
+  [
+    "temp-all-reset-refusal-borrow-not-released",
+    "MainTempRefusals.lean",
+    "ramRead after 0x80ffebbc#32 .w=0#32",
+    "ramRead after 0x80ffebbc#32 .w=0xffffffff#32"
+  ],
+  [
+    "temp-all-reset-wrong-pure-temperature-update",
+    "TempHttpSpec.lean",
+    "Spec.transition true s (.reportTemp t)=.ok ⟨some (next s t),next s t⟩",
+    "Spec.transition true s (.reportTemp t)=.ok ⟨none,s⟩"
+  ],
+  [
+    "temp-all-reset-transaction-falsely-preserves-initial-state",
+    "MainTempTransaction.lean",
+    "AppState.At after reply.state",
+    "AppState.At after s"
+  ],
+  [
+    "temp-all-reset-reset-falsely-preserves-initial-state",
+    "MainTempReset.lean",
+    "AppState.At after expected.state",
+    "AppState.At after Spec.initial"
+  ],
+  [
+    "temp-all-reset-prefix-agreement-omits-last-byte",
+    "MainConsumeCongr.lean",
+    "k<input.length+fuel",
+    "k<input.length+fuel-1"
+  ],
+  [
+    "temp-all-reset-missing-auth-incorrectly-yields400",
+    "MainTempResetWitness.lean",
+    "| .unauth => ⟨Spec.initial,401,[],[]⟩",
+    "| .unauth => ⟨Spec.initial,400,[],[]⟩"
+  ],
+  [
+    "setpoint-reset-wrong-completed-setpoint-route",
+    "MainSetpointChain.lean",
+    "d.pc=0x80001422#32 ∧ d.get 10=1#32",
+    "d.pc=0x80001422#32 ∧ d.get 10=0#32"
+  ],
+  [
+    "setpoint-reset-wrong-generic-second-path-length",
+    "MainSecondMatcherCall.lean",
+    "d.get 13=pathSize",
+    "d.get 13=5#32"
+  ],
+  [
+    "setpoint-reset-wrong-real-setpoint-return",
+    "MainSetpointWriteSetup.lean",
+    "d.get 1=2147489320#32",
+    "d.get 1=2147489284#32"
+  ],
+  [
+    "setpoint-reset-wrong-setpoint-fresh-byte",
+    "MainSetpointWriteSetup.lean",
+    "memory ram (sp+3912#32)=0#8",
+    "memory ram (sp+3912#32)=1#8"
+  ],
+  [
+    "setpoint-reset-wrong-setpoint-admin",
+    "MainSetpointWriteInput.lean",
+    "none true s",
+    "none false s"
+  ],
+  [
+    "setpoint-reset-wrong-derived-setpoint-method",
+    "MainSetpointWriteInput.lean",
+    ")=.put",
+    ")=.post"
+  ],
+  [
+    "setpoint-reset-setpoint-uses-temp-return",
+    "MainApiWriteCaller.lean",
+    "Ready 0 0x80fffab0#32",
+    "Ready 1 0x80fffab0#32"
+  ],
+  [
+    "setpoint-reset-success-falsely-preserves-state",
+    "MainApiWriteCallerSuccess.lean",
+    "AppState.At after (Spec.commit s (.ok res))",
+    "AppState.At after s"
+  ],
+  [
+    "setpoint-reset-kernel-error-changes-temperature",
+    "MainApiWriteCallerError.lean",
+    "AppState.At after (Spec.commit s (.error err))",
+    "AppState.At after {s with temp := 400#16}"
+  ],
+  [
+    "setpoint-reset-bad-auth-wrong-status-priority",
+    "MainApiWriteCallerRefusal.lean",
+    "=false ∧ status=401",
+    "=false ∧ status=403"
+  ],
+  [
+    "setpoint-reset-decoder-misses-404",
+    "ApiWriteHttpSpec.lean",
+    "status=400 ∨ status=404",
+    "status=400"
+  ],
+  [
+    "setpoint-reset-reset-falsely-preserves-initial",
+    "MainSetpointReset.lean",
+    "AppState.At after expected.state",
+    "AppState.At after Spec.initial"
+  ],
+  [
+    "setpoint-reset-reset-wrong-wire-status",
+    "MainSetpointReset.lean",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes expected.status",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes (expected.status+1)"
+  ],
+  [
+    "setpoint-reset-range-misreported-as200",
+    "MainSetpointResetWitness.lean",
+    "| .range => ⟨Spec.initial,422,",
+    "| .range => ⟨Spec.initial,200,"
+  ],
+  [
+    "mode-reset-mode-wrong-matcher-return",
+    "MainModeFourthCall.lean",
+    "d.get 1=2147488950#32",
+    "d.get 1=2147488876#32"
+  ],
+  [
+    "mode-reset-mode-omits-actual-instruction",
+    "MainModeWriteSetup.lean",
+    "Quiet.Steps B img 27",
+    "Quiet.Steps B img 26"
+  ],
+  [
+    "mode-reset-mode-wrong-fresh-flag",
+    "MainModeWriteSetup.lean",
+    "memory ram (sp+3824#32)=0#8",
+    "memory ram (sp+3824#32)=1#8"
+  ],
+  [
+    "mode-reset-mode-loses-initialized-s9",
+    "MainModeChain.lean",
+    "d.get 25=0x80fffa58#32",
+    "d.get 25=0x80fffa84#32"
+  ],
+  [
+    "mode-reset-mode-first-route-falsely-matches",
+    "MainModeChain.lean",
+    "d.pc=0x800013d2#32 ∧ d.get 10=0#32",
+    "d.pc=0x800013d2#32 ∧ d.get 10=1#32"
+  ],
+  [
+    "mode-reset-mode-wrong-admin-principal",
+    "MainModeWriteInput.lean",
+    "none true s",
+    "none false s"
+  ],
+  [
+    "mode-reset-mode-uses-wrong-upstream-s9",
+    "MainModeWriteInput.lean",
+    "(modePtr : c.get 25=0x80fffa58#32)",
+    "(modePtr : c.get 25=0x80fffa84#32)"
+  ],
+  [
+    "mode-reset-mode-uses-temp-return-adapter",
+    "MainModeCaller.lean",
+    "Ready 2 0x80fffa58#32",
+    "Ready 1 0x80fffa58#32"
+  ],
+  [
+    "mode-reset-mode-reset-falsely-preserves-state",
+    "MainModeReset.lean",
+    "AppState.At after expected.state",
+    "AppState.At after Spec.initial"
+  ],
+  [
+    "mode-reset-mode-reset-wrong-wire-status",
+    "MainModeReset.lean",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes expected.status",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes (expected.status+1)"
+  ],
+  [
+    "mode-reset-mode-wrong-completion-branch",
+    "MainModeReset.lean",
+    "d.pc=(if close then 0x80000978#32 else 0x800017be#32)",
+    "d.pc=(if close then 0x800017be#32 else 0x80000978#32)"
+  ],
+  [
+    "mode-reset-heat-incorrectly-leaves-heater-off",
+    "MainModeResetWitness.lean",
+    "with mode:=.heat,heater:=true",
+    "with mode:=.heat,heater:=false"
+  ],
+  [
+    "relay-reset-wrong-param-start-store",
+    "MainRelayCapture.lean",
+    "(params) (7#32) .w",
+    "(params) (6#32) .w"
+  ],
+  [
+    "relay-reset-wrong-param-end-store",
+    "MainRelayCapture.lean",
+    "((params+4#32)) (pathSize) .w",
+    "((params+4#32)) (pathSize-1#32) .w"
+  ],
+  [
+    "relay-reset-wrong-param-loop-cost",
+    "MainRelaySegment.lean",
+    "(5*xs.length+1)",
+    "(5*xs.length)"
+  ],
+  [
+    "relay-reset-matcher-falsely-preserves-zero-params",
+    "MainRelayMatch.lean",
+    "⟨d,MainRelayCapture.memory (MainPathStateSave.memory ram c) params (BitVec.ofNat 32 (7+param.length))⟩",
+    "⟨d,MainPathStateSave.memory ram c⟩"
+  ],
+  [
+    "relay-reset-return-frame-omits-ra",
+    "MainPathCapturedReturn.lean",
+    "ram 0x80ffeb30#32 96)",
+    "ram 0x80ffeb30#32 92)"
+  ],
+  [
+    "relay-reset-wrong-actual-fifth-return",
+    "MainRelayFifthCall.lean",
+    "d.get 1=2147489878#32",
+    "d.get 1=2147488950#32"
+  ],
+  [
+    "relay-reset-wrong-captured-start-word",
+    "MainRelayCaptured.lean",
+    "ramRead ram params .w=7#32",
+    "ramRead ram params .w=6#32"
+  ],
+  [
+    "relay-reset-wrong-initialized-relay-pointer",
+    "MainRelayChain.lean",
+    "pointer : c.get 24=0x80fffa2c#32",
+    "pointer : c.get 24=0x80fffa58#32"
+  ],
+  [
+    "relay-reset-wrong-actual-capture-count",
+    "MainRelayWriteSetup.lean",
+    "ramRead (memory ram savedIo) (sp+3680#32) .w=1#32",
+    "ramRead (memory ram savedIo) (sp+3680#32) .w=0#32"
+  ],
+  [
+    "relay-reset-wrong-actual-relay-fresh-flag",
+    "MainRelayWriteSetup.lean",
+    "memory ram savedIo (sp+3780#32)=0#8",
+    "memory ram savedIo (sp+3780#32)=1#8"
+  ],
+  [
+    "relay-reset-wrong-captured-pure-slice",
+    "MainRelayWriteInput.lean",
+    "ParamInput.captured (MainRelayCaptured.path param) 7 (7+param.length)=param",
+    "ParamInput.captured (MainRelayCaptured.path param) 6 (7+param.length)=param"
+  ],
+  [
+    "relay-reset-wrong-derived-relay-admin",
+    "MainRelayWriteInput.lean",
+    "(some param) true s",
+    "(some param) false s"
+  ],
+  [
+    "relay-reset-wrong-relay-return-adapter",
+    "MainRelayWriteInput.lean",
+    "MainApiWriteCaller.Ready 3 future",
+    "MainApiWriteCaller.Ready 2 future"
+  ],
+  [
+    "relay-reset-reset-loses-relay-update",
+    "MainRelayReset.lean",
+    "AppState.At after expected.state",
+    "AppState.At after Spec.initial"
+  ],
+  [
+    "relay-reset-reset-wrong-real-http-status",
+    "MainRelayReset.lean",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes expected.status",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes (expected.status+1)"
+  ],
+  [
+    "relay-reset-reset-wrong-completion-branch",
+    "MainRelayReset.lean",
+    "d.pc=(if close then 0x80000978#32 else 0x800017be#32)",
+    "d.pc=(if close then 0x800017be#32 else 0x80000978#32)"
+  ],
+  [
+    "t1-grammar-wrong-request-target-start",
+    "ApiRequestGrammar.lean",
+    ".ok 0 route.method.length (route.method.length+1)",
+    ".ok 0 route.method.length (route.method.length+2)"
+  ],
+  [
+    "t1-grammar-wrong-trimmed-header-end",
+    "ApiRequestGrammar.lean",
+    "(start+h.name.length+1+h.before.length+h.value.length) := by",
+    "(start+h.name.length+1+h.before.length+h.value.length+1) := by"
+  ],
+  [
+    "t1-grammar-wrong-content-length-fold",
+    "ApiHeaderGrammar.lean",
+    "= .ok (digitsValue acc xs) := by",
+    "= .ok (digitsValue acc xs+1) := by"
+  ],
+  [
+    "t1-grammar-missing-accepted-host",
+    "ApiHeadGrammar.lean",
+    "⟨f.headers++fieldsAt hs start,true,true,amount,false⟩",
+    "⟨f.headers++fieldsAt hs start,false,true,amount,false⟩"
+  ],
+  [
+    "t1-grammar-wrong-full-head-size",
+    "ApiFixedHead.lean",
+    "= .done r.head := by",
+    "= .done {r.head with len:=r.head.len+1} := by"
+  ],
+  [
+    "t1-grammar-full-head-falsely-incomplete",
+    "ApiHeadPrefix.lean",
+    "(proper : n<r.headBytes.length)",
+    "(proper : n≤r.headBytes.length)"
+  ],
+  [
+    "t1-grammar-head-stops-one-byte-early",
+    "ApiConsume.lean",
+    "⟨r.headBytes.length,r.headBytes,.done r.head⟩",
+    "⟨r.headBytes.length-1,r.headBytes,.done r.head⟩"
+  ],
+  [
+    "t1-grammar-body-delivery-extra-byte",
+    "ApiConsume.lean",
+    ") = r.bytes := by",
+    ") = r.bytes++[0#8] := by"
+  ],
+  [
+    "t1-grammar-wrong-query-path-slice",
+    "ApiRouting.lean",
+    "MainRequestSpans.path r.bytes r.head=r.route.path := by",
+    "MainRequestSpans.path r.bytes r.head=r.route.path.drop 1 := by"
+  ],
+  [
+    "t1-grammar-wrong-decoded-method",
+    "ApiRouting.lean",
+    "=method r.route := by",
+    "=MainMethodSpec.Method.get := by"
+  ],
+  [
+    "t1-grammar-root-rx-extra-byte",
+    "FirmwareOneRequest.lean",
+    "(reads r headerPlan bodyPlan hs bs (ApiReplySpec.close r))=r.bytes ∧",
+    "(reads r headerPlan bodyPlan hs bs (ApiReplySpec.close r))=r.bytes++[0#8] ∧"
+  ],
+  [
+    "t1-grammar-root-wrong-http-status",
+    "FirmwareOneRequest.lean",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes (r.reply Spec.initial).status",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes ((r.reply Spec.initial).status+1)"
+  ],
+  [
+    "t1-grammar-root-wrong-close-branch",
+    "FirmwareOneRequest.lean",
+    "d.pc=(if ApiReplySpec.close r then 0x80000978#32 else 0x800017be#32)",
+    "d.pc=(if ApiReplySpec.close r then 0x800017be#32 else 0x80000978#32)"
+  ],
+  [
+    "t1-grammar-root-loses-committed-state",
+    "FirmwareOneRequest.lean",
+    "AppState.At after (r.reply Spec.initial).state ∧ ramRead",
+    "AppState.At after Spec.initial ∧ ramRead"
+  ],
+  [
+    "t1-grammar-root-borrow-still-held",
+    "FirmwareOneRequest.lean",
+    "ramRead after 0x80ffebbc#32 .w=0#32",
+    "ramRead after 0x80ffebbc#32 .w=0xffffffff#32"
+  ],
+  [
+    "t1-grammar-root-wrong-live-stack",
+    "FirmwareOneRequest.lean",
+    "d.get 2=0x80ffeb90#32 ∧ d.get 8=0x80fff814#32 ∧ d.mie_=false ∧\n      AppState.At",
+    "d.get 2=0x80ffeb94#32 ∧ d.get 8=0x80fff814#32 ∧ d.mie_=false ∧\n      AppState.At"
+  ],
+  [
+    "t1-witness-duplicate-auth-priority",
+    "FirmwareOneRequestWitness.lean",
+    "| .unauth => 401",
+    "| .unauth => 200"
+  ],
+  [
+    "t1-witness-content-length-mismatch",
+    "FirmwareOneRequestWitness.lean",
+    "WireSpec.ascii \"002\"",
+    "WireSpec.ascii \"003\""
+  ]
+]
