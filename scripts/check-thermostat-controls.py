@@ -895,6 +895,7 @@ def main():
     mutations.extend(json.loads((ROOT / 'scripts/thermostat-t1-controls.json').read_text()))
     mutations.extend(json.loads((ROOT / 'scripts/thermostat-g6-controls.json').read_text()))
     mutations.extend(json.loads((ROOT / 'scripts/thermostat-g7-controls.json').read_text()))
+    mutations.extend(json.loads((ROOT / 'scripts/thermostat-t3-controls.json').read_text()))
     assert len({name for name, _, _, _ in mutations}) == len(mutations)
     if args.only:
         requested = set(args.only)
@@ -906,7 +907,7 @@ def main():
             # Mutate the public TX conclusion, leaving an identically spelled
             # local integration claim unchanged to avoid normalizing every
             # serializer branch before reaching the intended root mismatch.
-            count = 1 if name.startswith('g7_') or name in {'g6_next_tx_bytes', 'g6_sequence_tx'} else -1
+            count = 1 if name.startswith(('g7_', 't3_')) or name in {'g6_next_tx_bytes', 'g6_sequence_tx'} else -1
             wrong = source.replace(old, new, count)
             assert source != wrong
             if name == 'g7_g7_next_array_actual_destination':
@@ -958,6 +959,38 @@ def main():
                 assert positive.returncode == 0, (name, 'positive framing bridge failed', positive.stdout + positive.stderr)
                 (RV / 'build/thermostat-positive-request-framing.log').write_text(positive.stdout + positive.stderr)
                 wrong = framing_comparison(wrong)
+            if name == 't3_stack_json_actual_byte_count':
+                # Independently check the full original encoder proof before
+                # comparing types. Failed inference/resource use never passes.
+                def encoder_comparison(text):
+                    goal_start = source.index('    ∃ d n r, n ≤ 3893')
+                    goal_end = source.index(' := by', goal_start)
+                    proof_end = source.index('\nend ', goal_end)
+                    original_goal = source[goal_start:goal_end]
+                    wanted_goal = text[goal_start:text.index(' := by', goal_start)]
+                    proof = source[goal_end + len(' := by'):proof_end]
+                    nested = '\n'.join('  ' + line if line else line for line in proof.split('\n'))
+                    compare = """
+  run_tac Lean.Elab.Tactic.withMainContext do
+    let goal ← Lean.Elab.Tactic.getMainGoal
+    let declaration ← Lean.Meta.getLocalDeclFromUserName `actual
+    let actual := declaration.toExpr
+    let found ← Lean.Meta.inferType actual
+    let expected ← goal.getType
+    let agrees ← Lean.Meta.withTransparency .reducible (Lean.Meta.isDefEq found expected)
+    unless agrees do throwError "type mismatch: independently checked encoder conclusion differs"
+    goal.assign actual
+"""
+                    return ('import Lean.Elab.Tactic.Basic\n' + source[:goal_start] + wanted_goal +
+                        ' := by\n  have actual :\n' + original_goal + ' := by' + nested + compare + source[proof_end:])
+                baseline = Path(tmp) / 'EncoderBaseline.lean'
+                baseline.write_text(encoder_comparison(source))
+                positive = subprocess.run(['elan', 'run', 'leanprover/lean4:v4.35.0', 'lean',
+                    '-j1', '-M1500', '-Dpp.maxSteps=200', '-DmaxErrors=1', str(baseline)],
+                    cwd=RV, env=dict(os.environ, LEAN_PATH='.'), capture_output=True, text=True, timeout=120)
+                assert positive.returncode == 0, (name, 'positive encoder bridge failed', positive.stdout + positive.stderr)
+                (RV / 'build/thermostat-positive-t3-encoder.log').write_text(positive.stdout + positive.stderr)
+                wrong = encoder_comparison(wrong)
             bad = Path(tmp) / 'Bad.lean'
             bad.write_text(wrong)
             env = dict(os.environ, LEAN_PATH='.')
@@ -969,7 +1002,7 @@ def main():
             # Resource exhaustion is still rejected below, never a negative PASS.
             elaboration = ['-DmaxHeartbeats=3000000', '-DmaxRecDepth=10000'] if module in {
                 'FirmwareNextRequest.lean', 'FirmwareRequestSequence.lean'} else []
-            if name.startswith('g7_'):
+            if name.startswith(('g7_', 't3_')):
                 timeout = 360
                 elaboration = ['-Dpp.maxSteps=200', '-DmaxHeartbeats=1000000']
             if name in {'g7_g7_next_array_actual_destination', 'g7_g7_request_original_framing'}:
@@ -983,7 +1016,7 @@ def main():
             assert result.returncode == 1 and 'error:' in output, (name, output)
             assert 'unknown module' not in output and 'does not exist' not in output, output
             assert not any(reason in output for reason in (
-                'maximum recursion depth', 'deep recursion', 'maximum number of heartbeats', 'out of memory', 'excessive memory consumption', 'unexpected token', 'Unknown identifier', 'Unknown constant', 'invalid field', 'Unknown field', 'lean.unknownIdentifier', 'Invalid dotted identifier', 'failed to synthesize', 'Error pretty printing', 'error pretty printing', 'invalid -D parameter', 'unknown configuration option', 'unknown option', 'unknown tactic', 'declaration has metavariables', 'memory allocation', 'input file')), (name, output)
+                'maximum recursion depth', 'deep recursion', 'maximum number of heartbeats', 'out of memory', 'excessive memory consumption', 'unexpected token', 'Unknown identifier', 'Unknown constant', 'invalid field', 'Unknown field', 'lean.unknownIdentifier', 'Invalid dotted identifier', 'failed to synthesize', 'Error pretty printing', 'error pretty printing', 'invalid -D parameter', 'unknown configuration option', 'unknown option', 'unknown tactic', 'declaration has metavariables', 'memory allocation', 'input file', 'timeout at', 'aborted', 'interrupted')), (name, output)
             (RV / f'build/thermostat-negative-{name}.log').write_text(output)
             print(f'PASS negative {name}', flush=True)
 

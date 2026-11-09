@@ -1,0 +1,54 @@
+import Projects.thermostat.JsonLiteralQuiet
+import Projects.thermostat.StackAccess
+import Projects.thermostat.StackFormatLayout
+import Projects.thermostat.StackFormatSpace
+set_option autoImplicit false
+set_option maxRecDepth 3000
+set_option maxHeartbeats 2000000
+namespace E5R.Thermostat.StackJsonLiteral
+open E5R E5R.Thermostat JsonLiteral
+theorem contract_quiet (c : Core) (ram : Word → BitVec 8) (p obj args dst : Word)
+    (cap : Nat) (litPrefix : List (BitVec 8)) (values : Fin 8 → FormatValue.Value) (i : Fin 9)
+    (hr : FormatEngineReady.Ready c (p+160#32) obj args (JsonFormatData.tagPointer ⟨2*i.val,by have := i.isLt;omega⟩)
+      i.val (JsonFormatData.tagByte ⟨2*i.val,by have := i.isLt;omega⟩))
+    (h : StackFormatLayout.Layout ram p obj args dst cap litPrefix.length values)
+    (hx : Bytes.Span StackBoard.board ram dst litPrefix)
+    (hf : litPrefix.length+(JsonProgram.literal i).length ≤ cap) :
+    ∃ d n r, n ≤ 144 ∧ Quiet.Steps StackBoard.board img n ⟨c,ram⟩ ⟨d,r⟩ ∧
+      d.pc = FormatEngineNext.resultPc (JsonFormatData.tagByte ⟨2*i.val+1,by have := i.isLt;omega⟩) ∧
+      d.get 2 = p+160#32 ∧
+      ((JsonFormatData.tagByte ⟨2*i.val+1,by have := i.isLt;omega⟩).toNat ≠ 0 →
+        FormatEngineReady.Ready d (p+160#32) obj args (JsonFormatData.tagPointer ⟨2*i.val+1,by have := i.isLt;omega⟩)
+          i.val (JsonFormatData.tagByte ⟨2*i.val+1,by have := i.isLt;omega⟩)) ∧
+      d.get 27 = c.get 27 ∧ d.sameCsr c ∧
+      StackFormatLayout.Layout r p obj args dst cap (litPrefix++JsonProgram.literal i).length values ∧
+      Bytes.Span StackBoard.board r dst (litPrefix++JsonProgram.literal i) ∧ FormatLoopFrame.Frame ram r p obj dst cap := by
+  let desc := JsonFormatData.tagPointer ⟨2*i.val,by have := i.isLt;omega⟩
+  let nxt := JsonFormatData.tagByte ⟨2*i.val+1,by have := i.isLt;omega⟩
+  have hlen := (JsonProgram.literal_lengths i).2
+  have hl := StackFormatSpace.cursor h.toSpace 128 (by decide) (by decide) (JsonFormatData.literalPointer i)
+    (JsonProgram.literal i) (StackAccess.rom_span (JsonFormatData.literal_span i ram) (fun j => ((JsonFormatData.literal_layout i).2.2 j).2)) hlen (fun j => StackAccess.outside ((JsonFormatData.literal_layout i).2.2 j).2)
+  rw [JsonFormatData.literal_start] at hl
+  have hr' : FormatEngineReady.Ready c ((p+128#32)+32#32) obj args desc i.val (BitVec.ofNat 8 (JsonProgram.literal i).length) := by
+    simpa only [BitVec.add_assoc,show (128#32+32#32)=160#32 by decide +kernel,JsonFormatData.literal_tag,desc] using hr
+  have hn : ReadBytes.Byte StackBoard.board img ram ((desc+1#32)+BitVec.ofNat 32 (JsonProgram.literal i).length) nxt := by
+    rw [←JsonFormatData.literal_start,JsonFormatData.literal_end]
+    exact StackAccess.rom_byte (JsonFormatData.tag _ ram) (JsonFormatData.tag_layout _).2.2
+  have hro : StackBoard.board.inRam ((desc+1#32)+BitVec.ofNat 32 (JsonProgram.literal i).length) 1 = false := by
+    rw [←JsonFormatData.literal_start,JsonFormatData.literal_end]
+    exact StackAccess.outside (JsonFormatData.tag_layout _).2.2
+  obtain ⟨d,n,r,hb,td,hpc,hsp,ready,h27,hc,he⟩ := E5R.Thermostat.FormatLiteralPiece.contract_quiet StackBoard.board c ram (p+128#32) obj args desc dst cap litPrefix.length i.val
+    (JsonProgram.literal i) nxt hr' hl hf hn hro
+  have he176 := AppendEffect.widen he (total := 176) (by decide)
+  have he224 := AppendEffect.expand he176 (total := 224) (by decide)
+  refine ⟨d,n,r,by omega,td,hpc,?_,?_,h27,hc,?_,
+    AppendEffect.accumulates he224 h.output h.capacity hf h.outputArena h.objectOutput hx,
+    FormatLoopFrame.of_effect he176 hf⟩
+  · simpa only [BitVec.add_assoc,show (128#32+32#32)=160#32 by decide +kernel] using hsp
+  · intro hnz
+    have hh := ready hnz
+    rw [←JsonFormatData.literal_start,JsonFormatData.literal_end] at hh
+    simpa only [BitVec.add_assoc,show (128#32+32#32)=160#32 by decide +kernel] using hh
+  · simpa only [List.length_append] using StackFormatLayout.after_append h he224 hf
+
+end E5R.Thermostat.StackJsonLiteral

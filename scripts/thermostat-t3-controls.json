@@ -1,0 +1,1388 @@
+[
+  [
+    "t3_chunk_phase_actual_cursor",
+    "ChunkPhase.lean",
+    "c.get 24=BitVec.ofNat 32 r.read",
+    "c.get 24=BitVec.ofNat 32 (r.read+1)"
+  ],
+  [
+    "t3_chunk_phase_actual_filled",
+    "ChunkPhase.lean",
+    "ramRead ram (sp+3288#32) .w=BitVec.ofNat 32 r.read",
+    "ramRead ram (sp+3288#32) .w=BitVec.ofNat 32 (r.read+1)"
+  ],
+  [
+    "t3_chunk_phase_received_byte",
+    "ChunkPhase.lean",
+    "ChunkBufferSpec.consume (fun _ => byte) 1 raw",
+    "ChunkBufferSpec.consume (fun _ => byte+1) 1 raw"
+  ],
+  [
+    "t3_chunk_phase_reset_counter",
+    "ChunkPhase.lean",
+    "(HeaderPhase.classify s served original) := by",
+    "(HeaderPhase.classify s (served+1) original) := by"
+  ],
+  [
+    "t3_chunk_complete_exact_reply",
+    "ChunkCompletePhase.lean",
+    "(ChunkPhase.classify s served original head r) := by",
+    "(ChunkPhase.classify s (served+1) original head r) := by"
+  ],
+  [
+    "t3_chunk_complete_borrow_available",
+    "ChunkCompletePhase.lean",
+    "RequestPhase.At m.core m.ram ghost",
+    "RequestPhase.At m.core (ramWrite m.ram 0x80ffebbc#32 0xffffffff#32 .w) ghost"
+  ],
+  [
+    "t3_chunk_complete_original_header",
+    "ChunkCompletePhase.lean",
+    "(context : ChunkPhase.Context c ram s served original head)",
+    "(context : ChunkPhase.Context c ram s served (original++[0#8]) head)"
+  ],
+  [
+    "t3_chunk_reactive_actual_setup_steps",
+    "ChunkReactive.lean",
+    "Quiet.Steps B img 14",
+    "Quiet.Steps B img 13"
+  ],
+  [
+    "t3_chunk_reactive_actual_tail_steps",
+    "ChunkReactive.lean",
+    "Quiet.Steps B img 7",
+    "Quiet.Steps B img 6"
+  ],
+  [
+    "t3_chunk_reactive_real_filled_update",
+    "ChunkReactive.lean",
+    "MainChunkLoopInvariant.At B d after sp start read written (filled+1) decoder",
+    "MainChunkLoopInvariant.At B d after sp start read written filled decoder"
+  ],
+  [
+    "t3_chunk_reactive_actual_stored_byte",
+    "ChunkReactive.lean",
+    "=(c.get 11).setWidth 8 \u2227 ChunkCallerFrame.At",
+    "=(c.get 10).setWidth 8 \u2227 ChunkCallerFrame.At"
+  ],
+  [
+    "t3_chunk_reactive_recorded_lsr",
+    "ChunkReactive.lean",
+    "MainChunkWaitSafety.LsrOnly reads \u2227 MainChunkCoreFrame.At",
+    "reads=[] \u2227 MainChunkCoreFrame.At"
+  ],
+  [
+    "t3_chunk_reactive_actual_rbr_pc",
+    "ChunkReactive.lean",
+    "let d := c.wr 11 (UartPoll.byte (o 0)) 0x80000e84#32",
+    "let d := c.wr 11 (UartPoll.byte (o 0)) 0x80000e88#32"
+  ],
+  [
+    "t3_chunk_reactive_decoder_budget",
+    "ChunkReactive.lean",
+    "\u2203 n d after,n\u2264132",
+    "\u2203 n d after,n\u22647"
+  ],
+  [
+    "t3_chunk_reactive_pure_input_byte",
+    "ChunkReactive.lean",
+    "let byte := (c.get 11).setWidth 8",
+    "let byte := (c.get 10).setWidth 8"
+  ],
+  [
+    "t3_image_actual_executable_extent",
+    "ImageBounds.lean",
+    "(bad : a<0x80000000 \u2228 0x800056a8\u2264a)",
+    "(bad : a<0x80000000 \u2228 0x800056a6\u2264a)"
+  ],
+  [
+    "t3_image_actual_alignment",
+    "ImageBounds.lean",
+    "m.core.pc.getLsbD 0=false \u2227 \u2203 i len",
+    "m.core.pc.getLsbD 0=true \u2227 \u2203 i len"
+  ],
+  [
+    "t3_panic_actual_loop_jump",
+    "PanicLoop.lean",
+    "some (.jal 0 0xfffffffc#32,2#32)",
+    "some (.jal 0 0xfffffffa#32,2#32)"
+  ],
+  [
+    "t3_panic_actual_saved_call_target",
+    "PanicEntries.lean",
+    "c.get 1=0x80004b58#32",
+    "c.get 1=0x80004b5a#32"
+  ],
+  [
+    "t3_receive_cut_actual_free_borrow",
+    "CutBounds.lean",
+    "AppState.At m.ram g.snapshot",
+    "AppState.At (ramWrite m.ram 0x80ffebbc#32 0xffffffff#32 .w) g.snapshot"
+  ],
+  [
+    "t3_receive_cut_actual_stack_pointer",
+    "CutBounds.lean",
+    "m.core.get 2=0x80ffeb90#32",
+    "m.core.get 2=0x80ffeb94#32"
+  ],
+  [
+    "t3_firmware_actual_panic_exclusion",
+    "FirmwareBounds.lean",
+    "m.core.pc\u2209PanicEntries.entries",
+    "m.core.pc\u2208PanicEntries.entries"
+  ],
+  [
+    "t3_io_actual_rbr_address",
+    "IoBounds.lean",
+    "r.addr=0x10000000#32 \u2228 r.addr=0x10000005#32",
+    "r.addr=0x10000005#32 \u2228 r.addr=0x10000005#32"
+  ],
+  [
+    "t3_io_actual_thr_address",
+    "IoBounds.lean",
+    "e.addr=0x10000000#32 \u2227",
+    "e.addr=0x10000001#32 \u2227"
+  ],
+  [
+    "t3_io_actual_byte_width",
+    "IoBounds.lean",
+    "e.val.toNat<256",
+    "e.val.toNat<255"
+  ],
+  [
+    "t3_effect_core_property_soundness",
+    "EffectCoreProperty.lean",
+    "\u2192 P c := by",
+    "\u2192 P {c with pc:=c.pc+1} := by"
+  ],
+  [
+    "t3_startup_actual_sp_transient",
+    "StackScope.lean",
+    "m.core.get 2=0x81000008#32",
+    "m.core.get 2=0x81000000#32"
+  ],
+  [
+    "t3_startup_actual_pc_transient",
+    "StackScope.lean",
+    "m.core.pc=0x8000000c#32",
+    "m.core.pc=0x80000010#32"
+  ],
+  [
+    "t3_cut_actual_persisted_pending_state",
+    "CommittedCut.lean",
+    "| .reply p => p.response.state",
+    "| .reply p => g.snapshot"
+  ],
+  [
+    "t3_cut_actual_snapshot_storage",
+    "CommittedCut.lean",
+    "AppState.At m.ram (snapshot g) \u2227 Spec.Inv (snapshot g) \u2227",
+    "AppState.At (ramWrite m.ram 0x80ffebbc#32 0xffffffff#32 .w) (snapshot g) \u2227 Spec.Inv (snapshot g) \u2227"
+  ],
+  [
+    "t3_cut_actual_borrow_zero",
+    "CommittedCut.lean",
+    "ramRead m.ram 0x80ffebbc#32 .w=0#32",
+    "ramRead m.ram 0x80ffebbc#32 .w=0xffffffff#32"
+  ],
+  [
+    "t3_prefix_actual_image_bound",
+    "FirmwarePrefix.lean",
+    "m.core.pc.toNat<0x800056a8",
+    "m.core.pc.toNat<0x80000000"
+  ],
+  [
+    "t3_prefix_actual_interrupt_mask",
+    "FirmwarePrefix.lean",
+    "m.core.mie_=false \u2227",
+    "m.core.mie_=true \u2227"
+  ],
+  [
+    "t3_prefix_actual_boundary_borrow",
+    "FirmwarePrefix.lean",
+    "ramRead cut.ram 0x80ffebbc#32 .w=0#32",
+    "ramRead cut.ram 0x80ffebbc#32 .w=0xffffffff#32"
+  ],
+  [
+    "t3_stream_exact_output_prefix",
+    "FirmwareStream.lean",
+    "ProtocolStreamTrace.Trace g (Observed.input reads) (Observed.output evs) next",
+    "ProtocolStreamTrace.Trace g (Observed.input reads) (Observed.output evs++[0#8]) next"
+  ],
+  [
+    "t3_stream_exact_reset_counter",
+    "FirmwareStream.lean",
+    "ReactiveEnvelope.Envelope At m ProtocolStreamSpec.initial := by",
+    "ReactiveEnvelope.Envelope At m {ProtocolStreamSpec.initial with served:=1} := by"
+  ],
+  [
+    "t3_stream_architectural_interrupt_mask",
+    "FirmwareStream.lean",
+    "m.core.pc=0x80000000#32 \u2227 m.core.mie_=false \u2227",
+    "m.core.pc=0x80000000#32 \u2227 (m.core.mie_=false \u2228 m.core.mie_=true) \u2227"
+  ],
+  [
+    "t3_stream_exact_accepted_input_prefix",
+    "FirmwareStream.lean",
+    "(Observed.input reads) (Observed.output evs) g \u2227 \u00acEscapes",
+    "(Observed.input reads++[0#8]) (Observed.output evs) g \u2227 \u00acEscapes"
+  ],
+  [
+    "t3_stream_closed_persisted_borrow",
+    "FirmwareStream.lean",
+    "ReactiveEnvelope.Envelope At \u27e8d,m.ram\u27e9 next",
+    "ReactiveEnvelope.Envelope At \u27e8d,ramWrite m.ram 0x80ffebbc#32 0xffffffff#32 .w\u27e9 next"
+  ],
+  [
+    "t3_stream_actual_cut_counter",
+    "FirmwareStream.lean",
+    "RefusalSendPhase.Active m g",
+    "RefusalSendPhase.Active m {g with served:=g.served+1}"
+  ],
+  [
+    "t3_sender_actual_queue_order",
+    "SenderEntry.lean",
+    "(queue : p.remaining=SendPhase.header call++SendPhase.body call)",
+    "(queue : p.remaining=SendPhase.body call++SendPhase.header call)"
+  ],
+  [
+    "t3_read_handler_actual_reply_status",
+    "ReadHandlerPrepare.lean",
+    "\u27e8s,200,WireSpec.ascii",
+    "\u27e8s,201,WireSpec.ascii"
+  ],
+  [
+    "t3_read_handler_actual_borrow_release",
+    "ReadHandlerPrepare.lean",
+    "NormalSendPhase.Ready d after (reply state)",
+    "NormalSendPhase.Ready d (ramWrite after 0x80ffebbc#32 0xffffffff#32 .w) (reply state)"
+  ],
+  [
+    "t3_read_route_actual_head_flag",
+    "ReadRoutePrepare.lean",
+    "served used true close false := by",
+    "served used true close true := by"
+  ],
+  [
+    "t3_write_return_actual_time_bound",
+    "WriteReturnPrepare.lean",
+    "\u2203 n d after,n\u226442",
+    "\u2203 n d after,n\u226441"
+  ],
+  [
+    "t3_write_return_actual_body_pointer",
+    "WriteReturnPrepare.lean",
+    "(MainResponseExtractedReply.pointer json) (BitVec.ofNat 32 response.mime.length)",
+    "(MainResponseExtractedReply.pointer json+1#32) (BitVec.ofNat 32 response.mime.length)"
+  ],
+  [
+    "t3_write_return_actual_used",
+    "WriteReturnPrepare.lean",
+    "metadata : LoopTransactionMemory.At ram used",
+    "metadata : LoopTransactionMemory.At ram (used+1)"
+  ],
+  [
+    "t3_normal_response_actual_extracted_steps",
+    "NormalResponsePrepare.lean",
+    "Quiet.Steps B img 29",
+    "Quiet.Steps B img 28"
+  ],
+  [
+    "t3_normal_response_actual_head_flag",
+    "NormalResponsePrepare.lean",
+    "method : MainMethod.head (ram 0x80fff9f4#32)=headOnly",
+    "method : MainMethod.head (ram 0x80fff9f4#32)=(!headOnly)"
+  ],
+  [
+    "t3_normal_response_actual_prepare_steps",
+    "NormalResponsePrepare.lean",
+    "Quiet.Steps B img 26",
+    "Quiet.Steps B img 25"
+  ],
+  [
+    "t3_normal_response_actual_body_capacity",
+    "NormalResponsePrepare.lean",
+    "bodyBound : response.payload.length\u2264832",
+    "bodyBound : response.payload.length\u2264833"
+  ],
+  [
+    "t3_header_phase_pure_actual_byte",
+    "HeaderPhase.lean",
+    "ProtocolStreamSpec.receive \u27e8s,served,.head input\u27e9 byte=",
+    "ProtocolStreamSpec.receive \u27e8s,served,.head input\u27e9 0#8="
+  ],
+  [
+    "t3_header_phase_preserved_counter",
+    "HeaderPhase.lean",
+    "132) : Caller d after served := by",
+    "132) : Caller d after (served+1) := by"
+  ],
+  [
+    "t3_header_phase_initial_counter",
+    "HeaderPhase.lean",
+    "At c ram \u27e8s,served,.head []\u27e9 := by",
+    "At c ram \u27e8s,served+1,.head []\u27e9 := by"
+  ],
+  [
+    "t3_header_phase_actual_rx_projection",
+    "HeaderPhase.lean",
+    "Trace g (Observed.input reads) [] next",
+    "Trace g [] [] next"
+  ],
+  [
+    "t3_header_phase_actual_no_fault",
+    "HeaderPhase.lean",
+    "\u00acEscapes B img \u27e8c,ram\u27e9 := by",
+    "Escapes B img \u27e8c,ram\u27e9 := by"
+  ],
+  [
+    "t3_header_phase_actual_reset_pc",
+    "HeaderPhase.lean",
+    "(pc : c.pc=0x80000000#32)",
+    "(pc : c.pc=0x80000004#32)"
+  ],
+  [
+    "t3_header_phase_exact_accepted_extent",
+    "HeaderPhase.lean",
+    "head.len=input.length := by",
+    "head.len=input.length+1 := by"
+  ],
+  [
+    "t3_reparse_actual_parser_result",
+    "HeaderReparse.lean",
+    "(HttpRequestBytes.parse input 1024 1024)",
+    "(HttpRequestBytes.parse input.reverse 1024 1024)"
+  ],
+  [
+    "t3_reparse_preserved_region",
+    "HeaderReparse.lean",
+    "ViewFrame.Region ram after 0x80ffeb90#32 132 := by",
+    "ViewFrame.Region ram after 0x80ffeb90#32 65536 := by"
+  ],
+  [
+    "t3_byte_store_actual_steps",
+    "HeaderByteStore.lean",
+    "Quiet.Steps B img 10",
+    "Quiet.Steps B img 9"
+  ],
+  [
+    "t3_byte_store_actual_byte",
+    "HeaderByteStore.lean",
+    "=(c.get 10).setWidth 8",
+    "=(c.get 11).setWidth 8"
+  ],
+  [
+    "t3_byte_store_actual_count",
+    "HeaderByteStore.lean",
+    "d.get 12=BitVec.ofNat 32 (filled+1)",
+    "d.get 12=BitVec.ofNat 32 (filled+2)"
+  ],
+  [
+    "t3_reactive_actual_rbr_byte",
+    "HeaderReactive.lean",
+    "let next := input++[(c.get 10).setWidth 8]",
+    "let next := input++[(c.get 11).setWidth 8]"
+  ],
+  [
+    "t3_reactive_actual_rbr_pc",
+    "HeaderReactive.lean",
+    "let d := c.wr 10 (UartPoll.byte (o 0)) 0x80000bae#32",
+    "let d := c.wr 10 (UartPoll.byte (o 0)) 0x80000bb2#32"
+  ],
+  [
+    "t3_reactive_recorded_lsr",
+    "HeaderReactive.lean",
+    "MainHeaderWaitSafety.LsrOnly reads \u2227 MainGprBank.Frame c d",
+    "reads=[] \u2227 MainGprBank.Frame c d"
+  ],
+  [
+    "t3_protocol_refusal_restarts",
+    "ProtocolStreamSpec.lean",
+    "p.nextCount=0 \u2227",
+    "p.nextCount=1 \u2227"
+  ],
+  [
+    "t3_protocol_reply_blocks_rx",
+    "ProtocolStreamSpec.lean",
+    "receive m byte=none := by",
+    "receive m byte=some m := by"
+  ],
+  [
+    "t3_length_phase_pure_actual_byte",
+    "LengthPhase.lean",
+    "head amount body\u27e9 byte=",
+    "head amount body\u27e9 0#8="
+  ],
+  [
+    "t3_length_phase_real_rx_projection",
+    "LengthPhase.lean",
+    "Trace g (Observed.input reads) [] next",
+    "Trace g [] [] next"
+  ],
+  [
+    "t3_length_phase_actual_no_fault",
+    "LengthPhase.lean",
+    "\u00acEscapes B img \u27e8c,ram\u27e9 := by",
+    "Escapes B img \u27e8c,ram\u27e9 := by"
+  ],
+  [
+    "t3_length_phase_complete_actual_counter",
+    "LengthPhase.lean",
+    "classify s served original head amount bodyNext,step",
+    "classify s (served+1) original head amount bodyNext,step"
+  ],
+  [
+    "t3_length_phase_actual_start_counter",
+    "LengthPhase.lean",
+    "(HeaderPhase.classify s served original) := by",
+    "(HeaderPhase.classify s (served+1) original) := by"
+  ],
+  [
+    "t3_length_phase_actual_header_copy",
+    "LengthPhase.lean",
+    "(earlier : \u2200 k,k<original.length",
+    "(earlier : \u2200 k,k+1<original.length"
+  ],
+  [
+    "t3_length_store_actual_steps",
+    "LengthByteStore.lean",
+    "Quiet.Steps B img 10",
+    "Quiet.Steps B img 9"
+  ],
+  [
+    "t3_length_store_actual_byte",
+    "LengthByteStore.lean",
+    "=(c.get 10).setWidth 8",
+    "=(c.get 11).setWidth 8"
+  ],
+  [
+    "t3_length_store_actual_branch",
+    "LengthByteStore.lean",
+    "then 0x80000c3a#32 else 0x80000c98#32",
+    "then 0x80000c98#32 else 0x80000c3a#32"
+  ],
+  [
+    "t3_length_reactive_actual_byte",
+    "LengthReactive.lean",
+    "let next := input++[(c.get 10).setWidth 8]",
+    "let next := input++[(c.get 11).setWidth 8]"
+  ],
+  [
+    "t3_length_reactive_complete_target",
+    "LengthReactive.lean",
+    "d.get 25=BitVec.ofNat 32 (head.len+amount)",
+    "d.get 25=BitVec.ofNat 32 amount"
+  ],
+  [
+    "t3_length_reactive_static_frame",
+    "LengthReactive.lean",
+    "ViewFrame.Region ram after 0x80ffeb90#32 132 := by",
+    "ViewFrame.Region ram after 0x80ffeb90#32 65536 := by"
+  ],
+  [
+    "t3_length_reactive_recorded_lsr",
+    "LengthReactive.lean",
+    "MainLengthWaitSafety.LsrOnly reads \u2227 MainGprBank.Frame c d",
+    "reads=[] \u2227 MainGprBank.Frame c d"
+  ],
+  [
+    "t3_length_reactive_actual_rbr_pc",
+    "LengthReactive.lean",
+    "let d := c.wr 10 (MainLengthUart.byte (o 0)) 0x80000c78#32",
+    "let d := c.wr 10 (MainLengthUart.byte (o 0)) 0x80000c7c#32"
+  ],
+  [
+    "t3_normal_send_actual_return",
+    "NormalSendPhase.lean",
+    "c.get 1=0x80001784#32",
+    "c.get 1=0x80001786#32"
+  ],
+  [
+    "t3_normal_send_counter_bound",
+    "NormalSendPhase.lean",
+    "room : close=false \u2192 served<100",
+    "room : close=false \u2192 served\u2264100"
+  ],
+  [
+    "t3_normal_send_actual_used",
+    "NormalSendPhase.lean",
+    "metadata : LoopTransactionMemory.At ram used",
+    "metadata : LoopTransactionMemory.At ram (used+1)"
+  ],
+  [
+    "t3_normal_send_actual_next_count",
+    "NormalSendPhase.lean",
+    "p.nextCount=(if close then 0 else served)",
+    "p.nextCount=(if close then 0 else served+1)"
+  ],
+  [
+    "t3_normal_send_ready_borrow",
+    "NormalSendPhase.lean",
+    "HeaderPhase.enter ready",
+    "HeaderPhase.enter (ram := ramWrite after 0x80ffebbc#32 0xffffffff#32 .w) ready"
+  ],
+  [
+    "t3_trace_actual_input_order",
+    "ProtocolStreamTrace.lean",
+    "Trace a (rx\u2080++rx\u2081) (tx\u2080++tx\u2081) c",
+    "Trace a (rx\u2081++rx\u2080) (tx\u2080++tx\u2081) c"
+  ],
+  [
+    "t3_trace_actual_output_order",
+    "ProtocolStreamTrace.lean",
+    "Trace a (rx\u2080++rx\u2081) (tx\u2080++tx\u2081) c",
+    "Trace a (rx\u2080++rx\u2081) (tx\u2081++tx\u2080) c"
+  ],
+  [
+    "t3_reactive_envelope_no_escape",
+    "ReactiveEnvelope.lean",
+    "(h : Envelope I m g) :\n    \u00acEscapes B img m",
+    "(h : Envelope I m g) :\n    Escapes B img m"
+  ],
+  [
+    "t3_reactive_reach_input",
+    "ReactiveEnvelope.lean",
+    "(Observed.input reads) (Observed.output evs) g \u2227",
+    "(Observed.input reads++[0#8]) (Observed.output evs) g \u2227"
+  ],
+  [
+    "t3_reactive_platform_no_escape",
+    "ReactiveEnvelope.lean",
+    "\u00acEscapes B img m \u2227 \u2203 reads g",
+    "Escapes B img m \u2227 \u2203 reads g"
+  ],
+  [
+    "t3_tx_phase_exact_consumed_input",
+    "UartTxPhase.lean",
+    "Trace g (Observed.input reads) (Observed.output evs) next",
+    "Trace g (Observed.input reads++[0#8]) (Observed.output evs) next"
+  ],
+  [
+    "t3_tx_phase_exact_emitted_output",
+    "UartTxPhase.lean",
+    "Trace g (Observed.input reads) (Observed.output evs) next",
+    "Trace g (Observed.input reads) [] next"
+  ],
+  [
+    "t3_tx_phase_actual_gpr_frame",
+    "UartTxPhase.lean",
+    "r\u226012 \u2192 r\u226016 \u2192 r\u226017 \u2192 d.get r=c.get r",
+    "r\u226011 \u2192 r\u226016 \u2192 r\u226017 \u2192 d.get r=c.get r"
+  ],
+  [
+    "t3_tx_phase_actual_mask",
+    "UartTxPhase.lean",
+    "c.mie_=false := by",
+    "c.mie_=true := by"
+  ],
+  [
+    "t3_tx_phase_actual_no_fault",
+    "UartTxPhase.lean",
+    "\u00acEscapes B img \u27e8c,ram\u27e9 := by",
+    "Escapes B img \u27e8c,ram\u27e9 := by"
+  ],
+  [
+    "t3_refusal_actual_return",
+    "RefusalPhase.lean",
+    "c.get 1=0x80001c0a#32",
+    "c.get 1=0x80001c0c#32"
+  ],
+  [
+    "t3_refusal_actual_closed_header",
+    "RefusalPhase.lean",
+    "1#32 0 status [] [] true false",
+    "1#32 0 status [] [] false false"
+  ],
+  [
+    "t3_refusal_exact_status",
+    "RefusalPhase.lean",
+    "g=ProtocolStreamSpec.reject \u27e8s,served,.head []\u27e9 status",
+    "g=ProtocolStreamSpec.reject \u27e8s,served,.head []\u27e9 (status+1)"
+  ],
+  [
+    "t3_refusal_actual_completion_marker",
+    "RefusalPhase.lean",
+    "c.get 24=0xfffffffe#32",
+    "c.get 24=0xfffffffd#32"
+  ],
+  [
+    "t3_receive_actual_borrow_restore",
+    "ReceivePhases.lean",
+    "ReactiveEnvelope.Envelope Cut \u27e8d,m.ram\u27e9 next",
+    "ReactiveEnvelope.Envelope Cut \u27e8d,ramWrite m.ram 0x80ffebbc#32 0xffffffff#32 .w\u27e9 next"
+  ],
+  [
+    "t3_receive_actual_reset_counter",
+    "ReceivePhases.lean",
+    "ProtocolStreamSpec.initial := by",
+    "{ProtocolStreamSpec.initial with served:=1} := by"
+  ],
+  [
+    "t3_quiet_composition_actual_count",
+    "ReactiveEnvelopeComposition.lean",
+    "\u27e8mask,n+k,e,quiet.trans tail,final\u27e9",
+    "\u27e8mask,n+k+1,e,quiet.trans tail,final\u27e9"
+  ],
+  [
+    "t3_refusal_send_exact_status_family",
+    "RefusalSendPhase.lean",
+    "p.response=\u27e8s,status,[],[]\u27e9",
+    "p.response=\u27e8s,status+1,[],[]\u27e9"
+  ],
+  [
+    "t3_refusal_send_exact_next_counter",
+    "RefusalSendPhase.lean",
+    "p.nextCount=0",
+    "p.nextCount=1"
+  ],
+  [
+    "t3_refusal_send_actual_return",
+    "RefusalSendPhase.lean",
+    "c.pc=0x80001c0a#32",
+    "c.pc=0x80001c0c#32"
+  ],
+  [
+    "t3_refusal_send_actual_restart_steps",
+    "RefusalSendPhase.lean",
+    "masked,6+118,",
+    "masked,6+117,"
+  ],
+  [
+    "t3_refusal_send_actual_ready_borrow",
+    "RefusalSendPhase.lean",
+    "HeaderPhase.enter final",
+    "HeaderPhase.enter (ram := ramWrite after 0x80ffebbc#32 0xffffffff#32 .w) final"
+  ],
+  [
+    "t3_request_phase_actual_match_pc",
+    "RequestPhase.lean",
+    "c.pc=0x800013d2#32",
+    "c.pc=0x800013d4#32"
+  ],
+  [
+    "t3_request_phase_actual_captures",
+    "RequestPhase.lean",
+    "c.get 11=0#32",
+    "c.get 11=1#32"
+  ],
+  [
+    "t3_request_phase_actual_raw_extent",
+    "RequestPhase.lean",
+    "LoopTransactionMemory.At ram (BitVec.ofNat 32 rawUsed)",
+    "LoopTransactionMemory.At ram (BitVec.ofNat 32 (rawUsed+1))"
+  ],
+  [
+    "t3_empty_phase_original_counter",
+    "EmptyPhase.lean",
+    "(HeaderPhase.classify s served original) := by",
+    "(HeaderPhase.classify s (served+1) original) := by"
+  ],
+  [
+    "t3_empty_phase_first_terminal_history",
+    "EmptyPhase.lean",
+    "(earlier : \u2200 k,k<original.length",
+    "(earlier : \u2200 k,k+1<original.length"
+  ],
+  [
+    "t3_length_phase_actual_saved_end",
+    "LengthPhase.lean",
+    "c.get 25=BitVec.ofNat 32 (head.len+amount)",
+    "c.get 25=BitVec.ofNat 32 (head.len+amount+1)"
+  ],
+  [
+    "t3_length_complete_borrow_available",
+    "LengthCompletePhase.lean",
+    "RequestPhase.At m.core m.ram ghost",
+    "RequestPhase.At m.core (ramWrite m.ram 0x80ffebbc#32 0xffffffff#32 .w) ghost"
+  ],
+  [
+    "t3_write_handler_committed_state",
+    "WriteHandlerPrepare.lean",
+    "\u27e8Spec.commit s (.ok res),200",
+    "\u27e8s,200"
+  ],
+  [
+    "t3_write_handler_actual_auth_required",
+    "WriteHandlerPrepare.lean",
+    "(WireSpec.ascii \"dev-key\")=true",
+    "(WireSpec.ascii \"dev-key\")=false"
+  ],
+  [
+    "t3_write_handler_actual_used",
+    "WriteHandlerPrepare.lean",
+    "NormalSendPhase.Ready d after (successReply s res) served used true",
+    "NormalSendPhase.Ready d after (successReply s res) served (used+1) true"
+  ],
+  [
+    "t3_write_route_allowed_method",
+    "WriteRoutePrepare.lean",
+    "(MainMethodBytes.token input head.method.2))=true",
+    "(MainMethodBytes.token input head.method.2))=false"
+  ],
+  [
+    "t3_route_refusal_actual_status",
+    "RouteRefusalPrepare.lean",
+    "\u27e8s,RuntimeRefusalNext.status known,[],[]\u27e9",
+    "\u27e8s,RuntimeRefusalNext.status known+1,[],[]\u27e9"
+  ],
+  [
+    "t3_relay_wrong_method_actual_status",
+    "RouteRefusalPrepare.lean",
+    "\u27e8s,405,[],[]\u27e9",
+    "\u27e8s,404,[],[]\u27e9"
+  ],
+  [
+    "t3_router_actual_head_selection",
+    "RuntimeRoutePrepare.lean",
+    "NormalSendPhase.Ready d after response served used json close headOnly",
+    "NormalSendPhase.Ready d after response served used json close (!headOnly)"
+  ],
+  [
+    "t3_router_actual_served_counter",
+    "RuntimeRoutePrepare.lean",
+    "NormalSendPhase.Ready d after response served used json close headOnly",
+    "NormalSendPhase.Ready d after response (served+1) used json close headOnly"
+  ],
+  [
+    "t3_request_prepare_actual_borrow",
+    "StreamRequestPrepare.lean",
+    "NormalSendPhase.Entry m.core m.ram ghost",
+    "NormalSendPhase.Entry m.core (ramWrite m.ram 0x80ffebbc#32 0xffffffff#32 .w) ghost"
+  ],
+  [
+    "t3_request_prepare_actual_close",
+    "StreamRequestPrepare.lean",
+    "\u27e8response,close,(if close",
+    "\u27e8response,!close,(if close"
+  ],
+  [
+    "t3_prepared_refusal_exact_status",
+    "PreparedRefusalPrepare.lean",
+    "NormalSendPhase.Ready d after \u27e8s,status,[],[]\u27e9",
+    "NormalSendPhase.Ready d after \u27e8s,status+1,[],[]\u27e9"
+  ],
+  [
+    "t3_send_uart_actual_return",
+    "SendUartReactive.lean",
+    "returnAddress : a.get 1=ret",
+    "returnAddress : a.get 1=ret+2#32"
+  ],
+  [
+    "t3_send_actual_complete_queue",
+    "SendPhase.lean",
+    "\u2203 p,g.phase=.reply p \u2227 p.remaining=[]",
+    "\u2203 p,g.phase=.reply p \u2227 p.remaining=[0#8]"
+  ],
+  [
+    "t3_send_actual_finish_time",
+    "SendPhase.lean",
+    "\u27e8masked,11+11,",
+    "\u27e8masked,11+10,"
+  ],
+  [
+    "t3_send_actual_header_caller",
+    "SendPhase.lean",
+    "0x8000042e#32",
+    "0x80000430#32"
+  ],
+  [
+    "t3_send_actual_rx_absent",
+    "SendPhase.lean",
+    "Observed.input (Observed.stepInstr B img m o).reads=[]",
+    "Observed.input (Observed.stepInstr B img m o).reads=[0#8]"
+  ],
+  [
+    "t3_send_pure_reply_close_metadata",
+    "ReplyMetadata.lean",
+    "q.close=p.close \u2227 q.nextCount=p.nextCount := by",
+    "q.close=(!p.close) \u2227 q.nextCount=p.nextCount := by"
+  ],
+  [
+    "t3_send_pure_reply_counter_metadata",
+    "ReplyMetadata.lean",
+    "b.served=a.served \u2227 q.response",
+    "b.served=a.served+1 \u2227 q.response"
+  ],
+  [
+    "t3_stack_monitor_real_capacity",
+    "StackBoard.lean",
+    "0x80ff0000,65536,UartPlatform.board.devices",
+    "0x80ff0000,65532,UartPlatform.board.devices"
+  ],
+  [
+    "t3_stack_monitor_real_boot_count",
+    "StackBoard.lean",
+    "Quiet.Steps board img 2550",
+    "Quiet.Steps board img 2549"
+  ],
+  [
+    "t3_stack_monitor_real_rom_end",
+    "StackBoard.lean",
+    "(lower : 0x80005f18\u2264a)",
+    "(lower : 0x80005f17\u2264a)"
+  ],
+  [
+    "t3_restriction_preserves_actual_ram",
+    "BoardRestriction.lean",
+    "Observed.interp bigBoard image o e ram i evs reads=",
+    "Observed.interp bigBoard image o e (ramWrite ram 0#32 1#32 .w) i evs reads="
+  ],
+  [
+    "t3_restriction_preserves_read_log",
+    "BoardRestriction.lean",
+    "Observed.interp bigBoard image o e ram i evs reads=",
+    "Observed.interp bigBoard image o e ram i evs (reads++[\u27e80#32,.b,0#32,0\u27e9])="
+  ],
+  [
+    "t3_restriction_preserves_oracle_index",
+    "BoardRestriction.lean",
+    "Observed.interp bigBoard image o e ram i evs reads=",
+    "Observed.interp bigBoard image o e ram (i+1) evs reads="
+  ],
+  [
+    "t3_restriction_instruction_actual_pc",
+    "BoardRestriction.lean",
+    "Observed.stepInstr bigBoard image m o=",
+    "Observed.stepInstr bigBoard image \u27e8m.core.goto (m.core.pc+1#32),m.ram\u27e9 o="
+  ],
+  [
+    "t3_stack_chunk_reboard_preserves_written",
+    "ChunkStackFrame.lean",
+    "MainChunkLoopInvariant.At B2 c ram sp start read written filled decoder :=",
+    "MainChunkLoopInvariant.At B2 c ram sp start read (written+1) filled decoder :="
+  ],
+  [
+    "t3_stack_chunk_actual_lsr_address",
+    "StackChunkPoll.lean",
+    "[\u27e80x10000005#32,.b,UartPoll.byte (o 0),0\u27e9]",
+    "[\u27e80x10000004#32,.b,UartPoll.byte (o 0),0\u27e9]"
+  ],
+  [
+    "t3_stack_chunk_actual_rbr_register",
+    "StackChunkRbr.lean",
+    "(c.wr 11 (UartPoll.byte (o 0))",
+    "(c.wr 10 (UartPoll.byte (o 0))"
+  ],
+  [
+    "t3_stack_chunk_actual_setup_count",
+    "StackChunkReactive.lean",
+    "Quiet.Steps B img 14",
+    "Quiet.Steps B img 13"
+  ],
+  [
+    "t3_stack_chunk_actual_store_count",
+    "StackChunkReactive.lean",
+    "Quiet.Steps B img 7",
+    "Quiet.Steps B img 6"
+  ],
+  [
+    "t3_stack_chunk_actual_filled_increment",
+    "StackChunkReactive.lean",
+    "ramRead after (sp+3288#32) .w=BitVec.ofNat 32 (filled+1) \u2227",
+    "ramRead after (sp+3288#32) .w=BitVec.ofNat 32 filled \u2227"
+  ],
+  [
+    "t3_stack_chunk_actual_capacity_cut",
+    "StackChunkPhase.lean",
+    "by_cases full : r.read=2048",
+    "by_cases full : r.read=2047"
+  ],
+  [
+    "t3_stack_refusal_actual_preparation_count",
+    "StackRefusalPhase.lean",
+    "Quiet.Steps B img 780",
+    "Quiet.Steps B img 779"
+  ],
+  [
+    "t3_stack_refusal_actual_caller_return",
+    "StackRefusalSendPhase.lean",
+    "have pc : c.pc=0x80001c0a#32",
+    "have pc : c.pc=0x80001c0c#32"
+  ],
+  [
+    "t3_stack_write_actual_setpoint_setup_count",
+    "StackRuntimeSetpointWriteInput.lean",
+    "Quiet.Steps B img 28",
+    "Quiet.Steps B img 27"
+  ],
+  [
+    "t3_stack_write_actual_temp_setup_count",
+    "StackRuntimeTempWriteInput.lean",
+    "Quiet.Steps B img 28",
+    "Quiet.Steps B img 27"
+  ],
+  [
+    "t3_stack_write_actual_mode_setup_count",
+    "StackRuntimeModeWriteInput.lean",
+    "Quiet.Steps B img 27",
+    "Quiet.Steps B img 26"
+  ],
+  [
+    "t3_stack_write_actual_relay_setup_count",
+    "StackRuntimeRelayWriteInput.lean",
+    "Quiet.Steps B img 26",
+    "Quiet.Steps B img 25"
+  ],
+  [
+    "t3_stack_write_actual_success_borrow",
+    "StackWriteSuccessFrame.lean",
+    "ramRead r eng .w = 0#32 \u2227",
+    "ramRead r eng .w = 1#32 \u2227"
+  ],
+  [
+    "t3_stack_write_actual_error_borrow",
+    "StackWriteErrorFrame.lean",
+    "ramRead r eng .w = 0#32 \u2227",
+    "ramRead r eng .w = 1#32 \u2227"
+  ],
+  [
+    "t3_stack_write_actual_auth_status",
+    "StackMainFutureAuthHandler.lean",
+    "StatusMemory.At r out 401#32 \u2227",
+    "StatusMemory.At r out 400#32 \u2227"
+  ],
+  [
+    "t3_stack_error_actual_three_final_count",
+    "StackCopyThreeFinal.lean",
+    "Quiet.Steps StackBoard.board img 26",
+    "Quiet.Steps StackBoard.board img 25"
+  ],
+  [
+    "t3_stack_error_actual_two_final_count",
+    "StackCopyTwoFinal.lean",
+    "Quiet.Steps StackBoard.board img 19",
+    "Quiet.Steps StackBoard.board img 18"
+  ],
+  [
+    "t3_stack_error_actual_errno_status",
+    "StackEncodeError.lean",
+    "d.get 10=ErrorLiterals.status e \u2227",
+    "d.get 10=0#32 \u2227"
+  ],
+  [
+    "t3_stack_write_actual_common_response_return",
+    "StackRuntimeResponseTail.lean",
+    "d.pc=0x80001772#32 \u2227",
+    "d.pc=0x80001774#32 \u2227"
+  ],
+  [
+    "t3_stack_write_actual_handler_extract_return",
+    "StackLoopWriteReturn.lean",
+    "d.pc=0x80001710#32 \u2227",
+    "d.pc=0x80001712#32 \u2227"
+  ],
+  [
+    "t3_stack_firmware_actual_boot_count",
+    "StackFirmwareStream.lean",
+    "have quiet : Quiet.Steps B img 2550 m",
+    "have quiet : Quiet.Steps B img 2549 m"
+  ],
+  [
+    "t3_firmware_actual_interrupt_mask",
+    "FirmwareResetStream.lean",
+    "m.core.mie_=false \u2227",
+    "m.core.mie_=true \u2227"
+  ],
+  [
+    "t3_firmware_actual_pc_alignment",
+    "FirmwareResetStream.lean",
+    "m.core.pc.getLsbD 0=false \u2227",
+    "m.core.pc.getLsbD 0=true \u2227"
+  ],
+  [
+    "t3_stack_header_real_rx_capacity",
+    "StackHeaderReparse.lean",
+    "next.length\u22642048 := h.stable.layout.bound",
+    "next.length\u22642047 := h.stable.layout.bound"
+  ],
+  [
+    "t3_stack_header_real_parser_object",
+    "StackHeaderReparse.lean",
+    "(off := 63508) (m := 1326)",
+    "(off := 63512) (m := 1326)"
+  ],
+  [
+    "t3_stack_header_real_store_instructions",
+    "StackHeaderByteStore.lean",
+    "Quiet.Steps B img 10",
+    "Quiet.Steps B img 9"
+  ],
+  [
+    "t3_stack_header_cannot_drop_rbr_store",
+    "StackHeaderReactive.lean",
+    "store.trans parsed",
+    "parsed"
+  ],
+  [
+    "t3_stack_prefix_matching_ram",
+    "StackEnvelope.lean",
+    "Observed.Step narrow img m d reads evs := by",
+    "Observed.Step narrow img m \u27e8d.core,ramWrite d.ram 0#32 1#32 .w\u27e9 reads evs := by"
+  ],
+  [
+    "t3_stack_prefix_matching_reads",
+    "StackEnvelope.lean",
+    "Observed.Reach narrow img Init m reads evs := by",
+    "Observed.Reach narrow img Init m (reads++[\u27e80#32,.b,0#32,0\u27e9]) evs := by"
+  ],
+  [
+    "t3_stack_uart_actual_read_address",
+    "StackUartPlatform.lean",
+    "[\u27e8a,.b,devVal .b (o 0),0\u27e9]",
+    "[\u27e8a+1#32,.b,devVal .b (o 0),0\u27e9]"
+  ],
+  [
+    "t3_stack_uart_actual_lsr_oracle",
+    "StackUartPoll.lean",
+    "(byte (o 0)) 0x80000ba6#32",
+    "(byte (o 1)) 0x80000ba6#32"
+  ],
+  [
+    "t3_stack_uart_actual_rbr_address",
+    "StackUartPoll.lean",
+    "[\u27e80x10000000#32,.b,byte (o 0),0\u27e9]",
+    "[\u27e80x10000001#32,.b,byte (o 0),0\u27e9]"
+  ],
+  [
+    "t3_stack_header_actual_wait_target",
+    "StackHeaderWait.lean",
+    "else 0x80000baa#32",
+    "else 0x80000bb0#32"
+  ],
+  [
+    "t3_stack_header_phase_actual_pc",
+    "StackHeaderPhase.lean",
+    "Observed.stepInstr B img \u27e8c,ram\u27e9 o=",
+    "Observed.stepInstr B img \u27e8c.goto (c.pc+1#32),ram\u27e9 o="
+  ],
+  [
+    "t3_stack_length_real_rbr_address",
+    "StackLengthUart.lean",
+    "[\u27e80x10000000#32,.b,byte (o 0),0\u27e9]",
+    "[\u27e80x10000001#32,.b,byte (o 0),0\u27e9]"
+  ],
+  [
+    "t3_stack_length_real_store_count",
+    "StackLengthByteStore.lean",
+    "Quiet.Steps B img 10",
+    "Quiet.Steps B img 9"
+  ],
+  [
+    "t3_stack_length_real_prepare_count",
+    "StackLengthPrepareRegs.lean",
+    "Quiet.Steps B img 11",
+    "Quiet.Steps B img 10"
+  ],
+  [
+    "t3_stack_length_real_enter_total",
+    "StackLengthEnterRegs.lean",
+    "d.get 25=BitVec.ofNat 32 (head.len+amount)",
+    "d.get 25=BitVec.ofNat 32 (head.len+amount+1)"
+  ],
+  [
+    "t3_stack_length_real_body_copy_sp",
+    "StackHeaderToBodyRegs.lean",
+    "MainHeadCopy.contract B c ram sp head",
+    "MainHeadCopy.contract B c ram (sp+4#32) head"
+  ],
+  [
+    "t3_stack_length_phase_real_pc",
+    "StackLengthPhase.lean",
+    "Observed.stepInstr B img \u27e8c,ram\u27e9 o=",
+    "Observed.stepInstr B img \u27e8c.goto (c.pc+2#32),ram\u27e9 o="
+  ],
+  [
+    "t3_stack_monitor_preserves_block_width",
+    "StackAccess.lean",
+    "Memory.Block broad p n :=",
+    "Memory.Block broad p (n+1) :="
+  ],
+  [
+    "t3_stack_read_actual_get_setup",
+    "StackRuntimeReadInput.lean",
+    "Quiet.Steps B img 28",
+    "Quiet.Steps B img 27"
+  ],
+  [
+    "t3_stack_read_actual_head_setup",
+    "StackRuntimeHeadInput.lean",
+    "Quiet.Steps B img 32",
+    "Quiet.Steps B img 31"
+  ],
+  [
+    "t3_stack_read_acquire_borrow",
+    "StackLoopReadResponse.lean",
+    "ramRead r 0x80ffebbc#32 .w=0#32",
+    "ramRead r 0x80ffebbc#32 .w=1#32"
+  ],
+  [
+    "t3_stack_read_actual_shared_return",
+    "StackLoopReadResponse.lean",
+    "d.pc=0x80001772#32",
+    "d.pc=0x80001774#32"
+  ],
+  [
+    "t3_stack_json_actual_encoder_flag",
+    "StackEncodeReply.lean",
+    "d.get 10 = 1#32",
+    "d.get 10 = 0#32"
+  ],
+  [
+    "t3_stack_json_actual_byte_count",
+    "StackEncodeReply.lean",
+    "BitVec.ofNat 32 (ReplyJson.snapshot s).length \u2227",
+    "BitVec.ofNat 32 ((ReplyJson.snapshot s).length+1) \u2227"
+  ],
+  [
+    "t3_stack_json_actual_loop_return",
+    "StackJsonLoop.lean",
+    "d.pc = 0x80004b12#32",
+    "d.pc = 0x80004b10#32"
+  ],
+  [
+    "t3_stack_json_literal_actual_sp",
+    "StackJsonLiteral.lean",
+    "d.get 2 = p+160#32 \u2227",
+    "d.get 2 = p+164#32 \u2227"
+  ],
+  [
+    "t3_stack_read_handler_actual_json_family",
+    "StackReadHandlerPrepare.lean",
+    "served used true close isHead :=",
+    "served used false close isHead :="
+  ],
+  [
+    "t3_stack_request_whole_rx",
+    "StackRuntimeRequestSpans.lean",
+    "Bytes.Span B ram rx input :=",
+    "Bytes.Span B ram (rx+1#32) input :="
+  ],
+  [
+    "t3_stack_request_object_address",
+    "StackRuntimeRequestInputs.lean",
+    "Memory.Block B req n :=",
+    "Memory.Block B (req+1#32) n :="
+  ],
+  [
+    "t3_stack_request_first_path_address",
+    "StackRuntimePathView.lean",
+    "Bytes.Span B ram (rx+BitVec.ofNat 32 head.target.1) literal \u2227",
+    "Bytes.Span B ram (rx+BitVec.ofNat 32 head.target.1+1#32) literal \u2227"
+  ],
+  [
+    "t3_stack_request_empty_actual_steps",
+    "StackEmptyNextReady.lean",
+    "Quiet.Steps B img 409",
+    "Quiet.Steps B img 408"
+  ],
+  [
+    "t3_stack_request_chunk_actual_steps",
+    "StackChunkNextReady.lean",
+    "Quiet.Steps B img 408",
+    "Quiet.Steps B img 407"
+  ],
+  [
+    "t3_stack_request_length_actual_steps",
+    "StackMainNextLength.lean",
+    "Quiet.Steps B img 407",
+    "Quiet.Steps B img 406"
+  ],
+  [
+    "t3_stack_request_next_actual_steps",
+    "StackRuntimeNext.lean",
+    "Quiet.Steps B img 755",
+    "Quiet.Steps B img 754"
+  ],
+  [
+    "t3_stack_request_payload_actual_steps",
+    "StackRequestPayloadReady.lean",
+    "Quiet.Steps B img 460",
+    "Quiet.Steps B img 459"
+  ],
+  [
+    "t3_stack_request_close_forced_flag",
+    "StackRuntimeCloseForced.lean",
+    "served (c.get 27) true \u2227",
+    "served (c.get 27) false \u2227"
+  ],
+  [
+    "t3_stack_request_first_match_return",
+    "StackRuntimeFirstMatch.lean",
+    "d.pc=0x800013d2#32 \u2227",
+    "d.pc=0x800013d4#32 \u2227"
+  ],
+  [
+    "t3_stack_tx_actual_lsr_address",
+    "StackUartTxPoll.lean",
+    "[\u27e80x10000005#32,.b,UartPoll.byte (o 0),0\u27e9]",
+    "[\u27e80x10000004#32,.b,UartPoll.byte (o 0),0\u27e9]"
+  ],
+  [
+    "t3_stack_tx_actual_ready_bit",
+    "StackUartTxWaitSafety.lean",
+    "c.get 17 &&& 32#32",
+    "c.get 17 &&& 16#32"
+  ],
+  [
+    "t3_stack_tx_actual_data_address",
+    "StackUartTxReactive.lean",
+    "[\u27e80x10000000#32,UartTxByte.word byte\u27e9]",
+    "[\u27e80x10000001#32,UartTxByte.word byte\u27e9]"
+  ],
+  [
+    "t3_stack_tx_actual_load_register",
+    "StackUartTxReactive.lean",
+    "let d := c.wr 16 (UartTxByte.word byte)",
+    "let d := c.wr 17 (UartTxByte.word byte)"
+  ],
+  [
+    "t3_stack_tx_actual_source_increment",
+    "StackUartTxReactive.lean",
+    "c.wr 12 (src+1#32) 0x800007ec#32",
+    "c.wr 12 (src+2#32) 0x800007ec#32"
+  ],
+  [
+    "t3_stack_tx_actual_object_setup_count",
+    "StackUartWritePhase.lean",
+    "\u27e8h.masked,22,\u27e8d,ram\u27e9",
+    "\u27e8h.masked,21,\u27e8d,ram\u27e9"
+  ],
+  [
+    "t3_stack_tx_actual_empty_complete_count",
+    "StackUartWritePhase.lean",
+    "\u27e8h.masked,14,\u27e8d,UartWriteZero.memory",
+    "\u27e8h.masked,13,\u27e8d,UartWriteZero.memory"
+  ],
+  [
+    "t3_stack_header_actual_success_flag",
+    "StackResponseHead.lean",
+    "d.get 10=1#32 \u2227",
+    "d.get 10=0#32 \u2227"
+  ],
+  [
+    "t3_stack_reason_actual_ok_length",
+    "ReasonBoardHttpReason200Data.lean",
+    "d.get 11=BitVec.ofNat 32 (13+(WireSpec.ascii (ResponseHeadSpec.reason 200)).length) \u2227",
+    "d.get 11=BitVec.ofNat 32 (14+(WireSpec.ascii (ResponseHeadSpec.reason 200)).length) \u2227"
+  ],
+  [
+    "t3_stack_reason_actual_431_rom_byte",
+    "ReasonBoardHttpReason431Part0.lean",
+    "2147507436#32 82#8 :=",
+    "2147507436#32 83#8 :="
+  ],
+  [
+    "t3_stack_reason_actual_default_count",
+    "ReasonBoardHttpReasonDefault100.lean",
+    "Quiet.Steps B img 14",
+    "Quiet.Steps B img 13"
+  ],
+  [
+    "t3_stack_loop_actual_keep_steps",
+    "StackLoopKeep.lean",
+    "Quiet.Steps B img 115",
+    "Quiet.Steps B img 114"
+  ],
+  [
+    "t3_stack_loop_actual_restart_steps",
+    "StackLoopClose.lean",
+    "Quiet.Steps B img 118",
+    "Quiet.Steps B img 117"
+  ],
+  [
+    "t3_stack_loop_actual_empty_parser_steps",
+    "StackLoopPollEntry.lean",
+    "Quiet.Steps B img 59",
+    "Quiet.Steps B img 58"
+  ],
+  [
+    "t3_stack_send_actual_caller_return",
+    "StackNormalSendPhase.lean",
+    "have pc : c.pc=0x80001784#32",
+    "have pc : c.pc=0x80001786#32"
+  ],
+  [
+    "t3_tx_wait_actual_ready_bit",
+    "UartTxWaitSafety.lean",
+    "c.get 17 &&& 32#32",
+    "c.get 17 &&& 1#32"
+  ],
+  [
+    "t3_tx_wait_actual_uart_address",
+    "UartTxWaitSafety.lean",
+    "0x10000005#32",
+    "0x10000006#32"
+  ],
+  [
+    "t3_tx_reactive_exact_loaded_byte",
+    "UartTxReactive.lean",
+    "c.get 16=UartTxByte.word byte",
+    "c.get 16=UartTxByte.word byte+1#32"
+  ],
+  [
+    "t3_tx_reactive_actual_poll_input",
+    "UartTxReactive.lean",
+    "UartTxWaitSafety.LsrOnly reads \u2227",
+    "reads=[] \u2227"
+  ],
+  [
+    "t3_tx_reactive_actual_source_advance",
+    "UartTxReactive.lean",
+    "pointer : c.get 12=src+1#32",
+    "pointer : c.get 12=src+2#32"
+  ],
+  [
+    "t3_tx_reactive_exact_thr_byte",
+    "UartTxReactive.lean",
+    "[\u27e80x10000000#32,UartTxByte.word byte\u27e9],[]",
+    "[\u27e80x10000000#32,UartTxByte.word byte+1#32\u27e9],[]"
+  ],
+  [
+    "t3_tx_reactive_actual_through_ram",
+    "UartTxReactive.lean",
+    "\u27e8.ok d ram [\u27e80x10000000#32",
+    "\u27e8.ok d (ramWrite ram src 0#32 .b) [\u27e80x10000000#32"
+  ],
+  [
+    "t3_tx_reactive_exact_loop_exit",
+    "UartTxReactive.lean",
+    "d.pc=(if bytes=[] then 0x8000080a#32 else 0x800007f4#32)",
+    "d.pc=(if bytes=[] then 0x800007f4#32 else 0x8000080a#32)"
+  ],
+  [
+    "t3_uart_write_actual_remaining",
+    "UartWritePhase.lean",
+    "p.remaining=suffix",
+    "p.remaining=0#8::suffix"
+  ],
+  [
+    "t3_uart_write_actual_result_memory",
+    "UartWritePhase.lean",
+    "ram=UartWriteAll.memory before obj io src bs",
+    "ram=UartWriteAll.memory before obj io (src+1) bs"
+  ],
+  [
+    "t3_uart_write_actual_return_registers",
+    "UartWritePhase.lean",
+    "FormatCursor.Returned original c",
+    "FormatCursor.Returned original (c.wr 23 (c.get 23+1) c.pc)"
+  ],
+  [
+    "t3_uart_write_input_queue",
+    "UartWritePhase.lean",
+    "(queue : p.remaining=bs++suffix)",
+    "(queue : p.remaining=suffix++bs)"
+  ],
+  [
+    "t3_uart_write_real_complete_time",
+    "UartWritePhase.lean",
+    "context.masked,14,",
+    "context.masked,13,"
+  ],
+  [
+    "t3_uart_write_real_empty_time",
+    "UartWritePhase.lean",
+    "h.masked,14,",
+    "h.masked,13,"
+  ]
+]
