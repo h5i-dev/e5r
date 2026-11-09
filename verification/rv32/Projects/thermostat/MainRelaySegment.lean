@@ -9,7 +9,7 @@ open E5R E5R.Thermostat
 
 def Frame (c d : Core) : Prop := ∀ r : Reg, r≠12 → r≠23 → d.get r=c.get r
 
-private theorem head (B : Board) (c : Core) (ram : Word → BitVec 8) (base : Word) (i : Nat) (byte : BitVec 8)
+theorem head (B : Board) (c : Core) (ram : Word → BitVec 8) (base : Word) (i : Nat) (byte : BitVec 8)
     (hp : c.pc=0x80002894#32) (h20 : c.get 20=base) (h23 : c.get 23=BitVec.ofNat 32 i)
     (h24 : c.get 24=47#32) (memory : B.inRam (base+BitVec.ofNat 32 i) 1=true)
     (data : ram (base+BitVec.ofNat 32 i)=byte) (notSlash : byte≠47#8) :
@@ -37,7 +37,7 @@ private theorem head (B : Board) (c : Core) (ram : Word → BitVec 8) (base : Wo
   · intro r nr
     exact (dr r).trans ((br r nr).trans (Core.wr_get_ne _ _ _ _ _ nr))
 
-private theorem advance (B : Board) (c : Core) (ram : Word → BitVec 8) (i finish : Nat)
+theorem advance (B : Board) (c : Core) (ram : Word → BitVec 8) (i finish : Nat)
     (inside : i<finish) (bound : finish<2^32) (hp : c.pc=0x800028a0#32)
     (h23 : c.get 23=BitVec.ofNat 32 i) (h9 : c.get 9=BitVec.ofNat 32 finish) :
     ∃ d, Quiet.Steps B img 2 ⟨c,ram⟩ ⟨d,ram⟩ ∧
@@ -66,7 +66,7 @@ private theorem advance (B : Board) (c : Core) (ram : Word → BitVec 8) (i fini
   · intro r nr
     exact (dr r).trans (Core.wr_get_ne _ _ _ _ _ nr)
 
-private theorem finish (B : Board) (c : Core) (ram : Word → BitVec 8) (endWord : Word)
+theorem finish (B : Board) (c : Core) (ram : Word → BitVec 8) (endWord : Word)
     (hp : c.pc=0x800028a6#32) (h9 : c.get 9=endWord) :
     ∃ d, Quiet.Steps B img 1 ⟨c,ram⟩ ⟨d,ram⟩ ∧ d.pc=0x800028a8#32 ∧ d.get 23=endWord ∧
       (∀ r : Reg, r≠23 → d.get r=c.get r) ∧ d.sameCsr c := by

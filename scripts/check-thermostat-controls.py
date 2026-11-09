@@ -15,6 +15,7 @@ RV = ROOT / 'verification/rv32'
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--qemu', default=os.environ.get('QEMU_RISCV32', 'qemu-system-riscv32'))
+    parser.add_argument('--only', nargs='+', metavar='CONTROL', help='run only the named proof mutations, plus both wrong UART/HTTP expectations')
     args = parser.parse_args()
     (RV / 'build').mkdir(exist_ok=True)
     mutations = [
@@ -892,11 +893,20 @@ def main():
         ('reply', 'ReplyRestore.lean', '(sp+30#32) (c.get 27)', '(sp+30#32) (c.get 26)'),
     ]
     mutations.extend(json.loads((ROOT / 'scripts/thermostat-t1-controls.json').read_text()))
+    mutations.extend(json.loads((ROOT / 'scripts/thermostat-g6-controls.json').read_text()))
     assert len({name for name, _, _, _ in mutations}) == len(mutations)
+    if args.only:
+        requested = set(args.only)
+        assert requested <= {name for name, _, _, _ in mutations}, requested
+        mutations = [entry for entry in mutations if entry[0] in requested]
     with tempfile.TemporaryDirectory(prefix='thermostat-control-', dir=RV / 'build') as tmp:
         for name, module, old, new in mutations:
             source = (RV / 'Projects/thermostat' / module).read_text()
-            wrong = source.replace(old, new)
+            # Mutate the public TX conclusion, leaving an identically spelled
+            # local integration claim unchanged to avoid normalizing every
+            # serializer branch before reaching the intended root mismatch.
+            count = 1 if name in {'g6_next_tx_bytes', 'g6_sequence_tx'} else -1
+            wrong = source.replace(old, new, count)
             assert source != wrong
             bad = Path(tmp) / 'Bad.lean'
             bad.write_text(wrong)
@@ -905,8 +915,12 @@ def main():
             # term; other controls retain the existing memory bound.
             memory = 1900 if module == 'MainSetpointResetWitness.lean' else 1500
             timeout = 360 if module.endswith('Witness.lean') else 120
+            # Whole-request/sequence conclusions elaborate large serializer terms.
+            # Resource exhaustion is still rejected below, never a negative PASS.
+            elaboration = ['-DmaxHeartbeats=3000000', '-DmaxRecDepth=10000'] if module in {
+                'FirmwareNextRequest.lean', 'FirmwareRequestSequence.lean'} else []
             result = subprocess.run(['elan', 'run', 'leanprover/lean4:v4.35.0', 'lean',
-                                     '-j1', f'-M{memory}', '-DmaxErrors=1', str(bad)], cwd=RV, env=env,
+                                     '-j1', f'-M{memory}', '-DmaxErrors=1', *elaboration, str(bad)], cwd=RV, env=env,
                                     capture_output=True, text=True, timeout=timeout)
             output = result.stdout + result.stderr
             assert result.returncode == 1 and 'error:' in output, (name, output)

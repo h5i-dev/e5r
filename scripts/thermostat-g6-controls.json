@@ -1,0 +1,128 @@
+[
+  [
+    "g6_zero_memmove_instruction",
+    "LoopMemmoveZero.lean",
+    "Quiet.Steps B img 15",
+    "Quiet.Steps B img 14"
+  ],
+  [
+    "g6_keep_instruction",
+    "LoopKeep.lean",
+    "Quiet.Steps B img 115",
+    "Quiet.Steps B img 114"
+  ],
+  [
+    "g6_close_instruction",
+    "LoopClose.lean",
+    "Quiet.Steps B img 118",
+    "Quiet.Steps B img 117"
+  ],
+  [
+    "g6_real_filled_store",
+    "LoopKeepRebuild.lean",
+    "(0x80fff814#32+84#32) (0#32) .w",
+    "(0x80fff814#32+84#32) (1#32) .w"
+  ],
+  [
+    "g6_read_capacity_vs_scratch",
+    "LoopReadMarshal.lean",
+    "0x80ffeba0#32",
+    "0x80ffeba4#32"
+  ],
+  [
+    "g6_filled_used_mismatch",
+    "LoopTransactionMemory.lean",
+    "filled : ramRead ram (fp+84#32) .w=used",
+    "filled : ramRead ram (fp+84#32) .w=used+1#32"
+  ],
+  [
+    "g6_reset_counter",
+    "LoopReady.lean",
+    "At d after Spec.initial 0 := by",
+    "At d after Spec.initial 1 := by"
+  ],
+  [
+    "g6_close_counter",
+    "LoopReady.lean",
+    "At d after s (if close then 0 else served) := by",
+    "At d after s (if close then 1 else served) := by"
+  ],
+  [
+    "g6_irq_envelope",
+    "LoopKeep.lean",
+    "(masked : c.mie_=false)",
+    "(masked : c.mie_=true)"
+  ],
+  [
+    "g6_write_uart_register",
+    "LoopApiWriteTransaction.lean",
+    "d.get 19=c.get 19",
+    "d.get 19=c.get 19+1#32"
+  ],
+  [
+    "g6_write_borrow_reply_frame",
+    "LoopApiWriteTransaction.lean",
+    "AppState.At after reply.state",
+    "AppState.At after s"
+  ],
+  [
+    "g6_read_saved_uart",
+    "LoopReadRound.lean",
+    "d.get 19=c.get 19",
+    "d.get 19=c.get 19+1#32"
+  ],
+  [
+    "g6_next_rx_bytes",
+    "FirmwareNextRequest.lean",
+    "headerPlan bodyPlan hs bs)=r.bytes",
+    "headerPlan bodyPlan hs bs)=r.bytes.reverse"
+  ],
+  [
+    "g6_next_tx_bytes",
+    "FirmwareNextRequest.lean",
+    "UartTxLoop.events (r.reply s).payload) \u2227",
+    "UartTxLoop.events (r.reply s).payload.reverse) \u2227"
+  ],
+  [
+    "g6_next_counter",
+    "FirmwareNextRequest.lean",
+    "(LoopSpec.nextCount r served) := by",
+    "served := by"
+  ],
+  [
+    "g6_sequence_accepted_bytes",
+    "FirmwareRequestSequence.lean",
+    "Observed.input (reads plans)=LoopSpec.input requests",
+    "Observed.input (reads plans)=(LoopSpec.input requests).drop 1"
+  ],
+  [
+    "g6_sequence_tx",
+    "FirmwareRequestSequence.lean",
+    "(UartTxLoop.events (LoopSpec.output requests s served)) \u2227",
+    "(UartTxLoop.events (LoopSpec.output requests s served).reverse) \u2227"
+  ],
+  [
+    "g6_sequence_final_app",
+    "FirmwareRequestSequence.lean",
+    "AppState.At after (LoopSpec.final requests Spec.initial 0).1",
+    "AppState.At after Spec.initial"
+  ],
+  [
+    "g6_sequence_borrow",
+    "FirmwareRequestSequence.lean",
+    "ramRead after 0x80ffebbc#32 .w=0#32",
+    "ramRead after 0x80ffebbc#32 .w=1#32"
+  ],
+  [
+    "g6_mixed_relay_state",
+    "FirmwareSequenceWitness.lean",
+    ".1.relays 3=true",
+    ".1.relays 3=false"
+  ],
+  [
+    "g6_hundred_restart_count",
+    "FirmwareSequenceWitness.lean",
+    "hundred Spec.initial 0).2=1 := by",
+    "hundred Spec.initial 0).2=2 := by"
+  ]
+]
