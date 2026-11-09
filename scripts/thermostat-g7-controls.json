@@ -1,0 +1,1694 @@
+[
+  [
+    "g7_generic_write_auth_borrow_release",
+    "RuntimeApiWriteRefusalHandler.lean",
+    "ramRead after 0x80ffebbc#32 .w=0#32",
+    "ramRead after 0x80ffebbc#32 .w=0xffffffff#32"
+  ],
+  [
+    "g7_generic_write_commit_state",
+    "RuntimeApiWriteSuccess.lean",
+    "AppState.At after (Spec.commit s (.ok res))",
+    "AppState.At after s"
+  ],
+  [
+    "g7_generic_write_error_state",
+    "RuntimeApiWriteError.lean",
+    "AppState.At after (Spec.commit s (.error err))",
+    "AppState.At after Spec.initial"
+  ],
+  [
+    "g7_generic_write_refusal_status_bytes",
+    "RuntimeApiWriteRefusal.lean",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes status [] 0 close))",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes (status+1) [] 0 close))"
+  ],
+  [
+    "g7_generic_write_transaction_input_extent",
+    "RuntimeApiWriteTransaction.lean",
+    "cases allowed : AuthSpec.authorized (HeaderSpec.lookup (RuntimeRequestSpans.raw input rawUsed)",
+    "cases allowed : AuthSpec.authorized (HeaderSpec.lookup (RuntimeRequestSpans.raw input (head.len+amount))"
+  ],
+  [
+    "g7_generic_write_next_counter",
+    "RuntimeApiWriteNext.lean",
+    "LoopReady.At d after reply.state (if close then 0 else served)",
+    "LoopReady.At d after reply.state (if close then 0 else served+1)"
+  ],
+  [
+    "g7_actual_route_raw_length",
+    "RuntimeRouteInputs.lean",
+    "(RuntimeRequestSpans.raw input rawUsed).length=rawUsed",
+    "(RuntimeRequestSpans.raw input rawUsed).length=rawUsed+1"
+  ],
+  [
+    "g7_setpoint_actual_setup_count",
+    "RuntimeSetpointWriteInput.lean",
+    "Quiet.Steps B img 28",
+    "Quiet.Steps B img 27"
+  ],
+  [
+    "g7_temp_actual_raw_extent",
+    "RuntimeTempWriteInput.lean",
+    "input s head amount rawUsed served close \u2227 d.sameCsr c",
+    "input s head amount (rawUsed+1) served close \u2227 d.sameCsr c"
+  ],
+  [
+    "g7_mode_actual_handler_return",
+    "RuntimeModeWriteInput.lean",
+    "RuntimeApiWriteCaller.Ready 2 future",
+    "RuntimeApiWriteCaller.Ready 1 future"
+  ],
+  [
+    "g7_literal_write_actual_future",
+    "RuntimeLiteralWriteInput.lean",
+    "| .mode => 0x80fffa58#32",
+    "| .mode => 0x80fffa84#32"
+  ],
+  [
+    "g7_literal_write_raw_extent_not_decoded_length",
+    "RuntimeLiteralWriteTransaction.lean",
+    "(RuntimeRequestSpans.raw input rawUsed)",
+    "(RuntimeRequestSpans.raw input (head.len+amount))"
+  ],
+  [
+    "g7_header_slice_compaction",
+    "RuntimeHeaderLookup.lean",
+    "(raw.drop first).take (last-first)=(original.drop first).take (last-first)",
+    "(raw.drop first).take (last-first)=(original.drop (first+1)).take (last-first)"
+  ],
+  [
+    "g7_header_duplicate_first_lookup",
+    "RuntimeHeaderLookup.lean",
+    "HeaderSpec.lookup raw query entries=HeaderSpec.lookup original query entries",
+    "HeaderSpec.lookup raw query entries=HeaderSpec.lookup original query entries.reverse"
+  ],
+  [
+    "g7_header_connection_close_preserved",
+    "RuntimeHeaderLookup.lean",
+    "MainCloseSpec.mustClose minor served raw entries=MainCloseSpec.mustClose minor served original entries",
+    "MainCloseSpec.mustClose minor served raw entries=false"
+  ],
+  [
+    "g7_received_literal_body_compaction",
+    "ReceivedLiteralWriteCycle.lean",
+    "RuntimeRequestSpans.body raw head r.body.length=r.body",
+    "RuntimeRequestSpans.body raw head r.body.length=[]"
+  ],
+  [
+    "g7_received_literal_committed_state",
+    "ReceivedLiteralWriteCycle.lean",
+    "LoopReady.At d after response.state",
+    "LoopReady.At d after s"
+  ],
+  [
+    "g7_literal_fixture_parser_head_length",
+    "ReceivedLiteralWriteData.lean",
+    "],94,.chunked",
+    "],93,.chunked"
+  ],
+  [
+    "g7_literal_reset_committed_state",
+    "ReceivedLiteralWriteWitness.lean",
+    "LoopReady.At d after (response which).state",
+    "LoopReady.At d after Spec.initial"
+  ],
+  [
+    "g7_relay_capture_final_end",
+    "RelaySuccessMemory.lean",
+    "params (BitVec.ofNat 32 path.length)",
+    "params (BitVec.ofNat 32 (path.length-1))"
+  ],
+  [
+    "g7_relay_capture_actual_count",
+    "RelaySuccessMemory.lean",
+    "RouteRelayBody.count path=1#32",
+    "RouteRelayBody.count path=0#32"
+  ],
+  [
+    "g7_relay_capture_first_word",
+    "RuntimeRelayCaptured.lean",
+    "ramRead ram params .w=7#32",
+    "ramRead ram params .w=8#32"
+  ],
+  [
+    "g7_relay_actual_ram_hole",
+    "RuntimeRelaySuccess.lean",
+    "RuntimeRouteEnvelope.sp 3304",
+    "RuntimeRouteEnvelope.sp 3656"
+  ],
+  [
+    "g7_relay_actual_first_capture",
+    "RuntimeRelayWriteInput.lean",
+    "(RuntimeRelayCaptured.path param) (some param) d",
+    "(RuntimeRelayCaptured.path param) none d"
+  ],
+  [
+    "g7_relay_actual_decoded_capture",
+    "RuntimeRelayWriteTransaction.lean",
+    "(some ((RuntimeRequestSpans.path input head).drop 7))",
+    "(some ((RuntimeRequestSpans.path input head).drop 6))"
+  ],
+  [
+    "g7_received_relay_committed_state",
+    "ReceivedRelayWriteCycle.lean",
+    "LoopReady.At d after response.state",
+    "LoopReady.At d after s"
+  ],
+  [
+    "g7_relay_method_actual_decoder",
+    "RelayMethodCode.lean",
+    "some (.opimm .xor 12 12 1#32,4#32)",
+    "some (.opimm .xor 12 12 2#32,4#32)"
+  ],
+  [
+    "g7_relay_method_guard_actual_pc",
+    "RelayMethodRefusal.lean",
+    "d.pc=0x8000187c#32",
+    "d.pc=0x8000187a#32"
+  ],
+  [
+    "g7_relay_method_guard_actual_steps",
+    "RelayMethodRefusal.lean",
+    "Quiet.Steps B img 11",
+    "Quiet.Steps B img 10"
+  ],
+  [
+    "g7_relay_method_reply_status",
+    "RelayWrongSetup.lean",
+    "d.get 10=405#32",
+    "d.get 10=404#32"
+  ],
+  [
+    "g7_relay_method_real_flag_store",
+    "RelayWrongSetup.lean",
+    "\u27e8d,MainWriteFlags.memory ram fp\u27e9",
+    "\u27e8d,ram\u27e9"
+  ],
+  [
+    "g7_prepared_refusal_next_counter",
+    "RuntimePreparedRefusalNext.lean",
+    "LoopReady.At d after s (if close then 0 else served)",
+    "LoopReady.At d after s (if close then 0 else served+1)"
+  ],
+  [
+    "g7_relay_wrong_method_keepalive",
+    "RuntimeRelayWrongMethod.lean",
+    "LoopReady.At d after s (if close then 0 else served)",
+    "LoopReady.At d after s 0"
+  ],
+  [
+    "g7_relay_wrong_method_policy",
+    "RuntimeRouteRelayWrongMethod.lean",
+    "head.method.2)\u2260.put",
+    "head.method.2)\u2260.get"
+  ],
+  [
+    "g7_received_relay_wrong_method_status",
+    "ReceivedRelayWrongMethodCycle.lean",
+    "ResponseHeadSpec.bytes 405 [] 0 close",
+    "ResponseHeadSpec.bytes 404 [] 0 close"
+  ],
+  [
+    "g7_relay_reset_auth_refusal_bytes",
+    "ReceivedRelayWriteWitness.lean",
+    "ResponseHeadSpec.bytes 401 [] 0 close",
+    "ResponseHeadSpec.bytes 403 [] 0 close"
+  ],
+  [
+    "g7_relay_reset_method_before_auth",
+    "ReceivedRelayWrongMethodWitness.lean",
+    "ResponseHeadSpec.bytes 405 [] 0 close",
+    "ResponseHeadSpec.bytes 401 [] 0 close"
+  ],
+  [
+    "g7_g7_partial_boundary_filled",
+    "ChunkCallerPump.lean",
+    "(filled+received) r",
+    "(filled+received+1) r"
+  ],
+  [
+    "g7_g7_partial_one_byte_consumed",
+    "ChunkCallerPump.lean",
+    "r.read=filled+received",
+    "r.read=filled+received+1"
+  ],
+  [
+    "g7_g7_partial_wire_bytes",
+    "ChunkPrefixBody.lean",
+    "input[k]'hk=wire k",
+    "input[k]'hk=wire (k+1)"
+  ],
+  [
+    "g7_g7_capacity_caller_state",
+    "ChunkCallerPreserve.lean",
+    "AppState.At after s \u2227",
+    "AppState.At after Spec.initial \u2227"
+  ],
+  [
+    "g7_g7_capacity_raw_bound",
+    "ChunkCapacityBody.lean",
+    "input.length+arrivals=2048",
+    "input.length+arrivals=2049"
+  ],
+  [
+    "g7_g7_capacity_actual_instruction",
+    "ChunkCapacityBody.lean",
+    "nb+9+n",
+    "nb+8+n"
+  ],
+  [
+    "g7_g7_capacity_response_status",
+    "ChunkCapacityCycle.lean",
+    "UartTxLoop.events (ResponseHeadSpec.bytes 413 [] 0 true)",
+    "UartTxLoop.events (ResponseHeadSpec.bytes 400 [] 0 true)"
+  ],
+  [
+    "g7_g7_capacity_borrow",
+    "ChunkCapacityCycle.lean",
+    "ramRead after 0x80ffebbc#32 .w=0#32",
+    "ramRead after 0x80ffebbc#32 .w=1#32"
+  ],
+  [
+    "g7_g7_capacity_compacted_byte",
+    "ChunkCapacityWitness.lean",
+    "body++[97#8]",
+    "body++[98#8]"
+  ],
+  [
+    "g7_g7_capacity_incomplete_vs_done",
+    "ChunkCapacityWitness.lean",
+    "wire 1988 60 60 cStart []).stop=.needInput",
+    "wire 1988 60 60 cStart []).stop=.done"
+  ],
+  [
+    "g7_length_actual_body",
+    "LengthReceivedRequest.lean",
+    "RuntimeRequestSpans.body input head amount=arrivals wire head.len amount",
+    "RuntimeRequestSpans.body input head amount=[]"
+  ],
+  [
+    "g7_length_actual_raw_extent",
+    "LengthReceivedRequest.lean",
+    "(head.len+amount) (served+1)",
+    "head.len (served+1)"
+  ],
+  [
+    "g7_length_first_match_pc",
+    "ReceivedLengthFirstMatch.lean",
+    "d.pc=0x800013d2#32",
+    "d.pc=0x800013d4#32"
+  ],
+  [
+    "g7_route_case_selection",
+    "RouteCaseSpec.lean",
+    "RouteSpec.select path=some route",
+    "RouteSpec.select path=none"
+  ],
+  [
+    "g7_route_exact_head_output",
+    "RuntimeRouteTransaction.lean",
+    "ResponseHeadSpec.body response.status (isHead input head) response.payload",
+    "response.payload"
+  ],
+  [
+    "g7_route_committed_next_state",
+    "RuntimeRouteTransaction.lean",
+    "LoopReady.At d after response.state",
+    "LoopReady.At d after s"
+  ],
+  [
+    "g7_route_next_counter",
+    "RuntimeRouteTransaction.lean",
+    "(if close then 0 else served)",
+    "(if close then 0 else served+1)"
+  ],
+  [
+    "g7_original_header_lookup",
+    "RuntimeRouteCorrespondence.lean",
+    "RouteSpec.reply s method path raw body entries=RouteSpec.reply s method path original body entries",
+    "RouteSpec.reply s method path raw body entries=RouteSpec.reply s method path original [] entries"
+  ],
+  [
+    "g7_header_compaction_method",
+    "RuntimeRouteCorrespondence.lean",
+    "MainMethodSpec.decode (MainMethodBytes.token original head.method.2)",
+    "MainMethodSpec.decode (MainMethodBytes.token original (head.method.2+1))"
+  ],
+  [
+    "g7_complete_committed_state",
+    "ReceivedCompleteCycle.lean",
+    "LoopReady.At d after response.state",
+    "LoopReady.At d after s"
+  ],
+  [
+    "g7_complete_close_policy",
+    "ReceivedCompleteCycle.lean",
+    "close=MainCloseSpec.mustClose head.minor (served+1) original",
+    "close=MainCloseSpec.mustClose head.minor served original"
+  ],
+  [
+    "g7_complete_head_payload",
+    "ReceivedCompleteCycle.lean",
+    "ResponseHeadSpec.body response.status (RuntimeRouteTransaction.isHead original head) response.payload",
+    "response.payload"
+  ],
+  [
+    "g7_g7_head_empty_crlf_extent",
+    "HeadConsumedExtent.lean",
+    " : i+2\u2264len := by",
+    " : i+3\u2264len := by"
+  ],
+  [
+    "g7_g7_head_scan_cut",
+    "HeadConsumedExtent.lean",
+    "(stopped : scan p g i cap<small)",
+    "(stopped : scan p g i cap<small+2)"
+  ],
+  [
+    "g7_g7_head_complete_field_cut",
+    "HeadConsumedExtent.lean",
+    "(limits : len\u2264small \u2227 small\u2264cap)",
+    "(limits : len\u2264small+1 \u2227 small\u2264cap)"
+  ],
+  [
+    "g7_g7_head_parser_cut_one_byte",
+    "HeadConsumedExtent.lean",
+    "parseHead (L.take head.len) maxHead maxBody=.done head",
+    "parseHead (L.take (head.len-1)) maxHead maxBody=.done head"
+  ],
+  [
+    "g7_g7_head_received_extent",
+    "HeadConsumedExtent.lean",
+    ").input.length=head.len := by",
+    ").input.length=head.len+1 := by"
+  ],
+  [
+    "g7_g7_head_original_copy_base",
+    "HeadReceiveEntry.lean",
+    "InitRoutes.Layout after \u2227 HeadCompletedView.At after 0x80fffd38#32 head",
+    "InitRoutes.Layout after \u2227 HeadCompletedView.At after 0x80fffd3c#32 head"
+  ],
+  [
+    "g7_g7_head_entry_bound",
+    "HeadReceiveEntry.lean",
+    "MainHeadAcceptedBounds.At head.len 1024 head \u2227",
+    "MainHeadAcceptedBounds.At (head.len-1) 1024 head \u2227"
+  ],
+  [
+    "g7_g7_head_counter_before_request",
+    "HeadReceiveEntry.lean",
+    "MainServeLayout.At after served \u2227",
+    "MainServeLayout.At after (served+1) \u2227"
+  ],
+  [
+    "g7_capture_store_instruction_count",
+    "RelayCaptureStore.lean",
+    "Quiet.Steps B img 24",
+    "Quiet.Steps B img 23"
+  ],
+  [
+    "g7_capture_stores_actual_segment_end",
+    "RelayCaptureStore.lean",
+    "\u27e8d,MainRelayCapture.memory ram params captured\u27e9",
+    "\u27e8d,MainRelayCapture.memory ram params full\u27e9"
+  ],
+  [
+    "g7_extra_slash_match_flag",
+    "RelayCaptureNonempty.lean",
+    "d.get 10=(if captured=full then 1#32 else 0#32)",
+    "d.get 10=1#32"
+  ],
+  [
+    "g7_nonempty_capture_count",
+    "RelayCaptureNonempty.lean",
+    "d.get 11=1#32 \u2227",
+    "d.get 11=0#32 \u2227"
+  ],
+  [
+    "g7_empty_capture_actual_count",
+    "RelayCaptureEmpty.lean",
+    "Quiet.Steps B img 17",
+    "Quiet.Steps B img 16"
+  ],
+  [
+    "g7_empty_capture_refused",
+    "RelayCaptureEmpty.lean",
+    "d.get 10=0#32 \u2227",
+    "d.get 10=1#32 \u2227"
+  ],
+  [
+    "g7_scan_suffix_end_relation",
+    "RouteScanSpec.lean",
+    "RoutePathScan.length xs=xs.length \u2194",
+    "RoutePathScan.length xs\u2260xs.length \u2194"
+  ],
+  [
+    "g7_capture_suffix_status",
+    "RelayCaptureTail.lean",
+    "d.get 10=(if accepted ys then 1#32 else 0#32)",
+    "d.get 10=1#32"
+  ],
+  [
+    "g7_capture_suffix_empty_count",
+    "RelayCaptureTail.lean",
+    "d.get 11=(if RoutePathScan.length ys=0 then 0#32 else 1#32)",
+    "d.get 11=1#32"
+  ],
+  [
+    "g7_relay_prefix_next_index",
+    "RelayPrefixScan.lean",
+    "d.pc=0x8000287a#32 \u2227 d.get 22=7#32",
+    "d.pc=0x8000287a#32 \u2227 d.get 22=8#32"
+  ],
+  [
+    "g7_relay_prefix_refusal_pc",
+    "RelayPrefixScan.lean",
+    "else d.pc=0x8000293a#32",
+    "else d.pc=0x80002936#32"
+  ],
+  [
+    "g7_relay_body_policy",
+    "RouteRelayBody.lean",
+    "d.get 10=(if RouteSpec.relayPath (47#8::ys) then 1#32 else 0#32)",
+    "d.get 10=1#32"
+  ],
+  [
+    "g7_relay_body_capture_memory",
+    "RouteRelayBody.lean",
+    "\u27e8d,memory ram params (47#8::ys)\u27e9",
+    "\u27e8d,ram\u27e9"
+  ],
+  [
+    "g7_relay_full_return",
+    "RouteRelay.lean",
+    "\u2227 d.pc=ret \u2227",
+    "\u2227 d.pc=0x80001854#32 \u2227"
+  ],
+  [
+    "g7_relay_runtime_param_hole",
+    "RuntimeRelayMatch.lean",
+    "sp 3648 \u2227",
+    "sp 3656 \u2227"
+  ],
+  [
+    "g7_last_candidate_flag",
+    "RuntimeLastMatch.lean",
+    "then 2#32 else 3#32",
+    "then 3#32 else 2#32"
+  ],
+  [
+    "g7_last_match_loop_metadata",
+    "RuntimeLastMatch.lean",
+    "LoopTransactionMemory.At after used \u2227",
+    "LoopTransactionMemory.At after (used+1#32) \u2227"
+  ],
+  [
+    "g7_last_match_exact_uart_input",
+    "RuntimeLastMatchWitness.lean",
+    "Observed.input reads=headBytes which",
+    "Observed.input reads=[]"
+  ],
+  [
+    "g7_last_match_extra_slash_capture",
+    "RuntimeLastMatchWitness.lean",
+    "if which=.valid \u2228 which=.extra then 1#32 else 0#32",
+    "if which=.valid then 1#32 else 0#32"
+  ],
+  [
+    "g7_literal_actual_boolean",
+    "RouteLiteral.lean",
+    "d.get 10=(if first::rest=ys then 1#32 else 0#32)",
+    "d.get 10=(if first::rest=ys then 0#32 else 1#32)"
+  ],
+  [
+    "g7_literal_capture_count",
+    "RouteLiteral.lean",
+    "d.get 11=0#32",
+    "d.get 11=1#32"
+  ],
+  [
+    "g7_literal_actual_return",
+    "RouteLiteral.lean",
+    "d.pc=ret \u2227",
+    "d.pc=ret+2#32 \u2227"
+  ],
+  [
+    "g7_literal_tail_simultaneous_end",
+    "RouteLiteralTail.lean",
+    "d.get 10=(if first::rest=ys then 1#32 else 0#32)",
+    "d.get 10=(if first::rest=ys then 0#32 else 1#32)"
+  ],
+  [
+    "g7_literal_segment_comparison",
+    "RouteLiteralSegment.lean",
+    "d.pc=(if xs=ys then 0x80002912#32 else 0x8000292a#32)",
+    "d.pc=(if xs=ys then 0x8000292a#32 else 0x80002912#32)"
+  ],
+  [
+    "g7_literal_memcmp_result_branch",
+    "RouteLiteralCompare.lean",
+    "d.pc=(if xs=ys then 0x80002912#32 else 0x8000292a#32)",
+    "d.pc=(if xs=ys then 0x8000292a#32 else 0x80002912#32)"
+  ],
+  [
+    "g7_literal_empty_leading_advance",
+    "RouteLiteralLeading.lean",
+    "d.get 22=1#32",
+    "d.get 22=2#32"
+  ],
+  [
+    "g7_literal_next_index",
+    "RouteNextIndex.lean",
+    "d.get 22=BitVec.ofNat 32 (pe+1)",
+    "d.get 22=BitVec.ofNat 32 pe"
+  ],
+  [
+    "g7_literal_end_accept_extra_suffix",
+    "RouteLiteralEnd.lean",
+    "d.get 10=(if pathEnd=pathLen then 1#32 else 0#32)",
+    "d.get 10=1#32"
+  ],
+  [
+    "g7_literal_failed_match_boolean",
+    "RouteLiteralEnd.lean",
+    "d.get 10=0#32",
+    "d.get 10=1#32"
+  ],
+  [
+    "g7_literal_actual_call_target",
+    "RouteLiteralCall.lean",
+    "d.pc=0x80005162#32",
+    "d.pc=0x80005164#32"
+  ],
+  [
+    "g7_literal_slice_guard_count",
+    "RouteSliceGuards.lean",
+    "Quiet.Steps B img 4",
+    "Quiet.Steps B img 3"
+  ],
+  [
+    "g7_literal_path_scan_empty_guard",
+    "RoutePathEntry.lean",
+    "d.pc=0x800028a8#32",
+    "d.pc=0x80002894#32"
+  ],
+  [
+    "g7_literal_pattern_scan_cursor",
+    "RoutePatternScan.lean",
+    "d.get 22=BitVec.ofNat 32 (i+RoutePathScan.length xs)",
+    "d.get 22=BitVec.ofNat 32 (i+RoutePathScan.length xs+1)"
+  ],
+  [
+    "g7_literal_spec_head_policy",
+    "RouteSpec.lean",
+    "allows .state .head=true",
+    "allows .state .head=false"
+  ],
+  [
+    "g7_literal_spec_reject_trailing",
+    "RouteSpec.lean",
+    "select (WireSpec.ascii \"/state/\")=none",
+    "select (WireSpec.ascii \"/state/\")=some .state"
+  ],
+  [
+    "g7_first_match_actual_boolean",
+    "RuntimeFirstMatch.lean",
+    "d.get 10=(if RuntimeRequestSpans.path input head=WireSpec.ascii \"/state\" then 1#32 else 0#32)",
+    "d.get 10=(if RuntimeRequestSpans.path input head=WireSpec.ascii \"/state\" then 0#32 else 1#32)"
+  ],
+  [
+    "g7_first_match_actual_return",
+    "RuntimeFirstMatch.lean",
+    "d.pc=0x800013d2#32",
+    "d.pc=0x800013d6#32"
+  ],
+  [
+    "g7_first_match_saved_live_frame",
+    "RuntimeFirstMatch.lean",
+    "ViewFrame.Region ram (MainPathStateSave.memory ram c) sp 5232",
+    "ViewFrame.Region ram (MainPathStateSave.memory ram c) 0x80ffeb50#32 5232"
+  ],
+  [
+    "g7_router_export_reply_capacity",
+    "RuntimeRouterEntry.lean",
+    "replyCapacity : ramRead ram 0x80fff9fc#32 .w=832#32",
+    "replyCapacity : ramRead ram 0x80fff9fc#32 .w=833#32"
+  ],
+  [
+    "g7_router_export_count_bound",
+    "RuntimeRouterEntry.lean",
+    "countBound : served\u2264100",
+    "countBound : served\u226499"
+  ],
+  [
+    "g7_route_live_capacity",
+    "RuntimeRouteEnvelope.lean",
+    "replyCapacity : ramRead ram 0x80fff9fc#32 .w=832#32",
+    "replyCapacity : ramRead ram 0x80fff9fc#32 .w=833#32"
+  ],
+  [
+    "g7_received_first_empty_result",
+    "ReceivedFirstMatch.lean",
+    "d.get 10=(if RuntimeRequestSpans.path input head=WireSpec.ascii \"/state\" then 1#32 else 0#32)",
+    "d.get 10=1#32"
+  ],
+  [
+    "g7_received_first_chunk_result",
+    "ReceivedFirstMatch.lean",
+    "d.get 10=(if RuntimeRequestSpans.path raw head=WireSpec.ascii \"/state\" then 1#32 else 0#32)",
+    "d.get 10=1#32"
+  ],
+  [
+    "g7_received_first_chunk_body",
+    "ReceivedFirstMatch.lean",
+    "RuntimeRequestSpans.body raw head r.body.length=r.body",
+    "RuntimeRequestSpans.body raw head r.body.length=[]"
+  ],
+  [
+    "g7_received_first_chunk_used",
+    "ReceivedFirstMatch.lean",
+    "LoopTransactionMemory.At after (BitVec.ofNat 32 r.read)",
+    "LoopTransactionMemory.At after (BitVec.ofNat 32 r.written)"
+  ],
+  [
+    "g7_received_first_real_pc",
+    "ReceivedFirstMatch.lean",
+    "d.pc=0x800013d2#32",
+    "d.pc=0x80001422#32"
+  ],
+  [
+    "g7_g7_router_first_pattern",
+    "RuntimeRouterEntry.lean",
+    "pattern : c.get 10=0x80005b83#32",
+    "pattern : c.get 10=0x80005b89#32"
+  ],
+  [
+    "g7_g7_router_real_return",
+    "RuntimeRouterEntry.lean",
+    "ret : c.get 1=0x800013d2#32",
+    "ret : c.get 1=0x800013d6#32"
+  ],
+  [
+    "g7_g7_router_first_path_length",
+    "RuntimeRouterEntry.lean",
+    "pathLength : c.get 13=MainRequestBuild.pathLength input head",
+    "pathLength : c.get 13=MainRequestBuild.pathLength input head+1#32"
+  ],
+  [
+    "g7_g7_router_actual_instruction_count",
+    "RuntimeRouterEntry.lean",
+    "Quiet.Steps B img 83",
+    "Quiet.Steps B img 82"
+  ],
+  [
+    "g7_g7_router_loop_used_word",
+    "RuntimeRouteRequest.lean",
+    "LoopTransactionMemory.At after (BitVec.ofNat 32 rawUsed)",
+    "LoopTransactionMemory.At after (BitVec.ofNat 32 (rawUsed+1))"
+  ],
+  [
+    "g7_g7_received_empty_next_count",
+    "ReceivedRouteRequest.lean",
+    "head 0 head.len (served+1) lowValue close",
+    "head 0 head.len served lowValue close"
+  ],
+  [
+    "g7_g7_received_chunk_next_count",
+    "ReceivedRouteRequest.lean",
+    "r.body.length r.read (served+1) lowValue close",
+    "r.body.length r.read served lowValue close"
+  ],
+  [
+    "g7_g7_router_witness_dechunked_bytes",
+    "ReceivedRouteWitness.lean",
+    "(if which=.chunked then WireSpec.ascii \"-1\" else [])",
+    "(if which=.chunked then WireSpec.ascii \"-2\" else [])"
+  ],
+  [
+    "g7_g7_router_witness_raw_extent",
+    "ReceivedRouteWitness.lean",
+    "(head which).len+(body which).length",
+    "(head which).len+(body which).length+1"
+  ],
+  [
+    "g7_head_actual_no_payload",
+    "ReceivedHeadCycle.lean",
+    "UartTxLoop.events []) \u2227",
+    "UartTxLoop.events (ReplyJson.snapshot s)) \u2227"
+  ],
+  [
+    "g7_head_actual_representation_length",
+    "ReceivedHeadCycle.lean",
+    "UartTxLoop.events (ResponseHeadSpec.bytes 200 (WireSpec.ascii \"application/json\") (ReplyJson.snapshot s).length close)",
+    "UartTxLoop.events (ResponseHeadSpec.bytes 200 (WireSpec.ascii \"application/json\") 0 close)"
+  ],
+  [
+    "g7_head_chunk_read_cursor",
+    "ReceivedHeadCycle.lean",
+    "head.len+received=r.read",
+    "head.len+received=r.written"
+  ],
+  [
+    "g7_head_reusable_loop_count",
+    "ReceivedHeadCycle.lean",
+    "LoopReady.At d after s (if close then 0 else served+1)",
+    "LoopReady.At d after s 101"
+  ],
+  [
+    "g7_head_real_setup_count",
+    "StateHeadSetup.lean",
+    "Quiet.Steps B img 32",
+    "Quiet.Steps B img 28"
+  ],
+  [
+    "g7_head_real_method_branch_flag",
+    "StateHeadSetup.lean",
+    "d.get 12=1#32",
+    "d.get 12=0#32"
+  ],
+  [
+    "g7_head_actual_fetch_xori",
+    "StateHeadCode.lean",
+    "(.opimm .xor 12 12 1#32)",
+    "(.opimm .xor 12 12 2#32)"
+  ],
+  [
+    "g7_head_input_method_preservation",
+    "RuntimeHeadInput.lean",
+    "input s head amount served close true \u2227",
+    "input s head amount served close false \u2227"
+  ],
+  [
+    "g7_head_decoder_preserves_method",
+    "RuntimeMethodDecoded.lean",
+    "RuntimeReadViews.DecodedReady d after input s served close isHead",
+    "RuntimeReadViews.DecodedReady d after input s served close (!isHead)"
+  ],
+  [
+    "g7_head_next_actual_body_selection",
+    "RuntimeReadNext.lean",
+    "UartTxLoop.events (ResponseHeadSpec.body 200 isHead (ReplyJson.snapshot s))",
+    "UartTxLoop.events (ResponseHeadSpec.body 200 (!isHead) (ReplyJson.snapshot s))"
+  ],
+  [
+    "g7_head_transaction_no_payload",
+    "RuntimeHeadTransaction.lean",
+    "UartTxLoop.events []) \u2227",
+    "UartTxLoop.events (ReplyJson.snapshot s)) \u2227"
+  ],
+  [
+    "g7_head_reset_no_payload",
+    "ReceivedHeadWitness.lean",
+    "UartTxLoop.events []) \u2227",
+    "UartTxLoop.events (ReplyJson.snapshot Spec.initial)) \u2227"
+  ],
+  [
+    "g7_received_request_line_slash",
+    "RouteReceivedPath.lean",
+    "g ts=47 := by",
+    "g ts=48 := by"
+  ],
+  [
+    "g7_received_parse_original_byte",
+    "RouteReceivedPath.lean",
+    "MainQuerySpec.bytes input head.target.1=47 := by",
+    "MainQuerySpec.bytes input head.target.1=48 := by"
+  ],
+  [
+    "g7_received_query_path_initial_byte",
+    "RouteReceivedPath.lean",
+    "MainQuerySpec.path input start finish=47#8::ys",
+    "MainQuerySpec.path input start finish=48#8::ys"
+  ],
+  [
+    "g7_received_stream_path_initial_byte",
+    "RouteReceivedPath.lean",
+    "MainQuerySpec.path (MainHeaderStreamSpec.consume wire fuel []).input head.target.1 head.target.2=47#8::ys",
+    "MainQuerySpec.path (MainHeaderStreamSpec.consume wire fuel []).input head.target.1 head.target.2=48#8::ys"
+  ],
+  [
+    "g7_read_cycle_exact_json_body",
+    "ReceivedReadCycle.lean",
+    "UartTxLoop.events (ReplyJson.snapshot s)) \u2227",
+    "UartTxLoop.events []) \u2227"
+  ],
+  [
+    "g7_read_cycle_actual_http_status",
+    "ReceivedReadCycle.lean",
+    "UartTxLoop.events (ResponseHeadSpec.bytes 200",
+    "UartTxLoop.events (ResponseHeadSpec.bytes 201"
+  ],
+  [
+    "g7_read_cycle_empty_counter",
+    "ReceivedReadCycle.lean",
+    "LoopReady.At d after s (if close then 0 else served+1)",
+    "LoopReady.At d after s (if close then 0 else served)"
+  ],
+  [
+    "g7_read_cycle_chunk_cursor",
+    "ReceivedReadCycle.lean",
+    "head.len+received=r.read",
+    "head.len+received=r.written"
+  ],
+  [
+    "g7_read_cycle_chunk_body_correspondence",
+    "ReceivedReadCycle.lean",
+    "RuntimeRequestSpans.body raw head r.body.length=r.body",
+    "RuntimeRequestSpans.body raw head r.body.length=[]"
+  ],
+  [
+    "g7_read_transaction_return_boundary",
+    "RuntimeReadTransaction.lean",
+    "LoopReady.At d after s (if close then 0 else served)",
+    "LoopReady.At d after s 101"
+  ],
+  [
+    "g7_read_input_actual_instruction_count",
+    "RuntimeReadInput.lean",
+    "Quiet.Steps B img 28",
+    "Quiet.Steps B img 27"
+  ],
+  [
+    "g7_read_input_decoder_return",
+    "RuntimeReadInput.lean",
+    "MainReadRouteInput.Ready d (MainStateRouteSetup.memory ram)",
+    "MainReadRouteInput.Ready (d.goto 0x80001f70#32) (MainStateRouteSetup.memory ram)"
+  ],
+  [
+    "g7_read_prefix_method_bounds",
+    "RuntimeHeaderPrefix.lean",
+    "(inside : len\u2264cut)",
+    "(inside : len\u2264cut+1)"
+  ],
+  [
+    "g7_read_prefix_path_bounds",
+    "RuntimeHeaderPrefix.lean",
+    "first\u2264last \u2227 last\u2264cut",
+    "first\u2264last \u2227 last\u2264cut+1"
+  ],
+  [
+    "g7_read_reset_witness_next_boundary",
+    "ReceivedReadWitness.lean",
+    "LoopReady.At d after Spec.initial (if close then 0 else 1)",
+    "LoopReady.At d after Spec.initial 101"
+  ],
+  [
+    "g7_route_second_arbitrary_path_size",
+    "RouteSecondCall.lean",
+    "d.get 13=pathSize",
+    "d.get 13=pathSize+1#32"
+  ],
+  [
+    "g7_route_third_arbitrary_path_size",
+    "RouteThirdCall.lean",
+    "d.get 13=pathSize",
+    "d.get 13=pathSize+1#32"
+  ],
+  [
+    "g7_route_fourth_arbitrary_path_size",
+    "RouteFourthCall.lean",
+    "d.get 13=pathSize",
+    "d.get 13=pathSize+1#32"
+  ],
+  [
+    "g7_router_capacity_actual_store",
+    "RuntimeRouterWords.lean",
+    ".w=832#32 :=",
+    ".w=831#32 :="
+  ],
+  [
+    "g7_g7_terminal_actual_cursor",
+    "ChunkCallerTerminal.lean",
+    "d.get 24=BitVec.ofNat 32 (read+1)",
+    "d.get 24=BitVec.ofNat 32 read"
+  ],
+  [
+    "g7_g7_partial_actual_cursor",
+    "ChunkCallerPump.lean",
+    "d.get 24=BitVec.ofNat 32 r.read",
+    "d.get 24=BitVec.ofNat 32 (r.read+1)"
+  ],
+  [
+    "g7_g7_success_actual_cursor",
+    "ChunkSuccessBody.lean",
+    "usedReg : c.get 24=BitVec.ofNat 32 result.read",
+    "usedReg : c.get 24=BitVec.ofNat 32 result.written"
+  ],
+  [
+    "g7_g7_chunk_next_instruction",
+    "ChunkNextReady.lean",
+    "Quiet.Steps B img 408",
+    "Quiet.Steps B img 407"
+  ],
+  [
+    "g7_g7_empty_next_instruction",
+    "EmptyNextReady.lean",
+    "Quiet.Steps B img 409",
+    "Quiet.Steps B img 408"
+  ],
+  [
+    "g7_g7_chunk_payload_not_zero",
+    "ChunkNextStores.lean",
+    "(sp+5168#32) (alu .or high0 (alu .sll high1 16#32)) .w",
+    "(sp+5168#32) (0#32) .w"
+  ],
+  [
+    "g7_g7_chunk_encoded_decoded_finish",
+    "ChunkNextTail.lean",
+    "d.get 25=finish",
+    "d.get 25=len"
+  ],
+  [
+    "g7_g7_empty_original_high_payload",
+    "EmptyNextLoads.lean",
+    "(sp+4532#32) .h)=high0",
+    "(sp+3332#32) .h)=high0"
+  ],
+  [
+    "g7_g7_empty_real_copy_source",
+    "EmptyNextCall.lean",
+    "d.get 11=sp+4552#32",
+    "d.get 11=sp+3352#32"
+  ],
+  [
+    "g7_g7_empty_tail_raw_consumed",
+    "EmptyNextTail.lean",
+    "d.get 24=len",
+    "d.get 24=len+1#32"
+  ],
+  [
+    "g7_g7_runtime_count_real_store",
+    "RuntimeTarget.lean",
+    "head amount rawUsed (served+1) lowValue \u2227",
+    "head amount rawUsed (served+2) lowValue \u2227"
+  ],
+  [
+    "g7_g7_runtime_decoded_method",
+    "RuntimeMethod.lean",
+    "method : c.get 14=BitVec.ofNat 32 (MainMethodSpec.tag (MainMethodSpec.decode (MainMethodBytes.token input head.method.2)))",
+    "method : c.get 14=BitVec.ofNat 32 (MainMethodSpec.tag (MainMethodSpec.decode (MainMethodBytes.token input head.method.2))+1)"
+  ],
+  [
+    "g7_g7_common_request_counter",
+    "RuntimeRequestBuild.lean",
+    "head amount rawUsed (served+1) \u2227",
+    "head amount rawUsed served \u2227"
+  ],
+  [
+    "g7_g7_received_chunk_raw_consumed",
+    "ChunkReceivedRequest.lean",
+    "head.len+received=r.read",
+    "head.len+received=r.read+1"
+  ],
+  [
+    "g7_g7_received_chunk_header_order",
+    "ChunkReceivedRequest.lean",
+    "raw.take head.len=(MainHeaderStreamSpec.consume wire fuel []).input",
+    "raw.take head.len=(MainHeaderStreamSpec.consume wire fuel []).input.reverse"
+  ],
+  [
+    "g7_g7_received_chunk_body_order",
+    "ChunkReceivedRequest.lean",
+    "RuntimeRequestSpans.body raw head r.body.length=r.body",
+    "RuntimeRequestSpans.body raw head r.body.length=r.body.reverse"
+  ],
+  [
+    "g7_g7_received_empty_body_extent",
+    "EmptyReceivedRequest.lean",
+    "input s head 0 head.len (served+1)",
+    "input s head 1 head.len (served+1)"
+  ],
+  [
+    "g7_g7_received_empty_header_extent",
+    "EmptyReceivedRequest.lean",
+    ").input.length=head.len \u2227",
+    ").input.length=head.len+1 \u2227"
+  ],
+  [
+    "g7_g7_chunk_terminal_leftovers",
+    "ChunkCallerStreaming.lean",
+    "r.read=filled+received",
+    "r.read=filled+received+1"
+  ],
+  [
+    "g7_g7_chunk_incoming_wire",
+    "ChunkRejectBody.lean",
+    "input[k]'hk=wire k",
+    "input[k]'hk=wire (k+1)"
+  ],
+  [
+    "g7_g7_chunk_cycle_available_borrow",
+    "ChunkRejectCycle.lean",
+    "ramRead after 0x80ffebbc#32 .w=0#32",
+    "ramRead after 0x80ffebbc#32 .w=1#32"
+  ],
+  [
+    "g7_g7_chunk_cycle_commit_state",
+    "ChunkRejectCycle.lean",
+    "AppState.At after s \u2227",
+    "AppState.At after Spec.initial \u2227"
+  ],
+  [
+    "g7_g7_chunk_cycle_tx_order",
+    "ChunkRejectCycle.lean",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes status [] 0 true)) \u2227",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes status [] 0 true).reverse) \u2227"
+  ],
+  [
+    "g7_g7_chunk_oversized_status",
+    "ChunkRejectWitness.lean",
+    "| .oversized => 413",
+    "| .oversized => 400"
+  ],
+  [
+    "g7_g7_chunk_oversized_consumption",
+    "ChunkRejectWitness.lean",
+    "| .oversized => 4",
+    "| .oversized => 5"
+  ],
+  [
+    "g7_g7_terminal_filled_word",
+    "ChunkCallerTerminal.lean",
+    "ramRead after (sp+3288#32) .w=BitVec.ofNat 32 filled",
+    "ramRead after (sp+3288#32) .w=BitVec.ofNat 32 (filled+1)"
+  ],
+  [
+    "g7_g7_pump_filled_word",
+    "ChunkCallerPump.lean",
+    "ramRead after (sp+3288#32) .w=BitVec.ofNat 32 (filled+received)",
+    "ramRead after (sp+3288#32) .w=BitVec.ofNat 32 (filled+received+1)"
+  ],
+  [
+    "g7_g7_success_actual_rx_count",
+    "ChunkSuccessBody.lean",
+    "head.len+received=r.read",
+    "head.len+received=r.read+1"
+  ],
+  [
+    "g7_g7_success_decoded_body_bound",
+    "ChunkSuccessBody.lean",
+    "bodyBound : result.body.length\u22641024",
+    "bodyBound : result.body.length\u22641023"
+  ],
+  [
+    "g7_g7_success_saved_head_base",
+    "ChunkSuccessBody.lean",
+    "view : HeadCompletedView.At ram (sp+3320#32) head",
+    "view : HeadCompletedView.At ram (sp+3324#32) head"
+  ],
+  [
+    "g7_g7_success_decoded_byte",
+    "ChunkSuccessBody.lean",
+    "ChunkBufferView.Body ram sp head.len result.body",
+    "ChunkBufferView.Body ram sp (head.len+1) result.body"
+  ],
+  [
+    "g7_g7_reject_staging_tag",
+    "RejectNextCore.lean",
+    "d.get 10=1#32 \u2227",
+    "d.get 10=0#32 \u2227"
+  ],
+  [
+    "g7_g7_reject_staging_instruction",
+    "RejectNextCore.lean",
+    "Quiet.Steps B img 756",
+    "Quiet.Steps B img 755"
+  ],
+  [
+    "g7_g7_reject_descriptor_status_store",
+    "RejectResponseSetup.lean",
+    "(status) .h",
+    "(status+1#32) .h"
+  ],
+  [
+    "g7_g7_reject_descriptor_close_store",
+    "RejectResponseSetup.lean",
+    "(0x80fff814#32+142#32) (1#32) .b",
+    "(0x80fff814#32+142#32) (0#32) .b"
+  ],
+  [
+    "g7_g7_reject_descriptor_fresh_flag",
+    "RejectResponseSetup.lean",
+    "(0x80fff814#32+145#32) (0#32) .b",
+    "(0x80fff814#32+145#32) (1#32) .b"
+  ],
+  [
+    "g7_g7_reject_completion_pc",
+    "RejectResponseComplete.lean",
+    "d.pc=0x80000978#32",
+    "d.pc=0x8000096c#32"
+  ],
+  [
+    "g7_g7_reject_response_bytes",
+    "RejectResponseReady.lean",
+    "UartTxLoop.events (ResponseHeadSpec.bytes status [] 0 true)) \u2227",
+    "UartTxLoop.events (ResponseHeadSpec.bytes (status+1) [] 0 true)) \u2227"
+  ],
+  [
+    "g7_g7_reject_response_connection",
+    "RejectResponseReady.lean",
+    "UartTxLoop.events (ResponseHeadSpec.bytes status [] 0 true)) \u2227",
+    "UartTxLoop.events (ResponseHeadSpec.bytes status [] 0 false)) \u2227"
+  ],
+  [
+    "g7_g7_reject_restart_counter",
+    "RejectTransaction.lean",
+    "LoopReady.At d after s 0 := by",
+    "LoopReady.At d after s 1 := by"
+  ],
+  [
+    "g7_g7_reject_commit_state",
+    "RejectTransaction.lean",
+    "LoopReady.At d after s 0 := by",
+    "LoopReady.At d after Spec.initial 0 := by"
+  ],
+  [
+    "g7_g7_reject_head_capacity",
+    "RejectHeaderCycle.lean",
+    "(space : fuel\u22642048)",
+    "(space : fuel\u22642049)"
+  ],
+  [
+    "g7_g7_reject_status_set",
+    "RejectStatus.lean",
+    "s=400 \u2228",
+    "s=401 \u2228"
+  ],
+  [
+    "g7_g7_reject_witness_status",
+    "RejectHeaderWitness.lean",
+    "result=.reject 400 := by",
+    "result=.reject 500 := by"
+  ],
+  [
+    "g7_g7_reject_witness_borrow",
+    "RejectHeaderWitness.lean",
+    "ramRead after 0x80ffebbc#32 .w=0#32",
+    "ramRead after 0x80ffebbc#32 .w=1#32"
+  ],
+  [
+    "g7_g7_reject_witness_ready",
+    "RejectHeaderWitness.lean",
+    "fun _ => 129#32",
+    "fun _ => 128#32"
+  ],
+  [
+    "g7_g7_chunk_branch_instruction",
+    "ChunkRejectBranch.lean",
+    "Quiet.Steps B img 4",
+    "Quiet.Steps B img 3"
+  ],
+  [
+    "g7_g7_chunk_error_tag",
+    "ChunkRejectBranch.lean",
+    "d.get 9=3#32",
+    "d.get 9=2#32"
+  ],
+  [
+    "g7_g7_chunk_zero_body_variant",
+    "ChunkRejectBranch.lean",
+    "d.get 18=0#32",
+    "d.get 18=1#32"
+  ],
+  [
+    "g7_g7_chunk_static_vs_buffer",
+    "ChunkCallerFrame.lean",
+    "low : ViewFrame.Region before after sp 132",
+    "low : ViewFrame.Region before after sp 133"
+  ],
+  [
+    "g7_g7_chunk_append_value",
+    "ChunkCallerData.lean",
+    "after ((sp+132#32)+BitVec.ofNat 32 written)=ram ((sp+132#32)+BitVec.ofNat 32 read)",
+    "after ((sp+132#32)+BitVec.ofNat 32 written)=0#8"
+  ],
+  [
+    "g7_g7_chunk_actual_refill_count",
+    "ChunkCallerRefill.lean",
+    "25+5*pending.length",
+    "24+5*pending.length"
+  ],
+  [
+    "g7_g7_chunk_start_irq",
+    "ChunkCallerStart.lean",
+    "(hmask : c.mie_=false)",
+    "(hmask : c.mie_=true)"
+  ],
+  [
+    "g7_g7_chunk_response_restart",
+    "ChunkRejectFinish.lean",
+    "LoopReady.At d after s 0 := by",
+    "LoopReady.At d after s 1 := by"
+  ],
+  [
+    "g7_g7_chunk_response_status",
+    "ChunkRejectFinish.lean",
+    "UartTxLoop.events (ResponseHeadSpec.bytes status [] 0 true)) \u2227",
+    "UartTxLoop.events (ResponseHeadSpec.bytes (status+1) [] 0 true)) \u2227"
+  ],
+  [
+    "g7_method_non_get_fallback",
+    "RouteMethodMath.lean",
+    "alu .sltu (x ||| wanted) 1#32=0#32",
+    "alu .sltu (x ||| wanted) 1#32=1#32"
+  ],
+  [
+    "g7_setpoint_method_refusal_flag",
+    "SetpointMethodRefusal.lean",
+    "d.get 9=2#32",
+    "d.get 9=3#32"
+  ],
+  [
+    "g7_temp_method_refusal_target",
+    "TempMethodRefusal.lean",
+    "d.pc=0x80001492#32",
+    "d.pc=0x80001490#32"
+  ],
+  [
+    "g7_mode_method_refusal_instruction_count",
+    "ModeMethodRefusal.lean",
+    "Quiet.Steps B img 12",
+    "Quiet.Steps B img 11"
+  ],
+  [
+    "g7_third_candidate_preserves_405_flag",
+    "RuntimeThirdCandidate.lean",
+    "d.get 9=c.get 9",
+    "d.get 9=3#32"
+  ],
+  [
+    "g7_fourth_candidate_wrong_method_flag",
+    "RuntimeFourthCandidate.lean",
+    "d.get 9=2#32 \u2227",
+    "d.get 9=4#32 \u2227"
+  ],
+  [
+    "g7_temp_actual_literal_match",
+    "RuntimeThirdMatch.lean",
+    "d.get 10=(if RuntimeRequestSpans.path input head=WireSpec.ascii \"/temp\" then 1#32 else 0#32)",
+    "d.get 10=1#32"
+  ],
+  [
+    "g7_mode_actual_literal_match",
+    "RuntimeFourthMatch.lean",
+    "d.get 10=(if RuntimeRequestSpans.path input head=WireSpec.ascii \"/mode\" then 1#32 else 0#32)",
+    "d.get 10=1#32"
+  ],
+  [
+    "g7_relay_common_actual_return",
+    "RouteFifthCore.lean",
+    "d.get 1=2147489878#32",
+    "d.get 1=2147489880#32"
+  ],
+  [
+    "g7_relay_candidate_wrong_method_flag",
+    "RuntimeFifthCandidate.lean",
+    "d.get 9=2#32 \u2227",
+    "d.get 9=4#32 \u2227"
+  ],
+  [
+    "g7_relay_entry_actual_404_405_flag",
+    "RuntimeRelayEntry.lean",
+    "d.get 9=(if known (RuntimeRequestSpans.path input head) then 2#32 else 3#32)",
+    "d.get 9=(if known (RuntimeRequestSpans.path input head) then 3#32 else 2#32)"
+  ],
+  [
+    "g7_relay_entry_actual_loop_metadata",
+    "RuntimeRelayEntry.lean",
+    "LoopTransactionMemory.At after used \u2227",
+    "LoopTransactionMemory.At after (used+1#32) \u2227"
+  ],
+  [
+    "g7_relay_entry_reset_input_bytes",
+    "RuntimeRelayEntryWitness.lean",
+    "Observed.input reads=headBytes wrong",
+    "Observed.input reads=[]"
+  ],
+  [
+    "g7_relay_entry_reset_flags",
+    "RuntimeRelayEntryWitness.lean",
+    "d.get 9=(if wrong then 2#32 else 3#32)",
+    "d.get 9=(if wrong then 3#32 else 2#32)"
+  ],
+  [
+    "g7_second_actual_setpoint_boolean",
+    "RuntimeSecondMatch.lean",
+    "d.get 10=(if RuntimeRequestSpans.path input head=WireSpec.ascii \"/setpoint\" then 1#32 else 0#32)",
+    "d.get 10=(if RuntimeRequestSpans.path input head=WireSpec.ascii \"/state\" then 1#32 else 0#32)"
+  ],
+  [
+    "g7_second_404_405_flag",
+    "RuntimeSecondMatch.lean",
+    "d.get 9=(if RuntimeRequestSpans.path input head=WireSpec.ascii \"/state\" then 2#32 else 3#32)",
+    "d.get 9=(if RuntimeRequestSpans.path input head=WireSpec.ascii \"/state\" then 3#32 else 2#32)"
+  ],
+  [
+    "g7_second_loop_metadata_used",
+    "RuntimeSecondMatch.lean",
+    "LoopTransactionMemory.At after used \u2227",
+    "LoopTransactionMemory.At after (used+1#32) \u2227"
+  ],
+  [
+    "g7_state_wrong_method_flag",
+    "StateMethodRefusal.lean",
+    "d.get 9=2#32",
+    "d.get 9=3#32"
+  ],
+  [
+    "g7_state_missing_candidate_flag",
+    "RuntimeSecondCandidate.lean",
+    "d.get 9=3#32 \u2227",
+    "d.get 9=2#32 \u2227"
+  ],
+  [
+    "g7_state_wrong_method_candidate_flag",
+    "RuntimeSecondCandidate.lean",
+    "d.get 9=2#32 \u2227",
+    "d.get 9=3#32 \u2227"
+  ],
+  [
+    "g7_method_refusal_actual_jump",
+    "StateRefusalCode.lean",
+    "(.jal 0 4#32)",
+    "(.jal 0 2#32)"
+  ],
+  [
+    "g7_unmatched_decoded_status_xor",
+    "UnmatchedCode.lean",
+    "(.opimm .xor 10 10 405#32 : Instr)",
+    "(.opimm .xor 10 10 404#32 : Instr)"
+  ],
+  [
+    "g7_unmatched_instruction_count",
+    "UnmatchedCore.lean",
+    "Quiet.Steps B img 13",
+    "Quiet.Steps B img 12"
+  ],
+  [
+    "g7_unmatched_status_mapping",
+    "UnmatchedCore.lean",
+    "d.get 10=(if known then 405#32 else 404#32)",
+    "d.get 10=(if known then 404#32 else 405#32)"
+  ],
+  [
+    "g7_unmatched_real_poll_store",
+    "UnmatchedCore.lean",
+    "\u27e8d,MainWriteFlags.memory ram fp\u27e9",
+    "\u27e8d,ram\u27e9"
+  ],
+  [
+    "g7_unmatched_saved_scratch_word",
+    "UnmatchedCore.lean",
+    "d.get 6=ramRead ram (sp+20#32) .w",
+    "d.get 6=ramRead ram (sp+16#32) .w"
+  ],
+  [
+    "g7_response_tail_actual_entry",
+    "LoopResponseTail.lean",
+    "d.pc=0x80001772#32",
+    "d.pc=0x80001770#32"
+  ],
+  [
+    "g7_response_tail_actual_steps",
+    "LoopResponseTail.lean",
+    "Quiet.Steps B img 20",
+    "Quiet.Steps B img 19"
+  ],
+  [
+    "g7_response_tail_representation_length",
+    "RuntimeResponseTail.lean",
+    "mimePtr payload.length status",
+    "mimePtr (payload.length+1) status"
+  ],
+  [
+    "g7_response_reply_actual_status_bytes",
+    "RuntimeResponseReply.lean",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes status (mime json) payload.length close)++",
+    "(UartTxLoop.events (ResponseHeadSpec.bytes (status+1) (mime json) payload.length close)++"
+  ],
+  [
+    "g7_response_reply_close_continuation",
+    "RuntimeResponseReply.lean",
+    "if close then 0x80000978#32 else 0x800017be#32",
+    "if close then 0x800017be#32 else 0x80000978#32"
+  ],
+  [
+    "g7_refusal_next_request_count",
+    "RuntimeRefusalNext.lean",
+    "LoopReady.At d after s (if close then 0 else served)",
+    "LoopReady.At d after s (if close then 0 else served+1)"
+  ],
+  [
+    "g7_refusal_next_status_codes",
+    "RuntimeRefusalNext.lean",
+    "if known then 405 else 404",
+    "if known then 404 else 405"
+  ],
+  [
+    "g7_pure_route_refusal_state_preserved",
+    "RouteRefusalSpec.lean",
+    "=\u27e8s,status path,[],[]\u27e9",
+    "=\u27e8Spec.initial,status path,[],[]\u27e9"
+  ],
+  [
+    "g7_pure_route_refusal_status",
+    "RouteRefusalSpec.lean",
+    "if known path then 405 else 404",
+    "if known path then 404 else 405"
+  ],
+  [
+    "g7_relay_refusal_loop_close",
+    "RuntimeRelayRefusal.lean",
+    "LoopReady.At d after s (if close then 0 else served)",
+    "LoopReady.At d after s 0"
+  ],
+  [
+    "g7_route_refusal_pure_status_relation",
+    "RuntimeRouteRefusal.lean",
+    "=RouteRefusalSpec.status path",
+    "=RouteRefusalSpec.status path+1"
+  ],
+  [
+    "g7_received_refusal_body_compaction",
+    "ReceivedRouteRefusalCycle.lean",
+    "RuntimeRequestSpans.body raw head r.body.length=r.body",
+    "RuntimeRequestSpans.body raw head r.body.length=[]"
+  ],
+  [
+    "g7_received_refusal_loop_counter",
+    "ReceivedRouteRefusalCycle.lean",
+    "LoopReady.At d after s (if close then 0 else served+1)",
+    "LoopReady.At d after s (if close then 0 else served)"
+  ],
+  [
+    "g7_received_refusal_reset_state",
+    "ReceivedRouteRefusalWitness.lean",
+    "LoopReady.At d after Spec.initial (if close then 0 else 1)",
+    "LoopReady.At d after Spec.initial 0"
+  ],
+  [
+    "g7_g7_next_capacity_frame_excludes_span_store",
+    "ChunkNextStoreMemory.lean",
+    "(hi : off+size\u226424)",
+    "(hi : off+size\u226428)"
+  ],
+  [
+    "g7_g7_empty_capacity_frame_excludes_span_store",
+    "EmptyNextStoreMemory.lean",
+    "(hi : off+size\u226424)",
+    "(hi : off+size\u226428)"
+  ],
+  [
+    "g7_g7_common_frame_excludes_counter",
+    "RuntimeRequestBuild.lean",
+    "ViewFrame.Region ram after RuntimeNext.sp 132",
+    "ViewFrame.Region ram after RuntimeNext.sp 3293"
+  ],
+  [
+    "g7_g7_chunk_future_excludes_filled",
+    "ChunkSuccessBody.lean",
+    "ViewFrame.Region ram after (sp+3204#32) 84",
+    "ViewFrame.Region ram after (sp+3204#32) 88"
+  ],
+  [
+    "g7_g7_empty_loop_raw_metadata",
+    "EmptyReceivedRequest.lean",
+    "LoopTransactionMemory.At after (BitVec.ofNat 32 head.len) := by",
+    "LoopTransactionMemory.At after (BitVec.ofNat 32 (head.len+1)) := by"
+  ],
+  [
+    "g7_g7_chunk_loop_raw_metadata",
+    "ChunkReceivedRequest.lean",
+    "LoopTransactionMemory.At after (BitVec.ofNat 32 r.read) := by",
+    "LoopTransactionMemory.At after (BitVec.ofNat 32 r.written) := by"
+  ],
+  [
+    "g7_g7_close_forced_actual_flag",
+    "RuntimeCloseForced.lean",
+    "MainCloseCommit.memory ram sp 1#32",
+    "MainCloseCommit.memory ram sp 0#32"
+  ],
+  [
+    "g7_g7_close_scanned_wrong_policy",
+    "RuntimeCloseScanned.lean",
+    "(MainCloseSpec.wantsClose (RuntimeRequestSpans.raw input rawUsed) (RuntimeRequestInputs.entries head)) \u2227",
+    "(!(MainCloseSpec.wantsClose (RuntimeRequestSpans.raw input rawUsed) (RuntimeRequestInputs.entries head))) \u2227"
+  ],
+  [
+    "g7_literal_all_routes_boolean",
+    "RuntimeLiteralMatch.lean",
+    "d.get 10=(if RuntimeRequestSpans.path input head=RouteLiteralInfo.text kind then 1#32 else 0#32)",
+    "d.get 10=(if RuntimeRequestSpans.path input head=RouteLiteralInfo.text kind then 0#32 else 1#32)"
+  ],
+  [
+    "g7_literal_actual_rom_span",
+    "RouteLiteralInfo.lean",
+    "img ram (pointer kind) (text kind)",
+    "img ram (pointer kind+1#32) (text kind)"
+  ],
+  [
+    "g7_second_common_arbitrary_length",
+    "RouteSecondCore.lean",
+    "d.get 13=pathSize",
+    "d.get 13=pathSize+1#32"
+  ],
+  [
+    "g7_third_common_real_target",
+    "RouteThirdCore.lean",
+    "d.pc=0x8000283a#32",
+    "d.pc=0x8000283c#32"
+  ],
+  [
+    "g7_fourth_common_arbitrary_length",
+    "RouteFourthCore.lean",
+    "d.get 13=pathSize",
+    "d.get 13=pathSize+1#32"
+  ],
+  [
+    "g7_sequence_actual_committed_state",
+    "CompleteRequestSchedules.lean",
+    "LoopReady.At d after (r.reply s).state",
+    "LoopReady.At d after s"
+  ],
+  [
+    "g7_sequence_actual_rx_bytes",
+    "CompleteRequestSchedules.lean",
+    "Observed.input (reads served one)=r.input",
+    "Observed.input (reads served one)=r.body"
+  ],
+  [
+    "g7_sequence_actual_loop_counter",
+    "CompleteRequestSchedules.lean",
+    "(r.nextCount served) := by",
+    "served := by"
+  ],
+  [
+    "g7_sequence_actual_http_status",
+    "CompleteRequestSchedules.lean",
+    "(UartTxLoop.events (r.output s served))",
+    "(UartTxLoop.events (r.output s (served+1)))"
+  ],
+  [
+    "g7_sequence_observed_event_concat",
+    "FirmwareCompleteRequests.lean",
+    "UartTxLoop.events (CompleteRequestSpec.output rs s served)",
+    "UartTxLoop.events []"
+  ],
+  [
+    "g7_sequence_consumed_bytes",
+    "FirmwareCompleteRequests.lean",
+    "Observed.input (manyReads plans)=CompleteRequestSpec.input rs",
+    "Observed.input (manyReads plans)=[]"
+  ],
+  [
+    "g7_sequence_reset_borrow",
+    "FirmwareCompleteRequests.lean",
+    "ramRead after 0x80ffebbc#32 .w=0#32",
+    "ramRead after 0x80ffebbc#32 .w=0xffffffff#32"
+  ],
+  [
+    "g7_sequence_reset_committed_state",
+    "FirmwareCompleteRequests.lean",
+    "AppState.At after (CompleteRequestSpec.final requests Spec.initial 0).1",
+    "AppState.At after Spec.initial"
+  ],
+  [
+    "g7_sequence_mixed_borrow",
+    "FirmwareCompleteWitness.lean",
+    "ramRead after 0x80ffebbc#32 .w=0#32",
+    "ramRead after 0x80ffebbc#32 .w=0xffffffff#32"
+  ],
+  [
+    "g7_g7_saved_head_refill_filled_excluded",
+    "ChunkCallerFrame.lean",
+    "futureLow : ViewFrame.Region before after (sp+3204#32) 84",
+    "futureLow : ViewFrame.Region before after (sp+3204#32) 88"
+  ],
+  [
+    "g7_g7_saved_head_not_cursor",
+    "ChunkCallerFrame.lean",
+    "futureHigh : ViewFrame.Region before after (sp+3292#32) 364",
+    "futureHigh : ViewFrame.Region before after (sp+3292#32) 368"
+  ],
+  [
+    "g7_g7_runtime_encoded_vs_decoded",
+    "RuntimeRequest.lean",
+    "rawLength : ramRead ram (sp+3644#32) .w=BitVec.ofNat 32 rawUsed",
+    "rawLength : ramRead ram (sp+3644#32) .w=BitVec.ofNat 32 amount"
+  ],
+  [
+    "g7_g7_runtime_decoded_body_length",
+    "RuntimeRequest.lean",
+    "bodyLength : ramRead ram (sp+3636#32) .w=BitVec.ofNat 32 amount",
+    "bodyLength : ramRead ram (sp+3636#32) .w=BitVec.ofNat 32 rawUsed"
+  ],
+  [
+    "g7_g7_next_all_framings_instruction",
+    "NextFramingCore.lean",
+    "Quiet.Steps B img 755",
+    "Quiet.Steps B img 754"
+  ],
+  [
+    "g7_g7_next_array_actual_destination",
+    "NextFramingMemory.lean",
+    "(sp+4248#32) head := by",
+    "(sp+4252#32) head := by"
+  ],
+  [
+    "g7_g7_request_preserve_high_half",
+    "RequestPayloadFront.lean",
+    "d.get 16=half0",
+    "d.get 16=0#32"
+  ],
+  [
+    "g7_g7_request_preserve_high_half2",
+    "RequestPayloadHighLoad.lean",
+    "d.get 14=half2",
+    "d.get 14=0#32"
+  ],
+  [
+    "g7_g7_request_high_half_store",
+    "RequestPayloadMetadata.lean",
+    "(sp+3322#32) (high0) .h",
+    "(sp+3322#32) (0#32) .h"
+  ],
+  [
+    "g7_g7_request_actual_instruction",
+    "RequestPayloadCore.lean",
+    "Quiet.Steps B img 460",
+    "Quiet.Steps B img 459"
+  ],
+  [
+    "g7_g7_request_original_framing",
+    "RequestPayloadHead.lean",
+    "(HeadCompletedView.framingTag head.framing) 0#32 low) (sp+3312#32) head",
+    "1#32 0#32 low) (sp+3312#32) head"
+  ],
+  [
+    "g7_g7_request_ready_counter",
+    "RequestPayloadReady.lean",
+    "input s head amount rawUsed served \u2227 d.sameCsr c",
+    "input s head amount rawUsed (served+1) \u2227 d.sameCsr c"
+  ]
+]

@@ -894,6 +894,7 @@ def main():
     ]
     mutations.extend(json.loads((ROOT / 'scripts/thermostat-t1-controls.json').read_text()))
     mutations.extend(json.loads((ROOT / 'scripts/thermostat-g6-controls.json').read_text()))
+    mutations.extend(json.loads((ROOT / 'scripts/thermostat-g7-controls.json').read_text()))
     assert len({name for name, _, _, _ in mutations}) == len(mutations)
     if args.only:
         requested = set(args.only)
@@ -905,9 +906,58 @@ def main():
             # Mutate the public TX conclusion, leaving an identically spelled
             # local integration claim unchanged to avoid normalizing every
             # serializer branch before reaching the intended root mismatch.
-            count = 1 if name in {'g6_next_tx_bytes', 'g6_sequence_tx'} else -1
+            count = 1 if name.startswith('g7_') or name in {'g6_next_tx_bytes', 'g6_sequence_tx'} else -1
             wrong = source.replace(old, new, count)
             assert source != wrong
+            if name == 'g7_g7_next_array_actual_destination':
+                # Keep inference of the large RAM term independent of the
+                # deliberately wrong destination. Both the positive bridge
+                # and mutated conclusion are checked; no statement changes.
+                tail = '  exact MainNextArrayFrame.preserve second '
+                bridge = '  have actual : MainNextArrayView.At (memory ram sp) (sp+4248#32) head := MainNextArrayFrame.preserve (dst := sp+4248#32) second '
+                end = 'end E5R.Thermostat.NextFramingMemory'
+                assert source.count(tail) == 1 and source.count(end) == 1
+                def infer_destination(text):
+                    return text.replace(tail, bridge).replace(end, '  with_reducible exact actual\n' + end)
+                baseline = Path(tmp) / 'Baseline.lean'
+                baseline.write_text(infer_destination(source))
+                positive = subprocess.run(['elan', 'run', 'leanprover/lean4:v4.35.0', 'lean',
+                    '-j1', '-M1500', '-DmaxRecDepth=10000', '-Dpp.maxSteps=200', '-DmaxErrors=1', str(baseline)],
+                    cwd=RV, env=dict(os.environ, LEAN_PATH='.'), capture_output=True, text=True, timeout=120)
+                assert positive.returncode == 0, (name, 'positive inference bridge failed', positive.stdout + positive.stderr)
+                (RV / 'build/thermostat-positive-next-array-inference.log').write_text(positive.stdout + positive.stderr)
+                wrong = infer_destination(wrong)
+            if name == 'g7_g7_request_original_framing':
+                # Check the complete original proof first. Compare its type
+                # without rendering the enormous RAM expressions on failure.
+                # No exception is caught: resource exhaustion still fails.
+                goal_start = source.index('    HeadCompletedView.At ')
+                goal_end = source.index(' := by\n', goal_start)
+                original_goal = source[goal_start:goal_end].strip()
+                ending = 'end E5R.Thermostat.RequestPayloadHead'
+                compare = """  run_tac Lean.Elab.Tactic.withMainContext do
+    let goal ← Lean.Elab.Tactic.getMainGoal
+    let declaration ← Lean.Meta.getLocalDeclFromUserName `actual
+    let actual := declaration.toExpr
+    let found ← Lean.Meta.inferType actual
+    let expected ← goal.getType
+    let agrees ← Lean.Meta.withTransparency .reducible (Lean.Meta.isDefEq found expected)
+    unless agrees do throwError "type mismatch: checked original framing differs from the requested conclusion"
+    goal.assign actual
+"""
+                def framing_comparison(text):
+                    start = text.index(' := by\n', text.index('    HeadCompletedView.At ')) + len(' := by\n')
+                    end = text.index(ending, start)
+                    return ('import Lean.Elab.Tactic.Basic\n' + text[:start] + '  have actual : ' + original_goal + ' := by\n' +
+                        ''.join('  ' + line + '\n' for line in text[start:end].splitlines()) + compare + text[end:])
+                baseline = Path(tmp) / 'FramingBaseline.lean'
+                baseline.write_text(framing_comparison(source))
+                positive = subprocess.run(['elan', 'run', 'leanprover/lean4:v4.35.0', 'lean',
+                    '-j1', '-M1500', '-DmaxRecDepth=10000', '-Dpp.maxSteps=200', '-DmaxErrors=1', str(baseline)],
+                    cwd=RV, env=dict(os.environ, LEAN_PATH='.'), capture_output=True, text=True, timeout=120)
+                assert positive.returncode == 0, (name, 'positive framing bridge failed', positive.stdout + positive.stderr)
+                (RV / 'build/thermostat-positive-request-framing.log').write_text(positive.stdout + positive.stderr)
+                wrong = framing_comparison(wrong)
             bad = Path(tmp) / 'Bad.lean'
             bad.write_text(wrong)
             env = dict(os.environ, LEAN_PATH='.')
@@ -919,6 +969,13 @@ def main():
             # Resource exhaustion is still rejected below, never a negative PASS.
             elaboration = ['-DmaxHeartbeats=3000000', '-DmaxRecDepth=10000'] if module in {
                 'FirmwareNextRequest.lean', 'FirmwareRequestSequence.lean'} else []
+            if name.startswith('g7_'):
+                timeout = 360
+                elaboration = ['-Dpp.maxSteps=200', '-DmaxHeartbeats=1000000']
+            if name in {'g7_g7_next_array_actual_destination', 'g7_g7_request_original_framing'}:
+                # Printing the real destination type mismatch requires this
+                # depth; memory stays1500MiB and resource errors never pass.
+                elaboration += ['-DmaxRecDepth=10000']
             result = subprocess.run(['elan', 'run', 'leanprover/lean4:v4.35.0', 'lean',
                                      '-j1', f'-M{memory}', '-DmaxErrors=1', *elaboration, str(bad)], cwd=RV, env=env,
                                     capture_output=True, text=True, timeout=timeout)
@@ -926,7 +983,7 @@ def main():
             assert result.returncode == 1 and 'error:' in output, (name, output)
             assert 'unknown module' not in output and 'does not exist' not in output, output
             assert not any(reason in output for reason in (
-                'maximum recursion depth', 'deep recursion', 'maximum number of heartbeats', 'out of memory', 'excessive memory consumption', 'unexpected token', 'Unknown identifier', 'Unknown constant', 'invalid field', 'Unknown field', 'lean.unknownIdentifier', 'Invalid dotted identifier', 'failed to synthesize')), (name, output)
+                'maximum recursion depth', 'deep recursion', 'maximum number of heartbeats', 'out of memory', 'excessive memory consumption', 'unexpected token', 'Unknown identifier', 'Unknown constant', 'invalid field', 'Unknown field', 'lean.unknownIdentifier', 'Invalid dotted identifier', 'failed to synthesize', 'Error pretty printing', 'error pretty printing', 'invalid -D parameter', 'unknown configuration option', 'unknown option', 'unknown tactic', 'declaration has metavariables', 'memory allocation', 'input file')), (name, output)
             (RV / f'build/thermostat-negative-{name}.log').write_text(output)
             print(f'PASS negative {name}', flush=True)
 
