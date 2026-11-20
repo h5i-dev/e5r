@@ -163,6 +163,8 @@ pub struct Report {
     pub result: Result<FuncMeta, Vec<Violation>>,
     /// At L1: why the function is not at L2 (empty at L2).
     pub missed: Vec<Violation>,
+    /// At L2: the certificate for the Lean checker.
+    pub cert: Vec<frame::CertFact>,
 }
 
 impl Binary<'_> {
@@ -186,6 +188,7 @@ impl Binary<'_> {
                     level,
                     result: Err(violations),
                     missed: vec![],
+                    cert: vec![],
                 };
                 let (nodes, part) = match recorded {
                     Some(None) => {
@@ -242,6 +245,7 @@ impl Binary<'_> {
                             level: Some(got.level),
                             result: Ok(got),
                             missed: c.missed,
+                            cert: c.cert,
                         }
                     }
                 }

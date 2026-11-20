@@ -90,27 +90,71 @@ def segments : List Segment := [seg_rodata]
 /-- Every function entry: where calls and tail calls may go. -/
 def entries : List Word := [0x11164#64, 0x11190#64, 0x111d0#64]
 
-/-- `write_all`'s block/loop structure (rules R1 to R3, checked below). -/
+/-- `write_all`'s block/loop structure (rules R1 to R3, checked below with R4 to R6). -/
 def write_all_func : Struct.Func := ⟨0x11164#64, 11, [⟨.block, 0x1116c#64, 0x11188#64⟩, ⟨.loop, 0x1116c#64, 0x11184#64⟩]⟩
-theorem write_all_checked : Struct.check code write_all_func entries = true := by decide
+/-- `write_all`'s frame (rule R6): 0 bytes, its slots and address-taken ranges. -/
+def write_all_frame : Struct.Frame := ⟨0, [], []⟩
+/-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
+def write_all_cert : Struct.Cert := [
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩]
+/-- `write_all` is at level L2 (docs/isa/v1.md), as the kernel checks it. -/
+theorem write_all_checked : Struct.level code write_all_func entries write_all_frame write_all_cert = some .l2 := by decide
 
 /-- `write_all`: [0x11164, 0x11190), frame 0 bytes. -/
 def write_all_entry : Word := 0x11164#64
 /-- `write_all` and every function it calls. -/
 def write_all_dom : Dom := [(0x11164#64, 44)]
 
-/-- `hello`'s block/loop structure (rules R1 to R3, checked below). -/
+/-- `hello`'s block/loop structure (rules R1 to R3, checked below with R4 to R6). -/
 def hello_func : Struct.Func := ⟨0x11190#64, 16, []⟩
-theorem hello_checked : Struct.check code hello_func entries = true := by decide
+/-- `hello`'s frame (rule R6): 16 bytes, its slots and address-taken ranges. -/
+def hello_frame : Struct.Frame := ⟨16, [⟨8, .save 1⟩], []⟩
+/-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
+def hello_cert : Struct.Cert := [
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨16, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨16, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 1)]⟩,
+  ⟨16, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 1)]⟩,
+  ⟨16, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 1)]⟩,
+  ⟨16, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 1)]⟩,
+  ⟨16, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 1)]⟩,
+  ⟨16, [8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 1)]⟩,
+  ⟨16, [8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 1)]⟩,
+  ⟨16, [8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 1)]⟩,
+  ⟨16, [8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 1)]⟩,
+  ⟨16, [8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 1)]⟩,
+  ⟨16, [8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 1)]⟩,
+  ⟨16, [8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 1)]⟩,
+  ⟨16, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 1)]⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 1)]⟩]
+/-- `hello` is at level L2 (docs/isa/v1.md), as the kernel checks it. -/
+theorem hello_checked : Struct.level code hello_func entries hello_frame hello_cert = some .l2 := by decide
 
 /-- `hello`: [0x11190, 0x111d0), frame 16 bytes. -/
 def hello_entry : Word := 0x11190#64
 /-- `hello` and every function it calls. -/
 def hello_dom : Dom := [(0x11164#64, 44), (0x11190#64, 64)]
 
-/-- `_start`'s block/loop structure (rules R1 to R3, checked below). -/
+/-- `_start`'s block/loop structure (rules R1 to R3, checked below with R4 to R6). -/
 def _start_func : Struct.Func := ⟨0x111d0#64, 2, []⟩
-theorem _start_checked : Struct.check code _start_func entries = true := by decide
+/-- `_start`'s frame (rule R6): 0 bytes, its slots and address-taken ranges. -/
+def _start_frame : Struct.Frame := ⟨0, [], []⟩
+/-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
+def _start_cert : Struct.Cert := [
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩]
+/-- `_start` is at level L2 (docs/isa/v1.md), as the kernel checks it. -/
+theorem _start_checked : Struct.level code _start_func entries _start_frame _start_cert = some .l2 := by decide
 
 /-- `_start`: [0x111d0, 0x111d8), frame 0 bytes. -/
 def _start_entry : Word := 0x111d0#64

@@ -140,16 +140,26 @@ graph and checks against that; with the section, it checks against what the
 section says. The recovery is not trusted by the checker: it only proposes a
 tree.
 
-Rules R1 to R3 are also defined in Lean (`lean/NoCompiler/Struct.lean`, `check`),
-and `nocompiler export` writes, for every conforming function, its tree as a
-`Struct.Func` and a theorem `<name>_checked` that `check` accepts it, proved
-by evaluation in the kernel. `Struct.cfi` is what that buys: from any state
-of a run of a checked function, every step goes to the next instruction, to
-a structured target (the end of an enclosing block or the head of an
-enclosing loop), to a function entry by a call (with `ra` = pc + 4) or a
-tail call, to `ra` by a return, or ends the process. Nothing else. R4 and R5
-(registers and stack) are about data, not control, and are checked in Rust
-only.
+All the rules are also defined in Lean. R1 to R3 are `Struct.check`
+(`lean/NoCompiler/Struct.lean`); R4 to R6 are `Struct.checkL2`
+(`lean/NoCompiler/Frame.lean`), which checks a *certificate*: the dataflow
+fact before each instruction (how far `sp` is below its entry value, which
+saved registers hold their entry value, which slots hold whose), each checked
+against its instruction and successors, so the kernel never runs the
+dataflow itself. `nocompiler export` writes, for every function at L1 or
+above, its tree as a `Struct.Func`, its frame partition as a `Struct.Frame`,
+the certificate, and a theorem `<name>_checked` stating the level
+(`Struct.level ... = some .l2`), proved by evaluation in the kernel.
+`lean/Examples/FrameControls.lean` checks that the Lean checker alone refuses
+L2 to mutated code.
+
+`Struct.cfi` is what L1 buys: from any state of a run of a checked function,
+every step goes to the next instruction, to a structured target (the end of
+an enclosing block or the head of an enclosing loop), to a function entry by
+a call (with `ra` = pc + 4) or a tail call, to `ra` by a return, or ends the
+process. Nothing else. What L2 buys (theorems T2 to T4: slots behave as
+variables, the ABI's registers and `sp` come back, the stack bound) is
+stated over the structured semantics (docs/isa/v1.md).
 
 ## 5. Calling convention
 

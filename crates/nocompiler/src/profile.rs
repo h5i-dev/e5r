@@ -399,6 +399,8 @@ fn check_tree(f: &Func, nodes: &[Node], lo: u64, hi: u64, out: &mut Vec<Violatio
 pub struct Checked {
     pub meta: FuncMeta,
     pub missed: Vec<Violation>,
+    /// At L2: the certificate the Lean checker checks (frame::certificate).
+    pub cert: Vec<frame::CertFact>,
 }
 
 /// Why a function is below L1: `level` is L0 when it decodes (R1) but breaks
@@ -591,7 +593,13 @@ pub fn check_with(
         l2.extend(frame::check(f, &flows, &off, frame, &part));
     }
     let l2 = sorted(l2);
+    let cert = if l2.is_empty() {
+        frame::certificate(f, &flows, &off, frame, &part)
+    } else {
+        vec![]
+    };
     Ok(Checked {
+        cert,
         meta: FuncMeta {
             name: f.name.clone(),
             entry: f.entry,

@@ -6,9 +6,8 @@ to R3), as an executable checker, and the theorem that makes them mean
 something: a checked function only ever transfers control the way the rules
 say (`Struct.cfi`).
 
-The Rust checker (crates/nocompiler/src/profile.rs) decides the same rules plus the
-register and stack rules R4 and R5, which are about data, not control, and
-are not needed here. `nocompiler export` writes each conforming function's
+The Rust checker (crates/nocompiler/src/profile.rs) decides the same rules; the
+register, stack and frame rules R4 to R6 are in NoCompiler/Frame.lean. `nocompiler export` writes each conforming function's
 structure as a `Struct.Func` and a `<name>_checked` theorem proved by
 `decide`, so a function's conformance is a fact the kernel has checked.
 -/

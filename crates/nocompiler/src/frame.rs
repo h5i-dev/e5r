@@ -364,6 +364,44 @@ pub fn infer(
     Partition { slots, ranges }
 }
 
+/// One fact of the certificate `lean/NoCompiler/Frame.lean` checks: before
+/// an instruction, `sp` is `depth` bytes below its entry value, the saved
+/// registers in `keep` hold their entry value, and each `(k, r)` in `held` is
+/// a slot at frame offset `k` holding the entry value of `r`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CertFact {
+    pub depth: u64,
+    pub keep: Vec<u8>,
+    pub held: Vec<(u64, u8)>,
+}
+
+/// The certificate: the fact before every instruction (the entry fact for an
+/// instruction no path reaches).
+pub fn certificate(
+    f: &Func,
+    flows: &BTreeMap<u64, Flow>,
+    offs: &BTreeMap<u64, i64>,
+    frame: u64,
+    part: &Partition,
+) -> Vec<CertFact> {
+    let at = facts(f, flows, offs, frame, part, &mut |_, _, _, _| {});
+    (0..f.words.len() as u64)
+        .map(|i| f.entry + 4 * i)
+        .map(|pc| match (at.get(&pc), offs.get(&pc)) {
+            (Some(fact), Some(&off)) => CertFact {
+                depth: (-off) as u64,
+                keep: fact.keep.iter().copied().collect(),
+                held: fact.slots.iter().map(|(&k, r)| (k, r.0)).collect(),
+            },
+            _ => CertFact {
+                depth: 0,
+                keep: SAVED.to_vec(),
+                held: vec![],
+            },
+        })
+        .collect()
+}
+
 /// R6 (6a to 6e) and the `ra` part of R4, against a partition. `offs` are
 /// R5's offsets (every reachable instruction), `frame` the frame size.
 pub fn check(

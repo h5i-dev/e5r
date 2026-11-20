@@ -13,5 +13,6 @@ import NoCompiler.Mem
 import NoCompiler.Image
 import NoCompiler.Trace
 import NoCompiler.Struct
+import NoCompiler.Frame
 import NoCompiler.Vocab
 import NoCompiler.Module

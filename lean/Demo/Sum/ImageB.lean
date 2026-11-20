@@ -145,27 +145,95 @@ def segments : List Segment := [seg_data]
 /-- Every function entry: where calls and tail calls may go. -/
 def entries : List Word := [0x11190#64, 0x111b4#64, 0x11208#64]
 
-/-- `sum`'s block/loop structure (rules R1 to R3, checked below). -/
+/-- `sum`'s block/loop structure (rules R1 to R3, checked below with R4 to R6). -/
 def sum_func : Struct.Func := ⟨0x11190#64, 9, [⟨.block, 0x11194#64, 0x111ac#64⟩, ⟨.loop, 0x11198#64, 0x111ac#64⟩]⟩
-theorem sum_checked : Struct.check code sum_func entries = true := by decide
+/-- `sum`'s frame (rule R6): 0 bytes, its slots and address-taken ranges. -/
+def sum_frame : Struct.Frame := ⟨0, [], []⟩
+/-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
+def sum_cert : Struct.Cert := [
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩]
+/-- `sum` is at level L2 (docs/isa/v1.md), as the kernel checks it. -/
+theorem sum_checked : Struct.level code sum_func entries sum_frame sum_cert = some .l2 := by decide
 
 /-- `sum`: [0x11190, 0x111b4), frame 0 bytes. -/
 def sum_entry : Word := 0x11190#64
 /-- `sum` and every function it calls. -/
 def sum_dom : Dom := [(0x11190#64, 36)]
 
-/-- `sum2`'s block/loop structure (rules R1 to R3, checked below). -/
+/-- `sum2`'s block/loop structure (rules R1 to R3, checked below with R4 to R6). -/
 def sum2_func : Struct.Func := ⟨0x111b4#64, 21, []⟩
-theorem sum2_checked : Struct.check code sum2_func entries = true := by decide
+/-- `sum2`'s frame (rule R6): 32 bytes, its slots and address-taken ranges. -/
+def sum2_frame : Struct.Frame := ⟨32, [⟨0, .save 18⟩, ⟨8, .save 9⟩, ⟨16, .save 8⟩, ⟨24, .save 1⟩], []⟩
+/-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
+def sum2_cert : Struct.Cert := [
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨32, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨32, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(24, 1)]⟩,
+  ⟨32, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(16, 8), (24, 1)]⟩,
+  ⟨32, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [1, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [1, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [1, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [1, 8, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [1, 8, 9, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(0, 18), (8, 9), (16, 8), (24, 1)]⟩]
+/-- `sum2` is at level L2 (docs/isa/v1.md), as the kernel checks it. -/
+theorem sum2_checked : Struct.level code sum2_func entries sum2_frame sum2_cert = some .l2 := by decide
 
 /-- `sum2`: [0x111b4, 0x11208), frame 32 bytes. -/
 def sum2_entry : Word := 0x111b4#64
 /-- `sum2` and every function it calls. -/
 def sum2_dom : Dom := [(0x11190#64, 36), (0x111b4#64, 84)]
 
-/-- `_start`'s block/loop structure (rules R1 to R3, checked below). -/
+/-- `_start`'s block/loop structure (rules R1 to R3, checked below with R4 to R6). -/
 def _start_func : Struct.Func := ⟨0x11208#64, 23, []⟩
-theorem _start_checked : Struct.check code _start_func entries = true := by decide
+/-- `_start`'s frame (rule R6): 32 bytes, its slots and address-taken ranges. -/
+def _start_frame : Struct.Frame := ⟨32, [⟨8, .save 9⟩, ⟨16, .save 8⟩, ⟨24, .save 1⟩], []⟩
+/-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
+def _start_cert : Struct.Cert := [
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨32, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], []⟩,
+  ⟨32, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(24, 1)]⟩,
+  ⟨32, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(16, 8), (24, 1)]⟩,
+  ⟨32, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [1, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [1, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [1, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [1, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [1, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [1, 8, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨32, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩,
+  ⟨0, [1, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27], [(8, 9), (16, 8), (24, 1)]⟩]
+/-- `_start` is at level L2 (docs/isa/v1.md), as the kernel checks it. -/
+theorem _start_checked : Struct.level code _start_func entries _start_frame _start_cert = some .l2 := by decide
 
 /-- `_start`: [0x11208, 0x11264), frame 32 bytes. -/
 def _start_entry : Word := 0x11208#64

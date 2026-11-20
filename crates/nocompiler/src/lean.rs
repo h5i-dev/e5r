@@ -62,6 +62,12 @@ pub fn export(
     source: &str,
 ) -> Result<String, String> {
     let by_entry: BTreeMap<u64, &FuncMeta> = metas.iter().map(|m| (m.entry, m)).collect();
+    // Levels and certificates, from checking the binary again.
+    let levels: BTreeMap<u64, (crate::profile::Level, Vec<crate::frame::CertFact>)> = bin
+        .check()
+        .into_iter()
+        .filter_map(|r| Some((r.entry, (r.level?, r.cert))))
+        .collect();
     let mut o = String::new();
     let sha = crate::sha256::hex(&crate::sha256::digest(bin.bytes));
     writeln!(o, "/-").unwrap();
@@ -180,7 +186,7 @@ pub fn export(
         flat(&m.nodes, &mut nodes);
         writeln!(
             o,
-            "\n/-- `{}`'s block/loop structure (rules R1 to R3, checked below). -/",
+            "\n/-- `{}`'s block/loop structure (rules R1 to R3, checked below with R4 to R6). -/",
             m.name
         )
         .unwrap();
@@ -192,9 +198,79 @@ pub fn export(
             nodes.join(", ")
         )
         .unwrap();
+        let (level, cert) = levels
+            .get(&m.entry)
+            .cloned()
+            .unwrap_or((crate::profile::Level::L1, vec![]));
+        let slots: Vec<String> = m
+            .slots
+            .iter()
+            .map(|s| match s.kind {
+                crate::profile::SlotKind::Save(r) => format!("⟨{}, .save {}⟩", s.off, r.0),
+                crate::profile::SlotKind::Spill => format!("⟨{}, .spill⟩", s.off),
+            })
+            .collect();
+        let ranges: Vec<String> = m
+            .ranges
+            .iter()
+            .map(|g| format!("⟨{}, {}⟩", g.off, g.len))
+            .collect();
         writeln!(
             o,
-            "theorem {id}_checked : Struct.check code {id}_func entries = true := by decide"
+            "/-- `{}`'s frame (rule R6): {} bytes, its slots and address-taken ranges. -/",
+            m.name, m.frame
+        )
+        .unwrap();
+        writeln!(
+            o,
+            "def {id}_frame : Struct.Frame := ⟨{}, [{}], [{}]⟩",
+            m.frame,
+            slots.join(", "),
+            ranges.join(", ")
+        )
+        .unwrap();
+        let facts: Vec<String> = cert
+            .iter()
+            .map(|c| {
+                let keep: Vec<String> = c.keep.iter().map(|r| r.to_string()).collect();
+                let held: Vec<String> = c.held.iter().map(|(k, r)| format!("({k}, {r})")).collect();
+                format!(
+                    "⟨{}, [{}], [{}]⟩",
+                    c.depth,
+                    keep.join(", "),
+                    held.join(", ")
+                )
+            })
+            .collect();
+        writeln!(
+            o,
+            "/-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/"
+        )
+        .unwrap();
+        if facts.is_empty() {
+            writeln!(o, "def {id}_cert : Struct.Cert := []").unwrap();
+        } else {
+            writeln!(
+                o,
+                "def {id}_cert : Struct.Cert := [\n  {}]",
+                facts.join(",\n  ")
+            )
+            .unwrap();
+        }
+        let lv = match level {
+            crate::profile::Level::L0 => "l0",
+            crate::profile::Level::L1 => "l1",
+            crate::profile::Level::L2 => "l2",
+        };
+        writeln!(
+            o,
+            "/-- `{}` is at level {:?} (docs/isa/v1.md), as the kernel checks it. -/",
+            m.name, level
+        )
+        .unwrap();
+        writeln!(
+            o,
+            "theorem {id}_checked : Struct.level code {id}_func entries {id}_frame {id}_cert = some .{lv} := by decide"
         )
         .unwrap();
         let dom = closure(m, &by_entry)?;

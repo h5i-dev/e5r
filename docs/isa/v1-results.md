@@ -10,9 +10,9 @@ claim "easier to prove".
 | 1 | `sum2` proof size | open | |
 | 2 | syscall functions through `nocompiler_auto` | open | |
 | 3 | relocation (two links, one proof) | open | |
-| 4 | corpus conformance levels | passed (Rust checker; Lean side pending) | below |
+| 4 | corpus conformance levels | passed | below |
 | 5 | `asm(disasm(x)) = x` | open | |
-| 6 | negative controls | checker side passed; audit side (B) open | below |
+| 6 | negative controls | checker side passed (Rust and Lean); audit side (B) open | below |
 | 7 | checking cost at 55/160/500 instructions | open | |
 | 8 | demo A/B with calls and frames | open | |
 | 9 | LLM-written structured RV64 | open | |
@@ -41,6 +41,12 @@ variable-length array.
 The test asserts all of this except `call_in_loop`, whose level depends on the
 clang version.
 
+In Lean: the committed images (examples/elf/{sum,hello}.elf,
+demo/elf/{sum,cobs}.b.elf) state `<name>_checked : Struct.level ... = some .l2`
+for all 11 of their functions, proved by `decide` against the certificate
+`nocompiler export` writes (lean/NoCompiler/Frame.lean). The corpus beyond the
+committed images is checked in Rust only.
+
 ## 6. Negative controls, checker side
 
 `cargo test -p nocompiler --test levels`: mutations of `sum2` in
@@ -58,6 +64,11 @@ fault.
 | `sd sp, 0(a0)` (sp stored) | L1 | R6a |
 | `ld ra, 40(sp)` (past the entry sp) | L1 | R6c |
 | a declared partition missing s0's save slot | L1 | R6 |
+
+lean/Examples/FrameControls.lean makes the same faults (and an unbalanced
+`addi sp, sp, 16`) in `sum2`'s words and has the kernel refute L2 for each
+against the recorded frame and certificate, with no help from Rust; the
+unmutated code keeps L2.
 
 tests/profile.rs `each_rule_is_enforced` adds the rules on small assembly
 functions: `sp` in arithmetic or stored (R6a), a stack argument (R6c), half a
