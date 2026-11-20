@@ -34,6 +34,28 @@ elab "#assert_standard_axioms " id:ident : command => do
 #assert_standard_axioms E5R.Verified.call
 #assert_standard_axioms E5R.Verified.frame
 #assert_standard_axioms E5R.Verified.hw
+-- The structural checker in Lean, and its theorem.
+#assert_standard_axioms E5R.Struct.cfi
+#assert_standard_axioms E5R.Struct.inv_entry
+#assert_standard_axioms Examples.Sum.Image.sum_checked
+#assert_standard_axioms Examples.Sum.Image.sum2_checked
+#assert_standard_axioms Examples.Hello.Image.write_all_checked
+#assert_standard_axioms Examples.Hello.Image.hello_checked
+
+-- The Lean checker rejects what breaks the rules: `sum` without its tree
+-- (its branches then have no structured target), with the loop recorded as a
+-- block, and `write_all` claimed one instruction longer (falling into hello).
+example : Struct.check Examples.Sum.Image.code ⟨0x11190#64, 9, []⟩ Examples.Sum.Image.entries = false := by
+  decide
+example : Struct.check Examples.Sum.Image.code
+    ⟨0x11190#64, 9, [⟨.block, 0x11194#64, 0x111ac#64⟩, ⟨.block, 0x11198#64, 0x111ac#64⟩]⟩
+    Examples.Sum.Image.entries = false := by decide
+example : Struct.check Examples.Hello.Image.code
+    { Examples.Hello.Image.write_all_func with len := 12 } Examples.Hello.Image.entries = false := by
+  decide
+-- `sum2` with no function entries known: its calls go nowhere allowed.
+example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] = false := by decide
+
 -- The examples.
 #assert_standard_axioms Examples.Sum.sum_verified
 #assert_standard_axioms Examples.Sum.sum_hw

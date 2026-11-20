@@ -12,3 +12,4 @@ import E5R.Run
 import E5R.Mem
 import E5R.Image
 import E5R.Trace
+import E5R.Struct

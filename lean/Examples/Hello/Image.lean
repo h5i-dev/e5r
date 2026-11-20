@@ -87,15 +87,30 @@ def segments : List Segment := [seg_rodata]
 /-- `jalr zero, -64(t1)` -/
 @[e5r_image] theorem instr_111d4 : code.instr 0x111d4#64 = some (.jalr 0 6 0xfc0#12) := by rfl
 
+/-- Every function entry: where calls and tail calls may go. -/
+def entries : List Word := [0x11164#64, 0x11190#64, 0x111d0#64]
+
+/-- `write_all`'s block/loop structure (rules R1 to R3, checked below). -/
+def write_all_func : Struct.Func := ⟨0x11164#64, 11, [⟨.block, 0x1116c#64, 0x11188#64⟩, ⟨.loop, 0x1116c#64, 0x11184#64⟩]⟩
+theorem write_all_checked : Struct.check code write_all_func entries = true := by decide
+
 /-- `write_all`: [0x11164, 0x11190), frame 0 bytes. -/
 def write_all_entry : Word := 0x11164#64
 /-- `write_all` and every function it calls. -/
 def write_all_dom : Dom := [(0x11164#64, 44)]
 
+/-- `hello`'s block/loop structure (rules R1 to R3, checked below). -/
+def hello_func : Struct.Func := ⟨0x11190#64, 16, []⟩
+theorem hello_checked : Struct.check code hello_func entries = true := by decide
+
 /-- `hello`: [0x11190, 0x111d0), frame 16 bytes. -/
 def hello_entry : Word := 0x11190#64
 /-- `hello` and every function it calls. -/
 def hello_dom : Dom := [(0x11164#64, 44), (0x11190#64, 64)]
+
+/-- `_start`'s block/loop structure (rules R1 to R3, checked below). -/
+def _start_func : Struct.Func := ⟨0x111d0#64, 2, []⟩
+theorem _start_checked : Struct.check code _start_func entries = true := by decide
 
 /-- `_start`: [0x111d0, 0x111d8), frame 0 bytes. -/
 def _start_entry : Word := 0x111d0#64

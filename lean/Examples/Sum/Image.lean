@@ -142,15 +142,30 @@ def segments : List Segment := [seg_data]
 /-- `jalr zero, 0(ra)` -/
 @[e5r_image] theorem instr_11260 : code.instr 0x11260#64 = some (.jalr 0 1 0x000#12) := by rfl
 
+/-- Every function entry: where calls and tail calls may go. -/
+def entries : List Word := [0x11190#64, 0x111b4#64, 0x11208#64]
+
+/-- `sum`'s block/loop structure (rules R1 to R3, checked below). -/
+def sum_func : Struct.Func := ⟨0x11190#64, 9, [⟨.block, 0x11194#64, 0x111ac#64⟩, ⟨.loop, 0x11198#64, 0x111ac#64⟩]⟩
+theorem sum_checked : Struct.check code sum_func entries = true := by decide
+
 /-- `sum`: [0x11190, 0x111b4), frame 0 bytes. -/
 def sum_entry : Word := 0x11190#64
 /-- `sum` and every function it calls. -/
 def sum_dom : Dom := [(0x11190#64, 36)]
 
+/-- `sum2`'s block/loop structure (rules R1 to R3, checked below). -/
+def sum2_func : Struct.Func := ⟨0x111b4#64, 21, []⟩
+theorem sum2_checked : Struct.check code sum2_func entries = true := by decide
+
 /-- `sum2`: [0x111b4, 0x11208), frame 32 bytes. -/
 def sum2_entry : Word := 0x111b4#64
 /-- `sum2` and every function it calls. -/
 def sum2_dom : Dom := [(0x11190#64, 36), (0x111b4#64, 84)]
+
+/-- `_start`'s block/loop structure (rules R1 to R3, checked below). -/
+def _start_func : Struct.Func := ⟨0x11208#64, 23, []⟩
+theorem _start_checked : Struct.check code _start_func entries = true := by decide
 
 /-- `_start`: [0x11208, 0x11264), frame 32 bytes. -/
 def _start_entry : Word := 0x11208#64

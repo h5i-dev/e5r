@@ -33,8 +33,11 @@ trusting the following, and nothing else.
   ELF reader (`lean/E5R/Elf.lean`) and checks that its `.text` is word for
   word the image the proof uses, and every allocated data section
   (`.rodata`, `.data`, `.bss`, ...) byte for byte its exported `Segment`.
-- **`.e5r.struct`**, and the profile rules in general: they make proofs
-  easier to write. A proof about a binary that breaks them is still a proof.
+- **`.e5r.struct`**, and the Rust profile checker: they make proofs easier
+  to write. A proof about a binary that breaks the rules is still a proof.
+  Where conformance itself is the claim, the Lean checker
+  (`lean/E5R/Struct.lean`) decides rules R1 to R3 in the kernel
+  (`<name>_checked`), and `Struct.cfi` proves what they mean for control flow.
 - **The tactics** (`lean/E5R/Tactic.lean`): a tactic that does the wrong
   thing produces a term the kernel rejects.
 - **The program logic** (`Reach.bind`, `Reach.loop`, `Verified.call`, and

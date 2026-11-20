@@ -347,8 +347,27 @@ pub fn check(
             Err(e) => out.push(e),
         }
     }
+    // The jalr of an auipc/jalr pair takes its target from the register the
+    // auipc set, so it may only be reached from that auipc.
+    let pair_jalrs: BTreeSet<u64> = flows
+        .iter()
+        .filter(|(pc, fl)| {
+            matches!(fl, Flow::Call(_) | Flow::Tail(_))
+                && matches!(f.at(**pc), Some(Instr::Jalr(..)))
+        })
+        .map(|(&pc, _)| pc)
+        .collect();
     let mut callees = BTreeSet::new();
     for (&pc, &fl) in &flows {
+        if let Flow::Branch(t) | Flow::Jump(t) = fl {
+            if pair_jalrs.contains(&t) {
+                out.push(v(
+                    pc,
+                    "R2 control",
+                    format!("branch to {t:#x}, the jalr of an auipc/jalr pair"),
+                ));
+            }
+        }
         let i = f.at(pc).expect("decoded above");
         match fl {
             Flow::Branch(t) | Flow::Jump(t) if t != pc + 4 => {

@@ -92,7 +92,9 @@ decides it; each rule has an identifier in its output.
     entry of another function;
   - a return, exactly `jalr zero, 0(ra)`.
 
-  No other `jalr`: no computed jumps or calls in version 0. The last
+  No other `jalr`: no computed jumps or calls in version 0. The `jalr` of
+  an `auipc`/`jalr` pair is reached only from its `auipc` (no branch targets
+  it), so its register holds what the `auipc` put there. The last
   instruction of a function does not fall through.
 - **R3 structure.** The function has a block/loop tree: properly nested
   intervals of its addresses, each a `block` or a `loop`. A branch or jump
@@ -115,6 +117,17 @@ decides it; each rule has an identifier in its output.
 graph and checks against that; with the section, it checks against what the
 section says. The recovery is not trusted by the checker: it only proposes a
 tree.
+
+Rules R1 to R3 are also defined in Lean (`lean/E5R/Struct.lean`, `check`),
+and `e5r export` writes, for every conforming function, its tree as a
+`Struct.Func` and a theorem `<name>_checked` that `check` accepts it, proved
+by evaluation in the kernel. `Struct.cfi` is what that buys: from any state
+of a run of a checked function, every step goes to the next instruction, to
+a structured target (the end of an enclosing block or the head of an
+enclosing loop), to a function entry by a call (with `ra` = pc + 4) or a
+tail call, to `ra` by a return, or ends the process. Nothing else. R4 and R5
+(registers and stack) are about data, not control, and are checked in Rust
+only.
 
 ## 5. Calling convention
 

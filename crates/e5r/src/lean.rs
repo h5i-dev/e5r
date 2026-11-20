@@ -153,8 +153,50 @@ pub fn export(
             .unwrap();
         }
     }
+    let entries: Vec<String> = bin
+        .funcs
+        .iter()
+        .map(|f| format!("0x{:x}#64", f.entry))
+        .collect();
+    writeln!(
+        o,
+        "\n/-- Every function entry: where calls and tail calls may go. -/"
+    )
+    .unwrap();
+    writeln!(o, "def entries : List Word := [{}]", entries.join(", ")).unwrap();
     for m in metas {
         let id = ident(&m.name);
+        let mut nodes = Vec::new();
+        fn flat(ns: &[crate::profile::Node], out: &mut Vec<String>) {
+            for n in ns {
+                let k = match n.kind {
+                    crate::profile::Kind::Block => "block",
+                    crate::profile::Kind::Loop => "loop",
+                };
+                out.push(format!("⟨.{k}, 0x{:x}#64, 0x{:x}#64⟩", n.start, n.end));
+                flat(&n.children, out);
+            }
+        }
+        flat(&m.nodes, &mut nodes);
+        writeln!(
+            o,
+            "\n/-- `{}`'s block/loop structure (rules R1 to R3, checked below). -/",
+            m.name
+        )
+        .unwrap();
+        writeln!(
+            o,
+            "def {id}_func : Struct.Func := ⟨0x{:x}#64, {}, [{}]⟩",
+            m.entry,
+            m.size / 4,
+            nodes.join(", ")
+        )
+        .unwrap();
+        writeln!(
+            o,
+            "theorem {id}_checked : Struct.check code {id}_func entries = true := by decide"
+        )
+        .unwrap();
         let dom = closure(m, &by_entry)?;
         writeln!(
             o,

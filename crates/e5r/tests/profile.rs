@@ -125,6 +125,11 @@ const CASES: &[(&str, &str, &[&str])] = &[
     ("falls-through", "  addi a0, a0, 1", &["R2 control"]),
     ("link-t0", "  jal t0, 1f\n1:\n  ret", &["R2 control"]),
     (
+        "into-a-pair",
+        "  beqz a0, 1f\n  auipc t1, 0\n1:\n  jalr zero, 4(t1)",
+        &["R2 control"],
+    ),
+    (
         "into-loop",
         "  beqz a0, 2f\n1:\n  addi a1, a1, 1\n2:\n  addi a0, a0, -1\n  bnez a0, 1b\n  ret",
         &["R3 structure"],
