@@ -18,12 +18,37 @@ usage:
 Exit status: 0 success, 1 a function violates the profile, 2 usage or input error.
 docs/isa/ describes the profile, the metadata and the proof workflow.";
 
+/// `writeln!` into the output buffer; formatting into a `String` cannot fail.
+macro_rules! say {
+    ($out:expr, $($t:tt)*) => {{
+        use std::fmt::Write as _;
+        let _ = writeln!($out, $($t)*);
+    }};
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    match run(&args) {
+    // Output is collected and written once, so that a reader that stops early
+    // (`e5r disasm FILE | head`) ends the command quietly instead of making
+    // `println!` panic on the closed pipe.
+    let mut out = String::new();
+    let code = match run(&args, &mut out) {
         Ok(code) => code,
         Err(e) => {
             eprintln!("e5r: {e}");
+            ExitCode::from(2)
+        }
+    };
+    use std::io::Write as _;
+    let mut stdout = std::io::stdout().lock();
+    match stdout
+        .write_all(out.as_bytes())
+        .and_then(|()| stdout.flush())
+    {
+        Ok(()) => code,
+        Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => code,
+        Err(e) => {
+            eprintln!("e5r: writing the output: {e}");
             ExitCode::from(2)
         }
     }
@@ -54,18 +79,18 @@ fn json_str(s: &str) -> String {
     o
 }
 
-fn run(args: &[String]) -> Result<ExitCode, String> {
+fn run(args: &[String], out: &mut String) -> Result<ExitCode, String> {
     let Some(cmd) = args.first() else {
-        println!("{USAGE}");
+        say!(out, "{USAGE}");
         return Ok(ExitCode::from(2));
     };
     match cmd.as_str() {
         "--help" | "-h" | "help" => {
-            println!("{USAGE}");
+            say!(out, "{USAGE}");
             Ok(ExitCode::SUCCESS)
         }
         "--version" | "-V" => {
-            println!("e5r {}", env!("CARGO_PKG_VERSION"));
+            say!(out, "e5r {}", env!("CARGO_PKG_VERSION"));
             Ok(ExitCode::SUCCESS)
         }
         "check" => {
@@ -108,7 +133,8 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                         )
                     })
                     .collect();
-                println!(
+                say!(
+                    out,
                     "{{\"file\":{},\"metadata\":{},\"functions\":[{}]}}",
                     json_str(file),
                     bin.recorded.is_some(),
@@ -117,7 +143,8 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
             } else {
                 for r in &reports {
                     match &r.result {
-                        Ok(m) => println!(
+                        Ok(m) => say!(
+                            out,
                             "ok   {} {:#x} frame {} callees {}",
                             r.name,
                             r.entry,
@@ -125,14 +152,15 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                             m.callees.len()
                         ),
                         Err(vs) => {
-                            println!("FAIL {} {:#x}", r.name, r.entry);
+                            say!(out, "FAIL {} {:#x}", r.name, r.entry);
                             for v in vs {
-                                println!("     {v}");
+                                say!(out, "     {v}");
                             }
                         }
                     }
                 }
-                println!(
+                say!(
+                    out,
                     "{} of {} functions conform ({})",
                     reports.len() - bad,
                     reports.len(),
@@ -151,7 +179,7 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
         }
         "annotate" => {
             let file = args.get(1).ok_or("annotate: FILE missing")?;
-            let out = opt(args, "-o").ok_or("annotate: -o OUT missing")?;
+            let dst = opt(args, "-o").ok_or("annotate: -o OUT missing")?;
             let bytes = read(file)?;
             let bin = e5r::load(&bytes)?;
             let reports = bin.check();
@@ -168,7 +196,7 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                 }
             }
             let data = e5r::meta::encode(&metas);
-            let tmp = format!("{out}.e5r-struct.tmp");
+            let tmp = format!("{dst}.e5r-struct.tmp");
             std::fs::write(&tmp, &data).map_err(|e| format!("{tmp}: {e}"))?;
             let objcopy = std::env::var("E5R_OBJCOPY").unwrap_or_else(|_| "llvm-objcopy".into());
             let verb = if bin.recorded.is_some() {
@@ -179,15 +207,16 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
             let st = std::process::Command::new(&objcopy)
                 .arg(format!("{verb}={}={tmp}", e5r::meta::SECTION))
                 .arg(file)
-                .arg(out)
+                .arg(dst)
                 .status()
                 .map_err(|e| format!("{objcopy}: {e} (set E5R_OBJCOPY)"));
             let _ = std::fs::remove_file(&tmp);
             if !st?.success() {
                 return Err(format!("{objcopy} failed"));
             }
-            println!(
-                "{out}: {} functions, {} bytes of {}",
+            say!(
+                out,
+                "{dst}: {} functions, {} bytes of {}",
                 metas.len(),
                 data.len(),
                 e5r::meta::SECTION
@@ -212,8 +241,8 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                 .unwrap_or_default();
             let text = e5r::lean::export(&bin, &metas, ns, &name)?;
             match opt(args, "-o") {
-                Some(out) => std::fs::write(out, text).map_err(|e| format!("{out}: {e}"))?,
-                None => print!("{text}"),
+                Some(dst) => std::fs::write(dst, text).map_err(|e| format!("{dst}: {e}"))?,
+                None => out.push_str(&text),
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -222,12 +251,12 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
             let bytes = read(file)?;
             let bin = e5r::load(&bytes)?;
             for (f, r) in bin.funcs.iter().zip(bin.check()) {
-                println!("\n{} {:#x}:", f.name, f.entry);
+                say!(out, "\n{} {:#x}:", f.name, f.entry);
                 let nodes = match &r.result {
                     Ok(m) => m.nodes.clone(),
                     Err(vs) => {
                         for v in vs {
-                            println!("  ; {v}");
+                            say!(out, "  ; {v}");
                         }
                         vec![]
                     }
@@ -252,20 +281,25 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                 for (i, &w) in f.words.iter().enumerate() {
                     let pc = f.entry + 4 * i as u64;
                     for &(_, _, d, k) in marks.iter().filter(|m| m.0 == pc && !m.1) {
-                        println!("  {:ind$}end {k}", "", ind = 2 * d);
+                        say!(out, "  {:ind$}end {k}", "", ind = 2 * d);
                     }
                     for &(_, _, d, k) in marks.iter().filter(|m| m.0 == pc && m.1) {
-                        println!("  {:ind$}{k} {{", "", ind = 2 * d);
+                        say!(out, "  {:ind$}{k} {{", "", ind = 2 * d);
                     }
                     let depth = marks.iter().filter(|m| m.1 && m.0 <= pc).count()
                         - marks.iter().filter(|m| !m.1 && m.0 <= pc).count();
                     let text = e5r::isa::decode(w)
                         .map(|i| i.asm(pc))
                         .unwrap_or_else(|| format!(".word {w:#010x}"));
-                    println!("  {:ind$}{pc:8x}: {w:08x}  {text}", "", ind = 2 * depth);
+                    say!(
+                        out,
+                        "  {:ind$}{pc:8x}: {w:08x}  {text}",
+                        "",
+                        ind = 2 * depth
+                    );
                 }
                 for &(_, _, d, k) in marks.iter().filter(|m| m.0 == f.end() && !m.1) {
-                    println!("  {:ind$}end {k}", "", ind = 2 * d);
+                    say!(out, "  {:ind$}end {k}", "", ind = 2 * d);
                 }
             }
             Ok(ExitCode::SUCCESS)

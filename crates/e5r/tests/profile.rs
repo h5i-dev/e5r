@@ -297,3 +297,25 @@ fn rejects_what_is_not_the_profile() {
         assert!(e5r::load(&me).err().unwrap().contains("not RISC-V"));
     }
 }
+
+/// A reader that stops early (`e5r disasm FILE | head`) must not make the
+/// tool panic: the pipe is closed before the tool writes.
+#[test]
+fn a_closed_pipe_is_not_a_panic() {
+    use std::process::Stdio;
+    let exe = env!("CARGO_BIN_EXE_e5r");
+    let elf = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/elf/sum.elf");
+    for cmd in ["disasm", "check"] {
+        let mut child = Command::new(exe)
+            .args([cmd, elf])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        drop(child.stdout.take());
+        let out = child.wait_with_output().unwrap();
+        let err = String::from_utf8_lossy(&out.stderr);
+        assert!(!err.contains("panicked"), "{cmd}: {err}");
+        assert_eq!(out.status.code(), Some(0), "{cmd}: {err}");
+    }
+}
