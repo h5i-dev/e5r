@@ -41,6 +41,8 @@ pub struct Section {
     pub size: u64,
     pub link: u32,
     pub entsize: u64,
+    /// sh_addralign.
+    pub align: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -130,11 +132,12 @@ impl<'a> Elf<'a> {
                 u64_at(data, o + 32)?,
                 u32_at(data, o + 40)?,
                 u64_at(data, o + 56)?,
+                u64_at(data, o + 48)?,
             ));
         }
         let strtab = raw.get(shstrndx).map(|r| r.4 as usize);
         let mut sections = Vec::with_capacity(shnum);
-        for &(name, kind, flags, addr, offset, size, link, entsize) in &raw {
+        for &(name, kind, flags, addr, offset, size, link, entsize, align) in &raw {
             let name = match strtab {
                 Some(base) => cstr(data, base + name as usize)?,
                 None => String::new(),
@@ -151,6 +154,7 @@ impl<'a> Elf<'a> {
                 size,
                 link,
                 entsize,
+                align,
             });
         }
         let mut symbols = Vec::new();

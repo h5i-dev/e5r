@@ -17,6 +17,7 @@ pub mod meta;
 pub mod module;
 pub mod profile;
 pub mod sha256;
+pub mod text;
 
 use profile::{Func, FuncMeta, Violation};
 use std::collections::BTreeSet;
@@ -50,6 +51,8 @@ pub struct DataSegment {
     /// NOBITS (`.bss`): exported as zeros of `bytes.len()`.
     pub zero: bool,
     pub writable: bool,
+    /// The section's alignment (sh_addralign); not part of what a proof sees.
+    pub align: u64,
 }
 
 pub fn load(bytes: &[u8]) -> Result<Binary<'_>, String> {
@@ -117,6 +120,7 @@ pub fn load(bytes: &[u8]) -> Result<Binary<'_>, String> {
             },
             zero: s.kind == elf::SHT_NOBITS,
             writable: s.flags & elf::SHF_WRITE != 0,
+            align: s.align.max(1),
         })
         .collect();
     let mut declared = BTreeSet::new();

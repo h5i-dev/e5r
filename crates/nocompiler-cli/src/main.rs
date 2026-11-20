@@ -178,6 +178,14 @@ pub enum Command {
         #[arg(short = 'o', value_name = "OUT.lean")]
         out: Option<PathBuf>,
     },
+    /// Assemble structured text (what `disasm` prints) into a relocatable object (docs/isa/asm.md).
+    Asm {
+        /// The structured text.
+        file: PathBuf,
+        /// The object to write.
+        #[arg(short = 'o', value_name = "OUT.o")]
+        out: PathBuf,
+    },
     /// The ledger entries of a linked RISC-V binary's functions (docs/isa/ledger.md).
     Ledger {
         /// The linked RISC-V ELF.
@@ -690,7 +698,8 @@ impl Command {
             | Command::Cc { .. }
             | Command::Export { .. }
             | Command::Module { .. }
-            | Command::Ledger { .. } => None,
+            | Command::Ledger { .. }
+            | Command::Asm { .. } => None,
             Command::Project { .. } | Command::Ui { .. } => Some((out::When::Auto, false)),
             _ => {
                 let c = self.common();
@@ -723,7 +732,8 @@ impl Command {
             | Command::Cc { .. }
             | Command::Export { .. }
             | Command::Module { .. }
-            | Command::Ledger { .. } => {
+            | Command::Ledger { .. }
+            | Command::Asm { .. } => {
                 unreachable!("handled before a file is opened")
             }
             Command::Vtables { common, .. }
@@ -783,6 +793,7 @@ fn core(cli: &Cli, w: &mut out::Out) -> Option<Result<u8, String>> {
             out,
         } => cmd::module(file, namespace, out.as_deref(), &mut text),
         Command::Ledger { file, proofs } => cmd::ledger(file, proofs.as_deref(), &mut text),
+        Command::Asm { file, out } => cmd::asm(file, out, &mut text),
         Command::Disasm { common, .. } if common.json && is_risc_v(&common.file) => {
             Err("disasm: --json is not available for a RISC-V binary".into())
         }

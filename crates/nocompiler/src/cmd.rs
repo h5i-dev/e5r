@@ -265,6 +265,35 @@ pub fn ledger(file: &Path, proofs: Option<&Path>, out: &mut String) -> Result<u8
     Ok(0)
 }
 
+/// `nocompiler asm FILE -o OUT.o`: assemble the structured text into a
+/// relocatable object (docs/isa/asm.md). Status 1 when a function does not
+/// conform (nothing is written).
+pub fn asm(file: &Path, dst: &Path, out: &mut String) -> Result<u8, String> {
+    let text = std::fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
+    let o = match crate::text::assemble(&text) {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("{}: {e}", file.display());
+            return Ok(1);
+        }
+    };
+    let bytes = crate::text::write_object(&o)?;
+    std::fs::write(dst, &bytes).map_err(|e| format!("{}: {e}", dst.display()))?;
+    say!(
+        out,
+        "{}: {} functions ({}), {} data sections",
+        dst.display(),
+        o.funcs.len(),
+        o.funcs
+            .iter()
+            .map(|a| format!("{} {:?}", a.func.name, a.meta.level))
+            .collect::<Vec<_>>()
+            .join(", "),
+        o.data.len()
+    );
+    Ok(0)
+}
+
 /// `nocompiler disasm FILE [FUNC]`: list the code with its block/loop
 /// structure; every function, or only the one named `only`.
 pub fn disasm(file: &Path, only: Option<&str>, out: &mut String) -> Result<u8, String> {
@@ -275,6 +304,23 @@ pub fn disasm(file: &Path, only: Option<&str>, out: &mut String) -> Result<u8, S
     {
         return Err(format!("disasm: no function {name} in {}", file.display()));
     }
+    // The structured text (docs/isa/asm.md), which `asm` reads back; the
+    // address listing when the code has no relocatable form.
+    match crate::text::print(&bin, only) {
+        Ok(t) => {
+            out.push_str(&t);
+            return Ok(0);
+        }
+        Err(e) => say!(
+            out,
+            "; no structured text ({e}); the address listing instead"
+        ),
+    }
+    listing(&bin, only, out)
+}
+
+/// The address listing: every word with its address, nested by the tree.
+pub fn listing(bin: &crate::Binary, only: Option<&str>, out: &mut String) -> Result<u8, String> {
     for (f, r) in bin.funcs.iter().zip(bin.check()) {
         if only.is_some_and(|n| n != f.name) {
             continue;

@@ -11,7 +11,7 @@ claim "easier to prove".
 | 2 | syscall functions through `nocompiler_auto` | passed | below |
 | 3 | relocation (two links, one proof) | partial (leaf functions) | below |
 | 4 | corpus conformance levels | passed | below |
-| 5 | `asm(disasm(x)) = x` | open | |
+| 5 | `asm(disasm(x)) = x` | passed | below |
 | 6 | negative controls | checker side passed (Rust and Lean, A); audit side passed (B) | below |
 | 7 | checking cost at 55/160/500 instructions | open | |
 | 8 | demo A/B with calls and frames | open | |
@@ -147,3 +147,24 @@ step 3's).
 
 The proofs are at the image level (`VerifiedImg code dom entry spec`); the
 module-level `Verified M f spec` of step 3 is B's.
+
+## 5. Round trip (agent B, 2026-11-20)
+
+`cargo test -p nocompiler --test text -- --nocapture` (clang 15.0.7, ld.lld
+20 on the development host). For every function at L1 or above, the object
+`nocompiler asm` makes from the text `nocompiler disasm` prints holds the same
+relocatable function (words with the relocated fields zero, and the
+relocations) as the binary, with the same tree, level, frame and partition:
+
+- the committed binaries (examples/elf/{sum,hello,sum.link1,sum.link2}.elf,
+  demo/elf/{sum,cobs}.b.elf): 17 functions, all of them;
+- the C corpus built with `nocompiler cc` (tests/cc/{frames,fnptr,loops,recur,
+  structs,switch}.c, hello, cobs): 53 functions at L1 or above. Not in the
+  text, being below L1: `apply` (fnptr.c, a call through a function pointer)
+  and `call_in_loop` (frames.c, clang 15 rotates its loop; R3).
+
+Byte for byte: for every program all of whose functions are at L1 or above
+(the committed six, and loops, recur, structs, switch, hello, cobs), the
+object linked again by ld.lld at the binary's section addresses and function
+order gives the binary's `.text` and data sections exactly, and checks against
+the `.nocompiler.struct` the object carried. Format: docs/isa/asm.md.
