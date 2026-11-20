@@ -1,6 +1,7 @@
 //! `nocompiler`: check a RISC-V binary against the nocompiler profile, record its
 //! structure, and export it to Lean 4.
 
+use nocompiler::cmd;
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -64,141 +65,30 @@ fn opt<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
         .map(|s| s.as_str())
 }
 
-fn read(path: &str) -> Result<Vec<u8>, String> {
-    std::fs::read(path).map_err(|e| format!("{path}: {e}"))
-}
-
-fn json_str(s: &str) -> String {
-    let mut o = String::from("\"");
-    for c in s.chars() {
-        match c {
-            '"' => o.push_str("\\\""),
-            '\\' => o.push_str("\\\\"),
-            c if (c as u32) < 0x20 => o.push_str(&format!("\\u{:04x}", c as u32)),
-            c => o.push(c),
-        }
-    }
-    o.push('"');
-    o
-}
-
+/// Argument parsing only; the commands are in `nocompiler::cmd`.
 fn run(args: &[String], out: &mut String) -> Result<ExitCode, String> {
     let Some(cmd) = args.first() else {
         say!(out, "{USAGE}");
         return Ok(ExitCode::from(2));
     };
-    match cmd.as_str() {
+    let file = |what: &str| -> Result<&Path, String> {
+        args.get(1)
+            .map(Path::new)
+            .ok_or_else(|| format!("{what}: FILE missing"))
+    };
+    let code = match cmd.as_str() {
         "--help" | "-h" | "help" => {
             say!(out, "{USAGE}");
-            Ok(ExitCode::SUCCESS)
+            0
         }
         "--version" | "-V" => {
             say!(out, "nocompiler {}", env!("CARGO_PKG_VERSION"));
-            Ok(ExitCode::SUCCESS)
+            0
         }
-        "check" => {
-            let file = args.get(1).ok_or("check: FILE missing")?;
-            let bytes = read(file)?;
-            let bin = nocompiler::load(&bytes)?;
-            let reports = bin.check();
-            let bad = reports.iter().filter(|r| r.result.is_err()).count();
-            if args.iter().any(|a| a == "--json") {
-                let fs: Vec<String> = reports
-                    .iter()
-                    .map(|r| {
-                        let body = match &r.result {
-                            Ok(m) => format!(
-                                "\"conforms\":true,\"frame\":{},\"callees\":[{}]",
-                                m.frame,
-                                m.callees
-                                    .iter()
-                                    .map(|c| c.to_string())
-                                    .collect::<Vec<_>>()
-                                    .join(",")
-                            ),
-                            Err(vs) => format!(
-                                "\"conforms\":false,\"violations\":[{}]",
-                                vs.iter()
-                                    .map(|v| format!(
-                                        "{{\"addr\":{},\"rule\":{},\"detail\":{}}}",
-                                        v.addr,
-                                        json_str(v.rule),
-                                        json_str(&v.detail)
-                                    ))
-                                    .collect::<Vec<_>>()
-                                    .join(",")
-                            ),
-                        };
-                        format!(
-                            "{{\"name\":{},\"entry\":{},{body}}}",
-                            json_str(&r.name),
-                            r.entry
-                        )
-                    })
-                    .collect();
-                say!(
-                    out,
-                    "{{\"file\":{},\"metadata\":{},\"functions\":[{}]}}",
-                    json_str(file),
-                    bin.recorded.is_some(),
-                    fs.join(",")
-                );
-            } else {
-                for r in &reports {
-                    match &r.result {
-                        Ok(m) => say!(
-                            out,
-                            "ok   {} {:#x} frame {} callees {}",
-                            r.name,
-                            r.entry,
-                            m.frame,
-                            m.callees.len()
-                        ),
-                        Err(vs) => {
-                            say!(out, "FAIL {} {:#x}", r.name, r.entry);
-                            for v in vs {
-                                say!(out, "     {v}");
-                            }
-                        }
-                    }
-                }
-                say!(
-                    out,
-                    "{} of {} functions conform ({})",
-                    reports.len() - bad,
-                    reports.len(),
-                    if bin.recorded.is_some() {
-                        "checked against .nocompiler.struct"
-                    } else {
-                        "structure recovered"
-                    }
-                );
-            }
-            Ok(if bad == 0 {
-                ExitCode::SUCCESS
-            } else {
-                ExitCode::from(1)
-            })
-        }
+        "check" => cmd::check(file("check")?, args.iter().any(|a| a == "--json"), out)?,
         "annotate" => {
-            let file = args.get(1).ok_or("annotate: FILE missing")?;
             let dst = opt(args, "-o").ok_or("annotate: -o OUT missing")?;
-            match nocompiler::annotate(std::path::Path::new(file), std::path::Path::new(dst))? {
-                Ok((n, bytes)) => {
-                    say!(
-                        out,
-                        "{dst}: {n} functions, {bytes} bytes of {}",
-                        nocompiler::meta::SECTION
-                    );
-                    Ok(ExitCode::SUCCESS)
-                }
-                Err(vs) => {
-                    for v in vs {
-                        eprintln!("{v}");
-                    }
-                    Ok(ExitCode::from(1))
-                }
-            }
+            cmd::annotate(file("annotate")?, Path::new(dst), out)?
         }
         "cc" => {
             let dst = opt(args, "-o").ok_or("cc: -o OUT missing")?;
@@ -212,97 +102,14 @@ fn run(args: &[String], out: &mut String) -> Result<ExitCode, String> {
                 rest.push(args[i].clone());
                 i += 1;
             }
-            let report = nocompiler::cc::build(&rest, std::path::Path::new(dst))?;
-            out.push_str(&report.text);
-            Ok(if report.conforms {
-                ExitCode::SUCCESS
-            } else {
-                ExitCode::from(1)
-            })
+            cmd::cc(&rest, Path::new(dst), out)?
         }
         "export" => {
-            let file = args.get(1).ok_or("export: FILE missing")?;
             let ns = opt(args, "--namespace").ok_or("export: --namespace NS missing")?;
-            let bytes = read(file)?;
-            let bin = nocompiler::load(&bytes)?;
-            let mut metas = Vec::new();
-            for r in bin.check() {
-                match r.result {
-                    Ok(m) => metas.push(m),
-                    Err(vs) => {
-                        eprintln!("nocompiler: skipping {} ({} violations)", r.name, vs.len())
-                    }
-                }
-            }
-            let name = Path::new(file)
-                .file_name()
-                .map(|s| s.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            let text = nocompiler::lean::export(&bin, &metas, ns, &name)?;
-            match opt(args, "-o") {
-                Some(dst) => std::fs::write(dst, text).map_err(|e| format!("{dst}: {e}"))?,
-                None => out.push_str(&text),
-            }
-            Ok(ExitCode::SUCCESS)
+            cmd::export(file("export")?, ns, opt(args, "-o").map(Path::new), out)?
         }
-        "disasm" => {
-            let file = args.get(1).ok_or("disasm: FILE missing")?;
-            let bytes = read(file)?;
-            let bin = nocompiler::load(&bytes)?;
-            for (f, r) in bin.funcs.iter().zip(bin.check()) {
-                say!(out, "\n{} {:#x}:", f.name, f.entry);
-                let nodes = match &r.result {
-                    Ok(m) => m.nodes.clone(),
-                    Err(vs) => {
-                        for v in vs {
-                            say!(out, "  ; {v}");
-                        }
-                        vec![]
-                    }
-                };
-                let mut marks: Vec<(u64, bool, usize, &'static str)> = Vec::new();
-                fn walk(
-                    ns: &[nocompiler::profile::Node],
-                    d: usize,
-                    m: &mut Vec<(u64, bool, usize, &'static str)>,
-                ) {
-                    for n in ns {
-                        let k = match n.kind {
-                            nocompiler::profile::Kind::Block => "block",
-                            nocompiler::profile::Kind::Loop => "loop",
-                        };
-                        m.push((n.start, true, d, k));
-                        walk(&n.children, d + 1, m);
-                        m.push((n.end, false, d, k));
-                    }
-                }
-                walk(&nodes, 0, &mut marks);
-                for (i, &w) in f.words.iter().enumerate() {
-                    let pc = f.entry + 4 * i as u64;
-                    for &(_, _, d, k) in marks.iter().filter(|m| m.0 == pc && !m.1) {
-                        say!(out, "  {:ind$}end {k}", "", ind = 2 * d);
-                    }
-                    for &(_, _, d, k) in marks.iter().filter(|m| m.0 == pc && m.1) {
-                        say!(out, "  {:ind$}{k} {{", "", ind = 2 * d);
-                    }
-                    let depth = marks.iter().filter(|m| m.1 && m.0 <= pc).count()
-                        - marks.iter().filter(|m| !m.1 && m.0 <= pc).count();
-                    let text = nocompiler::isa::decode(w)
-                        .map(|i| i.asm(pc))
-                        .unwrap_or_else(|| format!(".word {w:#010x}"));
-                    say!(
-                        out,
-                        "  {:ind$}{pc:8x}: {w:08x}  {text}",
-                        "",
-                        ind = 2 * depth
-                    );
-                }
-                for &(_, _, d, k) in marks.iter().filter(|m| m.0 == f.end() && !m.1) {
-                    say!(out, "  {:ind$}end {k}", "", ind = 2 * d);
-                }
-            }
-            Ok(ExitCode::SUCCESS)
-        }
-        other => Err(format!("unknown command {other}\n{USAGE}")),
-    }
+        "disasm" => cmd::disasm(file("disasm")?, out)?,
+        other => return Err(format!("unknown command {other}\n{USAGE}")),
+    };
+    Ok(ExitCode::from(code))
 }

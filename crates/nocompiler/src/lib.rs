@@ -7,6 +7,7 @@
 //! the Lean kernel against the bytes of the binary (see docs/isa/trust.md).
 
 pub mod cc;
+pub mod cmd;
 pub mod elf;
 pub mod isa;
 pub mod lean;
