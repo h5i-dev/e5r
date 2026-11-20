@@ -61,8 +61,12 @@ are refuted from a7). A prologue's saves become conjuncts of every
 invariant, so a proof states no frame and no register preservation; arrays,
 buffers and segments that a specification keeps apart from the stack
 (`∀ x, A.mem x → ¬ R.mem x`) stay as they were under the frame's stores.
-What is left is named after the path (`entry_to_0x…`, `…_ret_0x…`,
-`…_exit_0x…`, `…_call_0x…_pre`); an existential whose witnesses the tactic
+Cut points are given by label (`loop_inv $l1 …`, the labels `nocompiler
+export` writes as `<f>_labels`, named as `disasm` names them) or by address.
+What is left is named after the path, without addresses, so a proof's text
+does not change when its function is linked elsewhere: labels where there
+are any, otherwise offsets from the function's entry (`entry_to_l1`,
+`l1_ret_x28`, `entry_exit_x30`, `entry_call_write_all_verified_pre`); an existential whose witnesses the tactic
 cannot determine is left whole, for the proof to give them by name
 (lean/Examples/Hello.lean, Sum2.lean).
 -/
@@ -856,6 +860,10 @@ structure Ctx where
   mode : Mode
   /-- Where the run started, for naming what it leaves. -/
   origin : String
+  /-- The function's labels: cut points are named by them. -/
+  labels : List (String × Nat) := []
+  /-- The function's entry: other points are named by their offset from it. -/
+  entryN : Nat := 0
 
 def hex (n : Nat) : String := "0x" ++ String.ofList (Nat.toDigits 16 n)
 
@@ -954,6 +962,14 @@ def endTag (cx : Ctx) (tag : String) : IO String := do
   r.modify (·.insert tag (n + 1))
   return if n = 0 then tag else s!"{tag}_{Char.ofNat (97 + n)}"
 
+/-- A point's name in goal names: its label, else its offset from the
+    function's entry (`x74`), so that names do not change when the function
+    is linked elsewhere. -/
+def Ctx.name (cx : Ctx) (pc : Nat) : String :=
+  match cx.labels.find? (·.2 == pc) with
+  | some (l, _) => l
+  | none => "x" ++ ((Nat.toDigits 16 ((pc + 2 ^ 64 - cx.entryN) % 2 ^ 64)).asString)
+
 def tagged (gs : List MVarId) (tag : String) : MetaM (List MVarId) := do
   let mut i := 0
   for g in gs do
@@ -1042,7 +1058,7 @@ def closeCut (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (List MVarId) := do
   if let some r := cx.log then r.modify (·.push (g, s!"cut {cx.origin} -> {hex pc}"))
   let fs ← simpArgs cx.facts
   let hR := cx.hR
-  let tag ← endTag cx s!"{cx.origin}_to_{hex pc}"
+  let tag ← endTag cx s!"{cx.origin}_to_{cx.name pc}"
   let gs ← run g (← `(tactic| (subst $hR:ident; refine $(mkIdent cx.fl.done) ?_; (try dsimp only); right)))
   let some g := gs.head? | return []
   let vc (g : MVarId) : TacticM (List MVarId) := do
@@ -1075,7 +1091,7 @@ def closeRet (cx : Ctx) (g : MVarId) (from_ : Nat) : TacticM (List MVarId) := do
   let he := cx.he
   let rs := cx.rs
   let sp := cx.spec
-  let tag ← endTag cx s!"{cx.origin}_ret_{hex from_}"
+  let tag ← endTag cx s!"{cx.origin}_ret_{cx.name from_}"
   let gs ← run g (← `(tactic| (subst $hR:ident; refine $(mkIdent cx.fl.done) ?_; (try dsimp only); left)))
   let some g := gs.head? | return []
   let [gf, gx, gp, gpres, gpost] ← run g (← `(tactic| refine ⟨.inl ?_, .inl ⟨?_, ?_, ?_, ?_⟩⟩))
@@ -1156,7 +1172,7 @@ def closeExit (cx : Ctx) (g : MVarId) (at_ : Nat) : TacticM (List MVarId) := do
   let fs ← simpArgs cx.facts
   let hR := cx.hR
   let sp := cx.spec
-  let tag ← endTag cx s!"{cx.origin}_exit_{hex at_}"
+  let tag ← endTag cx s!"{cx.origin}_exit_{cx.name at_}"
   let gs ← run g (← `(tactic| (subst $hR:ident; refine $(mkIdent cx.fl.done) ?_; (try dsimp only); left)))
   let some g := gs.head? | return []
   let [g1, g2, g3] ← run g (← `(tactic| refine ⟨.inr ?_, .inr ⟨?_, ?_⟩⟩)) | throwError "nocompiler_auto: exit"
@@ -1261,7 +1277,10 @@ def closeCall (cx : Ctx) (g : MVarId) (pc : Nat) (thm : Term) (calleeSpec : Name
   let he := cx.he
   let rs := cx.rs
   let csp := mkIdent calleeSpec
-  let tag ← endTag cx s!"{cx.origin}_call_{hex pc}"
+  let cname := match thm.raw.getId with
+    | .str _ n => n
+    | _ => hex pc
+  let tag ← endTag cx s!"{cx.origin}_call_{cname}"
   let cdoneI := mkIdent (Name.mkSimple s!"nocompiler_cdone_{tag}")
   let cframeI := mkIdent (Name.mkSimple s!"nocompiler_cframe_{tag}")
   let cxI := mkIdent (Name.mkSimple s!"nocompiler_cx_{tag}")
@@ -1359,7 +1378,7 @@ def closeCall (cx : Ctx) (g : MVarId) (pc : Nat) (thm : Term) (calleeSpec : Name
           for t in steps do
             r2 ← r2.foldlM (fun acc g => return acc ++ (← run g t)) []
           for g2 in r2 do
-            let (g3, postFacts) ← destructAnd g2 cpostI s!"hc_{(hex pc).drop 2}"
+            let (g3, postFacts) ← destructAnd g2 cpostI s!"hc_{cname}"
             -- The callee's postcondition, in the normal form of what is known here.
             let mut g3 := g3
             for pf in postFacts do
@@ -1454,7 +1473,9 @@ partial def drive (cx : Ctx) (first : Bool) (fuel : Nat) (g : MVarId) (last : Na
 
 /-! ### The front end -/
 
-syntax nocompilerCut := "loop_inv " term:max ppSpace term:max " measure " term:max
+/-- A label of the structured form, `$next`: where the cut point is, without its address. -/
+syntax nocompilerLabel := "$" noWs ident
+syntax nocompilerCut := "loop_inv " (nocompilerLabel <|> term:max) ppSpace term:max " measure " term:max
 
 /-- `nocompiler_auto f s he [facts] (loop_inv pc inv measure μ)*` proves the goal
     `Exec c (spec.perm a s) D (spec.Done a s) s` that `VerifiedImg c D entry spec`
@@ -1464,6 +1485,23 @@ syntax nocompilerCut := "loop_inv " term:max ppSpace term:max " measure " term:m
     `0x…_to_0x…`, `…_ret_0x…`, `…_measure`. -/
 syntax (name := nocompilerAuto) "nocompiler_auto " term:max ident ident (" [" Lean.Parser.Tactic.simpArg,* "]")?
   (" calls " "[" term,* "]")? (ppLine nocompilerCut)* : tactic
+
+unsafe def evalLabelsImpl (e : Expr) : MetaM (List (String × Nat)) :=
+  evalExpr (List (String × Nat)) (mkApp (mkConst ``List [Level.zero])
+    (mkApp2 (mkConst ``Prod [Level.zero, Level.zero]) (mkConst ``String) (mkConst ``Nat))) e
+@[implemented_by evalLabelsImpl] opaque evalLabels (e : Expr) : MetaM (List (String × Nat))
+
+/-- The labels `nocompiler export` writes for the function `f` (`<f>_func`
+    has `<f>_labels`), as names and addresses; none if there are none. -/
+def labelsOf (f : Syntax) : TacticM (List (String × Nat)) := do
+  let some n := (if f.isIdent then some f.getId else none) | return []
+  let .str p s := n | return []
+  unless s.endsWith "_func" do return []
+  let ln := mkIdent (.str p ((String.ofList (s.toList.take (s.length - 5))) ++ "_labels"))
+  try
+    let e ← Term.elabTerm (← `(List.map (fun p : String × Word => (p.1, p.2.toNat)) $ln)) none
+    evalLabels (← instantiateMVars e)
+  catch _ => return []
 
 unsafe def evalNatListImpl (e : Expr) : MetaM (List Nat) :=
   evalExpr (List Nat) (mkApp (mkConst ``List [Level.zero]) (mkConst ``Nat)) e
@@ -1540,9 +1578,11 @@ structure Call where
   code : Expr
   specName : Name
   cuts : Array (Nat × Term × Term × Term)
+  /-- The function's labels (name, address). -/
+  labels : List (String × Nat) := []
 
-def parseCall (fl : Flavor) (s0 he : Syntax) (factsStx : Syntax) (cutStx : Array Syntax) :
-    TacticM Call := do
+def parseCall (fl : Flavor) (s0 he : Syntax) (factsStx : Syntax) (cutStx : Array Syntax)
+    (labels : List (String × Nat) := []) : TacticM Call := do
   let userFacts : Array Term := if factsStx.isNone then #[] else
     factsStx[1].getSepArgs.map fun a => ⟨a[2]!⟩
   let g ← getMainGoal
@@ -1558,12 +1598,22 @@ def parseCall (fl : Flavor) (s0 he : Syntax) (factsStx : Syntax) (cutStx : Array
     | _ => throwError "nocompiler_auto: expected `spec.Done` as the postcondition"
   let mut cuts : Array (Nat × Term × Term × Term) := #[]
   for c in cutStx do
+    -- `$l`: a label. In term position it also parses as an antiquotation, so
+    -- the syntax may be a choice node; what is written starts with `$`.
+    let written : String := String.ofList ((c[1].reprint.getD "").toList.dropWhile Char.isWhitespace)
+    if c[1].getKind == ``nocompilerLabel || written.toList.head? == some '$' then
+      let some idStx := c[1].find? (·.isIdent) | throwError "nocompiler_auto: a label is `$name`"
+      let l := idStx.getId.toString
+      let some (_, v) := labels.find? (·.1 == l)
+        | throwError "nocompiler_auto: no label ${l} (the function's labels: {labels.map (·.1)})"
+      cuts := cuts.push (v, ← `((BitVec.ofNat 64 $(natLit v) : Word)), ⟨c[2]⟩, ⟨c[4]⟩)
+      continue
     let pcT : Term := ⟨c[1]⟩
     let pcE ← Term.elabTerm pcT (some (mkConst ``Word))
     let some ⟨_, v⟩ ← getBitVecValue? (← instantiateMVars pcE)
       | throwError "nocompiler_auto: cut point {pcT} is not a literal"
     cuts := cuts.push (v.toNat, pcT, ⟨c[2]⟩, ⟨c[4]⟩)
-  return { s0 := ⟨s0⟩, he := ⟨he⟩, userFacts, code, specName, cuts }
+  return { s0 := ⟨s0⟩, he := ⟨he⟩, userFacts, code, specName, cuts, labels }
 
 /-- The run, from the cut points on. -/
 def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat)
@@ -1645,7 +1695,9 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
         spec := mkIdent specName
         hR := hR
         mode := .start
-        origin := "entry" }
+        origin := "entry"
+        labels := call.labels
+        entryN := entryN }
       drive cx false 400 gStart entryN
   -- From each loop head.
   let gBody0 := gBody
@@ -1723,9 +1775,11 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
         spec := mkIdent specName
         hR := hR
         mode := .body
-        origin := hex 0 }
+        origin := hex 0
+        labels := call.labels
+        entryN := entryN }
       return (pc, cx)
-    let gs ← g.withContext do drive { cx with origin := hex pc } true 400 g pc
+    let gs ← g.withContext do drive { cx with origin := cx.name pc } true 400 g pc
     if !(nocompiler.auto.traceFile.get (← getOptions)).isEmpty then
       let e ← instantiateMVars (mkMVar g)
       traceLine s!"[size] body {hex pc}: {← e.numObjs} objects"
@@ -1760,7 +1814,7 @@ def parseCallees (fl : Flavor) (stx : Syntax) : TacticM (Array (Nat × Term × N
 @[tactic nocompilerAuto] def evalNoCompilerAuto : Tactic := fun stx => do
   traceLine "[nocompiler_auto] start"
   let f : Term := ⟨stx[1]⟩
-  let call ← parseCall {} stx[2] stx[3] stx[4] stx[6].getArgs
+  let call ← parseCall {} stx[2] stx[3] stx[4] stx[6].getArgs (← labelsOf stx[1])
   let callees ← parseCallees {} stx[5]
   -- The function's tree: its loop heads are the cut points.
   let fE ← Term.elabTerm f (some (mkConst ``Struct.Func))

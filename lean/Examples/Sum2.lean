@@ -66,6 +66,6 @@ def spec2 : Spec Args2 where
 theorem sum2_verified : VerifiedImg code sum2_dom sum2_entry spec2 := by
   rintro ⟨a, xs, b, ys⟩ s he ⟨ha0, ha1, ha2, ha3, hl1, hl2, hal1, hal2, harr1, harr2, hd1, hd2⟩
   nocompiler_auto sum2_func s he calls [sum_verified]
-  case entry_ret_0x11204 => exact BitVec.add_comm _ _
+  case entry_ret_x50 => exact BitVec.add_comm _ _
 
 end Examples.Sum2

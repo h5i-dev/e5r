@@ -92,6 +92,8 @@ def entries : List Word := [0x11164#64, 0x11190#64, 0x111d0#64]
 
 /-- `write_all`'s block/loop structure (rules R1 to R3, checked below with R4 to R6). -/
 def write_all_func : Struct.Func := ⟨0x11164#64, 11, [⟨.block, 0x1116c#64, 0x11188#64⟩, ⟨.loop, 0x1116c#64, 0x11184#64⟩]⟩
+/-- `write_all`'s labels: where `$l` is, for `loop_inv $l` (a loop's head, a block's end). -/
+def write_all_labels : List (String × Word) := [("b0", 0x11188#64), ("l1", 0x1116c#64)]
 /-- `write_all`'s frame (rule R6): 0 bytes, its slots and address-taken ranges. -/
 def write_all_frame : Struct.Frame := ⟨0, [], []⟩
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
@@ -117,6 +119,8 @@ def write_all_dom : Dom := [(0x11164#64, 44)]
 
 /-- `hello`'s block/loop structure (rules R1 to R3, checked below with R4 to R6). -/
 def hello_func : Struct.Func := ⟨0x11190#64, 16, []⟩
+/-- `hello`'s labels: where `$l` is, for `loop_inv $l` (a loop's head, a block's end). -/
+def hello_labels : List (String × Word) := []
 /-- `hello`'s frame (rule R6): 16 bytes, its slots and address-taken ranges. -/
 def hello_frame : Struct.Frame := ⟨16, [⟨8, .save 1⟩], []⟩
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
@@ -147,6 +151,8 @@ def hello_dom : Dom := [(0x11164#64, 44), (0x11190#64, 64)]
 
 /-- `_start`'s block/loop structure (rules R1 to R3, checked below with R4 to R6). -/
 def _start_func : Struct.Func := ⟨0x111d0#64, 2, []⟩
+/-- `_start`'s labels: where `$l` is, for `loop_inv $l` (a loop's head, a block's end). -/
+def _start_labels : List (String × Word) := []
 /-- `_start`'s frame (rule R6): 0 bytes, its slots and address-taken ranges. -/
 def _start_frame : Struct.Frame := ⟨0, [], []⟩
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/

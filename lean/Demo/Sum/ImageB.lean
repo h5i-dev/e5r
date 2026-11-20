@@ -147,6 +147,8 @@ def entries : List Word := [0x11190#64, 0x111b4#64, 0x11208#64]
 
 /-- `sum`'s block/loop structure (rules R1 to R3, checked below with R4 to R6). -/
 def sum_func : Struct.Func := ⟨0x11190#64, 9, [⟨.block, 0x11194#64, 0x111ac#64⟩, ⟨.loop, 0x11198#64, 0x111ac#64⟩]⟩
+/-- `sum`'s labels: where `$l` is, for `loop_inv $l` (a loop's head, a block's end). -/
+def sum_labels : List (String × Word) := [("b0", 0x111ac#64), ("l1", 0x11198#64)]
 /-- `sum`'s frame (rule R6): 0 bytes, its slots and address-taken ranges. -/
 def sum_frame : Struct.Frame := ⟨0, [], []⟩
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
@@ -170,6 +172,8 @@ def sum_dom : Dom := [(0x11190#64, 36)]
 
 /-- `sum2`'s block/loop structure (rules R1 to R3, checked below with R4 to R6). -/
 def sum2_func : Struct.Func := ⟨0x111b4#64, 21, []⟩
+/-- `sum2`'s labels: where `$l` is, for `loop_inv $l` (a loop's head, a block's end). -/
+def sum2_labels : List (String × Word) := []
 /-- `sum2`'s frame (rule R6): 32 bytes, its slots and address-taken ranges. -/
 def sum2_frame : Struct.Frame := ⟨32, [⟨0, .save 18⟩, ⟨8, .save 9⟩, ⟨16, .save 8⟩, ⟨24, .save 1⟩], []⟩
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
@@ -205,6 +209,8 @@ def sum2_dom : Dom := [(0x11190#64, 36), (0x111b4#64, 84)]
 
 /-- `_start`'s block/loop structure (rules R1 to R3, checked below with R4 to R6). -/
 def _start_func : Struct.Func := ⟨0x11208#64, 23, []⟩
+/-- `_start`'s labels: where `$l` is, for `loop_inv $l` (a loop's head, a block's end). -/
+def _start_labels : List (String × Word) := []
 /-- `_start`'s frame (rule R6): 32 bytes, its slots and address-taken ranges. -/
 def _start_frame : Struct.Frame := ⟨32, [⟨8, .save 9⟩, ⟨16, .save 8⟩, ⟨24, .save 1⟩], []⟩
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/

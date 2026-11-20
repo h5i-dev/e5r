@@ -204,6 +204,31 @@ pub fn export(
             nodes.join(", ")
         )
         .unwrap();
+        // Labels, named as `disasm` names them (crates/nocompiler/src/text.rs): the
+        // recorded one, else $b<k> / $l<k> by pre-order index; a block's label
+        // is its end, a loop's its head.
+        let mut labels = Vec::new();
+        fn lab(ns: &[crate::profile::Node], k: &mut usize, out: &mut Vec<String>) {
+            for n in ns {
+                let loop_ = n.kind == crate::profile::Kind::Loop;
+                let l = n
+                    .label
+                    .clone()
+                    .map(|l| l.trim_start_matches('$').to_string())
+                    .unwrap_or_else(|| format!("{}{}", if loop_ { "l" } else { "b" }, *k));
+                *k += 1;
+                out.push(format!("(\"{l}\", 0x{:x}#64)", if loop_ { n.start } else { n.end }));
+                lab(&n.children, k, out);
+            }
+        }
+        lab(&m.nodes, &mut 0, &mut labels);
+        writeln!(
+            o,
+            "/-- `{}`'s labels: where `$l` is, for `loop_inv $l` (a loop's head, a block's end). -/",
+            m.name
+        )
+        .unwrap();
+        writeln!(o, "def {id}_labels : List (String × Word) := [{}]", labels.join(", ")).unwrap();
         let (level, cert) = levels
             .get(&m.entry)
             .cloned()

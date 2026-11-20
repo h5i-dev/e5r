@@ -183,6 +183,8 @@ def entries : List Word := [0x11190#64, 0x1126c#64]
 
 /-- `cobs_decode`'s block/loop structure (rules R1 to R3, checked below with R4 to R6). -/
 def cobs_decode_func : Struct.Func := ⟨0x11190#64, 55, [⟨.block, 0x11190#64, 0x1125c#64⟩, ⟨.block, 0x11198#64, 0x111b0#64⟩, ⟨.loop, 0x11198#64, 0x111ac#64⟩, ⟨.block, 0x111b0#64, 0x1124c#64⟩, ⟨.block, 0x111b0#64, 0x111c0#64⟩, ⟨.loop, 0x111cc#64, 0x1124c#64⟩, ⟨.block, 0x111d8#64, 0x11228#64⟩, ⟨.block, 0x111d8#64, 0x11200#64⟩, ⟨.block, 0x111d8#64, 0x111ec#64⟩, ⟨.loop, 0x11208#64, 0x11224#64⟩, ⟨.block, 0x11238#64, 0x11248#64⟩]⟩
+/-- `cobs_decode`'s labels: where `$l` is, for `loop_inv $l` (a loop's head, a block's end). -/
+def cobs_decode_labels : List (String × Word) := [("b0", 0x1125c#64), ("b1", 0x111b0#64), ("l2", 0x11198#64), ("b3", 0x1124c#64), ("b4", 0x111c0#64), ("l5", 0x111cc#64), ("b6", 0x11228#64), ("b7", 0x11200#64), ("b8", 0x111ec#64), ("l9", 0x11208#64), ("b10", 0x11248#64)]
 /-- `cobs_decode`'s frame (rule R6): 0 bytes, its slots and address-taken ranges. -/
 def cobs_decode_frame : Struct.Frame := ⟨0, [], []⟩
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
@@ -252,6 +254,8 @@ def cobs_decode_dom : Dom := [(0x11190#64, 220)]
 
 /-- `_start`'s block/loop structure (rules R1 to R3, checked below with R4 to R6). -/
 def _start_func : Struct.Func := ⟨0x1126c#64, 16, [⟨.block, 0x11290#64, 0x112a0#64⟩, ⟨.block, 0x11290#64, 0x1129c#64⟩, ⟨.loop, 0x112a8#64, 0x112ac#64⟩]⟩
+/-- `_start`'s labels: where `$l` is, for `loop_inv $l` (a loop's head, a block's end). -/
+def _start_labels : List (String × Word) := [("b0", 0x112a0#64), ("b1", 0x1129c#64), ("l2", 0x112a8#64)]
 /-- `_start`'s frame (rule R6): 32 bytes, its slots and address-taken ranges. -/
 def _start_frame : Struct.Frame := ⟨32, [⟨24, .save 1⟩], [⟨0, 24⟩]⟩
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/

@@ -12,8 +12,8 @@ theorem sum_a : VerifiedC code sum_dom sum_entry spec := by
         u.reg 10 = a + BitVec.ofNat 64 (8 * (xs.length - m)) ∧
         u.reg 12 = sumW (xs.take (xs.length - m)) ∧ u.mem = s.mem)
       measure (fun u => (u.reg 11).toNat)
-  case entry_ret_0x111a0 => exact (sumW_nil xs (by omega)).symm
-  case entry_to_0x11194 => rfl
-  case «0x11194_to_0x11194» => rw [sumW_step xs m (by omega) (by omega)]
-  case «0x11194_ret_0x111a0» =>
+  case entry_ret_x10 => exact (sumW_nil xs (by omega)).symm
+  case entry_to_x4 => rfl
+  case x4_to_x4 => rw [sumW_step xs m (by omega) (by omega)]
+  case x4_ret_x10 =>
     rw [sumW_last xs m (by omega) (by omega)]

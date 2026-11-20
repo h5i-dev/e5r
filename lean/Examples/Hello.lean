@@ -66,14 +66,14 @@ def spec : Spec Args where
 theorem write_all_verified : VerifiedImg code write_all_dom write_all_entry spec := by
   rintro ⟨fd, buf, n⟩ s he ⟨ha0, ha1, ha2, hn⟩
   nocompiler_auto write_all_func s he
-    loop_inv 0x1116c (fun u => ∃ k evs, k ≤ n ∧ u.reg 11 = buf + BitVec.ofNat 64 k ∧
+    loop_inv $l1 (fun u => ∃ k evs, k ≤ n ∧ u.reg 11 = buf + BitVec.ofNat 64 k ∧
         u.reg 12 = BitVec.ofNat 64 (n - k) ∧ u.reg 13 = fd ∧ u.reg 17 = 64#64 ∧ u.mem = s.mem ∧
         u.trace = s.trace ++ evs ∧ writtenTo fd evs = some (readBytes s.mem buf k))
       measure (fun u => (u.reg 12).toNat)
-  case entry_to_0x1116c => exact ⟨0, [], by omega, by simp, by simp, trivial, trivial, trivial, by simp, by simp [readBytes]⟩
-  case «0x1116c_ret_0x1118c» => exact .inl ⟨by omega, rfl⟩
-  case «0x1116c_ret_0x11184» => exact .inr ⟨sys_err, nocompiler_he1, nocompiler_he2, rfl⟩
-  case «0x1116c_to_0x1116c» =>
+  case entry_to_l1 => exact ⟨0, [], by omega, by simp, by simp, trivial, trivial, trivial, by simp, by simp [readBytes]⟩
+  case l1_ret_x28 => exact .inl ⟨by omega, rfl⟩
+  case l1_ret_x20 => exact .inr ⟨sys_err, nocompiler_he1, nocompiler_he2, rfl⟩
+  case l1_to_l1 =>
     refine ⟨k + sys_n, evs ++ [.write fd (readBytes s.mem (buf + BitVec.ofNat 64 k) sys_n)], by omega, rfl,
       ?_, trivial, trivial, trivial, by simp, ?_⟩
     · apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_ofNat]; omega
@@ -110,7 +110,7 @@ theorem srl63_err {e : Nat} (h1 : 1 ≤ e) (h2 : e ≤ 4095) : (-(BitVec.ofNat 6
 theorem hello_verified : VerifiedImg code hello_dom hello_entry helloSpec := by
   rintro ⟨⟩ s he ⟨hro, hdisj⟩
   nocompiler_auto hello_func s he [seg_rodata] calls [write_all_verified]
-  case entry_exit_0x111c0 =>
+  case entry_exit_x30 =>
     -- The bytes written: the message, which the frame's one store did not touch.
     have hbytes : readBytes (writeLE s.mem (s.reg 2 + 18446744073709551608#64) (s.reg 1).toNat 8)
         65880#64 k = message.take k := by
@@ -119,10 +119,10 @@ theorem hello_verified : VerifiedImg code hello_dom hello_entry helloSpec := by
       have := Segment.readBytes_of_loaded hro 0 k (by simp [seg_rodata]; omega)
       simp only [BitVec.add_zero, List.drop_zero] at this
       rw [show (65880#64 : Word) = seg_rodata.base from rfl, this, ← message_in_rodata, List.take_take,
-        Nat.min_eq_left hc_11164_1]
-    refine ⟨evs, k, _, by simp, rfl, by rw [hc_11164_3, hbytes], ?_⟩
-    rcases nocompiler_cpost_entry_call_0x11164 with ⟨hk11, h0⟩ | ⟨e, he1, he2, herr⟩
+        Nat.min_eq_left hc_write_all_verified_1]
+    refine ⟨evs, k, _, by simp, rfl, by rw [hc_write_all_verified_3, hbytes], ?_⟩
+    rcases nocompiler_cpost_entry_call_write_all_verified with ⟨hk11, h0⟩ | ⟨e, he1, he2, herr⟩
     · exact .inl ⟨hk11, by rw [h0]; decide⟩
-    · exact .inr ⟨hc_11164_1, by rw [herr]; exact srl63_err he1 he2⟩
+    · exact .inr ⟨hc_write_all_verified_1, by rw [herr]; exact srl63_err he1 he2⟩
 
 end Examples.Hello
