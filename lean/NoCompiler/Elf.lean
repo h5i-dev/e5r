@@ -35,6 +35,7 @@ structure Section where
   addr : Nat
   offset : Nat
   size : Nat
+  link : Nat := 0
 
 def sections (b : ByteArray) : Except String (List Section) := do
   if b.size < 64 || b.get! 0 != 0x7f || b.get! 1 != 0x45 || b.get! 2 != 0x4c || b.get! 3 != 0x46 then
@@ -46,14 +47,14 @@ def sections (b : ByteArray) : Except String (List Section) := do
   let shentsize ← le b 58 2
   let shnum ← le b 60 2
   let shstrndx ← le b 62 2
-  let hdr (i : Nat) : Except String (Nat × Nat × Nat × Nat × Nat × Nat) := do
+  let hdr (i : Nat) : Except String (Nat × Nat × Nat × Nat × Nat × Nat × Nat) := do
     let o := shoff + i * shentsize
     return (← le b o 4, ← le b (o + 4) 4, ← le b (o + 8) 8, ← le b (o + 16) 8,
-      ← le b (o + 24) 8, ← le b (o + 32) 8)
-  let (_, _, _, _, stroff, _) ← hdr shstrndx
+      ← le b (o + 24) 8, ← le b (o + 32) 8, ← le b (o + 40) 4)
+  let (_, _, _, _, stroff, _, _) ← hdr shstrndx
   (List.range shnum).mapM fun i => do
-    let (name, kind, flags, addr, offset, size) ← hdr i
-    return { name := ← cstr b (stroff + name), kind, flags, addr, offset, size }
+    let (name, kind, flags, addr, offset, size, link) ← hdr i
+    return { name := ← cstr b (stroff + name), kind, flags, addr, offset, size, link }
 
 /-- The `.text` section as a code image. -/
 def text (b : ByteArray) : Except String Code := do
@@ -84,5 +85,17 @@ def segments (b : ByteArray) : Except String (List Segment) := do
       if s.offset + s.size > b.size then throw s!"{s.name} extends past the end of the file"
       pure ((List.range s.size).map fun i => BitVec.ofNat 8 (b.get! (s.offset + i)).toNat).toArray
     return { name := s.name, base := BitVec.ofNat 64 s.addr, bytes, writable := flag s.flags SHF_WRITE }
+
+/-- The function symbols (`STT_FUNC`, nonzero size) of `.symtab`: name and address. -/
+def funcSymbols (b : ByteArray) : Except String (List (String × Nat)) := do
+  let secs ← sections b
+  let some st := secs.find? (·.kind == 2) | return []
+  let some str := secs[st.link]? | throw "the symbol table links no string table"
+  let n := st.size / 24
+  let syms ← (List.range n).mapM fun i => do
+    let o := st.offset + 24 * i
+    let name ← cstr b (str.offset + (← le b o 4))
+    return (name, (← le b (o + 4) 1) % 16, ← le b (o + 8) 8, ← le b (o + 16) 8)
+  return (syms.filter fun (_, ty, _, sz) => ty == 2 && sz > 0).map fun (nm, _, v, _) => (nm, v)
 
 end NoCompiler.Elf

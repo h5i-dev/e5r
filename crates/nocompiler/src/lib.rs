@@ -14,6 +14,7 @@ pub mod frame;
 pub mod isa;
 pub mod lean;
 pub mod meta;
+pub mod module;
 pub mod profile;
 pub mod sha256;
 

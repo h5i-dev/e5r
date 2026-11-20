@@ -220,6 +220,21 @@ pub fn export(file: &Path, ns: &str, dst: Option<&Path>, out: &mut String) -> Re
     Ok(0)
 }
 
+/// `nocompiler module FILE --namespace NS [-o OUT]`: the relocatable module of a
+/// linked binary and its layout, as Lean (crate::module).
+pub fn module(file: &Path, ns: &str, dst: Option<&Path>, out: &mut String) -> Result<u8, String> {
+    let bytes = read(file)?;
+    let bin = crate::load(&bytes)?;
+    let m = crate::module::of_binary(&bin)?;
+    let sha = crate::sha256::hex(&crate::sha256::digest(&bytes));
+    let text = crate::module::lean(&m, ns, &file_name(file), &sha);
+    match dst {
+        Some(dst) => std::fs::write(dst, text).map_err(|e| format!("{}: {e}", dst.display()))?,
+        None => out.push_str(&text),
+    }
+    Ok(0)
+}
+
 /// Whether FILE is a RISC-V binary the profile loader accepts (`disasm` uses
 /// this to choose between the structured listing and the toolkit's plain one).
 pub fn is_profile_binary(file: &Path) -> bool {

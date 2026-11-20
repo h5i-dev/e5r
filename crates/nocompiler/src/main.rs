@@ -16,6 +16,8 @@ usage:
                                    record .nocompiler.struct and check (docs/isa/toolchain.md)
   nocompiler export FILE --namespace NS [-o OUT.lean]
                                    export .text and every conforming function to Lean
+  nocompiler module FILE --namespace NS [-o OUT.lean]
+                                   the relocatable module of a linked binary, and its layout
   nocompiler disasm FILE                  list the code with its block/loop structure
   nocompiler --version
 
@@ -107,6 +109,10 @@ fn run(args: &[String], out: &mut String) -> Result<ExitCode, String> {
         "export" => {
             let ns = opt(args, "--namespace").ok_or("export: --namespace NS missing")?;
             cmd::export(file("export")?, ns, opt(args, "-o").map(Path::new), out)?
+        }
+        "module" => {
+            let ns = opt(args, "--namespace").ok_or("module: --namespace NS missing")?;
+            cmd::module(file("module")?, ns, opt(args, "-o").map(Path::new), out)?
         }
         "disasm" => cmd::disasm(file("disasm")?, out)?,
         other => return Err(format!("unknown command {other}\n{USAGE}")),

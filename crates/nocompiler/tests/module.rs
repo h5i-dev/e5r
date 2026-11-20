@@ -1,0 +1,51 @@
+//! `nocompiler module`: the module recovered from a binary does not depend on
+//! where the binary was linked (examples/link/build.sh links one object twice).
+
+use std::path::PathBuf;
+
+fn module(name: &str) -> nocompiler::module::Module {
+    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples/elf")
+        .join(name);
+    let bytes = std::fs::read(p).unwrap();
+    nocompiler::module::of_binary(&nocompiler::load(&bytes).unwrap()).unwrap()
+}
+
+#[test]
+fn the_same_object_at_two_layouts_is_the_same_module() {
+    let (a, b) = (module("sum.link1.elf"), module("sum.link2.elf"));
+    assert_ne!(a.text_addr, b.text_addr);
+    let key = |m: &nocompiler::module::Module| {
+        m.funcs
+            .iter()
+            .map(|f| (f.name.clone(), f.words.clone(), f.relocs.clone()))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(key(&a), key(&b));
+    // sum2 calls sum twice; _start forms a data address and calls sum twice.
+    let sum2 = a.funcs.iter().find(|f| f.name == "sum2").unwrap();
+    assert_eq!(sum2.relocs.len(), 2);
+    let start = a.funcs.iter().find(|f| f.name == "_start").unwrap();
+    assert_eq!(
+        start
+            .relocs
+            .iter()
+            .filter(|r| r.kind == nocompiler::module::Kind::PcrelHi)
+            .count(),
+        1
+    );
+    // The relocated fields are zero.
+    assert!(
+        sum2.relocs
+            .iter()
+            .all(|r| sum2.words[(r.off / 4) as usize] & 0xffff_f000 == 0)
+    );
+}
+
+#[test]
+fn every_committed_binary_has_a_module() {
+    for e in ["sum.elf", "hello.elf"] {
+        let m = module(e);
+        assert!(!m.funcs.is_empty(), "{e}");
+    }
+}

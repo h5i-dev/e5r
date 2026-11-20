@@ -70,6 +70,8 @@ jobs:
         env:
           NOCOMPILER: ${{ github.workspace }}/target/debug/nocompiler
         run: ./scripts/check-proof-controls.sh
+      - name: Audit controls, every broken relinked binary fails the module audit
+        run: ./scripts/check-audit-controls.sh
       # docs/isa/vocab.md: the specifications themselves. Every computable one
       # against an independent reference, and every spec mutation but COBS's
       # (a few minutes; the full set is the manual spec-mutations workflow).

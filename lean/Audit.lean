@@ -63,6 +63,14 @@ example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] =
 #assert_standard_axioms Examples.Sum2.sum2_verified
 #assert_standard_axioms Examples.Hello.write_all_verified
 #assert_standard_axioms Examples.Hello.hello_verified
+-- Relocation (docs/isa/v1.md): the translation theorem, and sum at every layout and at two.
+#assert_standard_axioms NoCompiler.VerifiedImg.shift
+#assert_standard_axioms NoCompiler.Verified.of_leaf
+#assert_standard_axioms NoCompiler.Module.fetch_link
+#assert_standard_axioms Examples.Link.same_module
+#assert_standard_axioms Examples.Link.sum_relocatable
+#assert_standard_axioms Examples.Link.sum_link1
+#assert_standard_axioms Examples.Link.sum_link2
 
 -- The demo (demo/README.md): each function on the nocompiler build (B, `VerifiedImg`)
 -- and on the ordinary rv64gc build (A, `VerifiedC`, NoCompiler/Ext/Rvc.lean).
@@ -80,6 +88,12 @@ def images : List (String × Code × List Segment) :=
    ("examples/elf/hello.elf", Examples.Hello.Image.code, Examples.Hello.Image.segments),
    ("demo/elf/sum.b.elf", Demo.Sum.ImageB.code, Demo.Sum.ImageB.segments),
    ("demo/elf/cobs.b.elf", Demo.Cobs.ImageB.code, Demo.Cobs.ImageB.segments)]
+
+/-- Modules and the layouts their theorems are instantiated at, with the ELF
+    each layout is read from (docs/isa/v1.md, criterion 3). -/
+def modules : List (String × Module × Layout) :=
+  [("examples/elf/sum.link1.elf", Examples.Link.One.module, Examples.Link.One.layout),
+   ("examples/elf/sum.link2.elf", Examples.Link.Two.module, Examples.Link.Two.layout)]
 
 /-- The compressed binaries of the demo and their halfword images. Their
     proofs read no data section, so only `.text` is compared. -/
@@ -123,6 +137,41 @@ def checkImage (root : System.FilePath) (path : String) (c : Code) (segs : List 
     IO.println s!"ok   {path}: {c.words.size} words at {c.base.toNat} and {segs.length} data sections ({n} bytes) match the image"
     return true
 
+/-- The layout an ELF file has: every function symbol's address, every
+    section's, and the extent of `.text`. -/
+def elfLayout (b : ByteArray) : Except String Layout := do
+  let fs ← Elf.funcSymbols b
+  let secs ← Elf.sections b
+  let t ← Elf.text b
+  let addr (s : String) : Word :=
+    match fs.find? (·.1 == s) with
+    | some (_, v) => BitVec.ofNat 64 v
+    | none => match secs.find? (·.name == s) with
+      | some sec => BitVec.ofNat 64 sec.addr
+      | none => 0
+  return { addr, base := t.base, size := t.words.size }
+
+/-- A module and the layout its proofs are instantiated at, against an ELF:
+    the layout is the ELF's, the module can be linked there, and linking it
+    gives the ELF's `.text` and data, byte for byte. -/
+def checkModule (root : System.FilePath) (path : String) (M : Module) (L : Layout) : IO Bool := do
+  let b ← IO.FS.readBinFile (root / path)
+  match elfLayout b, Elf.text b, Elf.segments b with
+  | .error e, _, _ | _, .error e, _ | _, _, .error e => IO.println s!"FAIL {path}: {e}"; return false
+  | .ok L₀, .ok t, .ok ds =>
+    let syms := M.funcs.map (·.name) ++ M.data.map (·.name)
+    if L.base != L₀.base || L.size != L₀.size || syms.any (fun s => L.addr s != L₀.addr s) then
+      IO.println s!"FAIL {path}: the layout is not the ELF's"; return false
+    if !decide (M.Ok L₀) then
+      IO.println s!"FAIL {path}: the module cannot be linked at the ELF's layout (Module.Ok)"; return false
+    let c := M.link L₀
+    if c.base != t.base || c.words != t.words then
+      IO.println s!"FAIL {path}: the module linked at the ELF's layout is not its .text"; return false
+    if M.segments L₀ != ds then
+      IO.println s!"FAIL {path}: the module's data at the ELF's layout is not its data sections"; return false
+    IO.println s!"ok   {path}: the module ({M.funcs.length} functions, {M.data.length} data) linked at the ELF's layout is its .text and data"
+    return true
+
 def main (args : List String) : IO UInt32 := do
   let root : System.FilePath := args.headD ".."
   let mut ok := true
@@ -130,4 +179,6 @@ def main (args : List String) : IO UInt32 := do
     ok := (← checkImage root p c segs) && ok
   for (p, c) in imagesC do
     ok := (← checkImageC root p c) && ok
+  for (p, M, L) in modules do
+    ok := (← checkModule root p M L) && ok
   return if ok then 0 else 1

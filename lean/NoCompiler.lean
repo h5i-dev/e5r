@@ -16,3 +16,5 @@ import NoCompiler.Struct
 import NoCompiler.Frame
 import NoCompiler.Vocab
 import NoCompiler.Module
+import NoCompiler.Shift
+import NoCompiler.Relocate
