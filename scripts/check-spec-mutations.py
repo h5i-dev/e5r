@@ -87,7 +87,7 @@ MUTATIONS = [
      "writtenTo fd evs = some (readBytes s.mem buf k) ∧ Outcome",
      "writtenTo fd evs = some (readBytes s.mem buf (k + 1)) ∧ Outcome"),
     ("Examples/Hello.lean", ["Examples.Hello"], "post", "hello-success-status-1",
-     "(k = 11 ∧ c = 0)", "(k = 11 ∧ c = 1)"),
+     "some (message.take k) ∧ ((k = 11 ∧ c = 0)", "some (message.take k) ∧ ((k = 11 ∧ c = 1)"),
     ("Examples/Hello.lean", ["Examples.Hello"], "post", "hello-writes-to-fd-2",
      "writtenTo 1 evs = some (message.take k)", "writtenTo 2 evs = some (message.take k)"),
     ("Examples/Hello.lean", ["Examples.Hello"], "frame", "hello-stack-8",

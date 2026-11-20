@@ -1,0 +1,21 @@
+name: spec-mutations
+
+# The full spec mutation set (docs/isa/vocab.md), COBS included: about 15
+# minutes of Lean builds, so by hand rather than on every push. The core job
+# of ci.yaml runs the rest.
+on:
+  workflow_dispatch:
+
+jobs:
+  spec-mutations:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lean (elan; the version comes from lean/lean-toolchain)
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/v4.1.2/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Every spec mutation breaks its proofs
+        run: python3 -I scripts/check-spec-mutations.py

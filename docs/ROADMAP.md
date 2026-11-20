@@ -44,6 +44,7 @@ milestones and its "not building" list, is kept as
 | R4 and R5 (registers, stack discipline) in Lean | next |
 | `nocompiler cc`: clang and ld.lld with the flags that keep ordinary C in the profile, then annotate and check; tested on a corpus | done |
 | Loop invariants placed from `.nocompiler.struct` by the tactics instead of by hand | next |
+| Spec vocabulary (`lean/NoCompiler/Vocab/`: buffers, folds, words, frames) and spec QA: spec mutation tests, computable specs against independent references ([isa/vocab.md](isa/vocab.md)) | done |
 | Differential test against the Sail RISC-V model's C emulator (pinned release), random programs over every instruction | done |
 | Lean semantics generated from the Sail RISC-V model (its Lean backend) and proved equal to `NoCompiler.exec` | planned: needs the Sail toolchain built (OCaml 5, opam) and a generated model of tens of thousands of lines |
 

@@ -120,3 +120,9 @@ rewrites compiled code needs (a counter decremented with `addi -1`, a
 pointer advanced by a constant, alignment of `a + 8k`). Prefer them to
 `simp` on `toNat` of an expression with a 64-bit literal, which can be
 very slow.
+
+Facts about the specification rather than the code (buffers updated in
+place, folds, the first zero byte, frames and regions) are in
+`lean/NoCompiler/Vocab/`; [vocab.md](vocab.md) lists them, and the checks
+that a specification says what it should (spec mutation tests, and
+computable specifications run against independent references).

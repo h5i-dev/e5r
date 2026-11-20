@@ -69,6 +69,13 @@ jobs:
         env:
           NOCOMPILER: ${{ github.workspace }}/target/debug/nocompiler
         run: ./scripts/check-proof-controls.sh
+      # docs/isa/vocab.md: the specifications themselves. Every computable one
+      # against an independent reference, and every spec mutation but COBS's
+      # (a few minutes; the full set is the manual spec-mutations workflow).
+      - name: Executable specifications against independent references
+        run: python3 -I scripts/check-spec-references.py
+      - name: Spec mutations, every altered spec breaks its proofs (without COBS)
+        run: python3 -I scripts/check-spec-mutations.py --skip demo-cobs
       - name: Rebuild the examples (a different clang may differ; reported, not gated)
         run: NOCOMPILER=target/debug/nocompiler ./examples/build.sh || echo "::warning::examples/build.sh, the build differs from examples/elf/"
 

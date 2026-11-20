@@ -71,7 +71,23 @@ python3 -I scripts/check-spec-mutations.py --only Examples/Sum
 python3 -I scripts/check-spec-mutations.py                  # all (about 20 minutes: COBS is ~40 s a build)
 ```
 
-SPEC-MUTATION-RESULTS
+**Result** (2026-11-20): all 33 mutations break their proofs, on `sum`,
+`sum2`, `write_all`, `hello` and the demo's `sum` and `cobs_decode` (both
+builds); no specification was found too weak. Two observations:
+
+* The COBS postcondition mutations (the tag, the counts, the 255 rule, the
+  empty case) fail in the lemmas about the specification
+  (`CobsSpec.lean`: `report_of`, `decodeFrame_drop`, `report_empty`), not in
+  the two proofs over the code: those lemmas are stated about `report`, so
+  altering `report` breaks them first. That is still the proof failing, but
+  the check does not show the proof over the code would have failed on its
+  own.
+* The precondition conjuncts tested are all needed: alignment, the length
+  bound, the array's contents, and, for COBS, the slot's alignment, its
+  disjointness from the buffer and `len < 2^63`.
+
+The core job of CI runs every mutation but COBS's (a few minutes); the
+manual `spec-mutations` workflow runs all of them (about 15 minutes).
 
 ## Executable specifications against references (`scripts/check-spec-references.py`)
 
@@ -88,4 +104,8 @@ function rather than from the Lean text:
 | `write_all` | `NoCompiler.writtenTo` | the bytes of a trace of writes to one fd |
 | `hello` | `Examples.Hello.message` and the full length in `helloSpec` | the string in `examples/hello.c` |
 
-SPEC-REFERENCE-RESULTS
+**Result** (2026-11-20): 3,000 cases each for `sum`, `cobs_decode` and
+`write_all`, all agreeing. On the rename commit it caught a real
+inconsistency: the message in `examples/hello.c` had become 18 bytes while
+the specification said 11 (main's fix, cb1a45f, made it 11 again). It runs
+in the core job of CI.
