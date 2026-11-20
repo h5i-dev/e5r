@@ -132,7 +132,7 @@ fn liveness(w: &[u32]) -> Vec<BTreeSet<u8>> {
                 out.remove(&d);
             }
             out.extend(uses(&i));
-            out.remove(&0);
+            out.insert(0); // x0 reads 0 on both sides; the check wants every use live
             if out != live[k] {
                 live[k] = out;
                 changed = true;
@@ -361,24 +361,8 @@ pub fn lean(d: &Diff, a: &Side, b: &Side, ns: &str, title: &str) -> String {
     );
     let _ = writeln!(
         o,
-        "import NoCompiler.RefineStraightRegion\n\nnamespace {ns}\nopen NoCompiler\n"
+        "import NoCompiler.RefineStraightRegion\nimport NoCompiler.RefineLockstep\n\nnamespace {ns}\nopen NoCompiler\n"
     );
-    let _ = writeln!(
-        o,
-        "/-- The unchanged instructions: B at `pb` in step with A at `pa`. -/"
-    );
-    let _ = writeln!(o, "def cert : Lockstep.Cert := [");
-    for (k, (i, j, l)) in d.pairs.iter().enumerate() {
-        let sep = if k + 1 < d.pairs.len() { "," } else { "" };
-        let _ = writeln!(
-            o,
-            "  ⟨0x{:x}#64, 0x{:x}#64, [{}]⟩{sep}",
-            pb(*j),
-            pa(*i),
-            regs(l)
-        );
-    }
-    let _ = writeln!(o, "]");
     for (k, r) in d.regions.iter().enumerate() {
         let dom = |p: u64, n: usize| format!("[(0x{p:x}#64, {})]", 4 * n);
         let kind = if r.straight {
@@ -388,7 +372,7 @@ pub fn lean(d: &Diff, a: &Side, b: &Side, ns: &str, title: &str) -> String {
         };
         let _ = writeln!(
             o,
-            "\n/-- Changed interval {k} ({kind}). -/\ndef region{k} : RRegion where\n  pa := 0x{:x}#64\n  pb := 0x{:x}#64\n  paExit := 0x{:x}#64\n  pbExit := 0x{:x}#64\n  domA := {}\n  domB := {}\n  liveIn := [{}]\n  liveOut := [{}]",
+            "/-- Changed interval {k} ({kind}). -/\ndef region{k} : RRegion where\n  pa := 0x{:x}#64\n  pb := 0x{:x}#64\n  paExit := 0x{:x}#64\n  pbExit := 0x{:x}#64\n  domA := {}\n  domB := {}\n  liveIn := [{}]\n  liveOut := [{}]\n",
             pa(r.a0),
             pb(r.b0),
             pa(r.a1),
@@ -402,9 +386,24 @@ pub fn lean(d: &Diff, a: &Side, b: &Side, ns: &str, title: &str) -> String {
     let names: Vec<String> = (0..d.regions.len()).map(|k| format!("region{k}")).collect();
     let _ = writeln!(
         o,
-        "\n/-- The changed intervals. -/\ndef regions : List RRegion := [{}]",
-        names.join(", ")
+        "/-- The certificate: the unchanged instructions as pairs (B at `pb` in step"
     );
+    let _ = writeln!(
+        o,
+        "    with A at `pa`), and the changed intervals as regions. -/"
+    );
+    let _ = writeln!(o, "def cert : Lockstep.Cert where\n  pairs := [");
+    for (k, (i, j, l)) in d.pairs.iter().enumerate() {
+        let sep = if k + 1 < d.pairs.len() { "," } else { "" };
+        let _ = writeln!(
+            o,
+            "    ⟨0x{:x}#64, 0x{:x}#64, [{}]⟩{sep}",
+            pb(*j),
+            pa(*i),
+            regs(l)
+        );
+    }
+    let _ = writeln!(o, "  ]\n  regions := [{}]", names.join(", "));
     for (k, r) in d.regions.iter().enumerate() {
         if !r.straight {
             continue;
