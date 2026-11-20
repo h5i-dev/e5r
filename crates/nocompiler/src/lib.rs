@@ -258,7 +258,11 @@ pub fn annotate(
     out: &std::path::Path,
 ) -> Result<Result<(usize, usize), Vec<String>>, String> {
     let bytes = std::fs::read(file).map_err(|e| format!("{}: {e}", file.display()))?;
-    let bin = load(&bytes)?;
+    let mut bin = load(&bytes)?;
+    // What is recorded is replaced, so it is not what the code is checked
+    // against: the tree is recovered and the partition inferred afresh.
+    let had_section = bin.recorded.take().is_some();
+    bin.declared.clear();
     let mut metas = Vec::new();
     let mut bad = Vec::new();
     for r in bin.check() {
@@ -279,7 +283,7 @@ pub fn annotate(
     let tmp = out.with_extension("nocompiler-struct.tmp");
     std::fs::write(&tmp, &data).map_err(|e| format!("{}: {e}", tmp.display()))?;
     let objcopy = std::env::var("NOCOMPILER_OBJCOPY").unwrap_or_else(|_| "llvm-objcopy".into());
-    let verb = if bin.recorded.is_some() {
+    let verb = if had_section {
         "--update-section"
     } else {
         "--add-section"
