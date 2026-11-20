@@ -132,7 +132,7 @@ jobs:
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y clang llvm binutils qemu-user-static golang-go \
             gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
       - name: Build the fixture corpus
-        run: ./devinfra/scripts/build-fixtures.sh
+        run: ./scripts/toolkit/build-fixtures.sh
       - name: Say which oracles are present
         run: |
           for t in clang llvm-objdump objdump readelf c++filt qemu-x86_64 go rustc; do
@@ -161,11 +161,11 @@ jobs:
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y clang \
             gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user-static
-      - run: ./devinfra/scripts/build-fixtures.sh
+      - run: ./scripts/toolkit/build-fixtures.sh
       - run: cargo build --release
-      - run: ./devinfra/scripts/check-determinism.sh
+      - run: ./scripts/toolkit/check-determinism.sh
 
-  # G8: what the analysis FOUND, against the floors in devinfra/scripts/bench-budget.json.
+  # G8: what the analysis FOUND, against the floors in scripts/toolkit/bench-budget.json.
   #
   # Not a benchmark, and deliberately not run as one. Recall against the symbol
   # table and the count of entries no symbol names are the same bytes in, same
@@ -173,7 +173,7 @@ jobs:
   # and peak memory are facts about a machine, and a shared runner with a noisy
   # neighbour is not the machine the ceilings were recorded on -- so timing is
   # not measured here, not gated here, and not published from here. It is
-  # measured by hand on a known machine and written down in devinfra/docs/benchmarks.md.
+  # measured by hand on a known machine and written down in docs/toolkit/benchmarks.md.
   #
   # One run per binary for the same reason: the fastest of three exists to beat
   # down timing noise, and there is no timing to beat down.
@@ -194,12 +194,12 @@ jobs:
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y clang binutils \
             gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user-static
-      - run: ./devinfra/scripts/build-fixtures.sh
+      - run: ./scripts/toolkit/build-fixtures.sh
       # Release, like determinism above: the recall numbers have to come from
       # the code path a user runs.
       - run: cargo build --release
-      - run: RUNS=1 SKIP=rizin OUT="$GITHUB_WORKSPACE/target/recall.json" ./devinfra/scripts/compare-tools.sh
-      - run: ./devinfra/scripts/check-bench-budget.py "$GITHUB_WORKSPACE/target/recall.json" --portable-only --no-timing
+      - run: RUNS=1 SKIP=rizin OUT="$GITHUB_WORKSPACE/target/recall.json" ./scripts/toolkit/compare-tools.sh
+      - run: ./scripts/toolkit/check-bench-budget.py "$GITHUB_WORKSPACE/target/recall.json" --portable-only --no-timing
 
   # `install.sh` is what people pipe into a shell, and nothing else in this
   # workflow would notice it rotting: it is not built, not linked and not
@@ -213,16 +213,16 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - run: sh -n devinfra/install.sh
+      - run: sh -n install.sh
       - run: sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update -q && sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y shellcheck
-      - run: shellcheck --shell=sh devinfra/install.sh
+      - run: shellcheck --shell=sh install.sh
       # The one thing syntax cannot see: that the script still knows where the
       # release puts things. `build-release.sh` names the archive and the
       # directory inside it, and the installer reaches into that directory by
       # name -- so a change to either that forgot the other is a download that
       # unpacks into a path nobody looks at.
       - name: The installer agrees with the release layout
-        run: ./devinfra/scripts/check-installer.sh
+        run: ./scripts/toolkit/check-installer.sh
 
   # Experiment F (experiment/docs/firmware.md): rebuild the firmware and the
   # clamp fixture with the pinned rustc, recheck every verification job from

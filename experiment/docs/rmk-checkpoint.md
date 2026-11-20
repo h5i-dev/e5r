@@ -70,7 +70,7 @@ R0 reproducibility is **not accepted**. The f39d image has an in-place rebuild
 record, not two accepted independent clean builds. Another fixed-path image
 has separate records but has not replaced this proof target. Existing R0
 records and historical receipts are retained without upgrading their claims.
-See [the roadmap](../../devinfra/docs/ROADMAP-toolkit.md#r-rmk-on-risc-v-2026-10-29-owner-authorization)
+See [the roadmap](../../docs/toolkit/ROADMAP-toolkit.md#r-rmk-on-risc-v-2026-10-29-owner-authorization)
 and `verification/rv32/rmk-audit/`.
 
 The standard firmware CI script checks `jobs/*.json`; RMK jobs are under

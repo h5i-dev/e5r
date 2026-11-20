@@ -2,7 +2,7 @@
 
 Exports a RAM-resident, statically linked RV32 ELF as the initial RAM a loader
 writes, for machines without flash such as QEMU `-M virt -bios none -kernel`.
-Built for the RMK milestone (R0-R1 in [`ROADMAP.md`](../../devinfra/docs/ROADMAP-toolkit.md)); the first
+Built for the RMK milestone (R0-R1 in [`ROADMAP.md`](../../docs/toolkit/ROADMAP-toolkit.md)); the first
 target is the pinned `qemu-riscv-rynk` example. It is a loader, not a proof:
 nothing about RMK is verified by exporting it.
 

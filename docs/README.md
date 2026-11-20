@@ -17,7 +17,7 @@
 PTX kernel verification and RV32 firmware proofs, the work nocompiler grew from:
 [experiment/docs/](../experiment/docs).
 
-## Development infrastructure ([devinfra/](../devinfra/README.md))
+## Development infrastructure ([docs/toolkit/](toolkit/README.md))
 
 The binary analysis toolkit `nocompiler-x` (disassembler, decompiler, differ):
-[devinfra/docs/](../devinfra/docs), starting from [MANUAL.md](../devinfra/docs/MANUAL.md).
+[docs/toolkit/](toolkit/README.md), starting from [MANUAL.md](toolkit/MANUAL.md).

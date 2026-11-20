@@ -1,13 +1,13 @@
 # nocompiler: a formal-verification-friendly RISC-V profile, with Lean 4 proofs.
 #
-# crates/              the core: the nocompiler tool (crate `nocompiler`, binary `nocompiler`); lean/ has the proofs
-# devinfra/crates/     the binary analysis toolkit (`nocompiler-x`), development infrastructure
+# crates/nocompiler    the core: profile checker, metadata, Lean exporter (library `nocompiler`); lean/ has the proofs
+# crates/nocompiler-*  the binary analysis toolkit (loaders, decoders, IR, decompiler, differ, ...)
 # experiment/crates/   the PTX and RV32 firmware verifiers (`nocompiler-exp`), experiments
 #
-# The core depends on nothing in devinfra/ or experiment/. Toolkit crate
-# boundaries are documented in devinfra/docs/ROADMAP-toolkit.md.
+# The core library depends on no other crate. Toolkit crate boundaries are
+# documented in docs/toolkit/ROADMAP-toolkit.md.
 [workspace]
-members = ["crates/*", "devinfra/crates/*", "experiment/crates/*"]
+members = ["crates/*", "experiment/crates/*"]
 resolver = "3"
 
 [workspace.package]
@@ -26,19 +26,19 @@ keywords = ["risc-v", "formal-verification", "lean4", "binary", "elf"]
 categories = ["command-line-utilities", "development-tools::debugging"]
 
 [workspace.dependencies]
-nocompiler-core = { path = "devinfra/crates/nocompiler-core", version = "0.1.0" }
-nocompiler-format = { path = "devinfra/crates/nocompiler-format", version = "0.1.0" }
-nocompiler-arch = { path = "devinfra/crates/nocompiler-arch", version = "0.1.0" }
-nocompiler-asm = { path = "devinfra/crates/nocompiler-asm", version = "0.1.0" }
-nocompiler-sla = { path = "devinfra/crates/nocompiler-sla", version = "0.1.0" }
-nocompiler-sleigh = { path = "devinfra/crates/nocompiler-sleigh", version = "0.1.0" }
-nocompiler-analysis = { path = "devinfra/crates/nocompiler-analysis", version = "0.1.0" }
-nocompiler-db = { path = "devinfra/crates/nocompiler-db", version = "0.1.0" }
-nocompiler-types = { path = "devinfra/crates/nocompiler-types", version = "0.1.0" }
-nocompiler-diff = { path = "devinfra/crates/nocompiler-diff", version = "0.1.0" }
-nocompiler-ir = { path = "devinfra/crates/nocompiler-ir", version = "0.1.0" }
-nocompiler-decomp = { path = "devinfra/crates/nocompiler-decomp", version = "0.1.0" }
-nocompiler-api = { path = "devinfra/crates/nocompiler-api", version = "0.1.0" }
+nocompiler-core = { path = "crates/nocompiler-core", version = "0.1.0" }
+nocompiler-format = { path = "crates/nocompiler-format", version = "0.1.0" }
+nocompiler-arch = { path = "crates/nocompiler-arch", version = "0.1.0" }
+nocompiler-asm = { path = "crates/nocompiler-asm", version = "0.1.0" }
+nocompiler-sla = { path = "crates/nocompiler-sla", version = "0.1.0" }
+nocompiler-sleigh = { path = "crates/nocompiler-sleigh", version = "0.1.0" }
+nocompiler-analysis = { path = "crates/nocompiler-analysis", version = "0.1.0" }
+nocompiler-db = { path = "crates/nocompiler-db", version = "0.1.0" }
+nocompiler-types = { path = "crates/nocompiler-types", version = "0.1.0" }
+nocompiler-diff = { path = "crates/nocompiler-diff", version = "0.1.0" }
+nocompiler-ir = { path = "crates/nocompiler-ir", version = "0.1.0" }
+nocompiler-decomp = { path = "crates/nocompiler-decomp", version = "0.1.0" }
+nocompiler-api = { path = "crates/nocompiler-api", version = "0.1.0" }
 nocompiler-ptx = { path = "experiment/crates/nocompiler-ptx", version = "0.1.0" }
 
 # Kept deliberately short. Loaders and decoders are written here rather than

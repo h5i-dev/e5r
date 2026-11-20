@@ -7,10 +7,10 @@ formal-verification-friendly profile of RISC-V, with the Lean 4 library
 proofs about it are written in and the tools that check binaries against it
 ([docs/isa/](isa/README.md)). The PTX and RV32 firmware verifiers move to
 [experiment/](../experiment/README.md) and the binary analysis toolkit with
-its decompiler to [devinfra/](../devinfra/README.md). When they compete for
+its decompiler to [docs/toolkit/](toolkit/README.md). When they compete for
 effort, the core comes first. The previous roadmap, including the toolkit's
 milestones and its "not building" list, is kept as
-[devinfra/docs/ROADMAP-toolkit.md](../devinfra/docs/ROADMAP-toolkit.md).
+[docs/toolkit/ROADMAP-toolkit.md](toolkit/ROADMAP-toolkit.md).
 
 ## Principles
 

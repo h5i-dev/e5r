@@ -7,8 +7,8 @@ workspace/
 *.pdb
 
 # Build and analysis artifacts
-/devinfra/fixtures/build/
-/devinfra/fixtures/corpus/
+/fixtures/build/
+/fixtures/corpus/
 *.o
 *.elf
 *.exe
@@ -30,7 +30,7 @@ workspace/
 .idea/
 *.swp
 
-# Release archives, built by devinfra/scripts/build-release.sh.
+# Release archives, built by scripts/toolkit/build-release.sh.
 dist/
 
 # Byte-compiled / optimized / DLL files

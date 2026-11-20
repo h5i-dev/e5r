@@ -49,7 +49,7 @@ nocompiler build and an ordinary rv64gc build of the same C, and compares the tw
 | [lean/Examples/](lean/Examples) | proofs about committed binaries in [examples/elf/](examples/elf) |
 | [crates/nocompiler/](crates/nocompiler) | the `nocompiler` tool: ELF reader, decoder, profile checker, structure recovery, Lean export |
 | [experiment/](experiment/README.md) | earlier work: PTX kernel and RV32 firmware verification (`nocompiler-exp`) |
-| [devinfra/](devinfra/README.md) | development infrastructure: the binary analysis toolkit and decompiler (`nocompiler-x`) |
+| [docs/toolkit/](docs/toolkit/README.md) | the binary analysis toolkit and decompiler (crates/nocompiler-*, `nocompiler-x`) |
 
 ## Requirements
 

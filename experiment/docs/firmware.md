@@ -6,7 +6,7 @@ from the ELF file's bytes. nocompiler's decompiler, CFG recovery and IR are not
 inputs to any proof.
 
 This document defines the supported scope. Milestone status is in
-[ROADMAP.md, section F](../../devinfra/docs/ROADMAP-toolkit.md#f-scoped-firmware-verification-2026-10-28-owner-authorization);
+[ROADMAP.md, section F](../../docs/toolkit/ROADMAP-toolkit.md#f-scoped-firmware-verification-2026-10-28-owner-authorization);
 the V0 research proofs it grew from are in
 [verification-rv32.md](rv32-research.md).
 
