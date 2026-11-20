@@ -1081,7 +1081,6 @@ pub fn assemble(text: &str) -> Result<Assembled, String> {
     for ((f, ps), &entry) in src.funcs.iter().zip(&pres).zip(&starts) {
         struct Open {
             kind: Kind,
-            label: Option<String>,
             start: u64,
             line: usize,
             children: Vec<Node>,
@@ -1095,12 +1094,9 @@ pub fn assemble(text: &str) -> Result<Assembled, String> {
         let mut open_idx: Vec<usize> = Vec::new();
         for (k, (it, p)) in f.items.iter().zip(ps).enumerate() {
             match it {
-                Item::Open {
-                    kind, label, line, ..
-                } => {
+                Item::Open { kind, line, .. } => {
                     stack.push(Open {
                         kind: *kind,
-                        label: label.clone(),
                         start: pc,
                         line: *line,
                         children: vec![],
@@ -1463,7 +1459,7 @@ pub fn write_elf(a: &Assembled) -> Result<Vec<u8>, String> {
         return Err("the sections span more than 64 MiB".into());
     }
     for s in secs[nalloc..].iter_mut() {
-        end = (end + s.align - 1) / s.align * s.align;
+        end = end.div_ceil(s.align) * s.align;
         s.offset = end;
         end += s.size;
     }
