@@ -40,9 +40,13 @@ fn reg(offset: u64) -> Location {
 fn function(abi: &Abi, reads: usize, leaves_result: bool) -> SsaFunction {
     let result = reg(abi.results[0]);
     let mut ops = Vec::new();
-    for n in 0..reads {
+    assert!(
+        reads <= abi.integer_arguments.len(),
+        "the ABI has fewer argument registers"
+    );
+    for (n, &arg) in abi.integer_arguments.iter().take(reads).enumerate() {
         let version = n as u32 + 1;
-        let source = Operand::Undefined(reg(abi.integer_arguments[n]));
+        let source = Operand::Undefined(reg(arg));
         let inputs = if n == 0 {
             vec![source]
         } else {

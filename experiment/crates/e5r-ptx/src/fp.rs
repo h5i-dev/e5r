@@ -88,8 +88,8 @@ impl Big {
     fn sub(&self, o: &Big) -> Big {
         let mut v = Vec::with_capacity(self.0.len());
         let mut borrow = 0i128;
-        for i in 0..self.0.len() {
-            let d = self.0[i] as i128 - *o.0.get(i).unwrap_or(&0) as i128 - borrow;
+        for (i, &a) in self.0.iter().enumerate() {
+            let d = a as i128 - *o.0.get(i).unwrap_or(&0) as i128 - borrow;
             if d < 0 {
                 v.push((d + (1i128 << 64)) as u64);
                 borrow = 1;
