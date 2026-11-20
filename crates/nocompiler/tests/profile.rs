@@ -210,8 +210,23 @@ fn metadata_round_trips_and_is_checked() {
     let bytes = std::fs::read(path).unwrap();
     let bin = nocompiler::load(&bytes).unwrap();
     let recorded = bin.recorded.clone().unwrap();
-    let enc = nocompiler::meta::encode(&recorded);
-    assert_eq!(nocompiler::meta::decode(&enc).unwrap(), recorded);
+    let names: std::collections::BTreeMap<u64, String> = bin
+        .funcs
+        .iter()
+        .map(|f| (f.entry, f.name.clone()))
+        .collect();
+    let entries: std::collections::BTreeMap<String, u64> = bin
+        .funcs
+        .iter()
+        .map(|f| (f.name.clone(), f.entry))
+        .collect();
+    let enc = nocompiler::meta::encode(&recorded, &names).unwrap();
+    let back: Vec<_> = nocompiler::meta::decode(&enc)
+        .unwrap()
+        .iter()
+        .map(|r| r.place(entries[&r.meta.name], &entries).unwrap())
+        .collect();
+    assert_eq!(back, recorded);
     assert!(
         nocompiler::meta::decode(&enc[..enc.len() - 1]).is_err(),
         "truncation is an error"

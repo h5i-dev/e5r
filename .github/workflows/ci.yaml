@@ -1,16 +1,17 @@
 name: ci
 
-# `main` and pull requests, and nothing else.
+# `main`, `next` and pull requests, and nothing else.
 #
 # A branch name in this list is a name that will be wrong later: it was
 # `full-rewrite-to-rs`, which is one branch of one period of this repository's
 # life, and every other branch went unchecked while that one burned a runner on
 # every push. Work in progress is checked when it is proposed, which is what a
 # pull request is; a push to a branch nobody has proposed is not yet a claim
-# that anything works.
+# that anything works. `next` is the exception: it is the integration branch
+# that main is merged from, and what lands there is a claim.
 on:
   push:
-    branches: [main]
+    branches: [main, next]
   # Any base branch, so a feature branch proposed against anything is checked.
   pull_request:
 

@@ -112,7 +112,22 @@ pub fn load(bytes: &[u8]) -> Result<Binary<'_>, String> {
         })
         .collect();
     let recorded = match e.section(meta::SECTION) {
-        Some(s) => Some(meta::decode(e.bytes(s))?),
+        Some(s) => {
+            let by_name: std::collections::BTreeMap<String, u64> =
+                funcs.iter().map(|f| (f.name.clone(), f.entry)).collect();
+            let mut out = Vec::new();
+            for r in meta::decode(e.bytes(s))? {
+                let entry = *by_name.get(&r.meta.name).ok_or_else(|| {
+                    format!(
+                        "{}: {} is not a function of this file",
+                        meta::SECTION,
+                        r.meta.name
+                    )
+                })?;
+                out.push(r.place(entry, &by_name)?);
+            }
+            Some(out)
+        }
         None => None,
     };
     Ok(Binary {
@@ -153,15 +168,19 @@ impl Binary<'_> {
                         detail: format!("{} has no entry in {}", f.name, meta::SECTION),
                     }]),
                     Some(Some(m)) => profile::check(f, &m.nodes, &entries).and_then(|got| {
-                        if got.frame == m.frame && got.callees == m.callees && got.size == m.size {
+                        if got.frame == m.frame
+                            && got.callees == m.callees
+                            && got.size == m.size
+                            && got.level == m.level
+                        {
                             Ok(got)
                         } else {
                             Err(vec![Violation {
                                 addr: f.entry,
                                 rule: "M1 metadata",
                                 detail: format!(
-                                    "recorded frame {} callees {:x?} size {}, the code has {} {:x?} {}",
-                                    m.frame, m.callees, m.size, got.frame, got.callees, got.size
+                                    "recorded frame {} callees {:x?} size {} level {:?}, the code has {} {:x?} {} {:?}",
+                                    m.frame, m.callees, m.size, m.level, got.frame, got.callees, got.size, got.level
                                 ),
                             }])
                         }
@@ -196,7 +215,12 @@ pub fn annotate(
     if !bad.is_empty() {
         return Ok(Err(bad));
     }
-    let data = meta::encode(&metas);
+    let names: std::collections::BTreeMap<u64, String> = bin
+        .funcs
+        .iter()
+        .map(|f| (f.entry, f.name.clone()))
+        .collect();
+    let data = meta::encode(&metas, &names)?;
     let tmp = out.with_extension("nocompiler-struct.tmp");
     std::fs::write(&tmp, &data).map_err(|e| format!("{}: {e}", tmp.display()))?;
     let objcopy = std::env::var("NOCOMPILER_OBJCOPY").unwrap_or_else(|_| "llvm-objcopy".into());

@@ -8,3 +8,8 @@ it), [trust.md](trust.md) (what the result rests on). Then
 details, [vocab.md](vocab.md) for the library specifications are written
 with and the checks on specifications themselves, and
 [related-work.md](related-work.md).
+
+[v1.md](v1.md) is the version 1 specification being implemented (rules R4 to
+R6, conformance levels, the structured form and semantics, relocatable
+proofs); [v1-results.md](v1-results.md) records its acceptance criteria as
+measured.

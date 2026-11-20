@@ -111,8 +111,8 @@ decides it; each rule has an identifier in its output.
   same at each instruction, is a multiple of 16 at every call, and is 0 at
   every return and tail call. The largest depth is the function's frame.
 - **M1 metadata.** If the binary has an `.nocompiler.struct` section, each
-  function's tree, frame size and callees there are the ones the code has
-  ([metadata.md](metadata.md)).
+  function's tree, level, frame size and callees there are the ones the code
+  has ([metadata.md](metadata.md); version 2 since v1).
 
 `nocompiler check` without `.nocompiler.struct` recovers the tree from the control-flow
 graph and checks against that; with the section, it checks against what the

@@ -22,7 +22,54 @@ pub struct Node {
     pub kind: Kind,
     pub start: u64,
     pub end: u64,
+    /// The label (`$done`), if the writer gave one; `disasm` names the rest.
+    pub label: Option<String>,
     pub children: Vec<Node>,
+}
+
+/// The conformance level of a function (docs/isa/v1.md): L0 decodes (R1),
+/// L1 is structured (R1 to R3), L2 also keeps the register, stack and frame
+/// rules (R4 to R6).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Level {
+    L0,
+    L1,
+    L2,
+}
+
+/// What an 8-byte frame slot holds (rule 6b).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SlotKind {
+    /// The entry value of a callee-saved register, or of `ra` (rule 6e).
+    Save(isa::Reg),
+    /// A spilled value.
+    Spill,
+}
+
+/// An 8-byte, 8-aligned frame slot, at `off` bytes above the bottom of the frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Slot {
+    pub off: u64,
+    pub kind: SlotKind,
+}
+
+/// Where the length of an address-taken range came from (v1 decision 5).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum RangeSource {
+    /// Written by whoever produced the code (the structured form, a compiler).
+    Declared,
+    /// The size of the variable in the DWARF debug information.
+    Dwarf,
+    /// No debug information: the gap up to the next slot or range.
+    Heuristic,
+}
+
+/// An address-taken range of the frame: `len` bytes from `off` above its bottom.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Range {
+    pub off: u64,
+    pub len: u64,
+    pub source: RangeSource,
 }
 
 /// What `.nocompiler.struct` records for one function.
@@ -31,12 +78,22 @@ pub struct FuncMeta {
     pub name: String,
     pub entry: u64,
     pub size: u64,
+    /// The level the checker reached.
+    pub level: Level,
     /// Bytes of stack below the entry sp the function uses (its own frame).
     pub frame: u64,
+    /// The frame plus the deepest callee's `depth` (theorem T4); `None` when a
+    /// callee's depth is not known (it is not in the same table).
+    pub depth: Option<u64>,
     /// Entries of the functions it calls or tail-calls, sorted.
     pub callees: Vec<u64>,
     /// Top-level nodes; the function body itself is the implicit root.
     pub nodes: Vec<Node>,
+    /// The frame's partition (rule 6b), by offset; bytes in neither are unused.
+    pub slots: Vec<Slot>,
+    pub ranges: Vec<Range>,
+    /// Reserved for proof hints; carried through unchanged.
+    pub ext: Vec<u8>,
 }
 
 /// A function's code, as found in the binary.
@@ -288,6 +345,7 @@ fn nest(iv: &[(u64, u64, Kind)]) -> Vec<Node> {
             kind: k,
             start: s,
             end: e,
+            label: None,
             children: nest(&iv[i + 1..j]),
         });
         i = j;
@@ -476,9 +534,14 @@ pub fn check(
             name: f.name.clone(),
             entry: f.entry,
             size: 4 * f.words.len() as u64,
+            level: Level::L1,
             frame: (-min) as u64,
+            depth: None,
             callees: callees.into_iter().collect(),
             nodes: nodes.to_vec(),
+            slots: vec![],
+            ranges: vec![],
+            ext: vec![],
         })
     } else {
         out.sort_by_key(|x| x.addr);
