@@ -93,8 +93,8 @@ fn the_examples_reach_l2() {
     for elf in [
         "examples/elf/sum.elf",
         "examples/elf/hello.elf",
-        "demo/elf/sum.b.elf",
-        "demo/elf/cobs.b.elf",
+        "examples/demo/elf/sum.b.elf",
+        "examples/demo/elf/cobs.b.elf",
     ] {
         let bytes = std::fs::read(format!("{}/../../{elf}", env!("CARGO_MANIFEST_DIR"))).unwrap();
         let bin = nocompiler::load(&bytes).unwrap();
