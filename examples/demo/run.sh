@@ -55,7 +55,7 @@ python3 -I examples/demo/test/rvc_exec.py lean/.lake/build/bin/rvc-run examples/
 step "Lean: dependencies, then each proof file timed"
 (cd lean && "${LAKE[@]}" build NoCompiler NoCompiler.Ext.Rvc Demo.SumSpec Demo.CobsSpec Demo.Sum.ImageA Demo.Sum.ImageB \
   Demo.Cobs.ImageA Demo.Cobs.ImageB >/dev/null)
-for m in SumB SumA CobsB CobsA; do
+for m in SumB SumA Sum2B Sum2A CobsB CobsA; do
   t0=$(date +%s%N)
   (cd lean && "${LAKE[@]}" env lean "Demo/$m.lean")
   python3 -c "import sys; print(f'ok   Demo/{sys.argv[1]}.lean checks in {(int(sys.argv[3]) - int(sys.argv[2])) / 1e9:.1f} s')" \

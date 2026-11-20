@@ -182,10 +182,37 @@ inductive ReachC (c : CCode) (P : Perm) (D : Dom) (Q : State → Prop) : State �
 def ExecC (c : CCode) (P : Perm) (D : Dom) (Q : State → Prop) (s : State) : Prop :=
   ReachC c P D (fun s => Final D s ∧ Q s) s
 
-/-- `VerifiedImg` for compressed code: the same specification, entry
-    conditions and conclusion. -/
+/-- `Entry` for compressed code: the return address need only be 2-byte
+    aligned, since a call in compressed code may sit at an address that is 2
+    modulo 4 (and `jalr` clears only bit 0). Weaker than `Entry`, so a
+    `VerifiedC` proof assumes less. -/
+structure EntryC (D : Dom) (entry : Word) (s : State) : Prop where
+  pc : s.pc = entry
+  live : s.exit = none
+  ret : ¬ D.mem (s.reg Reg.ra)
+  retAligned : aligned (s.reg Reg.ra) 2
+  sp : aligned (s.reg Reg.sp) 16
+
+theorem and_not_one_of_aligned2 {x : Word} (h : aligned x 2) : x &&& ~~~1#64 = x := by
+  unfold aligned at h
+  apply BitVec.eq_of_getLsbD_eq
+  intro i hi
+  rw [BitVec.getLsbD_and, BitVec.getLsbD_not]
+  by_cases h0 : i = 0
+  · subst h0
+    have : x.getLsbD 0 = false := by
+      rw [BitVec.getLsbD, Nat.testBit_zero]; simp; omega
+    simpa [BitVec.getLsbD_eq_getElem] using this
+  · simp [h0, hi]
+
+/-- `jalr` returns to a 2-aligned address unchanged. -/
+theorem ret_mask2 {x : Word} (h : aligned x 2) : x &&& 0xfffffffffffffffe#64 = x :=
+  and_not_one_of_aligned2 h
+
+/-- `VerifiedImg` for compressed code: the same specification and conclusion,
+    entered under `EntryC`. -/
 def VerifiedC {α : Type} (c : CCode) (D : Dom) (entry : Word) (sp : Spec α) : Prop :=
-  ∀ a s, Entry D entry s → sp.pre a s → ExecC c (sp.perm a s) D (sp.Done a s) s
+  ∀ a s, EntryC D entry s → sp.pre a s → ExecC c (sp.perm a s) D (sp.Done a s) s
 
 /-! ## The rules, again -/
 
@@ -248,6 +275,129 @@ theorem exec_step {Q : State → Prop} {s : State} {i : Instr} {n : Nat}
 
 end ReachC
 
+/-! ## Calls, syscalls and the frame property, for compressed code
+
+The rules `nocompiler_auto_c` needs for functions with calls and syscalls,
+as `NoCompiler/Lemmas.lean` and `NoCompiler/Spec.lean` give them for `Reach`: the
+frame property of a step, `ReachC.bind`, `VerifiedC.frame`, `VerifiedC.call`
+and the syscall step. -/
+
+theorem execC_frame {n : Nat} {i : Instr} {s s' : State} (h : execC n i s = some s') :
+    s'.mem = s.mem ∨ ∃ op rs1 rs2 off, i = .store op rs1 rs2 off ∧
+      s'.mem = writeLE s.mem (ea s rs1 off) (s.reg rs2).toNat op.width := by
+  unfold execC at h
+  cases i with
+  | jal rd off => simp only [jumpToC] at h; split at h <;> cases h; left; simp
+  | jalr rd rs1 off => simp only [jumpToC] at h; split at h <;> cases h; left; simp
+  | branch op rs1 rs2 off =>
+    simp only [jumpToC] at h
+    split at h
+    · split at h <;> cases h; left; simp
+    · cases h; left; simp
+  | _ =>
+    obtain ⟨s1, h1, rfl⟩ := Option.map_eq_some_iff.1 h
+    rcases exec_frame h1 with e | ⟨op, rs1, rs2, off, hi, e⟩
+    · left; simpa using e
+    · right; exact ⟨op, rs1, rs2, off, hi, by simpa using e⟩
+
+theorem StepC.frame {c : CCode} {P : Perm} {s s' : State} (h : StepC c P s s') (x : Word)
+    (hx : ¬ P.writable x) : s'.mem x = s.mem x := by
+  cases h with
+  | exec _ _ hok hxs =>
+    rcases execC_frame hxs with e | ⟨op, rs1, rs2, off, rfl, e⟩
+    · rw [e]
+    · rw [e]
+      apply writeLE_other
+      rcases hok with h0 | ⟨r, hr, hc⟩
+      · exact absurd h0 (Nat.ne_of_gt (StOp.width_pos op))
+      · exact Nat.le_of_not_lt fun hlt => hx ⟨r, hr, Region.covers_mem hc hlt⟩
+  | sys _ _ hok hy =>
+    cases hy with
+    | writeOk => simp
+    | writeErr => simp
+    | exit => simp
+    | readErr => simp
+    | readOk ds hn hlen hmax =>
+      simp only [State.emit_mem, State.setMem_mem]
+      apply writeBytes_other
+      rcases hok.2 hn with h0 | ⟨r, hr, hc⟩
+      · omega
+      · exact Nat.le_of_not_lt fun hlt =>
+          hx ⟨r, hr, Region.covers_mem (n := ds.length) (by unfold Region.covers at *; omega) hlt⟩
+
+theorem StepC.instrOk {c P s s'} (h : StepC c P s s') :
+    ∃ i n, c.instr s.pc = some (i, n) ∧ InstrOk P i s ∧ s.exit = none := by
+  cases h with
+  | exec he hi hok _ => exact ⟨_, _, hi, hok, he⟩
+  | sys he hi hok _ => exact ⟨_, _, hi, hok, he⟩
+
+theorem StepC.restrict {c P Q s s₁ s'} (h : StepC c P s s₁) (h' : StepC c Q s s') : StepC c P s s' := by
+  obtain ⟨i, n, hi, hok, _⟩ := h.instrOk
+  cases h' with
+  | exec he hi' _ hx => rw [hi] at hi'; cases hi'; exact .exec he hi hok hx
+  | sys he hi' _ hy => rw [hi] at hi'; cases hi'; exact .sys he hi hok hy
+
+theorem StepC.mono {c P Q s s'} (hle : P.le Q) (h : StepC c P s s') : StepC c Q s s' := by
+  cases h with
+  | exec he hi hok hx => exact .exec he hi (InstrOk.mono hle hok) hx
+  | sys he hi hok hy => exact .sys he hi (InstrOk.mono (i := .ecall) hle hok) hy
+
+namespace ReachC
+variable {c : CCode} {P : Perm} {D : Dom}
+
+theorem mono {Q Q' : State → Prop} (hq : ∀ s, Q s → Q' s) {s} (h : ReachC c P D Q s) :
+    ReachC c P D Q' s := by
+  induction h with
+  | done hq' => exact .done (hq _ hq')
+  | step hd hex _ ih => exact .step hd hex ih
+
+theorem bind {P₁ P₂ : Perm} {D₁ D₂ : Dom} {Q₁ Q₂ : State → Prop} {s}
+    (h : ReachC c P₁ D₁ Q₁ s) (hP : P₁.le P₂) (hD : D₁.sub D₂)
+    (k : ∀ s', Q₁ s' → ReachC c P₂ D₂ Q₂ s') : ReachC c P₂ D₂ Q₂ s := by
+  induction h with
+  | done hq => exact k _ hq
+  | step hd hex _ ih =>
+    obtain ⟨s₁, h₁⟩ := hex
+    exact .step (hD _ hd) ⟨s₁, h₁.mono hP⟩ (fun s' h' => ih s' (h₁.restrict h'))
+
+theorem inv {Q I : State → Prop} (hI : ∀ u u', I u → StepC c P u u' → I u') {s}
+    (h : ReachC c P D Q s) (hs : I s) : ReachC c P D (fun u => Q u ∧ I u) s := by
+  induction h with
+  | done hq => exact .done ⟨hq, hs⟩
+  | step hd hex _ ih => exact .step hd hex (fun s' h' => ih s' h' (hI _ _ hs h'))
+
+theorem frame {Q : State → Prop} {s : State} (h : ReachC c P D Q s) :
+    ReachC c P D (fun u => Q u ∧ ∀ x, ¬ P.writable x → u.mem x = s.mem x) s :=
+  ReachC.inv (I := fun u => ∀ x, ¬ P.writable x → u.mem x = s.mem x)
+    (fun _ _ hu hs x hx => (hs.frame x hx).trans (hu x hx)) h (fun _ _ => rfl)
+
+/-- Step over an ECALL: every outcome the environment allows has to reach `Q`. -/
+theorem sys_step {Q : State → Prop} {s : State}
+    (hd : D.mem s.pc) (hx : s.exit = none) (hi : c.instr s.pc = some (.ecall, 4)) (hok : SysOk P s)
+    (hex : ∃ s', Sys s s') (h : ∀ s', Sys s s' → ReachC c P D Q s') : ReachC c P D Q s := by
+  obtain ⟨s₁, h₁⟩ := hex
+  refine .step hd ⟨s₁, .sys hx hi hok h₁⟩ (fun s' h' => ?_)
+  cases h' with
+  | exec _ hi' _ hx' => rw [hi] at hi'; cases hi'; simp [exec_ecallC] at hx'
+  | sys _ _ _ hy => exact h _ hy
+end ReachC
+
+variable {c : CCode} {α : Type}
+
+theorem VerifiedC.frame {D : Dom} {entry : Word} {sp : Spec α} (h : VerifiedC c D entry sp)
+    (a : α) (s : State) (he : EntryC D entry s) (hpre : sp.pre a s) :
+    ExecC c (sp.perm a s) D
+      (fun s' => sp.Done a s s' ∧ ∀ x, ¬ (sp.perm a s).writable x → s'.mem x = s.mem x) s :=
+  ReachC.mono (fun _ ⟨⟨hf, hd⟩, hm⟩ => ⟨hf, hd, hm⟩) (ReachC.frame (h a s he hpre))
+
+/-- The call rule, for compressed code. -/
+theorem VerifiedC.call {Dg D : Dom} {entry : Word} {sp : Spec α} {P : Perm}
+    {Q : State → Prop} {s : State} (hg : VerifiedC c Dg entry sp) (a : α)
+    (he : EntryC Dg entry s) (hpre : sp.pre a s) (hD : Dg.sub D) (hP : (sp.perm a s).le P)
+    (k : ∀ s', sp.Done a s s' → (∀ x, ¬ (sp.perm a s).writable x → s'.mem x = s.mem x) →
+      ReachC c P D Q s') : ReachC c P D Q s :=
+  ReachC.bind (hg.frame a s he hpre) hP hD (fun s' ⟨_, hd, hm⟩ => k s' hd hm)
+
 /-! ## The registers a function writes, and its instruction addresses -/
 
 namespace Auto
@@ -262,6 +412,34 @@ def writesC (c : CCode) (entry : Word) (bytes : Nat) : List Nat :=
       | some (i, n) => (rd? i).toList ++ go fuel (off + n)
       | none => go fuel (off + 2)
   ((go bytes 0).eraseDups).filter (· ≠ 0)
+
+/-- The addresses of the ECALLs in `[entry, entry + bytes)`. -/
+def ecallsC (c : CCode) (entry : Word) (bytes : Nat) : List Nat :=
+  let rec go : Nat → Nat → List Nat
+    | 0, _ => []
+    | fuel + 1, off =>
+      if off ≥ bytes then [] else
+      match c.instr (entry + BitVec.ofNat 64 off) with
+      | some (.ecall, n) => (entry + BitVec.ofNat 64 off).toNat :: go fuel (off + n)
+      | some (_, n) => go fuel (off + n)
+      | none => go fuel (off + 2)
+  go bytes 0
+
+/-- The prologue at `entry`, as `frameOf` gives it for 32-bit code:
+    `addi sp, sp, -N` (or `c.addi16sp`) and the `sd`/`c.sdsp` after it. -/
+def frameOfC (c : CCode) (entry : Word) : List Nat :=
+  match c.instr entry with
+  | some (.iop .addi 2 2 imm, n0) =>
+    if 2048 ≤ imm.toNat then
+      let rec go : Nat → Word → List Nat
+        | 0, _ => []
+        | fuel + 1, pc =>
+          match c.instr pc with
+          | some (.store .sd 2 r off, n) => off.toNat :: r.val :: go fuel (pc + BitVec.ofNat 64 n)
+          | _ => []
+      (4096 - imm.toNat) :: go 32 (entry + BitVec.ofNat 64 n0)
+    else []
+  | _ => []
 end Auto
 
 end NoCompiler
@@ -279,19 +457,26 @@ open Lean Elab Tactic Meta
 def cFlavor : Flavor :=
   { reach := ``ReachC, opt := ``ReachC.opt, instr := ``CCode.instr, exec := ``ExecC,
     execStep := ``ReachC.exec_step, done := ``ReachC.done, optSome := ``ReachC.opt_some,
-    optAligned := ``ReachC.opt_aligned, cutpoints := ``ReachC.cutpoints }
+    optAligned := ``ReachC.opt_aligned, cutpoints := ``ReachC.cutpoints,
+    verified := ``VerifiedC, callRule := ``VerifiedC.call, sysStep := ``ReachC.sys_step,
+    entry := ``EntryC, retMask := ``ret_mask2, retTwo := ``id }
 
 /-- `nocompiler_auto_c entry size s he [facts] (loop_inv pc inv measure μ)*`: as
     `nocompiler_auto`, for the function of `size` bytes at `entry` of a `CCode`. -/
 syntax (name := nocompilerAutoC) "nocompiler_auto_c " term:max term:max ident ident
-  (" [" Lean.Parser.Tactic.simpArg,* "]")? (ppLine nocompilerCut)* : tactic
+  (" [" Lean.Parser.Tactic.simpArg,* "]")? (" calls " "[" term,* "]")? (ppLine nocompilerCut)* : tactic
 
 @[tactic nocompilerAutoC] def evalNoCompilerAutoC : Tactic := fun stx => do
-  let call ← parseCall cFlavor stx[3] stx[4] stx[5] stx[6].getArgs
+  let call ← parseCall cFlavor stx[3] stx[4] stx[5] stx[7].getArgs
+  let callees ← parseCallees cFlavor stx[6]
   let entryE ← Term.elabTerm stx[1] (some (mkConst ``Word))
   let sizeE ← Term.elabTerm stx[2] (some (mkConst ``Nat))
   let entryN ← evalNat (← mkAppM ``BitVec.toNat #[entryE])
   let rsList ← evalNatList (mkApp3 (mkConst ``writesC) call.code entryE sizeE)
-  autoCore cFlavor call (call.cuts.toList.map (·.1)) rsList entryN
+  let rsList := if callees.isEmpty then rsList else
+    (rsList ++ nonPreserved.filter (fun r => r != 1 || rsList.contains 1)).eraseDups
+  let ecallList ← evalNatList (mkApp3 (mkConst ``ecallsC) call.code entryE sizeE)
+  let frameList ← evalNatList (mkApp2 (mkConst ``frameOfC) call.code entryE)
+  autoCore cFlavor call (call.cuts.toList.map (·.1)) rsList entryN callees ecallList frameList
 
 end NoCompiler.Auto

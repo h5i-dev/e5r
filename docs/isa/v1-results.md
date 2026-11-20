@@ -14,7 +14,7 @@ claim "easier to prove".
 | 5 | `asm(disasm(x)) = x` | passed | below |
 | 6 | negative controls | checker side passed (Rust and Lean, A); audit side passed (B) | below |
 | 7 | checking cost at 55/160/500 instructions | open | |
-| 8 | demo A/B with calls and frames | open | |
+| 8 | demo A/B with calls and frames | **not met**: no difference | below |
 | 9 | LLM-written structured RV64 | open | |
 
 ## 4. Corpus conformance (Rust checker)
@@ -178,3 +178,34 @@ Byte for byte: for every program all of whose functions are at L1 or above
 object linked again by ld.lld at the binary's section addresses and function
 order gives the binary's `.text` and data sections exactly, and checks against
 the `.nocompiler.struct` the object carried. Format: docs/isa/asm.md.
+
+## 8. Demo A/B with calls and frames: not met
+
+`sum2` (examples/demo/src/sum.c: two calls to `sum`, a 32-byte frame with
+four saves) proved on both builds of the demo, with the same automation on
+both sides: `nocompiler_auto` on B (`nocompiler cc -O2`, the profile) and
+`nocompiler_auto_c` on A (plain `clang -O2 -march=rv64gc`, compressed code),
+both now with calls, syscalls and frames (lean/Demo/Sum2B.lean,
+lean/Demo/Sum2A.lean). Counted by examples/demo/tools/count.py:
+
+| function | side | invariants | script | per-function lemmas |
+| --- | --- | --- | --- | --- |
+| sum2 | B (profile) | 0 | 4 lines, 60 tokens | 0 |
+| sum2 | A (rv64gc) | 0 | 4 lines, 61 tokens | 1 line, 19 tokens |
+
+The one extra line on A is the code region of `sum2` and its callee, which
+`nocompiler export` writes for B from the metadata and the ordinary build
+has no metadata for. Otherwise the proofs are the same text: what is left
+after the tactic, on both sides, is that the two sums commute. The leaf
+functions were already equal (sum 12 = 12 lines, cobs_decode 94 = 94).
+
+So criterion 8 is **not met**: with equal automation, calls and frames do
+not make the profile's proofs shorter either. The project does not claim
+"easier to prove" on proof length. What the profile buys on these functions
+is elsewhere: the checker's level and theorems (R4 to R6, T1), the frame and
+callee region coming from the metadata, and the audit; on A the same
+automation needed a weaker entry condition (`EntryC`: compressed code returns
+to 2-aligned addresses).
+
+Mutation controls: scripts/core/check-proof-controls.sh adds `add` becomes
+`sub` and "restores s0 from the wrong slot" for `sum2` on both builds.

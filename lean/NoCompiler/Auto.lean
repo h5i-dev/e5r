@@ -820,6 +820,14 @@ structure Flavor where
   optSome : Name := ``Reach.opt_some
   optAligned : Name := ``Reach.opt_aligned
   cutpoints : Name := ``Reach.cutpoints
+  /-- A callee's theorem, its call rule, the syscall step, the entry
+      conditions, and the facts about the return address. -/
+  verified : Name := ``VerifiedImg
+  callRule : Name := ``VerifiedImg.call
+  sysStep : Name := ``Reach.sys_step
+  entry : Name := ``Entry
+  retMask : Name := ``ret_mask
+  retTwo : Name := ``aligned_two_of_four
 
 structure Ctx where
   fl : Flavor := {}
@@ -1166,7 +1174,7 @@ set_option hygiene false in
 def stepSys (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (List MVarId × List MVarId) := do
   let fs ← simpArgs (cx.facts ++ (← sysNames))
   let sp := cx.spec
-  let gs ← run g (← `(tactic| refine Reach.sys_step ?_ ?_ ?_ ?_ ?_ ?_))
+  let gs ← run g (← `(tactic| refine $(mkIdent cx.fl.sysStep) ?_ ?_ ?_ ?_ ?_ ?_))
   let kind (g : MVarId) : MetaM String := do
     let t ← whnfR (← instantiateMVars (← g.getType))
     if t.isAppOf ``Dom.mem then return "hd"
@@ -1174,7 +1182,7 @@ def stepSys (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (List MVarId × List MV
     if t.isAppOf ``Exists then return "hex"
     if t.isForall then return "k"
     if t.isAppOf ``Eq then
-      return if (t.getArg! 1).isAppOf ``Code.instr then "hi" else "hx"
+      return if (t.getArg! 1).isAppOf cx.fl.instr then "hi" else "hx"
     return "?"
   let mut left := []
   let mut cont := []
@@ -1265,12 +1273,12 @@ def closeCall (cx : Ctx) (g : MVarId) (pc : Nat) (thm : Term) (calleeSpec : Name
   let cpI := mkIdent (Name.mkSimple s!"nocompiler_cp_{tag}")
   let cmemI := mkIdent (Name.mkSimple s!"nocompiler_cmem_{tag}")
   let cS := mkIdent (Name.mkSimple s!"nocompiler_sc_{tag}")
-  let gs ← run g (← `(tactic| refine' VerifiedImg.call $thm _ ?_ ?_ ?_ ?_ ?_))
+  let gs ← run g (← `(tactic| refine' $(mkIdent cx.fl.callRule) $thm _ ?_ ?_ ?_ ?_ ?_))
   let kind (g : MVarId) : MetaM String := do
     let t0 ← instantiateMVars (← g.getType)
     if t0.isAppOf ``Spec.pre then return "pre"
     let t ← whnfR t0
-    if t.isAppOf ``Entry then return "he"
+    if t.isAppOf cx.fl.entry then return "he"
     if t.isAppOf ``Dom.sub then return "hD"
     if t.isAppOf ``Perm.le then return "hP"
     if t.isForall then return "k"
@@ -1608,8 +1616,8 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
   let [gStart, gBody] ← run (← getMainGoal) (← `(tactic|
       refine $(mkIdent fl.cutpoints) (Q := fun s => Final _ s ∧ _) $invT $muT ?_ ?_))
     | throwError "nocompiler_auto: cutpoints"
-  let retFacts : Array Term := #[← `(ret_mask ($he).retAligned), ← `(eq_true ($he).retAligned),
-    ← `(eq_true (aligned_two_of_four ($he).retAligned))]
+  let retFacts : Array Term := #[← `($(mkIdent fl.retMask) ($he).retAligned), ← `(eq_true ($he).retAligned),
+    ← `(eq_true ($(mkIdent fl.retTwo) ($he).retAligned))]
   -- From the entry.
   let [gStart] ← run gStart (← `(tactic| intro $R:ident $hR:ident)) | throwError "nocompiler_auto: start"
   let [gStart] ← run gStart (← `(tactic|
@@ -1737,19 +1745,23 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
     traceLine s!"[kernel] whole goal: {← kernelCheckStep gTop} ms"
   replaceMainGoal (startGoals ++ bodyGoals)
 
+/-- The callees of `calls [thm, ...]`: entry, theorem, specification. -/
+def parseCallees (fl : Flavor) (stx : Syntax) : TacticM (Array (Nat × Term × Name)) := do
+  let calleeTerms : Array Term := if stx.isNone then #[] else stx[2].getSepArgs.map (⟨·⟩)
+  let mut callees : Array (Nat × Term × Name) := #[]
+  for t in calleeTerms do
+    let ty ← instantiateMVars (← inferType (← Term.elabTerm t none))
+    unless ty.isAppOfArity fl.verified 5 do throwError "nocompiler_auto: {t} is not a `{fl.verified}` theorem"
+    let entry := ty.getArg! 3
+    let some spN := (ty.getArg! 4).getAppFn.constName? | throwError "nocompiler_auto: the spec of {t} must be a constant"
+    callees := callees.push (← evalNat (← mkAppM ``BitVec.toNat #[entry]), t, spN)
+  return callees
+
 @[tactic nocompilerAuto] def evalNoCompilerAuto : Tactic := fun stx => do
   traceLine "[nocompiler_auto] start"
   let f : Term := ⟨stx[1]⟩
   let call ← parseCall {} stx[2] stx[3] stx[4] stx[6].getArgs
-  -- The callees: entry, theorem, specification.
-  let calleeTerms : Array Term := if stx[5].isNone then #[] else stx[5][2].getSepArgs.map (⟨·⟩)
-  let mut callees : Array (Nat × Term × Name) := #[]
-  for t in calleeTerms do
-    let ty ← instantiateMVars (← inferType (← Term.elabTerm t none))
-    unless ty.isAppOfArity ``VerifiedImg 5 do throwError "nocompiler_auto: {t} is not a `VerifiedImg` theorem"
-    let entry := ty.getArg! 3
-    let some spN := (ty.getArg! 4).getAppFn.constName? | throwError "nocompiler_auto: the spec of {t} must be a constant"
-    callees := callees.push (← evalNat (← mkAppM ``BitVec.toNat #[entry]), t, spN)
+  let callees ← parseCallees {} stx[5]
   -- The function's tree: its loop heads are the cut points.
   let fE ← Term.elabTerm f (some (mkConst ``Struct.Func))
   let heads ← evalNatList (mkApp (mkConst ``loopHeads) fE)

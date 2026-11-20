@@ -80,6 +80,8 @@ example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] =
 -- and on the ordinary rv64gc build (A, `VerifiedC`, NoCompiler/Ext/Rvc.lean).
 #assert_standard_axioms Demo.Sum.sum_b
 #assert_standard_axioms Demo.Sum.sum_a
+#assert_standard_axioms Demo.Sum.sum2_b
+#assert_standard_axioms Demo.Sum.sum2_a
 #assert_standard_axioms Demo.Cobs.cobs_b
 #assert_standard_axioms Demo.Cobs.cobs_a
 #assert_standard_axioms Demo.Sum.ImageB.sum_checked

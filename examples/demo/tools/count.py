@@ -69,7 +69,7 @@ def count_file(path):
 def main():
     md = "--markdown" in sys.argv
     rows = []
-    for f in ["Sum", "Cobs"]:
+    for f in ["Sum", "Sum2", "Cobs"]:
         for side in ["B", "A"]:
             p = os.path.join(LEAN, "Demo", f"{f}{side}.lean")
             if not os.path.exists(p):

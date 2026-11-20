@@ -38,6 +38,11 @@ mutations=(
   "examples/demo/elf/sum.b Demo.SumB 0x111a4 0x00850513 0x00450513 demo-B-sum-stride-8-becomes-4"
   "examples/demo/elf/sum.a Demo.SumA 0x11196 0x9636 0x8e15 demo-A-sum-add-becomes-sub"
   "examples/demo/elf/sum.a Demo.SumA 0x1119a 0x0521 0x0511 demo-A-sum-stride-8-becomes-4"
+  # Criterion 8 (docs/isa/v1.md): sum2, with calls and a frame, on both builds.
+  "examples/demo/elf/sum.b Demo.Sum2B 0x111ec 0x01250533 0x41250533 demo-B-sum2-add-becomes-sub"
+  "examples/demo/elf/sum.b Demo.Sum2B 0x111f4 0x01013403 0x00813403 demo-B-sum2-restores-s0-from-the-wrong-slot"
+  "examples/demo/elf/sum.a Demo.Sum2A 0x111be 0x9522 0x8d01 demo-A-sum2-add-becomes-sub"
+  "examples/demo/elf/sum.a Demo.Sum2A 0x111c2 0x6442 0x6422 demo-A-sum2-restores-s0-from-the-wrong-slot"
   "examples/demo/elf/cobs.b Demo.CobsB 0x111c8 0x00158713 0x00258713 demo-B-cobs-copies-from-one-byte-late"
   "examples/demo/elf/cobs.b Demo.CobsB 0x1124c 0x00053023 0x00f53023 demo-B-cobs-success-tag-is-src"
   "examples/demo/elf/cobs.b Demo.CobsB 0x11244 0x00080023 0x00b80023 demo-B-cobs-decodes-nonzero-separator"
