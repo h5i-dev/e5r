@@ -18,6 +18,7 @@ and what clang emits without each:
 | Flag | Without it |
 | --- | --- |
 | `--target=riscv64-unknown-elf -march=rv64im_zba_zbb -mabi=lp64` | C, A, F or D instructions (R1) |
+| `-mcmodel=medany` | data addresses as absolute `lui`/`addi` pairs (medlow): with medany every address in the code is pc-relative (`auipc` with `R_RISCV_PCREL_HI20`/`LO12`), so a function can be relinked at another address ([v1.md](v1.md), relocation) |
 | `-mno-relax` | the linker rewrites calls after the code is checked |
 | `-fno-pic`, static link | PLT and GOT: indirect calls (R2) |
 | `-fno-jump-tables` | a dense `switch` becomes an indirect jump (R2) |

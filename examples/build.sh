@@ -20,7 +20,7 @@ out=examples/build
 mkdir -p "$out"
 # The profile: RV64IM + Zba + Zbb, no C, statically linked, no relaxation
 # (so calls stay auipc/jalr or jal as the compiler wrote them), no PIC.
-cflags=(--target=riscv64-unknown-elf -march=rv64im_zba_zbb -mabi=lp64 -mno-relax -O2
+cflags=(--target=riscv64-unknown-elf -march=rv64im_zba_zbb -mabi=lp64 -mcmodel=medany -mno-relax -O2
   -ffreestanding -nostdlib -fno-pic -fno-asynchronous-unwind-tables -fno-unwind-tables
   -fno-ident)
 status=0

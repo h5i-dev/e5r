@@ -8,6 +8,7 @@
 //! | flag | without it |
 //! | --- | --- |
 //! | `-march=rv64im_zba_zbb` | C, A, F, D instructions (R1) |
+//! | `-mcmodel=medany` | data addresses as absolute `lui`/`addi` pairs (`R_RISCV_HI20`/`LO12`): the code is then tied to where the data is, and a proof cannot be relocated (docs/isa/v1.md, relocation) |
 //! | `-mno-relax` | the linker rewrites calls after the code is checked |
 //! | `-fno-pic`, static link | PLT and GOT: indirect calls (R2) |
 //! | `-fno-jump-tables` | a dense `switch` becomes an indirect jump (R2) |
@@ -25,6 +26,7 @@ pub const CFLAGS: &[&str] = &[
     "--target=riscv64-unknown-elf",
     "-march=rv64im_zba_zbb",
     "-mabi=lp64",
+    "-mcmodel=medany",
     "-mno-relax",
     "-fno-pic",
     "-ffreestanding",

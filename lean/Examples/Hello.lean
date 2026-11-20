@@ -206,7 +206,7 @@ theorem hello_verified : Verified code hello_dom hello_entry helloSpec := by
   -- la a1, message; li a0, 1; li a2, 11; call write_all
   nocompiler_steps 6
   have hPle : (spec.perm ⟨1#64, 0x10158#64, 11⟩
-      (((((((((((((((s.setReg 2 fb).setMem M).setPc 70040#64).setReg 10 65536#64).setPc 70044#64).setReg 11
+      (((((((((((((((s.setReg 2 fb).setMem M).setPc 70040#64).setReg 11 65944#64).setPc 70044#64).setReg 11
         65880#64).setPc 70048#64).setReg 10 1#64).setPc 70052#64).setReg 12 11#64).setPc 70056#64).setReg 1
         70056#64).setPc 70060#64).setReg 1 70064#64).setPc 69988#64)).le (helloSpec.perm () s) := by
     apply Perm.le_of
@@ -239,7 +239,7 @@ theorem hello_verified : Verified code hello_dom hello_entry helloSpec := by
       subst hr
       exact absurd hm (by simp [Region.mem, Spec.stackRegion])
   have hbytes : readBytes
-      (((((((((((((((s.setReg 2 fb).setMem M).setPc 70040#64).setReg 10 65536#64).setPc 70044#64).setReg 11
+      (((((((((((((((s.setReg 2 fb).setMem M).setPc 70040#64).setReg 11 65944#64).setPc 70044#64).setReg 11
         65880#64).setPc 70048#64).setReg 10 1#64).setPc 70052#64).setReg 12 11#64).setPc 70056#64).setReg 1
         70056#64).setPc 70060#64).setReg 1 70064#64).setPc 69988#64).mem 0x10158#64 k = message.take k := by
     nocompiler_norm
