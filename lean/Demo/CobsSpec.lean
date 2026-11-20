@@ -1,4 +1,4 @@
-import NoCompiler.Auto
+import NoCompiler.Vocab
 
 /-
 The specification of `cobs_decode` (demo/src/cobs.c), shared by the proof
@@ -12,12 +12,10 @@ frame was well formed and the bytes decoded (on an error: the bytes decoded
 before the block whose code runs past the end).
 -/
 namespace Demo.Cobs
-open NoCompiler
+open NoCompiler NoCompiler.Vocab
 
 /-- The index of the first zero byte, or the length. -/
-def frameLen : List Byte → Nat
-  | [] => 0
-  | b :: bs => if b = 0 then 0 else frameLen bs + 1
+def frameLen (l : List Byte) : Nat := l.findIdx (· == 0)
 
 /-- The zero decoded after a block of code `c` ending at `e`, in a frame of `n` bytes. -/
 def zeroAfter (c e n : Nat) : List Byte := if c ≠ 255 ∧ e < n then [0] else []
@@ -68,50 +66,6 @@ def spec : Spec Args where
 
 /-! ## Facts the proofs use (about the specification, not the code) -/
 
-theorem frameLen_le (l : List Byte) : frameLen l ≤ l.length := by
-  induction l with
-  | nil => simp [frameLen]
-  | cons b bs ih => simp only [frameLen]; split <;> simp <;> omega
-
-theorem getD_ne_zero_of_lt (l : List Byte) (j : Nat) (h : j < frameLen l) : l.getD j 0 ≠ 0 := by
-  induction l generalizing j with
-  | nil => simp [frameLen] at h
-  | cons b bs ih =>
-    simp only [frameLen] at h
-    split at h
-    · omega
-    · cases j with
-      | zero => simpa
-      | succ j => simpa using ih j (by omega)
-
-theorem frameLen_eq_of_zero (l : List Byte) (k : Nat) (hk : k < l.length) (hz : l.getD k 0 = 0)
-    (hle : k ≤ frameLen l) : frameLen l = k := by
-  induction l generalizing k with
-  | nil => simp at hk
-  | cons b bs ih =>
-    cases k with
-    | zero => simp_all [frameLen]
-    | succ k =>
-      simp only [frameLen] at hle ⊢
-      split at hle
-      · omega
-      · rename_i hb; simp only [hb, ite_false]
-        have := ih k (by simp at hk; omega) (by simpa using hz) (by omega); omega
-
-theorem succ_le_frameLen (l : List Byte) (k : Nat) (hk : k < l.length) (hnz : l.getD k 0 ≠ 0)
-    (hle : k ≤ frameLen l) : k + 1 ≤ frameLen l := by
-  induction l generalizing k with
-  | nil => simp at hk
-  | cons b bs ih =>
-    cases k with
-    | zero => simp_all [frameLen]
-    | succ k =>
-      simp only [frameLen] at hle ⊢
-      split at hle
-      · omega
-      · rename_i hb; simp only [hb, ite_false]
-        have := ih k (by simp at hk; omega) (by simpa using hnz) (by omega); omega
-
 /-- One block, read at index `src` of the frame. -/
 theorem decodeFrame_drop (xs : List Byte) (src : Nat) (hs : src < xs.length)
     (hc : 1 ≤ (xs.getD src 0).toNat) :
@@ -135,47 +89,6 @@ theorem decodeFrame_drop (xs : List Byte) (src : Nat) (hs : src < xs.length)
 theorem prepend_prepend (a b : List Byte) (r : Bool × List Byte) :
     prepend a (prepend b r) = prepend (a ++ b) r := by simp [prepend]
 
-theorem getD_of_drop_eq {L M : List Byte} {d i : Nat} (h : L.drop d = M.drop d) (hi : d ≤ i) :
-    L.getD i 0 = M.getD i 0 := by
-  have := congrArg (fun l => l.getD (i - d) 0) h
-  simp only [List.getD_eq_getElem?_getD, List.getElem?_drop] at this ⊢
-  rwa [Nat.add_sub_cancel' hi] at this
-
-theorem getD_take (l : List Byte) (n i : Nat) (h : i < n) : (l.take n).getD i 0 = l.getD i 0 := by
-  simp [List.getD_eq_getElem?_getD, h]
-
-/-! ### Lists at the write index -/
-
-theorem drop_set_succ (L : List Byte) (d : Nat) (x : Byte) :
-    (L.set d x).drop (d + 1) = L.drop (d + 1) := by
-  apply List.ext_getElem
-  · simp
-  · intro i h1 h2; simp [List.getElem_set]; omega
-
-theorem drop_succ_of_drop {L M : List Byte} {d : Nat} (h : L.drop d = M.drop d) :
-    L.drop (d + 1) = M.drop (d + 1) := by
-  have := congrArg (List.drop 1) h; simpa [List.drop_drop, Nat.add_comm] using this
-
-theorem take_set_le (L : List Byte) (d k : Nat) (x : Byte) (h : k ≤ d) :
-    (L.set d x).take k = L.take k := by
-  apply List.ext_getElem
-  · simp
-  · intro i h1 h2; simp only [List.length_take, List.length_set] at h1
-    rw [List.getElem_take, List.getElem_take, List.getElem_set]; simp; omega
-
-theorem take_set_succ (L : List Byte) (d : Nat) (x : Byte) (h : d < L.length) :
-    (L.set d x).take (d + 1) = L.take d ++ [x] := by
-  rw [List.take_add_one, take_set_le L d d x (Nat.le_refl _), List.getElem?_set_self h]; rfl
-
-theorem take_drop_succ (l : List Byte) (p cnt : Nat) (hp : p < l.length) (hc : 0 < cnt) :
-    (l.drop p).take cnt = l.getD p 0 :: (l.drop (p + 1)).take (cnt - 1) := by
-  obtain ⟨k, rfl⟩ : ∃ k, cnt = k + 1 := ⟨cnt - 1, by omega⟩
-  rw [List.drop_eq_getElem_cons hp, List.take_succ_cons]
-  simp [List.getD_eq_getElem?_getD, hp]
-
-theorem take_append_drop_of {L M : List Byte} {d : Nat} (h : L.drop d = M.drop d) :
-    L.take d ++ M.drop d = L := by rw [← h, List.take_append_drop]
-
 /-! ### The decode loop, one block at a time -/
 
 /-- The code byte: the buffer's at `src` (not yet overwritten) is the frame's,
@@ -188,9 +101,7 @@ theorem code_eq {orig L : List Byte} {src dst : Nat} (hsrc : src < frameLen orig
 theorem code_pos {orig L : List Byte} {src dst : Nat} (hsrc : src < frameLen orig)
     (hds : dst ≤ src) (hL : L.drop dst = orig.drop dst) : 1 ≤ (L.getD src 0).toNat := by
   rw [getD_of_drop_eq hL hds]
-  have := getD_ne_zero_of_lt orig src hsrc
-  have : (orig.getD src 0).toNat ≠ 0 := fun h => this (BitVec.eq_of_toNat_eq (by simpa using h))
-  omega
+  have := (byte_beq_zero_false _).1 (getD_not_of_lt_findIdx 0 hsrc); omega
 
 /-- The invariant of the decode loop at `src`, unfolded by one block. -/
 theorem inv_block {orig L : List Byte} {src dst : Nat}
@@ -203,7 +114,7 @@ theorem inv_block {orig L : List Byte} {src dst : Nat}
           zeroAfter (L.getD src 0).toNat (src + (L.getD src 0).toNat) (frameLen orig))
         (decodeFrame ((orig.take (frameLen orig)).drop (src + (L.getD src 0).toNat))) := by
   have hn : (orig.take (frameLen orig)).length = frameLen orig := by
-    simp [frameLen_le]
+    simp [show frameLen orig ≤ orig.length from List.findIdx_le_length]
   have hc := code_pos hsrc hds hL
   rw [code_eq hsrc hds hL] at hc ⊢
   rw [hdec, decodeFrame_drop _ src (by omega) hc, hn]

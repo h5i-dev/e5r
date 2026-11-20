@@ -11,7 +11,7 @@ Per function and side (lean/Demo/<F><A|B>.lean):
   lemmas      other declarations in the file (per-function lemmas)
 Shared, counted once (lean/Demo/<F>Spec.lean): the specification and the
 lemmas about it. Libraries: the core (lean/NoCompiler without Auto.lean and Ext/),
-NoCompiler/Auto.lean, NoCompiler/Ext/Rvc.lean."""
+NoCompiler/Auto.lean, NoCompiler/Ext/Rvc.lean, NoCompiler/Vocab/."""
 import os, re, sys
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
@@ -85,8 +85,12 @@ def main():
         shared.append((f"{f}Spec.lean: specification", len(a), tokens(a)))
         shared.append((f"{f}Spec.lean: lemmas about it", len(b), tokens(b)))
     core = [os.path.join(dp, n) for dp, _, ns in os.walk(os.path.join(LEAN, "NoCompiler")) for n in ns
-            if n.endswith(".lean") and "Ext" not in dp and n != "Auto.lean"]
-    libs = [("core lean/NoCompiler (without Auto.lean, Ext/)", core),
+            if n.endswith(".lean") and "Ext" not in dp and "Vocab" not in dp
+            and n not in ("Auto.lean", "Vocab.lean")]
+    vocab = [os.path.join(LEAN, "NoCompiler", "Vocab", n)
+             for n in sorted(os.listdir(os.path.join(LEAN, "NoCompiler", "Vocab")))]
+    libs = [("core lean/NoCompiler (without Auto.lean, Ext/, Vocab/)", core),
+            ("lean/NoCompiler/Vocab/ (spec vocabulary: lists, folds, words, memory)", vocab),
             ("lean/NoCompiler/Auto.lean (nocompiler_auto, shared normal form)", [os.path.join(LEAN, "NoCompiler", "Auto.lean")]),
             ("lean/NoCompiler/Ext/Rvc.lean (RVC extension, nocompiler_auto_c)", [os.path.join(LEAN, "NoCompiler", "Ext", "Rvc.lean")])]
     if md:

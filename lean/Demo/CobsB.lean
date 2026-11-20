@@ -2,12 +2,12 @@ import Demo.CobsSpec
 import Demo.Cobs.ImageB
 
 namespace Demo.Cobs
-open NoCompiler Demo.Cobs.ImageB
+open NoCompiler NoCompiler.Vocab Demo.Cobs.ImageB
 
 set_option maxHeartbeats 20000000 in
 theorem cobs_b : Verified code cobs_decode_dom cobs_decode_entry spec := by
   rintro ⟨r, buf, orig⟩ s he ⟨ha0, ha1, ha2, hlen, hmem, hal, hdis⟩
-  have hfl := frameLen_le orig
+  have hfl : frameLen orig ≤ orig.length := List.findIdx_le_length
   nocompiler_auto cobs_decode_func s he
     loop_inv 0x11198 (fun u => ∃ k, u.reg 13 = BitVec.ofNat 64 k ∧ k < orig.length ∧ k ≤ frameLen orig ∧
         u.reg 10 = r ∧ u.reg 11 = buf ∧ u.reg 12 = BitVec.ofNat 64 orig.length ∧ u.mem = s.mem)
@@ -35,18 +35,18 @@ theorem cobs_b : Verified code cobs_decode_dom cobs_decode_entry spec := by
   case entry_ret_0x11268_0 | entry_ret_0x11268_1 | entry_ret_0x11268_2 | entry_ret_0x11268_3 =>
     rw [report_empty (by omega)] <;> first | rfl | trivial
   case «0x11198_to_0x111cc_0» =>
-    exact (frameLen_eq_of_zero orig k h2 (BitVec.eq_of_toNat_eq ‹_ = 0›) h3).symm
+    exact (findIdx_eq_of_getD 0 h2 ((byte_beq_zero_iff _).2 ‹_ = 0›) h3).symm
   case «0x11198_to_0x111cc_1» | «0x11198_to_0x111cc_b_2» => simp [prepend]
   case «0x11198_ret_0x11258_0» | «0x11198_ret_0x11258_1» | «0x11198_ret_0x11258_2» |
       «0x11198_ret_0x11258_3» =>
     have hn : frameLen orig = 0 := by
-      have := frameLen_eq_of_zero orig k h2 (BitVec.eq_of_toNat_eq ‹_ = 0›) h3; omega
+      have : frameLen orig = k := findIdx_eq_of_getD 0 h2 ((byte_beq_zero_iff _).2 ‹_ = 0›) h3; omega
     have := report_of (orig := orig) (by omega)
       (show decodeFrame (orig.take (frameLen orig)) = (true, []) by rw [hn]; simp [decodeFrame])
     simp [this, hn]
-  case «0x11198_to_0x11198» => exact succ_le_frameLen orig k h2 (fun h => ‹¬(orig.getD k _).toNat = 0› (by rw [h]; rfl)) h3
+  case «0x11198_to_0x11198» => exact succ_le_findIdx_of_getD 0 h2 ((byte_beq_zero_false _).2 ‹_›) h3
   case «0x11198_to_0x111cc_b_0» | «0x11198_to_0x111cc_b_1» =>
-    have := succ_le_frameLen orig k h2 (fun h => ‹¬(orig.getD k _).toNat = 0› (by rw [h]; rfl)) h3; omega
+    have : k + 1 ≤ frameLen orig := succ_le_findIdx_of_getD 0 h2 ((byte_beq_zero_false _).2 ‹_›) h3; omega
   case «0x111cc_ret_0x111fc_0» | «0x111cc_ret_0x111fc_1» | «0x111cc_ret_0x111fc_2» |
       «0x111cc_ret_0x111fc_3» =>
     have hr := report_of (orig := orig) (by omega)
@@ -64,19 +64,19 @@ theorem cobs_b : Verified code cobs_decode_dom cobs_decode_entry spec := by
     have hd : (L.take dst).length = dst := by simp; omega
     simp [report_of (orig := orig) (by omega) hdec, hd, take_append_drop_of h11,
       show frameLen orig = src + 1 by omega]
-  case «0x111cc_to_0x111cc_0» => rw [drop_set_succ]; exact drop_succ_of_drop h11
+  case «0x111cc_to_0x111cc_0» => exact drop_set_of_drop _ h11
   case «0x111cc_to_0x111cc_1» =>
     have hc := code_pos h8 h9 h11
     rw [inv_block h8 h9 h11 h12, ite_eq_right (by omega), show (L.getD src 0).toNat = 1 by omega,
       take_set_succ _ _ _ (by omega)]
     simp [zeroAfter, prepend, show src + 1 < frameLen orig by omega]
-  case «0x11208_to_0x11208_0» | «0x11208_to_0x111cc_0» => rw [drop_set_succ]; exact drop_succ_of_drop h17
+  case «0x11208_to_0x11208_0» | «0x11208_to_0x111cc_0» => exact drop_set_of_drop _ h17
   case «0x11208_to_0x11208_1» =>
-    rw [h18, take_set_succ _ _ _ (by omega), take_drop_succ orig p cnt (by omega) h12,
+    rw [h18, take_set_succ _ _ _ (by omega), take_drop_succ (d := 0) orig p cnt (by omega) h12,
       getD_of_drop_eq h17 (by omega)]
     simp [prepend]
   case «0x11208_to_0x111cc_1» =>
-    rw [h18, take_set_succ _ _ _ (by omega), take_drop_succ orig p cnt (by omega) h12,
+    rw [h18, take_set_succ _ _ _ (by omega), take_drop_succ (d := 0) orig p cnt (by omega) h12,
       getD_of_drop_eq h17 (by omega), show cnt - 1 = 0 by omega,
       show zeroAfter c e (frameLen orig) = [] by simp [zeroAfter]; omega]
     simp [prepend, show e = p + 1 by omega]
@@ -84,20 +84,19 @@ theorem cobs_b : Verified code cobs_decode_dom cobs_decode_entry spec := by
       «0x11208_ret_0x11258_3» =>
     have hdec : decodeFrame (orig.take (frameLen orig)) =
         (true, (L.set dst (L.getD p 0)).take (dst + 1)) := by
-      rw [h18, take_set_succ _ _ _ (by omega), take_drop_succ orig p cnt (by omega) h12,
+      rw [h18, take_set_succ _ _ _ (by omega), take_drop_succ (d := 0) orig p cnt (by omega) h12,
         getD_of_drop_eq h17 (by omega), show cnt - 1 = 0 by omega,
         show zeroAfter c e (frameLen orig) = [] by simp [zeroAfter]; omega,
         List.drop_eq_nil_of_le (as := orig.take (frameLen orig)) (by simp; omega)]
       simp [prepend, decodeFrame]
     have hd : ((L.set dst (L.getD p 0)).take (dst + 1)).length = dst + 1 := by simp; omega
-    have hL' := drop_set_succ L dst (L.getD p 0) ▸ drop_succ_of_drop h17
+    have hL' := drop_set_of_drop (L.getD p 0) h17
     rw [report_of (orig := orig) (by omega) hdec]
     first | (simp only [hd, take_append_drop_of hL']; done) | simp [show frameLen orig = e by omega]
   case «0x11208_to_0x111cc_b_0» =>
-    rw [drop_set_succ]
-    exact drop_succ_of_drop (drop_set_succ L dst _ ▸ drop_succ_of_drop h17)
+    exact drop_set_of_drop _ (drop_set_of_drop _ h17)
   case «0x11208_to_0x111cc_b_1» =>
     rw [h18, take_set_succ _ _ _ (by simp; omega), take_set_succ _ _ _ (by omega),
-      take_drop_succ orig p cnt (by omega) h12, getD_of_drop_eq h17 (by omega),
+      take_drop_succ (d := 0) orig p cnt (by omega) h12, getD_of_drop_eq h17 (by omega),
       show cnt - 1 = 0 by omega, show zeroAfter c e (frameLen orig) = [0] by simp [zeroAfter]; omega]
     simp [prepend, show e = p + 1 by omega]

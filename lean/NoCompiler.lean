@@ -13,3 +13,4 @@ import NoCompiler.Mem
 import NoCompiler.Image
 import NoCompiler.Trace
 import NoCompiler.Struct
+import NoCompiler.Vocab

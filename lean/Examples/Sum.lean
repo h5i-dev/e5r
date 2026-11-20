@@ -19,6 +19,7 @@ is about the code it wrote, not the source. The loop invariant at 0x11198,
 after k elements: a0 = a + 8k, a1 = n - k, a2 = the sum of the first k.
 -/
 import Examples.Sum.Image
+import NoCompiler.Vocab
 
 namespace Examples.Sum
 open NoCompiler Examples.Sum.Image
@@ -61,9 +62,7 @@ theorem tail (s0 s : State) (ar : Args) (hv : s.reg 12 = sumW ar.xs)
     · simp [spec, hv]
 
 theorem sumW_take_succ (xs : List Word) (k : Nat) (h : k < xs.length) :
-    sumW (xs.take (k + 1)) = sumW (xs.take k) + xs[k] := by
-  rw [List.take_add_one, List.getElem?_eq_getElem h]
-  simp only [sumW, Option.toList, List.foldl_append, List.foldl_cons, List.foldl_nil]
+    sumW (xs.take (k + 1)) = sumW (xs.take k) + xs[k] := Vocab.foldl_take_succ _ _ xs k h
 
 /-- `sum` as compiled: correct, memory-safe, terminating, ABI-preserving. -/
 theorem sum_verified : Verified code sum_dom sum_entry spec := by

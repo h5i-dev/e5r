@@ -1,4 +1,4 @@
-import NoCompiler.Auto
+import NoCompiler.Vocab
 
 /-
 The specification of `u64 sum(const u64 *a, u64 n)` (demo/src/sum.c, the
@@ -7,7 +7,7 @@ Demo/SumA.lean (ordinary build). It is the specification of
 lean/Examples/Sum.lean, restated without that file's image.
 -/
 namespace Demo.Sum
-open NoCompiler
+open NoCompiler NoCompiler.Vocab
 
 /-- The sum of a list of words, modulo 2^64. -/
 def sumW (xs : List Word) : Word := xs.foldl (· + ·) 0
@@ -27,18 +27,12 @@ def spec : Spec Args where
 /-! Facts about `sumW` the proofs use: one more element, counted from the end. -/
 
 theorem sumW_step (xs : List Word) (m : Nat) (h : 0 < m) (h' : m ≤ xs.length) :
-    sumW (xs.take (xs.length - (m - 1))) = sumW (xs.take (xs.length - m)) + xs[xs.length - m] := by
-  rw [show xs.length - (m - 1) = xs.length - m + 1 by omega, List.take_add_one,
-    List.getElem?_eq_getElem (by omega)]
-  simp only [sumW, Option.toList, List.foldl_append, List.foldl_cons, List.foldl_nil]
+    sumW (xs.take (xs.length - (m - 1))) = sumW (xs.take (xs.length - m)) + xs[xs.length - m] :=
+  foldl_take_sub_pred _ _ xs m h h'
 
 theorem sumW_last (xs : List Word) (m : Nat) (h : m = 1) (h' : m ≤ xs.length) :
-    sumW xs = sumW (xs.take (xs.length - m)) + xs[xs.length - m] := by
-  subst h
-  have := sumW_step xs 1 (by omega) h'
-  rwa [Nat.sub_self, Nat.sub_zero, List.take_length] at this
+    sumW xs = sumW (xs.take (xs.length - m)) + xs[xs.length - m] := foldl_eq_last _ _ xs m h h'
 
-theorem sumW_nil (xs : List Word) (h : xs.length = 0) : sumW xs = 0 := by
-  simp_all [List.length_eq_zero_iff, sumW]
+theorem sumW_nil (xs : List Word) (h : xs.length = 0) : sumW xs = 0 := foldl_of_length_zero _ _ xs h
 
 end Demo.Sum
