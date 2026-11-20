@@ -320,13 +320,14 @@ def RunPlus (c : Code) (P : Perm) (D : Dom) (s t : State) : Prop :=
 
 /-- A big-step simulation: from related states, if B has finished then A can
     finish with the same observations; otherwise B's run (every run) reaches
-    states related to states A reaches by one or more steps. Single steps,
+    states related to states A reaches by one or more steps. `F` relates the
+    final states: `Obs` for a function, `RRegion.Exit` for a region. Single steps,
     straight-line blocks and whole regions are all instances. The obligation
     may use that A's run from `sa` is safe and terminates. -/
-structure BigSim (cA : Code) (DA : Dom) (cB : Code) (DB : Dom) (P : Perm) (dead : Region)
-    (R : State → State → Prop) : Prop where
+structure BigSim (cA : Code) (DA : Dom) (cB : Code) (DB : Dom) (P : Perm)
+    (F : State → State → Prop) (R : State → State → Prop) : Prop where
   fin : ∀ sa sb, R sa sb → Final DB sb →
-    ∃ ta, Run cA P DA sa ta ∧ Final DA ta ∧ Obs dead ta sb
+    ∃ ta, Run cA P DA sa ta ∧ Final DA ta ∧ F ta sb
   move : ∀ sa sb, R sa sb → ¬ Final DB sb → Exec cA P DA (fun _ => True) sa →
     Reach cB P DB (fun tb => ∃ ta, RunPlus cA P DA sa ta ∧ R ta tb) sb
 
@@ -338,14 +339,14 @@ theorem RunPlus.not_final {c : Code} {P : Perm} {D : Dom} {s t : State} (h : Run
   · exact h hd
   · exact h hx
 
-theorem BigSim.exec {dead : Region} {R : State → State → Prop}
-    (hs : BigSim cA DA cB DB P dead R) {s₀ : State} {Q : State → Prop}
+theorem BigSim.exec {F : State → State → Prop} {R : State → State → Prop}
+    (hs : BigSim cA DA cB DB P F R) {s₀ : State} {Q : State → Prop}
     (hA : Exec cA P DA Q s₀) :
     ∀ sb, R s₀ sb →
-      Exec cB P DB (fun tb => ∃ ta, Run cA P DA s₀ ta ∧ Final DA ta ∧ Obs dead ta tb) sb := by
+      Exec cB P DB (fun tb => ∃ ta, Run cA P DA s₀ ta ∧ Final DA ta ∧ F ta tb) sb := by
   suffices H : ∀ sa, Reach cA P DA (fun s => Final DA s ∧ Q s) sa → ∀ sx, Run cA P DA sa sx →
       Run cA P DA s₀ sx → ∀ sb, R sx sb →
-      Exec cB P DB (fun tb => ∃ ta, Run cA P DA s₀ ta ∧ Final DA ta ∧ Obs dead ta tb) sb from
+      Exec cB P DB (fun tb => ∃ ta, Run cA P DA s₀ ta ∧ Final DA ta ∧ F ta tb) sb from
     fun sb hr => H s₀ hA s₀ (.refl _) (.refl _) sb hr
   intro sa hA
   induction hA with
@@ -373,7 +374,7 @@ theorem BigSim.exec {dead : Region} {R : State → State → Prop}
 theorem Refines.of_bigSim {α : Type} {sp : Spec α} {eA eB : Word}
     (R : α → State → State → State → Prop)
     (hsim : ∀ a s, Entry DA eA s → ¬ DB.mem (s.reg Reg.ra) → sp.pre a s →
-      BigSim cA DA cB DB (sp.perm a s) (sp.dead s) (R a s))
+      BigSim cA DA cB DB (sp.perm a s) (Obs (sp.dead s)) (R a s))
     (hR : ∀ a s, Entry DA eA s → sp.pre a s → R a s s (s.setPc eB)) :
     Refines sp cA DA eA cB DB eB := by
   intro a s he hb hp hA

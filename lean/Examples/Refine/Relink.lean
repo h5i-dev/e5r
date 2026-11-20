@@ -25,7 +25,9 @@ def cB : Code := Examples.Link.Img2.code
 def DB : Dom := Examples.Link.Img2.sum_dom
 def eB : Word := Examples.Link.Img2.sum_entry
 
-def allRegs : List Reg := List.finRange 32
+abbrev allRegs : List Reg :=
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
+    29, 30, 31]
 
 /-- Pair i: B's i-th instruction with A's. -/
 def cert : Cert := ⟨(List.range 9).map fun i =>

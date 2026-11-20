@@ -25,3 +25,4 @@ import NoCompiler.RefineLockstep
 import NoCompiler.RefineRegion
 import NoCompiler.RefineStraight
 import NoCompiler.RefineStraightRegion
+import NoCompiler.RefineAuto

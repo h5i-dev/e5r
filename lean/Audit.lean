@@ -141,6 +141,8 @@ def bvTier : List String :=
 #assert_standard_axioms NoCompiler.RRegion.Ok.of_instr
 #assert_standard_axioms Examples.Refine.Peephole.refines
 #assert_standard_axioms Examples.Refine.Peephole.sum_peephole
+#assert_standard_axioms NoCompiler.RRegion.Ok.of_bigSim
+#assert_standard_axioms Examples.Refine.Peephole.Auto.refines'
 
 -- The demo (demo/README.md): each function on the nocompiler build (B, `VerifiedImg`)
 -- and on the ordinary rv64gc build (A, `VerifiedC`, NoCompiler/Ext/Rvc.lean).

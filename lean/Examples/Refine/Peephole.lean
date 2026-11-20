@@ -1,4 +1,5 @@
 import Examples.Refine.Relink
+import NoCompiler.RefineAuto
 
 /-
 Refinement with a changed instruction (docs/isa/refine.md): B is `sum` with
@@ -71,3 +72,16 @@ example : check cA ⟨cA.base, (cA.words.set! 7 addWord).set! 3 0x40c68633#32⟩
   decide +kernel
 
 end Examples.Refine.Peephole
+
+/-! ## The same, by the automation (NoCompiler/RefineAuto.lean) -/
+namespace Examples.Refine.Peephole.Auto
+open NoCompiler Examples.Refine.Peephole
+open Examples.Refine.Relink (cA DA eA)
+
+theorem region_ok' : region.Ok cA cB := by
+  nocompiler_region region [.iop .addi 10 12 0] [.rop .add 10 12 0]
+
+theorem refines' : Refines Examples.Sum.spec cA DA eA cB DA eA := by
+  nocompiler_refine Examples.Refine.Peephole.cert [region_ok']
+
+end Examples.Refine.Peephole.Auto

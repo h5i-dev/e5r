@@ -159,6 +159,21 @@ trusted: the kernel checks the certificate and each region's proof.
 `crates/nocompiler/tests/treediff.rs` checks these numbers and that the
 generated Lean is the committed one.
 
+## Automation (`lean/NoCompiler/RefineAuto.lean`)
+
+A task's proof is generated. The tree diff (item 5) writes the certificate and, per region, its two instruction sequences. The proof then reads:
+
+```lean
+theorem region_0_ok : region_0.Ok cA cB := by nocompiler_region region_0 [as…] [bs…]
+theorem refines : Refines spec cA DA eA cB DB eB := by nocompiler_refine cert [region_0_ok]
+```
+
+- `nocompiler_region r as bs` closes the straight-line region `r` with `RRegion.ok_of_seqEquiv` and `seq_equiv` (kernel tier). Its side conditions are decided.
+- `nocompiler_region_bv` does the same with `seq_equiv_bv`, so the result is in the bv_decide tier.
+- `nocompiler_refine cert [h, …]` applies `Refines.of_cert`: the kernel decides the check, and `h, …` are the regions' proofs in the certificate's order.
+
+Example: `Examples.Refine.Peephole.Auto.refines'` is the peephole refinement in two lines. Not automated yet are regions that are not straight-line equivalences: loops whose relation at the heads is not "the live registers are equal" (plan RA2 in STATUS-C: relational cut points). For those, `RRegion.Ok.of_bigSim` is the proof method.
+
 ## Open (plan: STATUS-C)
 
 - **Item 3, paired execution (rest).** Same-shaped loops with relational invariants at the paired heads (by default, the live state is equal), as a way to prove `RRegion.Ok`.

@@ -138,5 +138,65 @@ theorem Ok.of_instr {cA cB : Code} {r : RRegion} {iA iB : Instr}
     refine .done ⟨.inl (outB _ hpb'), sa', .step memA (.exec hx (hpa ▸ hiA) hok hexa) (.refl _),
       .inl (outA _ hpa'), .inl ⟨hxa', by rw [hpa', hpa, hxA], by rw [hpb', hpb, hxB], hra', hag'⟩⟩
 
+/-- A region from a big-step simulation inside it: `R sa₀` relates A's and
+    B's states during a run that entered at A's state `sa₀` (a relational
+    invariant at the paired loop heads, for example), holds at the entries,
+    and its final states satisfy `Exit`. The proof method for regions whose
+    two sides have the same shape but not the same values (strength
+    reduction, a pointer for an index), and for differently shaped ones. -/
+theorem Ok.of_bigSim {cA cB : Code} {r : RRegion} {pre : State → Prop}
+    (R : State → State → State → Prop)
+    (hR : ∀ sa sb, sa.exit = none → sa.pc = r.pa → sb.pc = r.pb → Agree r.liveIn sa sb → pre sa →
+      R sa sa sb)
+    (hsim : ∀ P sa₀, sa₀.exit = none → sa₀.pc = r.pa → pre sa₀ →
+      BigSim cA r.domA cB r.domB P (r.Exit sa₀) (R sa₀)) :
+    r.Ok cA cB pre := by
+  intro P sa sb hx hpa hpb hag hp hA
+  have h := (hsim P sa hx hpa hp).exec hA sb (hR sa sb hx hpa hpb hag hp)
+  exact Exec.mono (fun _ ⟨ta, hr, hf, he⟩ => ⟨ta, hr, hf, he⟩) h
+
 end RRegion
+/-! ## Stepping both sides (for proofs of simulations) -/
+
+/-- A's safe run, one instruction on: A at a non-final state with instruction
+    `i` (not a syscall) can step, the step is allowed by `P` (what B's matching
+    access needs), and A's run from the next state is still safe. -/
+theorem Exec.stepA {c : Code} {P : Perm} {D : Dom} {Q : State → Prop} {s s' : State} {i : Instr}
+    (h : Exec c P D Q s) (hd : D.mem s.pc) (hx : s.exit = none) (hi : c.instr s.pc = some i)
+    (he : exec i s = some s') : InstrOk P i s ∧ Step c P s s' ∧ Exec c P D Q s' := by
+  cases h with
+  | done hq =>
+    rcases hq.1 with h | h
+    · exact absurd hd h
+    · exact absurd hx h
+  | step _ hex hall =>
+    obtain ⟨t, ht⟩ := hex
+    obtain ⟨i', hi', hok, _⟩ := ht.instrOk
+    rw [hi] at hi'; cases hi'
+    have hst : Step c P s s' := .exec hx hi hok he
+    exact ⟨hok, hst, hall _ hst⟩
+
+/-- B, one instruction on (not a syscall). -/
+theorem Reach.exec_some {c : Code} {P : Perm} {D : Dom} {Q : State → Prop} {s s' : State} {i : Instr}
+    (hd : D.mem s.pc) (hx : s.exit = none) (hi : c.instr s.pc = some i) (hok : InstrOk P i s)
+    (he : exec i s = some s') (h : Reach c P D Q s') : Reach c P D Q s :=
+  Reach.exec_step hd hx hi hok (by rw [he, Reach.opt_some]; exact h)
+
+/-- A's safe run, one instruction on, when the next state is not known in
+    advance (a load whose alignment only A's safety guarantees). -/
+theorem Exec.stepA' {c : Code} {P : Perm} {D : Dom} {Q : State → Prop} {s : State} {i : Instr}
+    (h : Exec c P D Q s) (hd : D.mem s.pc) (hx : s.exit = none) (hi : c.instr s.pc = some i)
+    (hne : i ≠ .ecall) :
+    ∃ s', exec i s = some s' ∧ InstrOk P i s ∧ Step c P s s' ∧ Exec c P D Q s' := by
+  cases h with
+  | done hq =>
+    rcases hq.1 with h | h
+    · exact absurd hd h
+    · exact absurd hx h
+  | step _ hex hall =>
+    obtain ⟨t, ht⟩ := hex
+    cases ht with
+    | exec _ hi' hok he => rw [hi] at hi'; cases hi'; exact ⟨t, he, hok, .exec hx hi hok he, hall _ (.exec hx hi hok he)⟩
+    | sys _ hi' _ _ => rw [hi] at hi'; cases hi'; exact absurd rfl hne
+
 end NoCompiler
