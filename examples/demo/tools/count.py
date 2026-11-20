@@ -2,7 +2,7 @@
 """Proof sizes for demo/README.md: lines and tokens, without blank lines and
 comments.
 
-    python3 -I demo/tools/count.py [--markdown]
+    python3 -I examples/demo/tools/count.py [--markdown]
 
 Per function and side (lean/Demo/<F><A|B>.lean):
   invariants  the `loop_inv ... measure ...` blocks of the nocompiler_auto call
@@ -14,7 +14,7 @@ lemmas about it. Libraries: the core (lean/NoCompiler without Auto.lean and Ext/
 NoCompiler/Auto.lean, NoCompiler/Ext/Rvc.lean, NoCompiler/Vocab/."""
 import os, re, sys
 
-ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
 LEAN = os.path.join(ROOT, "lean")
 TOKEN = re.compile(r"[A-Za-z_À-￿][A-Za-z0-9_'.!?À-￿]*|\d[\dA-Fa-fx#]*|«[^»]*»|[^\sA-Za-z0-9_]")
 

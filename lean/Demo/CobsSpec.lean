@@ -1,7 +1,7 @@
 import NoCompiler.Vocab
 
 /-
-The specification of `cobs_decode` (demo/src/cobs.c), shared by the proof
+The specification of `cobs_decode` (examples/demo/src/cobs.c), shared by the proof
 about the nocompiler build (Demo/CobsB.lean) and the one about the ordinary build
 (Demo/CobsA.lean). Nothing here depends on either binary.
 

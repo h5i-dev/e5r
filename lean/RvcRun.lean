@@ -2,7 +2,7 @@ import NoCompiler.Ext.Rvc
 import NoCompiler.Elf
 
 /-
-For demo/test/rvc_exec.py: run a function of a compressed binary in the
+For examples/demo/test/rvc_exec.py: run a function of a compressed binary in the
 extension's semantics (`CCode.instr`, `execC`), on inputs read from stdin,
 so that the result can be compared with qemu-riscv64 running the same bytes.
 

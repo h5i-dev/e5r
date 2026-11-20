@@ -53,7 +53,7 @@ gives the report as JSON.
    theorems to its axiom checks.
 5. `lake build && lake exe nocompiler-audit` in `lean/`.
 6. Add mutations of the instructions the proof depends on to
-   `scripts/check-proof-controls.sh`; each must make the proof fail.
+   `scripts/core/check-proof-controls.sh`; each must make the proof fail.
 
 ## Next: inside LLVM
 

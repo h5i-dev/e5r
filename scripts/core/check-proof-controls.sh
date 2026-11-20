@@ -9,7 +9,7 @@
 #
 #   scripts/check-proof-controls.sh        (needs target/release/nocompiler and lake)
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 NOCOMPILER=${NOCOMPILER:-$PWD/target/release/nocompiler}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -34,21 +34,21 @@ mutations=(
   "hello Examples.Hello 0x111a4 0x00b00613 0x00a00613 hello-writes-10-bytes"
   "hello Examples.Hello 0x111b0 0x03f55513 0x03e55513 hello-exit-status-2-on-error"
   # demo/README.md: the same mutations on the nocompiler build (B) and the ordinary build (A).
-  "demo/elf/sum.b Demo.SumB 0x1119c 0x00c68633 0x40c68633 demo-B-sum-add-becomes-sub"
-  "demo/elf/sum.b Demo.SumB 0x111a4 0x00850513 0x00450513 demo-B-sum-stride-8-becomes-4"
-  "demo/elf/sum.a Demo.SumA 0x11196 0x9636 0x8e15 demo-A-sum-add-becomes-sub"
-  "demo/elf/sum.a Demo.SumA 0x1119a 0x0521 0x0511 demo-A-sum-stride-8-becomes-4"
-  "demo/elf/cobs.b Demo.CobsB 0x111c8 0x00158713 0x00258713 demo-B-cobs-copies-from-one-byte-late"
-  "demo/elf/cobs.b Demo.CobsB 0x1124c 0x00053023 0x00f53023 demo-B-cobs-success-tag-is-src"
-  "demo/elf/cobs.b Demo.CobsB 0x11244 0x00080023 0x00b80023 demo-B-cobs-decodes-nonzero-separator"
-  "demo/elf/cobs.a Demo.CobsA 0x111ae 0x00158813 0x00258813 demo-A-cobs-copies-from-one-byte-late"
-  "demo/elf/cobs.a Demo.CobsA 0x1121c 0x00053023 0x00553023 demo-A-cobs-success-tag-is-src"
-  "demo/elf/cobs.a Demo.CobsA 0x11208 0x00068023 0x00b68023 demo-A-cobs-decodes-nonzero-separator"
+  "examples/demo/elf/sum.b Demo.SumB 0x1119c 0x00c68633 0x40c68633 demo-B-sum-add-becomes-sub"
+  "examples/demo/elf/sum.b Demo.SumB 0x111a4 0x00850513 0x00450513 demo-B-sum-stride-8-becomes-4"
+  "examples/demo/elf/sum.a Demo.SumA 0x11196 0x9636 0x8e15 demo-A-sum-add-becomes-sub"
+  "examples/demo/elf/sum.a Demo.SumA 0x1119a 0x0521 0x0511 demo-A-sum-stride-8-becomes-4"
+  "examples/demo/elf/cobs.b Demo.CobsB 0x111c8 0x00158713 0x00258713 demo-B-cobs-copies-from-one-byte-late"
+  "examples/demo/elf/cobs.b Demo.CobsB 0x1124c 0x00053023 0x00f53023 demo-B-cobs-success-tag-is-src"
+  "examples/demo/elf/cobs.b Demo.CobsB 0x11244 0x00080023 0x00b80023 demo-B-cobs-decodes-nonzero-separator"
+  "examples/demo/elf/cobs.a Demo.CobsA 0x111ae 0x00158813 0x00258813 demo-A-cobs-copies-from-one-byte-late"
+  "examples/demo/elf/cobs.a Demo.CobsA 0x1121c 0x00053023 0x00553023 demo-A-cobs-success-tag-is-src"
+  "examples/demo/elf/cobs.a Demo.CobsA 0x11208 0x00068023 0x00b68023 demo-A-cobs-decodes-nonzero-separator"
 )
 
 cp -r lean "$work/lean"
-mkdir -p "$work/demo" && cp -r demo/tools "$work/demo/tools"
-# The functions of a compressed demo binary that its image lists (as demo/run.sh exports them).
+mkdir -p "$work/examples/demo" && cp -r examples/demo/tools "$work/examples/demo/tools"
+# The functions of a compressed demo binary that its image lists (as examples/demo/run.sh exports them).
 demo_funcs() { llvm-nm --print-size "$1" | awk '$3 == "T" && $4 != "_start" { printf "%s:%d:%d ", $4, strtonum("0x"$1), strtonum("0x"$2) }'; }
 fail=0
 run() { (cd "$work/lean" && timeout 900 lake build "$1" > "$work/log" 2>&1); }
@@ -76,11 +76,11 @@ for i in range(shnum):
 open(dst, 'wb').write(b)
 PY
   case "$mod" in
-    Demo.*)  # demo/elf/<f>.<a|b>.elf, image Demo/<F>/Image<A|B>.lean
+    Demo.*)  # examples/demo/elf/<f>.<a|b>.elf, image Demo/<F>/Image<A|B>.lean
       f=${base%.*}; side=${base##*.}; F=$(echo "$f" | sed -E 's/(^|_)([a-z])/\U\2/g'); S=${side^^}
       img=Demo/$F/Image$S.lean
       if [ "$side" = a ]; then
-        (cd "$work/lean" && lake env lean --run ../demo/tools/ExportC.lean "$work/$base.elf" "Demo.$F.ImageA" \
+        (cd "$work/lean" && lake env lean --run ../examples/demo/tools/ExportC.lean "$work/$base.elf" "Demo.$F.ImageA" \
           $(demo_funcs "$work/$base.elf") > "$img")
       else
         "$NOCOMPILER" export "$work/$base.elf" --namespace "Demo.$F.ImageB" -o "$work/lean/$img" 2>/dev/null

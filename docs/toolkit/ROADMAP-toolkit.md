@@ -123,8 +123,8 @@ Dependency edges run downward only. `nocompiler-cli` may depend on everything;
 
 ### M0. Clear the ground
 
-- [x] Copy the release-only build guards from h5i (`scripts/no-debug-guard.sh`,
-      `scripts/deny-debug-build.py`) and wire the hook in
+- [x] Copy the release-only build guards from h5i (`scripts/core/no-debug-guard.sh`,
+      `scripts/core/deny-debug-build.py`) and wire the hook in
       `.claude/settings.local.json`. This machine has 7.5 GB of RAM; a dev-profile
       build of a workspace this size is not affordable.
 - [x] Delete `src/`, `test/`, `script/`, `CMakeLists.txt` and the C++ build. Move

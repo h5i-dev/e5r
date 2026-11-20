@@ -35,7 +35,7 @@ memory) on a shared machine.
 """
 import os, re, shutil, subprocess, sys, tempfile, time
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 
 # (file under lean/, modules whose proofs must fail, kind, name, old, new)
 # `old` must occur exactly once in the file.

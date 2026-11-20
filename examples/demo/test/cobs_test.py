@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Differential test of cobs_decode (demo/cobs/cobs.c) under qemu-riscv64.
 
-    python3 -I demo/test/cobs_test.py TEST_ELF PROOF_ELF [N]
+    python3 -I examples/demo/test/cobs_test.py TEST_ELF PROOF_ELF [N]
 
-TEST_ELF links cobs.c with cobs_test_main.c; PROOF_ELF is demo/elf/cobs.{a,b}.elf.
+TEST_ELF links cobs.c with cobs_test_main.c; PROOF_ELF is examples/demo/elf/cobs.{a,b}.elf.
 First checks that cobs_decode has the same bytes in both, so what is tested
 is what is proved. Then feeds N random and edge-case buffers through the
 binary and compares the report and the whole buffer afterwards with an

@@ -5,7 +5,7 @@ namespace Demo.Cobs
 open NoCompiler NoCompiler.Vocab Demo.Cobs.ImageA
 
 set_option maxHeartbeats 20000000 in
-/-- `cobs_decode` as plain clang -O2 -march=rv64gc compiled it (demo/elf/cobs.a.elf).
+/-- `cobs_decode` as plain clang -O2 -march=rv64gc compiled it (examples/demo/elf/cobs.a.elf).
     No block/loop tree: the cut points are read off the control-flow graph by
     hand. The decode loop is entered by a jump into its middle (0x111b8), past
     its exit test at 0x111b4; the cut point is 0x111b8, which every trip

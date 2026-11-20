@@ -4,7 +4,7 @@ import Demo.Sum.ImageA
 namespace Demo.Sum
 open NoCompiler Demo.Sum.ImageA
 
-/-- `sum` as plain clang -O2 -march=rv64gc compiled it (demo/elf/sum.a.elf). -/
+/-- `sum` as plain clang -O2 -march=rv64gc compiled it (examples/demo/elf/sum.a.elf). -/
 theorem sum_a : VerifiedC code sum_dom sum_entry spec := by
   rintro ⟨a, xs⟩ s he ⟨ha0, ha1, hlen, hal, harr⟩
   nocompiler_auto_c sum_entry sum_size s he

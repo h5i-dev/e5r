@@ -84,10 +84,10 @@ library depends on nothing in either.
 Whether a dev build is affordable is a fact about the machine, so the guards
 are opt-in and not committed settings:
 
-- `scripts/no-debug-guard.sh on` puts a regular file at `target/debug`, so cargo
+- `scripts/core/no-debug-guard.sh on` puts a regular file at `target/debug`, so cargo
   stops with "failed to create directory ... File exists" before it compiles
   anything. `off` and `status` do what they say.
-- `scripts/deny-debug-build.py` is a PreToolUse hook for coding agents that
+- `scripts/core/deny-debug-build.py` is a PreToolUse hook for coding agents that
   refuses dev-profile cargo commands, target-directory redirection and attempts
   to remove the guard.
 

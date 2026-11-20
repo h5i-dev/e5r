@@ -1,7 +1,7 @@
 import NoCompiler.Vocab
 
 /-
-The specification of `u64 sum(const u64 *a, u64 n)` (demo/src/sum.c, the
+The specification of `u64 sum(const u64 *a, u64 n)` (examples/demo/src/sum.c, the
 same source as examples/sum.c), shared by Demo/SumB.lean (nocompiler build) and
 Demo/SumA.lean (ordinary build). It is the specification of
 lean/Examples/Sum.lean, restated without that file's image.

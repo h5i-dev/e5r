@@ -4,7 +4,7 @@ import Demo.Sum.ImageB
 namespace Demo.Sum
 open NoCompiler Demo.Sum.ImageB
 
-/-- `sum` as `nocompiler cc -O2` compiled it (demo/elf/sum.b.elf), from its block/loop tree. -/
+/-- `sum` as `nocompiler cc -O2` compiled it (examples/demo/elf/sum.b.elf), from its block/loop tree. -/
 theorem sum_b : VerifiedImg code sum_dom sum_entry spec := by
   rintro ⟨a, xs⟩ s he ⟨ha0, ha1, hlen, hal, harr⟩
   nocompiler_auto sum_func s he

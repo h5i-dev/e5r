@@ -15,23 +15,23 @@ graph, and an extension of the semantics had to be written, trusted and
 tested.
 
 ```bash
-demo/run.sh     # build both, check, test, export, prove, audit, count
+examples/demo/run.sh     # build both, check, test, export, prove, audit, count
 ```
 
 ## What is compared
 
-One source per function, compiled twice (`demo/build.sh`):
+One source per function, compiled twice (`examples/demo/build.sh`):
 
 | | compiler | binary |
 | --- | --- | --- |
-| **A**, ordinary | `clang -O2 --target=riscv64-unknown-elf -march=rv64gc` (+ `-ffreestanding -nostdlib`, static link), default layout: compressed instructions, clang's block placement | `demo/elf/{sum,cobs}.a.elf` |
-| **B**, nocompiler | `nocompiler cc -O2` (RV64IM+Zba+Zbb, no C, `-disable-block-placement`, checked, `.nocompiler.struct`) | `demo/elf/{sum,cobs}.b.elf` |
+| **A**, ordinary | `clang -O2 --target=riscv64-unknown-elf -march=rv64gc` (+ `-ffreestanding -nostdlib`, static link), default layout: compressed instructions, clang's block placement | `examples/demo/elf/{sum,cobs}.a.elf` |
+| **B**, nocompiler | `nocompiler cc -O2` (RV64IM+Zba+Zbb, no C, `-disable-block-placement`, checked, `.nocompiler.struct`) | `examples/demo/elf/{sum,cobs}.b.elf` |
 
 Functions:
 
-* `sum` (`demo/src/sum.c`, the source of `examples/sum.c`): the sum of an
+* `sum` (`examples/demo/src/sum.c`, the source of `examples/sum.c`): the sum of an
   array of words.
-* `cobs_decode` (`demo/src/cobs.c`): in-place COBS decoding, with the
+* `cobs_decode` (`examples/demo/src/cobs.c`): in-place COBS decoding, with the
   contract of the Rust `cobs` crate's `decode_in_place_report`. It returns
   `tag 1, a 0` for an empty buffer; `tag 1, a 1, b` = the bytes decoded before
   the bad block, for an invalid frame; and `tag 0, a` = the source bytes used,
@@ -43,7 +43,7 @@ Functions:
 
 Both builds of `cobs_decode` are tested under qemu-riscv64 against an
 independent Python decoder: 20,000 buffers (valid, corrupted, random) and
-2,000 encode/decode round trips (`demo/test/cobs_test.py`). The bytes tested
+2,000 encode/decode round trips (`examples/demo/test/cobs_test.py`). The bytes tested
 are checked to be the bytes proved.
 
 ### The property (shared, `lean/Demo/{Sum,Cobs}Spec.lean`)
@@ -67,7 +67,7 @@ the rest: memory safety (every access inside the regions, aligned), the
 calling convention (sp, gp, tp, s0–s11 preserved, return to ra), and
 termination. Memory outside the regions is unchanged (`VerifiedImg.frame`).
 
-## Proof sizes (`demo/tools/count.py`; code lines and tokens, no comments or blank lines)
+## Proof sizes (`examples/demo/tools/count.py`; code lines and tokens, no comments or blank lines)
 
 Per function:
 
@@ -98,12 +98,12 @@ Libraries (reported separately; not per function):
 | `lean/NoCompiler/Auto.lean`: the symbolic executor, word normal form, memory lemmas, `nocompiler_auto` | 897 | 12074 | A and B (the tree-driven front end: B only) |
 | `lean/NoCompiler/Ext/Rvc.lean`: compressed-code extension, `nocompiler_auto_c` | 200 | 3058 | A only |
 
-(`count.py --markdown` prints these tables; `demo/run.sh` prints them at the end.)
+(`count.py --markdown` prints these tables; `examples/demo/run.sh` prints them at the end.)
 
-**Lean check time** (wall clock per file as `demo/run.sh` measures it,
+**Lean check time** (wall clock per file as `examples/demo/run.sh` measures it,
 dependencies built, 1.4 s of each is loading the imports; a shared machine,
 so ±15%): `SumB` 3.2 s, `SumA` 3.6 s, `CobsB` 27.8 s, `CobsA` 31.8 s.
-A full `lake build` of the repository is about 75 s, and `demo/run.sh` about
+A full `lake build` of the repository is about 75 s, and `examples/demo/run.sh` about
 3 minutes. Peak memory is about 1.7 GB per file, 1.5 GB of it the imports.
 
 ## How a proof goes, on both sides
@@ -168,19 +168,19 @@ A and B share everything here except where the run stops:
   **Added to the trusted base, for A only:** `decodeC`, `CCode.instr`,
   `execC`, and the four definitions. **Checked:**
   * `decodeC` agrees with llvm-mc on every one of the 49,152 16-bit words
-    (`demo/test/rvc_decode.py`). The only deliberate difference: llvm-mc
+    (`examples/demo/test/rvc_decode.py`). The only deliberate difference: llvm-mc
     decodes the reserved `c.lui rd, 0` and `decodeC` rejects it (the
     conservative side).
   * The compressed `cobs_decode` run in the extension's semantics
     (`lean/RvcRun.lean`) matches qemu byte for byte on 3,000 buffers
-    (`demo/test/rvc_exec.py`; `run.sh` runs 500).
+    (`examples/demo/test/rvc_exec.py`; `run.sh` runs 500).
 
   **Not done:** the adequacy theorems of `NoCompiler/Adequacy.lean` (`VerifiedImg.hw`:
   what the theorem means for the machine that fetches from memory) for
   `StepC`. So A's theorem is about the proof relation over the image, not yet
   about the machine. And the extension is tested against qemu only on the
   instructions this function uses, not on random programs as the core is.
-* **A new exporter** (`demo/tools/ExportC.lean`; untrusted: every `instr_`
+* **A new exporter** (`examples/demo/tools/ExportC.lean`; untrusted: every `instr_`
   lemma is proved by `rfl`, and `nocompiler-audit` compares the halfwords with the
   ELF).
 * **Cut points chosen by hand** from the CFG, including one in the middle of
@@ -238,12 +238,12 @@ The format should matter more where this demo does not go:
   theorems and fails the build otherwise.
 * `lake exe nocompiler-audit` re-reads the four ELF files and checks that their
   `.text` (and, for B, the data sections) are the images the proofs use.
-* **Negative controls** (`scripts/check-proof-controls.sh`): mutations of
+* **Negative controls** (`scripts/core/check-proof-controls.sh`): mutations of
   both binaries, which must each make the proof fail:
   * `sum`: add becomes sub, stride 8 becomes 4, on A and B;
   * COBS: the copy starts one byte late, the success tag is a register
     instead of 0, a separator decodes as nonzero, on A and B.
-* `demo/run.sh` rebuilds both binaries, compares them with the committed
+* `examples/demo/run.sh` rebuilds both binaries, compares them with the committed
   ones, checks B against the profile, and runs the qemu and llvm-mc tests.
   It also re-exports the images (they must equal the committed ones), checks
   the four proofs with timings, runs the audit, and prints the counts.
@@ -252,10 +252,10 @@ The format should matter more where this demo does not go:
 
 | | |
 | --- | --- |
-| `demo/src/` | `sum.c`, `cobs.c`, the entry points and the test driver |
-| `demo/build.sh`, `demo/elf/` | the two builds; the committed binaries |
-| `demo/test/` | `cobs_test.py` (qemu, both builds), `rvc_decode.py` (llvm-mc), `rvc_exec.py` (qemu vs the extension) |
-| `demo/tools/` | `ExportC.lean` (images of compressed code), `RvcTable.lean`, `count.py` |
+| `examples/demo/src/` | `sum.c`, `cobs.c`, the entry points and the test driver |
+| `examples/demo/build.sh`, `examples/demo/elf/` | the two builds; the committed binaries |
+| `examples/demo/test/` | `cobs_test.py` (qemu, both builds), `rvc_decode.py` (llvm-mc), `rvc_exec.py` (qemu vs the extension) |
+| `examples/demo/tools/` | `ExportC.lean` (images of compressed code), `RvcTable.lean`, `count.py` |
 | `lean/Demo/` | the specifications, the four proofs, the images |
 | `lean/NoCompiler/Auto.lean` | `nocompiler_auto` |
 | `lean/NoCompiler/Ext/Rvc.lean` | the extension for compressed code, `nocompiler_auto_c` |

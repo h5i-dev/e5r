@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """decodeC (lean/NoCompiler/Ext/Rvc.lean) against llvm-mc, on every 16-bit word.
 
-    python3 -I demo/test/rvc_decode.py TABLE
+    python3 -I examples/demo/test/rvc_decode.py TABLE
 
-TABLE is demo/tools/RvcTable.lean's output: for each halfword h (low bits
+TABLE is examples/demo/tools/RvcTable.lean's output: for each halfword h (low bits
 not 11), `h none` or `h w`, w the 32-bit word of the instruction decodeC
 gives (checked there to decode to it). For each h, llvm-mc disassembles h
 with the C extension and w without it; the texts must be equal. Where

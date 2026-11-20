@@ -2,11 +2,11 @@
 """The extension's semantics (lean/NoCompiler/Ext/Rvc.lean) against qemu-riscv64, on
 the compressed cobs_decode the proof is about.
 
-    python3 -I demo/test/rvc_exec.py RVC_RUN TEST_ELF PROOF_ELF ENTRY [N]
+    python3 -I examples/demo/test/rvc_exec.py RVC_RUN TEST_ELF PROOF_ELF ENTRY [N]
 
 RVC_RUN is the `rvc-run` executable (lean/RvcRun.lean): it runs PROOF_ELF's
 function at ENTRY with CCode.instr and execC. TEST_ELF links the same
-cobs_decode (same bytes, checked by demo/test/cobs_test.py) with a driver,
+cobs_decode (same bytes, checked by examples/demo/test/cobs_test.py) with a driver,
 run under qemu. Both get the same N buffers; the 24-byte result slot and the
 buffer afterwards must be equal byte for byte."""
 import os, random, struct, subprocess, sys

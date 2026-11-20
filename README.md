@@ -36,7 +36,7 @@ alone. [lean/Examples/Hello.lean](lean/Examples/Hello.lean) proves a
 message from `.rodata` through it and exits.
 [lean/NoCompiler/Adequacy.lean](lean/NoCompiler/Adequacy.lean) proves, once for all
 programs, what such a theorem means for the machine.
-`scripts/check-proof-controls.sh` checks that mutated binaries break the proofs.
+`scripts/core/check-proof-controls.sh` checks that mutated binaries break the proofs.
 [demo/README.md](demo/README.md) proves the same specification about an
 nocompiler build and an ordinary rv64gc build of the same C, and compares the two.
 

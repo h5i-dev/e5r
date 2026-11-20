@@ -4,7 +4,7 @@ import Examples.Sum
 import Examples.Hello
 
 /-
-For scripts/check-spec-references.py: evaluate the computable parts of the
+For scripts/core/check-spec-references.py: evaluate the computable parts of the
 example specifications on inputs from stdin, so that they can be compared
 with independent reference implementations (in Python). Not used by any
 proof; what it runs is the specification's own definitions.

@@ -22,7 +22,7 @@ claim "easier to prove".
 `cargo test -p nocompiler --test corpus -- --nocapture`, with clang 15.0.7 and
 ld.lld 20 on the development host (the spec's survey used clang 18.1.3). The
 corpus is every C program in the repository built with `nocompiler cc`
-(examples/, demo/src, crates/nocompiler/tests/cc), including tests/cc/frames.c,
+(examples/, examples/demo/src, crates/nocompiler/tests/cc), including tests/cc/frames.c,
 24 functions written for R6: saves, spills, address-taken scalars, arrays and
 structs passed to callees, sret, calls in loops, eight and nine arguments, a
 variable-length array.
@@ -42,7 +42,7 @@ The test asserts all of this except `call_in_loop`, whose level depends on the
 clang version.
 
 In Lean: the committed images (examples/elf/{sum,hello}.elf,
-demo/elf/{sum,cobs}.b.elf) state `<name>_checked : Struct.level ... = some .l2`
+examples/demo/elf/{sum,cobs}.b.elf) state `<name>_checked : Struct.level ... = some .l2`
 for all 11 of their functions, proved by `decide` against the certificate
 `nocompiler export` writes (lean/NoCompiler/Frame.lean). The corpus beyond the
 committed images is checked in Rust only.
@@ -123,7 +123,7 @@ that read data (`hello`) need a specification that names the layout; also open.
 
 ## 6. Negative controls, audit side (agent B, 2026-11-20)
 
-`scripts/check-audit-controls.sh` patches a copy of a relinked binary and
+`scripts/core/check-audit-controls.sh` patches a copy of a relinked binary and
 requires the audit to fail for the stated reason; then the unpatched copy
 must pass. All pass:
 

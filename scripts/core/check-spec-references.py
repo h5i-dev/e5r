@@ -10,7 +10,7 @@ the function rather than from the Lean text:
 
   sum, sum2    Python's sum mod 2^64 (Examples.Sum.sumW, Demo.Sum.sumW;
                sum2's postcondition is sumW xs + sumW ys)
-  cobs_decode  the reference decoder of demo/test/cobs_test.py (the one the
+  cobs_decode  the reference decoder of examples/demo/test/cobs_test.py (the one the
                binaries are tested against under qemu) vs Demo.Cobs.report
   write_all    the bytes of a trace of writes to one fd vs NoCompiler.writtenTo
   hello        the message in examples/hello.c vs Examples.Hello.message, and
@@ -20,13 +20,13 @@ the function rather than from the Lean text:
 """
 import importlib.util, os, random, re, subprocess, sys
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 LEAN = os.path.join(ROOT, "lean")
 M64 = 1 << 64
 
 
 def load_cobs_reference():
-    spec = importlib.util.spec_from_file_location("cobs_test", os.path.join(ROOT, "demo/test/cobs_test.py"))
+    spec = importlib.util.spec_from_file_location("cobs_test", os.path.join(ROOT, "examples/demo/test/cobs_test.py"))
     mod = importlib.util.module_from_spec(spec)
     src = open(spec.origin).read()
     # Only the definitions: the module runs its test when executed as a script.

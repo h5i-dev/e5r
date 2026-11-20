@@ -23,9 +23,9 @@ proving such code in the same logic needs, and no further:
 What this adds to the trusted base, for results about compressed code only:
 `decodeC`, `CCode.instr` and `execC` (and the four definitions above). The
 results about nocompiler binaries do not import this file. Checked against llvm-mc
-(every 16-bit word, demo/test/rvc_decode.py) and against qemu-riscv64 (the
+(every 16-bit word, examples/demo/test/rvc_decode.py) and against qemu-riscv64 (the
 compressed `cobs_decode` run in Lean and in qemu on the same inputs,
-demo/test/rvc_exec.py). Not done here: the adequacy theorems of
+examples/demo/test/rvc_exec.py). Not done here: the adequacy theorems of
 NoCompiler/Adequacy.lean for `StepC`.
 -/
 namespace NoCompiler

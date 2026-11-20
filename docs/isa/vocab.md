@@ -23,7 +23,7 @@ The predicates themselves are the core's: `arr64` and `arrRegion`
 (`NoCompiler/Mem.lean`), `readBytes`, `Region`, `Region.Disjoint` and
 `Region.within`, `writtenTo` (`NoCompiler/Trace.lean`).
 
-**What moved, and what it saved** (`demo/tools/count.py`: code lines and
+**What moved, and what it saved** (`examples/demo/tools/count.py`: code lines and
 tokens without comments or blank lines):
 
 | | before | after |
@@ -44,9 +44,9 @@ of. `Examples/Sum2.lean` and `Examples/Hello.lean` (frames, calls,
 syscalls) are being re-proved with `nocompiler_auto`; the frame lemmas in
 `Vocab/Memory.lean` are for that and for callers in general.
 
-## Spec mutation tests (`scripts/check-spec-mutations.py`)
+## Spec mutation tests (`scripts/core/check-spec-mutations.py`)
 
-`scripts/check-proof-controls.sh` changes the binary and requires the proof
+`scripts/core/check-proof-controls.sh` changes the binary and requires the proof
 to fail: the proof depends on the code. This script changes the
 specification and requires every proof of it to fail: the specification
 pins down what the code does. For each mutation it alters one piece of one
@@ -66,9 +66,9 @@ fix is to the specification (or, for a `pre` that turns out unnecessary, to
 drop the conjunct and re-prove), never to the list.
 
 ```bash
-python3 -I scripts/check-spec-mutations.py --list           # what it does
-python3 -I scripts/check-spec-mutations.py --only Examples/Sum
-python3 -I scripts/check-spec-mutations.py                  # all (about 20 minutes: COBS is ~40 s a build)
+python3 -I scripts/core/check-spec-mutations.py --list           # what it does
+python3 -I scripts/core/check-spec-mutations.py --only Examples/Sum
+python3 -I scripts/core/check-spec-mutations.py                  # all (about 20 minutes: COBS is ~40 s a build)
 ```
 
 **Result** (2026-11-20): all 33 mutations break their proofs, on `sum`,
@@ -89,7 +89,7 @@ builds); no specification was found too weak. Two observations:
 The core job of CI runs every mutation but COBS's (a few minutes); the
 manual `spec-mutations` workflow runs all of them (about 15 minutes).
 
-## Executable specifications against references (`scripts/check-spec-references.py`)
+## Executable specifications against references (`scripts/core/check-spec-references.py`)
 
 Where a specification is computable, evaluating it is a way of reading it.
 `lake exe spec-eval` (`lean/SpecEval.lean`) runs the specifications' own
@@ -100,7 +100,7 @@ function rather than from the Lean text:
 | function | specification | reference |
 | --- | --- | --- |
 | `sum`, `sum2` | `Examples.Sum.sumW`, `Demo.Sum.sumW` (sum2's post is `sumW xs + sumW ys`) | Python's `sum` mod 2^64 |
-| `cobs_decode` | `Demo.Cobs.report` | the decoder of `demo/test/cobs_test.py`, the one the binaries are tested against under qemu |
+| `cobs_decode` | `Demo.Cobs.report` | the decoder of `examples/demo/test/cobs_test.py`, the one the binaries are tested against under qemu |
 | `write_all` | `NoCompiler.writtenTo` | the bytes of a trace of writes to one fd |
 | `hello` | `Examples.Hello.message` and the full length in `helloSpec` | the string in `examples/hello.c` |
 

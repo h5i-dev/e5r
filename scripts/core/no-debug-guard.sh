@@ -12,7 +12,7 @@
 #   scripts/no-debug-guard.sh off      # maintainer escape hatch
 #   scripts/no-debug-guard.sh status
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
 guard=target/debug
 
