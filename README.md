@@ -91,34 +91,39 @@ Every number comes from the repository.
 
 All acceptance criteria, open ones included, are in [docs/isa/v1-results.md](docs/isa/v1-results.md).
 
-## Formally verified in Lean 4
+## What the framework proves, once for every program
 
-The kernel checks all of these. They use only the standard axioms, except the `bv_decide` tier below ([lean/Audit.lean](lean/Audit.lean)).
-Each also trusts what [trust.md](docs/isa/trust.md) lists: the kernel, the semantics, the machine and environment models, and the spec.
+nocompiler is a framework, not a verified product.
+Its value is the theorems below. Each is proved once and applies to every binary you verify with it.
+All are kernel-checked with the standard axioms ([lean/Audit.lean](lean/Audit.lean)).
+They trust only what [trust.md](docs/isa/trust.md) lists: the kernel, the RV64 semantics, the machine and environment models.
 
-- **Example functions.**
-  - `sum_verified`: the sum of an array, as clang `-O2` compiled it.
-  - `sum2_verified`: a caller with a frame, proved from `sum`'s spec alone.
-  - `write_all_verified` and `hello_verified`: a `write` loop over short writes, and a program that exits.
-  - The audit checks each image against the committed ELF, byte for byte.
-- **Adequacy** ([Adequacy.lean](lean/NoCompiler/Adequacy.lean)), proved once for all programs.
-  - On the real fetch-from-memory machine, the function never faults, ends in its postcondition and terminates.
-  - It assumes the image is loaded and writable memory does not overlap the code.
-- **Structured control.**
-  - `Struct.cfi`: every control transfer of a checked function is structured (R1–R3).
-  - `Struct.level … = some .l2` adds the frame rules R4–R6 ([Frame.lean](lean/NoCompiler/Frame.lean)). All 11 committed functions reach L2.
-- **Relocatable proofs.**
-  - `sum_relocatable` holds at every layout. It comes from the fixed-address proof via `VerifiedImg.shift`.
-  - Leaf functions only. `sum2` is proved at two links with one proof text, not at every layout.
-  - The audit checks each linked ELF against its module.
-- **Refinement** ([refine.md](docs/isa/refine.md)).
-  - `Refines sp A B` makes A the spec: where A runs safely, B runs safely and ends as A can.
-  - `Refines.verified` turns a proof about A into one about B.
+- **Your theorem holds on the real machine.** `Exec.hw_safe`, `hw_final`, `hw_terminates`, `VerifiedImg.hw` ([Adequacy.lean](lean/NoCompiler/Adequacy.lean)).
+  - A proof about a function becomes a statement about the CPU fetching its bytes from memory.
+  - It never faults, ends in its postcondition and terminates.
+- **The checker's verdict is a theorem.** `Struct.cfi` ([Struct.lean](lean/NoCompiler/Struct.lean)), `Struct.level` ([Frame.lean](lean/NoCompiler/Frame.lean)).
+  - If the kernel accepts a function at L1, every control transfer is structured (R1–R3).
+  - At L2, the frame rules R4–R6 hold too.
+- **Proofs can work on the structure, not the pc.** `SReach.sound`, `SExec.sound` ([SSem.lean](lean/NoCompiler/SSem.lean)).
+  - A proof over the block/loop tree implies the machine-level result.
+- **Proofs compose.** `VerifiedImg.call`, `VerifiedImg.frame` ([Spec.lean](lean/NoCompiler/Spec.lean)).
+  - A caller uses only its callee's spec, never its code.
+  - Memory a function may not write is unchanged when it returns.
+- **Proofs survive linking.** `VerifiedImg.shift`, `Verified.of_leaf`, `Verified.mono` ([Relocate.lean](lean/NoCompiler/Relocate.lean)).
+  - A leaf function's proof holds at every layout.
+  - Adding modules keeps existing theorems.
+  - Functions with calls: not yet at every layout.
+- **An edited binary inherits the original's guarantees.** `Refines.verified`, `Refines.of_lockstep`, `RRegion.ok_of_seqEquiv` ([refine.md](docs/isa/refine.md)).
+  - If B refines A, every proof about A is a proof about B.
   - Lockstep certificates and straight-line equivalences are checked in the kernel.
-  - Loop-reshaping edits are not covered yet.
-- **`bv_decide` tier.** Some straight-line equivalences use `bv_decide`. Its check runs native code, so the audit lists these theorems separately.
-- **The demo.** Profile builds (`sum_b`, `cobs_b`) and rv64gc builds (`sum_a`, `cobs_a`).
-  - The rv64gc proofs also trust the compressed-instruction extension (`Ext/Rvc.lean`).
-  - That extension is tested against llvm-mc and qemu. It has no adequacy theorem yet.
+  - Loop-reshaping edits: not yet.
+
+**What you prove per function:** a spec, one invariant per loop, and the facts about your algorithm.
+`nocompiler_auto` does the rest. The audit then ties the theorem to the committed ELF, byte for byte.
+
+**Not standard axioms:** some straight-line equivalences use `bv_decide`, whose check runs native code. The audit lists them separately.
+
+**Examples** ([lean/Examples](lean/Examples), [examples/demo](examples/demo/README.md)): `sum`, `sum2` (calls, a frame), `write_all` and `hello` (syscalls), `cobs_decode`.
+The demo also proves rv64gc builds. Those proofs trust a compressed-instruction extension and have no adequacy theorem yet.
 
 [Docs](docs/README.md) · [Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md) · Apache-2.0
