@@ -57,6 +57,12 @@ theorem Reach.cutpoints {c : Code} {P : Perm} {D : Dom} {Q : State → Prop}
   Reach.trans (start _ rfl) fun s' h => h.elim .done fun hi =>
     Reach.loop (fun u => inv u.pc u) (fun u => μ u.pc u) (fun u hu => body u hu _ rfl) s' hi
 
+/-- An aligned access goes ahead. -/
+theorem Reach.opt_aligned {c : Code} {P : Perm} {D : Dom} {Q : State → Prop} {a : Word} {w : Nat}
+    {s : State} (h : aligned a w) :
+    Reach.opt c P D Q (if aligned a w then some s else none) = Reach c P D Q s := by
+  simp [h]
+
 /-- Two regions share no byte. -/
 def Region.Disjoint (r r' : Region) : Prop :=
   r.size ≤ (r'.base - r.base).toNat ∧ r'.size ≤ (r.base - r'.base).toNat
@@ -211,6 +217,9 @@ theorem add_ofNat_eq_iff (a : Word) (y : Nat) : a + BitVec.ofNat 64 y = a ↔ y 
 @[e5r_nat] theorem aligned_one (a : Word) : aligned a 1 = True := by
   simp [aligned, Nat.mod_one]
 
+theorem aligned_two_of_four {x : Word} (h : aligned x 4) : aligned x 2 := by
+  unfold aligned at *; omega
+
 /-! ## Memory -/
 
 theorem readLE_one (m : Word → Byte) (a : Word) : readLE m a 1 = (m a).toNat := by
@@ -250,14 +259,15 @@ theorem getElem_readBytes (m : Word → Byte) (a : Word) (n j : Nat) (h : j < (r
 
 /-- A byte of a buffer whose contents are known. -/
 theorem mem_of_readBytes {m : Word → Byte} {a : Word} {n : Nat} {L : List Byte}
-    (h : readBytes m a n = L) {i : Nat} (hi : i < n) : m (a + BitVec.ofNat 64 i) = L.getD i 0 := by
+    (h : readBytes m a n = L) : ∀ i, i < n → m (a + BitVec.ofNat 64 i) = L.getD i 0 := by
+  intro i hi
   subst h
   rw [← getElem_readBytes m a n i (by simp [readBytes_length, hi])]
   simp [List.getD_eq_getElem?_getD, readBytes_length, hi]
 
 theorem mem_of_readBytes_base {m : Word → Byte} {a : Word} {n : Nat} {L : List Byte}
     (h : readBytes m a n = L) (hn : 0 < n) : m a = L.getD 0 0 := by
-  have := mem_of_readBytes h hn
+  have := mem_of_readBytes h 0 hn
   rwa [add_ofNat_zero] at this
 
 theorem writeLE_one (m : Word → Byte) (p : Word) (v : Nat) :
@@ -379,6 +389,18 @@ macro_rules
         $loc:location)
       (try simp (config := { decide := true }) only [e5r_state, e5r_image, $ts,*] $loc:location)))
 
+/-- `e5r_anorm` without evaluation by `decide`: for verification conditions,
+    where `decide` would try to evaluate the specification's functions. -/
+syntax "e5r_vnorm" (" [" Lean.Parser.Tactic.simpArg,* "]")? : tactic
+macro_rules
+  | `(tactic| e5r_vnorm [$ts,*]) => `(tactic| (
+      (try simp only [e5r_sem])
+      (try simp (disch := decide) only [e5r_state, e5r_image, $ts,*])
+      (try simp only [e5r_lit])
+      (try simp (disch := e5r_disch) only [e5r_nat, e5r_lit,
+        Nat.add_zero, Nat.zero_add, Nat.sub_self, Nat.sub_zero, Nat.mul_zero, Nat.zero_mod, $ts,*])
+      (try simp (disch := decide) only [e5r_state, e5r_image, e5r_lit, $ts,*])))
+
 /-- A branch condition as a fact about the normal form. -/
 syntax "e5r_cond" (" [" Lean.Parser.Tactic.simpArg,* "]")? Lean.Parser.Tactic.location : tactic
 macro_rules
@@ -408,7 +430,21 @@ macro "e5r_align" : tactic => `(tactic| (
 
 inductive Mode | start | body
 
+/-- The step relation a run is about: `Reach` over a `Code`, or another one
+    with the same shape (E5R/Ext/Rvc.lean, compressed code). -/
+structure Flavor where
+  reach : Name := ``Reach
+  opt : Name := ``Reach.opt
+  instr : Name := ``Code.instr
+  exec : Name := ``Exec
+  execStep : Name := ``Reach.exec_step
+  done : Name := ``Reach.done
+  optSome : Name := ``Reach.opt_some
+  optAligned : Name := ``Reach.opt_aligned
+  cutpoints : Name := ``Reach.cutpoints
+
 structure Ctx where
+  fl : Flavor := {}
   /-- The loop heads: where a run stops and the invariant is due. -/
   cuts : List Nat
   /-- Rewrites for every normalisation: the caller's facts, the pc and the
@@ -438,19 +474,31 @@ def simpArgs (ts : Array Term) : TacticM SimpArgs := do
   return Syntax.TSepArray.ofElems arr
 
 register_option e5r.auto.trace : Bool := { defValue := false, descr := "trace e5r_auto" }
+register_option e5r.auto.traceFile : String :=
+  { defValue := "", descr := "append e5r_auto's trace to this file as it runs" }
+
+def traceLine (msg : String) : CoreM Unit := do
+  let f := e5r.auto.traceFile.get (← getOptions)
+  if f.isEmpty then return
+  let h ← IO.FS.Handle.mk f .append
+  h.putStrLn msg
+  h.flush
 
 def run (g : MVarId) (tac : TSyntax `tactic) : TacticM (List MVarId) := do
   if e5r.auto.trace.get (← getOptions) then
-    logInfo m!"run {tac} on{indentD (MessageData.ofGoal g)}"
+    let t ← IO.monoMsNow
+    let gs ← evalTacticAt tac g
+    traceLine s!"[e5r_auto {(← IO.monoMsNow) - t} ms] {tac.raw.prettyPrint.pretty 100 |>.take 160}"
+    return ← gs.filterM fun g => return !(← g.isAssigned)
   let gs ← evalTacticAt tac g
   gs.filterM fun g => return !(← g.isAssigned)
 
 /-- `Reach c P D R s` or `Reach.opt c P D R os`. -/
-def goalHead (g : MVarId) : MetaM (Option (Name × Expr)) := do
+def goalHead (fl : Flavor) (g : MVarId) : MetaM (Option (Name × Expr)) := do
   let t ← instantiateMVars (← g.getType)
   let t := t.consumeMData
-  if t.isAppOfArity ``Reach 5 then return some (``Reach, t.appArg!)
-  if t.isAppOfArity ``Reach.opt 5 then return some (``Reach.opt, t.appArg!)
+  if t.isAppOfArity fl.reach 5 then return some (fl.reach, t.appArg!)
+  if t.isAppOfArity fl.opt 5 then return some (fl.opt, t.appArg!)
   return none
 
 /-- The pc of a state in the step tactics' normal form, if it is a literal:
@@ -512,7 +560,7 @@ def finish (cx : Ctx) (gs : List MVarId) : TacticM (List MVarId) := do
       first
         | with_reducible rfl
         | omega
-        | (e5r_anorm [$fs,*]
+        | (e5r_vnorm [$fs,*]
            (try simp (disch := e5r_disch) only [ofNat_inj, add_ofNat_inj, eq_add_ofNat_iff,
              add_ofNat_eq_iff, List.length_set, readBytes_length])
            (try with_reducible rfl)
@@ -526,14 +574,14 @@ def closeCut (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (List MVarId) := do
   let fs ← simpArgs cx.facts
   let hR := cx.hR
   let tag := s!"{cx.origin}_to_{hex pc}"
-  let gs ← run g (← `(tactic| (subst $hR:ident; refine Reach.done ?_; (try dsimp only); right)))
+  let gs ← run g (← `(tactic| (subst $hR:ident; refine $(mkIdent cx.fl.done) ?_; (try dsimp only); right)))
   let some g := gs.head? | return []
   match cx.mode with
   | .start =>
     let [gx, gsame, gi] ← run g (← `(tactic| refine ⟨?_, ?_, ?_⟩)) | throwError "e5r_auto: cut"
     let r1 ← run gx (← `(tactic| e5r_anorm [$fs,*]))
     let r2 ← run gsame (← `(tactic| e5r_same))
-    let r3 ← run gi (← `(tactic| e5r_anorm [$fs,*]))
+    let r3 ← run gi (← `(tactic| e5r_vnorm [$fs,*]))
     let r3 ← r3.foldlM (fun acc g => return acc ++ (← splitGoal g)) []
     let r3 ← finish cx r3
     tagged (r1 ++ r2 ++ r3) tag
@@ -542,10 +590,10 @@ def closeCut (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (List MVarId) := do
       | throwError "e5r_auto: cut"
     let r1 ← run gx (← `(tactic| e5r_anorm [$fs,*]))
     let r2 ← run gsame (← `(tactic| e5r_same))
-    let r3 ← run gi (← `(tactic| e5r_anorm [$fs,*]))
+    let r3 ← run gi (← `(tactic| e5r_vnorm [$fs,*]))
     let r3 ← r3.foldlM (fun acc g => return acc ++ (← splitGoal g)) []
     let r3 ← finish cx r3
-    let r4 ← run gm (← `(tactic| (e5r_anorm [$fs,*]; (try omega))))
+    let r4 ← run gm (← `(tactic| (e5r_vnorm [$fs,*]; (try omega))))
     let r4 ← tagged r4 (tag ++ "_measure")
     return (← tagged (r1 ++ r2 ++ r3) tag) ++ r4
 
@@ -557,7 +605,7 @@ def closeRet (cx : Ctx) (g : MVarId) (from_ : Nat) : TacticM (List MVarId) := do
   let rs := cx.rs
   let sp := cx.spec
   let tag := s!"{cx.origin}_ret_{hex from_}"
-  let gs ← run g (← `(tactic| (subst $hR:ident; refine Reach.done ?_; (try dsimp only); left)))
+  let gs ← run g (← `(tactic| (subst $hR:ident; refine $(mkIdent cx.fl.done) ?_; (try dsimp only); left)))
   let some g := gs.head? | return []
   let [gf, gx, gp, gpres, gpost] ← run g (← `(tactic| refine ⟨.inl ?_, .inl ⟨?_, ?_, ?_, ?_⟩⟩))
     | throwError "e5r_auto: ret"
@@ -565,7 +613,7 @@ def closeRet (cx : Ctx) (g : MVarId) (from_ : Nat) : TacticM (List MVarId) := do
   let r2 ← run gx (← `(tactic| e5r_anorm [$fs,*]))
   let r3 ← run gp (← `(tactic| (e5r_anorm [$fs,*]; (try rfl))))
   let r4 ← run gpres (← `(tactic| exact Same.preserved (rs := $rs) (by e5r_same) (by decide)))
-  let r5 ← run gpost (← `(tactic| (simp only [$sp:ident]; e5r_anorm [$fs,*])))
+  let r5 ← run gpost (← `(tactic| (simp only [$sp:ident]; e5r_vnorm [$fs,*])))
   let r5 ← r5.foldlM (fun acc g => return acc ++ (← splitGoal g)) []
   let r5 ← finish cx r5
   tagged (r1 ++ r2 ++ r3 ++ r4 ++ r5) tag
@@ -575,14 +623,14 @@ def closeRet (cx : Ctx) (g : MVarId) (from_ : Nat) : TacticM (List MVarId) := do
 def step (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (MVarId × List MVarId) := do
   let fs ← simpArgs cx.facts
   let sp := cx.spec
-  let gs ← run g (← `(tactic| refine Reach.exec_step (i := ?_) ?_ ?_ ?_ ?_ ?_))
+  let gs ← run g (← `(tactic| refine' $(mkIdent cx.fl.execStep) ?_ ?_ ?_ ?_ ?_))
   let find (n : Name) : MetaM (Option MVarId) := gs.findM? fun g => do
     let t ← instantiateMVars (← g.getType)
     let h := if t.isAppOf ``Eq then
-        (if (t.getArg! 1).isAppOf ``Code.instr then `hi else `hx)
+        (if (t.getArg! 1).isAppOf cx.fl.instr then `hi else `hx)
       else if t.isAppOf ``Dom.mem then `hd
       else if t.isAppOf ``InstrOk then `hok
-      else if t.isAppOf ``Reach.opt then `h
+      else if t.isAppOf cx.fl.opt then `h
       else `i
     return h == n
   let some ghi ← find `hi | throwError "e5r_auto: step at {hex pc}"
@@ -607,17 +655,17 @@ def step (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (MVarId × List MVarId) :=
 partial def drive (cx : Ctx) (first : Bool) (fuel : Nat) (g : MVarId) (last : Nat) :
     TacticM (List MVarId) := do
   if fuel = 0 then
-    throwError "e5r_auto: no cut point within 2000 steps of {cx.origin}: is every loop given an invariant?"
-  let some (h, a) ← goalHead g
+    throwError "e5r_auto: no cut point within 400 steps of {cx.origin}: is every loop given an invariant?"
+  let some (h, a) ← goalHead cx.fl g
     | throwError "e5r_auto: expected a `Reach` goal, got{indentExpr (← g.getType)}"
-  if h == ``Reach.opt then
+  if h == cx.fl.opt then
     -- An `if` left by a branch or by an alignment check.
     let a ← whnfR (← instantiateMVars a)
     unless a.isAppOf ``ite do
       throwError "e5r_auto: cannot continue at {hex last}:{indentExpr (← g.getType)}"
     let cond := a.getArg! 1
     if cond.isAppOf ``aligned then
-      let gs ← run g (← `(tactic| (rw [ite_eq_left_of_eq_true _ (eq_true (by e5r_align))]; simp only [Reach.opt_some])))
+      let gs ← run g (← `(tactic| rw [$(mkIdent cx.fl.optAligned):ident (by e5r_align)]))
       match gs with
       | [g'] => return ← drive cx false (fuel - 1) g' last
       | _ =>
@@ -635,7 +683,7 @@ partial def drive (cx : Ctx) (first : Bool) (fuel : Nat) (g : MVarId) (last : Na
         let r ← r.foldlM (fun acc g => do
           return acc ++ (← run g (← `(tactic| (try (exfalso; omega)))))) []
         let r ← r.foldlM (fun acc g => do
-          return acc ++ (← run g (← `(tactic| (try simp only [Reach.opt_some]))))) []
+          return acc ++ (← run g (← `(tactic| (try simp only [$(mkIdent cx.fl.optSome):ident]))))) []
         for g'' in r do
           out := out ++ (← drive { cx with facts := cx.facts.push hb } false (fuel - 1) g'' last)
       return out
@@ -648,9 +696,9 @@ partial def drive (cx : Ctx) (first : Bool) (fuel : Nat) (g : MVarId) (last : Na
 
 /-! ### The front end -/
 
-syntax e5rCut := "loop " term:max ppSpace term:max " measure " term:max
+syntax e5rCut := "loop_inv " term:max ppSpace term:max " measure " term:max
 
-/-- `e5r_auto f s he [facts] (loop pc inv measure μ)*` proves the goal
+/-- `e5r_auto f s he [facts] (loop_inv pc inv measure μ)*` proves the goal
     `Exec c (spec.perm a s) D (spec.Done a s) s` that `Verified c D entry spec`
     leaves after `intro a s he hpre`, for the function whose block/loop tree is
     `f`, given an invariant and a measure at each of its loop heads. What it
@@ -666,14 +714,14 @@ unsafe def evalNatImpl (e : Expr) : MetaM Nat := evalExpr Nat (mkConst ``Nat) e
 @[implemented_by evalNatImpl] opaque evalNat (e : Expr) : MetaM Nat
 
 /-- Facts every normalisation uses, from the hypotheses of the context. -/
-def contextFacts (u : Expr) : TermElabM (Array Term) := do
+def contextFacts (us : List Expr) : TermElabM (Array Term) := do
   let mut out := #[]
   for d in ← getLCtx do
     if d.isImplementationDetail then continue
     let ty ← instantiateMVars d.type
     let x := mkFVar d.fvarId
     if let some (_, l, _) := ty.eq? then
-      if l.containsFVar u.fvarId! then
+      if us.any (fun u => l.containsFVar u.fvarId!) then
         out := out.push (← Term.exprToSyntax x)
         if l.isAppOfArity ``readBytes 3 then
           out := out.push (← `(mem_of_readBytes $(← Term.exprToSyntax x)))
@@ -682,11 +730,16 @@ def contextFacts (u : Expr) : TermElabM (Array Term) := do
       let t ← Term.exprToSyntax x
       out := out.push (← `(readBytes_writeLE_of_disjoint $t))
       out := out.push (← `(readBytes_writeLE_of_disjoint (Region.Disjoint.symm $t)))
-      out := out.push (← `(read64_writeLE_of_disjoint $t))
-      out := out.push (← `(read64_writeLE_of_disjoint (Region.Disjoint.symm $t)))
     if ty.isAppOfArity ``arr64 3 then
       out := out.push (← `(arr64.read $(← Term.exprToSyntax x)))
-  return out
+  -- Keep what elaborates: one ill-typed simp argument would void a whole pass.
+  out.filterM fun t => do
+    try
+      let s ← saveState
+      let _ ← Term.elabTerm t none
+      s.restore
+      return true
+    catch _ => return false
 
 /-- Alignment hypotheses as the arithmetic `omega` reads. -/
 def alignFacts : TacticM Unit := withMainContext do
@@ -699,18 +752,24 @@ def alignFacts : TacticM Unit := withMainContext do
 
 def natLit (n : Nat) : Term := Syntax.mkNumLit (toString n)
 
-@[tactic e5rAuto] def evalE5rAuto : Tactic := fun stx => do
-  let f : Term := ⟨stx[1]⟩
-  let s0 : Ident := ⟨stx[2]⟩
-  let he : Ident := ⟨stx[3]⟩
-  let userFacts : Array Term := if stx[4].isNone then #[] else
-    stx[4][1].getSepArgs.map fun a => ⟨a[2]!⟩
-  let cutStx := stx[5].getArgs
-  -- The goal and the function.
+/-- What both front ends share: the syntax of the call, the goal, and the
+    cut points as given. -/
+structure Call where
+  s0 : Ident
+  he : Ident
+  userFacts : Array Term
+  code : Expr
+  specName : Name
+  cuts : Array (Nat × Term × Term × Term)
+
+def parseCall (fl : Flavor) (s0 he : Syntax) (factsStx : Syntax) (cutStx : Array Syntax) :
+    TacticM Call := do
+  let userFacts : Array Term := if factsStx.isNone then #[] else
+    factsStx[1].getSepArgs.map fun a => ⟨a[2]!⟩
   let g ← getMainGoal
   let gt ← instantiateMVars (← g.getType)
-  unless gt.isAppOfArity ``Exec 5 do
-    throwError "e5r_auto: expected `Exec c P D Q s` (after `intro a s he hpre` on a `Verified` goal)"
+  unless gt.isAppOfArity fl.exec 5 do
+    throwError "e5r_auto: expected `{fl.exec} c P D Q s` (after `intro a s he hpre` on a `Verified` goal)"
   let code := gt.getArg! 0
   let doneE := (gt.getArg! 3).consumeMData
   let specName ← match doneE.getAppFn with
@@ -718,23 +777,23 @@ def natLit (n : Nat) : Term := Syntax.mkNumLit (toString n)
       | .const n _ => pure n
       | _ => throwError "e5r_auto: the specification must be a named constant"
     | _ => throwError "e5r_auto: expected `spec.Done` as the postcondition"
-  let fE ← Term.elabTerm f (some (mkConst ``Struct.Func))
-  let heads ← evalNatList (mkApp (mkConst ``loopHeads) fE)
-  let rsList ← evalNatList (mkApp2 (mkConst ``writes) code fE)
-  let entryN ← evalNat (← mkAppM ``BitVec.toNat #[mkApp (mkConst ``Struct.Func.entry) fE])
-  -- The cut points, in the tree's order.
   let mut cuts : Array (Nat × Term × Term × Term) := #[]
   for c in cutStx do
     let pcT : Term := ⟨c[1]⟩
     let pcE ← Term.elabTerm pcT (some (mkConst ``Word))
     let some ⟨_, v⟩ ← getBitVecValue? (← instantiateMVars pcE)
-      | throwError "e5r_auto: loop head {pcT} is not a literal"
+      | throwError "e5r_auto: cut point {pcT} is not a literal"
     cuts := cuts.push (v.toNat, pcT, ⟨c[2]⟩, ⟨c[4]⟩)
-  let given := cuts.toList.map (·.1)
-  for h in heads do
-    unless given.contains h do throwError "e5r_auto: no invariant for the loop at {hex h}"
-  for h in given do
-    unless heads.contains h do throwError "e5r_auto: {hex h} is not a loop head of {f}"
+  return { s0 := ⟨s0⟩, he := ⟨he⟩, userFacts, code, specName, cuts }
+
+/-- The run, from the cut points on. -/
+def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat) : TacticM Unit := do
+  let s0 := call.s0
+  let he := call.he
+  let userFacts := call.userFacts
+  let specName := call.specName
+  let cuts := call.cuts
+  traceLine "[e5r_auto] let rs ← `([$(rsList.toArray.map natLit)"
   let rs ← `([$(rsList.toArray.map natLit),*])
   let pcIdent := mkIdent `pc
   let uIdent := mkIdent `u
@@ -747,6 +806,7 @@ def natLit (n : Nat) : Term := Syntax.mkNumLit (toString n)
   let invT ← `(fun ($pcIdent : Word) ($uIdent : State) =>
     State.exit $uIdent = none ∧ Same $s0 $uIdent $rs ∧ $invChain)
   let muT ← `(fun ($pcIdent : Word) ($uIdent : State) => $muChain)
+  traceLine "[e5r_auto] alignFacts"
   alignFacts
   let hR := mkIdent `e5r_hR
   let R := mkIdent `e5r_R
@@ -756,11 +816,13 @@ def natLit (n : Nat) : Term := Syntax.mkNumLit (toString n)
   let hI := mkIdent `e5r_hI
   let hra := mkIdent `e5r_hra
   let entryLit := natLit entryN
-  evalTactic (← `(tactic| unfold Exec))
+  traceLine "[e5r_auto] evalTactic (← `(tactic| unfold Exec))"
+  evalTactic (← `(tactic| unfold $(mkIdent fl.exec):ident))
   let [gStart, gBody] ← run (← getMainGoal) (← `(tactic|
-      refine Reach.cutpoints (Q := fun s => Final _ s ∧ _) $invT $muT ?_ ?_))
+      refine $(mkIdent fl.cutpoints) (Q := fun s => Final _ s ∧ _) $invT $muT ?_ ?_))
     | throwError "e5r_auto: cutpoints"
-  let retFacts : Array Term := #[← `(ret_mask ($he).retAligned), ← `(eq_true ($he).retAligned)]
+  let retFacts : Array Term := #[← `(ret_mask ($he).retAligned), ← `(eq_true ($he).retAligned),
+    ← `(eq_true (aligned_two_of_four ($he).retAligned))]
   -- From the entry.
   let [gStart] ← run gStart (← `(tactic| intro $R:ident $hR:ident)) | throwError "e5r_auto: start"
   let [gStart] ← run gStart (← `(tactic|
@@ -772,9 +834,12 @@ def natLit (n : Nat) : Term := Syntax.mkNumLit (toString n)
   let startGoals ← do
     gStart.withContext do
       let own : Array Term := #[hpc, hx]
+      let s0E ← Term.elabTerm s0 none
+      let fs ← contextFacts [s0E]
       let cx : Ctx := {
+        fl := fl
         cuts := heads
-        facts := userFacts ++ retFacts ++ own
+        facts := userFacts ++ retFacts ++ fs ++ own
         rs := rs
         s0 := s0
         he := he
@@ -782,7 +847,7 @@ def natLit (n : Nat) : Term := Syntax.mkNumLit (toString n)
         hR := hR
         mode := .start
         origin := "entry" }
-      drive cx false 2000 gStart entryN
+      drive cx false 400 gStart entryN
   -- From each loop head.
   let [gBody] ← run gBody (← `(tactic| intro $uIdent:ident $hI:ident $R:ident $hR:ident))
     | throwError "e5r_auto: body"
@@ -832,9 +897,10 @@ def natLit (n : Nat) : Term := Syntax.mkNumLit (toString n)
     let (pc, cx) ← g.withContext do
       let some ud := (← getLCtx).findFromUserName? `u | throwError "e5r_auto: u"
       let some pc ← pcOf (mkFVar ud.fvarId) | throwError "e5r_auto: pc of a loop head"
-      let fs ← contextFacts (mkFVar ud.fvarId)
+      let fs ← contextFacts [mkFVar ud.fvarId, ← Term.elabTerm s0 none]
       let own : Array Term := #[hpc, hx, hra]
       let cx : Ctx := {
+        fl := fl
         cuts := heads
         facts := userFacts ++ retFacts ++ fs ++ own
         rs := rs
@@ -845,8 +911,29 @@ def natLit (n : Nat) : Term := Syntax.mkNumLit (toString n)
         mode := .body
         origin := hex 0 }
       return (pc, cx)
-    let gs ← g.withContext do drive { cx with origin := hex pc } true 2000 g pc
+    let gs ← g.withContext do drive { cx with origin := hex pc } true 400 g pc
     bodyGoals := bodyGoals ++ gs
   replaceMainGoal (startGoals ++ bodyGoals)
 
+@[tactic e5rAuto] def evalE5rAuto : Tactic := fun stx => do
+  traceLine "[e5r_auto] start"
+  let f : Term := ⟨stx[1]⟩
+  let call ← parseCall {} stx[2] stx[3] stx[4] stx[5].getArgs
+  -- The function's tree: its loop heads are the cut points.
+  let fE ← Term.elabTerm f (some (mkConst ``Struct.Func))
+  let heads ← evalNatList (mkApp (mkConst ``loopHeads) fE)
+  let rsList ← evalNatList (mkApp2 (mkConst ``writes) call.code fE)
+  let entryN ← evalNat (← mkAppM ``BitVec.toNat #[mkApp (mkConst ``Struct.Func.entry) fE])
+  let given := call.cuts.toList.map (·.1)
+  for h in heads do
+    unless given.contains h do throwError "e5r_auto: no invariant for the loop at {hex h}"
+  for h in given do
+    unless heads.contains h do throwError "e5r_auto: {hex h} is not a loop head of {f}"
+  autoCore {} call heads rsList entryN
+
+
+end E5R.Auto
+
+namespace E5R.Auto
+attribute [e5r_nat] BitVec.ofNat_eq_ofNat
 end E5R.Auto

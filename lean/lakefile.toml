@@ -1,6 +1,6 @@
 name = "e5r"
 version = "0.1.0"
-defaultTargets = ["E5R", "Examples", "e5r-audit"]
+defaultTargets = ["E5R", "Examples", "Demo", "e5r-audit"]
 
 # No dependencies on purpose: the trusted base of an e5r proof is the Lean
 # kernel plus the definitions docs/isa/trust.md lists.
@@ -9,6 +9,10 @@ name = "E5R"
 
 [[lean_lib]]
 name = "Examples"
+
+# The A-vs-B demo (demo/README.md).
+[[lean_lib]]
+name = "Demo"
 
 [[lean_exe]]
 name = "e5r-audit"
