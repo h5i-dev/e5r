@@ -40,12 +40,12 @@ from pathlib import Path
 if multiprocessing.get_start_method(allow_none=True) != "spawn":
     multiprocessing.set_start_method("spawn", force=True)
 
-_REPO = Path(__file__).resolve().parent.parent
+_REPO = Path(__file__).resolve().parent.parent.parent
 _DECBENCH = Path(os.environ.get("DECBENCH_REPO", "")).expanduser()
 if not (_DECBENCH / "decbench").is_dir():
     raise SystemExit("set DECBENCH_REPO to the DecBench checkout")
 sys.path.insert(0, str(_DECBENCH))
-sys.path.insert(0, str(_REPO / "scripts"))
+sys.path.insert(0, str(_REPO / "scripts" / "toolkit"))
 
 import decbench.decompilers  # noqa: E402,F401  (registers the in-tree backends)
 import decbench_nocompiler  # noqa: E402,F401  (registers ours)

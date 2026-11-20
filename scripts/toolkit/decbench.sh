@@ -57,9 +57,9 @@ python="$venv/bin/python"
 for opt in ${opts//,/ }; do
   if [ -z "$(ls "$tree/$opt/$project/compiled"/*.i 2> /dev/null || true)" ]; then
     echo "== compiling $project at $opt (first run only) =="
-    "$python" "$repo/scripts/decbench_run.py" --compile "$tree" "$project" "$opt"
+    "$python" "$repo/scripts/toolkit/decbench_run.py" --compile "$tree" "$project" "$opt"
   fi
 done
 
 echo "== decompiling and evaluating: $project $opts [$decs] =="
-"$python" "$repo/scripts/decbench_run.py" "$tree" "$project" "$opts" "$decs"
+"$python" "$repo/scripts/toolkit/decbench_run.py" "$tree" "$project" "$opts" "$decs"

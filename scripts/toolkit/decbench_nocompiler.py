@@ -35,7 +35,7 @@ from decbench.models.decompilation import (
     VariableInfo,
 )
 
-_REPO = Path(__file__).resolve().parent.parent
+_REPO = Path(__file__).resolve().parent.parent.parent
 
 
 def requested_addresses(
@@ -119,7 +119,7 @@ def nocompiler_binary() -> Path | None:
     if env:
         p = Path(env).expanduser()
         return p if p.is_file() and os.access(p, os.X_OK) else None
-    built = _REPO.parent / "target" / "release" / "nocompiler"
+    built = _REPO / "target" / "release" / "nocompiler"
     if built.is_file() and os.access(built, os.X_OK):
         return built
     found = shutil.which("nocompiler")

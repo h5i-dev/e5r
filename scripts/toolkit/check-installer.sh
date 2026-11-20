@@ -25,7 +25,7 @@ version=$(sed -n '/^\[workspace\.package\]/,/^\[/p' Cargo.toml |
 # a second architecture here would only slow the gate down. `install.sh` maps a
 # Linux host to musl, so the archive is renamed to what it will ask for.
 echo "==> building the release archive for $host"
-./scripts/build-release.sh "$host" > /dev/null
+./scripts/toolkit/build-release.sh "$host" > /dev/null
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"; [ -n "${server:-}" ] && kill "$server" 2> /dev/null || true' EXIT
