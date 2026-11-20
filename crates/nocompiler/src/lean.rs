@@ -217,7 +217,10 @@ pub fn export(
                     .map(|l| l.trim_start_matches('$').to_string())
                     .unwrap_or_else(|| format!("{}{}", if loop_ { "l" } else { "b" }, *k));
                 *k += 1;
-                out.push(format!("(\"{l}\", 0x{:x}#64)", if loop_ { n.start } else { n.end }));
+                out.push(format!(
+                    "(\"{l}\", 0x{:x}#64)",
+                    if loop_ { n.start } else { n.end }
+                ));
                 lab(&n.children, k, out);
             }
         }
@@ -228,7 +231,12 @@ pub fn export(
             m.name
         )
         .unwrap();
-        writeln!(o, "def {id}_labels : List (String × Word) := [{}]", labels.join(", ")).unwrap();
+        writeln!(
+            o,
+            "def {id}_labels : List (String × Word) := [{}]",
+            labels.join(", ")
+        )
+        .unwrap();
         let (level, cert) = levels
             .get(&m.entry)
             .cloned()
