@@ -57,10 +57,12 @@ Each number comes from the repository, with its source.
 | Proof size, `sum`: profile build vs rv64gc build | 12 vs 12 lines (168 vs 159 tokens) | same spec, same automation; [examples/demo](examples/demo/README.md) |
 | Proof size, `cobs_decode` (in-place COBS decoding) | 95 vs 95 lines (1412 vs 1413 tokens) | same; specification lemmas shared and counted once |
 | Lean check time, `cobs_decode` | 27.8 s vs 31.8 s | wall clock per file, shared machine, ±15%; same source |
+| Proofs with calls, syscalls and frames, by hand vs `nocompiler_auto` | `sum2` 193 → 5 lines, `write_all` 84 → 16, `hello` 102 → 18 | same specifications; automation versus hand proofs, both on the profile binary, so this does not compare the profile with plain RV64; [v1-results](docs/isa/v1-results.md), criteria 1–2 |
 | Corpus conformance | 58 functions: 54 at L2, 2 at L1, 2 at L0 | every C file in the repository through `nocompiler cc`, clang 15.0.7; [v1-results](docs/isa/v1-results.md), criterion 4 |
-| Negative controls | 25 of 25 mutated binaries break their proofs | `scripts/core/check-proof-controls.sh` |
+| Negative controls | every mutated binary breaks its proof (25 mutations); every mutated spec breaks its proofs (23) | `scripts/core/check-proof-controls.sh`, `scripts/core/check-spec-mutations.py --skip demo-cobs` |
+| Round trip `asm(disasm(x))` | the same relocatable function for 17 + 53 functions | committed binaries and the C corpus, every function at L1 or above; criterion 5 |
 | Semantics vs qemu-riscv64 and vs Sail | identical register and memory dumps | 48 random programs per run each (default), every instruction of the profile; `crates/nocompiler/tests/{semantics,sail}.rs` |
-| Relocation | one proof of `sum`, valid at every layout | two links (`.text` at 0x11190 and 0x40000); leaf functions only, functions with calls open; [v1-results](docs/isa/v1-results.md), criterion 3 |
+| Relocation | `sum`: one theorem valid at every layout. `sum2` (with calls): one address-free proof text that checks at both links | two links (`.text` at 0x11190 and 0x40000). No every-layout theorem for functions with calls yet; [v1-results](docs/isa/v1-results.md), criterion 3 |
 | PTX kernels (experiment) | 102 `map32` kernels proved; 20 of 21 mutants refuted | [experiment/docs/ptx.md](experiment/docs/ptx.md) |
 
 The full table of the spec v1 acceptance criteria, including the open ones, is in [docs/isa/v1-results.md](docs/isa/v1-results.md).
@@ -72,7 +74,7 @@ All of the following are checked by the kernel with the standard axioms only ([l
 - **The example functions.** `Examples.Sum.sum_verified` (the sum of an array, as clang `-O2` compiled it). `Examples.Sum2.sum2_verified` (a caller with a stack frame, proved from `sum`'s specification alone). `Examples.Hello.write_all_verified` (a `write` loop over short writes) and `hello_verified`. The audit checks that each image is byte for byte the committed ELF.
 - **Adequacy.** `VerifiedImg.hw` and `Exec.hw_safe`, `hw_final`, `hw_terminates` ([Adequacy.lean](lean/NoCompiler/Adequacy.lean)), proved once for all programs: the machine fetching from memory never faults inside the function, ends in the postcondition, and terminates. These add the assumptions that the image is loaded and that writable memory does not overlap the code.
 - **Structured control.** `Struct.cfi`: for a function whose `<name>_checked` the kernel has decided, every control transfer is structured (R1–R3). `Struct.level … = some .l2` adds the frame rules R4–R6 ([Frame.lean](lean/NoCompiler/Frame.lean)) and holds for all 11 functions of the committed images.
-- **Relocatable proofs.** `Examples.Link.sum_relocatable : Verified One.module "sum" spec` holds over every layout. It is obtained from the fixed-address proof through `VerifiedImg.shift`, and it covers leaf functions only. `nocompiler-audit` checks that each linked ELF is its module linked at the ELF's layout.
+- **Relocatable proofs.** `Examples.Link.sum_relocatable : Verified One.module "sum" spec` holds over every layout. It is obtained from the fixed-address proof through `VerifiedImg.shift`. Leaf functions only: `Examples.LinkCalls` proves `sum2` at each of the two links with one proof text, not over every layout. `nocompiler-audit` checks that each linked ELF is its module linked at the ELF's layout.
 - **The demo.** `sum_b`/`cobs_b` (profile builds, `VerifiedImg`) and `sum_a`/`cobs_a` (rv64gc builds, `VerifiedC`). The `_a` theorems also trust the compressed-instruction extension `Ext/Rvc.lean`, which is tested against llvm-mc and qemu, and they have no adequacy theorem yet.
 
 [Docs](docs/README.md) · [Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md) · Apache-2.0
