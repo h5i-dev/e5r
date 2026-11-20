@@ -5,7 +5,7 @@ namespace Demo.Cobs
 open NoCompiler NoCompiler.Vocab Demo.Cobs.ImageB
 
 set_option maxHeartbeats 20000000 in
-theorem cobs_b : Verified code cobs_decode_dom cobs_decode_entry spec := by
+theorem cobs_b : VerifiedImg code cobs_decode_dom cobs_decode_entry spec := by
   rintro ⟨r, buf, orig⟩ s he ⟨ha0, ha1, ha2, hlen, hmem, hal, hdis⟩
   have hfl : frameLen orig ≤ orig.length := List.findIdx_le_length
   nocompiler_auto cobs_decode_func s he

@@ -25,7 +25,7 @@
     11204  jalr zero, 0(ra)
 
 The proof never looks at `sum`'s code: both calls go through
-`Verified.call` with `sum_verified`, using only `sum`'s specification
+`VerifiedImg.call` with `sum_verified`, using only `sum`'s specification
 (its result, the registers it preserves, and that it writes no memory).
 -/
 import Examples.Sum
@@ -58,7 +58,7 @@ def spec2 : Spec Args2 where
 
 /-- `sum2` as compiled: correct, memory-safe, terminating, ABI-preserving,
     from `sum`'s specification. -/
-theorem sum2_verified : Verified code sum2_dom sum2_entry spec2 := by
+theorem sum2_verified : VerifiedImg code sum2_dom sum2_entry spec2 := by
   rintro ⟨a, xs, b, ys⟩ s he ⟨ha0, ha1, ha2, ha3, hl1, hl2, hal1, hal2, harr1, harr2, hd1, hd2⟩
   have hpc : s.pc = 0x111b4#64 := he.pc
   have hx := he.live
@@ -157,7 +157,7 @@ theorem sum2_verified : Verified code sum2_dom sum2_entry spec2 := by
       simp only [hst, hF]
       have : fb - BitVec.ofNat 64 0 - fb = 0 := by bv_omega
       rw [this]; simp
-  refine Verified.call sum_verified ⟨a, xs⟩ ⟨by nocompiler_norm <;> rfl, by nocompiler_norm [hx],
+  refine VerifiedImg.call sum_verified ⟨a, xs⟩ ⟨by nocompiler_norm <;> rfl, by nocompiler_norm [hx],
     by nocompiler_norm <;> decide, by nocompiler_norm <;> decide, by nocompiler_norm <;> exact hfal⟩ ?_
     (Dom.sub_of_ranges (by decide))
     (hPle a xs _ (by nocompiler_norm) (.inl rfl)) ?_
@@ -190,7 +190,7 @@ theorem sum2_verified : Verified code sum2_dom sum2_entry spec2 := by
   have h1sp : s1.reg 2 = fb := by simpa using hp1 2 (by decide)
   -- mv s2, a0; mv a0, s1; mv a1, s0; call sum
   nocompiler_steps 5 [h1pc, h1a0, h1s0, h1s1]
-  refine Verified.call sum_verified ⟨b, ys⟩ ⟨by nocompiler_norm <;> rfl, by nocompiler_norm [hx1],
+  refine VerifiedImg.call sum_verified ⟨b, ys⟩ ⟨by nocompiler_norm <;> rfl, by nocompiler_norm [hx1],
     by nocompiler_norm <;> decide, by nocompiler_norm <;> decide, by nocompiler_norm [h1sp] <;> exact hfal⟩ ?_
     (Dom.sub_of_ranges (by decide)) (hPle b ys _ (by nocompiler_norm [h1sp]) (.inr rfl)) ?_
   · refine ⟨by nocompiler_norm [ha2], by nocompiler_norm [ha3], hl2, hal2, ?_⟩

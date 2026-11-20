@@ -58,7 +58,7 @@ def spec : Spec Args where
 
 /-- `write_all` as compiled: correct for every way the kernel splits the
     writes, memory-safe, terminating, ABI-preserving. -/
-theorem write_all_verified : Verified code write_all_dom write_all_entry spec := by
+theorem write_all_verified : VerifiedImg code write_all_dom write_all_entry spec := by
   rintro ⟨fd, buf, n⟩ s he ⟨ha0, ha1, ha2, hn⟩
   have hpc : s.pc = 0x11164#64 := he.pc
   have hx := he.live
@@ -170,7 +170,7 @@ theorem srl63_err {e : Nat} (h1 : 1 ≤ e) (h2 : e ≤ 4095) : (-(BitVec.ofNat 6
 
 /-- `hello` as compiled: writes a prefix of the message and exits, the whole
     message exactly when it exits with 0; never returns. -/
-theorem hello_verified : Verified code hello_dom hello_entry helloSpec := by
+theorem hello_verified : VerifiedImg code hello_dom hello_entry helloSpec := by
   rintro ⟨⟩ s he ⟨hro, hdisj⟩
   have hpc : s.pc = 0x11190#64 := he.pc
   have hx := he.live
@@ -223,7 +223,7 @@ theorem hello_verified : Verified code hello_dom hello_entry helloSpec := by
       nocompiler_norm [hF]
       have : fb - BitVec.ofNat 64 0 - fb = 0 := by bv_omega
       rw [this]; simp
-  refine Verified.call write_all_verified ⟨1#64, 0x10158#64, 11⟩ ⟨by nocompiler_norm <;> rfl,
+  refine VerifiedImg.call write_all_verified ⟨1#64, 0x10158#64, 11⟩ ⟨by nocompiler_norm <;> rfl,
     by nocompiler_norm [hx], by nocompiler_norm <;> decide, by nocompiler_norm <;> decide, by nocompiler_norm <;> exact hfal⟩
     ⟨by nocompiler_norm, by nocompiler_norm, by nocompiler_norm, by decide⟩ (Dom.sub_of_ranges (by decide)) hPle ?_
   intro s1 hdone hfr

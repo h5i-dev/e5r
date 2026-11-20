@@ -65,7 +65,7 @@ theorem sumW_take_succ (xs : List Word) (k : Nat) (h : k < xs.length) :
     sumW (xs.take (k + 1)) = sumW (xs.take k) + xs[k] := Vocab.foldl_take_succ _ _ xs k h
 
 /-- `sum` as compiled: correct, memory-safe, terminating, ABI-preserving. -/
-theorem sum_verified : Verified code sum_dom sum_entry spec := by
+theorem sum_verified : VerifiedImg code sum_dom sum_entry spec := by
   rintro ⟨a, xs⟩ s he ⟨ha0, ha1, hlen, hal, harr⟩
   have hpc : s.pc = 0x11190#64 := he.pc
   have hx := he.live

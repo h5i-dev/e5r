@@ -5,7 +5,7 @@
 ## The nocompiler profile (the core)
 
 - [isa/profile.md](isa/profile.md): the instruction subset, the semantics choices, the structural rules R1 to R5, the calling convention
-- [isa/spec.md](isa/spec.md): function specifications, `Verified`, what a proof establishes about the machine, how to write one
+- [isa/spec.md](isa/spec.md): function specifications, `VerifiedImg`, what a proof establishes about the machine, how to write one
 - [isa/environment.md](isa/environment.md): the Linux syscall model behind `ecall`, and its assumptions
 - [isa/metadata.md](isa/metadata.md): the `.nocompiler.struct` section
 - [isa/toolchain.md](isa/toolchain.md): building conforming code, the proof workflow, the LLVM and Rust plan

@@ -32,9 +32,9 @@ elab "#assert_standard_axioms " id:ident : command => do
 #assert_standard_axioms NoCompiler.Reach.exec_step
 #assert_standard_axioms NoCompiler.Reach.sys_step
 #assert_standard_axioms NoCompiler.Reach.frame
-#assert_standard_axioms NoCompiler.Verified.call
-#assert_standard_axioms NoCompiler.Verified.frame
-#assert_standard_axioms NoCompiler.Verified.hw
+#assert_standard_axioms NoCompiler.VerifiedImg.call
+#assert_standard_axioms NoCompiler.VerifiedImg.frame
+#assert_standard_axioms NoCompiler.VerifiedImg.hw
 -- The structural checker in Lean, and its theorem.
 #assert_standard_axioms NoCompiler.Struct.cfi
 #assert_standard_axioms NoCompiler.Struct.inv_entry
@@ -64,7 +64,7 @@ example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] =
 #assert_standard_axioms Examples.Hello.write_all_verified
 #assert_standard_axioms Examples.Hello.hello_verified
 
--- The demo (demo/README.md): each function on the nocompiler build (B, `Verified`)
+-- The demo (demo/README.md): each function on the nocompiler build (B, `VerifiedImg`)
 -- and on the ordinary rv64gc build (A, `VerifiedC`, NoCompiler/Ext/Rvc.lean).
 #assert_standard_axioms Demo.Sum.sum_b
 #assert_standard_axioms Demo.Sum.sum_a

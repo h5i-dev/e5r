@@ -51,9 +51,9 @@ are checked to be the bytes proved.
 One `Spec` per function, used unchanged by both theorems:
 
 ```lean
-theorem sum_b  : Verified  ImageB.code sum_dom sum_entry spec                       -- Demo/SumB.lean
+theorem sum_b  : VerifiedImg  ImageB.code sum_dom sum_entry spec                       -- Demo/SumB.lean
 theorem sum_a  : VerifiedC ImageA.code sum_dom sum_entry spec                       -- Demo/SumA.lean
-theorem cobs_b : Verified  ImageB.code cobs_decode_dom cobs_decode_entry spec       -- Demo/CobsB.lean
+theorem cobs_b : VerifiedImg  ImageB.code cobs_decode_dom cobs_decode_entry spec       -- Demo/CobsB.lean
 theorem cobs_a : VerifiedC ImageA.code cobs_decode_dom cobs_decode_entry spec       -- Demo/CobsA.lean
 ```
 
@@ -62,10 +62,10 @@ afterwards are those of `report orig`. That is defined from `decodeFrame`,
 COBS decoding as a function on lists, not a transliteration of either
 binary. `writes` is the buffer and the 24-byte result slot, nothing else:
 there are no other reads, and no stack. `pre` requires `len < 2^63`, an
-8-aligned slot, and slot and buffer disjoint. `Verified`/`VerifiedC` add
+8-aligned slot, and slot and buffer disjoint. `VerifiedImg`/`VerifiedC` add
 the rest: memory safety (every access inside the regions, aligned), the
 calling convention (sp, gp, tp, s0–s11 preserved, return to ra), and
-termination. Memory outside the regions is unchanged (`Verified.frame`).
+termination. Memory outside the regions is unchanged (`VerifiedImg.frame`).
 
 ## Proof sizes (`demo/tools/count.py`; code lines and tokens, no comments or blank lines)
 
@@ -111,7 +111,7 @@ A full `lake build` of the repository is about 75 s, and `demo/run.sh` about
 Each proof is `rintro`, one call, and the verification conditions:
 
 ```lean
-theorem cobs_b : Verified code cobs_decode_dom cobs_decode_entry spec := by
+theorem cobs_b : VerifiedImg code cobs_decode_dom cobs_decode_entry spec := by
   rintro ⟨r, buf, orig⟩ s he ⟨ha0, ha1, ha2, hlen, hmem, hal, hdis⟩
   have hfl := frameLen_le orig
   nocompiler_auto cobs_decode_func s he                   -- A: nocompiler_auto_c cobs_decode_entry cobs_decode_size s he
@@ -175,7 +175,7 @@ A and B share everything here except where the run stops:
     (`lean/RvcRun.lean`) matches qemu byte for byte on 3,000 buffers
     (`demo/test/rvc_exec.py`; `run.sh` runs 500).
 
-  **Not done:** the adequacy theorems of `NoCompiler/Adequacy.lean` (`Verified.hw`:
+  **Not done:** the adequacy theorems of `NoCompiler/Adequacy.lean` (`VerifiedImg.hw`:
   what the theorem means for the machine that fetches from memory) for
   `StepC`. So A's theorem is about the proof relation over the image, not yet
   about the machine. And the extension is tested against qemu only on the
@@ -210,7 +210,7 @@ The format should matter more where this demo does not go:
   B rejects it.
 * **Many functions:** choosing and justifying cut points by hand scales
   badly; B reads them from the checked tree.
-* **Adequacy:** B's result already reaches the machine (`Verified.hw`); A's
+* **Adequacy:** B's result already reaches the machine (`VerifiedImg.hw`); A's
   needs `Adequacy.lean` redone for compressed fetch.
 
 ## The comparison is imperfect in these ways

@@ -51,7 +51,7 @@ the `exit` goals proved by rewriting.
 
 Scope: functions that make no calls, no syscalls and keep no stack frame
 (the registers they write are caller-saved). Those are where most loops are;
-a function with calls is proved with `Verified.call` as in
+a function with calls is proved with `VerifiedImg.call` as in
 lean/Examples/Sum2.lean, and can use `nocompiler_auto` for the leaf functions it
 calls.
 -/
@@ -893,7 +893,7 @@ partial def drive (cx : Ctx) (first : Bool) (fuel : Nat) (g : MVarId) (last : Na
 syntax nocompilerCut := "loop_inv " term:max ppSpace term:max " measure " term:max
 
 /-- `nocompiler_auto f s he [facts] (loop_inv pc inv measure μ)*` proves the goal
-    `Exec c (spec.perm a s) D (spec.Done a s) s` that `Verified c D entry spec`
+    `Exec c (spec.perm a s) D (spec.Done a s) s` that `VerifiedImg c D entry spec`
     leaves after `intro a s he hpre`, for the function whose block/loop tree is
     `f`, given an invariant and a measure at each of its loop heads. What it
     cannot close is left as goals named after the path: `entry_to_0x…`,
@@ -963,7 +963,7 @@ def parseCall (fl : Flavor) (s0 he : Syntax) (factsStx : Syntax) (cutStx : Array
   let g ← getMainGoal
   let gt := (← instantiateMVars (← g.getType)).consumeMData
   unless gt.isAppOfArity fl.exec 5 do
-    throwError "nocompiler_auto: expected `{fl.exec} c P D Q s` (after `intro a s he hpre` on a `Verified` goal)"
+    throwError "nocompiler_auto: expected `{fl.exec} c P D Q s` (after `intro a s he hpre` on a `VerifiedImg` goal)"
   let code := gt.getArg! 0
   let doneE := (gt.getArg! 3).consumeMData
   let specName ← match doneE.getAppFn with

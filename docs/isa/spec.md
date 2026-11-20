@@ -34,7 +34,7 @@ structure Spec (α : Type) where
 contents as a list. Memory regions may depend on them and on the entry state
 (a region at the address passed in `a0`).
 
-`Verified c D entry spec` says: for every `a` and every state `s` with
+`VerifiedImg c D entry spec` says: for every `a` and every state `s` with
 `Entry D entry s` (pc at the entry, not exited, return address outside `D`
 and 4-byte aligned, `sp` 16-byte aligned) and `spec.pre a s`,
 
@@ -57,19 +57,38 @@ access inside `perm`, every access aligned), the calling convention
 `nocompiler export` writes it as `<name>_dom`. Requiring the return address outside
 `D` is what lets "leaving `D`" mean "returning".
 
+### Over every layout: `Verified M f spec` (v1)
+
+`VerifiedImg` is about one code image at fixed addresses. The v1 statement
+(`lean/NoCompiler/Module.lean`, [v1.md](v1.md)) is about a module: relocatable
+functions (words with their relocated fields zero, and the `call`,
+`pcrelHi`, `pcrelLoI`/`S` relocations medany code has) and data.
+
+```lean
+def Verified (M : Module) (f : Sym) (spec : Spec α) : Prop :=
+  ∀ L, M.Ok L → VerifiedImg (M.link L) (M.dom L f) (L.addr f) spec
+```
+
+`L : Layout` gives every symbol an address; `M.Ok L` says the functions are
+aligned, inside the image, disjoint, uniquely named, and every relocation in
+reach; `M.link L` is the image they make there and `M.dom L f` the code of
+`f` and its callees. `Verified.img` gives the code-level statement at any one
+layout. `link` is not trusted: the audit compares it, at the layout read from
+an ELF, with the ELF's bytes.
+
 ## What comes for free
 
-- **Frame** (`Verified.frame`): memory outside `writes` and the stack region
+- **Frame** (`VerifiedImg.frame`): memory outside `writes` and the stack region
   is unchanged at return. It is derived from the permission once, in
   `Reach.frame`, and never has to be proved per function.
-- **Calls** (`Verified.call`): inside a caller's proof, a call to a verified
+- **Calls** (`VerifiedImg.call`): inside a caller's proof, a call to a verified
   function continues from every state the callee's specification allows,
   with its frame property, provided the callee's region and permission are
   within the caller's. This is the modular rule: a caller's proof uses the
   callee's specification, never its code.
 - **Loops** (`Reach.loop`): an invariant `I` at the loop head and a measure
   that decreases on every trip around the loop.
-- **The machine** (`Verified.hw`, from `lean/NoCompiler/Adequacy.lean`): the step
+- **The machine** (`VerifiedImg.hw`, from `lean/NoCompiler/Adequacy.lean`): the step
   relation proofs use takes instructions from the image and checks
   permissions. The machine (`HwStep`) fetches from memory and checks
   nothing. Given that memory holds the image when the function is entered
@@ -87,7 +106,7 @@ Nothing enforces a specification at run time. The theorem is conditional:
 if the function is entered as `Entry` and `pre` say, the conclusions hold.
 Unverified code in the same process can break the precondition, for example
 by overwriting the array while `sum` runs (there are no threads in the
-model, so only by being the caller). Verified callers discharge callee
+model, so only by being the caller). VerifiedImg callers discharge callee
 preconditions in their own proofs; the conditions at the outermost verified
 function are the assumptions of the whole result.
 
@@ -97,7 +116,7 @@ function are the assumptions of the whole result.
 `u64 sum(const u64 *a, u64 n)`, the loop invariant at the loop head the
 compiler chose, and the proof over the compiled instructions.
 `lean/Examples/Sum2.lean` is the example for calls: a 32-byte frame saving
-`ra` and three callee-saved registers, two calls through `Verified.call`, and
+`ra` and three callee-saved registers, two calls through `VerifiedImg.call`, and
 the frame reloaded with the lemmas of `lean/NoCompiler/Mem.lean` (a load after a
 store at the same and at a disjoint slot, an array untouched by writes
 outside it). `lean/Examples/Hello.lean` is the example for syscalls: a

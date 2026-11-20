@@ -16,7 +16,7 @@ proving such code in the same logic needs, and no further:
 * `execC n` is `exec` with the next pc and the link address at `pc + n`, and
   jump targets 2-byte aligned (instruction-address-misaligned with C enabled);
 * `StepC`, `ReachC`, `ExecC` and `VerifiedC` are `Step`, `Reach`, `Exec` and
-  `Verified` over `CCode`, with the same `Spec`, `Entry`, `Perm` and `Done`.
+  `VerifiedImg` over `CCode`, with the same `Spec`, `Entry`, `Perm` and `Done`.
   The rules a proof uses (`trans`, `loop`, `cutpoints`, `exec_step`) are
   proved again here, the same way.
 
@@ -182,7 +182,7 @@ inductive ReachC (c : CCode) (P : Perm) (D : Dom) (Q : State → Prop) : State �
 def ExecC (c : CCode) (P : Perm) (D : Dom) (Q : State → Prop) (s : State) : Prop :=
   ReachC c P D (fun s => Final D s ∧ Q s) s
 
-/-- `Verified` for compressed code: the same specification, entry
+/-- `VerifiedImg` for compressed code: the same specification, entry
     conditions and conclusion. -/
 def VerifiedC {α : Type} (c : CCode) (D : Dom) (entry : Word) (sp : Spec α) : Prop :=
   ∀ a s, Entry D entry s → sp.pre a s → ExecC c (sp.perm a s) D (sp.Done a s) s

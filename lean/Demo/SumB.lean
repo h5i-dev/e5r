@@ -5,7 +5,7 @@ namespace Demo.Sum
 open NoCompiler Demo.Sum.ImageB
 
 /-- `sum` as `nocompiler cc -O2` compiled it (demo/elf/sum.b.elf), from its block/loop tree. -/
-theorem sum_b : Verified code sum_dom sum_entry spec := by
+theorem sum_b : VerifiedImg code sum_dom sum_entry spec := by
   rintro ⟨a, xs⟩ s he ⟨ha0, ha1, hlen, hal, harr⟩
   nocompiler_auto sum_func s he
     loop_inv 0x11198 (fun u => ∃ m, u.reg 11 = BitVec.ofNat 64 m ∧ 0 < m ∧ m ≤ xs.length ∧

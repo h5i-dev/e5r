@@ -8,7 +8,7 @@ list, a length, a base pointer). It gives a precondition, a postcondition on
 return, an optional postcondition for a function that exits the process, the
 memory it may read and write, and a stack bound.
 
-`Verified c D entry spec` is the statement a function proof establishes:
+`VerifiedImg c D entry spec` is the statement a function proof establishes:
 called at `entry` with a return address outside its code `D`, a 16-byte
 aligned sp and the precondition, every execution
 
@@ -18,7 +18,7 @@ aligned sp and the precondition, every execution
   postcondition.
 
 That the memory it does not own is unchanged on return is not part of the
-definition; `Verified.frame` derives it, and `Verified.call` hands it to
+definition; `VerifiedImg.frame` derives it, and `VerifiedImg.call` hands it to
 the caller.
 -/
 namespace NoCompiler
@@ -97,7 +97,7 @@ structure Entry (D : Dom) (entry : Word) (s : State) : Prop where
   retAligned : aligned (s.reg Reg.ra) 4
   sp : aligned (s.reg Reg.sp) 16
 
-def Verified {α : Type} (c : Code) (D : Dom) (entry : Word) (sp : Spec α) : Prop :=
+def VerifiedImg {α : Type} (c : Code) (D : Dom) (entry : Word) (sp : Spec α) : Prop :=
   ∀ a s, Entry D entry s → sp.pre a s → Exec c (sp.perm a s) D (sp.Done a s) s
 
 /-! ## Using a verified function -/
@@ -135,7 +135,7 @@ theorem Perm.le_of {P Q : Perm}
 variable {c : Code} {α : Type}
 
 /-- The frame property of a verified function. -/
-theorem Verified.frame {D : Dom} {entry : Word} {sp : Spec α} (h : Verified c D entry sp)
+theorem VerifiedImg.frame {D : Dom} {entry : Word} {sp : Spec α} (h : VerifiedImg c D entry sp)
     (a : α) (s : State) (he : Entry D entry s) (hpre : sp.pre a s) :
     Exec c (sp.perm a s) D
       (fun s' => sp.Done a s s' ∧ ∀ x, ¬ (sp.perm a s).writable x → s'.mem x = s.mem x) s :=
@@ -143,8 +143,8 @@ theorem Verified.frame {D : Dom} {entry : Word} {sp : Spec α} (h : Verified c D
 
 /-- The call rule: inside a caller with region `D` and permission `P`, a call
     to a verified function continues from every way the callee can end. -/
-theorem Verified.call {Dg D : Dom} {entry : Word} {sp : Spec α} {P : Perm}
-    {Q : State → Prop} {s : State} (hg : Verified c Dg entry sp) (a : α)
+theorem VerifiedImg.call {Dg D : Dom} {entry : Word} {sp : Spec α} {P : Perm}
+    {Q : State → Prop} {s : State} (hg : VerifiedImg c Dg entry sp) (a : α)
     (he : Entry Dg entry s) (hpre : sp.pre a s) (hD : Dg.sub D) (hP : (sp.perm a s).le P)
     (k : ∀ s', sp.Done a s s' → (∀ x, ¬ (sp.perm a s).writable x → s'.mem x = s.mem x) →
       Reach c P D Q s') : Reach c P D Q s :=
@@ -152,7 +152,7 @@ theorem Verified.call {Dg D : Dom} {entry : Word} {sp : Spec α} {P : Perm}
 
 /-- What a verified function guarantees on the machine, from a loaded image:
     the three theorems of NoCompiler/Adequacy.lean, specialised. -/
-theorem Verified.hw {D : Dom} {entry : Word} {sp : Spec α} (h : Verified c D entry sp)
+theorem VerifiedImg.hw {D : Dom} {entry : Word} {sp : Spec α} (h : VerifiedImg c D entry sp)
     (a : α) (s : State) (he : Entry D entry s) (hpre : sp.pre a s) (hl : c.Loaded s.mem)
     (hp : Protected c (sp.perm a s)) (hb : aligned c.base 4) :
     (∀ t, HwRun D s t → D.mem t.pc → t.exit = none →

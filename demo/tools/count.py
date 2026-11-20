@@ -42,7 +42,7 @@ def split_proof(path):
         s = l.lstrip()
         indent = len(l) - len(s)
         if indent == 0:
-            if s.startswith("theorem") and ("Verified" in s or "VerifiedC" in s):
+            if s.startswith("theorem") and ("VerifiedImg" in s or "VerifiedC" in s):
                 mode = "thm"; script.append(l); continue
             if s.startswith(("import", "namespace", "open", "end ", "set_option")):
                 mode = None; continue

@@ -14,3 +14,4 @@ import NoCompiler.Image
 import NoCompiler.Trace
 import NoCompiler.Struct
 import NoCompiler.Vocab
+import NoCompiler.Module

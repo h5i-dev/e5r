@@ -13,9 +13,9 @@ trusting the following, and nothing else.
 | Instruction semantics | `lean/NoCompiler/Machine.lean` | Against qemu-riscv64 (`crates/nocompiler/tests/semantics.rs`) and against the official Sail RISC-V model's C emulator (`crates/nocompiler/tests/sail.rs`), each on random programs over every instruction |
 | The machine model | `HwStep` in `lean/NoCompiler/Step.lean` | By reading: fetch from memory, decode, execute, or hand ECALL to the environment |
 | The environment model | `lean/NoCompiler/Env.lean` | By reading against the Linux syscall ABI; its assumptions are listed in [environment.md](environment.md) |
-| The meaning of the definitions a theorem is stated with | `Reach`, `Exec`, `Spec`, `Verified`, `Preserved`, `Entry` | By reading [spec.md](spec.md) and the files |
+| The meaning of the definitions a theorem is stated with | `Reach`, `Exec`, `Spec`, `VerifiedImg`, `Preserved`, `Entry` | By reading [spec.md](spec.md) and the files |
 | The specification of the function | e.g. `spec` in `lean/Examples/Sum.lean` | By reading: it is the claim |
-| That memory holds the image at entry, and the function's writable memory does not overlap the code | `Code.Loaded`, `Protected` | Hypotheses of `Verified.hw`; the loader maps `.text` read-only and executable |
+| That memory holds the image at entry, and the function's writable memory does not overlap the code | `Code.Loaded`, `Protected` | Hypotheses of `VerifiedImg.hw`; the loader maps `.text` read-only and executable |
 | That memory holds a data section a proof reads from | `Segment.Loaded` (`lean/NoCompiler/Image.lean`), as a precondition | The loader maps the section; the audit checks the exported bytes are the file's |
 | The hardware or emulator implementing RV64IM, Zba and Zbb as the specification says | | Outside nocompiler |
 
@@ -40,7 +40,7 @@ trusting the following, and nothing else.
   (`<name>_checked`), and `Struct.cfi` proves what they mean for control flow.
 - **The tactics** (`lean/NoCompiler/Tactic.lean`): a tactic that does the wrong
   thing produces a term the kernel rejects.
-- **The program logic** (`Reach.bind`, `Reach.loop`, `Verified.call`, and
+- **The program logic** (`Reach.bind`, `Reach.loop`, `VerifiedImg.call`, and
   the rest): proved from the definitions.
 - **The adequacy theorems** (`lean/NoCompiler/Adequacy.lean`): proved, once, for
   every program.
@@ -51,7 +51,7 @@ trusting the following, and nothing else.
 the comparison in [demo/README.md](../../demo/README.md): `decodeC`,
 `CCode.instr` and `execC` are trusted *for the results stated with
 `VerifiedC`*, and are checked against llvm-mc (every 16-bit word) and qemu
-(the demo's compressed binary). Results about nocompiler binaries (`Verified`) do
+(the demo's compressed binary). Results about nocompiler binaries (`VerifiedImg`) do
 not depend on it. The adequacy theorems are not proved for it.
 
 ## Known gaps
