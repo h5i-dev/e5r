@@ -89,6 +89,13 @@ Two tactics, two trust tiers ([trust.md](trust.md)):
   of native computation; the audit checks it with `#assert_bv_tier` and lists
   it separately.
 
+**As a region** (`lean/NoCompiler/RefineStraightRegion.lean`):
+`RRegion.ok_of_seqEquiv` proves C's `RRegion.Ok` for a straight-line
+changed interval: A's interval holds `as` at `pa` (`Code.holds`, decided by
+the kernel), B's holds `bs` at `pb`, each `domX` is exactly those words
+(`seqDom`), the exits are just past them, `as` does not write `ra`, and
+`SeqEquiv liveIn liveOut as bs`. No entry condition. Example: `mulRegion_ok`.
+
 **Examples** (`lean/Examples/Refine/Straight.lean`): in the kernel tier,
 `slli a0,a0,3` = `sh3add a0,a0,zero`; strength reduction `li t0,8; mul
 a0,a0,t0` = `slli a0,a0,3` (t0 dead); `slli t0,a1,3; add a0,a0,t0` =

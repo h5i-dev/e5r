@@ -1,4 +1,4 @@
-import NoCompiler.RefineStraight
+import NoCompiler.RefineStraightRegion
 
 /-
 Straight-line equivalences (spec-v1-refine.md item 6; docs/isa/refine.md),
@@ -58,5 +58,29 @@ theorem live_temp_refuted : ¬ SeqEquiv [10, 5] [10, 5] [.iop .addi 5 0 8#12, .r
   intro h
   have := h (fun _ => 0) (fun _ => 0) (fun _ _ => rfl) 5 (by simp)
   revert this; decide
+
+/-! ## As a region (C's `RRegion.Ok`)
+
+The strength reduction as a changed interval between two code images: A
+holds `li t0, 8; mul a0, a0, t0` at 0x11000, B holds `slli a0, a0, 3` at
+0x22000; live in and out: a0. -/
+
+def codeA : Code := ⟨0x11000#64, #[0x00800293#32, 0x02550533#32]⟩
+def codeB : Code := ⟨0x22000#64, #[0x00351513#32]⟩
+
+def mulRegion : RRegion where
+  pa := 0x11000#64
+  pb := 0x22000#64
+  paExit := 0x11008#64
+  pbExit := 0x22004#64
+  domA := seqDom 0x11000#64 [.iop .addi 5 0 8#12, .rop .mul 10 10 5]
+  domB := seqDom 0x22000#64 [.shift .slli 10 10 3#6]
+  liveIn := [10]
+  liveOut := [10]
+
+theorem mulRegion_ok : mulRegion.Ok codeA codeB :=
+  RRegion.ok_of_seqEquiv (as := [.iop .addi 5 0 8#12, .rop .mul 10 10 5]) (bs := [.shift .slli 10 10 3#6])
+    (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide +kernel) (by decide +kernel) rfl rfl (by decide) (by decide) mul8_slli
 
 end Examples.Refine.Straight
