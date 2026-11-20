@@ -11,7 +11,7 @@ for t in tasks:
     if sched["kind"] == "stride":
         sched = dict(sched)
         sched["loop"] = {"head": sched.pop("head"), "registers": sched.pop("registers")}
-    spec = {"schema": "e5r.ptx.spec.v1", "kernel": k, "class": "map32",
+    spec = {"schema": "nocompiler.ptx.spec.v1", "kernel": k, "class": "map32",
             "arrays": [p(a) for a in t["arrays"]], "output": p(t["output"]),
             "length": p(t["length"]), "scalars": [p(s) for s in t.get("scalars", [])],
             "element": t["element"], "schedule": sched}

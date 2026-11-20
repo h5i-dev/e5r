@@ -1,4 +1,4 @@
-# The e5r profile
+# The nocompiler profile
 
 Read in this order: [profile.md](profile.md) (what the profile is),
 [spec.md](spec.md) (what a proof about a function says),

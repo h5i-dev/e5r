@@ -1,4 +1,4 @@
-/* Original e5r fixture, Apache-2.0. No runtime, no syscalls. */
+/* Original nocompiler fixture, Apache-2.0. No runtime, no syscalls. */
 .option norvc
 .option norelax
 .section .text

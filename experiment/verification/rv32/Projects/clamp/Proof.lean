@@ -8,7 +8,7 @@ set_option maxHeartbeats 0
 namespace Clamp
 open RV32
 
--- Independent ELF reader agrees with the actual e5r loaded memory, not a hash.
+-- Independent ELF reader agrees with the actual nocompiler loaded memory, not a hash.
 theorem image_fidelity : loadElf Exported.elfBytes = .ok (Exported.entry, Exported.image) := by
   decide +kernel
 

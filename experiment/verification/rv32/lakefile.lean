@@ -27,7 +27,7 @@ lean_exe analyze_firmware where
 lean_lib Tools where
   roots := #[`tools.Analyze, `tools.ReplayLib, `tools.Replay]
 
--- The proved ring-head summary the analyzer may use (`E5R_RING=1`).
+-- The proved ring-head summary the analyzer may use (`NOCOMPILER_RING=1`).
 lean_lib Hybrid where
   roots := #[`Projects.hifive1.hybrid.Ring, `Projects.hifive1.hybrid.RingAI,
     `Projects.hifive1.hybrid.Tail, `Projects.hifive1.hybrid.TailAI]

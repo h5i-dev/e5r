@@ -1514,7 +1514,7 @@
    "counterexample": "fault",
    "replayed": true,
    "reasons": [
-    "proof did not check: error: `simp` made no progress /tmp/e5r-ptx-749543-9173435f01a8/Proof.lean:53:2: error: `simp` made no progress /tmp/e5r-ptx-749543-9173435f01a8/Proof.lean:53:2: error: `simp` mad"
+    "proof did not check: error: `simp` made no progress /tmp/nocompiler-ptx-749543-9173435f01a8/Proof.lean:53:2: error: `simp` made no progress /tmp/nocompiler-ptx-749543-9173435f01a8/Proof.lean:53:2: error: `simp` mad"
    ],
    "gpu": "NVIDIA A10G",
    "gpu_mismatch": null,
@@ -1552,7 +1552,7 @@
    "counterexample": "wrong_value",
    "replayed": true,
    "reasons": [
-    "proof did not check: error: `simp` made no progress 'E5rCheck.correct' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]"
+    "proof did not check: error: `simp` made no progress 'NoCompilerCheck.correct' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]"
    ],
    "gpu": "NVIDIA A10G",
    "gpu_mismatch": "n=1 grid=1 block=256: wrong_scalar_y[0] = 2748168108, want 1618340716",
@@ -1609,7 +1609,7 @@
    "counterexample": "fault",
    "replayed": true,
    "reasons": [
-    "proof did not check: error: `simp` made no progress /tmp/e5r-ptx-749915-156718709306/Proof.lean:53:2: error: `simp` made no progress /tmp/e5r-ptx-749915-156718709306/Proof.lean:53:2: error: `simp` mad"
+    "proof did not check: error: `simp` made no progress /tmp/nocompiler-ptx-749915-156718709306/Proof.lean:53:2: error: `simp` made no progress /tmp/nocompiler-ptx-749915-156718709306/Proof.lean:53:2: error: `simp` mad"
    ],
    "gpu": "NVIDIA A10G",
    "gpu_mismatch": "n=7 grid=1 block=256: u64_elems_y[1] = 4202434855, want 4202434856",
@@ -1666,7 +1666,7 @@
    "counterexample": "fault",
    "replayed": true,
    "reasons": [
-    "proof did not check: error: `simp` made no progress /tmp/e5r-ptx-750074-9b7de1f2be4f/Proof.lean:52:2: error: `simp` made no progress /tmp/e5r-ptx-750074-9b7de1f2be4f/Proof.lean:52:2: error: `simp` mad"
+    "proof did not check: error: `simp` made no progress /tmp/nocompiler-ptx-750074-9b7de1f2be4f/Proof.lean:52:2: error: `simp` made no progress /tmp/nocompiler-ptx-750074-9b7de1f2be4f/Proof.lean:52:2: error: `simp` mad"
    ],
    "gpu": "NVIDIA A10G",
    "gpu_mismatch": "n=1 grid=1 block=256: in_place_wrong_x[0] = 1365212455, want 2730424910",

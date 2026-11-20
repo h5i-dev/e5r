@@ -20,8 +20,8 @@ import Projects.hifive1.clamp.Image
 
 set_option maxRecDepth 100000
 
-namespace E5R.Hifive1.Clamp
-open E5R
+namespace NoCompiler.Hifive1.Clamp
+open NoCompiler
 
 abbrev B := Hifive1Revb.board
 abbrev img := Clamp32.segments
@@ -153,4 +153,4 @@ theorem nonvacuous : ∃ n m, DetSteps B img n ⟨demo, demoRam⟩ m ∧ m.core.
   refine ⟨n, m, h, post.pc, ?_⟩
   rw [post.out]; decide
 
-end E5R.Hifive1.Clamp
+end NoCompiler.Hifive1.Clamp

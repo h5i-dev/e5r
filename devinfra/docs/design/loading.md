@@ -1,6 +1,6 @@
 # Loading
 
-`crates/e5r-format`
+`crates/nocompiler-format`
 
 ## What it is for
 

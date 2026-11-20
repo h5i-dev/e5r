@@ -1,8 +1,8 @@
-# e5r: a formal-verification-friendly RISC-V profile, with Lean 4 proofs.
+# nocompiler: a formal-verification-friendly RISC-V profile, with Lean 4 proofs.
 #
-# crates/              the core: the e5r tool (crate `e5r`, binary `e5r`); lean/ has the proofs
-# devinfra/crates/     the binary analysis toolkit (`e5rx`), development infrastructure
-# experiment/crates/   the PTX and RV32 firmware verifiers (`e5r-exp`), experiments
+# crates/              the core: the nocompiler tool (crate `nocompiler`, binary `nocompiler`); lean/ has the proofs
+# devinfra/crates/     the binary analysis toolkit (`nocompiler-x`), development infrastructure
+# experiment/crates/   the PTX and RV32 firmware verifiers (`nocompiler-exp`), experiments
 #
 # The core depends on nothing in devinfra/ or experiment/. Toolkit crate
 # boundaries are documented in devinfra/docs/ROADMAP-toolkit.md.
@@ -15,31 +15,31 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "Apache-2.0"
-repository = "https://github.com/h5i-dev/e5r"
-authors = ["e5r contributors"]
+repository = "https://github.com/h5i-dev/NoCompiler"
+authors = ["nocompiler contributors"]
 # Publishing metadata. Here rather than in each crate so a crate that becomes
 # publishable only has to opt in.
-homepage = "https://github.com/h5i-dev/e5r"
-documentation = "https://docs.rs/e5r-cli"
+homepage = "https://github.com/h5i-dev/NoCompiler"
+documentation = "https://docs.rs/nocompiler-cli"
 readme = "README.md"
 keywords = ["risc-v", "formal-verification", "lean4", "binary", "elf"]
 categories = ["command-line-utilities", "development-tools::debugging"]
 
 [workspace.dependencies]
-e5r-core = { path = "devinfra/crates/e5r-core", version = "0.1.0" }
-e5r-format = { path = "devinfra/crates/e5r-format", version = "0.1.0" }
-e5r-arch = { path = "devinfra/crates/e5r-arch", version = "0.1.0" }
-e5r-asm = { path = "devinfra/crates/e5r-asm", version = "0.1.0" }
-e5r-sla = { path = "devinfra/crates/e5r-sla", version = "0.1.0" }
-e5r-sleigh = { path = "devinfra/crates/e5r-sleigh", version = "0.1.0" }
-e5r-analysis = { path = "devinfra/crates/e5r-analysis", version = "0.1.0" }
-e5r-db = { path = "devinfra/crates/e5r-db", version = "0.1.0" }
-e5r-types = { path = "devinfra/crates/e5r-types", version = "0.1.0" }
-e5r-diff = { path = "devinfra/crates/e5r-diff", version = "0.1.0" }
-e5r-ir = { path = "devinfra/crates/e5r-ir", version = "0.1.0" }
-e5r-decomp = { path = "devinfra/crates/e5r-decomp", version = "0.1.0" }
-e5r-api = { path = "devinfra/crates/e5r-api", version = "0.1.0" }
-e5r-ptx = { path = "experiment/crates/e5r-ptx", version = "0.1.0" }
+nocompiler-core = { path = "devinfra/crates/nocompiler-core", version = "0.1.0" }
+nocompiler-format = { path = "devinfra/crates/nocompiler-format", version = "0.1.0" }
+nocompiler-arch = { path = "devinfra/crates/nocompiler-arch", version = "0.1.0" }
+nocompiler-asm = { path = "devinfra/crates/nocompiler-asm", version = "0.1.0" }
+nocompiler-sla = { path = "devinfra/crates/nocompiler-sla", version = "0.1.0" }
+nocompiler-sleigh = { path = "devinfra/crates/nocompiler-sleigh", version = "0.1.0" }
+nocompiler-analysis = { path = "devinfra/crates/nocompiler-analysis", version = "0.1.0" }
+nocompiler-db = { path = "devinfra/crates/nocompiler-db", version = "0.1.0" }
+nocompiler-types = { path = "devinfra/crates/nocompiler-types", version = "0.1.0" }
+nocompiler-diff = { path = "devinfra/crates/nocompiler-diff", version = "0.1.0" }
+nocompiler-ir = { path = "devinfra/crates/nocompiler-ir", version = "0.1.0" }
+nocompiler-decomp = { path = "devinfra/crates/nocompiler-decomp", version = "0.1.0" }
+nocompiler-api = { path = "devinfra/crates/nocompiler-api", version = "0.1.0" }
+nocompiler-ptx = { path = "experiment/crates/nocompiler-ptx", version = "0.1.0" }
 
 # Kept deliberately short. Loaders and decoders are written here rather than
 # pulled in, because provenance tagging and hostile-input behaviour are the

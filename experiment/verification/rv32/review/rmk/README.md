@@ -10,8 +10,8 @@ nothing here is a proof, and nothing about RMK is claimed verified.
 - Built with `recon.sh` (clean shallow checkout in `/dev/shm`, sources and `Cargo.lock` unchanged):
   `RUSTUP_TOOLCHAIN=1.98.1 cargo build --release --locked`, 55 s, `CARGO_BUILD_JOBS=2`.
   - Deviation from upstream: `run.py` builds the **dev** profile; this recon builds **release**
-    (e5r policy). The repository's `rust-toolchain.toml` says `channel = "stable"`; the
-    recon pins 1.98.1 (the e5r firmware toolchain) explicitly so no channel sync is triggered.
+    (nocompiler policy). The repository's `rust-toolchain.toml` says `channel = "stable"`; the
+    recon pins 1.98.1 (the nocompiler firmware toolchain) explicitly so no channel sync is triggered.
   - ELF `target/riscv32imac-unknown-none-elf/release/rmk-qemu-riscv`, 454 024 bytes,
     sha256 `f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30`.
     Reproducibility across machines not yet checked (paths are embedded in panic locations).
@@ -26,7 +26,7 @@ nothing here is a proof, and nothing about RMK is claimed verified.
   this board, so "code is never overwritten" becomes a proof obligation (unlike FE310 flash).
 - MMIO: UART 16550 at 0x1000_0000 (register stride 1), `uart_16550 0.8`, polled (no interrupts).
 - Semihosting: 7 `ebreak` sites, all in the `semihosting` crate (stdout write/close for `println!`).
-  QEMU `-semihosting` treats `slli x0,x0,0x1f; ebreak; srai x0,x0,7` as a host call; the e5r model
+  QEMU `-semihosting` treats `slli x0,x0,0x1f; ebreak; srai x0,x0,7` as a host call; the nocompiler model
   treats `ebreak` as a breakpoint exception. A model of the semihosting call (or a proof the calls
   are only on startup paths outside the property) is needed.
 - Interrupts: startup writes `mie = 0` and `mip = 0`; the only other CSR writes are `mtvec`, a
@@ -87,10 +87,10 @@ Call sites by callee, selected:
 ## Not done / open
 
 - QEMU run of the example (needs the rynk host client `qemu_behavior`; host build not attempted).
-- No e5r image export of this ELF yet; no `virt` board model in e5r (main owns boards/integration).
+- No nocompiler image export of this ELF yet; no `virt` board model in nocompiler (main owns boards/integration).
 - ELF reproducibility from a second checkout path.
 
-## ALERT: the e5r machine model does not fit a RAM-resident image as is
+## ALERT: the nocompiler machine model does not fit a RAM-resident image as is
 
 `Theories/Platform.lean` `stepInstr` fetches instructions from the immutable image (`fetch img pc`,
 `romRead?`), while loads and stores check `B.inRam` first and only then the image. That is exact for
@@ -107,13 +107,13 @@ RAM (0x80000000..), so:
 Neither is a bug in the FE310 work; they are obligations a `virt` board/loader must add before any
 RMK claim. Main owns Platform/boards; this is reported, not changed.
 
-## Blocker: e5r cannot export this ELF yet (checked)
+## Blocker: nocompiler cannot export this ELF yet (checked)
 
-- `e5r IMAGE.elf` (plain image export): `ELF must be between 52 and 65536 bytes` (file is 454 024 B;
-  crates/e5r-verify/src/lib.rs:17 also caps mapped bytes at 65 536, and `.text`+`.rodata` alone are ~168 KB).
-- `e5r-exp flash --board boards/hifive1-revb.json IMAGE.elf`: `PT_LOAD 0: physical address 0x80000000 is not
+- `nocompiler IMAGE.elf` (plain image export): `ELF must be between 52 and 65536 bytes` (file is 454 024 B;
+  crates/nocompiler-verify/src/lib.rs:17 also caps mapped bytes at 65 536, and `.text`+`.rodata` alone are ~168 KB).
+- `nocompiler-exp flash --board boards/hifive1-revb.json IMAGE.elf`: `PT_LOAD 0: physical address 0x80000000 is not
   in flash` (the loader only knows flash-resident images).
-- So the first RMK step on the e5r side is a loader/exporter mode for RAM-resident images (segments into the
+- So the first RMK step on the nocompiler side is a loader/exporter mode for RAM-resident images (segments into the
   initial `ram`, with the size limits raised or the image restricted to the functions under proof) plus a
   `virt` board; both are in main-owned crates/boards. Per-function proofs of the Deframer could use a
   review-owned image restricted to `.text` of those functions, but only once the RAM-fetch question (ALERT
@@ -121,7 +121,7 @@ RMK claim. Main owns Platform/boards; this is reported, not changed.
 
 ## Independent review of the RAM-image exporter (exporter worker's commit 2752dd0)
 
-Built `e5r` from 2752dd0 in a detached worktree (release) and exported the pinned ELF
+Built `nocompiler` from 2752dd0 in a detached worktree (release) and exported the pinned ELF
 (`ram-image --ram 0x80000000:0x1000000 --mapping paddr=vaddr`): 4 PT_LOADs (.text RX, .rodata R,
 .data RW, .bss+stack RW zero-fill to 0x81000000), 170 955 file bytes.
 

@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.verify.job.v1",
+  "schema": "nocompiler.verify.job.v1",
   "root": "../..",
   "board": "boards/qemu-virt-rv32.json",
   "elf": "build/rmk-qemu-riscv-rynk.elf",
@@ -7,7 +7,7 @@
   "image": {
     "kind": "ram",
     "module": "Projects.rmk.Elf",
-    "namespace": "E5R.Rmk.Image"
+    "namespace": "NoCompiler.Rmk.Image"
   },
   "id": "rmk-uart-send-bytes",
   "modules": [
@@ -49,10 +49,10 @@
     "Projects/ramimage/SendBytes.lean"
   ],
   "theorems": [
-    "E5R.RmkUart.*",
-    "E5R.Rmk.Uart.send_bytes",
-    "E5R.RmkDeframer.img_eq",
-    "E5R.RmkDeframer.board_eq"
+    "NoCompiler.RmkUart.*",
+    "NoCompiler.Rmk.Uart.send_bytes",
+    "NoCompiler.RmkDeframer.img_eq",
+    "NoCompiler.RmkDeframer.board_eq"
   ],
   "symbols": {
     "0x800098a6": "send_bytes"

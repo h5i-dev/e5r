@@ -4,14 +4,14 @@
   loaded (o = 1, 3 through the stack temporaries sp+0x10 / sp+0xe), merged
   with the previous source word and stored at t5; then 0x80020fb6.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.MemmoveMisStart
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk
-open E5R E5R.Rmk.MemmoveFetch
+namespace NoCompiler.Rmk
+open NoCompiler NoCompiler.Rmk.MemmoveFetch
 
 /-- What the end block leaves: the source word at a1 + o stored at t5, the
     two stack temporaries possibly changed, nothing else. -/
@@ -705,4 +705,4 @@ theorem end1 (g : Core) (R0 : Word → BitVec 8) (hpc : g.pc = 0x80020f4c) (hq :
     have h29 : r ≠ 29 := fun e => hr (by subst e; decide)
     simp [c25, c24, c23, c22, c21, c20, c19, c18, c17, c16, c15, c14, c13, c12, c11, c10, c9, c8, c7, c6, c5, c4, c3, c2, c1, Core.wr_get_ne, h6, h7, h11, h12, h14, h29]
 
-end E5R.Rmk
+end NoCompiler.Rmk

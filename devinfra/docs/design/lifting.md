@@ -1,6 +1,6 @@
 # Lifting
 
-`crates/e5r-ir`
+`crates/nocompiler-ir`
 
 ## What it is for
 

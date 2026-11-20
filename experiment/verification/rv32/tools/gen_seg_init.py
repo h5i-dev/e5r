@@ -53,15 +53,15 @@ print('''/-
   Projects/rmk/Init/InitFetch.lean; do not edit by hand. Memory side conditions are hypotheses,
   discharged in Init/InitPath.lean.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Deframer.TailNoCopy
 import Projects.rmk.Init.InitFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Init
-open E5R E5R.Rmk.InitFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Init
+open NoCompiler NoCompiler.Rmk.InitFetch NoCompiler.Rmk.Deframer.Tail
 ''')
 LDST = [2147499410, 2147499414, 2147499416, 2147499420, 2147499422, 2147499426, 2147499430, 2147499434, 2147499438, 2147499446, 2147499448, 2147499450, 2147499452, 2147499460, 2147499464, 2147499468, 2147499472, 2147499476, 2147499480, 2147499484, 2147499488, 2147499492, 2147499496, 2147499530, 2147499534, 2147499538, 2147499542]
 # short segments: long store chains time out
@@ -71,4 +71,4 @@ seg('iC', 0x80003dc4, 0x80017552, {**{pc: MEM for pc in LDST if 0x80003dc4 <= pc
                                    0x80003df4: {'target': 0x80017552}}, 'ic')
 seg('iMid', 0x80003df8, 0x80020bb2, {0x80003e06: {'target': 0x80020bb2}}, 'im')
 seg('iPost', 0x80003e0a, 0x80003e1a, {pc: MEM for pc in LDST if pc >= 0x80003e0a}, 'io')
-print('end E5R.Rmk.Init')
+print('end NoCompiler.Rmk.Init')

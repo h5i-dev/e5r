@@ -3,7 +3,7 @@
   abstract values. Every value operation the transfer function uses is shown
   to over-approximate the concrete operation of `Theories/Hart.lean`.
 
-  Original e5r code, Apache-2.0. Work in progress: memory, states, the
+  Original nocompiler code, Apache-2.0. Work in progress: memory, states, the
   transfer function and `check_sound` follow in later parts.
 -/
 import Theories.Absint
@@ -11,8 +11,8 @@ import Theories.Logic
 
 set_option linter.constructorNameAsVariable false
 
-namespace E5R.AI
-open E5R
+namespace NoCompiler.AI
+open NoCompiler
 
 /-! ## Concretization -/
 
@@ -393,33 +393,33 @@ theorem shamt_w (k : Nat) : (w k).toNat % 32 = k % 32 := by
   exact Nat.mod_mod_of_dvd k (by decide)
 
 theorem alu_sound {ρ : Nat → Word} (op : AluOp) {a b : AV} {x y : Word} (ha : a.gam ρ x)
-    (hb : b.gam ρ y) : (AV.alu op a b).gam ρ (E5R.alu op x y) := by
+    (hb : b.gam ρ y) : (AV.alu op a b).gam ρ (NoCompiler.alu op x y) := by
   cases op with
   | add => exact add_sound ha hb
   | sub => exact sub_sound ha hb
   | and => exact band_sound ha hb
   | or =>
-    simp only [AV.alu, E5R.alu]
+    simp only [AV.alu, NoCompiler.alu]
     split
     · exact lift2_sound ha hb
     · trivial
   | xor =>
-    simp only [AV.alu, E5R.alu]
+    simp only [AV.alu, NoCompiler.alu]
     split
     · exact lift2_sound ha hb
     · trivial
   | sll =>
-    simp only [AV.alu, E5R.alu]
+    simp only [AV.alu, NoCompiler.alu]
     split
     · next k => rw [gam_single hb, shamt_w]; exact shl_sound _ ha
     · trivial
   | srl =>
-    simp only [AV.alu, E5R.alu]
+    simp only [AV.alu, NoCompiler.alu]
     split
     · next k => rw [gam_single hb, shamt_w]; exact shr_sound _ ha
     · trivial
   | sra =>
-    simp only [AV.alu, E5R.alu]
+    simp only [AV.alu, NoCompiler.alu]
     split
     · exact lift2_sound (f := fun p q => p.sshiftRight (q.toNat % 32)) ha hb
     · next l h k =>
@@ -618,16 +618,16 @@ theorem sext_small (x : Word) (n : Nat) (hn : 0 < n) (hn' : n < 32) (h : x.toNat
 /-- Extending a loaded value: unsigned loads are the raw value (it fits),
     signed ones are exact on sets and unchanged on non-negative ranges. -/
 theorem extend_sound {ρ : Nat → Word} (wd : Width) (signed : Bool) {v : AV} {x : Word}
-    (hv : v.gam ρ x) (hf : Fits wd x) : (v.extend wd signed).gam ρ (E5R.extend wd signed x) := by
+    (hv : v.gam ρ x) (hf : Fits wd x) : (v.extend wd signed).gam ρ (NoCompiler.extend wd signed x) := by
   simp only [Fits, Width.bytes] at hf
   cases wd <;> cases signed
-  · simp only [AV.extend, E5R.extend]; rw [and_ff x (by omega)]; exact hv
-  · simp only [AV.extend, E5R.extend]
+  · simp only [AV.extend, NoCompiler.extend]; rw [and_ff x (by omega)]; exact hv
+  · simp only [AV.extend, NoCompiler.extend]
     split
     · next l =>
       apply mkVals_sound
       refine ⟨((x.setWidth 8).signExtend 32).toNat, List.mem_map.mpr ⟨x.toNat, hv, ?_⟩, ?_⟩
-      · simp [E5R.extend, w_toNat]
+      · simp [NoCompiler.extend, w_toNat]
       · exact Nat.mod_eq_of_lt (BitVec.isLt _)
     · next l h =>
       simp only [AV.gam] at hv
@@ -637,13 +637,13 @@ theorem extend_sound {ρ : Nat → Word} (wd : Width) (signed : Bool) {v : AV} {
         exact hv
       · rw [if_neg hh]; trivial
     · trivial
-  · simp only [AV.extend, E5R.extend]; rw [and_ffff x (by omega)]; exact hv
-  · simp only [AV.extend, E5R.extend]
+  · simp only [AV.extend, NoCompiler.extend]; rw [and_ffff x (by omega)]; exact hv
+  · simp only [AV.extend, NoCompiler.extend]
     split
     · next l =>
       apply mkVals_sound
       refine ⟨((x.setWidth 16).signExtend 32).toNat, List.mem_map.mpr ⟨x.toNat, hv, ?_⟩, ?_⟩
-      · simp [E5R.extend, w_toNat]
+      · simp [NoCompiler.extend, w_toNat]
       · exact Nat.mod_eq_of_lt (BitVec.isLt _)
     · next l h =>
       simp only [AV.gam] at hv
@@ -653,8 +653,8 @@ theorem extend_sound {ρ : Nat → Word} (wd : Width) (signed : Bool) {v : AV} {
         exact hv
       · rw [if_neg hh]; trivial
     · trivial
-  · simp only [AV.extend, E5R.extend]; exact hv
-  · simp only [AV.extend, E5R.extend]; exact hv
+  · simp only [AV.extend, NoCompiler.extend]; exact hv
+  · simp only [AV.extend, NoCompiler.extend]; exact hv
 
 /-! ## Memory cells -/
 
@@ -662,12 +662,12 @@ theorem extend_sound {ρ : Nat → Word} (wd : Width) (signed : Bool) {v : AV} {
     stack pointer `ρ 2`. -/
 def Cell.at (ρ : Nat → Word) (c : Cell) : Word :=
   match c.base with
-  | .abs => E5R.AI.w c.addr
-  | .rel => ρ 2 + E5R.AI.w c.addr
+  | .abs => NoCompiler.AI.w c.addr
+  | .rel => ρ 2 + NoCompiler.AI.w c.addr
 
 /-- A cell's fact holds in `ram` (when its guard does). -/
 def Cell.holds (ρ : Nat → Word) (ram : Word → BitVec 8) (c : Cell) : Prop :=
-  (∀ g, c.guard = some g → (ramRead ram (E5R.AI.w g.1) g.2.1).toNat ≠ g.2.2) →
+  (∀ g, c.guard = some g → (ramRead ram (NoCompiler.AI.w g.1) g.2.1).toNat ≠ g.2.2) →
   c.v.gam ρ (ramRead ram (c.at ρ) c.w)
 
 def MemHolds (ρ : Nat → Word) (ram : Word → BitVec 8) (mem : List Cell) : Prop :=
@@ -2254,7 +2254,7 @@ theorem case_muldiv {op : MulOp} {rd rs1 rs2 : Reg}
     (h : absExec cfg s len.toNat (.muldiv op rd rs1 rs2) = some ts) :
     StepOk cfg ρ ts o (exec m.core len (.muldiv op rd rs1 rs2)) m.ram := by
   have he : exec m.core len (.muldiv op rd rs1 rs2) =
-      .done (m.core.wr rd (E5R.muldiv op (m.core.get rs1) (m.core.get rs2)) (m.core.pc + len)) := rfl
+      .done (m.core.wr rd (NoCompiler.muldiv op (m.core.get rs1) (m.core.get rs2)) (m.core.pc + len)) := rfl
   rw [he]
   simp only [absExec] at h
   split at h
@@ -2928,8 +2928,8 @@ theorem load_exact {cfg : Config} {ρ : Nat → Word} {s : AState} {m : Machine}
   have hf := ramRead_fits m.ram (w a) wd
   simp only [Fits, Width.bytes] at hf
   cases wd <;> cases signed <;> simp at hsg
-  · simp only [E5R.extend]; rw [and_ff _ (by omega)]
-  · simp only [E5R.extend]; rw [and_ffff _ (by omega)]
+  · simp only [NoCompiler.extend]; rw [and_ff _ (by omega)]
+  · simp only [NoCompiler.extend]; rw [and_ffff _ (by omega)]
   · rfl
   · rfl
 
@@ -3159,7 +3159,7 @@ theorem entry_sound {G : List Cell} {ρ : Nat → Word} {s e : AState} {m : Mach
 /-! ### What a handler step may write -/
 
 /-- Every store in an effect tree satisfies `P`. -/
-def _root_.E5R.Eff.StoresIn (P : Word → Width → Prop) : Eff → Prop
+def _root_.NoCompiler.Eff.StoresIn (P : Word → Width → Prop) : Eff → Prop
   | .done _ | .trap _ | .unsupported _ => True
   | .choose k => ∀ b, (k b).StoresIn P
   | .pick k => ∀ v, (k v).StoresIn P
@@ -4027,4 +4027,4 @@ theorem check_sound_hybrid {cfg : Config} {boot : AState} {cert : Cert}
         exact ⟨c, ram, evs, h1, h2, h3.imp (fun h => ⟨k, h⟩) id⟩),
      (fun m ⟨k, hk⟩ code hen => (regions k).irq m hk code hen), hsums⟩ hinit
 
-end E5R.AI
+end NoCompiler.AI

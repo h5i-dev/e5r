@@ -1,18 +1,18 @@
 # Toolchain and workflow
 
-## Today: `e5r cc`
+## Today: `nocompiler cc`
 
 ```
-e5r cc -O2 f.c g.c -o f.elf         # compile, link, record .e5r.struct, check
-e5r disasm f.elf                    # the code, nested by block and loop
-e5r export f.elf --namespace My.Image -o lean/My/Image.lean
+nocompiler cc -O2 f.c g.c -o f.elf         # compile, link, record .nocompiler.struct, check
+nocompiler disasm f.elf                    # the code, nested by block and loop
+nocompiler export f.elf --namespace My.Image -o lean/My/Image.lean
 ```
 
-`e5r cc` runs clang on each source and ld.lld on the objects (entry
+`nocompiler cc` runs clang on each source and ld.lld on the objects (entry
 `_start`, static), with the profile's flags before the user's (`-O2` unless
 an `-O` is given). If every function conforms it writes the binary with
-`.e5r.struct`; otherwise it writes it without and lists the violations, and
-exits 1. `CLANG` and `LLD` name the tools. The flags (`e5r::cc::CFLAGS`),
+`.nocompiler.struct`; otherwise it writes it without and lists the violations, and
+exits 1. `CLANG` and `LLD` name the tools. The flags (`nocompiler::cc::CFLAGS`),
 and what clang emits without each:
 
 | Flag | Without it |
@@ -24,7 +24,7 @@ and what clang emits without each:
 | `-mllvm -disable-block-placement` | loops rotated so that their header is in the middle, entered by a forward jump into the loop (R3) |
 | `-ffreestanding -nostdlib` | libc, whose code would have to conform too |
 
-`crates/e5r/tests/toolchain.rs` checks this on a corpus (`crates/e5r/tests/cc`):
+`crates/nocompiler/tests/toolchain.rs` checks this on a corpus (`crates/nocompiler/tests/cc`):
 nested loops with `break`, `continue` and a `goto` out of two loops,
 do-while, dense and sparse `switch`, recursion and mutual recursion, struct
 copies (lowered to calls to a `memcpy` the program supplies, which conforms
@@ -32,25 +32,25 @@ too) all conform; without `-disable-block-placement`, three of the five
 loop functions break R3. What stays outside version 0 is what the source
 asks for: calls through function pointers (R2).
 
-`examples/build.sh` predates `e5r cc` and keeps its own flags (without
+`examples/build.sh` predates `nocompiler cc` and keeps its own flags (without
 `-disable-block-placement`), because the committed examples are the bytes
-the proofs are about; their code conforms either way. `e5r check --json`
+the proofs are about; their code conforms either way. `nocompiler check --json`
 gives the report as JSON.
 
 ## Proving a function
 
 1. Build and annotate the binary; commit the ELF the proof is about (proofs
    are about exact bytes; `examples/elf/` holds the committed ones).
-2. `e5r export` it into a Lean module. The module has the `.text` words, an
-   `@[e5r_image]` lemma per address naming its instruction, and for every
+2. `nocompiler export` it into a Lean module. The module has the `.text` words, an
+   `@[nocompiler_image]` lemma per address naming its instruction, and for every
    conforming function `<name>_entry` and `<name>_dom` (its code and its
    callees').
 3. Write the specification and the proof, as in `lean/Examples/Sum.lean`
-   ([spec.md](spec.md)). Loop invariants go at the loop heads `e5r disasm`
+   ([spec.md](spec.md)). Loop invariants go at the loop heads `nocompiler disasm`
    shows.
 4. Add the ELF and its image to `images` in `lean/Audit.lean`, and the
    theorems to its axiom checks.
-5. `lake build && lake exe e5r-audit` in `lean/`.
+5. `lake build && lake exe nocompiler-audit` in `lean/`.
 6. Add mutations of the instructions the proof depends on to
    `scripts/check-proof-controls.sh`; each must make the proof fail.
 
@@ -64,13 +64,13 @@ it needs an LLVM build, which the development machine cannot hold (an LLVM
 build tree is tens of GB, against about 10 GB free), so it waits for a
 machine that can.
 
-- **A target feature on the RISC-V backend** (`+e5r`) rather than a new
+- **A target feature on the RISC-V backend** (`+nocompiler`) rather than a new
   backend: the profile is a way of using RISC-V.
 - **Structured control flow from the WebAssembly backend's passes:**
   `WebAssemblyFixIrreducibleControlFlow` (make the CFG reducible),
   `WebAssemblyCFGSort` (make loops contiguous) and `WebAssemblyCFGStackify`
   (compute the block/loop nesting), run after block placement and branch
-  folding, with the tree emitted as `.e5r.struct` by the AsmPrinter.
+  folding, with the tree emitted as `.nocompiler.struct` by the AsmPrinter.
 - **Jump tables** as a fixed pseudo-instruction sequence (bounds check, then
   a table of offsets in `.rodata`) expanded late, so the checker can
   recognise the pattern. Version 0 rejects them.
@@ -87,4 +87,4 @@ machine that can.
   to whoever writes the invariants.
 
 The compiler stays untrusted in all of this: what it writes is either
-checked (`e5r check`) or used only as a hint.
+checked (`nocompiler check`) or used only as a hint.

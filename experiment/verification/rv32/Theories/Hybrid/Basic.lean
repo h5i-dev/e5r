@@ -3,7 +3,7 @@
   abstract-interpretation checker establishes) with directly proved
   machine-code summaries of hard regions.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   Everything here is stated over the concrete semantics of
   `Theories/Platform.lean` (`Step`, `Reach`, `Escapes`, `Event`) and the
@@ -23,8 +23,8 @@
 -/
 import Theories.Logic
 
-namespace E5R.Hybrid
-open E5R
+namespace NoCompiler.Hybrid
+open NoCompiler
 
 variable {B : Board} {img : List Segment}
 
@@ -182,4 +182,4 @@ theorem seq_sound {Init : Machine → Prop} {Ok : Event → Prop} (S : Summary B
       ⟨hne, fun m' evs hst => let ⟨h', hev⟩ := hs m' evs hst; ⟨.inl h', hev⟩⟩)
     (fun _ h => ⟨[], .init h⟩)
 
-end E5R.Hybrid
+end NoCompiler.Hybrid

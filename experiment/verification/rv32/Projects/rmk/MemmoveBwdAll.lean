@@ -2,14 +2,14 @@
   memmove (pinned RMK image): the backward misaligned path composed, and
   the contract for every size, direction and alignment.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.MemmoveBwdMis
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Memmove
-open E5R E5R.Rmk E5R.Rmk.MemmoveFetch
+namespace NoCompiler.Rmk.Memmove
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.MemmoveFetch
 
 /-- The tail-byte arithmetic of the backward paths (no alignment premise). -/
 theorem btail_arith (d s n H A W T : Word)
@@ -182,4 +182,4 @@ theorem contractAll (m₀ : Machine) (h : PreM m₀) : ∃ k m, QRun B img k m�
     (fun x hx => by rw [hRf x hx]; exact bwd_moved _ _ _ _ hdir hdr hsr x)
   exact ⟨7 + k + 5, m, (hpro.trans hr).trans hm, hpost⟩
 
-end E5R.Rmk.Memmove
+end NoCompiler.Rmk.Memmove

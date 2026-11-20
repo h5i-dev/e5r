@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.verify.job.v1",
+  "schema": "nocompiler.verify.job.v1",
   "id": "hifive1-clamp32",
   "root": "..",
   "board": "boards/hifive1-revb.json",
@@ -45,13 +45,13 @@
   "elf_sha256": "0294b5dd6198b281cf166726f093c6db507ae7c5eef261ffa00202abbb879544",
   "image": {
     "module": "Projects.hifive1.clamp.Image",
-    "namespace": "E5R.Clamp32"
+    "namespace": "NoCompiler.Clamp32"
   },
   "modules": [
     "Projects/hifive1/clamp/Proof.lean"
   ],
   "theorems": [
-    "E5R.Hifive1.Clamp.*"
+    "NoCompiler.Hifive1.Clamp.*"
   ],
   "limits": {
     "seconds": 1800,

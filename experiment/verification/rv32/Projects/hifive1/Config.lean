@@ -6,8 +6,8 @@ import Theories.Absint
 import Theories.Board.Hifive1Revb
 import Projects.hifive1.Image
 
-namespace E5R.Hifive1.Job
-open E5R E5R.AI
+namespace NoCompiler.Hifive1.Job
+open NoCompiler NoCompiler.AI
 
 /-- pwm0.pwmcmp1: every write must be a duty of at most 100. -/
 def pwmcmp1 : Nat := 0x10015024
@@ -37,4 +37,4 @@ def boot : AState where
   mscratch := .top
   hnd := false
 
-end E5R.Hifive1.Job
+end NoCompiler.Hifive1.Job

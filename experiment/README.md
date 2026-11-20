@@ -1,6 +1,6 @@
 # Experiments
 
-The work e5r grew out of, kept buildable and tested, but not the product and
+The work nocompiler grew out of, kept buildable and tested, but not the product and
 not where effort goes first (see [docs/ROADMAP.md](../docs/ROADMAP.md)):
 
 - **PTX**: proofs about NVIDIA PTX kernels (memory safety, race freedom,
@@ -12,16 +12,16 @@ not where effort goes first (see [docs/ROADMAP.md](../docs/ROADMAP.md)):
 
 | Path | What |
 | --- | --- |
-| `crates/e5r-verify` | the `e5r-exp` binary (formerly `e5r`): `e5r-exp ptx check`, `e5r-exp check JOB`, ... |
-| `crates/e5r-ptx` | the PTX parser and Lean exporter |
+| `crates/nocompiler-verify` | the `nocompiler-exp` binary (formerly `nocompiler`): `nocompiler-exp ptx check`, `nocompiler-exp check JOB`, ... |
+| `crates/nocompiler-ptx` | the PTX parser and Lean exporter |
 | `verification/ptx`, `verification/ptx-ieee-crosscheck`, `verification/rv32` | the Lean projects |
 | `scripts/` | their check scripts; run from anywhere, they work in this directory |
 | `docs/` | their documentation |
 
 ```bash
-cargo build --release -p e5r-verify          # ../target/release/e5r-exp
+cargo build --release -p nocompiler-verify          # ../target/release/nocompiler-exp
 experiment/scripts/recheck-ptx.sh            # rebuild and recheck every PTX result
 ```
 
 The RV32 proofs use their own hand-written RV32I model, independent of the
-core's RV64 model in `lean/E5R`.
+core's RV64 model in `lean/NoCompiler`.

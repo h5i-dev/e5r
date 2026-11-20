@@ -1,0 +1,19 @@
+[package]
+name = "nocompiler-diff"
+description = "nocompiler — matching functions across two builds."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+nocompiler-core = { workspace = true }
+nocompiler-arch = { workspace = true }
+nocompiler-analysis = { workspace = true }
+nocompiler-db = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+nocompiler-format = { workspace = true }

@@ -6,8 +6,8 @@
       "Quot.sound"
     ],
     "board_sha256": "6fe2d0db63ed5756db3ca2845b00931154c84359002daf47cff906b0df64287b",
-    "e5r_verify": "0.1.0",
-    "e5r_verify_sha256": "45be2c143cb6c8b02d844b8dd1f81e35e8633596f1dd040aebcdf4689be166bf",
+    "nocompiler_verify": "0.1.0",
+    "nocompiler_verify_sha256": "45be2c143cb6c8b02d844b8dd1f81e35e8633596f1dd040aebcdf4689be166bf",
     "elf": {
       "bytes": 454024,
       "path": "build/rmk-qemu-riscv-rynk.elf",
@@ -202,7 +202,7 @@
     "Projects/ramimage/SessionFragments.lean"
   ],
   "resumed": [],
-  "schema": "e5r.verify.result.v1",
+  "schema": "nocompiler.verify.result.v1",
   "seconds": 997.674725682,
   "stages": [
     {

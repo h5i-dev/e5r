@@ -3,7 +3,7 @@
 
   Initial conditions, all explicit:
   * the image is `RamElf.imageOf` of the packed ELF, cut into 256-byte pieces (proved equivalent
-    for every step: E5R.stepInstr_chunk) (Projects/rmk/QemuRiscvRynk/Image.lean,
+    for every step: NoCompiler.stepInstr_chunk) (Projects/rmk/QemuRiscvRynk/Image.lean,
     written by tools/pack_elf.py); the board is `QemuVirtRv32.board rwBase`;
   * the replay starts at the first QEMU state at the ELF entry (QEMU's reset ROM at 0x1000 is
     not modeled), with QEMU's registers and CSRs there;
@@ -15,7 +15,7 @@ import Theories.RamElf
 import Theories.Chunk
 import Theories.Board.QemuVirtRv32
 import Projects.rmk.QemuRiscvRynk.Image
-open E5R
+open NoCompiler
 
 def image : RamElf.Image := RamElf.imageOf QemuVirtRv32.dramBase 0x1000000 Rmk.QemuRiscvRynk.elf
 
@@ -31,7 +31,7 @@ def main (args : List String) : IO UInt32 := do
     IO.eprintln "TRACE OR TOOL ERROR: the RAM-image reader refuses the ELF"; return 2
   let semis := (args.drop 1).filterMap fun s => (String.toNat? s).map (BitVec.ofNat 32)
   -- Device register 0x10000000 is the UART's transmit holding register.
-  -- The image in 256-byte pieces: every read and step is the same (E5R.stepInstr_chunk), and
+  -- The image in 256-byte pieces: every read and step is the same (NoCompiler.stepInstr_chunk), and
   -- lookups no longer walk the 135 KB code segment.
   Replay.Mmio.replay (QemuVirtRv32.board image.rwBase) (chunkImg 256 image.ro) 0x10000000 path
     (ram0 := ram0) (start := some (BitVec.ofNat 32 image.entry)) (semihost := semis)

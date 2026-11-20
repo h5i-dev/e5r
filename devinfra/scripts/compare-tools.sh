@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# e5r measured against the other reverse engineering tools on this machine.
+# nocompiler measured against the other reverse engineering tools on this machine.
 #
 # Not a test: it needs rizin, and Ghidra with a JVM if that is asked for. The
 # numbers it prints are recorded in docs/benchmarks.md and docs/scorecard.md,
@@ -15,7 +15,7 @@
 #   scripts/compare-tools.sh /bin/ls              # one binary
 #   RUNS=1 scripts/compare-tools.sh               # the fast loop
 #
-# Env: E5R                the e5r executable (default ../target/release/e5rx)
+# Env: NoCompiler                the nocompiler executable (default ../target/release/nocompiler-x)
 #      RIZIN               the rizin executable (default whatever is on PATH)
 #      GHIDRA_INSTALL_DIR  a Ghidra installation; Ghidra is left out without one
 #      OUT                 where the JSON goes (default target/bench-tools.json,
@@ -29,11 +29,11 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-e5r=${E5R:-../target/release/e5rx}
+nocompiler=${NoCompiler:-../target/release/nocompiler-x}
 rizin=${RIZIN:-rizin}
 out=${OUT:-target/bench-tools.json}
 
-[ -x "$e5r" ] || {
+[ -x "$nocompiler" ] || {
   echo "build first: cargo build --release" >&2
   exit 2
 }
@@ -43,9 +43,9 @@ out=${OUT:-target/bench-tools.json}
 # underneath it, so half the table would describe one build and half another
 # with nothing in the output saying so. The copy is deleted on the way out and
 # its hash is recorded with the numbers.
-snapshot=$(mktemp -t e5r-bench-XXXXXX)
+snapshot=$(mktemp -t nocompiler-bench-XXXXXX)
 trap 'rm -f "$snapshot"' EXIT
-cp "$e5r" "$snapshot"
+cp "$nocompiler" "$snapshot"
 chmod +x "$snapshot"
 # Not checked when SKIP names it: a run that was told to leave rizin out and
 # then refuses to start without it is a gate nobody can run anywhere rizin is
@@ -93,8 +93,8 @@ fi
 
 # Not exec: the trap has to run and delete the snapshot.
 python3 scripts/compare_tools.py \
-  --e5r "$snapshot" \
-  --e5r-name "$e5r" \
+  --nocompiler "$snapshot" \
+  --nocompiler-name "$nocompiler" \
   --rizin "$rizin" \
   --ghidra "$ghidra" \
   --runs "${RUNS:-3}" \

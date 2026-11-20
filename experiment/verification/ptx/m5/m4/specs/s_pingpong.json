@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.ptx.spec.v1",
+  "schema": "nocompiler.ptx.spec.v1",
   "kernel": "s_pingpong",
   "class": "scan32",
   "input": "s_pingpong_param_0",

@@ -1,2 +1,2 @@
-*.e5r-patch merge=union
-*.e5r-proj  merge=union
+*.nocompiler-patch merge=union
+*.nocompiler-proj  merge=union

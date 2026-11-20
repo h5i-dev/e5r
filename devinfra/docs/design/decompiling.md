@@ -1,6 +1,6 @@
 # Decompiling
 
-`crates/e5r-decomp`, with `crates/e5r-api` driving it
+`crates/nocompiler-decomp`, with `crates/nocompiler-api` driving it
 
 ## What it is for
 

@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.ptx.spec.v1",
+  "schema": "nocompiler.ptx.spec.v1",
   "kernel": "vor",
   "class": "map32",
   "arrays": [

@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.ptx.spec.v1",
+  "schema": "nocompiler.ptx.spec.v1",
   "kernel": "vadd",
   "class": "map32",
   "arrays": ["vadd_param_0", "vadd_param_1", "vadd_param_2"],

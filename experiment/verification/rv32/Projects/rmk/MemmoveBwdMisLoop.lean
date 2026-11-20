@@ -3,7 +3,7 @@
   congruent mod 4: the shift/merge loop at 0x80021012 (pinned RMK image),
   for every iteration count.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
     0x80021012  mv a1,a5; add a3,t5,s2; lw a5,-4(a3); sll a1,a1,a2;
                 srl a3,a5,t4; or a1,a1,a3; add a3,s1,s2; addi s1,s1,-4;
@@ -17,8 +17,8 @@ import Projects.rmk.MemmoveMisLoop
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk
-open E5R E5R.Rmk.MemmoveFetch
+namespace NoCompiler.Rmk
+open NoCompiler NoCompiler.Rmk.MemmoveFetch
 
 def bmisBody (c : Core) (ram : Word → BitVec 8) : Core :=
   let L := c.get 30 + c.get 18
@@ -305,4 +305,4 @@ theorem bmis_loop (o : Nat) (ho : 0 < o ∧ o < 4) : ∀ (j : Nat) (c : Core) (r
     · intro r a b d e f
       rw [hfr r a b d e f, Core.goto_get]; exact bmisBody_get c ram r a b d e f
 
-end E5R.Rmk
+end NoCompiler.Rmk

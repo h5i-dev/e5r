@@ -2,7 +2,7 @@
   `Deframer::next`: one turn of the frame loop, part 1 (no call): the end of the pending bytes,
   the delimiter scan, and a delimiter found while discarding.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here:
   * `end_case`: LoopInv with cursor = filled => NextPost (via the exit test);
@@ -15,8 +15,8 @@ import Projects.rmk.Deframer.NextExit
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Next
-open E5R E5R.Rmk.NextFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.Next
+open NoCompiler NoCompiler.Rmk.NextFetch NoCompiler.Rmk.Deframer.Tail
 
 theorem add_toNat' (x y : Word) (h : x.toNat + y.toNat < 2 ^ 32) : (x + y).toNat = x.toNat + y.toNat := by
   rw [BitVec.toNat_add]; omega
@@ -221,4 +221,4 @@ theorem disc_case (c : Core) (R0 : Word → BitVec 8) (E : CallEnv nextPc nextSt
       exact mo x (by have := hx.1; omega)
   · rw [gd 8 (by decide) (by decide) (by decide) (by decide) (by decide), e8, d9, hs11]; omega
 
-end E5R.Rmk.Deframer.Next
+end NoCompiler.Rmk.Deframer.Next

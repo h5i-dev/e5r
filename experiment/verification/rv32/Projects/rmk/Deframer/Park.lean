@@ -2,7 +2,7 @@
   `Deframer::park_pending` on the pinned RMK image, proved against memmove's contract as an explicit
   hypothesis.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here, CONDITIONAL ON `CopyContract` (a hypothesis of each theorem, not proved here):
   `park_from_copy : ParkFromCopy`, i.e. `CopyContract → ParkContract`: from every machine at
@@ -15,8 +15,8 @@ import Projects.rmk.Deframer.ParkFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Park
-open E5R E5R.Rmk.ParkFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.Park
+open NoCompiler NoCompiler.Rmk.ParkFetch NoCompiler.Rmk.Deframer.Tail
 
 /-! ## The 16-byte frame: ra, s0, s1 at f + 0xc, f + 8, f + 4 -/
 
@@ -532,4 +532,4 @@ theorem park_from_copy : ParkFromCopy := by
     rw [keep _ (by omega) (by omega) (by rw [hdst]; omega)]
     exact psave_other c R0 hs _ (.inl (by omega))
 
-end E5R.Rmk.Deframer.Park
+end NoCompiler.Rmk.Deframer.Park

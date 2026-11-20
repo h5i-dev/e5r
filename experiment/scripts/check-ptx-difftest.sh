@@ -8,7 +8,7 @@
 #    and from a ptxas cubin.
 # 3. ptxdiff runs the same launches with the Lean definitions themselves
 #    (Ptx.Semantics.stepMem, compiled by Lean).
-# 4. The interpreter of e5r-ptx runs them too. All four outputs must be identical byte for byte. Each misaligned-access
+# 4. The interpreter of nocompiler-ptx runs them too. All four outputs must be identical byte for byte. Each misaligned-access
 #    launch must fault in the model and be refused by the GPU.
 #
 # Needs a CUDA GPU, the driver, nvcc's ptxas and gcc. Without a GPU it exits 77
@@ -22,16 +22,16 @@ if ! command -v nvidia-smi >/dev/null || ! nvidia-smi -L >/dev/null 2>&1 || [[ !
   echo "difftest: no GPU or no ptxas, skipped" >&2
   exit 77
 fi
-if [[ -z "${E5R_VERIFY:-}" ]]; then
-  CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" cargo build --release -p e5r-verify
-  E5R_VERIFY="$(cd .. && pwd)/target/release/e5r-exp"
+if [[ -z "${NOCOMPILER_VERIFY:-}" ]]; then
+  CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" cargo build --release -p nocompiler-verify
+  NOCOMPILER_VERIFY="$(cd .. && pwd)/target/release/nocompiler-exp"
 fi
 out=${DIFFTEST_OUT:-$(mktemp -d)}
 mkdir -p "$out"
 python3 $root/difftest/gen.py "$out"
 "$ptxas_bin" -arch=sm_86 "$out/diff.ptx" -o "$out/diff.cubin"
 gcc -O2 -Wall -o "$out/gpurun" $root/difftest/gpurun.c -I"$cuda/include" -lcuda
-"$E5R_VERIFY" ptx export --namespace Diff.Kernels --name difftest/diff.ptx "$out/diff.ptx" \
+"$NOCOMPILER_VERIFY" ptx export --namespace Diff.Kernels --name difftest/diff.ptx "$out/diff.ptx" \
   >$root/Diff/Kernels.lean
 (cd $root && LEAN_NUM_THREADS=${LEAN_NUM_THREADS:-2} lake build ptxdiff -q)
 
@@ -39,7 +39,7 @@ gcc -O2 -Wall -o "$out/gpurun" $root/difftest/gpurun.c -I"$cuda/include" -lcuda
 "$out/gpurun" "$out/diff.cubin" "$out/cases.txt" >"$out/gpu-cubin.txt"
 $root/.lake/build/bin/ptxdiff "$out/cases.txt" >"$out/model.txt"
 # the untrusted interpreter the counterexample search uses, on the same cases
-"$E5R_VERIFY" ptx run --cases "$out/cases.txt" "$out/diff.ptx" >"$out/interp.txt"
+"$NOCOMPILER_VERIFY" ptx run --cases "$out/cases.txt" "$out/diff.ptx" >"$out/interp.txt"
 n=$(wc -l <"$out/cases.txt")
 for g in gpu-jit gpu-cubin interp; do
   if [[ $(wc -l <"$out/$g.txt") -ne $n ]] || ! cmp -s "$out/$g.txt" "$out/model.txt"; then

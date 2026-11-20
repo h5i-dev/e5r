@@ -8,7 +8,7 @@ proposed edits, not applied. None of them requires migrating any evidence.
 * `build-canonical.sh` gives `5871dceee5aa302705f4d3ef423ee6765951c0c7d314e996559641630bf16a06`:
   run twice verbatim, and once by an independently written script at the same
   path, all byte-identical, with no build path embedded.
-* The recon recipe at `/dev/shm/e5r-rmk-recon` gives `e9598930…`, reproduced by a
+* The recon recipe at `/dev/shm/nocompiler-rmk-recon` gives `e9598930…`, reproduced by a
   different script.
 * Cause: across checkout paths, exactly the path crates (`rmk`, `rmk_config`,
   `rmk_macro`, `rmk_types`, the example, build scripts) change `-C metadata`.
@@ -26,7 +26,7 @@ proposed edits, not applied. None of them requires migrating any evidence.
    path dependencies, which changes symbol order, codegen-unit partitioning and
    inlining; remapping cannot remove this".
 2. Reproducibility claim, suggested wording: "byte-identical from a clean checkout
-   and cache **at the fixed path `/dev/shm/e5r-rmk-canonical`**, Rust 1.98.1, on
+   and cache **at the fixed path `/dev/shm/nocompiler-rmk-canonical`**, Rust 1.98.1, on
    this machine". Not established: any other path, another machine, rustup home or
    user, or a later crates.io index.
 3. `f39d833f`: "reproducible only at its original path" is supported, but not by a

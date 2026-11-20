@@ -92,9 +92,9 @@ def main():
         text, what = mutate(rng, src)
         if text in seen or text == src:
             continue
-        p = "/tmp/e5r_mut.ptx"
+        p = "/tmp/nocompiler_mut.ptx"
         open(p, "w").write(text)
-        r = subprocess.run([f"{CUDA}/bin/ptxas", "-arch=sm_86", p, "-o", "/tmp/e5r_mut.cubin"],
+        r = subprocess.run([f"{CUDA}/bin/ptxas", "-arch=sm_86", p, "-o", "/tmp/nocompiler_mut.cubin"],
                            capture_output=True)
         if r.returncode != 0:
             continue

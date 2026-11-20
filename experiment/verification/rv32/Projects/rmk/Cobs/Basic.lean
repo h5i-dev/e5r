@@ -2,7 +2,7 @@
   `cobs::dec::decode_in_place_report` (pinned RMK image, entry 0x8001e02e):
   calling environment, result layout, and the blocks every path shares.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   ABI, read from the bytes (0x8001e02e..0x8001e148) and from its caller
   `cobs::dec::decode_in_place` (0x8001e006, which passes a0 = sp+0xc of its own
@@ -24,8 +24,8 @@ import Projects.rmk.Run
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Cobs
-open E5R E5R.Rmk E5R.Rmk.CobsFetch
+namespace NoCompiler.Rmk.Cobs
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.CobsFetch
 
 /-- The decoder's entry. -/
 def entry : Word := 0x8001e02e
@@ -416,4 +416,4 @@ theorem finish (c : Core) (R S : Word → BitVec 8) (e : Core) (h : CobsEnv ⟨c
     unfold exitRam; rw [h10]
     rw [ramWrite_w_out, ramWrite_w_out] <;> bv_omega
 
-end E5R.Rmk.Cobs
+end NoCompiler.Rmk.Cobs

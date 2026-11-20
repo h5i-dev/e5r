@@ -3,10 +3,10 @@
   print `theorem fXXXXXXXX : fetchDecode img 0x… = some (instr, len) := fetchDecode_of …` in the form of
   Projects/rmk/Uart/SendFetch.lean. The kernel checks every printed fact against the packed ELF.
     LEAN_PATH=. lean --run rmk-audit/FactGen.lean A..B ...   (decimal addresses, from verification/rv32)
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Fetch
-open E5R E5R.Rmk
+open NoCompiler NoCompiler.Rmk
 def hex8 (n : Nat) : String :=
   let s := String.ofList (Nat.toDigits 16 n); "".pushn '0' (8 - s.length) ++ s
 def hexN (n : Nat) : String := String.ofList (Nat.toDigits 16 n)

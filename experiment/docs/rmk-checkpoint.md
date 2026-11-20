@@ -9,7 +9,7 @@ virt RV32, upstream RMK revision `71556128` (full pin in the R0 records).
 
 | Result | Evidence | Limits |
 | --- | --- | --- |
-| RAM ELF export and independent Lean image reconstruction | `e5r`, `RamElf`, generated fidelity theorem | Exact pinned ELF and board; not a verified compiler |
+| RAM ELF export and independent Lean image reconstruction | `nocompiler`, `RamElf`, generated fidelity theorem | Exact pinned ELF and board; not a verified compiler |
 | memmove, all sizes, directions and alignments in its contract | `Memmove.contractAll`, `Deframer.copy_contract` | Contract's address/stack bounds |
 | COBS decoder and Deframer tail/park/unpark/next | `Cobs.Bridge`, `RmkSessionDischarged.deframer` | Explicit entry and memory invariants |
 | Session receive/unpark and one-round decomposition | `RmkSessionDischarged`, `RmkFragments.round` | Quiet entry; stops at Some/read-future boundaries |
@@ -51,11 +51,11 @@ and the pinned ELF at
 The ELF is an ignored local input, not included in this source checkout.
 
 ```sh
-cargo build --release -p e5r-verify -j 2
-./target/release/e5r-exp check \
+cargo build --release -p nocompiler-verify -j 2
+./target/release/nocompiler-exp check \
   verification/rv32/jobs/rmk/rmk-checkpoint.json \
   --out /tmp/rmk-checkpoint.json
-./target/release/e5r-exp verify-result /tmp/rmk-checkpoint.json
+./target/release/nocompiler-exp verify-result /tmp/rmk-checkpoint.json
 ```
 
 The job lists the import closure of `Projects.ramimage.RmkCheckpoint` (102

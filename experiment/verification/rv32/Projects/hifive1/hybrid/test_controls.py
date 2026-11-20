@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Mutation controls for the hybrid proofs (Projects/hifive1/hybrid).
 
-Original e5r code, Apache-2.0. Each control changes one thing in a scratch
+Original nocompiler code, Apache-2.0. Each control changes one thing in a scratch
 copy of verification/rv32 (an instruction byte in the image, the abstract
 summary, the certificate, the wrap arithmetic, the masking premise) and
 recompiles the affected modules with the pinned Lean. A control passes only

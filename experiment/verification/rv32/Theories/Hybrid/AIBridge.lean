@@ -1,7 +1,7 @@
 /-
   Masked-run summaries as regions of the abstract-interpretation checker's
-  hybrid soundness theorem (`E5R.AI.check_sound_hybrid`, support-lean4
-  d6ae986). Original e5r code, Apache-2.0.
+  hybrid soundness theorem (`NoCompiler.AI.check_sound_hybrid`, support-lean4
+  d6ae986). Original nocompiler code, Apache-2.0.
 
   A delegated certificate node hands the machine to a region `R`; the
   checker's theorem requires every step from `R` to stay in `R` or reach a
@@ -15,8 +15,8 @@
 import Theories.Hybrid.Basic
 import Theories.AbsintSound
 
-namespace E5R.Hybrid
-open E5R E5R.AI
+namespace NoCompiler.Hybrid
+open NoCompiler NoCompiler.AI
 
 def regionOf (cfg : Config) (cert : Cert) : Region cfg cert where
   R := Inside cfg.board cfg.img (MainInv cert)
@@ -72,4 +72,4 @@ theorem safeStep_of_mrun {cfg : Config} {Q : Machine → Prop} {n m m'}
     exact ⟨fun code => irqEnabled_masked hm code,
       fun o => ⟨m₁.core, m₁.ram, [], hd o, by simp, safeTo_of_mrun hrest hq⟩⟩
 
-end E5R.Hybrid
+end NoCompiler.Hybrid

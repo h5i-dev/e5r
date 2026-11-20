@@ -27,7 +27,7 @@
 -/
 import tools.ReplayLib
 import Std.Data.HashMap
-open E5R
+open NoCompiler
 
 namespace Replay.Mmio
 

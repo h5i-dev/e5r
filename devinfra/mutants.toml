@@ -6,7 +6,7 @@
 # per entry, which drowns the signal from the decode logic that matters.
 exclude_globs = [
     "crates/*/src/*/text.rs",
-    "crates/e5r-arch/src/x86/table.rs",
-    "crates/e5r-cli/src/print.rs",
-    "crates/e5r-cli/src/json.rs",
+    "crates/nocompiler-arch/src/x86/table.rs",
+    "crates/nocompiler-cli/src/print.rs",
+    "crates/nocompiler-cli/src/json.rs",
 ]

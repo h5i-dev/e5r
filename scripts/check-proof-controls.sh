@@ -7,10 +7,10 @@
 # lean/, and require the proof module to FAIL. Then require the unpatched
 # copy to pass, so a failure is the mutation's and not the copy's.
 #
-#   scripts/check-proof-controls.sh        (needs target/release/e5r and lake)
+#   scripts/check-proof-controls.sh        (needs target/release/nocompiler and lake)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-E5R=${E5R:-$PWD/target/release/e5r}
+NoCompiler=${NoCompiler:-$PWD/target/release/nocompiler}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
@@ -33,7 +33,7 @@ mutations=(
   "hello Examples.Hello 0x11178 0x00a585b3 0x40a585b3 write_all-moves-buf-backwards"
   "hello Examples.Hello 0x111a4 0x00b00613 0x00a00613 hello-writes-10-bytes"
   "hello Examples.Hello 0x111b0 0x03f55513 0x03e55513 hello-exit-status-2-on-error"
-  # demo/README.md: the same mutations on the e5r build (B) and the ordinary build (A).
+  # demo/README.md: the same mutations on the nocompiler build (B) and the ordinary build (A).
   "demo/elf/sum.b Demo.SumB 0x1119c 0x00c68633 0x40c68633 demo-B-sum-add-becomes-sub"
   "demo/elf/sum.b Demo.SumB 0x111a4 0x00850513 0x00450513 demo-B-sum-stride-8-becomes-4"
   "demo/elf/sum.a Demo.SumA 0x11196 0x9636 0x8e15 demo-A-sum-add-becomes-sub"
@@ -83,11 +83,11 @@ PY
         (cd "$work/lean" && lake env lean --run ../demo/tools/ExportC.lean "$work/$base.elf" "Demo.$F.ImageA" \
           $(demo_funcs "$work/$base.elf") > "$img")
       else
-        "$E5R" export "$work/$base.elf" --namespace "Demo.$F.ImageB" -o "$work/lean/$img" 2>/dev/null
+        "$NoCompiler" export "$work/$base.elf" --namespace "Demo.$F.ImageB" -o "$work/lean/$img" 2>/dev/null
       fi ;;
     *)
       img=Examples/$(echo "$name" | sed -E 's/(^|_)([a-z])/\U\2/g')/Image.lean
-      "$E5R" export "$work/$name.elf" --namespace "$mod.Image" -o "$work/lean/$img" 2>/dev/null ;;
+      "$NoCompiler" export "$work/$name.elf" --namespace "$mod.Image" -o "$work/lean/$img" 2>/dev/null ;;
   esac
   # The mutated image must itself build: a proof that fails because its
   # image is broken (a failed export) would be no evidence.

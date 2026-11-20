@@ -3,7 +3,7 @@
   16 bytes (BOUNDED SPECIALIZATION: the word-copy and misaligned paths the
   code takes for 16 bytes or more are not covered here).
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   Entry is the call target every caller uses, the trampoline
   `memmove` at 0x80020c1e (`auipc t1,0; jr 0x180(t1)`), which jumps to
@@ -26,8 +26,8 @@ import Theories.AbsintSound
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Memmove
-open E5R E5R.Rmk E5R.Rmk.MemmoveFetch
+namespace NoCompiler.Rmk.Memmove
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.MemmoveFetch
 
 /-! ## Epilogue: 0x800210b0 lw s0..s2, addi sp, ret -/
 
@@ -448,25 +448,25 @@ theorem bwd_path (c : Core) (R0 : Word → BitVec 8) (hq : Quiet c)
 def InSlots (sp x : Word) : Prop := sp.toNat - 12 ≤ x.toNat ∧ x.toNat < sp.toNat
 
 theorem touches_slot {sp a x : Word} (hs : Slots sp) (k : Nat) (hk : k = 0x2c ∨ k = 0x28 ∨ k = 0x24)
-    (ha : a = sp + 0xffffffd0#32 + BitVec.ofNat 32 k) (h : E5R.AI.Touches a .w x) : InSlots sp x := by
+    (ha : a = sp + 0xffffffd0#32 + BitVec.ofNat 32 k) (h : NoCompiler.AI.Touches a .w x) : InSlots sp x := by
   obtain ⟨j, hj, rfl⟩ := h
   have := hs.ram; simp only [Width.bytes] at hj; subst ha
-  unfold InSlots; simp only [E5R.AI.w]
+  unfold InSlots; simp only [NoCompiler.AI.w]
   rcases hk with rfl | rfl | rfl <;> constructor <;> bv_omega
 
 theorem saved_other (c : Core) (ram : Word → BitVec 8) (hs : Slots (c.get 2)) (x : Word)
     (hx : ¬ InSlots (c.get 2) x) : saved c ram x = ram x := by
   unfold saved
   -- (saved unfolds to the three writes)
-  rw [E5R.AI.ramWrite_other _ _ _ _ _ (fun h => hx (touches_slot hs 0x24 (by decide) rfl h)),
-    E5R.AI.ramWrite_other _ _ _ _ _ (fun h => hx (touches_slot hs 0x28 (by decide) rfl h)),
-    E5R.AI.ramWrite_other _ _ _ _ _ (fun h => hx (touches_slot hs 0x2c (by decide) rfl h))]
+  rw [NoCompiler.AI.ramWrite_other _ _ _ _ _ (fun h => hx (touches_slot hs 0x24 (by decide) rfl h)),
+    NoCompiler.AI.ramWrite_other _ _ _ _ _ (fun h => hx (touches_slot hs 0x28 (by decide) rfl h)),
+    NoCompiler.AI.ramWrite_other _ _ _ _ _ (fun h => hx (touches_slot hs 0x2c (by decide) rfl h))]
 
 theorem disj_slots (sp : Word) (i j : Nat) (hi : i = 0x2c ∨ i = 0x28 ∨ i = 0x24)
     (hj : j = 0x2c ∨ j = 0x28 ∨ j = 0x24) (hij : i ≠ j) :
-    E5R.AI.Disj (sp + 0xffffffd0#32 + BitVec.ofNat 32 i) .w (sp + 0xffffffd0#32 + BitVec.ofNat 32 j) .w := by
+    NoCompiler.AI.Disj (sp + 0xffffffd0#32 + BitVec.ofNat 32 i) .w (sp + 0xffffffd0#32 + BitVec.ofNat 32 j) .w := by
   intro x ⟨a, ha, hx⟩ ⟨b, hb, hy⟩
-  simp only [Width.bytes, E5R.AI.w] at ha hb hx hy
+  simp only [Width.bytes, NoCompiler.AI.w] at ha hb hx hy
   rw [hx] at hy
   rcases hi with rfl | rfl | rfl <;> rcases hj with rfl | rfl | rfl <;> first | exact hij rfl | bv_omega
 
@@ -476,12 +476,12 @@ theorem saved_read (c : Core) (ram : Word → BitVec 8) :
     ramRead (saved c ram) (c.get 2 + 0xffffffd0#32 + 0x24#32) .w = c.get 18 := by
   unfold saved
   refine ⟨?_, ?_, ?_⟩
-  · rw [E5R.AI.ramRead_frame _ _ _ _ _ _ (disj_slots _ 0x2c 0x24 (by decide) (by decide) (by decide)),
-      E5R.AI.ramRead_frame _ _ _ _ _ _ (disj_slots _ 0x2c 0x28 (by decide) (by decide) (by decide)),
-      E5R.AI.ramRead_ramWrite_self]; rfl
-  · rw [E5R.AI.ramRead_frame _ _ _ _ _ _ (disj_slots _ 0x28 0x24 (by decide) (by decide) (by decide)),
-      E5R.AI.ramRead_ramWrite_self]; rfl
-  · rw [E5R.AI.ramRead_ramWrite_self]; rfl
+  · rw [NoCompiler.AI.ramRead_frame _ _ _ _ _ _ (disj_slots _ 0x2c 0x24 (by decide) (by decide) (by decide)),
+      NoCompiler.AI.ramRead_frame _ _ _ _ _ _ (disj_slots _ 0x2c 0x28 (by decide) (by decide) (by decide)),
+      NoCompiler.AI.ramRead_ramWrite_self]; rfl
+  · rw [NoCompiler.AI.ramRead_frame _ _ _ _ _ _ (disj_slots _ 0x28 0x24 (by decide) (by decide) (by decide)),
+      NoCompiler.AI.ramRead_ramWrite_self]; rfl
+  · rw [NoCompiler.AI.ramRead_ramWrite_self]; rfl
 
 theorem ramRead_congr {R R' : Word → BitVec 8} {a : Word}
     (h : ∀ k < 4, R (a + BitVec.ofNat 32 k) = R' (a + BitVec.ofNat 32 k)) : ramRead R a .w = ramRead R' a .w := by
@@ -636,4 +636,4 @@ theorem contract (m₀ : Machine) (h : Pre m₀) : ∃ k m, QRun B img k m₀ m 
         · rfl)
     exact ⟨7 + k + 5, m, (hpro.trans hr).trans hm, hpost⟩
 
-end E5R.Rmk.Memmove
+end NoCompiler.Rmk.Memmove

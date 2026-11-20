@@ -45,7 +45,7 @@ def hex (b : ByteArray) : String := Id.run do
 
 /-- Where the difftest launch places the `.shared` variables: from offset 0,
 in declaration order, each at the next multiple of its alignment (what
-`e5r_ptx::interp::layout` does). The test kernels' outputs do not depend on
+`nocompiler_ptx::interp::layout` does). The test kernels' outputs do not depend on
 the placement. -/
 def layout (K : Kernel) : (String → Addr) × Nat := Id.run do
   let mut pos := 0
@@ -115,7 +115,7 @@ def runThread (K : Kernel) (L : Launch) (t : Tid) (inb : ByteArray) (shBase : Ad
     | .halted => (.halted s, st)
     | .fault => (.fault, st)
 
-/-- One CTA on the schedule of `e5r_ptx::interp::run_grid`: each thread in
+/-- One CTA on the schedule of `nocompiler_ptx::interp::run_grid`: each thread in
 `Launch.threads` order runs to its next barrier; when all wait at the same
 `bar.sync` they are released (`Cfg.release`), and when all have halted the
 CTA is done. Anything else is a fault or a diverged barrier. -/

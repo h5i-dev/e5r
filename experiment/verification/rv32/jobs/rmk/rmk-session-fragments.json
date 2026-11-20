@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.verify.job.v1",
+  "schema": "nocompiler.verify.job.v1",
   "id": "rmk-session-fragments",
   "root": "../..",
   "board": "boards/qemu-virt-rv32.json",
@@ -8,7 +8,7 @@
   "image": {
     "kind": "ram",
     "module": "Projects.rmk.Elf",
-    "namespace": "E5R.Rmk.Image"
+    "namespace": "NoCompiler.Rmk.Image"
   },
   "modules": [
     "Projects/rmk/Run.lean",
@@ -88,22 +88,22 @@
     "Projects/ramimage/SessionFragments.lean"
   ],
   "theorems": [
-    "E5R.RmkFragments.*",
-    "E5R.Rmk.Deframer.SessionI.session_round",
-    "E5R.Rmk.Deframer.SessionI.unpark_round",
-    "E5R.Rmk.Deframer.SessionI.none_of_recv",
-    "E5R.Rmk.Deframer.SomeP.some_neg",
-    "E5R.Rmk.Deframer.SomeP.some_pos",
-    "E5R.Rmk.Deframer.SomeP.some_round",
-    "E5R.Rmk.Deframer.NoneP.none_step",
-    "E5R.Rmk.Deframer.Rx.rx_loop",
-    "E5R.Rmk.reach_lands",
-    "E5R.Rmk.reach_no_escape",
-    "E5R.Rmk.Deframer.copy_contract",
-    "E5R.Rmk.Memmove.contractAll",
-    "E5R.Rmk.Deframer.cobs_report",
-    "E5R.RmkDeframer.img_eq",
-    "E5R.RmkDeframer.board_eq"
+    "NoCompiler.RmkFragments.*",
+    "NoCompiler.Rmk.Deframer.SessionI.session_round",
+    "NoCompiler.Rmk.Deframer.SessionI.unpark_round",
+    "NoCompiler.Rmk.Deframer.SessionI.none_of_recv",
+    "NoCompiler.Rmk.Deframer.SomeP.some_neg",
+    "NoCompiler.Rmk.Deframer.SomeP.some_pos",
+    "NoCompiler.Rmk.Deframer.SomeP.some_round",
+    "NoCompiler.Rmk.Deframer.NoneP.none_step",
+    "NoCompiler.Rmk.Deframer.Rx.rx_loop",
+    "NoCompiler.Rmk.reach_lands",
+    "NoCompiler.Rmk.reach_no_escape",
+    "NoCompiler.Rmk.Deframer.copy_contract",
+    "NoCompiler.Rmk.Memmove.contractAll",
+    "NoCompiler.Rmk.Deframer.cobs_report",
+    "NoCompiler.RmkDeframer.img_eq",
+    "NoCompiler.RmkDeframer.board_eq"
   ],
   "symbols": {
     "0x8001d576": "8Deframer4tail",

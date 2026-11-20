@@ -5,14 +5,14 @@
   the model's own decoder and checked here by the kernel against the packed ELF
   (Projects/rmk/Fetch.lean `fetchDecode_of`).
 
-  Original e5r code, Apache-2.0. Regenerate rather than edit by hand.
+  Original nocompiler code, Apache-2.0. Regenerate rather than edit by hand.
 -/
 import Projects.rmk.Fetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.CobsFetch
-open E5R E5R.Rmk
+namespace NoCompiler.Rmk.CobsFetch
+open NoCompiler NoCompiler.Rmk
 
 theorem f8001e006 : fetchDecode img 0x8001e006 = some (Instr.opimm (AluOp.add) 2 2 0xffffffe0#32, 2) :=
   fetchDecode_of _ (by decide) (by decide) (bits := 4353) (by decide +kernel) (by decide +kernel)
@@ -245,4 +245,4 @@ theorem f8001e140 : fetchDecode img 0x8001e140 = some (Instr.auipc 1 0x00001000#
 theorem f8001e144 : fetchDecode img 0x8001e144 = some (Instr.jalr 1 1 0x000006fa#32, 4) :=
   fetchDecode_of _ (by decide) (by decide) (bits := 1872789735) (by decide +kernel) (by decide +kernel)
 
-end E5R.Rmk.CobsFetch
+end NoCompiler.Rmk.CobsFetch

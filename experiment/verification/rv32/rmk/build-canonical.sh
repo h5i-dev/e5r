@@ -1,6 +1,6 @@
 #!/bin/bash
 # R0: reproducible build of RMK examples/use_rust/qemu-riscv-rynk (release, Rust 1.98.1, --locked,
-# unchanged sources and lockfile). Original e5r code, Apache-2.0.
+# unchanged sources and lockfile). Original nocompiler code, Apache-2.0.
 #
 # Two things make the build path matter, and this recipe removes both:
 #  * panic locations and debug strings embed absolute source paths -> every path is remapped;
@@ -10,7 +10,7 @@
 #
 # usage: build-canonical.sh OUT.elf      (needs network for the pinned commit and crates)
 set -euo pipefail
-S=/dev/shm/e5r-rmk-canonical
+S=/dev/shm/nocompiler-rmk-canonical
 PIN=71556128fa72881fc35f0bf6c292d5e28ad9568d
 SRC=${RMK_SRC:-https://github.com/rmk-rs/rmk}
 test ! -e "$S" || { echo "$S exists; refusing to touch it" >&2; exit 2; }

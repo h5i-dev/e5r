@@ -1,7 +1,7 @@
 /-
   A device read as a node of a checkpoint tree (`Lands`), on the pinned RMK image.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here:
   * `rom_none`: below the image (address < 0x80000000) a read finds no image byte;
@@ -13,8 +13,8 @@
 import Projects.rmk.Trees
 import Projects.rmk.Fetch
 
-namespace E5R.Rmk
-open E5R
+namespace NoCompiler.Rmk
+open NoCompiler
 
 theorem rom_none (a : Nat) (h : a + 1 ≤ 0x80000000) : romRead? img a 1 false = none := by
   rw [ro_eq]
@@ -62,4 +62,4 @@ theorem lands_of_qrun_lands {P : Machine → Prop} :
     obtain ⟨rfl, -⟩ := quiet_step hq hs hx
     exact ih hp
 
-end E5R.Rmk
+end NoCompiler.Rmk

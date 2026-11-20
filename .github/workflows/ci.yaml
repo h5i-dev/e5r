@@ -28,7 +28,7 @@ concurrency:
 # Keep package mirror/network stalls bounded, separately from analysis time.
 # apt options below retain retries and fail with the actual download error.
 jobs:
-  # The core: the e5r tool's tests with every oracle installed (llvm-mc for the
+  # The core: the nocompiler tool's tests with every oracle installed (llvm-mc for the
   # decoder, qemu-riscv64 and the Sail model for the semantics), then the Lean library,
   # the example proofs and their audit, then the example build compared with
   # the committed binaries.
@@ -49,7 +49,7 @@ jobs:
           sh elan-init.sh -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       # The Sail RISC-V model's C emulator, pinned by release and checksum:
-      # the oracle for crates/e5r/tests/sail.rs.
+      # the oracle for crates/nocompiler/tests/sail.rs.
       - name: Sail RISC-V emulator (2026-11-16-a2ad4b5)
         run: |
           curl -sSfL -o "$RUNNER_TEMP/sail.tar.gz" \
@@ -62,15 +62,15 @@ jobs:
         run: lake build
       - name: The proofs' images are the committed binaries
         working-directory: lean
-        run: lake exe e5r-audit
-      - run: cargo test -p e5r --no-fail-fast -- --nocapture
-      - run: cargo build -p e5r
+        run: lake exe nocompiler-audit
+      - run: cargo test -p nocompiler --no-fail-fast -- --nocapture
+      - run: cargo build -p nocompiler
       - name: Negative controls, every mutated binary breaks its proof
         env:
-          E5R: ${{ github.workspace }}/target/debug/e5r
+          NoCompiler: ${{ github.workspace }}/target/debug/nocompiler
         run: ./scripts/check-proof-controls.sh
       - name: Rebuild the examples (a different clang may differ; reported, not gated)
-        run: E5R=target/debug/e5r ./examples/build.sh || echo "::warning::examples/build.sh, the build differs from examples/elf/"
+        run: NoCompiler=target/debug/nocompiler ./examples/build.sh || echo "::warning::examples/build.sh, the build differs from examples/elf/"
 
   # Runners are disposable, so these build the dev profile on purpose. The
   # release-only rule in CONTRIBUTING.md is about the maintainer's machine.
@@ -218,7 +218,7 @@ jobs:
   # clamp fixture with the pinned rustc, recheck every verification job from
   # source with the pinned Lean, run the negative controls, and replay QEMU
   # traces (instruction-level in user mode, the whole firmware on sifive_e)
-  # in the model. e5r itself is the dev profile here, like the rest
+  # in the model. nocompiler itself is the dev profile here, like the rest
   # of this workflow; the firmware is built --release because its bytes are
   # pinned.
   firmware-verification:
@@ -236,10 +236,10 @@ jobs:
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - name: RISC-V binutils 2.42 and QEMU 8.2.2 (Ubuntu 24.04)
         run: sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update -q && sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y --no-install-recommends binutils-riscv64-linux-gnu qemu-user qemu-system-misc
-      - run: cargo build -p e5r-verify
+      - run: cargo build -p nocompiler-verify
       - name: Every firmware proof, control and differential test
         env:
-          E5R_VERIFY: ${{ github.workspace }}/target/debug/e5r-exp
+          NOCOMPILER_VERIFY: ${{ github.workspace }}/target/debug/nocompiler-exp
         run: ./experiment/scripts/check-firmware-verification.sh
       - uses: actions/upload-artifact@v4
         if: always()
@@ -249,8 +249,8 @@ jobs:
 
   # Experiment P (experiment/docs/ptx.md), the quick set: regenerate every PTX
   # kernel module and refuse a stale one, build the Lean project, audit the
-  # axioms, and check every benchmark's verdict with `e5r ptx check`. It has to
-  # finish in minutes, so it stops there (E5R_PTX_QUICK).
+  # axioms, and check every benchmark's verdict with `nocompiler ptx check`. It has to
+  # finish in minutes, so it stops there (NOCOMPILER_PTX_QUICK).
   #
   # What it leaves out is what makes a full recheck take ~90 minutes: the 59
   # mutation controls and the supplied-proof controls, each of which starts Lean
@@ -275,7 +275,7 @@ jobs:
       # alone: key the cache on both and `lake build` is a near-no-op on a hit.
       # The key changes whenever any proof, kernel module or the toolchain does,
       # so a stale build is never restored, which is why the script's
-      # from-scratch `rm -rf` is skipped here (E5R_PTX_KEEP_BUILD=1).
+      # from-scratch `rm -rf` is skipped here (NOCOMPILER_PTX_KEEP_BUILD=1).
       #
       # Restore and save are separate steps, and save runs `always()`. A single
       # `actions/cache` step saves only when the job succeeds, so a job that is
@@ -286,12 +286,12 @@ jobs:
         with:
           path: experiment/verification/ptx/.lake/build
           key: ptx-lake-${{ runner.os }}-${{ hashFiles('experiment/verification/ptx/lean-toolchain', 'experiment/verification/ptx/lakefile.lean', 'experiment/verification/ptx/lake-manifest.json', 'experiment/verification/ptx/**/*.lean') }}
-      - run: cargo build -p e5r-verify
+      - run: cargo build -p nocompiler-verify
       - name: Lean proofs, axiom audit and benchmark verdicts
         env:
-          E5R_VERIFY: ${{ github.workspace }}/target/debug/e5r-exp
-          E5R_PTX_KEEP_BUILD: "1"
-          E5R_PTX_QUICK: "1"
+          NOCOMPILER_VERIFY: ${{ github.workspace }}/target/debug/nocompiler-exp
+          NOCOMPILER_PTX_KEEP_BUILD: "1"
+          NOCOMPILER_PTX_QUICK: "1"
         run: ./experiment/scripts/recheck-ptx.sh
       - name: Save the Lean build
         if: always() && steps.lake.outputs.cache-hit != 'true'

@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.ptx.spec.v1",
+  "schema": "nocompiler.ptx.spec.v1",
   "kernel": "acc_add_u32",
   "class": "accum",
   "op": "add",

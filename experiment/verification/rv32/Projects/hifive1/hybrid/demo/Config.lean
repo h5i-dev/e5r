@@ -3,14 +3,14 @@
   board, the PWM property, the boot description, and the abstract state the
   checker starts from at the end of the directly proved region.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Theories.Absint
 import Theories.Board.Hifive1Revb
 import Projects.hifive1.hybrid.demo.Image
 
-namespace E5R.HybridDemo.Job
-open E5R E5R.AI
+namespace NoCompiler.HybridDemo.Job
+open NoCompiler NoCompiler.AI
 
 /-- pwm0.pwmcmp1: every write must be at most 100 (as for the firmware). -/
 def pwmcmp1 : Nat := 0x10015024
@@ -23,7 +23,7 @@ def cfg : Config where
   allow := [⟨pwmcmp1, 0, 100⟩]
   hdepth := 0x400
 
-/-- Every boot state the board allows (as `E5R.Hifive1.Job.boot`): pc at the
+/-- Every boot state the board allows (as `NoCompiler.Hifive1.Job.boot`): pc at the
     entry, mstatus.MIE = 0, registers and RAM arbitrary. -/
 def boot : AState where
   pc := HybridDemo.entry
@@ -50,4 +50,4 @@ def handover : AState :=
     regs := (List.replicate 31 AV.top).set 9 (AV.const head)
     mem := [⟨.abs, head, .w, .vals [0, 1, 2, 3], none⟩] }
 
-end E5R.HybridDemo.Job
+end NoCompiler.HybridDemo.Job

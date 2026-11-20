@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure e5r against the other reverse engineering tools on this machine.
+"""Measure nocompiler against the other reverse engineering tools on this machine.
 
 Driven by ``scripts/compare-tools.sh``, which finds the tools and checks they
 run. This file does the measuring and nothing else.
@@ -90,8 +90,8 @@ class Layout:
 
 
 def readelf(*args: str) -> str:
-    """readelf rather than e5r: the oracle for a comparison e5r takes part
-    in cannot be e5r."""
+    """readelf rather than nocompiler: the oracle for a comparison nocompiler takes part
+    in cannot be nocompiler."""
     return subprocess.run(
         ["readelf", *args], capture_output=True, text=True
     ).stdout
@@ -279,8 +279,8 @@ def probe(argv: list[str]) -> str:
         return "unknown"
 
 
-class E5r:
-    name = "e5r"
+class NoCompiler:
+    name = "nocompiler"
 
     def __init__(self, exe: str, limit: int = DEFAULT_TIMEOUT):
         self.exe = exe
@@ -296,7 +296,7 @@ class E5r:
     def recover(self, binary: Path, work: Path):
         """Function recovery alone. Analysis is lazy, so listing functions
         forces nothing else."""
-        out = work / "e5r-recover.json"
+        out = work / "nocompiler-recover.json"
         secs, rss, code = run_timed(
             [self.exe, "funcs", str(binary), "--json"], out, self.limit
         )
@@ -309,7 +309,7 @@ class E5r:
         return secs, rss, {int(f["addr"], 16) for f in data["items"]}
 
     def analyze(self, binary: Path, work: Path):
-        """Time `e5rx stats`, count what `e5rx funcs` lists.
+        """Time `nocompiler-x stats`, count what `nocompiler-x funcs` lists.
 
         `stats` is the command that does the whole job -- functions, control
         flow, cross references and strings -- which is what `rizin -A` also
@@ -321,7 +321,7 @@ class E5r:
         secs, rss, code = run_timed([self.exe, "stats", str(binary), "--json"], None, self.limit)
         if code:
             return secs, rss, outcome(code, True)
-        out = work / "e5r.json"
+        out = work / "nocompiler.json"
         if run_timed([self.exe, "funcs", str(binary), "--json"], out)[2] != 0:
             return secs, rss, None
         try:
@@ -354,7 +354,7 @@ class Rizin:
     def recover(self, binary: Path, work: Path):
         # `aa` is rizin's own "analyze all (fcns + bbs)": function recovery
         # without the passes -A adds on top of it. This is the row that is
-        # like for like against e5r's function recovery, and on this corpus
+        # like for like against nocompiler's function recovery, and on this corpus
         # it is both much faster and much more accurate than -A.
         out = work / "rizin-aa.json"
         secs, rss, code = run_timed(
@@ -750,10 +750,10 @@ def build_tools(args) -> tuple[list, list[str]]:
     scripts = Path(__file__).resolve().parent / "ghidra"
     tools, absent = [], []
 
-    if "e5r" in skip:
-        absent.append("e5r: skipped by request")
+    if "nocompiler" in skip:
+        absent.append("nocompiler: skipped by request")
     else:
-        tools.append(E5r(args.e5r, args.timeout))
+        tools.append(NoCompiler(args.nocompiler, args.timeout))
 
     if "rizin" in skip:
         absent.append("rizin: skipped by request")
@@ -780,11 +780,11 @@ def build_tools(args) -> tuple[list, list[str]]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("binaries", nargs="*", type=Path)
-    ap.add_argument("--e5r", default=os.environ.get("E5R", "../target/release/e5rx"))
+    ap.add_argument("--nocompiler", default=os.environ.get("NoCompiler", "../target/release/nocompiler-x"))
     ap.add_argument(
-        "--e5r-name",
+        "--nocompiler-name",
         default="",
-        help="where the e5r binary came from, when --e5r is a snapshot of it",
+        help="where the nocompiler binary came from, when --nocompiler is a snapshot of it",
     )
     ap.add_argument("--rizin", default=os.environ.get("RIZIN", "rizin"))
     ap.add_argument("--ghidra", default=os.environ.get("GHIDRA_INSTALL_DIR", ""))
@@ -833,11 +833,11 @@ def main() -> int:
         print(f"not measured -- {line}")
     versions = {t.name: t.version() for t in tools}
     # The exact bytes measured, because this workspace gets rebuilt while a run
-    # is in progress and "e5r 0.1.0" does not distinguish two builds of it.
+    # is in progress and "nocompiler 0.1.0" does not distinguish two builds of it.
     for tool in tools:
-        if isinstance(tool, E5r):
-            versions["e5r"] += (
-                f" ({args.e5r_name or args.e5r}, sha256 {sha256(Path(tool.exe))[:16]})"
+        if isinstance(tool, NoCompiler):
+            versions["nocompiler"] += (
+                f" ({args.nocompiler_name or args.nocompiler}, sha256 {sha256(Path(tool.exe))[:16]})"
             )
     for name, text in versions.items():
         print(f"{name:<8} {text}")
@@ -869,7 +869,7 @@ def main() -> int:
             "oracle_functions": len(oracle),
             "tools": {},
         }
-        with tempfile.TemporaryDirectory(prefix="e5r-bench-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="nocompiler-bench-") as tmp:
             work = Path(tmp)
             for tool in tools:
                 runs = args.slow_runs if isinstance(tool, Ghidra) else args.runs
@@ -914,7 +914,7 @@ def main() -> int:
         for row in results:
             row["runs"] = args.runs
         doc = {
-            "schema": "e5r-bench/1",
+            "schema": "nocompiler-bench/1",
             "when": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "loadavg": os.getloadavg(),
             # The cost half of any budget derived from this run belongs to this

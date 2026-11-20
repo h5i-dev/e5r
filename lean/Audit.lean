@@ -2,18 +2,18 @@ import Examples
 import Demo
 
 /-
-`lake build e5r-audit && lake exe e5r-audit` (from lean/): the checks that tie
+`lake build nocompiler-audit && lake exe nocompiler-audit` (from lean/): the checks that tie
 the proofs to the binaries.
 
 At build time, `#assert_standard_axioms` fails the build if a listed theorem
 depends on any axiom beyond Lean's three standard ones (propext,
 Classical.choice, Quot.sound): no `sorry`, no `native_decide`, no
 `ofReduceBool`, no axiom of our own. At run time, `main` reads each committed ELF file with the
-Lean reader in E5R/Elf.lean and checks that its `.text` is word for word the
+Lean reader in NoCompiler/Elf.lean and checks that its `.text` is word for word the
 image the proofs are about, and that every data section (`.rodata`, `.data`,
 `.bss`, ...) is byte for byte the exported segment.
 -/
-open E5R
+open NoCompiler
 
 open Lean Elab Command in
 /-- Fail unless the theorem depends on no axiom beyond Lean's standard three. -/
@@ -24,20 +24,20 @@ elab "#assert_standard_axioms " id:ident : command => do
   unless bad.isEmpty do throwError "{n} depends on {bad.toList}"
 
 -- The adequacy theorems and the program-logic rules every proof builds on.
-#assert_standard_axioms E5R.Exec.hw_safe
-#assert_standard_axioms E5R.Exec.hw_final
-#assert_standard_axioms E5R.Exec.hw_terminates
-#assert_standard_axioms E5R.Reach.bind
-#assert_standard_axioms E5R.Reach.loop
-#assert_standard_axioms E5R.Reach.exec_step
-#assert_standard_axioms E5R.Reach.sys_step
-#assert_standard_axioms E5R.Reach.frame
-#assert_standard_axioms E5R.Verified.call
-#assert_standard_axioms E5R.Verified.frame
-#assert_standard_axioms E5R.Verified.hw
+#assert_standard_axioms NoCompiler.Exec.hw_safe
+#assert_standard_axioms NoCompiler.Exec.hw_final
+#assert_standard_axioms NoCompiler.Exec.hw_terminates
+#assert_standard_axioms NoCompiler.Reach.bind
+#assert_standard_axioms NoCompiler.Reach.loop
+#assert_standard_axioms NoCompiler.Reach.exec_step
+#assert_standard_axioms NoCompiler.Reach.sys_step
+#assert_standard_axioms NoCompiler.Reach.frame
+#assert_standard_axioms NoCompiler.Verified.call
+#assert_standard_axioms NoCompiler.Verified.frame
+#assert_standard_axioms NoCompiler.Verified.hw
 -- The structural checker in Lean, and its theorem.
-#assert_standard_axioms E5R.Struct.cfi
-#assert_standard_axioms E5R.Struct.inv_entry
+#assert_standard_axioms NoCompiler.Struct.cfi
+#assert_standard_axioms NoCompiler.Struct.inv_entry
 #assert_standard_axioms Examples.Sum.Image.sum_checked
 #assert_standard_axioms Examples.Sum.Image.sum2_checked
 #assert_standard_axioms Examples.Hello.Image.write_all_checked
@@ -64,8 +64,8 @@ example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] =
 #assert_standard_axioms Examples.Hello.write_all_verified
 #assert_standard_axioms Examples.Hello.hello_verified
 
--- The demo (demo/README.md): each function on the e5r build (B, `Verified`)
--- and on the ordinary rv64gc build (A, `VerifiedC`, E5R/Ext/Rvc.lean).
+-- The demo (demo/README.md): each function on the nocompiler build (B, `Verified`)
+-- and on the ordinary rv64gc build (A, `VerifiedC`, NoCompiler/Ext/Rvc.lean).
 #assert_standard_axioms Demo.Sum.sum_b
 #assert_standard_axioms Demo.Sum.sum_a
 #assert_standard_axioms Demo.Cobs.cobs_b

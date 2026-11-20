@@ -1,9 +1,9 @@
 /-
-The checker for supplied proofs (`e5r ptx check --proof`).
+The checker for supplied proofs (`nocompiler ptx check --proof`).
 
   proofcheck STATEMENT_MODULE PROOF_MODULE THEOREM STATEMENT
 
-`e5r` generates STATEMENT_MODULE (the kernel, the spec and
+`nocompiler` generates STATEMENT_MODULE (the kernel, the spec and
 `STATEMENT : Prop`) and compiles it and the supplied PROOF_MODULE to
 `.olean` files. This program then, independently of how the proof module
 was elaborated:

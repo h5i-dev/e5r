@@ -4,7 +4,7 @@
   combining a directly proved machine-code summary with the abstract-
   interpretation certificate checker.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   This is a separate integration example, not the Embassy firmware. The
   binary performs one ring-head step exactly as embassy-sync's channel does
@@ -17,7 +17,7 @@
     state the board allows, ending at 0x20010028 with the head in 0..3.
   * Everything reachable from there is covered by the checker:
     `check cfg handover cert = true`, evaluated by the kernel, and
-    `E5R.AI.check_sound`. The certificate comes from the untrusted analyzer
+    `NoCompiler.AI.check_sound`. The certificate comes from the untrusted analyzer
     (AnalyzeDemo.lean) and is only data here.
   * `Hybrid.seq_sound` composes them for global `Reach` from boot.
 
@@ -33,8 +33,8 @@ import Projects.hifive1.hybrid.demo.Cert
 
 set_option maxRecDepth 100000
 
-namespace E5R.HybridDemo.Proof
-open E5R E5R.AI E5R.Hybrid E5R.HybridDemo.Job
+namespace NoCompiler.HybridDemo.Proof
+open NoCompiler NoCompiler.AI NoCompiler.Hybrid NoCompiler.HybridDemo.Job
 
 abbrev B := cfg.board
 abbrev img := cfg.img
@@ -247,4 +247,4 @@ theorem ai_safe : Safe B img (StateHolds ρM handover) (EvOk cfg) :=
 theorem demo_safe : Safe B img (StateHolds ρM boot) (EvOk cfg) :=
   seq_sound summary (fun _ h => h) ai_safe
 
-end E5R.HybridDemo.Proof
+end NoCompiler.HybridDemo.Proof

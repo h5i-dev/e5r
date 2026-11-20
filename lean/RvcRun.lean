@@ -1,5 +1,5 @@
-import E5R.Ext.Rvc
-import E5R.Elf
+import NoCompiler.Ext.Rvc
+import NoCompiler.Elf
 
 /-
 For demo/test/rvc_exec.py: run a function of a compressed binary in the
@@ -12,7 +12,7 @@ Each call is `f(a0 = slot, a1 = buf, a2 = len)` with the 24-byte slot filled
 with 0xaa/0xbb/0xcc words, as the qemu driver does. Writes the slot and the
 buffer afterwards, as the driver does. Not used by any proof.
 -/
-open E5R
+open NoCompiler
 
 def slot : Word := 0x200000#64
 def bufAt : Word := 0x300000#64

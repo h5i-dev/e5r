@@ -1,7 +1,7 @@
 /-
   The byte copies memmove's loops perform, and what they mean.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   `fwd ram s d k` and `bwd ram p q k` are exactly what the emitted byte
   loops do to RAM (read a byte, write it, step the pointers); they are
@@ -13,8 +13,8 @@ import Theories.Logic
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk
-open E5R
+namespace NoCompiler.Rmk
+open NoCompiler
 
 def fwd : (Word → BitVec 8) → Word → Word → Nat → (Word → BitVec 8)
   | ram, _, _, 0 => ram
@@ -159,4 +159,4 @@ theorem wordsB_eq_bwd : ∀ (j : Nat) (ram : Word → BitVec 8) (p q : Word),
       rw [hw, show p + 0xfffffffc#32 + 3 = p + 3 - BitVec.ofNat 32 4 by bv_omega,
         show q + 0xfffffffc#32 = q - BitVec.ofNat 32 4 by bv_omega]
 
-end E5R.Rmk
+end NoCompiler.Rmk

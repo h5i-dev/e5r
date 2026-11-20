@@ -10,21 +10,21 @@ set -euo pipefail
 
 # A fresh project each run: importing into an existing one is a no-op and
 # would report the previous analysis as if it were this one.
-project=${PROJECT:-e5rcompare-$$}
-e5r=${E5R:-../target/release/e5rx}
+project=${PROJECT:-nocompilercompare-$$}
+nocompiler=${NoCompiler:-../target/release/nocompiler-x}
 ghidra=${GHIDRA:-ghidra}
 
 command -v "$ghidra" > /dev/null || {
   echo "no ghidra CLI on PATH" >&2
   exit 1
 }
-[ -x "$e5r" ] || {
+[ -x "$nocompiler" ] || {
   echo "build first: cargo build --release" >&2
   exit 1
 }
 
 printf '%-28s %8s %8s %8s %8s %9s %9s\n' \
-  binary ghidra e5r both only-g only-e5r e5r-time
+  binary ghidra nocompiler both only-g only-nocompiler nocompiler-time
 
 for binary in "$@"; do
   name=$(basename "$binary")
@@ -34,7 +34,7 @@ for binary in "$@"; do
 
   # Ghidra puts imported functions in a synthetic block past the end of the
   # file; those are not functions in the binary and are not counted.
-  limit=$("$e5r" sections "$binary" --json 2>/dev/null | python3 -c 'import json,sys
+  limit=$("$nocompiler" sections "$binary" --json 2>/dev/null | python3 -c 'import json,sys
 data = json.load(sys.stdin)
 ends = [int(s["addr"], 16) + int(s["size"], 16) for s in data["items"] if int(s["addr"], 16)]
 print(max(ends) if ends else 0)')
@@ -51,24 +51,24 @@ for f in data:
         print(a)" | sort -u > /tmp/ghidra-functions.txt
 
   start=$(date +%s.%N)
-  "$e5r" funcs "$binary" --json 2>/dev/null \
+  "$nocompiler" funcs "$binary" --json 2>/dev/null \
     | python3 -c 'import json,sys
 data = json.load(sys.stdin)
 for f in data["items"]:
-    print(int(f["addr"], 16))' | sort -u > /tmp/e5r-functions.txt
+    print(int(f["addr"], 16))' | sort -u > /tmp/nocompiler-functions.txt
   rtime=$(echo "$(date +%s.%N) - $start" | bc)
 
   g=$(wc -l < /tmp/ghidra-functions.txt)
-  r=$(wc -l < /tmp/e5r-functions.txt)
-  both=$(comm -12 /tmp/ghidra-functions.txt /tmp/e5r-functions.txt | wc -l)
-  only_g=$(comm -23 /tmp/ghidra-functions.txt /tmp/e5r-functions.txt | wc -l)
-  only_r=$(comm -13 /tmp/ghidra-functions.txt /tmp/e5r-functions.txt | wc -l)
+  r=$(wc -l < /tmp/nocompiler-functions.txt)
+  both=$(comm -12 /tmp/ghidra-functions.txt /tmp/nocompiler-functions.txt | wc -l)
+  only_g=$(comm -23 /tmp/ghidra-functions.txt /tmp/nocompiler-functions.txt | wc -l)
+  only_r=$(comm -13 /tmp/ghidra-functions.txt /tmp/nocompiler-functions.txt | wc -l)
 
   printf '%-28s %8s %8s %8s %8s %9s %8.3fs\n' \
     "$name" "$g" "$r" "$both" "$only_g" "$only_r" "$rtime"
   if [ -n "${VERBOSE:-}" ]; then
     echo "  ghidra analysis took ${gtime}s"
-    echo "  only ghidra: $(comm -23 /tmp/ghidra-functions.txt /tmp/e5r-functions.txt | head -5 | tr '\n' ' ')"
-    echo "  only e5r:   $(comm -13 /tmp/ghidra-functions.txt /tmp/e5r-functions.txt | head -5 | tr '\n' ' ')"
+    echo "  only ghidra: $(comm -23 /tmp/ghidra-functions.txt /tmp/nocompiler-functions.txt | head -5 | tr '\n' ' ')"
+    echo "  only nocompiler:   $(comm -13 /tmp/ghidra-functions.txt /tmp/nocompiler-functions.txt | head -5 | tr '\n' ' ')"
   fi
 done

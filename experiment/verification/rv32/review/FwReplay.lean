@@ -15,7 +15,7 @@
 -/
 import Theories.Board.Hifive1Revb
 import Projects.hifive1.Image
-open E5R
+open NoCompiler
 
 namespace FwReplay
 

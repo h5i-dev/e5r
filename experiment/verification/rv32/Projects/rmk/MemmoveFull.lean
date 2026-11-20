@@ -4,7 +4,7 @@
   the alignment. NOT COVERED: n ≥ 16 backward (dst inside the source,
   above it), the path `park_pending` takes.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   The callee's stack frame is the 48 bytes below sp: the misaligned path
   uses stack temporaries there besides the three save slots, so RAM is
@@ -15,8 +15,8 @@ import Projects.rmk.MemmoveContract
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Memmove
-open E5R E5R.Rmk
+namespace NoCompiler.Rmk.Memmove
+open NoCompiler NoCompiler.Rmk
 
 structure PreF (m : Machine) : Prop where
   pc : m.core.pc = 0x80020c1e
@@ -198,4 +198,4 @@ theorem contractF (m₀ : Machine) (h : PreF m₀) : ∃ k m, QRun B img k m₀ 
         · rfl)
     exact ⟨7 + k + 5, m, (hpro.trans hr).trans hm, hpost⟩
 
-end E5R.Rmk.Memmove
+end NoCompiler.Rmk.Memmove

@@ -2,10 +2,10 @@
 # RMK feasibility recon (untrusted evidence): build the upstream QEMU Rynk example
 # at a pinned commit in /dev/shm, release profile, pinned toolchain, unchanged
 # sources and lockfile, then list its instruction mix and panic call sites.
-# Original e5r code, Apache-2.0.
+# Original nocompiler code, Apache-2.0.
 set -eu
 PIN=71556128fa72881fc35f0bf6c292d5e28ad9568d
-S=${S:-/dev/shm/e5r-rmk-recon}
+S=${S:-/dev/shm/nocompiler-rmk-recon}
 HERE=$(cd "$(dirname "$0")" && pwd)
 export RUSTUP_TOOLCHAIN=1.98.1          # never let rust-toolchain.toml (channel=stable) sync a channel
 export CARGO_HOME="$S/cargo-home" CARGO_BUILD_JOBS=2

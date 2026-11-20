@@ -25,8 +25,8 @@ import Projects.hifive1.Image
 
 set_option maxRecDepth 100000
 
-namespace E5R.Hifive1.Duty
-open E5R
+namespace NoCompiler.Hifive1.Duty
+open NoCompiler
 
 abbrev B := Hifive1Revb.board
 abbrev img := Firmware.segments
@@ -322,4 +322,4 @@ theorem nonvacuous : ∃ n m, DetSteps B img n ⟨demo, fun _ => 10⟩ m ∧ (m.
   obtain ⟨n, m, h, post⟩ := duty_contract demo (fun _ => 10) 0x80000000 ⟨rfl, rfl, by decide, by decide⟩
   exact ⟨n, m, h, by rw [post.result]; decide⟩
 
-end E5R.Hifive1.Duty
+end NoCompiler.Hifive1.Duty

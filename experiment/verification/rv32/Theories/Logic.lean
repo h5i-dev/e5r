@@ -1,13 +1,13 @@
 /-
   Program logic over the platform semantics: deterministic step sequences,
   the fetch/decode/execute bridge, and frame lemmas for registers, CSRs and
-  RAM. Original e5r code, Apache-2.0.
+  RAM. Original nocompiler code, Apache-2.0.
 -/
 import Theories.Platform
 
 set_option linter.constructorNameAsVariable false
 
-namespace E5R
+namespace NoCompiler
 
 variable {B : Board} {img : List Segment}
 
@@ -275,4 +275,4 @@ theorem ramRead_w_congr {ram ram' : Word → BitVec 8} (a : Word)
   simp only [BitVec.add_zero] at h0 h1 h2 h3
   simp [ramRead, h0, h1, h2, h3]
 
-end E5R
+end NoCompiler

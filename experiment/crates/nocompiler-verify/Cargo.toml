@@ -1,0 +1,18 @@
+[package]
+name = "nocompiler-verify"
+description = "nocompiler — assembly-level formal verification with Lean 4: PTX kernels and RISC-V firmware binaries."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "nocompiler-exp"
+path = "src/main.rs"
+
+[dependencies]
+nocompiler-core.workspace = true
+nocompiler-format.workspace = true
+nocompiler-ptx.workspace = true
+serde.workspace = true
+serde_json.workspace = true

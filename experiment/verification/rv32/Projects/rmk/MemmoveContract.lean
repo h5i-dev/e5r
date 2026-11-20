@@ -4,7 +4,7 @@
   (dst - src ≥ n unsigned) with src ≡ dst (mod 4). The n ≥ 16 backward
   path and the misaligned forward path are not covered yet.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   Register frame: the standard calling convention. Every register but the
   temporaries t0..t6 and a1..a7 is as at entry (a0 = dst, ra, sp, gp, tp,
@@ -14,8 +14,8 @@ import Projects.rmk.MemmoveAligned
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Memmove
-open E5R E5R.Rmk
+namespace NoCompiler.Rmk.Memmove
+open NoCompiler NoCompiler.Rmk
 
 /-- The ABI's caller-saved temporaries (t0-t2, a1-a7, t3-t6). -/
 def temps : List Nat := [5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 28, 29, 30, 31]
@@ -177,4 +177,4 @@ theorem contractB (m₀ : Machine) (h : PreB m₀) : ∃ k m, QRun B img k m₀ 
         · rfl)
     exact ⟨7 + k + 5, m, (hpro.trans hr).trans hm, hpost⟩
 
-end E5R.Rmk.Memmove
+end NoCompiler.Rmk.Memmove

@@ -1,6 +1,6 @@
-# e5r: a formal-verification-friendly RISC-V
+# nocompiler: a formal-verification-friendly RISC-V
 
-e5r is a profile of 64-bit RISC-V (RV64IM + Zba + Zbb, structured control
+nocompiler is a profile of 64-bit RISC-V (RV64IM + Zba + Zbb, structured control
 flow, a fixed stack discipline) designed so that machine code can be proved
 correct in Lean 4, together with the Lean library the proofs are written in
 and the tools that check binaries against the profile and export them for
@@ -12,12 +12,12 @@ the Lean kernel, so neither the compiler nor whoever wrote the code or the
 proof has to be trusted.
 
 ```bash
-cargo build --release -p e5r
-e5r cc -O2 prog.c -o prog.elf       # compile into the profile, record its structure, check
-e5r check examples/elf/sum.elf      # does every function conform to the profile?
-e5r disasm examples/elf/sum.elf     # the code, nested by its block/loop structure
-e5r export examples/elf/sum.elf --namespace Examples.Sum.Image -o lean/Examples/Sum/Image.lean
-cd lean && lake build && lake exe e5r-audit
+cargo build --release -p nocompiler
+nocompiler cc -O2 prog.c -o prog.elf       # compile into the profile, record its structure, check
+nocompiler check examples/elf/sum.elf      # does every function conform to the profile?
+nocompiler disasm examples/elf/sum.elf     # the code, nested by its block/loop structure
+nocompiler export examples/elf/sum.elf --namespace Examples.Sum.Image -o lean/Examples/Sum/Image.lean
+cd lean && lake build && lake exe nocompiler-audit
 ```
 
 One theorem per function says it is correct, memory-safe, terminating and
@@ -34,22 +34,22 @@ the proof. [lean/Examples/Sum2.lean](lean/Examples/Sum2.lean) proves a caller,
 alone. [lean/Examples/Hello.lean](lean/Examples/Hello.lean) proves a
 `write_all` loop over the kernel's short writes, and a `hello` that writes a
 message from `.rodata` through it and exits.
-[lean/E5R/Adequacy.lean](lean/E5R/Adequacy.lean) proves, once for all
+[lean/NoCompiler/Adequacy.lean](lean/NoCompiler/Adequacy.lean) proves, once for all
 programs, what such a theorem means for the machine.
 `scripts/check-proof-controls.sh` checks that mutated binaries break the proofs.
 [demo/README.md](demo/README.md) proves the same specification about an
-e5r build and an ordinary rv64gc build of the same C, and compares the two.
+nocompiler build and an ordinary rv64gc build of the same C, and compares the two.
 
 ## Layout
 
 | Path | What |
 | --- | --- |
 | [docs/isa/](docs/isa/README.md) | the profile, specifications, environment model, metadata, trusted base |
-| [lean/E5R/](lean/E5R) | ISA semantics, environment model, program logic, adequacy, tactics |
+| [lean/NoCompiler/](lean/NoCompiler) | ISA semantics, environment model, program logic, adequacy, tactics |
 | [lean/Examples/](lean/Examples) | proofs about committed binaries in [examples/elf/](examples/elf) |
-| [crates/e5r/](crates/e5r) | the `e5r` tool: ELF reader, decoder, profile checker, structure recovery, Lean export |
-| [experiment/](experiment/README.md) | earlier work: PTX kernel and RV32 firmware verification (`e5r-exp`) |
-| [devinfra/](devinfra/README.md) | development infrastructure: the binary analysis toolkit and decompiler (`e5rx`) |
+| [crates/nocompiler/](crates/nocompiler) | the `nocompiler` tool: ELF reader, decoder, profile checker, structure recovery, Lean export |
+| [experiment/](experiment/README.md) | earlier work: PTX kernel and RV32 firmware verification (`nocompiler-exp`) |
+| [devinfra/](devinfra/README.md) | development infrastructure: the binary analysis toolkit and decompiler (`nocompiler-x`) |
 
 ## Requirements
 

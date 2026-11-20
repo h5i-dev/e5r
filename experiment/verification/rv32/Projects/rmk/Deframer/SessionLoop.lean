@@ -2,7 +2,7 @@
   The Rynk session loop, closing step: the unpark call site (0x80003fd8) back to the loop head
   (0x80003e1a), on the pinned RMK image.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here, CONDITIONAL ON `CopyContract` (memmove; a hypothesis, not proved):
   `unpark_step`: from 0x80003fd8 with the session bases, a stack as in `SessPre`, a parked count
@@ -20,8 +20,8 @@ import Projects.rmk.Deframer.UnparkSiteSegs
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Session
-open E5R E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.Session
+open NoCompiler NoCompiler.Rmk.Deframer.Tail
 
 /-- A method call from the session: the deframer and buffer at their fixed addresses, len = 488,
     the call made at the session's sp. -/
@@ -119,4 +119,4 @@ theorem unpark_step (hC : CopyContract) (m₀ : Machine) (h : UnparkAt m₀) :
     · show ¬ ((K.get 2).toNat - parkStack ≤ x.toNat ∧ x.toNat < (K.get 2).toNat)
       rw [K2]; exact fun h' => hx (.inr (.inr h'))
 
-end E5R.Rmk.Deframer.Session
+end NoCompiler.Rmk.Deframer.Session

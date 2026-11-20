@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.verify.job.v1",
+  "schema": "nocompiler.verify.job.v1",
   "id": "rmk-qemu-virt-image",
   "root": "../..",
   "board": "boards/qemu-virt-rv32.json",
@@ -8,13 +8,13 @@
   "image": {
     "kind": "ram",
     "module": "Projects.ramimage.Image",
-    "namespace": "E5R.RmkImage"
+    "namespace": "NoCompiler.RmkImage"
   },
   "modules": [
     "Projects/ramimage/Entry.lean"
   ],
   "theorems": [
-    "E5R.RmkImage.Check.*"
+    "NoCompiler.RmkImage.Check.*"
   ],
   "limits": {
     "seconds": 1800,

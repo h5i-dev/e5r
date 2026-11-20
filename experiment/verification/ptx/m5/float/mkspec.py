@@ -9,7 +9,7 @@ for t in json.load(open(os.path.join(HERE, "tasks.json"))):
     el = t["element"]
     for n in sorted(t["arrays"] + t["scalars"], key=len, reverse=True):
         el = re.sub(rf"(?<![\w.]){re.escape(n)}(?![\w(])", p(n), el)
-    sp = {"schema": "e5r.ptx.spec.v1", "kernel": k, "class": "map32", "element_type": "f32",
+    sp = {"schema": "nocompiler.ptx.spec.v1", "kernel": k, "class": "map32", "element_type": "f32",
           "arrays": [p(a) for a in t["arrays"]], "output": p(t["output"]), "length": p("n"),
           "scalars": [p(s) for s in t["scalars"]], "element": el, "result": "bit_exact"}
     if t.get("stride"):

@@ -190,8 +190,8 @@
   "outcome": "KILLED",
   "cases": 2,
   "first": [
-   "jalr x0,0(x11) bit0=1: MISMATCH step 0: model trap E5R.Exc.misalignedFetch, QEMU completed normally (expected model agree) ",
-   "jalr x1,-4(x1) bit0=1: MISMATCH step 0: model trap E5R.Exc.misalignedFetch, QEMU completed normally (expected model agree) "
+   "jalr x0,0(x11) bit0=1: MISMATCH step 0: model trap NoCompiler.Exc.misalignedFetch, QEMU completed normally (expected model agree) ",
+   "jalr x1,-4(x1) bit0=1: MISMATCH step 0: model trap NoCompiler.Exc.misalignedFetch, QEMU completed normally (expected model agree) "
   ]
  },
  {
@@ -349,8 +349,8 @@
   "cases": 4,
   "first": [
    "csrr mcause: DECLINE step 0: CSR write (expected model agree) ",
-   "csrr mhartid: MISMATCH step 0: model trap E5R.Exc.illegal, QEMU completed normally (expected model agree) ",
-   "csrrsi mhartid,0 (no write): MISMATCH step 0: model trap E5R.Exc.illegal, QEMU completed normally (expected model agree) "
+   "csrr mhartid: MISMATCH step 0: model trap NoCompiler.Exc.illegal, QEMU completed normally (expected model agree) ",
+   "csrrsi mhartid,0 (no write): MISMATCH step 0: model trap NoCompiler.Exc.illegal, QEMU completed normally (expected model agree) "
   ]
  },
  {
@@ -368,7 +368,7 @@
   "outcome": "KILLED",
   "cases": 1,
   "first": [
-   "fence.i: MISMATCH step 0: model trap E5R.Exc.illegal, QEMU completed normally (expected model agree) "
+   "fence.i: MISMATCH step 0: model trap NoCompiler.Exc.illegal, QEMU completed normally (expected model agree) "
   ]
  },
  {
@@ -376,7 +376,7 @@
   "outcome": "KILLED",
   "cases": 1,
   "first": [
-   "ecall: MISMATCH step 0: model trap E5R.Exc.ebreak, QEMU exception 11 (expected model agree) "
+   "ecall: MISMATCH step 0: model trap NoCompiler.Exc.ebreak, QEMU exception 11 (expected model agree) "
   ]
  },
  {

@@ -6,14 +6,14 @@
   (aligned), a2 := t5 + 4, a2 := (-t3) & 0x18; ends at the loop head
   0x80020f2e. Three instruction sequences, one per misalignment o.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.MemmoveMisLoop
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk
-open E5R E5R.Rmk.MemmoveFetch
+namespace NoCompiler.Rmk
+open NoCompiler NoCompiler.Rmk.MemmoveFetch
 
 theorem sext_low (v : Word) : extend .h true v &&& 0xffff#32 = v &&& 0xffff#32 := by
   apply BitVec.eq_of_getElem_eq; intro i hi
@@ -791,4 +791,4 @@ theorem start1 (c : Core) (R : Word → BitVec 8) (hpc : c.pc = 0x80020e64) (hq 
     have h28 : r ≠ 28 := fun e => hr (by subst e; decide)
     simp [c24, c23, c22, c21, c20, c19, c18, c17, c16, c15, c14, c13, c12, c11, c10, c9, c8, c7, c6, c5, c4, c3, c2, c1, Core.wr_get_ne, h11, h12, h14, h15, h28]
 
-end E5R.Rmk
+end NoCompiler.Rmk

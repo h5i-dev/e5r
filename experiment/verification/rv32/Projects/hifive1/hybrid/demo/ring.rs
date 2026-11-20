@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-// Original e5r fixture, Apache-2.0: a ring-head step as embassy-sync's
+// Original nocompiler fixture, Apache-2.0: a ring-head step as embassy-sync's
 // channel emits it, followed by a loop that drives the PWM from the head.
 // The first DTIM word is the ring head (arbitrary at boot).
 use core::ptr::{read_volatile, write_volatile};

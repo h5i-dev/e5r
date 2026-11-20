@@ -1,7 +1,7 @@
 /-
   RMK `Uart16550<MmioBackend>::send_bytes` (0x800098a6), main's proof (support-lean4 5bf94a2,
   `Projects/rmk/Uart/SendBytes.lean`), on the image the job runner generates
-  (`jobs/rmk/rmk-uart-send-bytes.json`). Original e5r code, Apache-2.0.
+  (`jobs/rmk/rmk-uart-send-bytes.json`). Original nocompiler code, Apache-2.0.
 
   Main's statement has no callee contract: `send_bytes : SendEnv m₀ → Lands B img (SendPost m₀) m₀`.
   This wrapper:
@@ -20,13 +20,13 @@
 import Projects.ramimage.Deframer
 import Projects.rmk.Uart.SendBytes
 
-namespace E5R.RmkUart
-open E5R E5R.Rmk.Deframer
-open E5R.Rmk (Lands Quiet)
-open E5R.Rmk.Uart (SendEnv SendPost)
+namespace NoCompiler.RmkUart
+open NoCompiler NoCompiler.Rmk.Deframer
+open NoCompiler.Rmk (Lands Quiet)
+open NoCompiler.Rmk.Uart (SendEnv SendPost)
 
 theorem send_bytes (m₀ : Machine) (E : SendEnv m₀) : Lands B img (SendPost m₀) m₀ :=
-  E5R.Rmk.Uart.send_bytes m₀ E
+  NoCompiler.Rmk.Uart.send_bytes m₀ E
 
 /-- `SendEnv`, every field. -/
 theorem env_iff (m : Machine) : SendEnv m ↔
@@ -91,4 +91,4 @@ theorem w16 : SendEnv (wm 16) :=
     16 bytes, with the struct and the buffer unchanged. -/
 theorem w16_lands : Lands B img (SendPost (wm 16)) (wm 16) := send_bytes _ w16
 
-end E5R.RmkUart
+end NoCompiler.RmkUart

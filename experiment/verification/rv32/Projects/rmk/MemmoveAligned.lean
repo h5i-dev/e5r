@@ -3,7 +3,7 @@
   congruent mod 4 (SPECIALIZATION: the misaligned shift/merge path, taken
   when they are not, is separate).
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
     0x80020e20 li a3,16; bltu a2,a3 (not taken)
     0x80020e26 neg a3,a0; andi a6,a3,3; add t5,a0,a6; bgeu a0,t5 -> 0x80020e4c
@@ -18,8 +18,8 @@ import Projects.rmk.MemmoveSmall
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Memmove
-open E5R E5R.Rmk E5R.Rmk.MemmoveFetch
+namespace NoCompiler.Rmk.Memmove
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.MemmoveFetch
 
 theorem and3 (x : Word) : (x &&& 3#32).toNat = x.toNat % 4 := by
   rw [BitVec.toNat_and, show (3#32 : Word).toNat = 2 ^ 2 - 1 from rfl, Nat.and_two_pow_sub_one_eq_mod]
@@ -460,4 +460,4 @@ theorem big_aligned (c : Core) (R0 : Word → BitVec 8) (hq : Quiet c)
       rw [hfre r h11 h12 h13 h14, Core.goto_get]
       exact f3 r (fun h => hr (by simp only [List.mem_cons, List.not_mem_nil, or_false] at h ⊢; omega))
 
-end E5R.Rmk.Memmove
+end NoCompiler.Rmk.Memmove

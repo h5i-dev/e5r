@@ -3,7 +3,7 @@
   states that a weakened or false variant of a summary obligation is false
   on this binary, so the corresponding proof could not have succeeded.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   * `false_post`: the summary cannot promise a head below 3 (it can reach 3).
   * `weak_pre`: with the precondition weakened to head <= 4, the real run
@@ -20,8 +20,8 @@ import Projects.hifive1.hybrid.demo.LoopProof
 
 set_option maxRecDepth 100000
 
-namespace E5R.HybridLoop.Controls
-open E5R E5R.AI E5R.Hybrid E5R.HybridLoop.Job E5R.HybridLoop.Proof
+namespace NoCompiler.HybridLoop.Controls
+open NoCompiler NoCompiler.AI NoCompiler.Hybrid NoCompiler.HybridLoop.Job NoCompiler.HybridLoop.Proof
 
 /-- A concrete machine at the region entry with head `h`. -/
 def atEntry (h : Word) (mie : Bool) : Machine :=
@@ -76,4 +76,4 @@ theorem interior_not_delegated_exit :
     ∀ n ∈ Cert.cert.nodes, n.s.pc ∉ [0x2001001a, 0x2001001e, 0x20010022, 0x20010024, 0x20010026] := by
   decide +kernel
 
-end E5R.HybridLoop.Controls
+end NoCompiler.HybridLoop.Controls

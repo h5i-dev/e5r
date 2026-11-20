@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# e5r measured against DecBench, the third-party decompiler benchmark.
+# nocompiler measured against DecBench, the third-party decompiler benchmark.
 #
 # Not a test: it needs a DecBench checkout, a Python virtualenv with decbench
 # and its dependencies installed (angr, pyjoern, which downloads a 1.8 GB Joern
@@ -10,24 +10,24 @@
 #
 # Usage: scripts/decbench.sh [results-tree] [project] [opt-levels] [decompilers]
 #
-#   scripts/decbench.sh                       # zlib, O0, e5r alone
-#   scripts/decbench.sh /tmp/db zlib O0 e5r,angr,ghidra
+#   scripts/decbench.sh                       # zlib, O0, nocompiler alone
+#   scripts/decbench.sh /tmp/db zlib O0 nocompiler,angr,ghidra
 #
 # Env: DECBENCH_REPO   the DecBench checkout (default ~/Ref/decbench)
 #      DECBENCH_VENV   virtualenv with decbench installed (default ~/.venvs/decbench)
-#      E5R            the e5r executable (default ../target/release/e5rx)
+#      NoCompiler            the nocompiler executable (default ../target/release/nocompiler-x)
 #      GHIDRA_INSTALL_DIR  needed only when ghidra is one of the decompilers
 set -euo pipefail
 
-tree=${1:-${DECBENCH_TREE:-/tmp/decbench-e5r}}
+tree=${1:-${DECBENCH_TREE:-/tmp/decbench-nocompiler}}
 project=${2:-zlib}
 opts=${3:-O0}
-decs=${4:-e5r}
+decs=${4:-nocompiler}
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 decbench=${DECBENCH_REPO:-$HOME/Ref/decbench}
 venv=${DECBENCH_VENV:-$HOME/.venvs/decbench}
-e5r=${E5R:-$repo/../target/release/e5rx}
+nocompiler=${NoCompiler:-$repo/../target/release/nocompiler-x}
 
 [ -d "$decbench/decbench" ] || {
   echo "no DecBench checkout at $decbench; set DECBENCH_REPO" >&2
@@ -41,14 +41,14 @@ e5r=${E5R:-$repo/../target/release/e5rx}
   echo "  python3 -m venv $venv && $venv/bin/pip install -e /tmp/decbench-work" >&2
   exit 1
 }
-[ -x "$e5r" ] || {
+[ -x "$nocompiler" ] || {
   echo "build first: cargo build --release" >&2
   exit 1
 }
 
 # Importing the out-of-tree backend would otherwise leave a __pycache__ in
 # scripts/, which is not ours to litter.
-export DECBENCH_REPO="$decbench" E5R="$e5r" PYTHONDONTWRITEBYTECODE=1
+export DECBENCH_REPO="$decbench" NoCompiler="$nocompiler" PYTHONDONTWRITEBYTECODE=1
 python="$venv/bin/python"
 
 # The corpus projects are built from their own upstream sources, so the first

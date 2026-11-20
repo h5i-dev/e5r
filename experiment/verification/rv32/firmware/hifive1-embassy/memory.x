@@ -1,5 +1,5 @@
 /* HiFive1 Rev B (FE310-G002): the bootloader in the first 64 KiB of SPI flash
-   jumps to 0x20010000; 16 KiB DTIM data RAM. Original e5r file, Apache-2.0. */
+   jumps to 0x20010000; 16 KiB DTIM data RAM. Original nocompiler file, Apache-2.0. */
 MEMORY
 {
   FLASH : ORIGIN = 0x20010000, LENGTH = 0x3F0000

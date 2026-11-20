@@ -2,7 +2,7 @@
   Instruction fetch from the pinned RMK image (QEMU virt), made cheap for
   the kernel.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   The model's image is `(RamElf.imageOf 0x80000000 0x1000000 elf).ro`, the
   read-only segments the independent reader (Theories/RamElf.lean) makes
@@ -23,8 +23,8 @@ import Theories.Logic
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk
-open E5R E5R.RamElf
+namespace NoCompiler.Rmk
+open NoCompiler NoCompiler.RamElf
 
 abbrev elf := Image.elf
 abbrev img : List Segment := (imageOf 0x80000000 0x1000000 elf).ro
@@ -196,4 +196,4 @@ theorem fetchDecode_of (pc : Word) (h1 : 0x80000000 ≤ pc.toNat)
     fetchDecode img pc = some (i, len) :=
   fetchDecode_eq (byte := textByte) (fun x a b => romByte_text x a b) pc h1 h2 hf hd
 
-end E5R.Rmk
+end NoCompiler.Rmk

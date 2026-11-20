@@ -2,7 +2,7 @@
   `Deframer::next` (0x8001d43a) on the pinned RMK image: the invariant at the frame loop head
   0x8001d476, and the prologue establishing it.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here: `head`: from every machine meeting `next`'s precondition (`CallEnv nextPc nextStack`,
   the deframer invariant, discarding ≤ 1), a quiet run reaches the loop head with `LoopInv`.
@@ -13,8 +13,8 @@ import Projects.rmk.Deframer.NextSegs
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Next
-open E5R E5R.Rmk.NextFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.Next
+open NoCompiler NoCompiler.Rmk.NextFetch NoCompiler.Rmk.Deframer.Tail
 
 /-- `next`'s stack pointer after `addi sp, sp, -0x40`. -/
 def ng (c : Core) : Word := c.get 2 + 0xffffffc0#32
@@ -170,4 +170,4 @@ theorem head (c : Core) (R0 : Word → BitVec 8) (E : CallEnv nextPc nextStack �
     rw [show nextStack = 0x70 from rfl] at h3
     exact nsaves_other c R0 hs x (by omega)
 
-end E5R.Rmk.Deframer.Next
+end NoCompiler.Rmk.Deframer.Next

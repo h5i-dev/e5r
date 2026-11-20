@@ -5,14 +5,14 @@
   the last loaded word into the stack temporary at sp+0x20 and stores the
   last merged word below `a1`.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.MemmoveBwdMisStart
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk
-open E5R E5R.Rmk.MemmoveFetch
+namespace NoCompiler.Rmk
+open NoCompiler NoCompiler.Rmk.MemmoveFetch
 
 /-- What the end block leaves: the source word at `Lq - 4 + o` stored below
     `a1`, the temporary word at sp+0x20 possibly changed, nothing else. -/
@@ -728,4 +728,4 @@ theorem bend3 (g : Core) (R0 : Word → BitVec 8) (Lq : Word) (hpc : g.pc = 0x80
     have h30 : r ≠ 30 := fun e => hr (by subst e; decide)
     simp [e23, e22, e21, e20, e19, e18, e17, e16, e15, e14, e13, e12, e11, e10, e9, e8, e7, e6, e5, e4, e3, e2, e1, Core.wr_get_ne, h6', h9, h12, h13, h14, h30]
 
-end E5R.Rmk
+end NoCompiler.Rmk

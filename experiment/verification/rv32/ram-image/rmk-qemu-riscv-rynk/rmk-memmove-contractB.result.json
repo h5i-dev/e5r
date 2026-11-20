@@ -6,8 +6,8 @@
    "Quot.sound"
   ],
   "board_sha256": "6fe2d0db63ed5756db3ca2845b00931154c84359002daf47cff906b0df64287b",
-  "e5r_verify": "0.1.0",
-  "e5r_verify_sha256": "51c3bea108faafa695f5388401228151212ce468c9016fd47de229023dc4a255",
+  "nocompiler_verify": "0.1.0",
+  "nocompiler_verify_sha256": "51c3bea108faafa695f5388401228151212ce468c9016fd47de229023dc4a255",
   "elf": {
    "bytes": 454024,
    "path": "build/rmk-qemu-riscv-rynk.elf",
@@ -79,7 +79,7 @@
   "Projects/ramimage/MemmoveB.lean"
  ],
  "resumed": [],
- "schema": "e5r.verify.result.v1",
+ "schema": "nocompiler.verify.result.v1",
  "seconds": 376.8,
  "stages": [
   {
@@ -301,19 +301,19 @@
     "Classical.choice",
     "Quot.sound"
    ],
-   "name": "E5R.Rmk.Memmove.contractB"
+   "name": "NoCompiler.Rmk.Memmove.contractB"
   },
   {
    "axioms": [
     "propext"
    ],
-   "name": "E5R.RmkMemmove.img_eq"
+   "name": "NoCompiler.RmkMemmove.img_eq"
   },
   {
    "axioms": [
     "propext"
    ],
-   "name": "E5R.RmkMemmove.board_eq"
+   "name": "NoCompiler.RmkMemmove.board_eq"
   },
   {
    "axioms": [
@@ -321,31 +321,31 @@
     "Classical.choice",
     "Quot.sound"
    ],
-   "name": "E5R.RmkMemmoveB.contractB"
+   "name": "NoCompiler.RmkMemmoveB.contractB"
   },
   {
    "axioms": [
     "propext"
    ],
-   "name": "E5R.Rmk.Image.image_accepted"
+   "name": "NoCompiler.Rmk.Image.image_accepted"
   },
   {
    "axioms": [
     "propext"
    ],
-   "name": "E5R.Rmk.Image.image_agrees"
+   "name": "NoCompiler.Rmk.Image.image_agrees"
   },
   {
    "axioms": [
     "propext"
    ],
-   "name": "E5R.Rmk.Image.image_entry"
+   "name": "NoCompiler.Rmk.Image.image_entry"
   },
   {
    "axioms": [
     "propext"
    ],
-   "name": "E5R.Rmk.Image.image_rwBase"
+   "name": "NoCompiler.Rmk.Image.image_rwBase"
   }
  ]
 }

@@ -2,7 +2,7 @@
   `Deframer::tail` on the pinned RMK image: the prologue and epilogue every path of `tail`
   shares, and the whole path that makes no call (consumed = 0).
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here (no dependency on memmove: this path makes no call):
   * `prologue`: 0x8001d576..0x8001d58c, frame, the five saves, the two field loads;
@@ -17,8 +17,8 @@ import Projects.rmk.Deframer.TailFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Tail
-open E5R E5R.Rmk.TailFetch
+namespace NoCompiler.Rmk.Deframer.Tail
+open NoCompiler NoCompiler.Rmk.TailFetch
 
 theorem alu_add (a b : Word) : alu .add a b = a + b := rfl
 theorem alu_sub (a b : Word) : alu .sub a b = a - b := rfl
@@ -465,4 +465,4 @@ theorem nocopy (frame : Nat) (hf : 0x20 ≤ frame) (m₀ : Machine) (h : TailPre
     have e8 : (c.get 10 + 8).toNat = (c.get 10).toNat + 8 := add_toNat _ 8 (by omega)
     exact congrArg BitVec.toNat (tsave_other c R0 hs _ (.inl (by omega)))
 
-end E5R.Rmk.Deframer.Tail
+end NoCompiler.Rmk.Deframer.Tail

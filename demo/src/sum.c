@@ -1,4 +1,4 @@
-/* The first e5r examples: the sum of an array of 64-bit words, and a caller.
+/* The first nocompiler examples: the sum of an array of 64-bit words, and a caller.
  * lean/Examples/Sum.lean proves `sum` correct, memory-safe and terminating
  * as compiled here, and lean/Examples/Sum2.lean proves `sum2` from `sum`'s
  * specification alone. examples/build.sh builds it, and `_start` lets it run

@@ -2,7 +2,7 @@
   `cobs::dec::decode_in_place` (0x8001e006), the 18-instruction wrapper `next` calls, proved
   against the COBS decoder's contract as an explicit hypothesis.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here, CONDITIONAL ON `CobsReportContract` (a hypothesis here, discharged in
   CobsDischarge.lean by `cobs_report`;
@@ -17,8 +17,8 @@ import Projects.rmk.Deframer.NextFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Wrap
-open E5R E5R.Rmk.NextFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.Wrap
+open NoCompiler NoCompiler.Rmk.NextFetch NoCompiler.Rmk.Deframer.Tail
 
 /-- The wrapper's calling environment: a0 = out (8 bytes), a1 = data, a2 = n. -/
 structure WrapEnv (m : Machine) : Prop where
@@ -395,4 +395,4 @@ theorem wrap (hR : CobsReportContract) (m₀ : Machine) (E : WrapEnv m₀) :
       slot_off8] at this
     exact this hok'
 
-end E5R.Rmk.Deframer.Wrap
+end NoCompiler.Rmk.Deframer.Wrap

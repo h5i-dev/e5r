@@ -2,7 +2,7 @@
   The RMK memmove `contractB` (Projects/rmk/MemmoveContract.lean, peer) stated on
   the image the job runner generates (`jobs/rmk/rmk-memmove-contractB.json`).
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   BOUNDED, not full memmove: `PreB` admits n < 16 in either direction, or
   n ≥ 16 copied forward ((dst - src) ≥ n unsigned) with src ≡ dst (mod 4).
@@ -19,14 +19,14 @@
 import Projects.ramimage.Memmove
 import Projects.rmk.MemmoveContract
 
-namespace E5R.RmkMemmoveB
-open E5R
+namespace NoCompiler.RmkMemmoveB
+open NoCompiler
 
 /-- memmove under `PreB` on the runner's image and board. -/
-theorem contractB (m₀ : Machine) (h : E5R.Rmk.Memmove.PreB m₀) :
-    ∃ k m, E5R.Rmk.QRun (QemuVirtRv32.board E5R.Rmk.Image.image.rwBase) E5R.Rmk.Image.image.ro k m₀ m ∧
-      E5R.Rmk.Memmove.PostB m₀ m := by
-  rw [← E5R.RmkMemmove.img_eq, ← E5R.RmkMemmove.board_eq]
-  exact E5R.Rmk.Memmove.contractB m₀ h
+theorem contractB (m₀ : Machine) (h : NoCompiler.Rmk.Memmove.PreB m₀) :
+    ∃ k m, NoCompiler.Rmk.QRun (QemuVirtRv32.board NoCompiler.Rmk.Image.image.rwBase) NoCompiler.Rmk.Image.image.ro k m₀ m ∧
+      NoCompiler.Rmk.Memmove.PostB m₀ m := by
+  rw [← NoCompiler.RmkMemmove.img_eq, ← NoCompiler.RmkMemmove.board_eq]
+  exact NoCompiler.Rmk.Memmove.contractB m₀ h
 
-end E5R.RmkMemmoveB
+end NoCompiler.RmkMemmoveB

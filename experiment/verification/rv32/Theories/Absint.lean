@@ -1,7 +1,7 @@
 /-
   Abstract interpretation of firmware binaries, as a certificate checker.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   An analyzer (untrusted; `tools/Analyze.lean`) explores the binary and emits
   a certificate: a finite set of abstract nodes (an exact pc plus abstract
@@ -19,8 +19,8 @@ import Theories.Platform
 
 set_option linter.constructorNameAsVariable false
 
-namespace E5R.AI
-open E5R
+namespace NoCompiler.AI
+open NoCompiler
 
 def M32 : Nat := 4294967296
 def maxVals : Nat := 24
@@ -525,7 +525,7 @@ def AV.extend (wd : Width) (signed : Bool) (v : AV) : AV :=
   | .w, _ => v
   | _, false => v
   | _, true => match v with
-    | .vals l => mkVals (l.map fun x => (E5R.extend wd true (w x)).toNat)
+    | .vals l => mkVals (l.map fun x => (NoCompiler.extend wd true (w x)).toNat)
     | .rng l h => if h < signedLimit wd then .rng l h else .top
     | _ => .top
 
@@ -660,7 +660,7 @@ def absExec (cfg : Config) (s : AState) (len : Nat) (i : Instr) : Option (List A
   | .op op rd rs1 rs2 => adv (s.set rd (AV.alu op (g rs1) (g rs2)))
   | .muldiv op rd rs1 rs2 =>
     match g rs1, g rs2 with
-    | .vals x, .vals y => adv (s.set rd (lift2 (E5R.muldiv op) x y))
+    | .vals x, .vals y => adv (s.set rd (lift2 (NoCompiler.muldiv op) x y))
     | _, _ => adv (s.set rd .top)
   | .lr rd rs1 =>
     (absLoad cfg s (g rs1) .w true).bind fun v => adv (s.set rd v)
@@ -832,10 +832,10 @@ def interruptibleOk (cfg : Config) (cert : Cert) (G : List Cell) (s : AState) : 
     address space). -/
 def Cell.wf (cfg : Config) (c : Cell) : Bool :=
   (match c.base with
-   | .abs => c.addr < M32 && cfg.board.inRam (E5R.AI.w c.addr) c.w.bytes
+   | .abs => c.addr < M32 && cfg.board.inRam (NoCompiler.AI.w c.addr) c.w.bytes
    | .rel => M32 - cfg.hdepth ≤ c.addr && c.addr + c.w.bytes ≤ M32) &&
   (match c.guard with
-   | some g => g.1 < M32 && cfg.board.inRam (E5R.AI.w g.1) g.2.1.bytes
+   | some g => g.1 < M32 && cfg.board.inRam (NoCompiler.AI.w g.1) g.2.1.bytes
    | none => true)
 
 def AState.wf (cfg : Config) (s : AState) : Bool :=
@@ -971,4 +971,4 @@ def check (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
 def checkHybrid (cfg : Config) (boot : AState) (cert : Cert) : Bool :=
   checkAt { cfg with hkeep := cert.hkeep } boot cert
 
-end E5R.AI
+end NoCompiler.AI

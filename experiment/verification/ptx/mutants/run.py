@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mutation controls for every property `e5r ptx check` proves.
+"""Mutation controls for every property `nocompiler ptx check` proves.
 
 Each proved benchmark is mutated, one change at a time, in the PTX or in the
 spec. Every mutant changes what the kernel does on some launch inside the
@@ -9,7 +9,7 @@ mutant is proved. It also records how many were refuted with a counterexample
 the Lean kernel replayed and how many were left `unknown` (fail-closed but
 not refuted), per targeted property, and writes results.json.
 
-  run.py E5R_VERIFY OUTDIR [PREFIX ...]
+  run.py NOCOMPILER_VERIFY OUTDIR [PREFIX ...]
 
 With prefixes, only the mutants whose name starts with one of them run.
 """
@@ -186,10 +186,10 @@ def main():
     exe, out = sys.argv[1], sys.argv[2]
     # Per-mutant wall-clock cap passed to `ptx check`. Every mutant here is a
     # control that proves or refutes well under this; the cap only bounds the
-    # tail of a mutant that goes `unknown`. CI sets E5R_PTX_MUTANT_TIMEOUT low
+    # tail of a mutant that goes `unknown`. CI sets NOCOMPILER_PTX_MUTANT_TIMEOUT low
     # so a stuck mutant cannot run the job into its ceiling; the default keeps
     # the maintainer's generous bound.
-    timeout = os.environ.get("E5R_PTX_MUTANT_TIMEOUT", "300")
+    timeout = os.environ.get("NOCOMPILER_PTX_MUTANT_TIMEOUT", "300")
     os.makedirs(out, exist_ok=True)
     rows, proved = [], []
     only = sys.argv[3:]

@@ -2,7 +2,7 @@
   The session task's initialization, 0x80003b38 -> 0x80003e1a, on the pinned RMK image: from an
   explicit entry state, every behaviour reaches the session loop head with `SessInv`.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   The code sets s10 = s6+0x333 and s11 = s6+0x330, stores the RynkService pointer (s7+0xf1) and the
   two Uart16550 pointers (the async fn's arguments at sp+0x1c and sp+0x18) into the session statics
@@ -25,8 +25,8 @@ import Projects.rmk.Deframer.SomeRound
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Init
-open E5R E5R.Rmk E5R.Rmk.Deframer E5R.Rmk.Deframer.Tail E5R.Rmk.Deframer.Session E5R.Rmk.Deframer.SessionI
+namespace NoCompiler.Rmk.Init
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.Deframer NoCompiler.Rmk.Deframer.Tail NoCompiler.Rmk.Deframer.Session NoCompiler.Rmk.Deframer.SessionI
 
 /-- The entry of the initialization, with the values observed on QEMU virt. -/
 structure InitAt (m : Machine) : Prop where
@@ -332,4 +332,4 @@ theorem init_round (hT : TopicsNewContract) (m₀ : Machine) (h : InitAt m₀) :
         show (0x8002a200 : Word).toNat = 0x8002a200 from rfl, show (0x8002a7c9 : Word).toNat = 0x8002a7c9 from rfl] at this
       omega
 
-end E5R.Rmk.Init
+end NoCompiler.Rmk.Init

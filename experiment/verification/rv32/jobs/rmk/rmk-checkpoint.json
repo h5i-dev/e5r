@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.verify.job.v1",
+  "schema": "nocompiler.verify.job.v1",
   "root": "../..",
   "board": "boards/qemu-virt-rv32.json",
   "elf": "build/rmk-qemu-riscv-rynk.elf",
@@ -7,7 +7,7 @@
   "image": {
     "kind": "ram",
     "module": "Projects.rmk.Elf",
-    "namespace": "E5R.Rmk.Image"
+    "namespace": "NoCompiler.Rmk.Image"
   },
   "id": "rmk-checkpoint",
   "modules": [
@@ -115,23 +115,23 @@
     "Projects/ramimage/RmkCheckpoint.lean"
   ],
   "theorems": [
-    "E5R.RmkSessionDischarged.copy",
-    "E5R.RmkSessionDischarged.deframer",
-    "E5R.RmkSessionDischarged.recv",
-    "E5R.RmkSessionDischarged.unpark",
-    "E5R.RmkSessionDischarged.unpark_then_recv",
-    "E5R.RmkFragments.round",
-    "E5R.RmkFragments.unpark_lands",
-    "E5R.RmkFragments.reach_sound",
-    "E5R.RmkSend.send_round",
-    "E5R.RmkSend.send_to_loop",
-    "E5R.RmkSend.nonvacuous",
-    "E5R.Rmk.Encode.encode_spec",
-    "E5R.Rmk.Encode.encode_callPost",
-    "E5R.Rmk.Encode.encPre_witness",
-    "E5R.Rmk.Encode.encode_reaches",
-    "E5R.Rmk.Init.init_round",
-    "E5R.Rmk.Init.initAt_real"
+    "NoCompiler.RmkSessionDischarged.copy",
+    "NoCompiler.RmkSessionDischarged.deframer",
+    "NoCompiler.RmkSessionDischarged.recv",
+    "NoCompiler.RmkSessionDischarged.unpark",
+    "NoCompiler.RmkSessionDischarged.unpark_then_recv",
+    "NoCompiler.RmkFragments.round",
+    "NoCompiler.RmkFragments.unpark_lands",
+    "NoCompiler.RmkFragments.reach_sound",
+    "NoCompiler.RmkSend.send_round",
+    "NoCompiler.RmkSend.send_to_loop",
+    "NoCompiler.RmkSend.nonvacuous",
+    "NoCompiler.Rmk.Encode.encode_spec",
+    "NoCompiler.Rmk.Encode.encode_callPost",
+    "NoCompiler.Rmk.Encode.encPre_witness",
+    "NoCompiler.Rmk.Encode.encode_reaches",
+    "NoCompiler.Rmk.Init.init_round",
+    "NoCompiler.Rmk.Init.initAt_real"
   ],
   "symbols": {
     "0x8001d576": "8Deframer4tail",

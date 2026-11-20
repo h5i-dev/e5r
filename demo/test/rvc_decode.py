@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""decodeC (lean/E5R/Ext/Rvc.lean) against llvm-mc, on every 16-bit word.
+"""decodeC (lean/NoCompiler/Ext/Rvc.lean) against llvm-mc, on every 16-bit word.
 
     python3 -I demo/test/rvc_decode.py TABLE
 

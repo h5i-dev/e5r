@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """End-to-end lifecycle tests of RAM-image verification jobs (`image.kind: ram`).
 
-Usage: python3 -I experiment/scripts/test-ram-image-job.py E5R_VERIFY IMAGE.elf
+Usage: python3 -I experiment/scripts/test-ram-image-job.py NOCOMPILER_VERIFY IMAGE.elf
 
 IMAGE.elf is a RAM-resident ELF the qemu-virt-rv32 board accepts (the pinned
 RMK example). Jobs, modules and copies of the ELF are written under
 verification/rv32/build/testjobs (ignored by git), so the committed job and
 its generated files are not touched. Needs elan; the run takes a few minutes.
 
-Each case runs `E5R_VERIFY check` (or `verify-result`) and checks the exit
+Each case runs `NOCOMPILER_VERIFY check` (or `verify-result`) and checks the exit
 status (0 proved, 10 failed, 11 unsupported, 13 error) and a message
 substring. The positive case is a real `proved` run; a statement about the
 image, not about the program.
@@ -22,14 +22,14 @@ import sys
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "verification", "rv32")
 T = os.path.join(ROOT, "build", "testjobs")
-NS = "E5R.TestRamImage"
+NS = "NoCompiler.TestRamImage"
 MOD = "build.testjobs.Image"
 failures = 0
 
 
 def job(name, **over):
     j = {
-        "schema": "e5r.verify.job.v1", "id": f"test-{name}", "root": "../..",
+        "schema": "nocompiler.verify.job.v1", "id": f"test-{name}", "root": "../..",
         "board": "boards/qemu-virt-rv32.json", "elf": "build/testjobs/image.elf",
         "image": {"kind": "ram", "module": MOD, "namespace": NS},
         "modules": ["build/testjobs/Ok.lean"], "theorems": [f"{NS}.T.*"],

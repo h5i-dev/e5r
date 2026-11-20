@@ -215,10 +215,10 @@ def describe(cases):
 
 def tools_env():
     env = dict(os.environ)
-    bins = os.environ.get('E5R_BINUTILS_ROOT',
-                          str(Path.home() / '.local/state/e5r-lean-agent-20261028/tools/root'))
-    qemu = os.environ.get('E5R_QEMU_ROOT',
-                          str(Path.home() / '.local/state/e5r-claude-production-20261029T024659Z/tools/root'))
+    bins = os.environ.get('NOCOMPILER_BINUTILS_ROOT',
+                          str(Path.home() / '.local/state/nocompiler-lean-agent-20261028/tools/root'))
+    qemu = os.environ.get('NOCOMPILER_QEMU_ROOT',
+                          str(Path.home() / '.local/state/nocompiler-claude-production-20261029T024659Z/tools/root'))
     env['PATH'] = f'{bins}/usr/bin:{qemu}/usr/bin:' + env.get('PATH', '')
     libs = [f'{bins}/usr/lib/x86_64-linux-gnu', f'{qemu}/usr/lib/x86_64-linux-gnu',
             f'{qemu}/lib/x86_64-linux-gnu']
@@ -354,7 +354,7 @@ def evaluate(cases, out, lean_root=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--out', default='/dev/shm/e5r-isa-review-20261029T042314Z/diff')
+    ap.add_argument('--out', default='/dev/shm/nocompiler-isa-review-20261029T042314Z/diff')
     ap.add_argument('--filter', default='')
     ap.add_argument('--timeout', type=float, default=300)
     ap.add_argument('--no-lean', action='store_true')

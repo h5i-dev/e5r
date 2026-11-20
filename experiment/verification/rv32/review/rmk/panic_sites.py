@@ -1,6 +1,6 @@
 """Resolve auipc+jalr / jal call targets in an llvm-objdump -d listing and count
 call sites of Rust panic entry points per calling function (RMK recon, untrusted
-evidence, not a proof). Original e5r code, Apache-2.0.
+evidence, not a proof). Original nocompiler code, Apache-2.0.
 Usage: panic_sites.py LISTING.dis
 """
 import re,sys,collections

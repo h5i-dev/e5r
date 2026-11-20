@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Targeted mutations of the RMK memmove contractB job (jobs/rmk/rmk-memmove-contractB.json).
 
-Usage: python3 -I experiment/scripts/test-rmk-memmoveB-job.py E5R_VERIFY
+Usage: python3 -I experiment/scripts/test-rmk-memmoveB-job.py NOCOMPILER_VERIFY
 
 Proof mutations edit a COPY of Projects/rmk/MemmoveContract.lean (written to
 verification/rv32/build/testjobs/MutContract.lean; the peer's file is not
@@ -53,7 +53,7 @@ def run(name, src=None, elf=None, modules=None):
         open(os.path.join(ROOT, MUT), "w", encoding="utf-8").write(src)
         mods = [MUT if m == "Projects/rmk/MemmoveContract.lean" else m for m in mods]
     j["modules"] = modules or mods
-    j["theorems"] = ["E5R.Rmk.Memmove.contractB"]
+    j["theorems"] = ["NoCompiler.Rmk.Memmove.contractB"]
     if elf:
         j["elf"] = elf
         j.pop("elf_sha256")

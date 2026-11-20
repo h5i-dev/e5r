@@ -1,11 +1,11 @@
-name = "e5r"
+name = "nocompiler"
 version = "0.1.0"
-defaultTargets = ["E5R", "Examples", "Demo", "e5r-audit"]
+defaultTargets = ["NoCompiler", "Examples", "Demo", "nocompiler-audit"]
 
-# No dependencies on purpose: the trusted base of an e5r proof is the Lean
+# No dependencies on purpose: the trusted base of an nocompiler proof is the Lean
 # kernel plus the definitions docs/isa/trust.md lists.
 [[lean_lib]]
-name = "E5R"
+name = "NoCompiler"
 
 [[lean_lib]]
 name = "Examples"
@@ -15,7 +15,7 @@ name = "Examples"
 name = "Demo"
 
 [[lean_exe]]
-name = "e5r-audit"
+name = "nocompiler-audit"
 root = "Audit"
 
 # Runs compressed code in the extension's semantics, for demo/test/rvc_exec.py.

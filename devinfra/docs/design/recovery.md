@@ -1,6 +1,6 @@
 # Function recovery
 
-`crates/e5r-analysis`
+`crates/nocompiler-analysis`
 
 ## What it is for
 

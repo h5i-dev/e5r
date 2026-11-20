@@ -62,15 +62,15 @@ print('''/-
   not edit by hand. Branch outcomes and memory side conditions are hypotheses, discharged in
   Uart/SendBytes.lean.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Deframer.TailNoCopy
 import Projects.rmk.Uart.SendFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Uart
-open E5R E5R.Rmk.SendFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Uart
+open NoCompiler NoCompiler.Rmk.SendFetch NoCompiler.Rmk.Deframer.Tail
 ''')
 # prologue: the 0x30 frame, nine saves
 seg('bPro', 0x800098a6, 0x800098ba, {pc: MEM for pc in range(0x800098a8, 0x800098ba, 2)}, 'bp')
@@ -101,4 +101,4 @@ seg('bNext', 0x80009984, 0x8000996c, {0x80009984: T}, 'bx')
 seg('bDone', 0x80009984, 0x80009986, {0x80009984: F}, 'bd')
 # epilogue: a0 = count, nine restores, return
 seg('bEpi', 0x80009986, None, {**{pc: MEM for pc in range(0x80009988, 0x8000999a, 2)}, 0x8000999c: {'ra': H}}, 'be')
-print('end E5R.Rmk.Uart')
+print('end NoCompiler.Rmk.Uart')

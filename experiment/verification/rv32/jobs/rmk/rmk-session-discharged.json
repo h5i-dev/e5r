@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.verify.job.v1",
+  "schema": "nocompiler.verify.job.v1",
   "id": "rmk-session-discharged",
   "root": "../..",
   "board": "boards/qemu-virt-rv32.json",
@@ -8,7 +8,7 @@
   "image": {
     "kind": "ram",
     "module": "Projects.rmk.Elf",
-    "namespace": "E5R.Rmk.Image"
+    "namespace": "NoCompiler.Rmk.Image"
   },
   "modules": [
     "Projects/rmk/Run.lean",
@@ -76,20 +76,20 @@
     "Projects/ramimage/SessionDischarged.lean"
   ],
   "theorems": [
-    "E5R.Rmk.Deframer.copy_contract",
-    "E5R.Rmk.Memmove.contractAll",
-    "E5R.Rmk.Deframer.tail_contract",
-    "E5R.Rmk.Deframer.park_contract",
-    "E5R.Rmk.Deframer.unpark_contract",
-    "E5R.Rmk.Deframer.next_contract",
-    "E5R.Rmk.Deframer.recv_step'",
-    "E5R.Rmk.Deframer.unpark_step'",
-    "E5R.RmkSessionDischarged.*",
-    "E5R.Rmk.Deframer.Session.recv_step",
-    "E5R.Rmk.Deframer.Session.unpark_step",
-    "E5R.Rmk.Deframer.cobs_report",
-    "E5R.RmkDeframer.img_eq",
-    "E5R.RmkDeframer.board_eq"
+    "NoCompiler.Rmk.Deframer.copy_contract",
+    "NoCompiler.Rmk.Memmove.contractAll",
+    "NoCompiler.Rmk.Deframer.tail_contract",
+    "NoCompiler.Rmk.Deframer.park_contract",
+    "NoCompiler.Rmk.Deframer.unpark_contract",
+    "NoCompiler.Rmk.Deframer.next_contract",
+    "NoCompiler.Rmk.Deframer.recv_step'",
+    "NoCompiler.Rmk.Deframer.unpark_step'",
+    "NoCompiler.RmkSessionDischarged.*",
+    "NoCompiler.Rmk.Deframer.Session.recv_step",
+    "NoCompiler.Rmk.Deframer.Session.unpark_step",
+    "NoCompiler.Rmk.Deframer.cobs_report",
+    "NoCompiler.RmkDeframer.img_eq",
+    "NoCompiler.RmkDeframer.board_eq"
   ],
   "symbols": {
     "0x8001d576": "8Deframer4tail",

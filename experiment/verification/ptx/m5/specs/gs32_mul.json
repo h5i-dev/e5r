@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.ptx.spec.v1",
+  "schema": "nocompiler.ptx.spec.v1",
   "kernel": "gs32_mul",
   "class": "map32",
   "arrays": [

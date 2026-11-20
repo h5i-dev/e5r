@@ -6,17 +6,17 @@
   applied to the runner-generated packed file. Every printed fact is then checked
   by the kernel in CobsFetch.lean; this program is only trusted to propose them.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Theories.Logic
 import Theories.RamElf
 import Projects.rmk.Elf
-open E5R
+open NoCompiler
 
-def img : List Segment := (RamElf.imageOf 0x80000000 0x1000000 E5R.Rmk.Image.elf).ro
+def img : List Segment := (RamElf.imageOf 0x80000000 0x1000000 NoCompiler.Rmk.Image.elf).ro
 
 def clean (s : String) : String :=
-  ((s.replace "E5R." "").replace "\n" " ").splitOn " " |>.filter (· ≠ "") |> " ".intercalate
+  ((s.replace "NoCompiler." "").replace "\n" " ").splitOn " " |>.filter (· ≠ "") |> " ".intercalate
 
 def main : IO Unit := do
   let mut pc : Nat := 0x8001e006

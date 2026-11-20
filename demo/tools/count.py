@@ -5,13 +5,13 @@ comments.
     python3 -I demo/tools/count.py [--markdown]
 
 Per function and side (lean/Demo/<F><A|B>.lean):
-  invariants  the `loop_inv ... measure ...` blocks of the e5r_auto call
+  invariants  the `loop_inv ... measure ...` blocks of the nocompiler_auto call
   script      everything else in the file's theorems (intro, the call, the
               verification conditions)
   lemmas      other declarations in the file (per-function lemmas)
 Shared, counted once (lean/Demo/<F>Spec.lean): the specification and the
-lemmas about it. Libraries: the core (lean/E5R without Auto.lean and Ext/),
-E5R/Auto.lean, E5R/Ext/Rvc.lean."""
+lemmas about it. Libraries: the core (lean/NoCompiler without Auto.lean and Ext/),
+NoCompiler/Auto.lean, NoCompiler/Ext/Rvc.lean."""
 import os, re, sys
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
@@ -52,7 +52,7 @@ def split_proof(path):
                 mode = "inv"; inv.append(l); continue
             script.append(l)
         elif mode == "inv":
-            if indent >= 4 and not s.startswith("e5r_auto"):
+            if indent >= 4 and not s.startswith("nocompiler_auto"):
                 inv.append(l)
             else:
                 mode = "thm"; script.append(l)
@@ -84,11 +84,11 @@ def main():
         a, b = code_lines(text[:k]), code_lines(text[k:])
         shared.append((f"{f}Spec.lean: specification", len(a), tokens(a)))
         shared.append((f"{f}Spec.lean: lemmas about it", len(b), tokens(b)))
-    core = [os.path.join(dp, n) for dp, _, ns in os.walk(os.path.join(LEAN, "E5R")) for n in ns
+    core = [os.path.join(dp, n) for dp, _, ns in os.walk(os.path.join(LEAN, "NoCompiler")) for n in ns
             if n.endswith(".lean") and "Ext" not in dp and n != "Auto.lean"]
-    libs = [("core lean/E5R (without Auto.lean, Ext/)", core),
-            ("lean/E5R/Auto.lean (e5r_auto, shared normal form)", [os.path.join(LEAN, "E5R", "Auto.lean")]),
-            ("lean/E5R/Ext/Rvc.lean (RVC extension, e5r_auto_c)", [os.path.join(LEAN, "E5R", "Ext", "Rvc.lean")])]
+    libs = [("core lean/NoCompiler (without Auto.lean, Ext/)", core),
+            ("lean/NoCompiler/Auto.lean (nocompiler_auto, shared normal form)", [os.path.join(LEAN, "NoCompiler", "Auto.lean")]),
+            ("lean/NoCompiler/Ext/Rvc.lean (RVC extension, nocompiler_auto_c)", [os.path.join(LEAN, "NoCompiler", "Ext", "Rvc.lean")])]
     if md:
         print("| function | side | invariants + measures | script | per-function lemmas | total |")
         print("| --- | --- | --- | --- | --- | --- |")

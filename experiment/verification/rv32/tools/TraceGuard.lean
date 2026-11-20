@@ -1,12 +1,12 @@
 import tools.Analyze
 import Projects.hifive1.Config
-open E5R E5R.AI Analyze
+open NoCompiler NoCompiler.AI Analyze
 
 /-- Debug aid: find the first transition that loses a given guarded fact. -/
 def main (args : List String) : IO UInt32 := do
   let addr := args[0]!.toNat!
   let gaddr := args[1]!.toNat!
-  let su : Setup := { cfg := E5R.Hifive1.Job.cfg, boot := E5R.Hifive1.Job.boot }
+  let su : Setup := { cfg := NoCompiler.Hifive1.Job.cfg, boot := NoCompiler.Hifive1.Job.boot }
   let st0 ← fixG su none 0 true
   let st := runOnce su (some (proposeGuards (st0.G.getD [])))
   let P := proposeGuards (st0.G.getD [])

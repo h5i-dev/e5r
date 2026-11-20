@@ -4,15 +4,15 @@
   image). Its stack temporaries (sp+0x14..0x17, sp+0x10, sp+0xe of the
   callee frame) are the only bytes besides the destination it writes.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.MemmoveMisEnd
 import Projects.rmk.MemmoveAligned
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk
-open E5R E5R.Rmk.MemmoveFetch
+namespace NoCompiler.Rmk
+open NoCompiler NoCompiler.Rmk.MemmoveFetch
 
 /-! ## Copies ignore bytes they neither read nor write -/
 
@@ -411,4 +411,4 @@ theorem big_mis (c : Core) (R0 : Word → BitVec 8) (hq : Quiet c)
       (fun y hy => hRt y (by rw [g8_2]; intro e'; apply hy; subst e'; unfold InTemps; bv_omega)
         (by rw [g8_2]; intro e'; apply hy; subst e'; unfold InTemps; bv_omega)) x hx
 
-end E5R.Rmk
+end NoCompiler.Rmk

@@ -1,4 +1,4 @@
-//! HiFive1 Rev B Embassy firmware, the first e5r binary-verification target.
+//! HiFive1 Rev B Embassy firmware, the first nocompiler binary-verification target.
 //!
 //! One thread-mode executor and two tasks. `sampler` wakes every 10 ms from the
 //! CLINT machine-timer interrupt, reads one byte from UART0 if one is waiting

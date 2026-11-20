@@ -1,6 +1,6 @@
 /-
   The RMK session poll's UART send path on the image the job runner generates
-  (`jobs/rmk/rmk-uart-send-round.json`). Original e5r code, Apache-2.0.
+  (`jobs/rmk/rmk-uart-send-round.json`). Original nocompiler code, Apache-2.0.
 
   Restates, with their types written out (an interface change fails this job):
   * main's `send_bytes` (5bf94a2, no contract), with `SendEnv`/`SendPost` pinned field by field and two
@@ -18,21 +18,21 @@
 import Projects.ramimage.SendBytes
 import Projects.rmk.Uart.SendToLoop
 
-namespace E5R.RmkSend
-open E5R E5R.Rmk.Deframer E5R.Rmk.Deframer.SessionI
-open E5R.Rmk (Lands)
-open E5R.Rmk.Uart (SendAt SendQ SendLoopQ)
+namespace NoCompiler.RmkSend
+open NoCompiler NoCompiler.Rmk.Deframer NoCompiler.Rmk.Deframer.SessionI
+open NoCompiler.Rmk (Lands)
+open NoCompiler.Rmk.Uart (SendAt SendQ SendLoopQ)
 
 theorem send_round (m₀ : Machine) (h : SendAt m₀) : Lands B img (SendQ m₀) m₀ :=
-  E5R.Rmk.Uart.send_round m₀ h
+  NoCompiler.Rmk.Uart.send_round m₀ h
 
 theorem send_to_loop (m₀ : Machine) (h : SendAt m₀) (E : Extras m₀)
     (hpk : (ramRead m₀.ram 0x8002a798 .w).toNat ≤ bufLen) (hdc : discarding m₀.ram Session.dfr ≤ 1) :
     Lands B img (SendLoopQ m₀) m₀ :=
-  E5R.Rmk.Uart.send_to_loop m₀ h E hpk hdc
+  NoCompiler.Rmk.Uart.send_to_loop m₀ h E hpk hdc
 
 theorem nonvacuous : ∃ m, SendAt m ∧ Extras m ∧ (ramRead m.ram 0x8002a798 .w).toNat ≤ bufLen ∧
     discarding m.ram Session.dfr ≤ 1 :=
-  ⟨_, E5R.Rmk.Uart.w_sendLoop⟩
+  ⟨_, NoCompiler.Rmk.Uart.w_sendLoop⟩
 
-end E5R.RmkSend
+end NoCompiler.RmkSend

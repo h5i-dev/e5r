@@ -2,7 +2,7 @@
   Non-vacuity of the repaired Some-point interface (after the 3ecd81b audit), on the pinned RMK
   image.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here:
   * `someAt_real`: a concrete machine at the layout observed on QEMU virt (RynkService 0x8002a4c0 at
@@ -22,8 +22,8 @@ import Projects.rmk.Deframer.SomeRound
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.SomeW
-open E5R E5R.Rmk E5R.Rmk.Deframer.Session E5R.Rmk.Deframer.SessionI E5R.Rmk.Deframer.SomeP
+namespace NoCompiler.Rmk.Deframer.SomeW
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.Deframer.Session NoCompiler.Rmk.Deframer.SessionI NoCompiler.Rmk.Deframer.SomeP
 
 def memT (t : List (Nat × Nat)) (a : Word) : BitVec 8 :=
   match t.find? (fun p => p.1 == a.toNat) with
@@ -98,4 +98,4 @@ theorem svc_zero_not_someAt (m : Machine) (h0 : ramRead m.ram 0x8002a780 .w = 0)
 theorem svc_zero_not_dispEnv (m : Machine) (h0 : ramRead m.ram 0x8002a780 .w = 0) : ¬ DispEnv m :=
   fun h => absurd (h0.symm.trans h.svc) (by decide)
 
-end E5R.Rmk.Deframer.SomeW
+end NoCompiler.Rmk.Deframer.SomeW

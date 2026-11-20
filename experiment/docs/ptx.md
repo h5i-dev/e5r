@@ -60,7 +60,7 @@ evaluation, which would put the compiler in the trusted base.
 | --- | --- | --- |
 | M1 semantics, sequential proofs (P1) | done | `sum_correct` |
 | M2 SIMT, race freedom (P2) | done | `grid_sound`, `vadd_correct`, `saxpy_correct`, three refutations |
-| M3 proof automation (P3) | done for `map32` | `e5r-exp ptx check`; 102 kernels proved, 20 of 21 mutants refuted |
+| M3 proof automation (P3) | done for `map32` | `nocompiler-exp ptx check`; 102 kernels proved, 20 of 21 mutants refuted |
 | M4 shared memory, barriers, reduction (P4) | done for `reduce32` and `scan32` | `phase_sound`; `reduce_correct`, `scan_correct`, `reduce_atomic_correct`; `ptx check` on 3 benchmarks and 6 M5 kernels; 0 of 14 M4 mutants proved, 14 refuted |
 | M5 AI-written PTX benchmark (P5) | done, with the limits stated | `m5/RESULTS.md`; differential test against the A10G |
 | Supplied proofs (P6) | done | `ptx check --proof`; `a_direct` and `s_pingpong` proved; 10 negative controls refused |
@@ -71,7 +71,7 @@ evaluation, which would put the compiler in the trusted base.
 
 ```sh
 ./scripts/recheck-ptx.sh       # everything below, about 90 min on the development machine
-E5R_PTX_QUICK=1 ./scripts/recheck-ptx.sh   # Lean proofs, axiom audit and benchmark verdicts only
+NOCOMPILER_PTX_QUICK=1 ./scripts/recheck-ptx.sh   # Lean proofs, axiom audit and benchmark verdicts only
 ```
 
 Pull requests run the quick form in CI (`ci.yaml`, `ptx-verification`). The
@@ -86,7 +86,7 @@ It runs, in order, and fails on the first problem:
 2. `scripts/check-lean-ptx.sh`: regenerate every kernel module from its `.ptx`
    and refuse a stale one, assemble every benchmark with ptxas when it is
    installed, build the Lean project from scratch, and run the axiom audit;
-3. `e5r-exp ptx check` on every benchmark against
+3. `nocompiler-exp ptx check` on every benchmark against
    `benchmarks/expected.txt` (26 proved, 3 refuted, 2 unsupported);
 4. the mutation controls (`mutants/run.py`): no mutant may be proved;
 5. the supplied proofs and their negative controls (`proofs/controls.sh`);
@@ -101,12 +101,12 @@ for the M3 part and about 2 hours for the M4 part (most of it failed proof
 attempts on mutants running into the timeout):
 
 ```sh
-python3.12 verification/ptx/m5/run.py ./target/release/e5r /tmp/m5
+python3.12 verification/ptx/m5/run.py ./target/release/nocompiler /tmp/m5
 python3 verification/ptx/m5/report.py /tmp/m5/results.json
-python3.12 verification/ptx/m5/m4/run4.py ./target/release/e5r /tmp/m5m4
-python3.12 verification/ptx/m5/m4/run4.py --mutants ./target/release/e5r /tmp/m5mut
+python3.12 verification/ptx/m5/m4/run4.py ./target/release/nocompiler /tmp/m5m4
+python3.12 verification/ptx/m5/m4/run4.py --mutants ./target/release/nocompiler /tmp/m5mut
 python3 verification/ptx/m5/m4/report4.py    # reads the copies in m5/m4/
-python3.12 verification/ptx/m5/float/run_float.py ./target/release/e5r /tmp/m5f
+python3.12 verification/ptx/m5/float/run_float.py ./target/release/nocompiler /tmp/m5f
 python3 verification/ptx/m5/float/report_float.py   # reads the copies in m5/float/
 ```
 
@@ -119,18 +119,18 @@ on lean-ieee754's toolchain (v4.33.1) with Mathlib; nothing in
 Lean is capped on purpose: a Lean process was OOM-killed at 15 GB on the
 development machine. The scripts run Lean with `LEAN_NUM_THREADS=2` under a
 10 GB cgroup limit (`systemd-run`, no swap; override with `PTX_LEAN_MEMORY`).
-`e5r-exp ptx check` runs one Lean thread under a 6 GB cap and a 600 s
+`nocompiler-exp ptx check` runs one Lean thread under a 6 GB cap and a 600 s
 timeout (`--memory-mb`, `--timeout`). Without systemd only the thread count
 and the timeout apply.
 
 ## Command line
 
 ```
-e5r-exp ptx export [--namespace NS] [--name NAME] FILE.ptx
-e5r-exp ptx check FILE.ptx --spec SPEC.json [--project DIR] [--out RESULT.json]
+nocompiler-exp ptx export [--namespace NS] [--name NAME] FILE.ptx
+nocompiler-exp ptx check FILE.ptx --spec SPEC.json [--project DIR] [--out RESULT.json]
                      [--keep DIR] [--timeout SECS] [--memory-mb MB] [--no-search]
                      [--proof PROOF.lean]
-e5r-exp ptx run --cases CASES FILE.ptx
+nocompiler-exp ptx run --cases CASES FILE.ptx
 ```
 
 `export` prints the Lean `Ptx.Module` of a file after the token round trip.
@@ -138,10 +138,10 @@ e5r-exp ptx run --cases CASES FILE.ptx
 
 `check` is the verifier. It parses the PTX (refusing anything outside the
 subset), reads the spec, generates a Lean file that states
-`E5rCheck.correct : spec.Correct K` and proves it with the class tactics,
+`NoCompilerCheck.correct : spec.Correct K` and proves it with the class tactics,
 runs Lean on it under the caps, and audits the theorem's axioms. If that
 does not produce a proof it searches for a counterexample with the concrete
-interpreter and, if it finds one, generates `E5rCheck.refuted : ¬ spec.Correct K`
+interpreter and, if it finds one, generates `NoCompilerCheck.refuted : ¬ spec.Correct K`
 and runs Lean on that. `--keep DIR` keeps both Lean files.
 
 Exit status and verdict, fail-closed (only `proved` exits 0):
@@ -155,7 +155,7 @@ Exit status and verdict, fail-closed (only `proved` exits 0):
 | 4 | `error` | malformed spec, unreadable file, missing kernel, Lean library does not build |
 | 64 | | the command line could not be understood |
 
-The result is a JSON document with `"schema": "e5r.ptx.result.v1"`:
+The result is a JSON document with `"schema": "nocompiler.ptx.result.v1"`:
 `verdict`; `properties` (`memory_safety`, `termination`, `race_freedom`,
 `functional_correctness`, each `proved`, `refuted`, `unknown` or
 `unsupported`); `theorem` (name, statement, axioms) for a proof;
@@ -166,10 +166,10 @@ the Lean definitions the theorem is about; `reasons`; timings. A refuted
 verdict marks only the violated property `refuted`; the others stay
 `unknown`.
 
-### The spec (`e5r.ptx.spec.v1`, class `map32`)
+### The spec (`nocompiler.ptx.spec.v1`, class `map32`)
 
 ```json
-{ "schema": "e5r.ptx.spec.v1", "kernel": "saxpy", "class": "map32",
+{ "schema": "nocompiler.ptx.spec.v1", "kernel": "saxpy", "class": "map32",
   "arrays": ["saxpy_x", "saxpy_y"], "output": "saxpy_y", "length": "saxpy_n",
   "scalars": ["saxpy_a"], "element": "saxpy_a * saxpy_x + saxpy_y",
   "schedule": { "kind": "stride", "bound": "2^64",
@@ -201,7 +201,7 @@ claiming 2^32 − 1 is refuted with a thread whose index wraps negative
 ### Float maps (`map32` with `"element_type": "f32"`)
 
 ```json
-{ "schema": "e5r.ptx.spec.v1", "kernel": "saxpy_f32", "class": "map32",
+{ "schema": "nocompiler.ptx.spec.v1", "kernel": "saxpy_f32", "class": "map32",
   "element_type": "f32",
   "arrays": ["saxpy_f32_param_1", "saxpy_f32_param_2"], "output": "saxpy_f32_param_2",
   "length": "saxpy_f32_param_3", "scalars": ["saxpy_f32_param_0"],
@@ -232,7 +232,7 @@ claiming 2^32 − 1 is refuted with a thread whose index wraps negative
 ### The block specs (`reduce32`, `scan32`)
 
 ```json
-{ "schema": "e5r.ptx.spec.v1", "kernel": "reduce", "class": "reduce32",
+{ "schema": "nocompiler.ptx.spec.v1", "kernel": "reduce", "class": "reduce32",
   "result": "per_block",
   "input": "reduce_param_0", "output": "reduce_param_1", "length": "reduce_param_2",
   "shared": "_ZZ6reduceE1s", "max_block": 1024,
@@ -278,7 +278,7 @@ and no replayed counterexample the verdict is `unknown` inside the shape and
 ### The atomic spec (`accum`)
 
 ```json
-{ "schema": "e5r.ptx.spec.v1", "kernel": "acc_min_s32", "class": "accum",
+{ "schema": "nocompiler.ptx.spec.v1", "kernel": "acc_min_s32", "class": "accum",
   "op": "min", "type": "s32",
   "input": "acc_min_s32_param_0", "output": "acc_min_s32_param_1",
   "length": "acc_min_s32_param_2" }
@@ -314,27 +314,27 @@ For a kernel the automation cannot handle, `check --proof PROOF.lean` checks
 a proof someone else wrote. The tool, not the author, writes the theorem
 statement:
 
-1. It generates module `E5rSpec` from the PTX and the spec: the kernel as
-   exported, the spec definition, and `E5rSpec.statement : Prop`, the same
+1. It generates module `NoCompilerSpec` from the PTX and the spec: the kernel as
+   exported, the spec definition, and `NoCompilerSpec.statement : Prop`, the same
    class statement the automation would prove (`spec.Correct K` for `map32`,
    `Reduce32.Correct`, `Reduce32.Atomic.Correct` or `Scan32.Correct` for the
    block classes, `Accum.Correct` for `accum`). Only the statement-level checks apply (parameter names and
    types); the class's proof shape (barrier count, roles, shared array) does
    not.
-2. The supplied file must be module `E5rProof`, contain a manifest
-   `/- e5r-proof ptx=<sha256> spec=<sha256> toolchain=<lean-toolchain> -/`
+2. The supplied file must be module `NoCompilerProof`, contain a manifest
+   `/- nocompiler-proof ptx=<sha256> spec=<sha256> toolchain=<lean-toolchain> -/`
    naming the exact inputs it was written for, and prove
-   `theorem E5rProof.correct : E5rSpec.statement`. A manifest that does not
+   `theorem NoCompilerProof.correct : NoCompilerSpec.statement`. A manifest that does not
    match the PTX, the spec or the project's toolchain is refused.
 3. Both modules are compiled under the caps. Then the separate checker
    `proofcheck` (`Checker/ProofCheck.lean`, a `lake` executable) loads the
-   compiled environment and: refuses imports other than `E5rSpec`, `Ptx.*`,
+   compiled environment and: refuses imports other than `NoCompilerSpec`, `Ptx.*`,
    `Init`, `Std`, `Lean`; refuses any `axiom` the proof declares; sends every
    declaration of the proof module to the kernel again
    (`Kernel.Environment.replay`) on an environment with only its imports, so
    `set_option debug.skipKernelTC` or a metaprogram that adds an unchecked
-   declaration does not get through; requires `E5rProof.correct` to be a
-   theorem whose type is the constant `E5rSpec.statement`; and requires its
+   declaration does not get through; requires `NoCompilerProof.correct` to be a
+   theorem whose type is the constant `NoCompilerSpec.statement`; and requires its
    transitive axioms to be among `propext`, `Quot.sound`, `Classical.choice`.
 
 Only then is the verdict `proved`, with `"theorem": {"generated": false,
@@ -618,16 +618,16 @@ interleaving.
 | `Ptx.Examples.Map.saxpy_correct` (M2) | `benchmarks/correct/saxpy.ptx`, grid-stride | any `G`, `B`, `n`; `x`, `y` fit, aligned, disjoint | `y[i] = a·x[i] + y[i] mod 2^32` |
 | `Ptx.grid_sound` | every kernel | per-thread `Solo` runs, disjoint write footprints | the five clauses above |
 | `Ptx.Auto.correct_of_threadOk`, `threadOk_of_guardedOk`, `threadOk_of_stride` | every `map32` kernel | the local obligations | `MapSpec.Correct` |
-| `E5rCheck.correct` (generated) | each kernel `check` proves | `MapSpec.Pre` | `MapSpec.Correct` |
+| `NoCompilerCheck.correct` (generated) | each kernel `check` proves | `MapSpec.Pre` | `MapSpec.Correct` |
 | `Ptx.Phased.phase_sound` (M4) | every kernel | per-phase `Run` derivations, footprint disjointness, accumulator cells of one `CellAlg` | the five clauses, final memory, each cell = `op(initial, fold of contributions)` |
 | `Ptx.Examples.Reduce.reduce_correct` (M4) | `benchmarks/correct/reduce_nvcc.ptx`, nvcc 13.2 | `B = 2^j ≤ 1024`, `G·B ≤ 2^32`, any `n`; arrays fit, aligned, disjoint; any shared placement ptxas could choose | `out[b]` = sum of block `b`'s segment |
 | `Ptx.Examples.ReduceAtomic.reduce_atomic_correct` (M4) | `reduce_atomic_nvcc.ptx` | as above, one output word | `*out` = initial + sum of `x[0 .. min(n, G·B))` |
 | `Ptx.Examples.Scan.scan_correct` (M4) | `scan_nvcc.ptx` | `1 ≤ B ≤ 1024`, `n ≤ G·B ≤ 2^32` | `out[i]` = inclusive prefix sum of `i`'s block segment |
 | `Ptx.Auto.Reduce32.correct_of`, `Reduce32.Atomic.correct_of`, `Scan32.correct_of` (M4) | every `reduce32` / `scan32` kernel | `Obligations` | the class's `Correct` |
 | `Ptx.Auto.Accum.correct_of` | every `accum` kernel, all 16 algebras | `Obligation` (one phase per thread) | `Accum.Correct` |
-| `E5rCheck.correct` (generated) | `benchmarks/correct/accum/acc_*.ptx`, nvcc 13.2 | `Accum.Args.Pre` | `Accum.Correct` for `add.u32 add.u64 and/or/xor.b32 and/or/xor.b64 min/max.u32 min/max.s32 min/max.u64 min/max.s64` |
-| `E5rProof.correct` (supplied) | `m5/m4/kernels/a_direct.ptx`, `s_pingpong.ptx` | the class's `Pre` | `Reduce32.Atomic.Correct`, `Scan32.Correct` |
-| `E5rCheck.correct` (generated) | `benchmarks/correct/float/saxpy_f32.ptx`, `fdefault.ptx` (nvcc 13.2) | `MapSpec.Pre`, any NaN oracle | output = `fma.rn(a, x, y)`, `div.rn(x, y)`, `sqrt.rn(x)`, `max(x, 0)` bit for bit, any NaN where that is NaN |
+| `NoCompilerCheck.correct` (generated) | `benchmarks/correct/accum/acc_*.ptx`, nvcc 13.2 | `Accum.Args.Pre` | `Accum.Correct` for `add.u32 add.u64 and/or/xor.b32 and/or/xor.b64 min/max.u32 min/max.s32 min/max.u64 min/max.s64` |
+| `NoCompilerProof.correct` (supplied) | `m5/m4/kernels/a_direct.ptx`, `s_pingpong.ptx` | the class's `Pre` | `Reduce32.Atomic.Correct`, `Scan32.Correct` |
+| `NoCompilerCheck.correct` (generated) | `benchmarks/correct/float/saxpy_f32.ptx`, `fdefault.ptx` (nvcc 13.2) | `MapSpec.Pre`, any NaN oracle | output = `fma.rn(a, x, y)`, `div.rn(x, y)`, `sqrt.rn(x)`, `max(x, 0)` bit for bit, any NaN where that is NaN |
 | `Crosscheck.roundQ_eq`, `overflows_iff`, `tiny_iff`, `roundSqrtQ_eq` (separate project, Mathlib) | the rounding core | none | equal to lean-ieee754's `roundWithMode`, `OverflowWithMode`, `TinyWithMode` |
 
 The vadd preconditions are the ones the PTX needs:
@@ -731,7 +731,7 @@ inputs (fixed seed). The same launches run:
 - on the A10G from the PTX text (driver JIT);
 - on the A10G from a ptxas cubin;
 - in Lean, executing the definitions of `Ptx.Semantics` (`lake exe ptxdiff`);
-- on the concrete interpreter of `e5r-ptx` (`ptx run`).
+- on the concrete interpreter of `nocompiler-ptx` (`ptx run`).
 
 The Lean side runs the CTAs with the same schedule as the interpreter
 (`Diff/Main.lean`), so contended atomics compare the same order; their final
@@ -873,8 +873,8 @@ baseline does not use the Lean model.
 ## How it works
 
 ```
-.ptx --e5r-ptx--> AST --token round trip--> Lean Ptx.Module
-spec.json --e5r-exp ptx check--> Proof.lean (template) --lake env lean--> axiom audit --> verdict
+.ptx --nocompiler-ptx--> AST --token round trip--> Lean Ptx.Module
+spec.json --nocompiler-exp ptx check--> Proof.lean (template) --lake env lean--> axiom audit --> verdict
                                  \-> interpreter search --> Refute.lean --lake env lean--> verdict
 
 Ptx/Semantics: Memory, Instruction (one thread), SIMT (grid, interleaving)
@@ -922,7 +922,7 @@ interleaving. A new kernel never re-proves concurrency.
 
 ### Parser
 
-`crates/e5r-ptx` lexes, parses and type-checks the subset and refuses
+`crates/nocompiler-ptx` lexes, parses and type-checks the subset and refuses
 everything else with a line number: other types (`.u16`, `.f16`), state spaces
 (`.local`, `.const`), instructions (integer `neg`, `rem`, `mad.wide`, `ld.global.nc`,
 `ld.volatile`, `barrier.sync`, `bar.arrive`, `bar.sync` with another barrier
@@ -961,16 +961,16 @@ What a theorem here does and does not establish:
    `launch`, `params`, `elt`), the algebra definitions of
    `Ptx/Logic/CellAlgs.lean` the spec names (`op` and `e` are part of the
    statement; their laws are proved), `afold`, and the generated
-   `Accum.Spec`. For a supplied proof it is the generated `E5rSpec`
+   `Accum.Spec`. For a supplied proof it is the generated `NoCompilerSpec`
    module, and the checker `Checker/ProofCheck.lean` with the Lean kernel's
    `replay`.
    A weak spec proves a weak property, and nothing here detects that.
    Not trusted: the tactics, `wp_sound` and the rest of `Ptx/Logic` and
    `Ptx/Auto` (proved), the counterexample search and the interpreter
    (replayed), the Lean file generator beyond the statement it emits.
-2. **The verdict logic.** `e5r-exp ptx check` decides `proved` from Lean's
+2. **The verdict logic.** `nocompiler-exp ptx check` decides `proved` from Lean's
    exit status, the absence of `error:` and `sorry` in its output, and the
-   axiom list of `E5rCheck.correct`. That code (`src/ptx/mod.rs`, `run_lean`
+   axiom list of `NoCompilerCheck.correct`. That code (`src/ptx/mod.rs`, `run_lean`
    and `check`) is trusted for the exit status.
 3. **The semantics' fidelity to PTX.** Written from the PTX ISA manual and
    differentially tested on the A10G (above). The float definitions
@@ -1110,7 +1110,7 @@ checked here:
 | *Proving LLM-Generated GPU Kernels Correct and Safe* (2026-10-17) | Velvet plus VerCors on CUDA source | proves source, not the compiled PTX |
 | Kuiper (PLDI 2026) | F*, separation logic over shared memory, barriers and tensor cores | some proofs still admitted |
 | NVlabs `ptxmemorymodel` | Coq formalisation of the PTX memory model | requires Coq 8.4 |
-| VOLTA | PTX parser | `e5r-ptx` is independent of it |
+| VOLTA | PTX parser | `nocompiler-ptx` is independent of it |
 | KernelBench-Verified | AI kernel-generation tasks | candidate source for P5 |
 
 Theorem's RISC-V binary verification (`rocq-linux-process-semantics`) is in

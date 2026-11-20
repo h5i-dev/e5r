@@ -33,11 +33,11 @@ jobs:
         with:
           path: experiment/verification/ptx/.lake/build
           key: ptx-lake-${{ runner.os }}-${{ hashFiles('experiment/verification/ptx/lean-toolchain', 'experiment/verification/ptx/lakefile.lean', 'experiment/verification/ptx/lake-manifest.json', 'experiment/verification/ptx/**/*.lean') }}
-      - run: cargo build -p e5r-verify
+      - run: cargo build -p nocompiler-verify
       - name: Every PTX proof, refutation, axiom audit, benchmark verdict, mutant and supplied proof
         env:
-          E5R_VERIFY: ${{ github.workspace }}/target/debug/e5r-exp
-          E5R_PTX_KEEP_BUILD: "1"
+          NOCOMPILER_VERIFY: ${{ github.workspace }}/target/debug/nocompiler-exp
+          NOCOMPILER_PTX_KEEP_BUILD: "1"
         # The GPU differential test needs a GPU and skips itself here.
         run: ./experiment/scripts/recheck-ptx.sh
       - name: Save the Lean build

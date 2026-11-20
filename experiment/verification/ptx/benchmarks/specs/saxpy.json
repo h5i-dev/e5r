@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.ptx.spec.v1",
+  "schema": "nocompiler.ptx.spec.v1",
   "kernel": "saxpy",
   "class": "map32",
   "arrays": ["saxpy_x", "saxpy_y"],

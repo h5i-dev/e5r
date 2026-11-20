@@ -1,12 +1,12 @@
 /-
   The ring-index wrap rustc emits for `if i + 1 == 4 { 0 } else { i + 1 }`:
   `a = i + 1; t = seqz(a - 4) - 1; i' = t & a` (branch-free). Word-level
-  facts the machine-code summaries use. Original e5r code, Apache-2.0.
+  facts the machine-code summaries use. Original nocompiler code, Apache-2.0.
 -/
 import Theories.Hart
 
-namespace E5R.Hybrid
-open E5R
+namespace NoCompiler.Hybrid
+open NoCompiler
 
 /-- The ring index after one step: `i + 1`, wrapped at the capacity 4. -/
 def next (h : Word) : Word := if h = 3 then 0 else h + 1
@@ -33,4 +33,4 @@ theorem wrap' {h : Word} (hh : h.toNat < 4) :
     alu .and (h + 1) (alu .add (alu .sltu (h + 1 + 0xfffffffc) 1) 0xffffffff) = next h := by
   rcases cases4 hh with rfl | rfl | rfl | rfl <;> decide
 
-end E5R.Hybrid
+end NoCompiler.Hybrid

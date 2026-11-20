@@ -1,6 +1,6 @@
 /-
   RMK Deframer methods (main's Projects/rmk/Deframer/*), CONDITIONAL, on the image the job runner
-  generates (`jobs/rmk/rmk-deframer-conditional.json`). Original e5r code, Apache-2.0.
+  generates (`jobs/rmk/rmk-deframer-conditional.json`). Original nocompiler code, Apache-2.0.
 
   NOT a safety claim. `conditional` is an implication: IF memmove meets `CopyContract` (open: the
   backward and misaligned memmove paths are not proved) and IF `decode_in_place_report` meets
@@ -16,13 +16,13 @@ import Projects.rmk.ElfFidelity
 import Projects.rmk.Deframer.Next
 import Projects.rmk.Deframer.Unpark
 
-namespace E5R.RmkDeframer
-open E5R E5R.Rmk.Deframer
+namespace NoCompiler.RmkDeframer
+open NoCompiler NoCompiler.Rmk.Deframer
 
-theorem img_eq : E5R.Rmk.Deframer.img = E5R.Rmk.Image.image.ro := rfl
+theorem img_eq : NoCompiler.Rmk.Deframer.img = NoCompiler.Rmk.Image.image.ro := rfl
 
-theorem board_eq : E5R.Rmk.Deframer.B = QemuVirtRv32.board E5R.Rmk.Image.image.rwBase := by
-  rw [E5R.Rmk.Image.image_rwBase]
+theorem board_eq : NoCompiler.Rmk.Deframer.B = QemuVirtRv32.board NoCompiler.Rmk.Image.image.rwBase := by
+  rw [NoCompiler.Rmk.Image.image_rwBase]
 
 /-- **CONDITIONAL** on the open memmove and COBS-interface contracts. -/
 theorem conditional :
@@ -30,4 +30,4 @@ theorem conditional :
     (CopyContract → CobsReportContract → NextContract) :=
   ⟨fun hC => ⟨Tail.tail_from_copy hC, Park.park_from_copy hC, Unpark.unpark_from_copy hC⟩, Next.next_from_deps⟩
 
-end E5R.RmkDeframer
+end NoCompiler.RmkDeframer

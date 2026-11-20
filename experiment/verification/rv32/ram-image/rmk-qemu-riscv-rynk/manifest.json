@@ -29,7 +29,7 @@
     "size": 16777216
   },
   "rw_base": 2147654600,
-  "schema": "e5r.ram-image.v1",
+  "schema": "nocompiler.ram-image.v1",
   "segments": [
     {
       "blob": "seg-0.bin",
@@ -112,7 +112,7 @@
     }
   ],
   "tool": {
-    "name": "e5r-verify ram-image",
+    "name": "nocompiler-verify ram-image",
     "version": "0.1.0"
   },
   "totals": {

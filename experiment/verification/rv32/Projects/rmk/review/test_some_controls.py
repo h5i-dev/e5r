@@ -2,7 +2,7 @@
 """Adversarial controls for main's Some round against named callee contracts (review of 07a17e5),
 and for this review's own refutations (SomeAudit.lean).
 
-Original e5r code, Apache-2.0. Each control drops or weakens ONE hypothesis (or strengthens one
+Original nocompiler code, Apache-2.0. Each control drops or weakens ONE hypothesis (or strengthens one
 claim) in a scratch copy of main's sources and recompiles from the changed module to the end of
 the chain. It passes only if the first error is in the expected declaration and is a proof
 failure (REJECTED), not an elaboration failure. Main's tree is never modified.
@@ -80,8 +80,8 @@ CONTROLS = [
               'def rtS : List ((Nat × Nat) × Word) := [((0x800210dc, 4), 0x8000023c#32)]')],
      f'{R}/review/SomeAudit.lean', 'dispatch_contract_false'),
     ('audit: first dispatch instruction misstated (addi sp,-0x3f0), the fetch check must reject it',
-     [replace(f'{R}/review/SomeAudit.lean', '(0x800001f2#32, E5R.Instr.opimm (E5R.AluOp.add) 2 2 0xfffffc20#32',
-              '(0x800001f2#32, E5R.Instr.opimm (E5R.AluOp.add) 2 2 0xfffffc10#32')],
+     [replace(f'{R}/review/SomeAudit.lean', '(0x800001f2#32, NoCompiler.Instr.opimm (NoCompiler.AluOp.add) 2 2 0xfffffc20#32',
+              '(0x800001f2#32, NoCompiler.Instr.opimm (NoCompiler.AluOp.add) 2 2 0xfffffc10#32')],
      f'{R}/review/SomeAudit.lean', 'dispatch_contract_false'),
     ('audit: encode refutation with the real UART struct pointer (no alias with the buffer)',
      [replace(f'{R}/review/SomeAudit.lean', '   memT [(0x8002a784, 0x95), (0x8002a785, 0xa7), (0x8002a786, 2), (0x8002a787, 0x80), (0x8002a7b1, 0x55)]⟩',

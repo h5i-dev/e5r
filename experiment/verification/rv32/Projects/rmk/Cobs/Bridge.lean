@@ -1,8 +1,8 @@
 /-
-  The proved COBS contract (`E5R.Rmk.Cobs.decode`) implies main's interface
-  `E5R.Rmk.Deframer.CobsReportContract` (Projects/rmk/Deframer/Spec.lean, imported, not edited).
+  The proved COBS contract (`NoCompiler.Rmk.Cobs.decode`) implies main's interface
+  `NoCompiler.Rmk.Deframer.CobsReportContract` (Projects/rmk/Deframer/Spec.lean, imported, not edited).
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   The two `CobsEnv`s agree field by field (same entry, bound, slot, frame, separations); the
   posts agree on pc, caller-saved registers, CSRs and the RAM frame; main's `ok` clause (when
@@ -14,8 +14,8 @@ import Projects.rmk.Deframer.Spec
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Cobs
-open E5R E5R.Rmk
+namespace NoCompiler.Rmk.Cobs
+open NoCompiler NoCompiler.Rmk
 
 /-- The loop's output is never longer than the first zero index. -/
 theorem run_length (f : Nat → Nat) (n : Nat) :
@@ -33,12 +33,12 @@ theorem run_length (f : Nat → Nat) (n : Nat) :
         obtain ⟨a, b, c⟩ := block_some hb (by omega)
         exact run_length f n fuel src' (acc ++ out) (by simp; omega) b
 
-theorem env_bridge (m : Machine) (h : E5R.Rmk.Deframer.CobsEnv m) : CobsEnv m := by
+theorem env_bridge (m : Machine) (h : NoCompiler.Rmk.Deframer.CobsEnv m) : CobsEnv m := by
   obtain ⟨pc, quiet, n, data, out, outAl, frame, spAl, ⟨s1, s2, s3⟩, ra⟩ := h
   exact ⟨pc, quiet, out, outAl, data, n, frame, spAl, by rcases s1 with e | e <;> omega, s3, s2, ra⟩
 
 /-- **Main's COBS interface, discharged** by the machine-code proof of `decode`. -/
-theorem cobs_report_contract : E5R.Rmk.Deframer.CobsReportContract := by
+theorem cobs_report_contract : NoCompiler.Rmk.Deframer.CobsReportContract := by
   intro m₀ h
   obtain ⟨k, m, hr, hret, hres⟩ := decode m₀ (env_bridge m₀ h)
   refine ⟨k, m, hr, ⟨hret.pc, fun r hr' => hret.regs r hr', hret.csr, fun x a b c => hret.ram x ?_, ?_⟩⟩
@@ -62,4 +62,4 @@ theorem cobs_report_contract : E5R.Rmk.Deframer.CobsReportContract := by
         rw [if_neg hne] at r4
         rw [r0, r4] at hok; exact absurd hok (by decide)
 
-end E5R.Rmk.Cobs
+end NoCompiler.Rmk.Cobs

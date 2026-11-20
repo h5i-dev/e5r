@@ -5,7 +5,7 @@
 #   1. parser, round trip, ptxas agreement and fuzz tests (cargo, release);
 #   2. every Lean proof and refutation from scratch, and the axiom audit of
 #      every Ptx.* declaration (experiment/scripts/check-lean-ptx.sh);
-#   3. `e5r ptx check` on every benchmark, against the verdict in
+#   3. `nocompiler ptx check` on every benchmark, against the verdict in
 #      benchmarks/expected.txt;
 #   4. the mutation controls (mutants/run.py): no mutant may be proved;
 #   4b. the supplied-proof route (proofs/controls.sh): two supplied proofs
@@ -16,17 +16,17 @@
 #      (experiment/scripts/check-ptx-ieee-crosscheck.sh), skipped with a note when its
 #      Mathlib dependency has not been fetched.
 #
-# E5R_VERIFY=path skips the cargo build and test (CI passes its dev build).
-# E5R_PTX_QUICK=1 stops after step 3 (see below); the full run is about 90 min.
+# NOCOMPILER_VERIFY=path skips the cargo build and test (CI passes its dev build).
+# NOCOMPILER_PTX_QUICK=1 stops after step 3 (see below); the full run is about 90 min.
 # Lean runs with LEAN_NUM_THREADS=2 and a 10 GB cgroup cap unless overridden.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 root=verification/ptx
 export LEAN_NUM_THREADS="${LEAN_NUM_THREADS:-2}"
-if [[ -z "${E5R_VERIFY:-}" ]]; then
-  CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" cargo test --release -p e5r-ptx -p e5r-verify -q
-  CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" cargo build --release -p e5r-verify
-  export E5R_VERIFY="$(cd .. && pwd)/target/release/e5r-exp"
+if [[ -z "${NOCOMPILER_VERIFY:-}" ]]; then
+  CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" cargo test --release -p nocompiler-ptx -p nocompiler-verify -q
+  CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" cargo build --release -p nocompiler-verify
+  export NOCOMPILER_VERIFY="$(cd .. && pwd)/target/release/nocompiler-exp"
 fi
 echo "== Lean proofs and axiom audit"
 ./scripts/check-lean-ptx.sh | tail -3
@@ -38,7 +38,7 @@ fail=0
 while read -r ptx spec want; do
   [[ -z $ptx || $ptx == \#* ]] && continue
   set +e
-  "$E5R_VERIFY" ptx check "$root/benchmarks/$ptx" --spec "$root/benchmarks/specs/$spec" >"$out/r.json"
+  "$NOCOMPILER_VERIFY" ptx check "$root/benchmarks/$ptx" --spec "$root/benchmarks/specs/$spec" >"$out/r.json"
   rc=$?
   set -e
   got=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["verdict"])' "$out/r.json")
@@ -51,17 +51,17 @@ done <"$root/benchmarks/expected.txt"
 # finishes in minutes. Steps 4 to 6 launch Lean dozens of times (59 mutants,
 # 12 supplied-proof cases) and take most of the ~90 minutes of a full recheck,
 # so they are run by hand or by the manual ptx-full workflow, not per push.
-if [[ "${E5R_PTX_QUICK:-0}" == 1 ]]; then
+if [[ "${NOCOMPILER_PTX_QUICK:-0}" == 1 ]]; then
   echo "recheck: quick set passed (Lean proofs, axiom audit, benchmark verdicts);"
-  echo "         mutation controls and supplied proofs not run (unset E5R_PTX_QUICK)"
+  echo "         mutation controls and supplied proofs not run (unset NOCOMPILER_PTX_QUICK)"
   exit 0
 fi
 
 echo "== mutation controls"
-python3 $root/mutants/run.py "$E5R_VERIFY" "$out/mutants" | tail -1
+python3 $root/mutants/run.py "$NOCOMPILER_VERIFY" "$out/mutants" | tail -1
 
 echo "== supplied proofs and their negative controls"
-$root/proofs/controls.sh "$E5R_VERIFY" | tail -1
+$root/proofs/controls.sh "$NOCOMPILER_VERIFY" | tail -1
 
 echo "== GPU differential test"
 set +e

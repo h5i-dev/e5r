@@ -1,8 +1,8 @@
-import E5R.Auto
+import NoCompiler.Auto
 
 /-
 The specification of `cobs_decode` (demo/src/cobs.c), shared by the proof
-about the e5r build (Demo/CobsB.lean) and the one about the ordinary build
+about the nocompiler build (Demo/CobsB.lean) and the one about the ordinary build
 (Demo/CobsA.lean). Nothing here depends on either binary.
 
 COBS, as a function on lists: a frame is a sequence of blocks, each a code
@@ -12,7 +12,7 @@ frame was well formed and the bytes decoded (on an error: the bytes decoded
 before the block whose code runs past the end).
 -/
 namespace Demo.Cobs
-open E5R
+open NoCompiler
 
 /-- The index of the first zero byte, or the length. -/
 def frameLen : List Byte → Nat

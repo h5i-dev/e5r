@@ -4,15 +4,15 @@
   do not edit by hand. Branch outcomes and memory side conditions are hypotheses, discharged in
   Deframer/SomePath.lean.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Deframer.TailNoCopy
 import Projects.rmk.Deframer.SomeFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.SomeP
-open E5R E5R.Rmk.SomeFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.SomeP
+open NoCompiler NoCompiler.Rmk.SomeFetch NoCompiler.Rmk.Deframer.Tail
 
 def sNegCore (e : Core) (M : Word → BitVec 8) : Core :=
   ((e.wr 10 (extend .h true (ramRead M (e.get 22 + 0x000000cb#32) .h)) 0x80003e74).goto 0x80003e78).goto 0x80003fd8
@@ -811,4 +811,4 @@ theorem sSend (e : Core) (M : Word → BitVec 8) (hpc : e.pc = 0x80003f4c) (hq :
 theorem sSendCsr (e : Core) (M : Word → BitVec 8) : (sSendCore e M).sameCsr e :=
   (Core.sameCsr_goto _ _)
 
-end E5R.Rmk.Deframer.SomeP
+end NoCompiler.Rmk.Deframer.SomeP

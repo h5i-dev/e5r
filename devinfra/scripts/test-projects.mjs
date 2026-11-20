@@ -11,13 +11,13 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 const { chromium } = await import(
-  process.env.E5R_PLAYWRIGHT_MODULE || "playwright"
+  process.env.NOCOMPILER_PLAYWRIGHT_MODULE || "playwright"
 );
-const root = mkdtempSync(join(tmpdir(), "e5r-projects-"));
-const executable = resolve(process.env.E5R_BINARY || "target/release/e5rx");
-const env = { ...process.env, E5R_PROJECT_HOME: join(root, "registry") };
+const root = mkdtempSync(join(tmpdir(), "nocompiler-projects-"));
+const executable = resolve(process.env.NOCOMPILER_BINARY || "target/release/nocompiler-x");
+const env = { ...process.env, NOCOMPILER_PROJECT_HOME: join(root, "registry") };
 const binary = join(root, "sample"),
-  local = join(root, "local.e5rproj");
+  local = join(root, "local.nocompilerproj");
 const cli = (...args) =>
   execFileSync(executable, args, { env, cwd: tmpdir(), encoding: "utf8" });
 let server, browser;
@@ -53,7 +53,7 @@ try {
   assert.equal(JSON.parse(cli("project", "list", "--json")).projects.length, 2);
   assert.match(
     readFileSync(
-      join(env.E5R_PROJECT_HOME, "alpha", "project.e5rproj"),
+      join(env.NOCOMPILER_PROJECT_HOME, "alpha", "project.nocompilerproj"),
       "utf8",
     ),
     new RegExp(binary),
@@ -98,9 +98,9 @@ try {
   await page.goto(url);
   await page.locator("#project-rows .project-link").first().waitFor();
   assert.equal(await page.locator("#project-rows .project-link").count(), 2);
-  await page.screenshot({ path: "/tmp/e5r-projects.png", fullPage: true });
+  await page.screenshot({ path: "/tmp/nocompiler-projects.png", fullPage: true });
   assert.equal(await page.locator("#new-project").count(), 0);
-  assert.equal((await fetch(url + "/api/projects", {method:"POST", headers:{"X-E5R-Client":"dashboard","Content-Type":"application/json"}, body:JSON.stringify({name:"gamma", binary})})).status, 405);
+  assert.equal((await fetch(url + "/api/projects", {method:"POST", headers:{"X-NoCompiler-Client":"dashboard","Content-Type":"application/json"}, body:JSON.stringify({name:"gamma", binary})})).status, 405);
   cli("project", "new", binary, "--name", "gamma");
   await page.locator("#refresh").click();
   await page.waitForFunction(() => document.querySelectorAll("#project-rows .project-link").length === 3);

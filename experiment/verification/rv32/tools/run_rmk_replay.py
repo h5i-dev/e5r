@@ -19,7 +19,7 @@ boards/qemu-virt-rv32.json):
 
 Environment: RMK_ELF (the pinned release ELF; its sha256 is checked),
 QEMU_SYSTEM_RISCV32, QEMU_DATA, RMK_STATES (trace length, default 300000).
-Scratch goes to RMK_WORK (default /dev/shm/e5r-rmk-replay)."""
+Scratch goes to RMK_WORK (default /dev/shm/nocompiler-rmk-replay)."""
 import hashlib
 import os
 from pathlib import Path
@@ -32,7 +32,7 @@ import time
 VERIFY = Path(__file__).resolve().parents[1]
 PIN = 'f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30'
 ELF = Path(os.environ.get('RMK_ELF', ''))
-WORK = Path(os.environ.get('RMK_WORK', '/dev/shm/e5r-rmk-replay'))
+WORK = Path(os.environ.get('RMK_WORK', '/dev/shm/nocompiler-rmk-replay'))
 QEMU = os.environ.get('QEMU_SYSTEM_RISCV32', 'qemu-system-riscv32')
 STATES = int(os.environ.get('RMK_STATES', '300000'))
 # A Rynk-like COBS frame, a malformed one, and stray bytes: host input is

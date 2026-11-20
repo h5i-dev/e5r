@@ -11,20 +11,20 @@
 import Theories.Platform
 import Projects.ramimage.ImageFidelity
 
-namespace E5R.RmkImage.Check
-open E5R
+namespace NoCompiler.RmkImage.Check
+open NoCompiler
 
 /-- The read-only image is two segments, at the ELF's first two PT_LOAD
     addresses, the first one executable. -/
 theorem segments :
-    (E5R.RmkImage.image.ro.map fun s => (s.base, s.exec)) =
+    (NoCompiler.RmkImage.image.ro.map fun s => (s.base, s.exec)) =
       [(0x80000000, true), (0x800210dc, false)] := by
   decide +kernel
 
 /-- The entry point's first four bytes in the image are those of
     `lui ra, 0x80000` (0x800000b7, little-endian), the first instruction. -/
 theorem entry_bytes :
-    ((E5R.RmkImage.image.ro.headD ⟨0, [], false⟩).bytes.take 4) = [0xb7, 0x00, 0x00, 0x80] := by
+    ((NoCompiler.RmkImage.image.ro.headD ⟨0, [], false⟩).bytes.take 4) = [0xb7, 0x00, 0x00, 0x80] := by
   decide +kernel
 
-end E5R.RmkImage.Check
+end NoCompiler.RmkImage.Check

@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.verify.job.v1",
+  "schema": "nocompiler.verify.job.v1",
   "id": "rmk-deframer-conditional",
   "root": "../..",
   "board": "boards/qemu-virt-rv32.json",
@@ -8,7 +8,7 @@
   "image": {
     "kind": "ram",
     "module": "Projects.rmk.Elf",
-    "namespace": "E5R.Rmk.Image"
+    "namespace": "NoCompiler.Rmk.Image"
   },
   "modules": [
     "Theories/Absint.lean",
@@ -42,11 +42,11 @@
     "Projects/ramimage/Deframer.lean"
   ],
   "theorems": [
-    "E5R.Rmk.Deframer.Tail.tail_from_copy",
-    "E5R.Rmk.Deframer.Park.park_from_copy",
-    "E5R.Rmk.Deframer.Unpark.unpark_from_copy",
-    "E5R.Rmk.Deframer.Next.next_from_deps",
-    "E5R.RmkDeframer.*"
+    "NoCompiler.Rmk.Deframer.Tail.tail_from_copy",
+    "NoCompiler.Rmk.Deframer.Park.park_from_copy",
+    "NoCompiler.Rmk.Deframer.Unpark.unpark_from_copy",
+    "NoCompiler.Rmk.Deframer.Next.next_from_deps",
+    "NoCompiler.RmkDeframer.*"
   ],
   "symbols": {
     "0x8001d576": "8Deframer4tail",

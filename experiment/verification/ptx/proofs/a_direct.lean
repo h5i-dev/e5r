@@ -1,4 +1,4 @@
-/- e5r-proof ptx=54c18301c47eebc7977431d6f215b5bae29e41b158dfe541fe8170141b31b44d spec=ce6a9031796b1300d647a23fc92b23f34cefbeb4478df82877b5a4f78ed8fdc6 toolchain=leanprover/lean4:v4.35.0 -/
+/- nocompiler-proof ptx=54c18301c47eebc7977431d6f215b5bae29e41b158dfe541fe8170141b31b44d spec=ce6a9031796b1300d647a23fc92b23f34cefbeb4478df82877b5a4f78ed8fdc6 toolchain=leanprover/lean4:v4.35.0 -/
 /-
 A supplied proof (experiment/docs/ptx.md, "Supplied proofs") for
 `m5/m4/kernels/a_direct.ptx`: every thread with `gid < n` adds `x[gid]` to
@@ -11,18 +11,18 @@ The proof is one phase of `phase_sound` per thread, with `*out` the
 accumulator cell and each thread's element its ghost contribution.
 
 Check it with
-  e5r ptx check m5/m4/kernels/a_direct.ptx --spec m5/m4/specs/a_direct.json \
+  nocompiler ptx check m5/m4/kernels/a_direct.ptx --spec m5/m4/specs/a_direct.json \
     --proof proofs/a_direct.lean
 -/
-import E5rSpec
+import NoCompilerSpec
 
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
-namespace E5rProof
-open Ptx Ptx.Auto Ptx.Auto.Block Ptx.Auto.Reduce32 E5rSpec
+namespace NoCompilerProof
+open Ptx Ptx.Auto Ptx.Auto.Block Ptx.Auto.Reduce32 NoCompilerSpec
 
-abbrev K := E5rSpec.«a_direct»
+abbrev K := NoCompilerSpec.«a_direct»
 
 section
 variable (A : Block.Args spec)
@@ -61,7 +61,7 @@ theorem phase (hpre : Pre K 1 A) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Tid}
   have hg := A.gid_toNat hcB hGB
   have hcB' : t.ctaid.x.toNat * A.B.toNat < 2 ^ 32 := by omega
   refine (wpR_sound (cut := fun _ => false) ?_).weaken fun s h d hq => hq.1
-  simp only [ptx_eval, K, E5rSpec.«a_direct», Block.Args.launch, Block.Args.params, spec_input,
+  simp only [ptx_eval, K, NoCompilerSpec.«a_direct», Block.Args.launch, Block.Args.params, spec_input,
     spec_output, spec_length, Phased.J, phased, foot, gid, List.map_cons, List.map_nil]
   ptx_branches4
   all_goals ptx_addrs4 [A.x, A.out] [t.ctaid.x.toNat * A.B.toNat + t.tid.x.toNat, 0]
@@ -117,7 +117,7 @@ theorem ok (hpre : Pre K 1 A) (m₀ : Mem) (sh₀ : Dim3 → Mem) (r₀ : Tid �
 
 end
 
-theorem correct : E5rSpec.statement := by
+theorem correct : NoCompilerSpec.statement := by
   intro A hpre m₀ sh₀ r₀ p₀ L c₀
   have R := Phased.phase_sound (ok A hpre m₀ sh₀ r₀ p₀)
   refine ⟨R.noFault, R.progress, R.bounded, R.raceFree,
@@ -133,4 +133,4 @@ theorem correct : E5rSpec.statement := by
     split <;> (rename_i h; simp only [h, ↓reduceIte, lo32_ext32]; first | rfl | exact BitVec.zero_add _)
   · intro b hb; simp only [phased] at hb; subst hb; exact hy
 
-end E5rProof
+end NoCompilerProof

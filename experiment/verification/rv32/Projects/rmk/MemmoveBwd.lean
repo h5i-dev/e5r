@@ -3,7 +3,7 @@
   source, above it), n ≥ 16 (pinned RMK image): entry and top head bytes,
   the aligned word path, and the shared byte tail at 0x80021088.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
     0x80020dae  s1 = a0+a2; a3 = 16; a6 = a1+a2; bltu a2,a3 (small: not here)
     0x80020dbc  a7 = s1&3; t2 = s1&-4; s2 = -a7; bgeu t2,s1 -> de8
@@ -19,8 +19,8 @@ import Projects.rmk.MemmoveFull
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Memmove
-open E5R E5R.Rmk E5R.Rmk.MemmoveFetch
+namespace NoCompiler.Rmk.Memmove
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.MemmoveFetch
 
 /-! ## The byte tail from 0x80021088 -/
 
@@ -649,4 +649,4 @@ theorem contractG (m₀ : Machine) (h : PreG m₀) : ∃ k m, QRun B img k m₀ 
     (fun x _ => bwd_moved _ _ _ _ hdir hdr hsr x)
   exact ⟨7 + k + 5, m, (hpro.trans hr).trans hm, hpost⟩
 
-end E5R.Rmk.Memmove
+end NoCompiler.Rmk.Memmove

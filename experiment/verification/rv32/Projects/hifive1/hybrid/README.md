@@ -1,8 +1,8 @@
 # Hybrid proofs: abstract interpretation + directly proved machine-code summaries
 
-Original e5r work, Apache-2.0. Everything here is stated over the unchanged concrete semantics
+Original nocompiler work, Apache-2.0. Everything here is stated over the unchanged concrete semantics
 (`Theories/Platform.lean`: `Step`, `Reach`, `Escapes`, `Event`) and proves the same property as
-`E5R.AI.check_sound`: no reachable machine can escape, and every device write satisfies the
+`NoCompiler.AI.check_sound`: no reachable machine can escape, and every device write satisfies the
 configuration's `allow` list.
 
 | File | What it proves |
@@ -26,9 +26,9 @@ non-relational domain loses (`a2 = a1 - 4` across `seqz`).
 ```sh
 # Each job: build the binary with the pinned toolchain, export the image, check every module from
 # source with the pinned Lean, replay with leanchecker, audit axioms.
-../../target/release/e5r-exp check Projects/hifive1/hybrid/jobs/hybrid-ringhead-firmware.json --out build/results/hybrid-ringhead-firmware.json
-../../target/release/e5r-exp check Projects/hifive1/hybrid/jobs/hybrid-ring-demo.json --out build/results/hybrid-ring-demo.json
-../../target/release/e5r-exp check Projects/hifive1/hybrid/jobs/hybrid-ring-loop-demo.json --out build/results/hybrid-ring-loop-demo.json
+../../target/release/nocompiler-exp check Projects/hifive1/hybrid/jobs/hybrid-ringhead-firmware.json --out build/results/hybrid-ringhead-firmware.json
+../../target/release/nocompiler-exp check Projects/hifive1/hybrid/jobs/hybrid-ring-demo.json --out build/results/hybrid-ring-demo.json
+../../target/release/nocompiler-exp check Projects/hifive1/hybrid/jobs/hybrid-ring-loop-demo.json --out build/results/hybrid-ring-loop-demo.json
 python3 Projects/hifive1/hybrid/test_controls.py          # needs the modules' .olean files (after the jobs)
 # Untrusted certificate producers (outputs are committed, the kernel checks them):
 lake env lean --run Projects/hifive1/hybrid/demo/AnalyzeDemo.lean Projects/hifive1/hybrid/demo/Cert.lean

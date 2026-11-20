@@ -1,0 +1,13 @@
+[package]
+name = "nocompiler-asm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Instruction encoders for x86-64 and AArch64, the inverse of the decoders in nocompiler-arch."
+
+[dependencies]
+nocompiler-core.workspace = true
+nocompiler-arch.workspace = true

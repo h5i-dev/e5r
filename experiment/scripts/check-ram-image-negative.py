@@ -2,12 +2,12 @@
 """Negative controls: malformed variants of a RAM-resident ELF must be refused
 by both the Rust exporter and the checker's Lean reader.
 
-Usage: python3 -I experiment/scripts/check-ram-image-negative.py E5R_VERIFY IMAGE.elf RV32_DIR [BASE SIZE]
+Usage: python3 -I experiment/scripts/check-ram-image-negative.py NOCOMPILER_VERIFY IMAGE.elf RV32_DIR [BASE SIZE]
 
-Each mutation edits header fields of IMAGE.elf. For each: `E5R_VERIFY
+Each mutation edits header fields of IMAGE.elf. For each: `NOCOMPILER_VERIFY
 ram-image` must exit non-zero and create nothing; the mutated file, packed
 here (64-byte little-endian words, independently of the Rust packer), must
-make the kernel decide `E5R.RamElf.accepts BASE SIZE f = false`. The
+make the kernel decide `NoCompiler.RamElf.accepts BASE SIZE f = false`. The
 unmutated file is the positive control (`accepts = true`). Exit status 0
 only if every expectation holds.
 """
@@ -90,15 +90,15 @@ def main():
             src = os.path.join(d, f"M{k}.lean")
             open(src, "w").write(
                 "import Theories.RamElf\nset_option maxRecDepth 100000\n"
-                f"def f : E5R.RamElf.File := ⟨{len(b)}, [{', '.join(words)}]⟩\n"
-                f"theorem t : E5R.RamElf.accepts {base} {size} f = {str(want).lower()} := "
+                f"def f : NoCompiler.RamElf.File := ⟨{len(b)}, [{', '.join(words)}]⟩\n"
+                f"theorem t : NoCompiler.RamElf.accepts {base} {size} f = {str(want).lower()} := "
                 "by decide +kernel\n")
             lr = subprocess.run(["elan", "run", toolchain, "lean", src], capture_output=True,
                                 text=True, env=env)
             lean_ok = lr.returncode == 0
             ok = rust_ok == want and lean_ok
             bad += not ok
-            why = r.stderr.strip().removeprefix("e5r: ") if not rust_ok else "accepted"
+            why = r.stderr.strip().removeprefix("nocompiler: ") if not rust_ok else "accepted"
             print(f"{'ok' if ok else 'FAIL'} {name}: rust {why!r}; "
                   f"lean kernel accepts = {str(want).lower()} {'proved' if lean_ok else 'NOT proved'}")
             if not lean_ok:

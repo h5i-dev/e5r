@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Independent check of an `e5r ram-image` export against its ELF.
+"""Independent check of an `nocompiler ram-image` export against its ELF.
 
-Original e5r code, Apache-2.0. Untrusted review tooling, not part of any
+Original nocompiler code, Apache-2.0. Untrusted review tooling, not part of any
 proof. It shares no code with the exporter: the ELF header, program headers
 and section headers are parsed here with `struct`, and every claim of
 manifest.json is recomputed:

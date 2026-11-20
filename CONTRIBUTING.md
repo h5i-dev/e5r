@@ -64,19 +64,19 @@ dev-profile build of this workspace is too large for it. Every command takes
 ```
 CARGO_BUILD_JOBS=4 cargo build --release
 CARGO_BUILD_JOBS=4 cargo test --release
-(cd lean && lake build && lake exe e5r-audit)   # the core's proofs and their audit
+(cd lean && lake build && lake exe nocompiler-audit)   # the core's proofs and their audit
 bash examples/build.sh                          # rebuild the examples, compare with examples/elf/
 bash devinfra/scripts/build-fixtures.sh         # the toolkit corpus its gates measure against
 bash devinfra/scripts/check-determinism.sh      # the same input must give the same output
 ```
 
-The core's oracle tests (`crates/e5r/tests`) need llvm-mc, clang, ld.lld,
+The core's oracle tests (`crates/nocompiler/tests`) need llvm-mc, clang, ld.lld,
 qemu-riscv64, lake and the Sail RISC-V emulator; each tool can be named by an
 environment variable (`LLVM_MC`, `CLANG`, `LLD`, `QEMU_RISCV64`, `LAKE`,
 `SAIL_RISCV_SIM`; the CI workflow shows which Sail release). A test whose tool is
 missing prints `SKIPPED` and its reason.
 
-Where things go: the core is `crates/e5r`, `lean/`, `examples/` and
+Where things go: the core is `crates/nocompiler`, `lean/`, `examples/` and
 `docs/isa/`; experiments are under `experiment/`, the toolkit under
 `devinfra/`. The core depends on nothing in either.
 

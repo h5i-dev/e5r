@@ -21,7 +21,7 @@ after k elements: a0 = a + 8k, a1 = n - k, a2 = the sum of the first k.
 import Examples.Sum.Image
 
 namespace Examples.Sum
-open E5R Examples.Sum.Image
+open NoCompiler Examples.Sum.Image
 
 /-- The sum of a list of words, modulo 2^64. -/
 def sumW (xs : List Word) : Word := xs.foldl (· + ·) 0
@@ -45,11 +45,11 @@ theorem tail (s0 s : State) (ar : Args) (hv : s.reg 12 = sumW ar.xs)
     (he : Entry sum_dom sum_entry s0)
     (hpc : s.pc = 0x111ac#64) (hx : s.exit = none) (hr : Same s0 s [10, 11, 12, 13]) :
     Exec code (spec.perm ar s0) sum_dom (spec.Done ar s0) s := by
-  e5r_step [hpc]
-  e5r_step [hpc]
+  nocompiler_step [hpc]
+  nocompiler_step [hpc]
   rw [hr 1 (by decide), ret_mask he.retAligned]
   simp only [he.retAligned, ite_true]
-  e5r_norm
+  nocompiler_norm
   apply Exec.final
   · left; simpa using he.ret
   · left
@@ -57,7 +57,7 @@ theorem tail (s0 s : State) (ar : Args) (hv : s.reg 12 = sumW ar.xs)
     · intro r hr'
       simp only [preservedRegs, List.mem_cons, List.not_mem_nil, or_false] at hr'
       rcases hr' with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-        (e5r_norm; exact hr _ (by decide))
+        (nocompiler_norm; exact hr _ (by decide))
     · simp [spec, hv]
 
 theorem sumW_take_succ (xs : List Word) (k : Nat) (h : k < xs.length) :
@@ -70,8 +70,8 @@ theorem sum_verified : Verified code sum_dom sum_entry spec := by
   rintro ⟨a, xs⟩ s he ⟨ha0, ha1, hlen, hal, harr⟩
   have hpc : s.pc = 0x11190#64 := he.pc
   have hx := he.live
-  e5r_step [hpc]
-  e5r_step [hpc]
+  nocompiler_step [hpc]
+  nocompiler_step [hpc]
   have hn : xs.length < 2^64 := by omega
   have hsame0 : Same s ((s.setReg 12 0).setPc 70060#64) [10, 11, 12, 13] :=
     (Same.refl s _).setReg 0 (by decide) |>.setPc _
@@ -95,7 +95,7 @@ theorem sum_verified : Verified code sum_dom sum_entry spec := by
     · rintro u ⟨k, hk, hpc', hx', h10, h11, h12, hsame, hmem⟩
       have h8k : 8 * k + 8 ≤ 8 * xs.length := by omega
       -- ld a3, 0(a0)
-      e5r_step [hpc']
+      nocompiler_step [hpc']
       · right
         refine ⟨arrRegion a xs, by simp [Spec.perm, spec], ?_⟩
         simp only [Region.covers, arrRegion, h10, add_ofNat_sub_toNat a (show 8 * k < 2 ^ 64 by omega)]
@@ -104,7 +104,7 @@ theorem sum_verified : Verified code sum_dom sum_entry spec := by
         aligned_add_ofNat hal (by omega) (by decide)
       rw [h10]; simp only [hal', ite_true, Reach.opt_some]
       -- add a2, a3, a2; addi a1, a1, -1; addi a0, a0, 8; bnez a1, loop
-      e5r_steps 4 [h10, h11, h12]
+      nocompiler_steps 4 [h10, h11, h12]
       have hm : read64 u.mem (a + BitVec.ofNat 64 (8 * k)) = xs[k] := by rw [hmem]; exact harr k hk
       have h11' := ofNat_add_allOnes (xs.length - k) (by omega) (by omega)
       have h10' : a + BitVec.ofNat 64 (8 * k) + 8#64 = a + BitVec.ofNat 64 (8 * (k + 1)) :=
@@ -119,11 +119,11 @@ theorem sum_verified : Verified code sum_dom sum_entry spec := by
           simp only [bne_iff_ne, ne_eq]
           rw [ofNat_eq_zero_iff (by omega)]; omega
         simp only [hne, ite_true]
-        e5r_norm
-        refine .done (.inr ⟨⟨k + 1, hk1, rfl, hx', by e5r_norm, by e5r_norm,
-          by e5r_norm, ?_, by e5r_norm [hmem]⟩, ?_⟩)
-        · e5r_same
-        · e5r_norm [h11]
+        nocompiler_norm
+        refine .done (.inr ⟨⟨k + 1, hk1, rfl, hx', by nocompiler_norm, by nocompiler_norm,
+          by nocompiler_norm, ?_, by nocompiler_norm [hmem]⟩, ?_⟩)
+        · nocompiler_same
+        · nocompiler_norm [h11]
           rw [toNat_ofNat_of_lt (by omega), toNat_ofNat_of_lt (by omega)]; omega
       · -- not taken: the return
         have hk1 : k + 1 = xs.length := by omega
@@ -131,9 +131,9 @@ theorem sum_verified : Verified code sum_dom sum_entry spec := by
           rw [← hk1, Nat.sub_self]; rfl
         simp only [hne, Bool.false_eq_true, ite_false, Reach.opt_some]
         refine Reach.mono (fun _ h => Or.inl h)
-          (tail s _ ⟨a, xs⟩ ?_ he (by e5r_norm) (by e5r_norm [hx']) ?_)
-        · e5r_norm; rw [hk1, List.take_length]
-        · e5r_same
+          (tail s _ ⟨a, xs⟩ ?_ he (by nocompiler_norm) (by nocompiler_norm [hx']) ?_)
+        · nocompiler_norm; rw [hk1, List.take_length]
+        · nocompiler_same
     · refine ⟨0, ?_, by simp, by simp [hx], by simp [ha0], by simp [ha1], by simp [sumW], ?_, by simp⟩
       · have : s.reg 11 ≠ 0 := by simpa using hz
         rw [ha1] at this
@@ -143,7 +143,7 @@ theorem sum_verified : Verified code sum_dom sum_entry spec := by
 
 /-- What `sum_verified` says about the machine, for a run started from a
     loaded image: no fault and only permitted accesses, the result on return,
-    and termination (E5R/Adequacy.lean). -/
+    and termination (NoCompiler/Adequacy.lean). -/
 theorem sum_hw (ar : Args) (s : State) (he : Entry sum_dom sum_entry s) (hpre : spec.pre ar s)
     (hl : code.Loaded s.mem) (hp : Protected code (spec.perm ar s)) :
     (∀ t, HwRun sum_dom s t → sum_dom.mem t.pc → t.exit = none →

@@ -1,11 +1,11 @@
 /-
   The firmware ring-head summary (Ring.lean) between abstract states of the
-  certificate checker, ready for `E5R.AI.check_sound_hybrid` on the Embassy
+  certificate checker, ready for `NoCompiler.AI.check_sound_hybrid` on the Embassy
   firmware: a certificate may delegate pc 0x20010698 to region
   `Hybrid.regionOf`, and `hentry` follows from `adapter` for every delegated
   node whose state `enterOk` accepts, once the analyzer covers `post` of it.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   `enterOk` asks for: the exact pc, a main-thread state, MIE known clear
   (the critical section entered at 0x20010638), the head `a0` in 0..3, the
@@ -21,10 +21,10 @@ import Projects.hifive1.Config
 
 set_option maxRecDepth 100000
 
-namespace E5R.Hifive1.Hybrid.RingAI
-open E5R E5R.AI E5R.Hybrid E5R.Hifive1.Hybrid.Ring
+namespace NoCompiler.Hifive1.Hybrid.RingAI
+open NoCompiler NoCompiler.AI NoCompiler.Hybrid NoCompiler.Hifive1.Hybrid.Ring
 
-abbrev cfg := E5R.Hifive1.Job.cfg
+abbrev cfg := NoCompiler.Hifive1.Job.cfg
 
 def headAV : AV := .vals [0, 1, 2, 3]
 def byteAV : AV := .rng 0 255
@@ -174,4 +174,4 @@ theorem spec_sound (keep : List (Nat × Nat)) : SumSound { cfg with hkeep := kee
   obtain ⟨m', hr, hpost⟩ := adapter ha hs
   exact safeStep_of_mrun (cfg := { cfg with hkeep := keep }) (n := 7) hr hpost
 
-end E5R.Hifive1.Hybrid.RingAI
+end NoCompiler.Hifive1.Hybrid.RingAI

@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.ptx.spec.v1",
+  "schema": "nocompiler.ptx.spec.v1",
   "kernel": "sum",
   "class": "map32",
   "arrays": ["sum_a", "sum_out"],

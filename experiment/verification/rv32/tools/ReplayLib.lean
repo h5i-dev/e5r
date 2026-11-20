@@ -5,7 +5,7 @@
   observed; everything else must be computed by the model.
 -/
 import Theories.Platform
-open E5R
+open NoCompiler
 
 namespace Replay
 

@@ -2,13 +2,13 @@ import Demo.CobsSpec
 import Demo.Cobs.ImageB
 
 namespace Demo.Cobs
-open E5R Demo.Cobs.ImageB
+open NoCompiler Demo.Cobs.ImageB
 
 set_option maxHeartbeats 20000000 in
 theorem cobs_b : Verified code cobs_decode_dom cobs_decode_entry spec := by
   rintro ⟨r, buf, orig⟩ s he ⟨ha0, ha1, ha2, hlen, hmem, hal, hdis⟩
   have hfl := frameLen_le orig
-  e5r_auto cobs_decode_func s he
+  nocompiler_auto cobs_decode_func s he
     loop_inv 0x11198 (fun u => ∃ k, u.reg 13 = BitVec.ofNat 64 k ∧ k < orig.length ∧ k ≤ frameLen orig ∧
         u.reg 10 = r ∧ u.reg 11 = buf ∧ u.reg 12 = BitVec.ofNat 64 orig.length ∧ u.mem = s.mem)
       measure (fun u => 3 * orig.length + 3 - (u.reg 13).toNat)

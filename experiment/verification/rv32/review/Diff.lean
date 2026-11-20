@@ -14,7 +14,7 @@
   Run: `lake env lean --run review/Diff.lean <qemu.txt> <verdicts.txt>`.
 -/
 import Theories.Board.Hifive1Revb
-open E5R
+open NoCompiler
 
 namespace Review
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent oracle for `e5r ram-image` output.
+"""Independent oracle for `nocompiler ram-image` output.
 
 Usage: python3 -I experiment/scripts/check-ram-image.py IMAGE.elf OUT_DIR
 
@@ -44,7 +44,7 @@ def main():
     elf, out = sys.argv[1], sys.argv[2]
     data = open(elf, "rb").read()
     man = json.load(open(os.path.join(out, "manifest.json")))
-    if man["schema"] != "e5r.ram-image.v1" or man["mapping"] != "paddr=vaddr":
+    if man["schema"] != "nocompiler.ram-image.v1" or man["mapping"] != "paddr=vaddr":
         fail("schema or mapping")
     if man["elf"] != {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}:
         fail("ELF hash/size")

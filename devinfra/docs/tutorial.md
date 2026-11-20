@@ -16,7 +16,7 @@ $ strip ./prog
 ## 1. Ask what it is before asking anything else
 
 ```
-$ e5rx info prog
+$ nocompiler-x info prog
 ```
 
 Format, architecture, entry point, image base, whether it is position
@@ -29,7 +29,7 @@ after this point rests on it.
 ## 2. Find the functions, and look at the evidence column
 
 ```
-$ e5rx funcs prog
+$ nocompiler-x funcs prog
 address                 size  blocks   insns  strength  evidence                    name
 0x400144                  24       1       9  inferred  direct call target          sub_400144
 0x400168                  14       1       5  inferred  direct call target          sub_400168
@@ -49,8 +49,8 @@ into one number.
 To see what is fact and what is a scanner's opinion, run it both ways:
 
 ```
-$ e5rx funcs prog --no-scan | wc -l
-$ e5rx funcs prog | wc -l
+$ nocompiler-x funcs prog --no-scan | wc -l
+$ nocompiler-x funcs prog | wc -l
 ```
 
 The difference is the scan's contribution, and if it is large on your binary
@@ -61,9 +61,9 @@ that is worth knowing before you trust it.
 Build a signature library from a binary that has symbols:
 
 ```
-$ e5rx sig fixtures/build/driver.a64.O2 create -o driver.e5r-sig
+$ nocompiler-x sig fixtures/build/driver.a64.O2 create -o driver.nocompiler-sig
 38 signature(s) written
-$ e5rx sig prog apply driver.e5r-sig
+$ nocompiler-x sig prog apply driver.nocompiler-sig
 address              match      name                         was
 0x400144             exact      arith8                       sub_400144
 0x400168             exact      arith16                      sub_400168
@@ -92,8 +92,8 @@ worse than no name, because you will believe it.
 ## 4. Read the code
 
 ```
-$ e5rx disas prog 0x400144
-$ e5rx decompile prog 0x400144
+$ nocompiler-x disas prog 0x400144
+$ nocompiler-x decompile prog 0x400144
 ```
 
 The C is a statement of what the machine does, in C's notation. Where the
@@ -105,17 +105,17 @@ an operation has no C, a named helper appears (`__bits`, `__clobbered`,
 To find the function worth reading first:
 
 ```
-$ e5rx query prog 'functions where insns > 100 and calls > 5'
-$ e5rx strings prog --min 8
-$ e5rx xrefs prog 0x410008
+$ nocompiler-x query prog 'functions where insns > 100 and calls > 5'
+$ nocompiler-x strings prog --min 8
+$ nocompiler-x xrefs prog 0x410008
 ```
 
 ## 5. Write down what you worked out
 
 ```
-$ e5rx annotate prog name 0x400144 parse_header
-$ e5rx annotate prog comment 0x400144 "length is little endian, unlike the rest"
-$ e5rx annotate prog type 0x400144 "int parse_header(const uint8_t *p, size_t n)"
+$ nocompiler-x annotate prog name 0x400144 parse_header
+$ nocompiler-x annotate prog comment 0x400144 "length is little endian, unlike the rest"
+$ nocompiler-x annotate prog type 0x400144 "int parse_header(const uint8_t *p, size_t n)"
 ```
 
 Each one prints what it recorded:
@@ -125,15 +125,15 @@ Each one prints what it recorded:
 0x400144 comment = "length is little endian, unlike the rest"
 ```
 
-and writes `prog.e5r`, one assertion per line:
+and writes `prog.nocompiler`, one assertion per line:
 
 ```
-$ cat prog.e5r
-e5r-annotations 1
+$ cat prog.nocompiler
+nocompiler-annotations 1
 # One assertion per line, sorted by content id. Order does not affect the
 # result, so the union of two branches is the correct merge. Put this in
 # .gitattributes so git does that for you:
-#     *.e5r merge=union
+#     *.nocompiler merge=union
 # Do not sort or reflow by hand.
 name shape=6a0730fc0e7aa36f bytes=893ddaba11934499 insns=9 abs=400144 off=0 \
   seq=0 id=0a30883f9c5dc4a3 by="you" value="parse_header"
@@ -150,8 +150,8 @@ and its address as a tiebreak. The first two survive a rebase and a relink.
 Made a mistake:
 
 ```
-$ e5rx annotate prog undo
-$ e5rx annotate prog redo
+$ nocompiler-x annotate prog undo
+$ nocompiler-x annotate prog redo
 ```
 
 Undo is a new assertion, not an edit, so the history is never rewritten.
@@ -159,8 +159,8 @@ Undo is a new assertion, not an edit, so the history is never rewritten.
 ## 6. Commit it
 
 ```
-$ echo '*.e5r merge=union' >> .gitattributes
-$ git add .gitattributes prog.e5r
+$ echo '*.nocompiler merge=union' >> .gitattributes
+$ git add .gitattributes prog.nocompiler
 $ git commit -m "Name the header parser and its length field"
 ```
 
@@ -184,7 +184,7 @@ This is the step the incumbents cannot do.
 
 ```
 $ make -B                      # rebuild the program from changed source
-$ e5rx annotate ./prog list
+$ nocompiler-x annotate ./prog list
 0x400144            name     "parse_header"
 0x400144            comment  "length is little endian, unlike the rest"
 ```
@@ -196,16 +196,16 @@ the same-binary fast path, and `abs=` is the address, used only as a tiebreak.
 
 Where it matters most is the case where an anchor resolves on the address
 alone, because that means the code the annotation was written against is not
-there any more. Nothing hides that. `e5rx sig ... apply` prints the resolution
-per function in its `match` column, and `e5rx patch ... apply` refuses outright
+there any more. Nothing hides that. `nocompiler-x sig ... apply` prints the resolution
+per function in its `match` column, and `nocompiler-x patch ... apply` refuses outright
 unless you pass `--allow-address-only`.
 
 ## 8. Save the session
 
 ```
-$ e5rx project new prog -o prog.e5r-proj
-$ e5rx project add prog.e5r-proj --signatures driver.e5r-sig
-$ git add prog.e5r-proj && git commit -m "Record the session"
+$ nocompiler-x project new prog -o prog.nocompiler-proj
+$ nocompiler-x project add prog.nocompiler-proj --signatures driver.nocompiler-sig
+$ git add prog.nocompiler-proj && git commit -m "Record the session"
 ```
 
 A project names its binary by content as well as by path. Opening it against a

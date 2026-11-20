@@ -3,7 +3,7 @@
   congruent mod 4: the whole path composed (pinned RMK image), and the
   memmove contract for every case.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   Besides the destination this path writes only its stack temporaries
   sp+0x1a..sp+0x23 of the callee frame, i.e. [sp - 22, sp - 12) of the
@@ -14,8 +14,8 @@ import Projects.rmk.MemmoveBwd
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk
-open E5R E5R.Rmk.MemmoveFetch E5R.Rmk.Memmove
+namespace NoCompiler.Rmk
+open NoCompiler NoCompiler.Rmk.MemmoveFetch NoCompiler.Rmk.Memmove
 
 /-! ## Copies ignore bytes they neither read nor write -/
 
@@ -360,4 +360,4 @@ theorem bmis_arith (d s n sp H A W T : Word) (o J : Nat)
     | (refine ⟨?_, ?_⟩ <;> bv_omega)
     | bv_omega
 
-end E5R.Rmk
+end NoCompiler.Rmk

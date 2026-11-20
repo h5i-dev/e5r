@@ -1,0 +1,20 @@
+[package]
+name = "nocompiler-ir"
+description = "nocompiler — the intermediate representation, its lifters and its interpreter."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+nocompiler-core = { workspace = true }
+nocompiler-arch = { workspace = true }
+nocompiler-types = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+nocompiler-format = { workspace = true }
+nocompiler-analysis = { workspace = true }
+nocompiler-arch = { workspace = true }

@@ -2,7 +2,7 @@
   The byte loops of the emitted memmove (compiler_builtins) in the pinned
   RMK image, as quiet runs that compute `fwd` / `bwd` (Copy.lean).
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
     forward  0x80020fc6: lbu a4,0(a1); addi a2,a2,-1; sb a4,0(a3);
              addi a3,a3,1; addi a1,a1,1; bnez a2,0x80020fc6;  j 0x800210b0
@@ -20,8 +20,8 @@ import Projects.rmk.MemmoveFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk
-open E5R E5R.Rmk.MemmoveFetch
+namespace NoCompiler.Rmk
+open NoCompiler NoCompiler.Rmk.MemmoveFetch
 
 /-- Model RAM of the board ends below 2^32. -/
 theorem B_ram (a : Word) (n : Nat) :
@@ -302,4 +302,4 @@ theorem bwd_loop : ∀ (k : Nat) (c : Core) (ram : Word → BitVec 8),
     · intro r a b d e
       rw [hfr r a b d e, Core.goto_get]; exact bwdBody_get c ram r a b d e
 
-end E5R.Rmk
+end NoCompiler.Rmk

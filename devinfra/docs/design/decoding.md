@@ -1,6 +1,6 @@
 # Decoding
 
-`crates/e5r-arch`
+`crates/nocompiler-arch`
 
 ## What it is for
 

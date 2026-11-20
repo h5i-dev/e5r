@@ -1,7 +1,7 @@
 /-
   From proved runs to `Reach`: the interface a session-loop safety proof has to meet.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   `SessionSafe` (Projects/rmk/Deframer/Spec.lean) quantifies over `Reach`: every machine any
   sequence of `Step`s (any oracle, any enabled interrupt) can produce. The session theorems so
@@ -23,8 +23,8 @@
 -/
 import Projects.rmk.Run
 
-namespace E5R.Rmk.Closure
-open E5R E5R.Rmk
+namespace NoCompiler.Rmk.Closure
+open NoCompiler NoCompiler.Rmk
 
 /-- A quiet deterministic step is the only transition. -/
 theorem qrun_only {B : Board} {img : List Segment} {m m₁ m' : Machine} {evs : List Event}
@@ -119,4 +119,4 @@ theorem reach_anchored {B : Board} {img : List Segment} {A : Machine → Prop}
   | nil => rfl
   | cons e _ => exact (h3 e (by simp)).elim
 
-end E5R.Rmk.Closure
+end NoCompiler.Rmk.Closure

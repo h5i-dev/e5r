@@ -2,7 +2,7 @@
   Audit regression matrix (tests, not proofs): the emitted memmove of the
   pinned RMK image executed in the model over a bounded input matrix.
 
-  Original e5r code, Apache-2.0. Uses only the model (`stepInstr`), the
+  Original nocompiler code, Apache-2.0. Uses only the model (`stepInstr`), the
   QEMU-virt board and the checker's reader applied to the runner-generated
   packed file; independent of the proofs under Projects/rmk.
 
@@ -30,9 +30,9 @@ import Std.Data.HashMap
 import Theories.Chunk
 import Theories.Board.QemuVirtRv32
 import Projects.rmk.Elf
-open E5R
+open NoCompiler
 
-def image : RamElf.Image := RamElf.imageOf 0x80000000 0x1000000 E5R.Rmk.Image.elf
+def image : RamElf.Image := RamElf.imageOf 0x80000000 0x1000000 NoCompiler.Rmk.Image.elf
 def img0 : List Segment := chunkImg 256 image.ro
 def img : List Segment :=
   let (a, b) := img0.partition fun s => 0x80020c00 ≤ s.base ∧ s.base < 0x80021100
@@ -200,7 +200,7 @@ def mainControls : IO UInt32 := do
 
 def main (args : List String) : IO UInt32 := do
   unless disjoint do IO.eprintln "image segments overlap: reordering would change lookups"; return 2
-  unless RamElf.accepts 0x80000000 0x1000000 E5R.Rmk.Image.elf do IO.eprintln "reader refuses the ELF"; return 2
+  unless RamElf.accepts 0x80000000 0x1000000 NoCompiler.Rmk.Image.elf do IO.eprintln "reader refuses the ELF"; return 2
   match args with
   | ["main", s, k] => mainMatrix s.toNat! k.toNat!
   | ["bounds"] => mainBounds

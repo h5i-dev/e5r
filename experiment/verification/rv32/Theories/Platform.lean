@@ -2,7 +2,7 @@
   A single-hart platform: RAM, a read-only executable image, and a table of
   device registers, interpreting the effect trees of `Theories/Hart.lean`.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   The platform is deliberately an over-approximation of the board in the
   directions that cannot make a proof unsound:
@@ -19,7 +19,7 @@ import Theories.Hart
 
 set_option linter.constructorNameAsVariable false
 
-namespace E5R
+namespace NoCompiler
 
 /-- A device register: a word-aligned, word-sized address. Reads (if
     allowed) return environmental values; accepted writes are observable
@@ -190,4 +190,4 @@ inductive Reach (B : Board) (img : List Segment) (Init : Machine → Prop) :
   | step {m m' evs evs'} : Reach B img Init m evs → Step B img m m' evs' →
       Reach B img Init m' (evs ++ evs')
 
-end E5R
+end NoCompiler

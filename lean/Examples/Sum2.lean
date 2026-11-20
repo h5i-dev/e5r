@@ -31,7 +31,7 @@ The proof never looks at `sum`'s code: both calls go through
 import Examples.Sum
 
 namespace Examples.Sum2
-open E5R Examples.Sum.Image
+open NoCompiler Examples.Sum.Image
 open Examples.Sum (sumW Args spec sum_verified)
 
 /-- The logical arguments: two arrays. -/
@@ -81,18 +81,18 @@ theorem sum2_verified : Verified code sum2_dom sum2_entry spec2 := by
   have hal : ∀ off, off % 8 = 0 → aligned (fb + BitVec.ofNat 64 off) 8 := fun off ho =>
     aligned_add_ofNat hfal8 ho (by decide)
   -- addi sp, sp, -32
-  e5r_step [hpc, hfb]
+  nocompiler_step [hpc, hfb]
   -- sd ra, 24(sp); sd s0, 16(sp); sd s1, 8(sp); sd s2, 0(sp)
-  e5r_step
+  nocompiler_step
   · exact hw 24 (by omega)
   simp only [hal 24 (by decide), ite_true, Reach.opt_some]
-  e5r_step
+  nocompiler_step
   · exact hw 16 (by omega)
   simp only [hal 16 (by decide), ite_true, Reach.opt_some]
-  e5r_step
+  nocompiler_step
   · exact hw 8 (by omega)
   simp only [hal 8 (by decide), ite_true, Reach.opt_some]
-  e5r_step
+  nocompiler_step
   · simpa using hw 0 (by omega)
   simp only [hfal8, ite_true, Reach.opt_some]
   -- The frame, abstracted: each slot holds what was stored, nothing else moved.
@@ -137,7 +137,7 @@ theorem sum2_verified : Verified code sum2_dom sum2_entry spec2 := by
     simp only [BitVec.add_zero] at h1 h2 h3
     rw [h1, h2, h3]; exact read64_writeLE_same _ _ _
   -- mv s0, a3; mv s1, a2; call sum
-  e5r_steps 4
+  nocompiler_steps 4
   have hPle : ∀ (c : Word) (zs : List Word) (st : State), st.reg 2 = fb →
       (arrRegion c zs = arrRegion a xs ∨ arrRegion c zs = arrRegion b ys) →
       (spec.perm ⟨c, zs⟩ st).le (spec2.perm ⟨a, xs, b, ys⟩ s) := by
@@ -157,12 +157,12 @@ theorem sum2_verified : Verified code sum2_dom sum2_entry spec2 := by
       simp only [hst, hF]
       have : fb - BitVec.ofNat 64 0 - fb = 0 := by bv_omega
       rw [this]; simp
-  refine Verified.call sum_verified ⟨a, xs⟩ ⟨by e5r_norm <;> rfl, by e5r_norm [hx],
-    by e5r_norm <;> decide, by e5r_norm <;> decide, by e5r_norm <;> exact hfal⟩ ?_
+  refine Verified.call sum_verified ⟨a, xs⟩ ⟨by nocompiler_norm <;> rfl, by nocompiler_norm [hx],
+    by nocompiler_norm <;> decide, by nocompiler_norm <;> decide, by nocompiler_norm <;> exact hfal⟩ ?_
     (Dom.sub_of_ranges (by decide))
-    (hPle a xs _ (by e5r_norm) (.inl rfl)) ?_
-  · refine ⟨by e5r_norm [ha0], by e5r_norm [ha1], hl1, hal1, ?_⟩
-    e5r_norm
+    (hPle a xs _ (by nocompiler_norm) (.inl rfl)) ?_
+  · refine ⟨by nocompiler_norm [ha0], by nocompiler_norm [ha1], hl1, hal1, ?_⟩
+    nocompiler_norm
     exact arr64_congr hl1 harr1 fun x hx => hMout x (hd1 x hx)
   intro s1 hdone hfr
   obtain ⟨hx1, hpc1, hpres1, hpost1⟩ := hdone.resolve_right fun h => h.2.elim
@@ -174,27 +174,27 @@ theorem sum2_verified : Verified code sum2_dom sum2_entry spec2 := by
     rw [hpres1 r hr]
     simp only [preservedRegs, List.mem_cons, List.not_mem_nil, or_false] at hr
     rcases hr with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-      e5r_norm
+      nocompiler_norm
   have hm1 : s1.mem = M := by
     funext x
     rw [hfr x ?_]
-    · e5r_norm
+    · nocompiler_norm
     · rintro ⟨r, hr, hm⟩
       simp only [Spec.perm, spec, List.nil_append, List.mem_singleton] at hr
       subst hr
       exact absurd hm (by simp [Region.mem, Spec.stackRegion])
-  have h1pc : s1.pc = 70104#64 := by rw [hpc1]; e5r_norm
+  have h1pc : s1.pc = 70104#64 := by rw [hpc1]; nocompiler_norm
   have h1a0 : s1.reg 10 = sumW xs := hpost1
   have h1s0 : s1.reg 8 = s.reg 13 := by simpa using hp1 8 (by decide)
   have h1s1 : s1.reg 9 = s.reg 12 := by simpa using hp1 9 (by decide)
   have h1sp : s1.reg 2 = fb := by simpa using hp1 2 (by decide)
   -- mv s2, a0; mv a0, s1; mv a1, s0; call sum
-  e5r_steps 5 [h1pc, h1a0, h1s0, h1s1]
-  refine Verified.call sum_verified ⟨b, ys⟩ ⟨by e5r_norm <;> rfl, by e5r_norm [hx1],
-    by e5r_norm <;> decide, by e5r_norm <;> decide, by e5r_norm [h1sp] <;> exact hfal⟩ ?_
-    (Dom.sub_of_ranges (by decide)) (hPle b ys _ (by e5r_norm [h1sp]) (.inr rfl)) ?_
-  · refine ⟨by e5r_norm [ha2], by e5r_norm [ha3], hl2, hal2, ?_⟩
-    e5r_norm [hm1]
+  nocompiler_steps 5 [h1pc, h1a0, h1s0, h1s1]
+  refine Verified.call sum_verified ⟨b, ys⟩ ⟨by nocompiler_norm <;> rfl, by nocompiler_norm [hx1],
+    by nocompiler_norm <;> decide, by nocompiler_norm <;> decide, by nocompiler_norm [h1sp] <;> exact hfal⟩ ?_
+    (Dom.sub_of_ranges (by decide)) (hPle b ys _ (by nocompiler_norm [h1sp]) (.inr rfl)) ?_
+  · refine ⟨by nocompiler_norm [ha2], by nocompiler_norm [ha3], hl2, hal2, ?_⟩
+    nocompiler_norm [hm1]
     exact arr64_congr hl2 harr2 fun x hx => hMout x (hd2 x hx)
   intro s2 hdone hfr
   obtain ⟨hx2, hpc2, hpres2, hpost2⟩ := hdone.resolve_right fun h => h.2.elim
@@ -203,52 +203,52 @@ theorem sum2_verified : Verified code sum2_dom sum2_entry spec2 := by
     rw [hpres2 r hr]
     simp only [preservedRegs, List.mem_cons, List.not_mem_nil, or_false] at hr
     rcases hr with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-      e5r_norm [h1a0]
+      nocompiler_norm [h1a0]
   have hm2 : s2.mem = M := by
     funext x
     rw [hfr x ?_]
-    · e5r_norm [hm1]
+    · nocompiler_norm [hm1]
     · rintro ⟨r, hr, hm⟩
       simp only [Spec.perm, spec, List.nil_append, List.mem_singleton] at hr
       subst hr
       exact absurd hm (by simp [Region.mem, Spec.stackRegion])
-  have h2pc : s2.pc = 70124#64 := by rw [hpc2]; e5r_norm
+  have h2pc : s2.pc = 70124#64 := by rw [hpc2]; nocompiler_norm
   have h2a0 : s2.reg 10 = sumW ys := hpost2
   have h2s2 : s2.reg 18 = sumW xs := by simpa using hp2 18 (by decide)
   have h2sp : s2.reg 2 = fb := by rw [hp2 2 (by decide)]; simpa using h1sp
   have hret : fb + 32#64 = s.reg 2 := by rw [← hF]; bv_omega
   -- add a0, a0, s2
-  e5r_step [h2pc, h2a0, h2s2]
+  nocompiler_step [h2pc, h2a0, h2s2]
   -- ld ra, 24(sp); ld s0, 16(sp); ld s1, 8(sp); ld s2, 0(sp)
-  e5r_step [h2sp]
+  nocompiler_step [h2sp]
   · exact Perm.canRead_of_canWrite (hw 24 (by omega))
   simp only [hal 24 (by decide), ite_true, Reach.opt_some]
-  e5r_step [h2sp]
+  nocompiler_step [h2sp]
   · exact Perm.canRead_of_canWrite (hw 16 (by omega))
   simp only [hal 16 (by decide), ite_true, Reach.opt_some]
-  e5r_step [h2sp]
+  nocompiler_step [h2sp]
   · exact Perm.canRead_of_canWrite (hw 8 (by omega))
   simp only [hal 8 (by decide), ite_true, Reach.opt_some]
-  e5r_step [h2sp]
+  nocompiler_step [h2sp]
   · simpa using Perm.canRead_of_canWrite (hw 0 (by omega))
   simp only [hfal8, ite_true, Reach.opt_some]
   -- addi sp, sp, 32; ret
-  e5r_step [h2sp, hret]
-  e5r_step [hm2, hM24]
+  nocompiler_step [h2sp, hret]
+  nocompiler_step [hm2, hM24]
   rw [ret_mask he.retAligned]
   simp only [he.retAligned, ite_true, Reach.opt_some]
   apply Exec.final
-  · left; e5r_norm; exact he.ret
+  · left; nocompiler_norm; exact he.ret
   · left
-    refine ⟨by e5r_norm [hx2], by e5r_norm, ?_, ?_⟩
+    refine ⟨by nocompiler_norm [hx2], by nocompiler_norm, ?_, ?_⟩
     · intro r hr
       have h2 := hp2 r hr
       have h1 := hp1 r hr
       simp only [preservedRegs, List.mem_cons, List.not_mem_nil, or_false] at hr
       rcases hr with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-        e5r_norm [hM16, hM8, hM0] <;> simp_all
+        nocompiler_norm [hM16, hM8, hM0] <;> simp_all
     · show _ = sumW xs + sumW ys
-      e5r_norm
+      nocompiler_norm
       exact BitVec.add_comm _ _
 
 end Examples.Sum2
