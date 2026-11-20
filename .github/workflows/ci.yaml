@@ -28,6 +28,41 @@ concurrency:
 # Keep package mirror/network stalls bounded, separately from analysis time.
 # apt options below retain retries and fail with the actual download error.
 jobs:
+  # The core: the e5r tool's tests with every oracle installed (llvm-mc for the
+  # decoder, qemu-riscv64 and Lean for the semantics), then the Lean library,
+  # the example proofs and their audit, then the example build compared with
+  # the committed binaries.
+  core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Oracles (llvm-mc, clang, ld.lld, qemu-riscv64)
+        run: |
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update -q
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y --no-install-recommends clang lld llvm qemu-user
+      - name: Lean (elan; the version comes from lean/lean-toolchain)
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/v4.1.2/elan-init.sh -o elan-init.sh
+          sh elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Lean library, example proofs and the axiom audit
+        working-directory: lean
+        run: lake build
+      - name: The proofs' images are the committed binaries
+        working-directory: lean
+        run: lake exe e5r-audit
+      - run: cargo test -p e5r --no-fail-fast -- --nocapture
+      - run: cargo build -p e5r
+      - name: Negative controls, every mutated binary breaks its proof
+        env:
+          E5R: ${{ github.workspace }}/target/debug/e5r
+        run: ./scripts/check-proof-controls.sh
+      - name: Rebuild the examples (a different clang may differ; reported, not gated)
+        run: E5R=target/debug/e5r ./examples/build.sh || echo "::warning::examples/build.sh, the build differs from examples/elf/"
+
   # Runners are disposable, so these build the dev profile on purpose. The
   # release-only rule in CONTRIBUTING.md is about the maintainer's machine.
   check:
@@ -78,7 +113,7 @@ jobs:
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y clang llvm binutils qemu-user-static golang-go \
             gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
       - name: Build the fixture corpus
-        run: ./scripts/build-fixtures.sh
+        run: ./devinfra/scripts/build-fixtures.sh
       - name: Say which oracles are present
         run: |
           for t in clang llvm-objdump objdump readelf c++filt qemu-x86_64 go rustc; do
@@ -107,11 +142,11 @@ jobs:
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y clang \
             gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user-static
-      - run: ./scripts/build-fixtures.sh
+      - run: ./devinfra/scripts/build-fixtures.sh
       - run: cargo build --release
-      - run: ./scripts/check-determinism.sh
+      - run: ./devinfra/scripts/check-determinism.sh
 
-  # G8: what the analysis FOUND, against the floors in scripts/bench-budget.json.
+  # G8: what the analysis FOUND, against the floors in devinfra/scripts/bench-budget.json.
   #
   # Not a benchmark, and deliberately not run as one. Recall against the symbol
   # table and the count of entries no symbol names are the same bytes in, same
@@ -119,7 +154,7 @@ jobs:
   # and peak memory are facts about a machine, and a shared runner with a noisy
   # neighbour is not the machine the ceilings were recorded on -- so timing is
   # not measured here, not gated here, and not published from here. It is
-  # measured by hand on a known machine and written down in docs/toolkit/benchmarks.md.
+  # measured by hand on a known machine and written down in devinfra/docs/benchmarks.md.
   #
   # One run per binary for the same reason: the fastest of three exists to beat
   # down timing noise, and there is no timing to beat down.
@@ -140,12 +175,12 @@ jobs:
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y clang binutils \
             gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user-static
-      - run: ./scripts/build-fixtures.sh
+      - run: ./devinfra/scripts/build-fixtures.sh
       # Release, like determinism above: the recall numbers have to come from
       # the code path a user runs.
       - run: cargo build --release
-      - run: RUNS=1 SKIP=rizin OUT=target/recall.json ./scripts/compare-tools.sh
-      - run: ./scripts/check-bench-budget.py target/recall.json --portable-only --no-timing
+      - run: RUNS=1 SKIP=rizin OUT="$GITHUB_WORKSPACE/target/recall.json" ./devinfra/scripts/compare-tools.sh
+      - run: ./devinfra/scripts/check-bench-budget.py "$GITHUB_WORKSPACE/target/recall.json" --portable-only --no-timing
 
   # `install.sh` is what people pipe into a shell, and nothing else in this
   # workflow would notice it rotting: it is not built, not linked and not
@@ -159,18 +194,18 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - run: sh -n install.sh
+      - run: sh -n devinfra/install.sh
       - run: sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update -q && sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y shellcheck
-      - run: shellcheck --shell=sh install.sh
+      - run: shellcheck --shell=sh devinfra/install.sh
       # The one thing syntax cannot see: that the script still knows where the
       # release puts things. `build-release.sh` names the archive and the
       # directory inside it, and the installer reaches into that directory by
       # name -- so a change to either that forgot the other is a download that
       # unpacks into a path nobody looks at.
       - name: The installer agrees with the release layout
-        run: ./scripts/check-installer.sh
+        run: ./devinfra/scripts/check-installer.sh
 
-  # Scope F (docs/verification/firmware.md): rebuild the firmware and the
+  # Experiment F (experiment/docs/firmware.md): rebuild the firmware and the
   # clamp fixture with the pinned rustc, recheck every verification job from
   # source with the pinned Lean, run the negative controls, and replay QEMU
   # traces (instruction-level in user mode, the whole firmware on sifive_e)
@@ -185,7 +220,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Pinned Rust for the firmware and fixtures
         run: rustup toolchain install 1.98.1 --profile minimal --target riscv32imac-unknown-none-elf --component llvm-tools
-      - name: Lean (elan; the version comes from verification/rv32/lean-toolchain)
+      - name: Lean (elan; the version comes from experiment/verification/rv32/lean-toolchain)
         run: |
           curl -sSfL https://raw.githubusercontent.com/leanprover/elan/v4.1.2/elan-init.sh -o elan-init.sh
           sh elan-init.sh -y --default-toolchain none
@@ -195,15 +230,15 @@ jobs:
       - run: cargo build -p e5r-verify
       - name: Every firmware proof, control and differential test
         env:
-          E5R_VERIFY: target/debug/e5r
-        run: ./scripts/check-firmware-verification.sh
+          E5R_VERIFY: ${{ github.workspace }}/target/debug/e5r-exp
+        run: ./experiment/scripts/check-firmware-verification.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: firmware-verification-results
-          path: verification/rv32/build/results/
+          path: experiment/verification/rv32/build/results/
 
-  # Scope P (docs/verification/ptx.md), the quick set: regenerate every PTX
+  # Experiment P (experiment/docs/ptx.md), the quick set: regenerate every PTX
   # kernel module and refuse a stale one, build the Lean project, audit the
   # axioms, and check every benchmark's verdict with `e5r ptx check`. It has to
   # finish in minutes, so it stops there (E5R_PTX_QUICK).
@@ -211,7 +246,7 @@ jobs:
   # What it leaves out is what makes a full recheck take ~90 minutes: the 59
   # mutation controls and the supplied-proof controls, each of which starts Lean
   # many times. Those are mutation testing, not a per-push check; they run by
-  # hand (`scripts/recheck-ptx.sh`) or from the manual ptx-full workflow. No GPU
+  # hand (`experiment/scripts/recheck-ptx.sh`) or from the manual ptx-full workflow. No GPU
   # or CUDA here: the ptxas and GPU steps skip and say so.
   ptx-verification:
     runs-on: ubuntu-24.04
@@ -220,13 +255,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Lean (elan; the version comes from verification/ptx/lean-toolchain)
+      - name: Lean (elan; the version comes from experiment/verification/ptx/lean-toolchain)
         run: |
           curl -sSfL https://raw.githubusercontent.com/leanprover/elan/v4.1.2/elan-init.sh -o elan-init.sh
           sh elan-init.sh -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       # The Lean proof build is the one thing `rust-cache` does not cover.
-      # `verification/ptx` has no fetched dependencies (core Lean only), so
+      # `experiment/verification/ptx` has no fetched dependencies (core Lean only), so
       # `.lake/build` is a function of the pinned toolchain and the Lean sources
       # alone: key the cache on both and `lake build` is a near-no-op on a hit.
       # The key changes whenever any proof, kernel module or the toolchain does,
@@ -240,18 +275,18 @@ jobs:
         id: lake
         uses: actions/cache/restore@v4
         with:
-          path: verification/ptx/.lake/build
-          key: ptx-lake-${{ runner.os }}-${{ hashFiles('verification/ptx/lean-toolchain', 'verification/ptx/lakefile.lean', 'verification/ptx/lake-manifest.json', 'verification/ptx/**/*.lean') }}
+          path: experiment/verification/ptx/.lake/build
+          key: ptx-lake-${{ runner.os }}-${{ hashFiles('experiment/verification/ptx/lean-toolchain', 'experiment/verification/ptx/lakefile.lean', 'experiment/verification/ptx/lake-manifest.json', 'experiment/verification/ptx/**/*.lean') }}
       - run: cargo build -p e5r-verify
       - name: Lean proofs, axiom audit and benchmark verdicts
         env:
-          E5R_VERIFY: target/debug/e5r
+          E5R_VERIFY: ${{ github.workspace }}/target/debug/e5r-exp
           E5R_PTX_KEEP_BUILD: "1"
           E5R_PTX_QUICK: "1"
-        run: ./scripts/recheck-ptx.sh
+        run: ./experiment/scripts/recheck-ptx.sh
       - name: Save the Lean build
         if: always() && steps.lake.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: verification/ptx/.lake/build
+          path: experiment/verification/ptx/.lake/build
           key: ${{ steps.lake.outputs.cache-primary-key }}

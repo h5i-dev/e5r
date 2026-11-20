@@ -9,7 +9,7 @@ name: release
 #   * The `install` and `linux` jobs run commands that were run by hand on the
 #     maintainer's machine before this file was written. The two musl builds,
 #     the archive layout and the checksum file are the output of
-#     scripts/build-release.sh, which is the same script this workflow calls.
+#     devinfra/scripts/build-release.sh, which is the same script this workflow calls.
 #   * The `macos` and `windows` jobs are UNVERIFIED. Neither can be run on the
 #     development machine, which is aarch64 Linux with no macOS SDK and no
 #     Windows import libraries, and cross-compiling is a different claim from
@@ -64,7 +64,7 @@ jobs:
         with:
           targets: x86_64-unknown-linux-musl,aarch64-unknown-linux-musl
       - uses: Swatinem/rust-cache@v2
-      - run: ./scripts/build-release.sh x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+      - run: ./devinfra/scripts/build-release.sh x86_64-unknown-linux-musl aarch64-unknown-linux-musl
       # The runner is x86_64, so one of the two can be run rather than merely
       # linked. `file` reports the other, which is all this job can honestly
       # claim about it.
@@ -99,7 +99,7 @@ jobs:
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
       - uses: Swatinem/rust-cache@v2
-      - run: ./scripts/build-release.sh aarch64-apple-darwin x86_64-apple-darwin
+      - run: ./devinfra/scripts/build-release.sh aarch64-apple-darwin x86_64-apple-darwin
       - name: Run the native one
         run: |
           tmp=$(mktemp -d)
@@ -140,9 +140,9 @@ jobs:
           $name = "e5r-$version-x86_64-pc-windows-msvc"
           New-Item -ItemType Directory -Force -Path "dist/$name" | Out-Null
           Copy-Item "target/x86_64-pc-windows-msvc/release/e5rx.exe" "dist/$name/"
-          Copy-Item README.md, LICENSE "dist/$name/"
+          Copy-Item devinfra/README.md, LICENSE "dist/$name/"
           New-Item -ItemType Directory -Force -Path "dist/$name/docs" | Out-Null
-          Copy-Item docs/toolkit/MANUAL.md, docs/ROADMAP.md, docs/toolkit/dashboard.md "dist/$name/docs/"
+          Copy-Item devinfra/docs/MANUAL.md, devinfra/docs/ROADMAP-toolkit.md, devinfra/docs/dashboard.md "dist/$name/docs/"
           & "dist/$name/e5rx.exe" --version
           Compress-Archive -Path "dist/$name" -DestinationPath "dist/$name.zip"
       - uses: actions/upload-artifact@v4

@@ -1,0 +1,18 @@
+[package]
+name = "e5r"
+description = "e5r: a formal-verification-friendly RISC-V profile. Checks binaries against the profile, recovers their structure and exports them to Lean 4 for proof."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+# The core depends on nothing else in the workspace and on no external crate:
+# it is small enough to read in one sitting, and none of it is trusted by a
+# proof (the Lean kernel re-checks everything it exports).
+[dependencies]
+
+[[bin]]
+name = "e5r"
+path = "src/main.rs"

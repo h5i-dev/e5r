@@ -29,7 +29,8 @@ and under what licence, in the file that uses it.
 ## What a change has to come with
 
 Every claim this tool makes is measured, and a change that makes a claim has to
-bring its measurement. `docs/ROADMAP.md` says what each milestone is gated on; the
+bring its measurement. `docs/ROADMAP.md` says what each part of the core is gated on
+(and `devinfra/docs/ROADMAP-toolkit.md` for the toolkit); the
 short version:
 
 - **An external oracle wherever one exists.** A decoder is compared against
@@ -40,7 +41,7 @@ short version:
 - **Wrong and missing are different.** A wrong answer is a bug with no
   allowance and the test asserts zero of them. A missing answer is a gap with a
   floor or a ceiling that only moves one way, and the number stays in
-  `docs/toolkit/scorecard.md` even when it is unflattering.
+  `devinfra/docs/scorecard.md` even when it is unflattering.
 - **A test that cannot fail is not a test.** After writing one, break the code
   it covers on purpose and check that it goes red.
 
@@ -63,9 +64,20 @@ dev-profile build of this workspace is too large for it. Every command takes
 ```
 CARGO_BUILD_JOBS=4 cargo build --release
 CARGO_BUILD_JOBS=4 cargo test --release
-bash scripts/build-fixtures.sh      # the corpus the gates measure against
-bash scripts/check-determinism.sh   # the same input must give the same output
+(cd lean && lake build && lake exe e5r-audit)   # the core's proofs and their audit
+bash examples/build.sh                          # rebuild the examples, compare with examples/elf/
+bash devinfra/scripts/build-fixtures.sh         # the toolkit corpus its gates measure against
+bash devinfra/scripts/check-determinism.sh      # the same input must give the same output
 ```
+
+The core's oracle tests (`crates/e5r/tests`) need llvm-mc, clang, ld.lld,
+qemu-riscv64 and lake; each tool can be named by an environment variable
+(`LLVM_MC`, `CLANG`, `LLD`, `QEMU_RISCV64`, `LAKE`). A test whose tool is
+missing prints `SKIPPED` and its reason.
+
+Where things go: the core is `crates/e5r`, `lean/`, `examples/` and
+`docs/isa/`; experiments are under `experiment/`, the toolkit under
+`devinfra/`. The core depends on nothing in either.
 
 Whether a dev build is affordable is a fact about the machine, so the guards
 are opt-in and not committed settings:
