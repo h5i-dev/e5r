@@ -13,6 +13,7 @@ proof has to be trusted.
 
 ```bash
 cargo build --release -p e5r
+e5r cc -O2 prog.c -o prog.elf       # compile into the profile, record its structure, check
 e5r check examples/elf/sum.elf      # does every function conform to the profile?
 e5r disasm examples/elf/sum.elf     # the code, nested by its block/loop structure
 e5r export examples/elf/sum.elf --namespace Examples.Sum.Image -o lean/Examples/Sum/Image.lean

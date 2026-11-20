@@ -10,6 +10,9 @@ e5r: a formal-verification-friendly RISC-V profile
 usage:
   e5r check FILE [--json]          check every function against the profile
   e5r annotate FILE -o OUT         write FILE with an .e5r.struct section to OUT
+  e5r cc [CLANG ARGS] SOURCES... -o OUT
+                                   compile and link C or assembly into the profile,
+                                   record .e5r.struct and check (docs/isa/toolchain.md)
   e5r export FILE --namespace NS [-o OUT.lean]
                                    export .text and every conforming function to Lean
   e5r disasm FILE                  list the code with its block/loop structure
@@ -180,48 +183,42 @@ fn run(args: &[String], out: &mut String) -> Result<ExitCode, String> {
         "annotate" => {
             let file = args.get(1).ok_or("annotate: FILE missing")?;
             let dst = opt(args, "-o").ok_or("annotate: -o OUT missing")?;
-            let bytes = read(file)?;
-            let bin = e5r::load(&bytes)?;
-            let reports = bin.check();
-            let mut metas = Vec::new();
-            for r in reports {
-                match r.result {
-                    Ok(m) => metas.push(m),
-                    Err(vs) => {
-                        for v in vs {
-                            eprintln!("{} {v}", r.name);
-                        }
-                        return Ok(ExitCode::from(1));
+            match e5r::annotate(std::path::Path::new(file), std::path::Path::new(dst))? {
+                Ok((n, bytes)) => {
+                    say!(
+                        out,
+                        "{dst}: {n} functions, {bytes} bytes of {}",
+                        e5r::meta::SECTION
+                    );
+                    Ok(ExitCode::SUCCESS)
+                }
+                Err(vs) => {
+                    for v in vs {
+                        eprintln!("{v}");
                     }
+                    Ok(ExitCode::from(1))
                 }
             }
-            let data = e5r::meta::encode(&metas);
-            let tmp = format!("{dst}.e5r-struct.tmp");
-            std::fs::write(&tmp, &data).map_err(|e| format!("{tmp}: {e}"))?;
-            let objcopy = std::env::var("E5R_OBJCOPY").unwrap_or_else(|_| "llvm-objcopy".into());
-            let verb = if bin.recorded.is_some() {
-                "--update-section"
-            } else {
-                "--add-section"
-            };
-            let st = std::process::Command::new(&objcopy)
-                .arg(format!("{verb}={}={tmp}", e5r::meta::SECTION))
-                .arg(file)
-                .arg(dst)
-                .status()
-                .map_err(|e| format!("{objcopy}: {e} (set E5R_OBJCOPY)"));
-            let _ = std::fs::remove_file(&tmp);
-            if !st?.success() {
-                return Err(format!("{objcopy} failed"));
+        }
+        "cc" => {
+            let dst = opt(args, "-o").ok_or("cc: -o OUT missing")?;
+            let mut rest = Vec::new();
+            let mut i = 1;
+            while i < args.len() {
+                if args[i] == "-o" {
+                    i += 2;
+                    continue;
+                }
+                rest.push(args[i].clone());
+                i += 1;
             }
-            say!(
-                out,
-                "{dst}: {} functions, {} bytes of {}",
-                metas.len(),
-                data.len(),
-                e5r::meta::SECTION
-            );
-            Ok(ExitCode::SUCCESS)
+            let report = e5r::cc::build(&rest, std::path::Path::new(dst))?;
+            out.push_str(&report.text);
+            Ok(if report.conforms {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(1)
+            })
         }
         "export" => {
             let file = args.get(1).ok_or("export: FILE missing")?;

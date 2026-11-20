@@ -6,6 +6,7 @@
 //! one the proof tactics handle well; what a proof establishes is checked by
 //! the Lean kernel against the bytes of the binary (see docs/isa/trust.md).
 
+pub mod cc;
 pub mod elf;
 pub mod isa;
 pub mod lean;
@@ -173,4 +174,46 @@ impl Binary<'_> {
             })
             .collect()
     }
+}
+
+/// Check `file` and write it to `out` with an `.e5r.struct` section (through
+/// llvm-objcopy, or `E5R_OBJCOPY`). The inner error lists the violations,
+/// when a function does not conform and nothing is written.
+pub fn annotate(
+    file: &std::path::Path,
+    out: &std::path::Path,
+) -> Result<Result<(usize, usize), Vec<String>>, String> {
+    let bytes = std::fs::read(file).map_err(|e| format!("{}: {e}", file.display()))?;
+    let bin = load(&bytes)?;
+    let mut metas = Vec::new();
+    let mut bad = Vec::new();
+    for r in bin.check() {
+        match r.result {
+            Ok(m) => metas.push(m),
+            Err(vs) => bad.extend(vs.into_iter().map(|v| format!("{} {v}", r.name))),
+        }
+    }
+    if !bad.is_empty() {
+        return Ok(Err(bad));
+    }
+    let data = meta::encode(&metas);
+    let tmp = out.with_extension("e5r-struct.tmp");
+    std::fs::write(&tmp, &data).map_err(|e| format!("{}: {e}", tmp.display()))?;
+    let objcopy = std::env::var("E5R_OBJCOPY").unwrap_or_else(|_| "llvm-objcopy".into());
+    let verb = if bin.recorded.is_some() {
+        "--update-section"
+    } else {
+        "--add-section"
+    };
+    let st = std::process::Command::new(&objcopy)
+        .arg(format!("{verb}={}={}", meta::SECTION, tmp.display()))
+        .arg(file)
+        .arg(out)
+        .status()
+        .map_err(|e| format!("{objcopy}: {e} (set E5R_OBJCOPY)"));
+    let _ = std::fs::remove_file(&tmp);
+    if !st?.success() {
+        return Err(format!("{objcopy} failed"));
+    }
+    Ok(Ok((metas.len(), data.len())))
 }

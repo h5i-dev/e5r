@@ -1,29 +1,41 @@
 # Toolchain and workflow
 
-## Today: clang, then `e5r`
+## Today: `e5r cc`
 
-The profile needs no compiler changes for straight-line, branching and
-looping code with direct calls. The flags:
+```
+e5r cc -O2 f.c g.c -o f.elf         # compile, link, record .e5r.struct, check
+e5r disasm f.elf                    # the code, nested by block and loop
+e5r export f.elf --namespace My.Image -o lean/My/Image.lean
+```
 
-| Flag | Why |
+`e5r cc` runs clang on each source and ld.lld on the objects (entry
+`_start`, static), with the profile's flags before the user's (`-O2` unless
+an `-O` is given). If every function conforms it writes the binary with
+`.e5r.struct`; otherwise it writes it without and lists the violations, and
+exits 1. `CLANG` and `LLD` name the tools. The flags (`e5r::cc::CFLAGS`),
+and what clang emits without each:
+
+| Flag | Without it |
 | --- | --- |
-| `--target=riscv64-unknown-elf -march=rv64im_zba_zbb -mabi=lp64` | the instruction set; no C, so every instruction is 32 bits |
-| `-mno-relax` | calls stay as the compiler wrote them; the linker does not rewrite them |
-| `-fno-pic`, static link | no PLT or GOT: calls are direct |
-| `-ffreestanding -nostdlib` | no libc, whose code would also have to conform |
-| `-fno-jump-tables` (when needed) | a `switch` becomes branches instead of an indirect jump |
+| `--target=riscv64-unknown-elf -march=rv64im_zba_zbb -mabi=lp64` | C, A, F or D instructions (R1) |
+| `-mno-relax` | the linker rewrites calls after the code is checked |
+| `-fno-pic`, static link | PLT and GOT: indirect calls (R2) |
+| `-fno-jump-tables` | a dense `switch` becomes an indirect jump (R2) |
+| `-mllvm -disable-block-placement` | loops rotated so that their header is in the middle, entered by a forward jump into the loop (R3) |
+| `-ffreestanding -nostdlib` | libc, whose code would have to conform too |
 
-`examples/build.sh` is the reference build. Then:
+`crates/e5r/tests/toolchain.rs` checks this on a corpus (`crates/e5r/tests/cc`):
+nested loops with `break`, `continue` and a `goto` out of two loops,
+do-while, dense and sparse `switch`, recursion and mutual recursion, struct
+copies (lowered to calls to a `memcpy` the program supplies, which conforms
+too) all conform; without `-disable-block-placement`, three of the five
+loop functions break R3. What stays outside version 0 is what the source
+asks for: calls through function pointers (R2).
 
-```
-e5r check f.elf                     # which functions conform, which rule each one breaks
-e5r annotate f.elf -o f.e5r.elf     # record .e5r.struct (docs/isa/metadata.md)
-e5r disasm f.e5r.elf                # the code, nested by block and loop
-e5r export f.e5r.elf --namespace My.Image -o lean/My/Image.lean
-```
-
-`e5r check --json` gives the same report as JSON. Exit status 1 means a
-function violates the profile.
+`examples/build.sh` predates `e5r cc` and keeps its own flags (without
+`-disable-block-placement`), because the committed examples are the bytes
+the proofs are about; their code conforms either way. `e5r check --json`
+gives the report as JSON.
 
 ## Proving a function
 
@@ -45,8 +57,12 @@ function violates the profile.
 ## Next: inside LLVM
 
 Doing the structure in the compiler means the tree is the compiler's own
-(no recovery), and it can be extended to what recovery cannot see. The plan,
-not started:
+(no recovery), loops keep the layout block placement prefers (which
+`-disable-block-placement` gives up), and the profile can grow what flags
+cannot give: jump tables and typed indirect calls. The plan, not started:
+it needs an LLVM build, which the development machine cannot hold (an LLVM
+build tree is tens of GB, against about 10 GB free), so it waits for a
+machine that can.
 
 - **A target feature on the RISC-V backend** (`+e5r`) rather than a new
   backend: the profile is a way of using RISC-V.

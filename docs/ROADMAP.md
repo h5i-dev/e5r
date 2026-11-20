@@ -42,6 +42,7 @@ milestones and its "not building" list, is kept as
 | Syscall examples: `write_all` (a loop over short writes, with errors) and `hello` (writes a `.rodata` message through it, then exits) | done |
 | The structural checker in Lean (R1 to R3), `<name>_checked` theorems for every exported function, and `Struct.cfi`: a checked function only transfers control as the rules allow | done |
 | R4 and R5 (registers, stack discipline) in Lean | next |
+| `e5r cc`: clang and ld.lld with the flags that keep ordinary C in the profile, then annotate and check; tested on a corpus | done |
 | Loop invariants placed from `.e5r.struct` by the tactics instead of by hand | next |
 | Differential test against the Sail RISC-V model's C emulator (pinned release), random programs over every instruction | done |
 | Lean semantics generated from the Sail RISC-V model (its Lean backend) and proved equal to `E5R.exec` | planned: needs the Sail toolchain built (OCaml 5, opam) and a generated model of tens of thousands of lines |
@@ -53,6 +54,8 @@ milestones and its "not building" list, is kept as
 - Recursion with a variant and a stack bound.
 - The `+e5r` target feature in LLVM's RISC-V backend with WebAssembly's
   structuring passes, emitting `.e5r.struct` ([isa/toolchain.md](isa/toolchain.md)).
+  Not started: it needs an LLVM build tree (tens of GB), which the current
+  development machine has no room for. `e5r cc` covers what flags can.
 - A Rust target specification and a `no_std` example.
 - `mmap`/`brk` in the environment model.
 
