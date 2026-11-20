@@ -29,8 +29,25 @@ permitted by the specification's regions, the access aligned, and, at every
 loop head and at the return, that the registers the function never writes
 hold their entry values (`Same`, hence `Preserved`).
 
+What is left is named after the path: `entry_to_0x…`, `0x…_to_0x…`,
+`0x…_ret_0x…` (with `_b`, `_c`, ... when several runs end at the same place,
+and `_0`, `_1`, ... for the conjuncts of one invariant or postcondition),
+`…_measure`, and `perm_0x…` / `align_0x…` for side conditions it could not
+discharge. In each, the invariant's ghosts have the names they are bound by,
+its facts are `h1`, `h2`, ... in the order of its conjuncts, and the branch
+taken at address `a` is the hypothesis `hb_a`.
+
 Nothing here is trusted: the result is a proof term the kernel checks, built
 from `Reach.cutpoints`, `Reach.exec_step` and the lemmas below.
+
+Two rules keep that proof cheap for the kernel, and both were found the hard
+way (a 160-instruction run whose proof elaborates in 20 s took the kernel
+over 9 GB): no `decide` on an open proposition (`Nat.ble` on a variable and
+a 2^64 literal unfolds along the literal), and no definitional step between
+two different machine states (`rfl` lemmas and `assumption` up to unfolding
+make the kernel compare the states, memory writes included). Hence
+`e5r_decide_closed`, `e5r_omega`, the proof-carrying `State.*'` lemmas, and
+the `exit` goals proved by rewriting.
 
 Scope: functions that make no calls, no syscalls and keep no stack frame
 (the registers they write are caller-saved). Those are where most loops are;
@@ -563,12 +580,9 @@ def simpArgs (ts : Array Term) : TacticM SimpArgs := do
   return Syntax.TSepArray.ofElems arr
 
 register_option e5r.auto.trace : Bool := { defValue := false, descr := "trace e5r_auto" }
-register_option e5r.auto.debugSkip : String :=
-  { defValue := "", descr := "debugging only: close the runs from these origins (`entry`, `0x...`) with sorry" }
 register_option e5r.auto.debugKernel : Bool :=
-  { defValue := false, descr := "debugging only: kernel-check each step's proof alone, and trace the time" }
-register_option e5r.auto.debugNoClose : Bool :=
-  { defValue := false, descr := "debugging only: close every cut point and return with sorry" }
+  { defValue := false, descr := "debugging only: after the run, close what is left with sorry and \
+      kernel-check the proof of every step bottom-up, tracing the time (adds declarations)" }
 register_option e5r.auto.traceFile : String :=
   { defValue := "", descr := "append e5r_auto's trace to this file as it runs" }
 
@@ -580,20 +594,6 @@ def traceLine (msg : String) : CoreM Unit := do
   h.flush
 
 
-
-/-- Debugging: the size of `e` as a tree (without sharing), by dynamic
-    programming over its DAG. -/
-partial def treeSize (e : Expr) : StateM (Std.HashMap UInt64 Nat) Nat := do
-  let k := hash e
-  if let some n := (← get)[k]? then return n
-  let n ← match e with
-    | .app f a => return 1 + (← treeSize f) + (← treeSize a)
-    | .lam _ t b _ | .forallE _ t b _ => return 1 + (← treeSize t) + (← treeSize b)
-    | .letE _ t v b _ => return 1 + (← treeSize t) + (← treeSize v) + (← treeSize b)
-    | .mdata _ b | .proj _ _ b => return 1 + (← treeSize b)
-    | _ => return 1
-  modify (·.insert k n)
-  return n
 
 /-- Debugging: the proof a step assigned to `g`, with what is still open
     replaced by `sorry`, checked by the kernel as a theorem of its own. -/
@@ -730,7 +730,6 @@ def finish (cx : Ctx) (gs : List MVarId) : TacticM (List MVarId) := do
     state reached. -/
 def closeCut (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (List MVarId) := do
   if let some r := cx.log then r.modify (·.push (g, s!"cut {cx.origin} -> {hex pc}"))
-  if e5r.auto.debugNoClose.get (← getOptions) then let _ ← run g (← `(tactic| sorry)); return []
   let fs ← simpArgs cx.facts
   let hR := cx.hR
   let tag ← endTag cx s!"{cx.origin}_to_{hex pc}"
@@ -762,7 +761,6 @@ def closeCut (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (List MVarId) := do
 /-- The run has returned (`jalr zero, 0(ra)`): the postcondition. -/
 def closeRet (cx : Ctx) (g : MVarId) (from_ : Nat) : TacticM (List MVarId) := do
   if let some r := cx.log then r.modify (·.push (g, s!"ret {cx.origin} at {hex from_}"))
-  if e5r.auto.debugNoClose.get (← getOptions) then let _ ← run g (← `(tactic| sorry)); return []
   let fs ← simpArgs cx.facts
   let hR := cx.hR
   let he := cx.he
@@ -1049,8 +1047,6 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
         hR := hR
         mode := .start
         origin := "entry" }
-      if ((e5r.auto.debugSkip.get (← getOptions)).splitOn ",").contains "entry" then
-        let _ ← run gStart (← `(tactic| sorry)); return []
       drive cx false 400 gStart entryN
   -- From each loop head.
   let gBody0 := gBody
@@ -1124,12 +1120,10 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
         mode := .body
         origin := hex 0 }
       return (pc, cx)
-    if ((e5r.auto.debugSkip.get (← getOptions)).splitOn ",").contains (hex pc) then
-      let _ ← run g (← `(tactic| sorry)); continue
     let gs ← g.withContext do drive { cx with origin := hex pc } true 400 g pc
     if !(e5r.auto.traceFile.get (← getOptions)).isEmpty then
       let e ← instantiateMVars (mkMVar g)
-      traceLine s!"[size] body {hex pc}: {← e.numObjs} objects, {(treeSize e).run' {}} as a tree"
+      traceLine s!"[size] body {hex pc}: {← e.numObjs} objects"
       if e5r.auto.debugKernel.get (← getOptions) then
         traceLine s!"[kernel] body {hex pc}: {← kernelCheckStep g} ms"
     bodyGoals := bodyGoals ++ gs

@@ -92,7 +92,7 @@ theorem cobs_b : Verified code cobs_decode_dom cobs_decode_entry spec := by
     have hd : ((L.set dst (L.getD p 0)).take (dst + 1)).length = dst + 1 := by simp; omega
     have hL' := drop_set_succ L dst (L.getD p 0) ▸ drop_succ_of_drop h17
     rw [report_of (orig := orig) (by omega) hdec]
-    first | (simp only [hd, take_append_drop_of hL']; done) | simp [hd, show frameLen orig = e by omega]
+    first | (simp only [hd, take_append_drop_of hL']; done) | simp [show frameLen orig = e by omega]
   case «0x11208_to_0x111cc_b_0» =>
     rw [drop_set_succ]
     exact drop_succ_of_drop (drop_set_succ L dst _ ▸ drop_succ_of_drop h17)

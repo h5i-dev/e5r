@@ -1,4 +1,5 @@
 import Examples
+import Demo
 
 /-
 `lake build e5r-audit && lake exe e5r-audit` (from lean/): the checks that tie
@@ -63,11 +64,42 @@ example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] =
 #assert_standard_axioms Examples.Hello.write_all_verified
 #assert_standard_axioms Examples.Hello.hello_verified
 
+-- The demo (demo/README.md): each function on the e5r build (B, `Verified`)
+-- and on the ordinary rv64gc build (A, `VerifiedC`, E5R/Ext/Rvc.lean).
+#assert_standard_axioms Demo.Sum.sum_b
+#assert_standard_axioms Demo.Sum.sum_a
+#assert_standard_axioms Demo.Cobs.cobs_b
+#assert_standard_axioms Demo.Cobs.cobs_a
+#assert_standard_axioms Demo.Sum.ImageB.sum_checked
+#assert_standard_axioms Demo.Cobs.ImageB.cobs_decode_checked
+
 /-- Each committed binary (relative to the repository root), and the code
     image and data segments its proofs use. -/
 def images : List (String × Code × List Segment) :=
   [("examples/elf/sum.elf", Examples.Sum.Image.code, Examples.Sum.Image.segments),
-   ("examples/elf/hello.elf", Examples.Hello.Image.code, Examples.Hello.Image.segments)]
+   ("examples/elf/hello.elf", Examples.Hello.Image.code, Examples.Hello.Image.segments),
+   ("demo/elf/sum.b.elf", Demo.Sum.ImageB.code, Demo.Sum.ImageB.segments),
+   ("demo/elf/cobs.b.elf", Demo.Cobs.ImageB.code, Demo.Cobs.ImageB.segments)]
+
+/-- The compressed binaries of the demo and their halfword images. Their
+    proofs read no data section, so only `.text` is compared. -/
+def imagesC : List (String × CCode) :=
+  [("demo/elf/sum.a.elf", Demo.Sum.ImageA.code), ("demo/elf/cobs.a.elf", Demo.Cobs.ImageA.code)]
+
+def checkImageC (root : System.FilePath) (path : String) (c : CCode) : IO Bool := do
+  let b ← IO.FS.readBinFile (root / path)
+  match Elf.sections b with
+  | .error e => IO.println s!"FAIL {path}: {e}"; return false
+  | .ok secs =>
+    let some t := secs.find? (·.name == ".text") | IO.println s!"FAIL {path}: no .text"; return false
+    if t.offset + t.size > b.size || t.size % 2 != 0 then
+      IO.println s!"FAIL {path}: .text is not whole halfwords inside the file"; return false
+    let halves := (List.range (t.size / 2)).map fun i =>
+      BitVec.ofNat 16 ((b.get! (t.offset + 2 * i)).toNat + 256 * (b.get! (t.offset + 2 * i + 1)).toNat)
+    if BitVec.ofNat 64 t.addr != c.base || halves.toArray != c.halves then
+      IO.println s!"FAIL {path}: .text differs from the image"; return false
+    IO.println s!"ok   {path}: {c.halves.size} halfwords at {c.base.toNat} match the compressed image"
+    return true
 
 def checkImage (root : System.FilePath) (path : String) (c : Code) (segs : List Segment) :
     IO Bool := do
@@ -96,4 +128,6 @@ def main (args : List String) : IO UInt32 := do
   let mut ok := true
   for (p, c, segs) in images do
     ok := (← checkImage root p c segs) && ok
+  for (p, c) in imagesC do
+    ok := (← checkImageC root p c) && ok
   return if ok then 0 else 1
