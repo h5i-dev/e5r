@@ -7,7 +7,7 @@ lean/ (a constant in the postcondition, a result register, a region, a
 conjunct of the precondition) and require every proof of that specification
 to FAIL against the altered one. Then require the unaltered copy to pass.
 
-The code-side counterpart is scripts/check-proof-controls.sh (mutate the
+The code-side counterpart is scripts/core/check-proof-controls.sh (mutate the
 binary, keep the spec). The two answer different questions: there, "does the
 proof depend on the code?"; here, "does the proof establish the spec, and
 does the spec pin down the behaviour?".
@@ -28,7 +28,7 @@ A mutation is only evidence if the altered spec is itself well formed: if
 Lean reports an error inside a `def` or `structure` (the spec, not the
 proof), the mutation is reported as INVALID.
 
-    python3 -I scripts/check-spec-mutations.py [--only SUBSTR] [--skip SUBSTR] [--list]
+    python3 -I scripts/core/check-spec-mutations.py [--only SUBSTR] [--skip SUBSTR] [--list]
 
 Needs lake (elan) on PATH. Wrap it as the other Lean scripts are (bounded
 memory) on a shared machine.
@@ -92,7 +92,7 @@ MUTATIONS = [
      "writtenTo 1 evs = some (message.take k)", "writtenTo 2 evs = some (message.take k)"),
     ("Examples/Hello.lean", ["Examples.Hello"], "frame", "hello-stack-8",
      "stack := 16", "stack := 8"),
-    # The demo: one spec, two binaries (demo/README.md)
+    # The demo: one spec, two binaries (examples/demo/README.md)
     ("Demo/SumSpec.lean", ["Demo.SumB", "Demo.SumA"], "post", "demo-sum-post-plus-one",
      "post := fun ⟨_, xs⟩ _ s' => s'.reg Reg.a0 = sumW xs",
      "post := fun ⟨_, xs⟩ _ s' => s'.reg Reg.a0 = sumW xs + 1"),

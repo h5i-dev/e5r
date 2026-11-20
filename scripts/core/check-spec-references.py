@@ -16,7 +16,7 @@ the function rather than from the Lean text:
   hello        the message in examples/hello.c vs Examples.Hello.message, and
                its length vs the constant the specification uses
 
-    python3 -I scripts/check-spec-references.py [N]     (needs lake; builds spec-eval)
+    python3 -I scripts/core/check-spec-references.py [N]     (needs lake; builds spec-eval)
 """
 import importlib.util, os, random, re, subprocess, sys
 

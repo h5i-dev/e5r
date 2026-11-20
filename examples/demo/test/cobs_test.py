@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Differential test of cobs_decode (demo/cobs/cobs.c) under qemu-riscv64.
+"""Differential test of cobs_decode (examples/demo/cobs/cobs.c) under qemu-riscv64.
 
     python3 -I examples/demo/test/cobs_test.py TEST_ELF PROOF_ELF [N]
 

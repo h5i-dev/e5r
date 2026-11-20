@@ -167,7 +167,7 @@ relocatable function (words with the relocated fields zero, and the
 relocations) as the binary, with the same tree, level, frame and partition:
 
 - the committed binaries (examples/elf/{sum,hello,sum.link1,sum.link2}.elf,
-  demo/elf/{sum,cobs}.b.elf): 17 functions, all of them;
+  examples/demo/elf/{sum,cobs}.b.elf): 17 functions, all of them;
 - the C corpus built with `nocompiler cc` (tests/cc/{frames,fnptr,loops,recur,
   structs,switch}.c, hello, cobs): 53 functions at L1 or above. Not in the
   text, being below L1: `apply` (fnptr.c, a call through a function pointer)

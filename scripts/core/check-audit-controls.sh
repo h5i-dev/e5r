@@ -5,7 +5,7 @@
 # ELF in a scratch root and requires the audit to fail on it, with the
 # expected reason; then the unpatched copy must pass.
 #
-#   scripts/check-audit-controls.sh        (needs lake; builds nocompiler-audit)
+#   scripts/core/check-audit-controls.sh        (needs lake; builds nocompiler-audit)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 work=$(mktemp -d)

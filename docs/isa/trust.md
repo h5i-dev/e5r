@@ -48,7 +48,7 @@ trusting the following, and nothing else.
 ## Extensions outside the profile
 
 `lean/NoCompiler/Ext/Rvc.lean` extends the semantics to compressed (RVC) code, for
-the comparison in [demo/README.md](../../demo/README.md): `decodeC`,
+the comparison in [examples/demo/README.md](../../examples/demo/README.md): `decodeC`,
 `CCode.instr` and `execC` are trusted *for the results stated with
 `VerifiedC`*, and are checked against llvm-mc (every 16-bit word) and qemu
 (the demo's compressed binary). Results about nocompiler binaries (`VerifiedImg`) do

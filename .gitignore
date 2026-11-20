@@ -266,4 +266,4 @@ __marimo__/
 /lean/.lake/
 # The committed binaries the proofs are about (`*.elf` is ignored above).
 !/examples/elf/*.elf
-/demo/build/
+/examples/demo/build/

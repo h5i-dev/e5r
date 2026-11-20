@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Proof sizes for demo/README.md: lines and tokens, without blank lines and
+"""Proof sizes for examples/demo/README.md: lines and tokens, without blank lines and
 comments.
 
     python3 -I examples/demo/tools/count.py [--markdown]

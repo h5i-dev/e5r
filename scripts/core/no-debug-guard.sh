@@ -5,12 +5,12 @@
 #
 # A full dev-profile build of this workspace is very large, so a machine that
 # cannot spare the space wants the checkout pinned to release-only. Unlike
-# scripts/deny-debug-build.py, which only Claude Code obeys, this works against
+# scripts/core/deny-debug-build.py, which only Claude Code obeys, this works against
 # every tool: Codex, an editor, a stray shell, anything.
 #
-#   scripts/no-debug-guard.sh          # or `on`: install the guard
-#   scripts/no-debug-guard.sh off      # maintainer escape hatch
-#   scripts/no-debug-guard.sh status
+#   scripts/core/no-debug-guard.sh          # or `on`: install the guard
+#   scripts/core/no-debug-guard.sh off      # maintainer escape hatch
+#   scripts/core/no-debug-guard.sh status
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -27,7 +27,7 @@ case "${1:-on}" in
     printf '%s\n' \
       "Not a directory, on purpose: this checkout is release-only." \
       "Everything here is built with --release. See CONTRIBUTING.md." \
-      "Maintainer escape hatch: scripts/no-debug-guard.sh off" > "$guard"
+      "Maintainer escape hatch: scripts/core/no-debug-guard.sh off" > "$guard"
     echo "guard on: dev-profile cargo builds now fail immediately"
     ;;
   off)

@@ -7,7 +7,7 @@
 # lean/, and require the proof module to FAIL. Then require the unpatched
 # copy to pass, so a failure is the mutation's and not the copy's.
 #
-#   scripts/check-proof-controls.sh        (needs target/release/nocompiler and lake)
+#   scripts/core/check-proof-controls.sh        (needs target/release/nocompiler and lake)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 NOCOMPILER=${NOCOMPILER:-$PWD/target/release/nocompiler}
@@ -33,7 +33,7 @@ mutations=(
   "hello Examples.Hello 0x11178 0x00a585b3 0x40a585b3 write_all-moves-buf-backwards"
   "hello Examples.Hello 0x111a4 0x00b00613 0x00a00613 hello-writes-10-bytes"
   "hello Examples.Hello 0x111b0 0x03f55513 0x03e55513 hello-exit-status-2-on-error"
-  # demo/README.md: the same mutations on the nocompiler build (B) and the ordinary build (A).
+  # examples/demo/README.md: the same mutations on the nocompiler build (B) and the ordinary build (A).
   "examples/demo/elf/sum.b Demo.SumB 0x1119c 0x00c68633 0x40c68633 demo-B-sum-add-becomes-sub"
   "examples/demo/elf/sum.b Demo.SumB 0x111a4 0x00850513 0x00450513 demo-B-sum-stride-8-becomes-4"
   "examples/demo/elf/sum.a Demo.SumA 0x11196 0x9636 0x8e15 demo-A-sum-add-becomes-sub"

@@ -4,7 +4,7 @@
 A dev-profile build of this workspace is very large. On a machine that cannot
 spare the space, this hook pins the checkout to release-only: it stops the
 command before it runs and says what to type instead. The hard layer is the
-placeholder file at target/debug (scripts/no-debug-guard.sh), which stops every
+placeholder file at target/debug (scripts/core/no-debug-guard.sh), which stops every
 other tool too.
 
 Opt-in, and deliberately not wired up by the repository. Nothing here fires

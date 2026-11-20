@@ -8,7 +8,7 @@
  *   success          tag 0, a = source bytes used (n), b = bytes decoded
  *
  * lean/Demo/CobsB.lean and CobsA.lean prove `cobs_decode` as nocompiler cc and
- * as plain clang -march=rv64gc compile it (demo/build.sh).
+ * as plain clang -march=rv64gc compile it (examples/demo/build.sh).
  * "Target too small", the crate's third error, cannot happen in place: the
  * output never overtakes the input. */
 typedef unsigned long u64;

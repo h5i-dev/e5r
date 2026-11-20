@@ -10,7 +10,7 @@ name = "NoCompiler"
 [[lean_lib]]
 name = "Examples"
 
-# The A-vs-B demo (demo/README.md).
+# The A-vs-B demo (examples/demo/README.md).
 [[lean_lib]]
 name = "Demo"
 

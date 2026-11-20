@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The A-vs-B demo, end to end (demo/README.md):
+# The A-vs-B demo, end to end (examples/demo/README.md):
 #   1. rebuild both binaries from examples/demo/src (A: plain clang rv64gc, B: nocompiler cc)
 #      and compare them with the committed examples/demo/elf/;
 #   2. check B against the profile; test cobs_decode on both against a reference

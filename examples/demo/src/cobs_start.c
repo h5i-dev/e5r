@@ -1,5 +1,5 @@
 /* Entry point of the binary the proof is about: decode a fixed frame and
- * exit with the decoded length (qemu-riscv64 demo/cobs/cobs.elf; echo $?). */
+ * exit with the decoded length (qemu-riscv64 examples/demo/cobs/cobs.elf; echo $?). */
 struct cobs_report { unsigned long tag, a, b; };
 void cobs_decode(struct cobs_report *r, unsigned char *buf, unsigned long len);
 

@@ -1,6 +1,6 @@
 /* Test driver: reads records `u64 len; u8 bytes[len]` from stdin until EOF,
  * decodes each in place with cobs_decode, and writes `report (24 bytes);
- * bytes[len]` to stdout. demo/test/cobs_test.py compares it with a reference. */
+ * bytes[len]` to stdout. examples/demo/test/cobs_test.py compares it with a reference. */
 typedef unsigned long u64;
 typedef unsigned char u8;
 struct cobs_report { u64 tag, a, b; };

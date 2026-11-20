@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build each demo source twice (demo/README.md):
+# Build each demo source twice (examples/demo/README.md):
 #   A, ordinary:  clang -O2 --target=riscv64-unknown-elf -march=rv64gc, default
 #                 layout and options (compressed code, clang's block placement)
 #   B, nocompiler:       nocompiler cc -O2 (the profile: RV64IM+Zba+Zbb, structured, checked)
