@@ -13,7 +13,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export LLD=${LLD:-$(command -v ld.lld || command -v ld.lld-20)}
-cargo build --release -q -p nocompiler
+cargo build --release -q -p nocompiler-cli --bin nocompiler
 NOCOMPILER=${CARGO_TARGET_DIR:-target}/release/nocompiler
 export NOCOMPILER
 LAKE=(lake)

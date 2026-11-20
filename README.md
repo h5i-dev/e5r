@@ -12,7 +12,7 @@ the Lean kernel, so neither the compiler nor whoever wrote the code or the
 proof has to be trusted.
 
 ```bash
-cargo build --release -p nocompiler
+cargo build --release -p nocompiler-cli
 nocompiler cc -O2 prog.c -o prog.elf       # compile into the profile, record its structure, check
 nocompiler check examples/elf/sum.elf      # does every function conform to the profile?
 nocompiler disasm examples/elf/sum.elf     # the code, nested by its block/loop structure

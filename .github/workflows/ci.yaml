@@ -65,7 +65,9 @@ jobs:
         working-directory: lean
         run: lake exe nocompiler-audit
       - run: cargo test -p nocompiler --no-fail-fast -- --nocapture
-      - run: cargo build -p nocompiler
+      # The core commands through the one binary (crates/nocompiler-cli).
+      - run: cargo test -p nocompiler-cli --test core -- --nocapture
+      - run: cargo build -p nocompiler-cli --bin nocompiler
       - name: Negative controls, every mutated binary breaks its proof
         env:
           NOCOMPILER: ${{ github.workspace }}/target/debug/nocompiler
