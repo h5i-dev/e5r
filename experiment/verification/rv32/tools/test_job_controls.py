@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Negative controls for `e5r check`: each must produce the stated
+"""Negative controls for `nocompiler check`: each must produce the stated
 status, and none may report `proved`. Run from the repository root after a
-release build of e5r and with the pinned Lean on PATH."""
+release build of nocompiler and with the pinned Lean on PATH."""
 import json
 import os
 from pathlib import Path
@@ -11,7 +11,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[3]
 VERIFY = ROOT / 'verification/rv32'
-BIN = Path(os.environ.get('E5R_VERIFY', ROOT / 'target/release/e5r'))
+BIN = Path(os.environ.get('NOCOMPILER_VERIFY', ROOT / 'target/release/nocompiler'))
 WORK = VERIFY / 'build/controls'
 
 
@@ -43,13 +43,13 @@ def main():
         'theorem wraps : spec 0xfffffffa = 6 := by sorry'))
     skip = VERIFY / 'Projects/hifive1/clamp/ControlSkip.lean'
     skip.write_text('import Lean\nopen Lean Elab Command\nrun_cmd liftCoreM do\n'
-                    '  let decl := Declaration.thmDecl { name := `E5R.bad, levelParams := [], '
+                    '  let decl := Declaration.thmDecl { name := `NoCompiler.bad, levelParams := [], '
                     'type := mkConst ``False, value := mkConst ``True.intro }\n'
                     '  withOptions (fun o => o.setBool (Name.mkStr2 "debug" ("skipKernel" ++ "TC")) true) '
                     '(addDecl decl)\n')
     imp = VERIFY / 'Projects/hifive1/clamp/ControlImport.lean'
-    imp.write_text('import Theories.Absint\nnamespace E5R.Hifive1.Clamp\ntheorem ok : True := trivial\n'
-                   'end E5R.Hifive1.Clamp\n')
+    imp.write_text('import Theories.Absint\nnamespace NoCompiler.Hifive1.Clamp\ntheorem ok : True := trivial\n'
+                   'end NoCompiler.Hifive1.Clamp\n')
     failures = []
     try:
         cases = []
@@ -64,15 +64,15 @@ def main():
         j = base(); j['id'] = 'control-unsupported'; j['elf'] = 'Projects/hifive1/clamp/clamp.rs'
         j['elf_sha256'] = None
         cases.append((j, 'unsupported', 'a file that is not an ELF'))
-        j = base(); j['id'] = 'control-theorem'; j['theorems'] = ['E5R.Hifive1.Clamp.no_such_theorem']
+        j = base(); j['id'] = 'control-theorem'; j['theorems'] = ['NoCompiler.Hifive1.Clamp.no_such_theorem']
         cases.append((j, 'error', 'a theorem that does not exist'))
         # The independent review's bypass: a theorem added with kernel
         # checking switched off through metaprogramming.
         j = base(); j['id'] = 'control-skipkernel'; j['modules'] = ['Projects/hifive1/clamp/ControlSkip.lean']
-        j['theorems'] = ['E5R.bad']
+        j['theorems'] = ['NoCompiler.bad']
         cases.append((j, 'error', 'a theorem added without kernel checking'))
         j = base(); j['id'] = 'control-import'; j['modules'] = ['Projects/hifive1/clamp/ControlImport.lean']
-        j['theorems'] = ['E5R.Hifive1.Clamp.ok']
+        j['theorems'] = ['NoCompiler.Hifive1.Clamp.ok']
         cases.append((j, 'error', 'an import the job does not check'))
         for job, want, what in cases:
             result, code = run(job)

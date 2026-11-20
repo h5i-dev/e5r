@@ -3,7 +3,7 @@
   poll (Deframer/Rx.lean) at support-lean4 f8f1c44. Review evidence only: nothing here is used by
   main's proofs, and no main module is changed.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here:
   * `lands_hits`: a `Lands` tree is not vacuous: from its root some actual sequence of `Step`s
@@ -16,8 +16,8 @@
 -/
 import Projects.rmk.Deframer.Rx
 
-namespace E5R.Rmk.Review
-open E5R E5R.Rmk E5R.Rmk.Deframer.Rx
+namespace NoCompiler.Rmk.Review
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.Deframer.Rx
 
 /-- Prepending a step to a run from a single start. -/
 theorem reach_cons {B : Board} {img : List Segment} {m m' : Machine} {e : List Event}
@@ -100,9 +100,9 @@ theorem irq_counter (M0 : Word → BitVec 8) :
   refine ⟨⟨c1irq, M0⟩, .irq 7 (show irqEnabled c1 7 = true by decide) (show takeIrq c1 7 = .done c1irq by rfl), rfl, ?_⟩
   rintro ⟨o, evs, h⟩
   have hpc : (⟨c1, M0⟩ : Machine).core.pc = 0x80004374 := rfl
-  rw [stepInstr_of (by rw [hpc]; decide) (by rw [hpc]; exact E5R.Rmk.RxFetch.f80004374), exec_opimm] at h
+  rw [stepInstr_of (by rw [hpc]; decide) (by rw [hpc]; exact NoCompiler.Rmk.RxFetch.f80004374), exec_opimm] at h
   simp only [interp, Result.ok.injEq] at h
   have := congrArg Core.pc h.1
   simp [Core.wr, c1, c0, c1irq] at this
 
-end E5R.Rmk.Review
+end NoCompiler.Rmk.Review

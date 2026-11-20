@@ -1,13 +1,13 @@
 # Demo: the same C, the same specification, two binaries
 
 **Question.** For one C source and one property, how much shorter is the
-proof about the e5r-format binary than the proof about an ordinary binary?
+proof about the nocompiler-format binary than the proof about an ordinary binary?
 
 **Answer, for these two functions: it is not shorter.** With the same
 automation on both sides, the per-function proofs about the ordinary binary
-are the same size as the ones about the e5r binary (tables below). What the
-e5r format changes is not the length of the proof but what it rests on: on
-the e5r side the cut points come from a block/loop tree the kernel has
+are the same size as the ones about the nocompiler binary (tables below). What the
+nocompiler format changes is not the length of the proof but what it rests on: on
+the nocompiler side the cut points come from a block/loop tree the kernel has
 checked, the semantics is the profile's (no compressed-code extension in the
 trusted base), and the adequacy theorems connect the result to the machine.
 On the ordinary side a person read the cut points off the control-flow
@@ -25,7 +25,7 @@ One source per function, compiled twice (`demo/build.sh`):
 | | compiler | binary |
 | --- | --- | --- |
 | **A**, ordinary | `clang -O2 --target=riscv64-unknown-elf -march=rv64gc` (+ `-ffreestanding -nostdlib`, static link), default layout: compressed instructions, clang's block placement | `demo/elf/{sum,cobs}.a.elf` |
-| **B**, e5r | `e5r cc -O2` (RV64IM+Zba+Zbb, no C, `-disable-block-placement`, checked, `.e5r.struct`) | `demo/elf/{sum,cobs}.b.elf` |
+| **B**, nocompiler | `nocompiler cc -O2` (RV64IM+Zba+Zbb, no C, `-disable-block-placement`, checked, `.nocompiler.struct`) | `demo/elf/{sum,cobs}.b.elf` |
 
 Functions:
 
@@ -35,7 +35,7 @@ Functions:
   contract of the Rust `cobs` crate's `decode_in_place_report`. It returns
   `tag 1, a 0` for an empty buffer; `tag 1, a 1, b` = the bytes decoded before
   the bad block, for an invalid frame; and `tag 0, a` = the source bytes used,
-  `b` = the bytes decoded, on success. The C was written so that `e5r cc`
+  `b` = the bytes decoded, on success. The C was written so that `nocompiler cc`
   gives a conforming binary: the copy loop is `while (src < end)`, because
   with `for (i = 1; i < code; i++)` clang places the copy loop after the exit
   and jumps into the middle of the outer loop (R3). That rewrite is the only
@@ -94,9 +94,9 @@ Libraries (reported separately; not per function):
 
 | | lines | tokens | used by |
 | --- | --- | --- | --- |
-| core `lean/E5R` (semantics, logic, adequacy, Struct, step tactics) | 1690 | 22666 | A and B |
-| `lean/E5R/Auto.lean`: the symbolic executor, word normal form, memory lemmas, `e5r_auto` | 897 | 12074 | A and B (the tree-driven front end: B only) |
-| `lean/E5R/Ext/Rvc.lean`: compressed-code extension, `e5r_auto_c` | 200 | 3058 | A only |
+| core `lean/NoCompiler` (semantics, logic, adequacy, Struct, step tactics) | 1690 | 22666 | A and B |
+| `lean/NoCompiler/Auto.lean`: the symbolic executor, word normal form, memory lemmas, `nocompiler_auto` | 897 | 12074 | A and B (the tree-driven front end: B only) |
+| `lean/NoCompiler/Ext/Rvc.lean`: compressed-code extension, `nocompiler_auto_c` | 200 | 3058 | A only |
 
 (`count.py --markdown` prints these tables; `demo/run.sh` prints them at the end.)
 
@@ -114,7 +114,7 @@ Each proof is `rintro`, one call, and the verification conditions:
 theorem cobs_b : Verified code cobs_decode_dom cobs_decode_entry spec := by
   rintro ⟨r, buf, orig⟩ s he ⟨ha0, ha1, ha2, hlen, hmem, hal, hdis⟩
   have hfl := frameLen_le orig
-  e5r_auto cobs_decode_func s he                   -- A: e5r_auto_c cobs_decode_entry cobs_decode_size s he
+  nocompiler_auto cobs_decode_func s he                   -- A: nocompiler_auto_c cobs_decode_entry cobs_decode_size s he
     loop_inv 0x11198 (fun u => ∃ k, ...) measure (fun u => ...)    -- scan for the zero
     loop_inv 0x111cc (fun u => ∃ src dst L, ...) measure (...)      -- decode loop
     loop_inv 0x11208 (fun u => ∃ p cnt dst L c e, ...) measure (...) -- copy loop
@@ -122,7 +122,7 @@ theorem cobs_b : Verified code cobs_decode_dom cobs_decode_entry spec := by
   ...
 ```
 
-The tactic (`lean/E5R/Auto.lean`) runs symbolically from the entry and from
+The tactic (`lean/NoCompiler/Auto.lean`) runs symbolically from the entry and from
 each cut point to the next cut point or the return:
 * **every step:** the instruction from the image, pc in the code, the
   permission from the spec's regions, the alignment, the branch split
@@ -140,13 +140,13 @@ with the case names (which carry addresses) renamed.
 
 A and B share everything here except where the run stops:
 
-* **B (`e5r_auto f`)**: the cut points are the loop heads of the function's
-  block/loop tree `f : Struct.Func` (exported by `e5r export`; the kernel
+* **B (`nocompiler_auto f`)**: the cut points are the loop heads of the function's
+  block/loop tree `f : Struct.Func` (exported by `nocompiler export`; the kernel
   checks it against the code, `cobs_decode_checked`). The front end refuses
   an invariant at an address that is not a loop head, and requires one at
   every loop head. By R3 every cycle passes through a loop head, so every run
   is finite.
-* **A (`e5r_auto_c entry size`)**: there is no tree. The cut points are the
+* **A (`nocompiler_auto_c entry size`)**: there is no tree. The cut points are the
   ones the proof gives, read off `llvm-objdump` by hand: `0x11194` (scan),
   `0x111b8` (the decode loop, which clang rotated so that its entry jumps
   past its exit test at `0x111b4` into the middle), and `0x111d8` (copy).
@@ -155,7 +155,7 @@ A and B share everything here except where the run stops:
 
 ## What A needed that B did not
 
-* **A semantics for compressed code** (`lean/E5R/Ext/Rvc.lean`, an
+* **A semantics for compressed code** (`lean/NoCompiler/Ext/Rvc.lean`, an
   extension, clearly marked, imported only by the A proofs):
   * `decodeC` expands each RVC instruction into the existing `Instr`;
   * `CCode` is an image of halfwords, fetched on 2-byte boundaries;
@@ -175,13 +175,13 @@ A and B share everything here except where the run stops:
     (`lean/RvcRun.lean`) matches qemu byte for byte on 3,000 buffers
     (`demo/test/rvc_exec.py`; `run.sh` runs 500).
 
-  **Not done:** the adequacy theorems of `E5R/Adequacy.lean` (`Verified.hw`:
+  **Not done:** the adequacy theorems of `NoCompiler/Adequacy.lean` (`Verified.hw`:
   what the theorem means for the machine that fetches from memory) for
   `StepC`. So A's theorem is about the proof relation over the image, not yet
   about the machine. And the extension is tested against qemu only on the
   instructions this function uses, not on random programs as the core is.
 * **A new exporter** (`demo/tools/ExportC.lean`; untrusted: every `instr_`
-  lemma is proved by `rfl`, and `e5r-audit` compares the halfwords with the
+  lemma is proved by `rfl`, and `nocompiler-audit` compares the halfwords with the
   ELF).
 * **Cut points chosen by hand** from the CFG, including one in the middle of
   a rotated loop (above).
@@ -200,7 +200,7 @@ facts at its loops, in different registers. The conditions are facts about
 COBS, not about the code. Everything that depends on the code (stepping,
 permissions, alignment, the frame) is automatic on both sides, because the
 symbolic executor needs only cut points. A has cut points too, once someone
-chooses them. So for leaf functions with a few reducible loops, the e5r
+chooses them. So for leaf functions with a few reducible loops, the nocompiler
 format buys correctness of the cut-point choice and a smaller trusted base,
 not a shorter proof.
 
@@ -218,7 +218,7 @@ The format should matter more where this demo does not go:
 * **Different code.** A `cobs_decode` is 57 instructions in 162 bytes, B is
   55 in 220. `sum` is 9 and 9 instructions (18 and 36 bytes). The register
   assignment and loop layout differ: A rotates the decode loop, and B keeps it
-  structured, because `e5r cc` passes `-mllvm -disable-block-placement`.
+  structured, because `nocompiler cc` passes `-mllvm -disable-block-placement`.
 * **The source was shaped once for B** (the copy loop, above); A uses the
   same source.
 * **Trust differs** as described: A adds the RVC extension and lacks
@@ -236,7 +236,7 @@ The format should matter more where this demo does not go:
 * No `sorry`. Only the standard axioms (propext, Classical.choice,
   Quot.sound). No `native_decide`. `lean/Audit.lean` asserts this for all four
   theorems and fails the build otherwise.
-* `lake exe e5r-audit` re-reads the four ELF files and checks that their
+* `lake exe nocompiler-audit` re-reads the four ELF files and checks that their
   `.text` (and, for B, the data sections) are the images the proofs use.
 * **Negative controls** (`scripts/check-proof-controls.sh`): mutations of
   both binaries, which must each make the proof fail:
@@ -257,5 +257,5 @@ The format should matter more where this demo does not go:
 | `demo/test/` | `cobs_test.py` (qemu, both builds), `rvc_decode.py` (llvm-mc), `rvc_exec.py` (qemu vs the extension) |
 | `demo/tools/` | `ExportC.lean` (images of compressed code), `RvcTable.lean`, `count.py` |
 | `lean/Demo/` | the specifications, the four proofs, the images |
-| `lean/E5R/Auto.lean` | `e5r_auto` |
-| `lean/E5R/Ext/Rvc.lean` | the extension for compressed code, `e5r_auto_c` |
+| `lean/NoCompiler/Auto.lean` | `nocompiler_auto` |
+| `lean/NoCompiler/Ext/Rvc.lean` | the extension for compressed code, `nocompiler_auto_c` |

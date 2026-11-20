@@ -1,7 +1,7 @@
 /-
   `Deframer::next`: from the shared return block 0x8001d510 to `NextPost`.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here: `ret_post`: a core at 0x8001d510 with next's frame intact (the 13 save slots, sp,
   x0/gp/tp), a0 ∈ {0, 1}, a Some length (s6) in (2, len], and the deframer invariant in RAM,
@@ -11,8 +11,8 @@ import Projects.rmk.Deframer.NextInv
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Next
-open E5R E5R.Rmk.NextFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.Next
+open NoCompiler NoCompiler.Rmk.NextFetch NoCompiler.Rmk.Deframer.Tail
 
 /-- The return-block state of `next` relative to its entry machine `⟨c, R0⟩`. -/
 structure RetAt (c : Core) (R0 : Word → BitVec 8) (e : Core) (M : Word → BitVec 8) : Prop where
@@ -107,4 +107,4 @@ theorem ret_post (c : Core) (R0 : Word → BitVec 8) (E : CallEnv nextPc nextSta
     have e11 : (nepiCore e M).get 11 = e.get 22 := by simp [nepiCore, Core.wr_get_ne, Core.wr_get_self, alu_add]
     rw [e11]; exact hval h1'
 
-end E5R.Rmk.Deframer.Next
+end NoCompiler.Rmk.Deframer.Next

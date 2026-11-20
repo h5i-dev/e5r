@@ -1,4 +1,4 @@
-/* Original e5r fixture, Apache-2.0. HiFive1 Rev B flash entry; no data. */
+/* Original nocompiler fixture, Apache-2.0. HiFive1 Rev B flash entry; no data. */
 OUTPUT_ARCH(riscv)
 ENTRY(_start)
 PHDRS { text PT_LOAD FLAGS(5); }

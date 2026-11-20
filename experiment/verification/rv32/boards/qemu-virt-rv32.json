@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.board.v1",
+  "schema": "nocompiler.board.v1",
   "id": "qemu-virt-rv32",
   "name": "QEMU virt machine, 32-bit (RMK qemu-riscv-rynk target)",
   "soc": "QEMU 8.2.2 hw/riscv/virt.c, -M virt -cpu rv32 -bios none",

@@ -4,15 +4,15 @@
   Projects/rmk/Deframer/NoneFetch.lean; do not edit by hand. Branch outcomes and memory side
   conditions are hypotheses, discharged in Deframer/NonePath.lean.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Deframer.TailNoCopy
 import Projects.rmk.Deframer.NoneFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.NoneP
-open E5R E5R.Rmk.NoneFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.NoneP
+open NoCompiler NoCompiler.Rmk.NoneFetch NoCompiler.Rmk.Deframer.Tail
 
 def nDiscCore (e : Core) (M : Word → BitVec 8) : Core :=
   e.goto 0x80003ff2
@@ -382,4 +382,4 @@ theorem nCommit (e : Core) (M : Word → BitVec 8) (hpc : e.pc = 0x800043a8) (hq
     rw [exec_jal, Core.set_zero, show (nc8).pc = 0x80003ba2 from rfl, show (0x80003ba2 : Word) + 0x00000278#32 = 0x80003e1a by decide, jump_ok _ _ (by decide)]; rfl
   exact .step hq s0 (.step qnc1 s1 (.step qnc2 s2 (.step qnc3 s3 (.step qnc4 s4 (.step qnc5 s5 (.step qnc6 s6 (.step qnc7 s7 (.single qnc8 s8))))))))
 
-end E5R.Rmk.Deframer.NoneP
+end NoCompiler.Rmk.Deframer.NoneP

@@ -1,0 +1,18 @@
+[package]
+name = "nocompiler-api"
+description = "nocompiler — the library surface the CLI and the servers share."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+nocompiler-core = { workspace = true }
+nocompiler-format = { workspace = true }
+nocompiler-analysis = { workspace = true }
+nocompiler-ir = { workspace = true }
+nocompiler-decomp = { workspace = true }
+nocompiler-db = { workspace = true }
+nocompiler-types = { workspace = true }

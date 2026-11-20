@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check an `e5r ram-image` image.lean against the ELF and the checker's reader.
+"""Check an `nocompiler ram-image` image.lean against the ELF and the checker's reader.
 
 Usage: python3 -I experiment/scripts/check-ram-image-lean.py IMAGE.elf OUT_DIR RV32_DIR [BASE SIZE]
 
@@ -52,9 +52,9 @@ def main():
     src = open(os.path.join(out, "image.lean"), encoding="utf-8").read()
 
     m = re.search(r"^namespace (\S+)\n", src, re.M)
-    lit = re.search(r"def elf : E5R\.RamElf\.File := ⟨(\d+), \[([0-9,\s]*)\]⟩\nend ", src)
+    lit = re.search(r"def elf : NoCompiler\.RamElf\.File := ⟨(\d+), \[([0-9,\s]*)\]⟩\nend ", src)
     if not m or not lit:
-        fail("image.lean is not `def elf : E5R.RamElf.File := ⟨len, [...]⟩`")
+        fail("image.lean is not `def elf : NoCompiler.RamElf.File := ⟨len, [...]⟩`")
     ns = m.group(1)
     n = int(lit.group(1))
     words = [int(w) for w in lit.group(2).replace("\n", "").split(",") if w.strip()]
@@ -73,7 +73,7 @@ def main():
         f"({s['p_vaddr']}, {s['p_memsz']}, {str(s['w']).lower()}, {str(s['x']).lower()}, "
         f"{s['p_offset']}, {s['p_filesz']})" for s in man["segments"])
     check = f"""import {ns}
-open E5R.RamElf
+open NoCompiler.RamElf
 namespace {ns}.Check
 theorem accepted : accepts {base} {size} {ns}.elf = true := by decide +kernel
 /-- The reader's parse equals the exporter's manifest (entry, loads, rwBase). -/

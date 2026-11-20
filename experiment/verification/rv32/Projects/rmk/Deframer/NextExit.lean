@@ -1,7 +1,7 @@
 /-
   `Deframer::next`: the exit test at 0x8001d4f8 (no complete frame left) to `NextPost`.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here: `exit_post`: from 0x8001d4f8 with next's frame intact, s0 = filled ≤ len, s7 ≤ 1
   and the deframer fields as stored, every one of the four exits (discarding: consumed := filled,
@@ -12,8 +12,8 @@ import Projects.rmk.Deframer.NextRet
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Next
-open E5R E5R.Rmk.NextFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.Next
+open NoCompiler NoCompiler.Rmk.NextFetch NoCompiler.Rmk.Deframer.Tail
 
 structure XAt (c : Core) (R0 : Word → BitVec 8) (e : Core) (M : Word → BitVec 8) : Prop where
   pc : e.pc = 0x8001d4f8
@@ -179,4 +179,4 @@ theorem exit_post (c : Core) (R0 : Word → BitVec 8) (E : CallEnv nextPc nextSt
         (by simp [nx2Core, Core.wr_get_ne, Core.wr_get_self]; exact a0z))
       exact ⟨_, m, r.trans r2, post⟩
 
-end E5R.Rmk.Deframer.Next
+end NoCompiler.Rmk.Deframer.Next

@@ -3,7 +3,7 @@
   pure function of the ORIGINAL buffer bytes: a transliteration of the emitted
   machine code (0x8001e064..0x8001e0ea), not of the COBS specification.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   Machine loop, with src = t4, dst = t2, n = a4 (first zero), len = a2:
     0x8001e068  (src < n)  code := buf[src]
@@ -18,7 +18,7 @@
   why the specification needs only `orig`.
 -/
 
-namespace E5R.Rmk.Cobs
+namespace NoCompiler.Rmk.Cobs
 
 /-- One iteration at source index `src`: the bytes appended to the output and the
     next source index, or `none` for an invalid frame (a code running past `n`). -/
@@ -97,4 +97,4 @@ theorem run_congr (f g : Nat → Nat) (n : Nat) (h : ∀ j, j < n → f j = g j)
       · rfl
       · exact run_congr f g n h fuel _ _
 
-end E5R.Rmk.Cobs
+end NoCompiler.Rmk.Cobs

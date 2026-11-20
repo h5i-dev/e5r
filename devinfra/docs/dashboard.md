@@ -3,11 +3,11 @@
 Start the global collection from any directory:
 
 ```sh
-e5rx project new ./a.out --name parser
-e5rx ui
+nocompiler-x project new ./a.out --name parser
+nocompiler-x ui
 ```
 
-In this checkout, use `./target/release/e5rx` if e5r is not installed. Open the
+In this checkout, use `./target/release/nocompiler-x` if nocompiler is not installed. Open the
 printed `http://127.0.0.1:7879` address. The collection shows every project's
 live tasks, blockers, review requests and binary availability. Select a project
 to open its task dashboard and decompiler; **All projects** returns to the
@@ -16,24 +16,24 @@ the CLI. An unavailable binary does not prevent reading that project's tasks.
 
 Project storage follows h5i's convention, in this order:
 
-1. `E5R_PROJECT_HOME`
-2. `$XDG_DATA_HOME/e5r/projects` (absolute XDG paths only)
-3. `~/.local/share/e5r/projects`
+1. `NOCOMPILER_PROJECT_HOME`
+2. `$XDG_DATA_HOME/nocompiler/projects` (absolute XDG paths only)
+3. `~/.local/share/nocompiler/projects`
 
-Each name owns `<root>/<name>/project.e5rproj` and
-`project.e5rproj.work/`. Binaries and existing annotation logs remain at their
+Each name owns `<root>/<name>/project.nocompilerproj` and
+`project.nocompilerproj.work/`. Binaries and existing annotation logs remain at their
 recorded absolute paths. Creation refuses existing names. Omitting `--name`
 uses the binary filename; `--out FILE` keeps the explicit local-file workflow.
 Named project commands work from any directory. A registered name takes
 precedence over a same-named local file; use `./FILE` to select a local manifest:
 
 ```sh
-e5rx project list --json
-e5rx project task parser list --json
-e5rx project task parser add 'Trace input validation' --owner agent-a
-e5rx project import ./old.e5rproj --name older-investigation
-e5rx project relocate parser /new/path/to/a.out
-e5rx project dashboard parser           # optional single-project mode
+nocompiler-x project list --json
+nocompiler-x project task parser list --json
+nocompiler-x project task parser add 'Trace input validation' --owner agent-a
+nocompiler-x project import ./old.nocompilerproj --name older-investigation
+nocompiler-x project relocate parser /new/path/to/a.out
+nocompiler-x project dashboard parser           # optional single-project mode
 ```
 
 Import copies the manifest and task history, preserving the original files.
@@ -83,7 +83,7 @@ are shown for pseudocode only.
 flow kind and known target name. Saved comments appear at their instruction
 address, with author and anchor match. **Annotations** shows saved names, types
 and comments together; low-confidence anchor matches are marked explicitly.
-Comments are also readable in the context panel while viewing pseudocode; e5r
+Comments are also readable in the context panel while viewing pseudocode; nocompiler
 keeps their instruction addresses rather than inventing source-line positions.
 
 **References** defaults to incoming references to the selected entry address.
@@ -122,7 +122,7 @@ Design references: h5i's local console uses restrained surface steps and reserve
 color for meaningful signals. [IDA's subviews](https://docs.hex-rays.com/ida-9.2/user-guide/user-interface/subviews)
 keep function selection synchronized with the active view and retain navigation
 history. [Ghidra's CodeBrowser](https://ghidra.re/ghidra_docs/GhidraClass/Beginner/Introduction_to_Ghidra_Student_Guide.html)
-provides a stable function/listing/decompiler context. e5r uses these navigation
+provides a stable function/listing/decompiler context. nocompiler uses these navigation
 principles at function granularity; its analysis does not supply instruction to
 pseudocode correspondence.
 
@@ -143,16 +143,16 @@ analysis settings are `scan_gaps`, `follow_calls`, `strings`, `xrefs`, `noreturn
 The CLI writes the task store that the browser reads:
 
 ```sh
-e5rx project task investigation.e5rproj add 'Trace input validation' \
+nocompiler-x project task investigation.nocompilerproj add 'Trace input validation' \
   --owner agent-a --next 'Inspect parse_header and its callers' \
   --priority high --evidence function:0x401000 --author agent-a
-e5rx project task investigation.e5rproj list --json
-e5rx project task investigation.e5rproj update T-0001 \
+nocompiler-x project task investigation.nocompilerproj list --json
+nocompiler-x project task investigation.nocompilerproj update T-0001 \
   --revision 1 --input task.json --author agent-a
 ```
 
 `add` and `update` return the saved task as JSON. `list --json` returns
-`e5r.work.v1`, with each saved task, `ready`, `waiting_on` and `attention`.
+`nocompiler.work.v1`, with each saved task, `ready`, `waiting_on` and `attention`.
 `update` takes the last observed revision and a complete content document:
 
 ```json
@@ -182,7 +182,7 @@ Task content is limited to 64 KiB. Writer names contain 1–200 bytes. `--input`
 can also create a task from a full content document. Content flags
 apply when supplying a title and cannot be combined with `--input`, which
 supplies the whole content instead.
-`--author` defaults to `E5R_AUTHOR`, then the OS user. The browser has no write controls.
+`--author` defaults to `NOCOMPILER_AUTHOR`, then the OS user. The browser has no write controls.
 
 ## Durability and conflicts
 
@@ -210,12 +210,12 @@ and rebound-host requests. All non-GET requests are refused with 405. Edits use 
 | `GET /api/projects` | all registered projects and live task signals |
 | `GET /api/project` | project identity and container information |
 | `GET /api/tasks` | shared task snapshot |
-| `GET /api/functions` | recovered functions, using the existing `e5r/1` JSON |
+| `GET /api/functions` | recovered functions, using the existing `nocompiler/1` JSON |
 | `GET /api/decompile/0xADDRESS` | one function's pseudocode |
 | `GET /api/disas/0xADDRESS` | one function's instructions |
 | `GET /api/xrefs/0xADDRESS` | incoming references |
 | `GET /api/callgraph/0xADDRESS` | incoming and outgoing direct-call edges |
-| `GET /api/context/0xADDRESS` | function-local annotations, outgoing references with target context, and CFG blocks (`e5r.context.v1`) |
+| `GET /api/context/0xADDRESS` | function-local annotations, outgoing references with target context, and CFG blocks (`nocompiler.context.v1`) |
 | `GET /api/records` | findings, notes and reports |
 
 In collection mode, workspace routes are prefixed with `/p/NAME` (for example,
@@ -234,9 +234,9 @@ Run `cargo test --release --workspace` for Rust checks. For the browser workflow
 install Playwright and its Chromium browser outside the checkout, then run:
 
 ```sh
-cargo build --release -p e5r-cli
-E5R_PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node scripts/test-dashboard.mjs
-E5R_PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node scripts/test-projects.mjs
+cargo build --release -p nocompiler-cli
+NOCOMPILER_PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node scripts/test-dashboard.mjs
+NOCOMPILER_PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node scripts/test-projects.mjs
 ```
 
 The integration check compiles a small C binary with `cc`, starts an isolated
@@ -246,7 +246,7 @@ project and stops the server when finished. Screenshots are written under `/tmp`
 
 The collection check verifies global registration/import, working-directory
 independence, project isolation, CLI creation and read-only collection, decompiler access and binary
-relocation with a temporary `E5R_PROJECT_HOME`.
+relocation with a temporary `NOCOMPILER_PROJECT_HOME`.
 
 ## Findings, notes and reports
 
@@ -257,19 +257,19 @@ Records do not contribute to task readiness or task counts. Imports preserve
 all three stores along with tasks.
 
 ```sh
-e5rx project record parser finding add 'Length check before copy' \
+nocompiler-x project record parser finding add 'Length check before copy' \
   --description 'The recovered guard rejects lengths above 32 before the copy.' \
   --evidence function:0x401000 --author agent-a
-e5rx project record parser note add 'Open questions' --description 'Check indirect callers.'
-e5rx project record parser report add 'Parser investigation' --description 'Investigation text'
-e5rx project record parser finding list --json
-e5rx project record parser finding update T-0001 --revision 1 --input finding.json
+nocompiler-x project record parser note add 'Open questions' --description 'Check indirect callers.'
+nocompiler-x project record parser report add 'Parser investigation' --description 'Investigation text'
+nocompiler-x project record parser finding list --json
+nocompiler-x project record parser finding update T-0001 --revision 1 --input finding.json
 ```
 
 Attach a note to a recovered function using its exact address as evidence:
 
 ```sh
-e5rx project record parser note add 'Input length checks' \
+nocompiler-x project record parser note add 'Input length checks' \
   --description 'The parser rejects lengths above 32 before the copy.' \
   --evidence function:0x401000 --author agent-a
 ```
@@ -287,7 +287,7 @@ these live project records; comments are shown in disassembly and Annotations.
 Full record text lives in `description`; use `--input FILE` for large content.
 The UI renders text literally, including Markdown, without executing HTML.
 
-Disassembly JSON (`e5r/1`) includes additive `bytes` and `target_name` fields for
+Disassembly JSON (`nocompiler/1`) includes additive `bytes` and `target_name` fields for
 each instruction. `bytes` is the mapped encoding in hex, or null if unavailable;
 `target_name` is a known name for a direct flow target, or null. The JSON includes
 encodings regardless of the CLI's text-only `--bytes` switch. Other CLI consumers

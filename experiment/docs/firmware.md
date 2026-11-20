@@ -1,8 +1,8 @@
 # Binary-level firmware verification (scope F)
 
-e5r proves safety properties of a firmware **binary** for one board.
+nocompiler proves safety properties of a firmware **binary** for one board.
 The Lean kernel checks the proofs. The proof subject is the flash image built
-from the ELF file's bytes. e5r's decompiler, CFG recovery and IR are not
+from the ELF file's bytes. nocompiler's decompiler, CFG recovery and IR are not
 inputs to any proof.
 
 This document defines the supported scope. Milestone status is in
@@ -18,9 +18,9 @@ the V0 research proofs it grew from are in
 | `duty()` contract on the Embassy firmware binary (buffer loop, frame, source-level result) | Proved |
 | Clamp binary for all 2^32 inputs, wraparound included | Proved |
 | Verification jobs: CLI, structured results, stale-result detection, limits | Done |
-| Soundness of the whole-firmware certificate checker (`E5R.AI.check_sound`) | Proved; kernel-replayed, standard axioms only |
-| Hybrid composition: checker plus directly proved regions and masked summaries (`E5R.AI.check_sound_hybrid`) | Proved; standard axioms only |
-| Machine-code summary of the firmware's channel ring-head update (`RingAI.spec_sound`, review worker) | Proved; used by the analyzer with `E5R_RING=1` |
+| Soundness of the whole-firmware certificate checker (`NoCompiler.AI.check_sound`) | Proved; kernel-replayed, standard axioms only |
+| Hybrid composition: checker plus directly proved regions and masked summaries (`NoCompiler.AI.check_sound_hybrid`) | Proved; standard axioms only |
+| Machine-code summary of the firmware's channel ring-head update (`RingAI.spec_sound`, review worker) | Proved; used by the analyzer with `NOCOMPILER_RING=1` |
 | Two separate real binaries combining the checker with a direct summary (`demo_safe`, `loop_safe`) | Proved (labeled demos, not the Embassy firmware) |
 | **Whole-firmware safety theorem for the Embassy example** (no escape from the model, every PWM duty ≤ 100) | **Not yet proved.** It needs a certificate for the firmware that the checker accepts; the analyzer does not yet produce one that is precise and small enough |
 
@@ -170,7 +170,7 @@ script in the `firmware-verification` job.
 
 ### Jobs
 
-A job (`verification/rv32/jobs/*.json`, schema `e5r.verify.job.v1`) names:
+A job (`verification/rv32/jobs/*.json`, schema `nocompiler.verify.job.v1`) names:
 
 - the ELF, how to build it, and its reviewed SHA-256;
 - the board;
@@ -180,8 +180,8 @@ A job (`verification/rv32/jobs/*.json`, schema `e5r.verify.job.v1`) names:
 - time and resident-memory limits.
 
 ```sh
-target/release/e5r-exp check verification/rv32/jobs/hifive1-duty.json --out duty.json
-target/release/e5r-exp verify-result duty.json
+target/release/nocompiler-exp check verification/rv32/jobs/hifive1-duty.json --out duty.json
+target/release/nocompiler-exp verify-result duty.json
 ```
 
 `check` does the following:
@@ -202,7 +202,7 @@ target/release/e5r-exp verify-result duty.json
 6. Prints each named theorem's axioms and refuses anything beyond `propext`,
    `Classical.choice` and `Quot.sound`.
 
-The result (`e5r.verify.result.v1`) has one status:
+The result (`nocompiler.verify.result.v1`) has one status:
 
 | Status | Meaning |
 | --- | --- |
@@ -218,7 +218,7 @@ current job kind produces one.
 A result records SHA-256 identities of:
 - the job, the board and the ELF;
 - every model and proof source;
-- the Lean and `e5r` versions.
+- the Lean and `nocompiler` versions.
 
 `verify-result` recomputes them and reports the result stale if any differ,
 so a proof is never silently carried over to a changed binary,
@@ -227,10 +227,10 @@ module only if its source, every earlier module's source and the Lean
 version are unchanged since it last compiled successfully. It is for
 development; CI and the one-command check always run fresh.
 
-### Rechecking without e5r
+### Rechecking without nocompiler
 
 ```sh
-target/release/e5r-exp bundle verification/rv32/jobs/hifive1-clamp32.json --out clamp-bundle
+target/release/nocompiler-exp bundle verification/rv32/jobs/hifive1-clamp32.json --out clamp-bundle
 cd clamp-bundle && ./recheck.sh
 ```
 
@@ -239,19 +239,19 @@ self-contained directory: the model and proof sources, the generated image
 and fidelity modules, the ELF, the result, and SHA-256 sums of all of
 them. Its `recheck.sh` needs only Lean, the version named in
 `lean-toolchain`. It checks the sums, recompiles every module and requires
-the axiom report to equal the recorded one. Python, Rust and e5r are not
+the axiom report to equal the recorded one. Python, Rust and nocompiler are not
 involved, and no network access is needed. The clamp bundle is 11 MB and
 rechecks in under a minute.
 
 ### Adding a target
 
 1. Build the firmware so its ELF is byte-reproducible (no host paths in
-   loaded bytes), and run `e5r-exp flash` on it. A refusal names the rule
+   loaded bytes), and run `nocompiler-exp flash` on it. A refusal names the rule
    the image breaks.
 2. Write the property in Lean against `Theories/Logic.lean` and the
    generated image module, as `Projects/hifive1/Duty.lean` does.
 3. Add a job file listing the build, the ELF pin, the modules and the
-   theorems, and run `e5r-exp check`.
+   theorems, and run `nocompiler-exp check`.
 
 No runner needs editing. Writing the proof is still manual for now; the
 automatic whole-program checker is the open item above.
@@ -380,8 +380,8 @@ Two things are open, and one is done:
    - unconditional facts implied by guarded ones whose guard holds;
    - several facts about the same bytes are intersected.
    The untrusted analyzer's merge and reuse choices still lose the fact
-   (`tools/Analyze.lean` options `E5R_ADDR_SPLIT`, `E5R_TAG_DEPTH`,
-   `E5R_KEEP`, `E5R_KEEP_GUARDED`, `E5R_FREEZE_G`, `E5R_RING`, with their
+   (`tools/Analyze.lean` options `NOCOMPILER_ADDR_SPLIT`, `NOCOMPILER_TAG_DEPTH`,
+   `NOCOMPILER_KEEP`, `NOCOMPILER_KEEP_GUARDED`, `NOCOMPILER_FREEZE_G`, `NOCOMPILER_RING`, with their
    measurements in the commit messages).
 2. **Size: the blocker.** The zero-report certificate's source (29 MB
    after sharing repeated lists) aborts elaboration within 24 GB after

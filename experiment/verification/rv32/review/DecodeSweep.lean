@@ -7,7 +7,7 @@
   immediates as 32-bit hex).
 -/
 import Theories.Platform
-open E5R
+open NoCompiler
 
 namespace DecodeSweep
 

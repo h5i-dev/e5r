@@ -1,7 +1,7 @@
 /-
   `Uart16550<MmioBackend>::send_bytes` (0x800098a6), on the pinned RMK image: PROVED, no contract.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   The function (uart_16550, MMIO backend, stride 1 at 0x10000000 on QEMU virt) checks that the
   transmitter holds nothing (LSR bit 5), and, when the struct's flow-control byte (+0x15) is set and
@@ -20,8 +20,8 @@ import Projects.rmk.DevRead
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Uart
-open E5R E5R.Rmk E5R.Rmk.SendFetch E5R.Rmk.Deframer E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Uart
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.SendFetch NoCompiler.Rmk.Deframer NoCompiler.Rmk.Deframer.Tail
 
 /-- A byte store to a device register: one step, every oracle, one write event, RAM unchanged. -/
 theorem lands_sb_dev {P : Machine → Prop} {m : Machine} {rs1 rs2 : Reg} {off len a : Word} {d : DevReg}
@@ -683,4 +683,4 @@ theorem send_bytes (m₀ : Machine) (E : SendEnv m₀) : Lands B img (SendPost m
     (by rw [Core.wr_get_ne _ _ _ _ _ (by decide), k22]) (by rw [Core.wr_get_ne _ _ _ _ _ (by decide), k20])
     (by rw [Core.wr_get_ne _ _ _ _ _ (by decide), k21])
 
-end E5R.Rmk.Uart
+end NoCompiler.Rmk.Uart

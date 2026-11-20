@@ -4,7 +4,7 @@
   pinned RMK image. No callee contract is assumed (memmove and COBS inside unpark are discharged by
   main's `copy_contract`/`cobs_report`); the yield poll stays an explicit boundary.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here: `send_to_loop`: from `SendAt` with the session's `Extras` and the deframer facts the
   unpark step needs (parked ≤ 488, discarding ≤ 1), every behaviour reaches the loop head 0x80003e1a
@@ -17,8 +17,8 @@
 import Projects.rmk.Uart.SendRound
 import Projects.rmk.Deframer.SessionInv
 
-namespace E5R.Rmk.Uart
-open E5R E5R.Rmk E5R.Rmk.Deframer E5R.Rmk.Deframer.Session E5R.Rmk.Deframer.SessionI
+namespace NoCompiler.Rmk.Uart
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.Deframer NoCompiler.Rmk.Deframer.Session NoCompiler.Rmk.Deframer.SessionI
 
 theorem sendW_SW {sp y : Word} (h : SendW sp y) : SW sp y := by
   unfold SendW InSlots at h; unfold SW; omega
@@ -56,4 +56,4 @@ theorem w_sendLoop : SendAt ⟨wCore, wRam⟩ ∧ Extras ⟨wCore, wRam⟩ ∧
   ⟨w_sendAt, ⟨by decide, by decide, ⟨by decide, by decide⟩, by decide, by decide, by simp only [SW]; decide,
     by decide, by decide, by decide, by decide, by decide, by decide, by decide, by decide, by decide⟩, by decide, by decide⟩
 
-end E5R.Rmk.Uart
+end NoCompiler.Rmk.Uart

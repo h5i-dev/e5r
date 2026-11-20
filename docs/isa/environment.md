@@ -1,7 +1,7 @@
 # The environment model
 
 `ecall` hands control to the Linux kernel, and the ISA says nothing about
-what happens next. `lean/E5R/Env.lean` says what e5r assumes happens, for
+what happens next. `lean/NoCompiler/Env.lean` says what nocompiler assumes happens, for
 the four syscalls the profile admits. It is a relation, not a function: the
 kernel's choices are left open, and a proof has to hold for every one of
 them. It is part of the trusted base ([trust.md](trust.md)).
@@ -24,7 +24,7 @@ Any other syscall number has no successor, so no proof about code that makes
 one goes through.
 
 The permission side: `write` needs `buf[0, n)` readable and `read` needs it
-writable (`SysOk` in `lean/E5R/Step.lean`). That is what makes a buffer
+writable (`SysOk` in `lean/NoCompiler/Step.lean`). That is what makes a buffer
 overrun through a syscall a memory-safety violation, like one through a
 store.
 

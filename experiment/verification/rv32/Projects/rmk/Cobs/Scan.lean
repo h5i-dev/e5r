@@ -8,14 +8,14 @@
     0x8001e048 addi a4,a4,1 ; bne a2,a4,0x8001e03e
     0x8001e04e mv a4,a2                                 (falls to 0x8001e050)
 
-  Original e5r code, Apache-2.0. Every load is a byte of `[a1, a1 + a2)`.
+  Original nocompiler code, Apache-2.0. Every load is a byte of `[a1, a1 + a2)`.
 -/
 import Projects.rmk.Cobs.Basic
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Cobs
-open E5R E5R.Rmk E5R.Rmk.CobsFetch
+namespace NoCompiler.Rmk.Cobs
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.CobsFetch
 
 /-- Byte `j` of the buffer at `buf` in RAM `S`. -/
 def bufByte (S : Word → BitVec 8) (buf : Word) (j : Nat) : Nat := (S (buf + BitVec.ofNat 32 j)).toNat
@@ -174,4 +174,4 @@ theorem scan (buf : Word) (len : Nat) (hbuf : B.inRam buf len = true) :
         rw [hi1, firstZero_eq ((bufByte S buf)) (d.get 14).toNat, if_pos (by omega), if_neg hb]
       · rw [hg2 r h13 h14]; simp only [e1, Core.goto_get]; exact hg r h13 h14
 
-end E5R.Rmk.Cobs
+end NoCompiler.Rmk.Cobs

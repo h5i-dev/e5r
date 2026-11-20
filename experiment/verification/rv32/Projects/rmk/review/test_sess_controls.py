@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Adversarial controls for main's session invariant and rounds (review of 094b8c6).
 
-Original e5r code, Apache-2.0. Each control drops or weakens ONE hypothesis (or strengthens one
+Original nocompiler code, Apache-2.0. Each control drops or weakens ONE hypothesis (or strengthens one
 claim) in a scratch copy of main's sources and recompiles from the changed module to the end of
 the chain. It passes only if the first error is in the expected declaration and is a proof
 failure (REJECTED), not an elaboration failure. Main's tree is never modified.

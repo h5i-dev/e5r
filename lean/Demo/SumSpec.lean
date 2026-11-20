@@ -1,13 +1,13 @@
-import E5R.Auto
+import NoCompiler.Auto
 
 /-
 The specification of `u64 sum(const u64 *a, u64 n)` (demo/src/sum.c, the
-same source as examples/sum.c), shared by Demo/SumB.lean (e5r build) and
+same source as examples/sum.c), shared by Demo/SumB.lean (nocompiler build) and
 Demo/SumA.lean (ordinary build). It is the specification of
 lean/Examples/Sum.lean, restated without that file's image.
 -/
 namespace Demo.Sum
-open E5R
+open NoCompiler
 
 /-- The sum of a list of words, modulo 2^64. -/
 def sumW (xs : List Word) : Word := xs.foldl (· + ·) 0

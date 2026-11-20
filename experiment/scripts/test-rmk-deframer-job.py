@@ -3,7 +3,7 @@
 (jobs/rmk/rmk-deframer-conditional.json: tail/park/unpark from CopyContract, next from
 CopyContract and CobsReportContract; main's proofs, my runner wrapper).
 
-Usage: python3 -I experiment/scripts/test-rmk-deframer-job.py E5R_VERIFY [JOB_ID] [--copies|--official]
+Usage: python3 -I experiment/scripts/test-rmk-deframer-job.py NOCOMPILER_VERIFY [JOB_ID] [--copies|--official]
 
 JOB_ID defaults to rmk-deframer-conditional; rmk-session-conditional (main's recv_step and
 unpark_step, CopyContract explicit) adds the session cases below. --official (default once
@@ -197,7 +197,7 @@ def main():
     COPYPOST = "    m.ram x = Memmove.moved m₀.ram (m₀.core.get 10) (m₀.core.get 11) (m₀.core.get 12).toNat x\n\n/-- The dependency"
     MOVED = "m.ram x = Memmove.moved m₀.ram (m₀.core.get 10) (m₀.core.get 11) (m₀.core.get 12).toNat x"
     BRIDGE = ("  exact ⟨k, m, r, P.pc, P.regs, P.csr, P.ram⟩\n",
-              "  exact ⟨k, m, r, P.pc, P.regs, P.csr, P.ram, fun x hx => P.ram x (by unfold E5R.Rmk.InFrame; omega)⟩\n")
+              "  exact ⟨k, m, r, P.pc, P.regs, P.csr, P.ram, fun x hx => P.ram x (by unfold NoCompiler.Rmk.InFrame; omega)⟩\n")
     if JOBID == "rmk-session-discharged":
         cases += [
             ("copy-post-below", {"Spec": (COPYPOST, COPYPOST.replace("\n\n", f"\n  below : ∀ x, x.toNat + 48 ≤ (m₀.core.get 2).toNat → {MOVED}\n\n")),

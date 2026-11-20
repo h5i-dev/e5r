@@ -1,10 +1,10 @@
 /-
   The firmware ring-tail summary (Tail.lean) between abstract states of the
   certificate checker: `spec : SumSpec` at pc 0x20010482 and `spec_sound`
-  for `E5R.AI.check_sound_hybrid`'s `hsums`, next to the ring-head summary
+  for `NoCompiler.AI.check_sound_hybrid`'s `hsums`, next to the ring-head summary
   (RingAI.lean).
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   `enterOk` asks for: the exact pc, a main-thread state, MIE known clear,
   the channel `s1` an exact address whose head and tail words (+0x14,
@@ -24,9 +24,9 @@ import Projects.hifive1.hybrid.RingAI
 
 set_option maxRecDepth 100000
 
-namespace E5R.Hifive1.Hybrid.TailAI
-open E5R E5R.AI E5R.Hybrid E5R.Hifive1.Hybrid.Tail
-open E5R.Hifive1.Hybrid.RingAI (cfg chan sameCsr_parts w_add)
+namespace NoCompiler.Hifive1.Hybrid.TailAI
+open NoCompiler NoCompiler.AI NoCompiler.Hybrid NoCompiler.Hifive1.Hybrid.Tail
+open NoCompiler.Hifive1.Hybrid.RingAI (cfg chan sameCsr_parts w_add)
 
 def tailAV : AV := .vals [0, 1, 2, 3]
 def maskAV : AV := .vals [0, 0xffffffff]
@@ -215,4 +215,4 @@ theorem spec_sound (keep : List (Nat × Nat)) : SumSound { cfg with hkeep := kee
   obtain ⟨m', hr, hpost⟩ := adapter ha hs
   exact safeStep_of_mrun (cfg := { cfg with hkeep := keep }) (n := 9) hr hpost
 
-end E5R.Hifive1.Hybrid.TailAI
+end NoCompiler.Hifive1.Hybrid.TailAI

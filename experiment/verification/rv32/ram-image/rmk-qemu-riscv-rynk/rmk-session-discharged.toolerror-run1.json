@@ -6,8 +6,8 @@
       "Quot.sound"
     ],
     "board_sha256": "6fe2d0db63ed5756db3ca2845b00931154c84359002daf47cff906b0df64287b",
-    "e5r_verify": "0.1.0",
-    "e5r_verify_sha256": "51c3bea108faafa695f5388401228151212ce468c9016fd47de229023dc4a255",
+    "nocompiler_verify": "0.1.0",
+    "nocompiler_verify_sha256": "51c3bea108faafa695f5388401228151212ce468c9016fd47de229023dc4a255",
     "elf": {
       "bytes": 454024,
       "path": "build/rmk-qemu-riscv-rynk.elf",
@@ -105,7 +105,7 @@
   },
   "job": "rmk-session-discharged",
   "job_file": "jobs/rmk/rmk-session-discharged.json",
-  "message": "unexpected Lean output: 'E5R.Rmk.Deframer.recv_step'' depends on axioms: [propext, Classical.choice, Quot.sound]",
+  "message": "unexpected Lean output: 'NoCompiler.Rmk.Deframer.recv_step'' depends on axioms: [propext, Classical.choice, Quot.sound]",
   "modules": [
     "Theories/Hart.lean",
     "Theories/Platform.lean",
@@ -180,7 +180,7 @@
     "Projects/ramimage/SessionDischarged.lean"
   ],
   "resumed": [],
-  "schema": "e5r.verify.result.v1",
+  "schema": "nocompiler.verify.result.v1",
   "seconds": 1341.795261161,
   "stages": [
     {

@@ -4,15 +4,15 @@
   Projects/rmk/Init/InitFetch.lean; do not edit by hand. Memory side conditions are hypotheses,
   discharged in Init/InitPath.lean.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Deframer.TailNoCopy
 import Projects.rmk.Init.InitFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Init
-open E5R E5R.Rmk.InitFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Init
+open NoCompiler NoCompiler.Rmk.InitFetch NoCompiler.Rmk.Deframer.Tail
 
 def iACore (e : Core) (M : Word → BitVec 8) : Core :=
   (((((((((e.wr 26 (alu .add (e.get 22) 0x00000333#32) 0x80003b3c).wr 27 (alu .add (e.get 22) 0x00000330#32) 0x80003b40).goto 0x80003d8e).wr 10 (alu .add (e.get 23) 0x000000f1#32) 0x80003d92).goto 0x80003d96).wr 12 (ramRead (ramWrite M (e.get 22 + 0x000002df#32) (alu .add (e.get 23) 0x000000f1#32) .w) (e.get 2 + 0x0000001c#32) .w) 0x80003d98).goto 0x80003d9c).wr 11 (ramRead (ramWrite (ramWrite M (e.get 22 + 0x000002df#32) (alu .add (e.get 23) 0x000000f1#32) .w) (e.get 22 + 0x000002e3#32) (ramRead (ramWrite M (e.get 22 + 0x000002df#32) (alu .add (e.get 23) 0x000000f1#32) .w) (e.get 2 + 0x0000001c#32) .w) .w) (e.get 2 + 0x00000018#32) .w) 0x80003d9e).goto 0x80003da2).goto 0x80003da6
@@ -359,4 +359,4 @@ theorem iPost (e : Core) (M : Word → BitVec 8) (hpc : e.pc = 0x80003e0a) (hq :
 theorem iPostCsr (e : Core) (M : Word → BitVec 8) : (iPostCore e M).sameCsr e :=
   ((Core.sameCsr_goto _ _).trans ((Core.sameCsr_goto _ _).trans ((Core.sameCsr_goto _ _).trans (Core.sameCsr_goto _ _))))
 
-end E5R.Rmk.Init
+end NoCompiler.Rmk.Init

@@ -2,7 +2,7 @@
   `Deframer::tail` on the pinned RMK image: the path with a copy (consumed ≠ 0), proved against
   memmove's contract as an explicit hypothesis, and the whole of `tail` from both paths.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here, CONDITIONAL ON `CopyContract` (a hypothesis of every theorem below,
   not proved here; the peer's memmove proofs discharge it only for the cases `Memmove.PreB` allows,
@@ -16,8 +16,8 @@ import Projects.rmk.Deframer.TailNoCopy
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Tail
-open E5R E5R.Rmk.TailFetch
+namespace NoCompiler.Rmk.Deframer.Tail
+open NoCompiler NoCompiler.Rmk.TailFetch
 
 /-! ## Before the call: 0x8001d58c .. 0x8001d5a4 -/
 
@@ -391,4 +391,4 @@ theorem tail_from_copy : TailFromCopy := fun hC m₀ h => by
   · exact nocopy tailStack (by decide) m₀ h hc
   · exact withCopy hC tailStack (by decide) m₀ h hc
 
-end E5R.Rmk.Deframer.Tail
+end NoCompiler.Rmk.Deframer.Tail

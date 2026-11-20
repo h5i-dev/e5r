@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The extension's semantics (lean/E5R/Ext/Rvc.lean) against qemu-riscv64, on
+"""The extension's semantics (lean/NoCompiler/Ext/Rvc.lean) against qemu-riscv64, on
 the compressed cobs_decode the proof is about.
 
     python3 -I demo/test/rvc_exec.py RVC_RUN TEST_ELF PROOF_ELF ENTRY [N]

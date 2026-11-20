@@ -11582,7 +11582,7 @@
    "family": "illegal",
    "expect": "ok",
    "model": "oracle-divergence",
-   "verdict": "MISMATCH step 0: model trap E5R.Exc.illegal, QEMU completed normally"
+   "verdict": "MISMATCH step 0: model trap NoCompiler.Exc.illegal, QEMU completed normally"
   },
   {
    "name": "system f3=4",

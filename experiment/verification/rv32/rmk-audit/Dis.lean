@@ -2,15 +2,15 @@
   Disassembler for audit notes (a program, not part of any proof): the model's own fetchDecode on the
   runner-generated packed image. Usage (verification/rv32, after the RAM-image job built Projects/rmk/Elf):
     LEAN_PATH=. lean --run rmk-audit/Dis.lean A..B ...   (decimal addresses)
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Theories.Logic
 import Theories.RamElf
 import Projects.rmk.Elf
-open E5R
-def img : List Segment := (RamElf.imageOf 0x80000000 0x1000000 E5R.Rmk.Image.elf).ro
+open NoCompiler
+def img : List Segment := (RamElf.imageOf 0x80000000 0x1000000 NoCompiler.Rmk.Image.elf).ro
 def clean (s : String) : String :=
-  ((s.replace "E5R." "").replace "Instr." "").replace "\n" " " |>.splitOn " " |>.filter (· ≠ "") |> " ".intercalate
+  ((s.replace "NoCompiler." "").replace "Instr." "").replace "\n" " " |>.splitOn " " |>.filter (· ≠ "") |> " ".intercalate
 def dis (a b : Nat) : IO Unit := do
   let mut pc := a
   while pc < b do

@@ -20,8 +20,8 @@ def load_facts(path):
 
 
 def parse(instr):
-    s = instr.replace('E5R.Instr.', '').replace('E5R.AluOp.', '').replace('E5R.Width.', '').replace(
-        'E5R.BrCond.', '').replace('E5R.MulOp.', '').replace('(', '').replace(')', '')
+    s = instr.replace('NoCompiler.Instr.', '').replace('NoCompiler.AluOp.', '').replace('NoCompiler.Width.', '').replace(
+        'NoCompiler.BrCond.', '').replace('NoCompiler.MulOp.', '').replace('(', '').replace(')', '')
     return s.split()
 
 

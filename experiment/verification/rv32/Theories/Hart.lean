@@ -1,7 +1,7 @@
 /-
-  RV32IMAC + Zicsr hart semantics for the e5r firmware product scope.
+  RV32IMAC + Zicsr hart semantics for the nocompiler firmware product scope.
 
-  Original e5r code, Apache-2.0, written from the RISC-V Unprivileged ISA
+  Original nocompiler code, Apache-2.0, written from the RISC-V Unprivileged ISA
   (20240411) and Privileged Architecture (20240411) specifications. The split
   between a pure instruction semantics that returns a first-order effect tree
   and a separate interpreter that owns memory and devices follows the design
@@ -22,7 +22,7 @@
 
 set_option linter.constructorNameAsVariable false
 
-namespace E5R
+namespace NoCompiler
 
 abbrev Word := BitVec 32
 abbrev Reg := Fin 32
@@ -498,4 +498,4 @@ def takeIrq (c : Core) (code : Nat) : Eff :=
 def irqEnabled (c : Core) (code : Nat) : Bool :=
   c.mie_ && code ∈ irqCodes && c.mieReg.getLsbD code
 
-end E5R
+end NoCompiler

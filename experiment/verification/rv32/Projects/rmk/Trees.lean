@@ -1,7 +1,7 @@
 /-
   Checkpoint composition with device I/O: every behaviour of the model, not only deterministic runs.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   `Lands P m`: from m every behaviour of `Step` reaches a checkpoint (P) after finitely many steps
   (the tree is inductive, so every path through it is finite; no uniform bound is claimed, since
@@ -20,8 +20,8 @@
 -/
 import Projects.rmk.Reach
 
-namespace E5R.Rmk
-open E5R
+namespace NoCompiler.Rmk
+open NoCompiler
 
 inductive Lands (B : Board) (img : List Segment) (P : Machine → Prop) : Machine → Prop
   | done {m} : P m → Lands B img P m
@@ -93,4 +93,4 @@ theorem reach_no_escape {B : Board} {img : List Segment} (P : Machine → Prop)
   · exact key.2 o f h
   · rw [key.1 code] at he; exact absurd he (by decide)
 
-end E5R.Rmk
+end NoCompiler.Rmk

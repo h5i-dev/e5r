@@ -6,11 +6,11 @@
 import tools.ReplayLib
 import Theories.FlashElf
 import Theories.Board.QemuUserRv32
-open E5R
+open NoCompiler
 
 def main (args : List String) : IO UInt32 := do
   let bytes ← IO.FS.readBinFile args[0]!
-  let B := E5R.QemuUserRv32.board
+  let B := NoCompiler.QemuUserRv32.board
   let w : FlashElf.Windows := ⟨0x10000, 0x10000, B.ramBase, B.ramSize⟩
   match FlashElf.loadFlash w (bytes.toList.map (·.toNat)) with
   | .error e => IO.eprintln s!"{args[0]!}: {e}"; return 2

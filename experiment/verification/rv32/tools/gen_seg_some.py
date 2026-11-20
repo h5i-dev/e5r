@@ -51,15 +51,15 @@ print('''/-
   do not edit by hand. Branch outcomes and memory side conditions are hypotheses, discharged in
   Deframer/SomePath.lean.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Deframer.TailNoCopy
 import Projects.rmk.Deframer.SomeFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.SomeP
-open E5R E5R.Rmk.SomeFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.SomeP
+open NoCompiler NoCompiler.Rmk.SomeFetch NoCompiler.Rmk.Deframer.Tail
 ''')
 # header halfword at s6+0xcb (the message's first field) negative: straight to the unpark call site
 seg('sNeg', 0x80003e70, 0x80003fd8, {0x80003e70: MEM, 0x80003e74: MEM, 0x80003e78: T}, 'sn')
@@ -86,4 +86,4 @@ seg('sState', 0x80003f2c, 0x80003f4c, {pc: MEM for pc in (0x80003f2c, 0x80003f30
                                                           0x80003f3c, 0x80003f40, 0x80003f44, 0x80003f48)}, 'st')
 seg('sEmpty', 0x80003f4c, 0x80003fd8, {0x80003f4c: F, 0x80003f52: MEM}, 'se')
 seg('sSend', 0x80003f4c, 0x8000429e, {0x80003f4c: T}, 'ss')
-print('end E5R.Rmk.Deframer.SomeP')
+print('end NoCompiler.Rmk.Deframer.SomeP')

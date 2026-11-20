@@ -3,7 +3,7 @@
   send side), in the emitted firmware (sampler task poll), for hybrid
   composition with the abstract-interpretation checker.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   embassy-sync's `Channel<_, u8, 4>` send side, as rustc emitted it inside
   the sampler's poll, in a critical section (MIE cleared before this point):
@@ -32,8 +32,8 @@ import Projects.hifive1.Image
 
 set_option maxRecDepth 100000
 
-namespace E5R.Hifive1.Hybrid.Tail
-open E5R E5R.Hybrid
+namespace NoCompiler.Hifive1.Hybrid.Tail
+open NoCompiler NoCompiler.Hybrid
 
 abbrev B := Hifive1Revb.board
 abbrev img := Firmware.segments
@@ -206,4 +206,4 @@ def summary : Summary B img where
 theorem post_tail_lt {m₀ m : Machine} (h : Pre m₀) (hs : Spec m₀ m) : (m.core.get 13).toNat < 4 := by
   rw [hs.a3]; exact next_lt h.tailLt
 
-end E5R.Hifive1.Hybrid.Tail
+end NoCompiler.Hifive1.Hybrid.Tail

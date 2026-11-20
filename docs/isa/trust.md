@@ -9,15 +9,15 @@ trusting the following, and nothing else.
 | What | Where | How it is checked |
 | --- | --- | --- |
 | The Lean 4 kernel (v4.35.0) | `lean/lean-toolchain` | The kernel is small and widely used; `lean/Audit.lean` fails the build if a listed theorem uses an axiom beyond `propext`, `Classical.choice` and `Quot.sound` |
-| Instruction decoding | `lean/E5R/Isa.lean` | Against llvm-mc (`crates/e5r/tests/decode.rs`, through the Rust decoder) and against the Rust decoder directly (`crates/e5r/tests/semantics.rs`) |
-| Instruction semantics | `lean/E5R/Machine.lean` | Against qemu-riscv64 (`crates/e5r/tests/semantics.rs`) and against the official Sail RISC-V model's C emulator (`crates/e5r/tests/sail.rs`), each on random programs over every instruction |
-| The machine model | `HwStep` in `lean/E5R/Step.lean` | By reading: fetch from memory, decode, execute, or hand ECALL to the environment |
-| The environment model | `lean/E5R/Env.lean` | By reading against the Linux syscall ABI; its assumptions are listed in [environment.md](environment.md) |
+| Instruction decoding | `lean/NoCompiler/Isa.lean` | Against llvm-mc (`crates/nocompiler/tests/decode.rs`, through the Rust decoder) and against the Rust decoder directly (`crates/nocompiler/tests/semantics.rs`) |
+| Instruction semantics | `lean/NoCompiler/Machine.lean` | Against qemu-riscv64 (`crates/nocompiler/tests/semantics.rs`) and against the official Sail RISC-V model's C emulator (`crates/nocompiler/tests/sail.rs`), each on random programs over every instruction |
+| The machine model | `HwStep` in `lean/NoCompiler/Step.lean` | By reading: fetch from memory, decode, execute, or hand ECALL to the environment |
+| The environment model | `lean/NoCompiler/Env.lean` | By reading against the Linux syscall ABI; its assumptions are listed in [environment.md](environment.md) |
 | The meaning of the definitions a theorem is stated with | `Reach`, `Exec`, `Spec`, `Verified`, `Preserved`, `Entry` | By reading [spec.md](spec.md) and the files |
 | The specification of the function | e.g. `spec` in `lean/Examples/Sum.lean` | By reading: it is the claim |
 | That memory holds the image at entry, and the function's writable memory does not overlap the code | `Code.Loaded`, `Protected` | Hypotheses of `Verified.hw`; the loader maps `.text` read-only and executable |
-| That memory holds a data section a proof reads from | `Segment.Loaded` (`lean/E5R/Image.lean`), as a precondition | The loader maps the section; the audit checks the exported bytes are the file's |
-| The hardware or emulator implementing RV64IM, Zba and Zbb as the specification says | | Outside e5r |
+| That memory holds a data section a proof reads from | `Segment.Loaded` (`lean/NoCompiler/Image.lean`), as a precondition | The loader maps the section; the audit checks the exported bytes are the file's |
+| The hardware or emulator implementing RV64IM, Zba and Zbb as the specification says | | Outside nocompiler |
 
 ## Not trusted
 
@@ -25,33 +25,33 @@ trusting the following, and nothing else.
   miscompilation makes a proof fail, not succeed.
 - **Whoever or whatever wrote the code or the proof.** The kernel checks the
   proof.
-- **The `e5r` tool** (`crates/e5r`): its ELF reader, decoder, profile
+- **The `nocompiler` tool** (`crates/nocompiler`): its ELF reader, decoder, profile
   checker, structure recovery and Lean exporter. The exporter writes the raw
   `.text` words and the bytes of every data section. Each `instr_<addr>`
   lemma it writes is proved by `rfl`, that is by the kernel evaluating the
-  Lean decoder on the word. `e5r-audit` re-reads the ELF file with the Lean
-  ELF reader (`lean/E5R/Elf.lean`) and checks that its `.text` is word for
+  Lean decoder on the word. `nocompiler-audit` re-reads the ELF file with the Lean
+  ELF reader (`lean/NoCompiler/Elf.lean`) and checks that its `.text` is word for
   word the image the proof uses, and every allocated data section
   (`.rodata`, `.data`, `.bss`, ...) byte for byte its exported `Segment`.
-- **`.e5r.struct`**, and the Rust profile checker: they make proofs easier
+- **`.nocompiler.struct`**, and the Rust profile checker: they make proofs easier
   to write. A proof about a binary that breaks the rules is still a proof.
   Where conformance itself is the claim, the Lean checker
-  (`lean/E5R/Struct.lean`) decides rules R1 to R3 in the kernel
+  (`lean/NoCompiler/Struct.lean`) decides rules R1 to R3 in the kernel
   (`<name>_checked`), and `Struct.cfi` proves what they mean for control flow.
-- **The tactics** (`lean/E5R/Tactic.lean`): a tactic that does the wrong
+- **The tactics** (`lean/NoCompiler/Tactic.lean`): a tactic that does the wrong
   thing produces a term the kernel rejects.
 - **The program logic** (`Reach.bind`, `Reach.loop`, `Verified.call`, and
   the rest): proved from the definitions.
-- **The adequacy theorems** (`lean/E5R/Adequacy.lean`): proved, once, for
+- **The adequacy theorems** (`lean/NoCompiler/Adequacy.lean`): proved, once, for
   every program.
 
 ## Extensions outside the profile
 
-`lean/E5R/Ext/Rvc.lean` extends the semantics to compressed (RVC) code, for
+`lean/NoCompiler/Ext/Rvc.lean` extends the semantics to compressed (RVC) code, for
 the comparison in [demo/README.md](../../demo/README.md): `decodeC`,
 `CCode.instr` and `execC` are trusted *for the results stated with
 `VerifiedC`*, and are checked against llvm-mc (every 16-bit word) and qemu
-(the demo's compressed binary). Results about e5r binaries (`Verified`) do
+(the demo's compressed binary). Results about nocompiler binaries (`Verified`) do
 not depend on it. The adequacy theorems are not proved for it.
 
 ## Known gaps
@@ -62,6 +62,6 @@ not depend on it. The adequacy theorems are not proved for it.
   The test runs the C emulator generated from Sail (release
   2026-11-16-a2ad4b5) on random programs; it covers what the programs
   exercise, every instruction with chosen and random operands, not every
-  state. Proving `E5R.exec` equal to the Lean that Sail's Lean backend
+  state. Proving `NoCompiler.exec` equal to the Lean that Sail's Lean backend
   generates is on the [roadmap](../ROADMAP.md); it needs the Sail toolchain
   (OCaml, opam) built here, and the generated model is large.

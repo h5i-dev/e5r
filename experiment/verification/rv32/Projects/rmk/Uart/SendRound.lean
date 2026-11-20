@@ -4,7 +4,7 @@
   `send_bytes`; the yield poll (0x8001e14a, which calls the executor's waker through a vtable) is an
   explicit BOUNDARY.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   The loop (from the bytes): the response slice (ptr s0, len a1) and the Uart16550 pointer [s6+0x307]
   are stored in the poll's future slots [s6+0x307, s6+0x334) = [0x8002a7c4, 0x8002a7f1); then, with
@@ -33,8 +33,8 @@ import Projects.rmk.Uart.SendLoopSegs
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Uart
-open E5R E5R.Rmk E5R.Rmk.Deframer E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Uart
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.Deframer NoCompiler.Rmk.Deframer.Tail
 
 /-- The send loop's future slots [0x8002a7c4, 0x8002a7f1) (s6+0x307 .. s6+0x334). -/
 def InSlots (x : Word) : Prop := 0x8002a7c4 ≤ x.toNat ∧ x.toNat < 0x8002a7f1
@@ -485,4 +485,4 @@ theorem w_sendAt : SendAt ⟨wCore, wRam⟩ := by
   refine ⟨rfl, fun code => by simp [irqEnabled, wCore], by decide, by decide, by decide, by decide, by decide,
     by decide, by decide, by decide, by decide, by decide, by decide, by decide, by decide, by decide, by decide⟩
 
-end E5R.Rmk.Uart
+end NoCompiler.Rmk.Uart

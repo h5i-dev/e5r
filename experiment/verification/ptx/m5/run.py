@@ -5,7 +5,7 @@ For each task (kernels/NAME.ptx written by the model, specs/NAME.json from
 mkspec.py):
 
   1. ptxas -arch=sm_86 must assemble the PTX;
-  2. `e5r ptx check` gives proved / refuted / unknown / unsupported,
+  2. `nocompiler ptx check` gives proved / refuted / unknown / unsupported,
      with the Lean time;
   3. on the GPU (CUDA driver API through ctypes): the kernel runs on random
      inputs at several lengths and launch shapes inside the spec's range, and
@@ -14,7 +14,7 @@ mkspec.py):
   4. timing: the PTX kernel against a CUDA C baseline with the same schedule,
      compiled by nvcc -O3, at n = 2^24, median of 20 launches.
 
-  run.py E5R_VERIFY OUTDIR [NAME ...]
+  run.py NOCOMPILER_VERIFY OUTDIR [NAME ...]
 
 Writes OUTDIR/results.json and prints one line per task and a summary.
 """

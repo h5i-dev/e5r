@@ -4,7 +4,7 @@
   in which abstract interpretation covers the program around a directly
   proved region that runs on every loop iteration.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   The main loop loads the ring head, steps it exactly as embassy-sync's
   channel does in the firmware (0x20010018..0x20010026: addi +1; addi -4;
@@ -19,7 +19,7 @@
     entry node describes, the run ends in a machine `post` of that node
     describes, and `post` of every delegated node is covered by a main node
     (`entries_ok`, kernel-evaluated).
-  * `E5R.AI.check_sound_hybrid` (support-lean4 d6ae986) composes them, with
+  * `NoCompiler.AI.check_sound_hybrid` (support-lean4 d6ae986) composes them, with
     `Hybrid.regionOf` discharging its step and interrupt obligations.
 
   Abstract interpretation alone cannot prove this program (BuildLoopCert
@@ -32,8 +32,8 @@ import Projects.hifive1.hybrid.demo.LoopCert
 
 set_option maxRecDepth 100000
 
-namespace E5R.HybridLoop.Proof
-open E5R E5R.AI E5R.Hybrid E5R.HybridLoop.Job
+namespace NoCompiler.HybridLoop.Proof
+open NoCompiler NoCompiler.AI NoCompiler.Hybrid NoCompiler.HybridLoop.Job
 
 abbrev B := cfg.board
 abbrev img := cfg.img
@@ -207,10 +207,10 @@ theorem adapter {s : AState} {m : Machine} (ha : enterOk s = true) (hs : StateHo
     case msc => show s.mscratch.gam ρM m'.core.mscratch; rw [e8]; exact hs.mscratch
   · simp at h10
 
-end E5R.HybridLoop.Proof
+end NoCompiler.HybridLoop.Proof
 
-namespace E5R.HybridLoop.Proof
-open E5R E5R.AI E5R.Hybrid E5R.HybridLoop.Job
+namespace NoCompiler.HybridLoop.Proof
+open NoCompiler NoCompiler.AI NoCompiler.Hybrid NoCompiler.HybridLoop.Job
 
 /-! ## Composition with the checker -/
 
@@ -247,4 +247,4 @@ theorem hentry : ∀ k (n : Node), (n.s.pc, k) ∈ Cert.cert.delegate → n ∈ 
 theorem loop_safe : Safe B img (StateHolds ρM boot) (EvOk cfg) :=
   check_sound_hybrid ai_check (fun _ => region) hentry (fun _ h => by cases h) (fun _ h => h)
 
-end E5R.HybridLoop.Proof
+end NoCompiler.HybridLoop.Proof

@@ -2,7 +2,7 @@
   Symbolic execution of RV32 code on the pinned RMK image, with a soundness proof against the
   model's own `stepInstr`.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   A symbolic state `AS` has a concrete pc. Its registers are expressions `SE` over the entry
   registers `R` and the entry RAM `M`, and its memory is the entry RAM under a list of symbolic
@@ -23,8 +23,8 @@ import Projects.rmk.Trees
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Sym
-open E5R E5R.Rmk
+namespace NoCompiler.Rmk.Sym
+open NoCompiler NoCompiler.Rmk
 
 /-! ## Symbolic values -/
 
@@ -43,7 +43,7 @@ def SE.eval (R : Nat → Word) (M : Word → BitVec 8) : SE → Word
   | .c w => w
   | .reg r => R r
   | .ld w a => ramRead M (a.eval R M) w
-  | .alu op a b => E5R.alu op (a.eval R M) (b.eval R M)
+  | .alu op a b => NoCompiler.alu op (a.eval R M) (b.eval R M)
   | .ext w s a => extend w s (a.eval R M)
   | .cat acc b k => BitVec.ofNat 32 ((acc.eval R M).toNat + (b.eval R M).toNat % 256 * 256 ^ k)
 
@@ -83,9 +83,9 @@ theorem lin_sound (R : Nat → Word) (M : Word → BitVec 8) :
     rw [ha, hb] at h
     have ea := iha _ _ ha
     have eb := ihb _ _ hb
-    show E5R.alu .add (a.eval R M) (b.eval R M) = _
+    show NoCompiler.alu .add (a.eval R M) (b.eval R M) = _
     rw [ea, eb]
-    simp only [E5R.alu]
+    simp only [NoCompiler.alu]
     cases qa with
     | none =>
       simp only [Option.some.injEq, Prod.mk.injEq] at h
@@ -112,19 +112,19 @@ theorem mkLin_eval (R : Nat → Word) (M : Word → BitVec 8) (p : Option Nat ×
     simp only [mkLin]
     split
     · rename_i h; subst h; simp [SE.eval, baseVal]
-    · simp [SE.eval, baseVal, E5R.alu]
+    · simp [SE.eval, baseVal, NoCompiler.alu]
 
 /-- A symbolic ALU result: folded when both operands are known, kept linear when possible. -/
 def aluS (op : AluOp) (a b : SE) : SE :=
   match a, b with
-  | .c x, .c y => .c (E5R.alu op x y)
+  | .c x, .c y => .c (NoCompiler.alu op x y)
   | _, _ =>
     match (SE.alu op a b).lin with
     | some p => mkLin p
     | none => .alu op a b
 
 theorem aluS_eval (R : Nat → Word) (M : Word → BitVec 8) (op : AluOp) (a b : SE) :
-    (aluS op a b).eval R M = E5R.alu op (a.eval R M) (b.eval R M) := by
+    (aluS op a b).eval R M = NoCompiler.alu op (a.eval R M) (b.eval R M) := by
   unfold aluS
   split
   · rfl
@@ -475,7 +475,7 @@ theorem rdByte_sound {E : Env} {R : Nat → Word} {M : Word → BitVec 8} (hE : 
   | nil =>
     intro a k e h
     simp only [rdByte, Option.some.injEq] at h; subst h
-    simp only [SE.eval, ramRead, aluS_eval, E5R.alu, applyW, BitVec.toNat_ofNat]
+    simp only [SE.eval, ramRead, aluS_eval, NoCompiler.alu, applyW, BitVec.toNat_ofNat]
     have := (M (a.eval R M + BitVec.ofNat 32 k)).isLt
     omega
   | cons hd ws ih =>
@@ -503,7 +503,7 @@ theorem rdByte_sound {E : Env} {R : Nat → Word} {M : Word → BitVec 8} (hE : 
         split
         · rename_i h0; subst h0; simp
         · rw [aluS_eval]
-          simp only [SE.eval, E5R.alu, BitVec.toNat_ushiftRight, BitVec.toNat_ofNat, Nat.shiftRight_eq_div_pow]
+          simp only [SE.eval, NoCompiler.alu, BitVec.toNat_ushiftRight, BitVec.toNat_ofNat, Nat.shiftRight_eq_div_pow]
           have : 8 * d % 2 ^ 32 % 32 = 8 * d := by omega
           rw [this, Nat.pow_mul]
     · split at h

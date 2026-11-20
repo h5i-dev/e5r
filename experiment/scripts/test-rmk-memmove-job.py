@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Negative controls for the RMK memmove job (jobs/rmk/rmk-memmove-small.json).
 
-Usage: python3 -I experiment/scripts/test-rmk-memmove-job.py E5R_VERIFY [BUNDLE_DIR]
+Usage: python3 -I experiment/scripts/test-rmk-memmove-job.py NOCOMPILER_VERIFY [BUNDLE_DIR]
 
 Runs variants of the job (written under verification/rv32/build/testjobs,
 id `rmk-memmove-neg`, `--resume` so unchanged modules are not recompiled)
@@ -15,7 +15,7 @@ and expects each to be refused for its own reason:
   * a proof address no longer at the named symbol: `error`;
   * a module claiming the board's model RAM starts 4 bytes later: `failed`;
   * the image declared as flash on the RAM board: `error`.
-With BUNDLE_DIR (from `e5r bundle` of the job), a copy of it with the
+With BUNDLE_DIR (from `nocompiler bundle` of the job), a copy of it with the
 packed module changed by one word fails `recheck.sh` at the checksums, and
 with the checksum forged as well, at the packing check.
 Exit status 0 only if every case behaves as stated.
@@ -81,12 +81,12 @@ def main():
            "places images in ram")
     open(os.path.join(T, "MemmoveWrongBoard.lean"), "w").write(
         "import Projects.ramimage.Memmove\n"
-        "theorem E5R.RmkMemmoveNeg.board : E5R.Rmk.B = "
-        "E5R.QemuVirtRv32.board (E5R.Rmk.Image.image.rwBase + 4) := by\n"
-        "  rw [E5R.Rmk.Image.image_rwBase]\n")
+        "theorem NoCompiler.RmkMemmoveNeg.board : NoCompiler.Rmk.B = "
+        "NoCompiler.QemuVirtRv32.board (NoCompiler.Rmk.Image.image.rwBase + 4) := by\n"
+        "  rw [NoCompiler.Rmk.Image.image_rwBase]\n")
     expect("false claim about the board",
            check + [variant("board", modules=JOB["modules"] + ["build/testjobs/MemmoveWrongBoard.lean"],
-                            theorems=JOB["theorems"] + ["E5R.RmkMemmoveNeg.board"])],
+                            theorems=JOB["theorems"] + ["NoCompiler.RmkMemmoveNeg.board"])],
            10, "MemmoveWrongBoard.lean")
     expect("changed memmove instruction, unpinned: the proof fails",
            check + [variant("unpinned", elf=wrong, elf_sha256=None)], 10, "MemmoveFetch.lean")

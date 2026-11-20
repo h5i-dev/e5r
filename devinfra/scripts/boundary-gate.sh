@@ -13,7 +13,7 @@
 #   * Ground truth is every DWARF subprogram with a low_pc and a high_pc, read
 #     out of the *unstripped* binary by readelf. Not by our own DWARF reader:
 #     a boundary score graded by the thing being graded is not a measurement.
-#   * e5r is run on a copy with the debug information removed, in two
+#   * nocompiler is run on a copy with the debug information removed, in two
 #     configurations. `stripped` is `strip --strip-all`, which leaves
 #     .eh_frame, and .eh_frame names the start of every function that can be
 #     unwound through: a tool that reads it scores perfect recall and has
@@ -23,7 +23,7 @@
 #     ground-truth start. Start-only, because that is the number the field
 #     reports and the number the rest of analysis depends on; the end is
 #     reported separately as `exact`, where the size must also agree.
-#   * Ground truth is restricted to addresses inside a section e5r considers
+#   * Ground truth is restricted to addresses inside a section nocompiler considers
 #     executable, so a subprogram the linker discarded is not counted against
 #     recall. Precision is scoped to the byte ranges DWARF covers, for the
 #     reason spelled out where it is computed.
@@ -34,21 +34,21 @@
 #   scripts/boundary-gate.sh --csv        # machine-readable, for docs/
 #   scripts/boundary-gate.sh zlib         # only manifest rows matching zlib
 #
-# Env: E5R  the executable (default ../target/release/e5rx)
+# Env: NoCompiler  the executable (default ../target/release/nocompiler-x)
 #
 # Degrades rather than fails: no corpus is a skip and a zero exit, like every
 # other gate here. A non-zero exit means a floor below was missed.
 set -euo pipefail
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-e5r=${E5R:-$repo/../target/release/e5rx}
+nocompiler=${NoCompiler:-$repo/../target/release/nocompiler-x}
 
 csv=0
 if [ "${1:-}" = "--csv" ]; then csv=1; shift; fi
 filter=${1:-}
 
-if [ ! -x "$e5r" ]; then
-  echo "no $e5r; build first: cargo build --release. Skipping." >&2
+if [ ! -x "$nocompiler" ]; then
+  echo "no $nocompiler; build first: cargo build --release. Skipping." >&2
   exit 0
 fi
 
@@ -116,8 +116,8 @@ score_one() {
     image=$stripped
     [ "$mode" = stripped ] || image=$blind
     [ -n "$image" ] || continue
-    "$e5r" funcs --json "$image" > "$work/funcs.json" 2> /dev/null || continue
-    "$e5r" sections --json "$image" > "$work/sections.json" 2> /dev/null || continue
+    "$nocompiler" funcs --json "$image" > "$work/funcs.json" 2> /dev/null || continue
+    "$nocompiler" sections --json "$image" > "$work/sections.json" 2> /dev/null || continue
     python3 - "$project" "$opt" "$orig" "$mode" "$truth" "$work/funcs.json" \
       "$work/sections.json" <<'PY' >> "$rows"
 import json, os, sys
@@ -160,7 +160,7 @@ if not truth:
 # A stripped binary contains code the project did not compile: PLT thunks,
 # _init and _fini, and whatever the C runtime linked in, none of which has
 # DWARF because none of it was built with -g. Counting those as false
-# positives would say e5r invented 300 functions where it found 300 real
+# positives would say nocompiler invented 300 functions where it found 300 real
 # ones the ground truth simply does not describe.
 #
 # In scope means inside a byte range DWARF actually covers. A reported
@@ -287,9 +287,9 @@ hdr = (f"{'':<26} {'bins':>4} {'truth':>7} {'scope':>7} {'reported':>8} "
 print("G4: function boundary recovery against DWARF ground truth")
 print()
 print("  truth     DWARF subprograms with a low_pc inside an executable section")
-print("  scope     functions e5r reported inside a byte range DWARF covers")
-print("  reported  functions e5r reported at all, PLT and CRT code included")
-print("  recall    ground-truth starts e5r found")
+print("  scope     functions nocompiler reported inside a byte range DWARF covers")
+print("  reported  functions nocompiler reported at all, PLT and CRT code included")
+print("  recall    ground-truth starts nocompiler found")
 print("  prec      in-scope reported functions that are ground-truth starts")
 print("  exact     ground-truth functions whose start AND size both matched")
 print()

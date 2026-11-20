@@ -1,13 +1,13 @@
-# The e5r profile
+# The nocompiler profile
 
 Status: version 0, 2026-11-20. The definitions this document describes are
-`lean/E5R/Isa.lean` (instructions), `lean/E5R/Machine.lean` (semantics) and
-`crates/e5r/src/profile.rs` (structural rules). Where this text and the code
+`lean/NoCompiler/Isa.lean` (instructions), `lean/NoCompiler/Machine.lean` (semantics) and
+`crates/nocompiler/src/profile.rs` (structural rules). Where this text and the code
 disagree, the code is what is checked; report the disagreement.
 
 ## 1. What it is
 
-The e5r profile is a subset of 64-bit RISC-V plus a set of rules about how
+The nocompiler profile is a subset of 64-bit RISC-V plus a set of rules about how
 code is laid out, chosen so that a machine-code function can be proved
 correct in Lean 4 with as little effort as possible, by a person or by a
 model writing the proof.
@@ -21,7 +21,7 @@ whether or not anyone checked the rules first (see [spec.md](spec.md)).
 The rules come from three places: NaCl's restrictions on x86 code, eBPF's
 static checks, and WebAssembly's structured control flow. Unlike eBPF, a
 binary that breaks a rule is not rejected by anything at run time: breaking
-a rule only means the proof is harder to write, or that `e5r check` says so.
+a rule only means the proof is harder to write, or that `nocompiler check` says so.
 
 ## 2. Instructions
 
@@ -56,12 +56,12 @@ variable-length vector state. They are later versions of the profile
 
 The decoder is checked against llvm-mc on every funct7/funct3 combination,
 every 12-bit immediate of every immediate opcode, and 60,000 random words
-(`crates/e5r/tests/decode.rs`); the Lean decoder is checked against the Rust
-one (`crates/e5r/tests/semantics.rs`).
+(`crates/nocompiler/tests/decode.rs`); the Lean decoder is checked against the Rust
+one (`crates/nocompiler/tests/semantics.rs`).
 
 ## 3. Semantics
 
-`lean/E5R/Machine.lean` follows the RISC-V unprivileged specification for
+`lean/NoCompiler/Machine.lean` follows the RISC-V unprivileged specification for
 these instructions. The profile narrows it in two places, both of which make
 the model smaller than the hardware, never larger:
 
@@ -73,14 +73,14 @@ the model smaller than the hardware, never larger:
   multiple of 4 has no successor (instruction-address-misaligned: there is no
   C extension).
 
-The semantics are compared with qemu-riscv64 (`crates/e5r/tests/semantics.rs`)
+The semantics are compared with qemu-riscv64 (`crates/nocompiler/tests/semantics.rs`)
 and with the C emulator generated from the official Sail RISC-V model
-(`crates/e5r/tests/sail.rs`), on random programs covering every instruction.
+(`crates/nocompiler/tests/sail.rs`), on random programs covering every instruction.
 
 ## 4. Structural rules
 
 A function is the code named by an `STT_FUNC` symbol with a nonzero size,
-inside `.text`. A binary conforms when every function does. `e5r check`
+inside `.text`. A binary conforms when every function does. `nocompiler check`
 decides it; each rule has an identifier in its output.
 
 - **R1 decode.** Every word of the function decodes to a profile instruction.
@@ -110,17 +110,17 @@ decides it; each rule has an identifier in its output.
   of 16. Along every path the offset of `sp` from its value at entry is the
   same at each instruction, is a multiple of 16 at every call, and is 0 at
   every return and tail call. The largest depth is the function's frame.
-- **M1 metadata.** If the binary has an `.e5r.struct` section, each
+- **M1 metadata.** If the binary has an `.nocompiler.struct` section, each
   function's tree, frame size and callees there are the ones the code has
   ([metadata.md](metadata.md)).
 
-`e5r check` without `.e5r.struct` recovers the tree from the control-flow
+`nocompiler check` without `.nocompiler.struct` recovers the tree from the control-flow
 graph and checks against that; with the section, it checks against what the
 section says. The recovery is not trusted by the checker: it only proposes a
 tree.
 
-Rules R1 to R3 are also defined in Lean (`lean/E5R/Struct.lean`, `check`),
-and `e5r export` writes, for every conforming function, its tree as a
+Rules R1 to R3 are also defined in Lean (`lean/NoCompiler/Struct.lean`, `check`),
+and `nocompiler export` writes, for every conforming function, its tree as a
 `Struct.Func` and a theorem `<name>_checked` that `check` accepts it, proved
 by evaluation in the kernel. `Struct.cfi` is what that buys: from any state
 of a run of a checked function, every step goes to the next instruction, to
@@ -143,12 +143,12 @@ includes this as `Preserved` ([spec.md](spec.md)).
 clang --target=riscv64-unknown-elf -march=rv64im_zba_zbb -mabi=lp64 -mno-relax -O2 \
   -ffreestanding -nostdlib -fno-pic -c f.c
 ld.lld -static -e _start f.o -o f.elf
-e5r annotate f.elf -o f.e5r.elf     # check, then record .e5r.struct
+nocompiler annotate f.elf -o f.nocompiler.elf     # check, then record .nocompiler.struct
 ```
 
 What clang emits at `-O2` for ordinary C conforms as long as the code needs
 no jump table (a dense `switch`; `-fno-jump-tables` avoids it) and no
-function pointer; `e5r check` says which function fails which rule.
+function pointer; `nocompiler check` says which function fails which rule.
 Recursion is allowed by the rules; bounding its stack use is then part of
 the proof.
 [toolchain.md](toolchain.md) has the details, and the plan for doing this

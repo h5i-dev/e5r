@@ -53,15 +53,15 @@ print('''/-
   Projects/rmk/Uart/SendLoopFetch.lean; do not edit by hand. Branch outcomes and memory side conditions
   are hypotheses, discharged in Uart/SendRound.lean.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Deframer.TailNoCopy
 import Projects.rmk.Uart.SendLoopFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Uart
-open E5R E5R.Rmk.SendLoopFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Uart
+open NoCompiler NoCompiler.Rmk.SendLoopFetch NoCompiler.Rmk.Deframer.Tail
 ''')
 # entry: a2 = [s6+0x307] (the Uart16550 pointer), the outer slice saved, to 0x80004262: sent = 0, the
 # inner slice; len != 0; the call send_bytes(uart, ptr + sent, len - sent)
@@ -83,4 +83,4 @@ seg('lDn1', 0x80004308, 0x80004282, {0x80004308: MEM, 0x8000430c: T, 0x80004278:
 # the outer slice advanced by sent (no slice panic), nothing left: [s10] = 1, to the unpark site
 seg('lDn2', 0x80004282, 0x80003fd8, {0x80004282: MEM, 0x80004286: F, 0x8000428a: MEM, 0x80004292: MEM,
                                      0x80004296: MEM, 0x8000429a: T, 0x80003f52: MEM}, 'lf')
-print('end E5R.Rmk.Uart')
+print('end NoCompiler.Rmk.Uart')

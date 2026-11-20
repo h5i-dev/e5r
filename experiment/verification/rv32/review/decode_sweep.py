@@ -268,7 +268,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--samples', type=int, default=1_000_000)
     ap.add_argument('--seed', type=int, default=1)
-    ap.add_argument('--out', default=os.environ.get('E5R_SCRATCH', '/dev/shm') + '/decode-sweep')
+    ap.add_argument('--out', default=os.environ.get('NOCOMPILER_SCRATCH', '/dev/shm') + '/decode-sweep')
     ap.add_argument('--summary')
     ap.add_argument('--controls', action='store_true')
     a = ap.parse_args()

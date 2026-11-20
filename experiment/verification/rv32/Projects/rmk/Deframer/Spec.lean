@@ -1,6 +1,6 @@
 /-
   R2: the host-input property for RMK's Rynk deframer, as Lean statements.
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   STATUS: SPECIFICATION ONLY. Nothing here is proved; every definition below is a proof
   obligation, and the constants marked CANDIDATE are read from the disassembly of the pinned ELF
@@ -21,20 +21,20 @@
   command authorized, so an authorization property would be vacuous for this example and is not
   claimed.
 
-  Function contracts have the shape of E5R.Rmk.Memmove.contract: from a machine meeting `Pre`,
+  Function contracts have the shape of NoCompiler.Rmk.Memmove.contract: from a machine meeting `Pre`,
   a quiet run (no interrupt enabled at any machine, every step deterministic, no event, no fault)
   reaches a machine meeting `Post`. Because each step of such a run is the only behaviour of the
   model there, a returning run also shows the panic is not reached on the way.
 -/
 import Projects.rmk.MemmoveContract
 
-namespace E5R.Rmk.Deframer
-open E5R E5R.Rmk
+namespace NoCompiler.Rmk.Deframer
+open NoCompiler NoCompiler.Rmk
 
 -- The runner's one image module (Projects.rmk.Elf, as the memmove job uses), so these statements
--- compose with E5R.Rmk.Memmove.contractB.
-abbrev B : Board := E5R.Rmk.B
-abbrev img : List Segment := E5R.Rmk.img
+-- compose with NoCompiler.Rmk.Memmove.contractB.
+abbrev B : Board := NoCompiler.Rmk.B
+abbrev img : List Segment := NoCompiler.Rmk.img
 
 /-! ## Constants read from the ELF (CANDIDATE until a proof uses them) -/
 
@@ -258,7 +258,7 @@ def NextPanicControl : Prop :=
 /-! ## The copy contract the methods need (DEPENDENCY, not proved)
 
 Every method copies with `memmove(dst, src, n)`, n up to `bufLen`, src and dst anywhere in the
-buffer (either direction, any alignment). The review worker's `E5R.Rmk.Memmove.contractB` proves
+buffer (either direction, any alignment). The review worker's `NoCompiler.Rmk.Memmove.contractB` proves
 n < 16 (either direction) and n ≥ 16 forward with src ≡ dst (mod 4); the n ≥ 16 backward and
 misaligned paths are in progress. `CopyContract` is the full statement the deframer proofs take as
 an explicit HYPOTHESIS until that work proves it; no result below holds without it. -/
@@ -365,4 +365,4 @@ def SessionSafe (sp : SessionPoint) : Prop :=
     m.core.pc ≠ BitVec.ofNat 32 unwindPc ∧
     (m.core.pc = BitVec.ofNat 32 sp.loopPc → Inv m.ram sp.deframer bufLen)
 
-end E5R.Rmk.Deframer
+end NoCompiler.Rmk.Deframer

@@ -2,7 +2,7 @@ import Demo.CobsSpec
 import Demo.Cobs.ImageA
 
 namespace Demo.Cobs
-open E5R Demo.Cobs.ImageA
+open NoCompiler Demo.Cobs.ImageA
 
 set_option maxHeartbeats 20000000 in
 /-- `cobs_decode` as plain clang -O2 -march=rv64gc compiled it (demo/elf/cobs.a.elf).
@@ -13,7 +13,7 @@ set_option maxHeartbeats 20000000 in
 theorem cobs_a : VerifiedC code cobs_decode_dom cobs_decode_entry spec := by
   rintro ⟨r, buf, orig⟩ s he ⟨ha0, ha1, ha2, hlen, hmem, hal, hdis⟩
   have hfl := frameLen_le orig
-  e5r_auto_c cobs_decode_entry cobs_decode_size s he
+  nocompiler_auto_c cobs_decode_entry cobs_decode_size s he
     loop_inv 0x11194 (fun u => ∃ k, u.reg 7 = BitVec.ofNat 64 k ∧ k < orig.length ∧ k ≤ frameLen orig ∧
         u.reg 10 = r ∧ u.reg 11 = buf ∧ u.reg 12 = BitVec.ofNat 64 orig.length ∧ u.mem = s.mem)
       measure (fun u => 3 * orig.length + 3 - (u.reg 7).toNat)

@@ -4,7 +4,7 @@
 For each task (kernels/NAME.ptx, specs/NAME.json from mkspec.py):
 
   1. ptxas -arch=sm_86 must assemble the PTX;
-  2. `e5r ptx check` gives the verdict and the Lean time;
+  2. `nocompiler ptx check` gives the verdict and the Lean time;
   3. on the GPU: the PTX kernel and a CUDA C baseline written with the
      intrinsic of the same rounding (`__fmaf_rn`, `__fdiv_rn`, ...; `-ftz=true`
      where the task flushes) run on the same inputs (edge values, random bit
@@ -14,7 +14,7 @@ For each task (kernels/NAME.ptx, specs/NAME.json from mkspec.py):
      The baseline is compiled by nvcc and is independent of the Lean model;
   4. timing against the baseline at n = 2^24, median of 20 launches.
 
-  run_float.py E5R_VERIFY OUTDIR [NAME ...]
+  run_float.py NOCOMPILER_VERIFY OUTDIR [NAME ...]
 """
 import ctypes
 import json

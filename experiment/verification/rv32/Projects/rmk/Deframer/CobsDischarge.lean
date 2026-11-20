@@ -1,9 +1,9 @@
 /-
   The COBS dependency of `next`, discharged: `CobsReportContract` (Deframer/Spec.lean) from the
-  COBS worker's proved contract of `decode_in_place_report` (`E5R.Rmk.Cobs.decode`,
+  COBS worker's proved contract of `decode_in_place_report` (`NoCompiler.Rmk.Cobs.decode`,
   Projects/rmk/Cobs/Decode.lean), and with it `next`'s contract conditional on memmove's alone.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here:
   * `run_len`: the decode loop's output is never longer than the frame (`Cobs.run`, the COBS
@@ -19,8 +19,8 @@
 import Projects.rmk.Deframer.Next
 import Projects.rmk.Cobs.Decode
 
-namespace E5R.Rmk.Deframer
-open E5R E5R.Rmk
+namespace NoCompiler.Rmk.Deframer
+open NoCompiler NoCompiler.Rmk
 
 theorem run_len (orig : Nat → Nat) (n : Nat) :
     ∀ fuel src (acc : List Nat), acc.length ≤ src → src ≤ n → (Cobs.run orig n fuel src acc).2.length ≤ n
@@ -75,4 +75,4 @@ theorem cobs_report : CobsReportContract := by
 /-- `next`'s contract given memmove's alone (COBS discharged by `cobs_report`). -/
 theorem next_from_copy : NextFromCopy := fun hC => Next.next_from_deps hC cobs_report
 
-end E5R.Rmk.Deframer
+end NoCompiler.Rmk.Deframer

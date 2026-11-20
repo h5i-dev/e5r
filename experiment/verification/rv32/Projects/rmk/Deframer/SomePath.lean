@@ -1,7 +1,7 @@
 /-
   The session's Some path from 0x80003e70, on the pinned RMK image: the first branch, proved.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   At 0x80003e70 the code loads the message's header halfword (0x8002a588 = s6+0xcb, written by
   `RynkMessage::from_decoded`), stores it at s6+0x2eb and, if it is negative as an i16, jumps
@@ -19,8 +19,8 @@ import Projects.rmk.Deframer.SomeSegs
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.SomeP
-open E5R E5R.Rmk E5R.Rmk.Deframer.Tail E5R.Rmk.Deframer.Session E5R.Rmk.Deframer.SessionI
+namespace NoCompiler.Rmk.Deframer.SomeP
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.Deframer.Tail NoCompiler.Rmk.Deframer.Session NoCompiler.Rmk.Deframer.SessionI
 
 /-- A halfword whose high byte is ≥ 0x80 is negative as an i16. -/
 theorem neg_h (x y : BitVec 8) (h : 0x80 ≤ y.toNat) :
@@ -81,4 +81,4 @@ theorem some_neg (m : Machine) (h : SomeAt m) (hneg : 0x80 ≤ (m.ram 0x8002a589
   obtain ⟨k, m', r2, hpc, hI⟩ := unpark_round ⟨K, R⟩ UA E
   exact ⟨_, m', r1.trans r2, hpc, hI⟩
 
-end E5R.Rmk.Deframer.SomeP
+end NoCompiler.Rmk.Deframer.SomeP

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Emit the Lean boilerplate of a straight-line quiet run of the pinned memmove.
 
-Original e5r code, Apache-2.0. Reads the instruction facts of MemmoveFetch.lean
+Original nocompiler code, Apache-2.0. Reads the instruction facts of MemmoveFetch.lean
 and a path: start pc, then one decision per branch ('T' taken / 'N' not).
 Prints, in the lazy style of MemmoveMisStart (each core written from the
 previous core's registers, so every step is `rw [exec_*]; rfl`):

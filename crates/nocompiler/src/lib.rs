@@ -1,0 +1,219 @@
+//! nocompiler: a formal-verification-friendly profile of RISC-V (RV64IM + Zba +
+//! Zbb, structured control flow, a fixed stack discipline), and the tools to
+//! check a binary against it, record its structure, and export it to Lean 4.
+//!
+//! None of this crate is trusted by a proof. A binary that passes `check` is
+//! one the proof tactics handle well; what a proof establishes is checked by
+//! the Lean kernel against the bytes of the binary (see docs/isa/trust.md).
+
+pub mod cc;
+pub mod elf;
+pub mod isa;
+pub mod lean;
+pub mod meta;
+pub mod profile;
+pub mod sha256;
+
+use profile::{Func, FuncMeta, Violation};
+use std::collections::BTreeSet;
+
+/// ELF `e_flags` bit for the C extension.
+const EF_RISCV_RVC: u32 = 1;
+
+/// A RISC-V executable as the profile sees it.
+pub struct Binary<'a> {
+    pub bytes: &'a [u8],
+    pub text_addr: u64,
+    pub text: Vec<u32>,
+    pub funcs: Vec<Func>,
+    /// `.nocompiler.struct`, if the file has one.
+    pub recorded: Option<Vec<FuncMeta>>,
+    /// Every allocated section that is not code, in header order.
+    pub segments: Vec<DataSegment>,
+}
+
+/// An allocated, non-executable section: `.rodata`, `.data`, `.bss`, ...
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DataSegment {
+    pub name: String,
+    pub addr: u64,
+    /// The bytes; zeros for NOBITS.
+    pub bytes: Vec<u8>,
+    /// NOBITS (`.bss`): exported as zeros of `bytes.len()`.
+    pub zero: bool,
+    pub writable: bool,
+}
+
+pub fn load(bytes: &[u8]) -> Result<Binary<'_>, String> {
+    let e = elf::Elf::parse(bytes).map_err(|e| e.to_string())?;
+    if e.machine != elf::EM_RISCV {
+        return Err(format!("e_machine {} is not RISC-V", e.machine));
+    }
+    if e.flags & EF_RISCV_RVC != 0 {
+        return Err(
+            "built with the C extension (e_flags RVC); the profile has fixed 32-bit instructions"
+                .into(),
+        );
+    }
+    let text = e.section(".text").ok_or("no .text section")?;
+    for s in &e.sections {
+        if s.flags & elf::SHF_EXECINSTR != 0 && s.name != ".text" && s.size > 0 {
+            return Err(format!(
+                "executable section {} besides .text; the profile has one",
+                s.name
+            ));
+        }
+    }
+    if text.addr % 4 != 0 || text.size % 4 != 0 {
+        return Err(".text is not a whole number of aligned words".into());
+    }
+    let words: Vec<u32> = e
+        .bytes(text)
+        .chunks_exact(4)
+        .map(|c| u32::from_le_bytes(c.try_into().unwrap()))
+        .collect();
+    let mut funcs = Vec::new();
+    for s in e.functions() {
+        if s.value < text.addr || s.value + s.size > text.addr + text.size {
+            continue;
+        }
+        if (s.value - text.addr) % 4 != 0 || s.size % 4 != 0 {
+            return Err(format!(
+                "function {} is not a whole number of aligned words",
+                s.name
+            ));
+        }
+        let i = ((s.value - text.addr) / 4) as usize;
+        funcs.push(Func {
+            name: s.name.clone(),
+            entry: s.value,
+            words: words[i..i + (s.size / 4) as usize].to_vec(),
+        });
+    }
+    let segments = e
+        .sections
+        .iter()
+        .filter(|s| {
+            s.flags & elf::SHF_ALLOC != 0
+                && s.flags & elf::SHF_EXECINSTR == 0
+                && s.size > 0
+                && (s.kind == elf::SHT_PROGBITS || s.kind == elf::SHT_NOBITS)
+        })
+        .map(|s| DataSegment {
+            name: s.name.clone(),
+            addr: s.addr,
+            bytes: if s.kind == elf::SHT_NOBITS {
+                vec![0; s.size as usize]
+            } else {
+                e.bytes(s).to_vec()
+            },
+            zero: s.kind == elf::SHT_NOBITS,
+            writable: s.flags & elf::SHF_WRITE != 0,
+        })
+        .collect();
+    let recorded = match e.section(meta::SECTION) {
+        Some(s) => Some(meta::decode(e.bytes(s))?),
+        None => None,
+    };
+    Ok(Binary {
+        bytes,
+        text_addr: text.addr,
+        text: words,
+        funcs,
+        recorded,
+        segments,
+    })
+}
+
+/// The outcome for one function.
+pub struct Report {
+    pub name: String,
+    pub entry: u64,
+    pub result: Result<FuncMeta, Vec<Violation>>,
+}
+
+impl Binary<'_> {
+    pub fn entries(&self) -> BTreeSet<u64> {
+        self.funcs.iter().map(|f| f.entry).collect()
+    }
+
+    /// Check every function: against `.nocompiler.struct` where the file has one,
+    /// otherwise against the recovered tree. A recorded entry whose frame,
+    /// callees or size disagree with the code is a violation.
+    pub fn check(&self) -> Vec<Report> {
+        let entries = self.entries();
+        self.funcs
+            .iter()
+            .map(|f| {
+                let recorded = self.recorded.as_ref().map(|r| r.iter().find(|m| m.entry == f.entry));
+                let result = match recorded {
+                    Some(None) => Err(vec![Violation {
+                        addr: f.entry,
+                        rule: "M1 metadata",
+                        detail: format!("{} has no entry in {}", f.name, meta::SECTION),
+                    }]),
+                    Some(Some(m)) => profile::check(f, &m.nodes, &entries).and_then(|got| {
+                        if got.frame == m.frame && got.callees == m.callees && got.size == m.size {
+                            Ok(got)
+                        } else {
+                            Err(vec![Violation {
+                                addr: f.entry,
+                                rule: "M1 metadata",
+                                detail: format!(
+                                    "recorded frame {} callees {:x?} size {}, the code has {} {:x?} {}",
+                                    m.frame, m.callees, m.size, got.frame, got.callees, got.size
+                                ),
+                            }])
+                        }
+                    }),
+                    None => profile::recover(f, &entries)
+                        .map_err(|e| vec![e])
+                        .and_then(|nodes| profile::check(f, &nodes, &entries)),
+                };
+                Report { name: f.name.clone(), entry: f.entry, result }
+            })
+            .collect()
+    }
+}
+
+/// Check `file` and write it to `out` with an `.nocompiler.struct` section (through
+/// llvm-objcopy, or `NOCOMPILER_OBJCOPY`). The inner error lists the violations,
+/// when a function does not conform and nothing is written.
+pub fn annotate(
+    file: &std::path::Path,
+    out: &std::path::Path,
+) -> Result<Result<(usize, usize), Vec<String>>, String> {
+    let bytes = std::fs::read(file).map_err(|e| format!("{}: {e}", file.display()))?;
+    let bin = load(&bytes)?;
+    let mut metas = Vec::new();
+    let mut bad = Vec::new();
+    for r in bin.check() {
+        match r.result {
+            Ok(m) => metas.push(m),
+            Err(vs) => bad.extend(vs.into_iter().map(|v| format!("{} {v}", r.name))),
+        }
+    }
+    if !bad.is_empty() {
+        return Ok(Err(bad));
+    }
+    let data = meta::encode(&metas);
+    let tmp = out.with_extension("nocompiler-struct.tmp");
+    std::fs::write(&tmp, &data).map_err(|e| format!("{}: {e}", tmp.display()))?;
+    let objcopy = std::env::var("NOCOMPILER_OBJCOPY").unwrap_or_else(|_| "llvm-objcopy".into());
+    let verb = if bin.recorded.is_some() {
+        "--update-section"
+    } else {
+        "--add-section"
+    };
+    let st = std::process::Command::new(&objcopy)
+        .arg(format!("{verb}={}={}", meta::SECTION, tmp.display()))
+        .arg(file)
+        .arg(out)
+        .status()
+        .map_err(|e| format!("{objcopy}: {e} (set NOCOMPILER_OBJCOPY)"));
+    let _ = std::fs::remove_file(&tmp);
+    if !st?.success() {
+        return Err(format!("{objcopy} failed"));
+    }
+    Ok(Ok((metas.len(), data.len())))
+}

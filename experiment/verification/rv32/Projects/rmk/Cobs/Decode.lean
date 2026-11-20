@@ -1,6 +1,6 @@
 /-
   **`cobs::dec::decode_in_place_report` (pinned RMK image, 0x8001e02e): the whole
-  function.** Original e5r code, Apache-2.0.
+  function.** Original nocompiler code, Apache-2.0.
 
   `decode`: from every machine meeting `CobsEnv` (a0 = 12-byte result slot, a1 = buffer,
   a2 = len ≤ 488, a 16-byte frame below sp; all in model RAM, aligned and pairwise
@@ -21,8 +21,8 @@ import Projects.rmk.Cobs.Empty
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Cobs
-open E5R E5R.Rmk E5R.Rmk.CobsFetch
+namespace NoCompiler.Rmk.Cobs
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.CobsFetch
 
 theorem firstZero_congr (f g : Nat → Nat) (len : Nat) (hfg : ∀ j, j < len → f j = g j) :
     ∀ k i, i + k = len → firstZero f i len = firstZero g i len
@@ -190,7 +190,7 @@ theorem decode (m₀ : Machine) (h : CobsEnv m₀) : ∃ k m, QRun B img k m₀ 
         g5 r (fun e => hr (by subst e; decide)) (fun e => hr (by subst e; decide))
           (fun e => hr (by subst e; decide)) (fun e => hr (by subst e; decide))
           (fun e => hr (by subst e; decide)) (fun e => hr (by subst e; decide))
-      have e5r : ∀ r : Reg, r.val ∉ [2, 5, 6, 7, 13, 14, 16, 17, 29] → e11.get r = c.get r := fun r hr => by
+      have nocompiler : ∀ r : Reg, r.val ∉ [2, 5, 6, 7, 13, 14, 16, 17, 29] → e11.get r = c.get r := fun r hr => by
         rw [g11' r (fun e => hr (by simp only [List.mem_cons, List.not_mem_nil, or_false] at e ⊢; omega)),
           g5' r (fun e => hr (by simp only [List.mem_cons, List.not_mem_nil, or_false] at e ⊢; omega))]
       have e5_2 : e5.get 2 = c.get 2 + 0xfffffff0#32 := by
@@ -209,8 +209,8 @@ theorem decode (m₀ : Machine) (h : CobsEnv m₀) : ∃ k m, QRun B img k m₀ 
             Core.wr_get_ne _ _ _ _ _ (show (12 : Reg) ≠ 13 by decide), Core.goto_get]
           exact g5' 12 (by decide)
         have e8_13 : e8.get 13 = 1#32 := by simp [e8, e7, Core.wr_get_ne, Core.wr_get_self, alu]
-        refine ⟨k11, e5r 10 (by decide), e5r 11 (by decide), e5r 12 (by decide), ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
-          e5r 1 (by decide), ?_, ?_, fun _ _ => rfl, ⟨Nat.le_refl _, Nat.zero_le _, hnl⟩⟩
+        refine ⟨k11, nocompiler 10 (by decide), nocompiler 11 (by decide), nocompiler 12 (by decide), ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
+          nocompiler 1 (by decide), ?_, ?_, fun _ _ => rfl, ⟨Nat.le_refl _, Nat.zero_le _, hnl⟩⟩
         · rw [g11' 14 (by decide)]; exact e5_14
         · rw [g11' 29 (by decide)]; simp [e5, e4, Core.wr_get_ne, Core.wr_get_self, alu]
         · rw [g11' 7 (by decide)]; simp [e5, Core.wr_get_self, alu]
@@ -222,7 +222,7 @@ theorem decode (m₀ : Machine) (h : CobsEnv m₀) : ∃ k m, QRun B img k m₀ 
         · rw [g11' 16 (by decide)]; exact e5_16
         · rw [g11' 2 (by decide)]; exact e5_2
         · intro r hr hr'
-          apply e5r r
+          apply nocompiler r
           simp only [clobbered, List.mem_cons, List.not_mem_nil, or_false] at hr hr' ⊢
           omega
         · intro j hj; rw [dif_neg (by simp)]; exact bufByte_saved c R h j hj
@@ -253,4 +253,4 @@ theorem decode (m₀ : Machine) (h : CobsEnv m₀) : ∃ k m, QRun B img k m₀ 
     · show _ = (if _ then _ else _); rw [r0, hres, if_neg (by decide)]; rfl
     · show _ = BitVec.ofNat 32 (if _ then _ else _); rw [r4, hres, if_neg (by decide)]
 
-end E5R.Rmk.Cobs
+end NoCompiler.Rmk.Cobs

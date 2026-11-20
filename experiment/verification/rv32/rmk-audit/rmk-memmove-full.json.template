@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.verify.job.v1",
+  "schema": "nocompiler.verify.job.v1",
   "id": "rmk-memmove-full",
   "root": "../..",
   "board": "boards/qemu-virt-rv32.json",
@@ -8,7 +8,7 @@
   "image": {
     "kind": "ram",
     "module": "Projects.rmk.Elf",
-    "namespace": "E5R.Rmk.Image"
+    "namespace": "NoCompiler.Rmk.Image"
   },
   "modules": [
     "Theories/Absint.lean",
@@ -28,9 +28,9 @@
   ],
   "theorems": [
     "<peer full contract name>",
-    "E5R.RmkMemmove.img_eq",
-    "E5R.RmkMemmove.board_eq",
-    "E5R.RmkMemmoveFull.*"
+    "NoCompiler.RmkMemmove.img_eq",
+    "NoCompiler.RmkMemmove.board_eq",
+    "NoCompiler.RmkMemmoveFull.*"
   ],
   "symbols": {
     "0x80020c1e": "memmove",

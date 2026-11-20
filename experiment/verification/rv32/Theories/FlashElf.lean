@@ -1,9 +1,9 @@
 /-
   Independent reader of a bare-metal ELF32 image as flash contents, for the
-  image-fidelity theorem. Original e5r code, Apache-2.0.
+  image-fidelity theorem. Original nocompiler code, Apache-2.0.
 
   This is a second implementation of the rules in
-  `crates/e5r-verify/src/flash.rs`, written against the ELF specification,
+  `crates/nocompiler-verify/src/flash.rs`, written against the ELF specification,
   not translated from the Rust. The theorem `loadFlash elfBytes = .ok
   (entry, segments)` makes the exported image a checked function of the
   original file bytes.
@@ -13,8 +13,8 @@ import Theories.Platform
 -- The image-fidelity theorem is decided by the kernel.
 deriving instance DecidableEq for Except
 
-namespace E5R.FlashElf
-open E5R
+namespace NoCompiler.FlashElf
+open NoCompiler
 
 structure Windows where
   flashBase : Nat
@@ -80,4 +80,4 @@ def loadFlash (w : Windows) (bs : List Nat) : Except String (Nat × List Segment
     throw "entry"
   return (entry, segs)
 
-end E5R.FlashElf
+end NoCompiler.FlashElf

@@ -2,7 +2,7 @@
   The loops of the emitted memmove's n ≥ 16 backward path (pinned RMK
   image), as quiet runs that compute `bwd` / `wordsB` (Copy.lean).
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
     head  0x80020dd4: lbu s0,0(a5); addi a4,a3,-1; sb s0,-1(a3); addi a5,a5,-1;
           mv a3,a4; bltu t2,a4,0x80020dd4             (falls to 0x80020de8)
@@ -13,8 +13,8 @@ import Projects.rmk.MemmoveLoops
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk
-open E5R E5R.Rmk.MemmoveFetch
+namespace NoCompiler.Rmk
+open NoCompiler NoCompiler.Rmk.MemmoveFetch
 
 /-! ## Backward head loop -/
 
@@ -281,4 +281,4 @@ theorem bword_loop : ∀ (j : Nat) (c : Core) (ram : Word → BitVec 8),
     · intro r a b d e
       rw [hfr r a b d e, Core.goto_get]; exact bwordBody_get c ram r a b d e
 
-end E5R.Rmk
+end NoCompiler.Rmk

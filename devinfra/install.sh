@@ -4,24 +4,24 @@ set -e
 # Everything lives in main() and main is called on the last line, so a
 # truncated `curl … | sh` cannot execute a half-downloaded prefix.
 main() {
-  REPO="h5i-dev/e5r"
-  INSTALL_DIR="${E5R_INSTALL_DIR:-/usr/local/bin}"
+  REPO="h5i-dev/NoCompiler"
+  INSTALL_DIR="${NOCOMPILER_INSTALL_DIR:-/usr/local/bin}"
 
   for arg in "$@"; do
     case "$arg" in
       -h | --help)
         echo "Usage: install.sh"
         echo
-        echo "  Installs e5rx, the e5r toolkit binary, with no runtime dependency."
+        echo "  Installs nocompiler-x, the nocompiler toolkit binary, with no runtime dependency."
         echo
         echo "Piped into a shell, options go after \`sh -s --\`:"
         echo "  curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | sh -s -- --help"
         echo
         echo "Environment:"
-        echo "  E5R_INSTALL_DIR   where the binary goes (default /usr/local/bin)"
-        echo "  E5R_VERSION       a tag to install instead of the latest"
-        echo "  E5R_SKIP_CHECKSUM set to 1 to install without verifying"
-        echo "  E5R_BASE_URL      where the archives are, for a mirror"
+        echo "  NOCOMPILER_INSTALL_DIR   where the binary goes (default /usr/local/bin)"
+        echo "  NOCOMPILER_VERSION       a tag to install instead of the latest"
+        echo "  NOCOMPILER_SKIP_CHECKSUM set to 1 to install without verifying"
+        echo "  NOCOMPILER_BASE_URL      where the archives are, for a mirror"
         exit 0
         ;;
       *)
@@ -39,7 +39,7 @@ main() {
     Darwin) os="macos" ;;
     *)
       echo "Unsupported OS: $OS" >&2
-      echo "Windows: download the .zip from the releases page and put e5rx.exe on your PATH." >&2
+      echo "Windows: download the .zip from the releases page and put nocompiler-x.exe on your PATH." >&2
       exit 1
       ;;
   esac
@@ -66,16 +66,16 @@ main() {
   esac
 
   # ── which release ──────────────────────────────────────────────────────────
-  VERSION="${E5R_VERSION:-}"
-  if [ -z "$VERSION" ] && [ -z "${E5R_BASE_URL:-}" ]; then
+  VERSION="${NOCOMPILER_VERSION:-}"
+  if [ -z "$VERSION" ] && [ -z "${NOCOMPILER_BASE_URL:-}" ]; then
     VERSION="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
       | grep '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')"
   fi
   if [ -z "$VERSION" ]; then
     echo "Could not determine the latest version." >&2
-    echo "With E5R_BASE_URL set, E5R_VERSION has to be set too: a mirror has" >&2
+    echo "With NOCOMPILER_BASE_URL set, NOCOMPILER_VERSION has to be set too: a mirror has" >&2
     echo "no releases API to ask." >&2
-    echo "Set E5R_VERSION=vX.Y.Z, or check that a release exists:" >&2
+    echo "Set NOCOMPILER_VERSION=vX.Y.Z, or check that a release exists:" >&2
     echo "  https://github.com/${REPO}/releases" >&2
     exit 1
   fi
@@ -85,19 +85,19 @@ main() {
 
   # The version inside an archive's name has no leading `v`; the tag has one.
   BARE="${VERSION#v}"
-  ARCHIVE="e5r-${BARE}-${target}.tar.gz"
+  ARCHIVE="nocompiler-${BARE}-${target}.tar.gz"
   # Overridable for a mirror, and for testing this script against a release
   # that has not been published yet -- which is the difference between an
   # installer that has been run and one that has only been written.
-  BASE="${E5R_BASE_URL:-https://github.com/${REPO}/releases/download/${VERSION}}"
+  BASE="${NOCOMPILER_BASE_URL:-https://github.com/${REPO}/releases/download/${VERSION}}"
 
-  echo "Installing e5r ${VERSION} (${target}) → ${INSTALL_DIR}/e5rx"
+  echo "Installing nocompiler ${VERSION} (${target}) → ${INSTALL_DIR}/nocompiler-x"
 
   if ! curl -fsSL "${BASE}/${ARCHIVE}" -o "${TMP}/${ARCHIVE}"; then
     echo "Could not download ${ARCHIVE}." >&2
     echo "  ${BASE}/${ARCHIVE}" >&2
     echo "Not every release carries every platform; the asset list is on the" >&2
-    echo "releases page, and E5R_VERSION picks a different one." >&2
+    echo "releases page, and NOCOMPILER_VERSION picks a different one." >&2
     exit 1
   fi
 
@@ -109,8 +109,8 @@ main() {
   # checks and which this script deliberately does not require: cosign is not
   # on most machines, and an installer that fails without it would be one
   # people work around rather than run.
-  if [ "${E5R_SKIP_CHECKSUM:-0}" = "1" ]; then
-    echo "!  checksum verification skipped (E5R_SKIP_CHECKSUM=1)" >&2
+  if [ "${NOCOMPILER_SKIP_CHECKSUM:-0}" = "1" ]; then
+    echo "!  checksum verification skipped (NOCOMPILER_SKIP_CHECKSUM=1)" >&2
   else
     if command -v sha256sum > /dev/null 2>&1; then
       actual="$(sha256sum "${TMP}/${ARCHIVE}" | cut -d' ' -f1)"
@@ -118,13 +118,13 @@ main() {
       actual="$(shasum -a 256 "${TMP}/${ARCHIVE}" | cut -d' ' -f1)"
     else
       echo "Neither sha256sum nor shasum found; cannot verify the download." >&2
-      echo "Install one, or re-run with E5R_SKIP_CHECKSUM=1 to accept the risk." >&2
+      echo "Install one, or re-run with NOCOMPILER_SKIP_CHECKSUM=1 to accept the risk." >&2
       exit 1
     fi
 
     if ! curl -fsSL "${BASE}/SHA256SUMS" -o "${TMP}/SHA256SUMS"; then
       echo "Could not fetch SHA256SUMS — refusing to install unverified." >&2
-      echo "Re-run with E5R_SKIP_CHECKSUM=1 to accept the risk." >&2
+      echo "Re-run with NOCOMPILER_SKIP_CHECKSUM=1 to accept the risk." >&2
       exit 1
     fi
 
@@ -148,16 +148,16 @@ main() {
   fi
 
   # ── install ────────────────────────────────────────────────────────────────
-  # `--no-same-owner`: only `$TMP/.../e5rx` is installed, with an explicit mode,
+  # `--no-same-owner`: only `$TMP/.../nocompiler-x` is installed, with an explicit mode,
   # so this changes nothing today. It is here so an archive with more members
   # cannot carry ownership in from a tarball the operator did not build.
   tar -xzf "${TMP}/${ARCHIVE}" -C "$TMP" --no-same-owner
 
   # The archive holds a directory, not a bare binary, so that the README, the
   # licence and the manual travel with it.
-  BIN="${TMP}/e5r-${BARE}-${target}/e5rx"
+  BIN="${TMP}/nocompiler-${BARE}-${target}/nocompiler-x"
   if [ ! -x "$BIN" ]; then
-    echo "The archive did not contain e5rx where expected:" >&2
+    echo "The archive did not contain nocompiler-x where expected:" >&2
     echo "  ${BIN}" >&2
     exit 1
   fi
@@ -166,17 +166,17 @@ main() {
   # which under sudo leaves a user-writable binary in a root-owned PATH
   # directory.
   if [ -w "$INSTALL_DIR" ]; then
-    install -m 755 "$BIN" "${INSTALL_DIR}/e5rx"
+    install -m 755 "$BIN" "${INSTALL_DIR}/nocompiler-x"
   elif [ -d "$INSTALL_DIR" ] || [ -w "$(dirname "$INSTALL_DIR")" ]; then
     sudo install -d -m 755 "$INSTALL_DIR"
-    sudo install -o root -g 0 -m 755 "$BIN" "${INSTALL_DIR}/e5rx"
+    sudo install -o root -g 0 -m 755 "$BIN" "${INSTALL_DIR}/nocompiler-x"
   else
     echo "${INSTALL_DIR} does not exist and its parent is not writable." >&2
-    echo "Pick somewhere else: E5R_INSTALL_DIR=\$HOME/.local/bin sh install.sh" >&2
+    echo "Pick somewhere else: NOCOMPILER_INSTALL_DIR=\$HOME/.local/bin sh install.sh" >&2
     exit 1
   fi
 
-  echo "✔  e5r ${VERSION} installed: run e5rx --help"
+  echo "✔  nocompiler ${VERSION} installed: run nocompiler-x --help"
 
   # Said once, at the end, rather than buried in the transcript above. A PATH
   # directory the invoking user can write is not a defect this script can fix
@@ -186,7 +186,7 @@ main() {
     *":${INSTALL_DIR}:"*) ;;
     *)
       echo "!  ${INSTALL_DIR} is not on your PATH." >&2
-      echo "   Add it, or run ${INSTALL_DIR}/e5rx directly." >&2
+      echo "   Add it, or run ${INSTALL_DIR}/nocompiler-x directly." >&2
       ;;
   esac
 }

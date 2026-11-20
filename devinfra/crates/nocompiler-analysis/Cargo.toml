@@ -1,0 +1,17 @@
+[package]
+name = "nocompiler-analysis"
+description = "nocompiler — function discovery, control flow, cross references, strings."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+nocompiler-core = { workspace = true }
+nocompiler-format = { workspace = true }
+nocompiler-arch = { workspace = true }
+nocompiler-types = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }

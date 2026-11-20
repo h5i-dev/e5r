@@ -1,5 +1,5 @@
 // Optional browser integration check. Requires Playwright + Chromium, and cc.
-// E5R_PLAYWRIGHT_MODULE may point to an out-of-tree Playwright installation.
+// NOCOMPILER_PLAYWRIGHT_MODULE may point to an out-of-tree Playwright installation.
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
@@ -7,12 +7,12 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { get } from "node:http";
 const { chromium } = await import(
-  process.env.E5R_PLAYWRIGHT_MODULE || "playwright"
+  process.env.NOCOMPILER_PLAYWRIGHT_MODULE || "playwright"
 );
-const root = mkdtempSync(join(tmpdir(), "e5r-dashboard-"));
-const executable = resolve(process.env.E5R_BINARY || "target/release/e5rx");
+const root = mkdtempSync(join(tmpdir(), "nocompiler-dashboard-"));
+const executable = resolve(process.env.NOCOMPILER_BINARY || "target/release/nocompiler-x");
 const binary = join(root, "sample"),
-  project = join(root, "sample.e5rproj");
+  project = join(root, "sample.nocompilerproj");
 let server, browser;
 function cli(...args) {
   return execFileSync(executable, args, { encoding: "utf8" });
@@ -123,7 +123,7 @@ try {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-E5R-Client": "dashboard",
+          "X-NoCompiler-Client": "dashboard",
         },
         body: "x".repeat(128 * 1024 + 1),
       })
@@ -158,7 +158,7 @@ try {
   assert.equal(await page.locator("#task-dialog input, #task-dialog textarea, #task-dialog select").count(), 0);
   await page.locator("#expand-task").click();
   assert(await page.locator("#task-dialog").evaluate(e => e.classList.contains("full-view")));
-  await page.screenshot({path:"/tmp/e5r-dashboard-task-full.png", fullPage:true});
+  await page.screenshot({path:"/tmp/nocompiler-dashboard-task-full.png", fullPage:true});
   await page.locator("#expand-task").click();
   assert(!(await page.locator("#task-dialog").evaluate(e => e.classList.contains("full-view"))));
   const draft = { ...task.content, next: "Agent update", evidence: ["Evidence line\n".repeat(100)] };
@@ -185,7 +185,7 @@ try {
   await page.locator("#refresh").click();
   assert(await page.locator("#records details").filter({hasText:"report title"}).evaluate(e => e.open));
   await page.screenshot({
-    path: "/tmp/e5r-dashboard-overview.png",
+    path: "/tmp/nocompiler-dashboard-overview.png",
     fullPage: true,
   });
   await page.locator("#nav-workspace").click();
@@ -210,7 +210,7 @@ try {
   await page.locator("#code .record-body").filter({hasText:"Updated function note"}).waitFor();
   assert((await page.locator("#function-notes").textContent()).includes("Updated function note"));
   assert((await page.locator("#code").textContent()).includes("agent-c"));
-  await page.screenshot({path:"/tmp/e5r-dashboard-function-notes.png", fullPage:true});
+  await page.screenshot({path:"/tmp/nocompiler-dashboard-function-notes.png", fullPage:true});
   await page.locator("#function-search").fill("parse_header");
   await page.locator('.function-row[title="parse_header"]').click();
   assert.equal(await page.locator("#code .function-note h3").textContent(), "note · Parser-only note");
@@ -220,7 +220,7 @@ try {
   await page.getByRole("tab", {name:"Pseudocode"}).click();
   await page.locator(".line-source").first().waitFor();
   await page.screenshot({
-    path: "/tmp/e5r-dashboard-decompiler.png",
+    path: "/tmp/nocompiler-dashboard-decompiler.png",
     fullPage: true,
   });
   await page
@@ -243,7 +243,7 @@ try {
   await page.locator("#function-name").filter({ hasText: "main" }).waitFor();
   await page.locator("#font-larger").click();
   assert.equal(await page.locator(".code-line").first().evaluate(e => getComputedStyle(e).fontSize), "15px");
-  assert.equal(await page.evaluate(() => localStorage.getItem("e5r.code-size")), "15");
+  assert.equal(await page.evaluate(() => localStorage.getItem("nocompiler.code-size")), "15");
   await page.locator("#toggle-context").click();
   assert.equal(await page.locator("#inspector").isVisible(), false);
   await page.locator("#toggle-functions").click();
@@ -260,7 +260,7 @@ try {
   assert((await page.locator("#code").textContent()).includes("Entry comment <img"));
   assert.equal(await page.locator("#code img").count(), 0);
   assert.equal(await page.locator(".instruction-bytes").first().textContent(), disas.items[0].insns[0].bytes);
-  await page.screenshot({path:"/tmp/e5r-dashboard-disassembly.png", fullPage:true});
+  await page.screenshot({path:"/tmp/nocompiler-dashboard-disassembly.png", fullPage:true});
   await page.getByRole("tab", { name: "Disassembly" }).focus();
   await page.keyboard.press("ArrowRight");
   assert.equal(await page.getByRole("tab", { name: "References" }).getAttribute("aria-selected"), "true");
@@ -281,7 +281,7 @@ try {
   await page.locator("#reference-direction").selectOption("data");
   await page.locator("#code").filter({hasText:"function string <img src=x>"}).waitFor();
   assert.equal(await page.locator("#code img").count(), 0);
-  await page.screenshot({path:"/tmp/e5r-dashboard-data.png", fullPage:true});
+  await page.screenshot({path:"/tmp/nocompiler-dashboard-data.png", fullPage:true});
   await page.getByRole("tab", {name:"Annotations", exact:true}).click();
   await page.locator("#code .annotation-text").filter({hasText:"Instruction comment"}).waitFor();
   assert((await page.locator("#code").textContent()).includes("match"));
@@ -298,7 +298,7 @@ try {
   await page.locator(".cfg-node").first().waitFor();
   assert(parserContext.blocks.length > 1);
   assert.equal(await page.locator(".cfg-canvas svg > path").count(), parserContext.blocks.flatMap(b => b.successors).filter(addr => parserContext.blocks.some(b => b.addr === addr)).length);
-  await page.screenshot({path:"/tmp/e5r-dashboard-cfg.png", fullPage:true});
+  await page.screenshot({path:"/tmp/nocompiler-dashboard-cfg.png", fullPage:true});
   await page.locator("#function-search").fill("large_cfg");
   await page.locator('.function-row[title="large_cfg"]').click();
   const large = functions.items.find(f => f.name === "large_cfg");
@@ -313,7 +313,7 @@ try {
   await page.locator("#back").click();
   await page.getByRole("tab", { name: "Call graph" }).click();
   await page.locator(".call-node").filter({hasText:"parse_header"}).first().waitFor();
-  await page.screenshot({path:"/tmp/e5r-dashboard-callgraph.png", fullPage:true});
+  await page.screenshot({path:"/tmp/nocompiler-dashboard-callgraph.png", fullPage:true});
   await page.locator(".call-node").filter({hasText:"parse_header"}).first().click();
   await page.locator("#function-name").filter({hasText:"parse_header"}).waitFor();
   await page.locator(".call-node").filter({hasText:"main"}).first().waitFor();
@@ -334,7 +334,7 @@ try {
   await page.getByRole("tab", { name: "Pseudocode" }).click();
   await page.locator(".line-source").first().waitFor();
   await page.screenshot({
-    path: "/tmp/e5r-dashboard-mobile.png",
+    path: "/tmp/nocompiler-dashboard-mobile.png",
     fullPage: true,
   });
   assert.equal(

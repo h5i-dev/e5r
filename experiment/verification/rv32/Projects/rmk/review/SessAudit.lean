@@ -3,7 +3,7 @@
   Deframer/SomePath.lean) at support-lean4 094b8c6. Review evidence only: nothing here is used by
   main's proofs, and no main module is changed.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   The witness RAM below uses the values observed (QEMU, untrusted, not used by any proof) at the
   real first arrival at the loop head 0x80003e1a of the pinned image:
@@ -21,8 +21,8 @@
 -/
 import Projects.rmk.Deframer.SomePath
 
-namespace E5R.Rmk.Review2
-open E5R E5R.Rmk E5R.Rmk.Deframer E5R.Rmk.Deframer.Session E5R.Rmk.Deframer.SessionI E5R.Rmk.Deframer.SomeP
+namespace NoCompiler.Rmk.Review2
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.Deframer NoCompiler.Rmk.Deframer.Session NoCompiler.Rmk.Deframer.SessionI NoCompiler.Rmk.Deframer.SomeP
 
 theorem reach_cons {B : Board} {img : List Segment} {m m' : Machine} {e : List Event}
     (hs : Step B img m m' e) : ∀ {x evs}, Reach B img (· = m') x evs → Reach B img (· = m) x (e ++ evs) := by
@@ -116,4 +116,4 @@ theorem some_neg_hits : ∃ k m', QRun B img k ⟨core 0x80003e70, mem someTbl�
     m'.core.pc = 0x80003e1a ∧ SessInv m' :=
   some_neg _ some_witness (by decide)
 
-end E5R.Rmk.Review2
+end NoCompiler.Rmk.Review2

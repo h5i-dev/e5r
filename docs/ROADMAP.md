@@ -1,8 +1,8 @@
 # Roadmap
 
-Status: 2026-11-20. This file is the scope authority for e5r.
+Status: 2026-11-20. This file is the scope authority for nocompiler.
 
-**Decision (2026-11-20).** The core of e5r is the e5r profile: a
+**Decision (2026-11-20).** The core of nocompiler is the nocompiler profile: a
 formal-verification-friendly profile of RISC-V, with the Lean 4 library
 proofs about it are written in and the tools that check binaries against it
 ([docs/isa/](isa/README.md)). The PTX and RV32 firmware verifiers move to
@@ -35,27 +35,27 @@ milestones and its "not building" list, is kept as
 | Adequacy: no fault, memory safety, postcondition, termination on the machine | done, proved |
 | Function specifications with the LP64 calling convention | done |
 | Step tactics and word-arithmetic lemmas | done |
-| `e5r` tool: check R1 to R5, recover structure, `.e5r.struct`, export, disasm | done |
-| Lean ELF reader and `e5r-audit`: `.text` and every data section match the binary, axioms | done |
+| `nocompiler` tool: check R1 to R5, recover structure, `.nocompiler.struct`, export, disasm | done |
+| Lean ELF reader and `nocompiler-audit`: `.text` and every data section match the binary, axioms | done |
 | Worked examples from clang `-O2`: `sum` (a loop over an array) and `sum2` (a stack frame and two calls to `sum`, proved from its specification alone) | done |
 | Negative controls: mutated binaries must break their proofs (`scripts/check-proof-controls.sh`) | done |
 | Syscall examples: `write_all` (a loop over short writes, with errors) and `hello` (writes a `.rodata` message through it, then exits) | done |
 | The structural checker in Lean (R1 to R3), `<name>_checked` theorems for every exported function, and `Struct.cfi`: a checked function only transfers control as the rules allow | done |
 | R4 and R5 (registers, stack discipline) in Lean | next |
-| `e5r cc`: clang and ld.lld with the flags that keep ordinary C in the profile, then annotate and check; tested on a corpus | done |
-| Loop invariants placed from `.e5r.struct` by the tactics instead of by hand | next |
+| `nocompiler cc`: clang and ld.lld with the flags that keep ordinary C in the profile, then annotate and check; tested on a corpus | done |
+| Loop invariants placed from `.nocompiler.struct` by the tactics instead of by hand | next |
 | Differential test against the Sail RISC-V model's C emulator (pinned release), random programs over every instruction | done |
-| Lean semantics generated from the Sail RISC-V model (its Lean backend) and proved equal to `E5R.exec` | planned: needs the Sail toolchain built (OCaml 5, opam) and a generated model of tens of thousands of lines |
+| Lean semantics generated from the Sail RISC-V model (its Lean backend) and proved equal to `NoCompiler.exec` | planned: needs the Sail toolchain built (OCaml 5, opam) and a generated model of tens of thousands of lines |
 
 ## Version 1
 
 - Jump tables as a recognised pattern; typed indirect calls (function
   pointers, vtables, `dyn Trait`).
 - Recursion with a variant and a stack bound.
-- The `+e5r` target feature in LLVM's RISC-V backend with WebAssembly's
-  structuring passes, emitting `.e5r.struct` ([isa/toolchain.md](isa/toolchain.md)).
+- The `+nocompiler` target feature in LLVM's RISC-V backend with WebAssembly's
+  structuring passes, emitting `.nocompiler.struct` ([isa/toolchain.md](isa/toolchain.md)).
   Not started: it needs an LLVM build tree (tens of GB), which the current
-  development machine has no room for. `e5r cc` covers what flags can.
+  development machine has no room for. `nocompiler cc` covers what flags can.
 - A Rust target specification and a `no_std` example.
 - `mmap`/`brk` in the environment model.
 

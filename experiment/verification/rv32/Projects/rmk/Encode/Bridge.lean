@@ -3,13 +3,13 @@
   (`SomeP.CallPost` and `SomeP.EncRes`, Deframer/SomeRound.lean). The caller only has to show
   that the cells it keeps (`Kept`) are outside encode_frame's write set (`EncW`).
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Encode.Spec
 import Projects.rmk.Deframer.SomeRound
 
-namespace E5R.Rmk.Encode
-open E5R E5R.Rmk
+namespace NoCompiler.Rmk.Encode
+open NoCompiler NoCompiler.Rmk
 
 /-- Every register main's ABI frame treats as preserved is zero, ra, or callee-saved here. -/
 theorem preserved_regs : ∀ r : Reg, r.val ∉ Deframer.callerSaved →
@@ -33,4 +33,4 @@ theorem encode_callPost (m₀ : Machine) (hpre : EncPre m₀)
     Lands B img (fun m => Deframer.SomeP.CallPost 0x80003f1e m₀ m ∧ Deframer.SomeP.EncRes m₀ m) m₀ :=
   lands_seq (fun m hm => .done (callPost_of_encPost m₀ m hpre hm hK)) (encode_spec m₀ hpre)
 
-end E5R.Rmk.Encode
+end NoCompiler.Rmk.Encode

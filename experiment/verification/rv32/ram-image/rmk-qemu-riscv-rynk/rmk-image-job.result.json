@@ -6,8 +6,8 @@
    "Quot.sound"
   ],
   "board_sha256": "6fe2d0db63ed5756db3ca2845b00931154c84359002daf47cff906b0df64287b",
-  "e5r_verify": "0.1.0",
-  "e5r_verify_sha256": "953e1538911737c6c804d128bf5870459f9885e61b9c05899d6ac71170d6ddd6",
+  "nocompiler_verify": "0.1.0",
+  "nocompiler_verify_sha256": "953e1538911737c6c804d128bf5870459f9885e61b9c05899d6ac71170d6ddd6",
   "elf": {
    "bytes": 454024,
    "path": "build/rmk-qemu-riscv-rynk.elf",
@@ -55,7 +55,7 @@
   "Projects/ramimage/Entry.lean"
  ],
  "resumed": [],
- "schema": "e5r.verify.result.v1",
+ "schema": "nocompiler.verify.result.v1",
  "seconds": 49.7,
  "stages": [
   {
@@ -155,37 +155,37 @@
    "axioms": [
     "propext"
    ],
-   "name": "E5R.RmkImage.Check.segments"
+   "name": "NoCompiler.RmkImage.Check.segments"
   },
   {
    "axioms": [
     "propext"
    ],
-   "name": "E5R.RmkImage.Check.entry_bytes"
+   "name": "NoCompiler.RmkImage.Check.entry_bytes"
   },
   {
    "axioms": [
     "propext"
    ],
-   "name": "E5R.RmkImage.image_accepted"
+   "name": "NoCompiler.RmkImage.image_accepted"
   },
   {
    "axioms": [
     "propext"
    ],
-   "name": "E5R.RmkImage.image_agrees"
+   "name": "NoCompiler.RmkImage.image_agrees"
   },
   {
    "axioms": [
     "propext"
    ],
-   "name": "E5R.RmkImage.image_entry"
+   "name": "NoCompiler.RmkImage.image_entry"
   },
   {
    "axioms": [
     "propext"
    ],
-   "name": "E5R.RmkImage.image_rwBase"
+   "name": "NoCompiler.RmkImage.image_rwBase"
   }
  ]
 }

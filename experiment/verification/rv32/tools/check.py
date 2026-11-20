@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rebuild exact ELF inputs, export with e5r, check Lean and audit assumptions."""
+"""Rebuild exact ELF inputs, export with nocompiler, check Lean and audit assumptions."""
 import ast
 import hashlib
 import json
@@ -78,7 +78,7 @@ def export(elf, image, namespace='Exported'):
     raw = elf.read_bytes()
     if hashlib.sha256(raw).hexdigest() != IDENTITIES[elf.stem]:
         raise RuntimeError(f'{elf.name}: image identity changed; review bytes and identities.json')
-    source = run([ROOT/'target/release/e5r', elf])
+    source = run([ROOT/'target/release/nocompiler', elf])
     # This binds the literal in the actual Lean source to every original file
     # byte. A digest alone, or checking a separate JSON sidecar, is insufficient.
     literal = re.search(r'^def elfBytes : List Nat := (\[.*\])$', source, re.M)
@@ -88,7 +88,7 @@ def export(elf, image, namespace='Exported'):
     source = source.replace('end Exported', f'end {namespace}')
     image.write_text(source)
     # Compare fresh exports as a determinism check.
-    again = run([ROOT/'target/release/e5r', elf])
+    again = run([ROOT/'target/release/nocompiler', elf])
     assert again.replace('namespace Exported', f'namespace {namespace}').replace(
         'end Exported', f'end {namespace}') == source
     return {'elf_sha256': hashlib.sha256(raw).hexdigest(),

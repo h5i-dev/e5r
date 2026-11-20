@@ -3,14 +3,14 @@
   pinned RMK image, generated from the model's own decoder and checked by
   the kernel against the packed ELF (Projects/rmk/Fetch.lean).
 
-  Original e5r code, Apache-2.0. Regenerate rather than edit by hand.
+  Original nocompiler code, Apache-2.0. Regenerate rather than edit by hand.
 -/
 import Projects.rmk.Fetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.MemmoveFetch
-open E5R E5R.Rmk
+namespace NoCompiler.Rmk.MemmoveFetch
+open NoCompiler NoCompiler.Rmk
 
 theorem f80020c1e : fetchDecode img 0x80020c1e = some (Instr.auipc 6 0x00000000#32, 4) :=
   fetchDecode_of _ (by decide) (by decide) (bits := 0x317) (by decide +kernel) (by decide +kernel)
@@ -531,4 +531,4 @@ theorem f800210b6 : fetchDecode img 0x800210b6 = some (Instr.opimm (AluOp.add) 2
 theorem f800210b8 : fetchDecode img 0x800210b8 = some (Instr.jalr 0 1 0x00000000#32, 2) :=
   fetchDecode_of _ (by decide) (by decide) (bits := 0x8082) (by decide +kernel) (by decide +kernel)
 
-end E5R.Rmk.MemmoveFetch
+end NoCompiler.Rmk.MemmoveFetch

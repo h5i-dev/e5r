@@ -4,7 +4,7 @@
   * an error or a frame of at most 2 bytes: back to the loop head, cursor := z + 1;
   * a longer frame: `Some(len)`, moved to the buffer's front by memmove unless already there.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here, CONDITIONAL ON `CopyContract` AND `CobsReportContract` (hypotheses, not axioms, not
   proved here): `call_case`.
@@ -14,8 +14,8 @@ import Projects.rmk.Deframer.Wrap
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Next
-open E5R E5R.Rmk.NextFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.Next
+open NoCompiler NoCompiler.Rmk.NextFetch NoCompiler.Rmk.Deframer.Tail
 
 theorem s5_toNat (cur : Word) (j : Nat) (h : cur.toNat + j < 2 ^ 32) :
     (alu .sub cur (0 - BitVec.ofNat 32 j)).toNat = cur.toNat + j := by
@@ -378,4 +378,4 @@ theorem call_case (hC : CopyContract) (hR : CobsReportContract) (c : Core) (R0 :
       (by simp [nerrCore, Core.wr_get_ne, Core.wr_get_self, alu_add])
     exact .inr ⟨_, _, _, (r1.trans rw2).trans r3, li, me⟩
 
-end E5R.Rmk.Deframer.Next
+end NoCompiler.Rmk.Deframer.Next

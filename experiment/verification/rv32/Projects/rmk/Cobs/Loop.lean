@@ -2,15 +2,15 @@
   `cobs::dec::decode_in_place_report`, the decode loop (0x8001e064..0x8001e0ea) and
   its two exits to 0x8001e102, refined to `Spec.run` over the original bytes.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Cobs.Copy
 import Projects.rmk.Cobs.Spec
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Cobs
-open E5R E5R.Rmk E5R.Rmk.CobsFetch
+namespace NoCompiler.Rmk.Cobs
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.CobsFetch
 
 /-- The decode loop's state at a machine `⟨d, S⟩`, for the call from `⟨c, R⟩`:
     source index `src`, output so far `acc` (dst = acc.length), first zero `n`. -/
@@ -771,4 +771,4 @@ theorem loop (c : Core) (R : Word → BitVec 8) (h : CobsEnv ⟨c, R⟩) (n : Na
         obtain ⟨k2, e2, S2, hr2, hx2⟩ := ih src' (acc ++ out) e S' hx hpc' (by omega) (by omega)
         exact ⟨_, e2, S2, hr.trans hr2, hx2⟩
 
-end E5R.Rmk.Cobs
+end NoCompiler.Rmk.Cobs

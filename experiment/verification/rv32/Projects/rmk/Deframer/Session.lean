@@ -2,7 +2,7 @@
   The Rynk session's receive step (main task poll, loop head 0x80003e1a) on the pinned RMK image,
   composed from the deframer contracts at their real call sites.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here, CONDITIONAL ON `CopyContract` (memmove; a hypothesis, not proved):
   `recv_step`: from every machine at the session loop head with the deframer invariant
@@ -29,8 +29,8 @@ import Projects.rmk.Deframer.FromDecodedSeg
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Session
-open E5R E5R.Rmk.SessionFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.Session
+open NoCompiler NoCompiler.Rmk.SessionFetch NoCompiler.Rmk.Deframer.Tail
 
 /-- The session bases in s6/s7 (task future statics) and where the deframer and buffer are. -/
 def s6v : Word := 0x8002a4bd
@@ -455,4 +455,4 @@ theorem recv_step (hC : CopyContract) (m₀ : Machine) (h : SessPre m₀) :
         PPs 26 (by decide)]
       simp [K3, ssomeCore, Core.wr_get_ne]; exact e1_26
 
-end E5R.Rmk.Deframer.Session
+end NoCompiler.Rmk.Deframer.Session

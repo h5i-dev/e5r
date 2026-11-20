@@ -1,7 +1,7 @@
 /-
   From quiet deterministic runs between checkpoints to every reachable machine (`Reach`).
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here, for any board, image and checkpoint set P:
   * `quiet_step`: from a quiet machine with a deterministic step, `Step` (under ANY oracle, or an
@@ -19,8 +19,8 @@
 -/
 import Projects.rmk.Run
 
-namespace E5R.Rmk
-open E5R
+namespace NoCompiler.Rmk
+open NoCompiler
 
 theorem qrun_first {B : Board} {img : List Segment} {k : Nat} {m m' : Machine} (h : QRun B img (k + 1) m m') :
     ∃ m₁, Quiet m.core ∧ DetStep B img m m₁ ∧ QRun B img k m₁ m' := by
@@ -70,4 +70,4 @@ theorem reach_avoids {B : Board} {img : List Segment} (P : Machine → Prop)
   obtain ⟨-, k, m', hrun', hp⟩ := reach_on_runs P hrun m evs hr
   exact hP m' hp (hR k m m' hm hrun')
 
-end E5R.Rmk
+end NoCompiler.Rmk

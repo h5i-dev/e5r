@@ -1,4 +1,4 @@
-{ "schema": "e5r.ptx.spec.v1", "kernel": "scan", "class": "scan32",
+{ "schema": "nocompiler.ptx.spec.v1", "kernel": "scan", "class": "scan32",
   "input": "scan_param_0", "output": "scan_param_1", "length": "scan_param_2",
   "shared": "_ZZ4scanE1s", "max_block": 1024,
   "barriers": {

@@ -4,7 +4,7 @@
   closure 0x800001f2, polled at 0x80003e9a) and `EncodeContract` (`encode_frame` 0x80008d5c, called
   at 0x80003f1a). Every theorem that uses them takes them as hypotheses `hD` / `hE`.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   AUDIT CAVEAT (peer, 3ecd81b, review/SomeAudit.lean on 07a17e5): the 07a17e5 statements of both
   contracts are FALSE (kernel-checked counterexample runs), so `some_round` as stated there was
@@ -46,8 +46,8 @@ import Projects.rmk.Deframer.SomePath
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.SomeP
-open E5R E5R.Rmk E5R.Rmk.Deframer.Tail E5R.Rmk.Deframer.Session E5R.Rmk.Deframer.SessionI
+namespace NoCompiler.Rmk.Deframer.SomeP
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.Deframer.Tail NoCompiler.Rmk.Deframer.Session NoCompiler.Rmk.Deframer.SessionI
 
 /-! ## The two callee contracts (NOT proved) -/
 
@@ -162,7 +162,7 @@ theorem slice_ok (t : BitVec 8) (len : Word) (h : t.toNat = 1 ∨ (t.toNat = 0 �
 
 theorem spIn (sp : Word) (o n : Nat) (h1 : 0x80029bc8 ≤ sp.toNat) (h2 : sp.toNat + o + n ≤ 0x81000000) :
     B.inRam (sp + BitVec.ofNat 32 o) n = true :=
-  (E5R.Rmk.B_ram _ _).mpr (by rw [BitVec.toNat_add, BitVec.toNat_ofNat]; omega)
+  (NoCompiler.Rmk.B_ram _ _).mpr (by rw [BitVec.toNat_add, BitVec.toNat_ofNat]; omega)
 
 theorem spOff (sp : Word) (o : Nat) (h : sp.toNat + o < 2 ^ 32) :
     (sp + BitVec.ofNat 32 o).toNat = sp.toNat + o := by
@@ -575,4 +575,4 @@ theorem some_round (W : (Word → BitVec 8) → Prop) (hD : DispatchContract W) 
     exact lands_of_qrun r (.inl ⟨hpc, hI⟩)
   · exact some_pos W hD hE m₀ h hW (by omega)
 
-end E5R.Rmk.Deframer.SomeP
+end NoCompiler.Rmk.Deframer.SomeP

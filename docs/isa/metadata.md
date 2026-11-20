@@ -1,22 +1,22 @@
-# The `.e5r.struct` section
+# The `.nocompiler.struct` section
 
 Each function's block/loop tree, frame size and callees, written by
-`e5r annotate` (and, later, by the compiler). The section has no `SHF_ALLOC`
+`nocompiler annotate` (and, later, by the compiler). The section has no `SHF_ALLOC`
 flag, so it is not loaded: stripping it, or never having it, changes nothing
 about how the binary runs. The encoder and decoder are
-`crates/e5r/src/meta.rs`.
+`crates/nocompiler/src/meta.rs`.
 
 ## Use
 
-- `e5r check` checks a binary with the section against the trees in it, and
+- `nocompiler check` checks a binary with the section against the trees in it, and
   reports rule M1 when a recorded frame, callee list or size is not what the
   code has. Without the section it recovers the trees itself.
-- `e5r disasm` prints the code nested by the tree; with the tree, the
+- `nocompiler disasm` prints the code nested by the tree; with the tree, the
   structured program is the listing.
 - A compiler that knows the structure writes it, and a proof uses it to find
   the loop heads, which is where invariants go.
 
-Nothing in a proof depends on the section: `e5r export` writes the tree's
+Nothing in a proof depends on the section: `nocompiler export` writes the tree's
 information (entries, code regions) as Lean definitions next to the
 instruction words, and a proof that relied on a wrong one would not check.
 
@@ -25,7 +25,7 @@ instruction words, and a proof that relied on a wrong one would not check.
 Little-endian throughout.
 
 ```text
-header   magic "E5RS"   version:u16 = 1   reserved:u16 = 0   nfunc:u32
+header   magic "NCST"   version:u16 = 1   reserved:u16 = 0   nfunc:u32
 func     entry:u64   size:u64   frame:u64
          name_len:u16   name:[u8; name_len]       (UTF-8, not terminated)
          ncallees:u32   callee:u64 * ncallees      (entries, ascending)

@@ -12,14 +12,14 @@
   word 1 = the inner word 8 (bytes decoded; for an empty input, whatever the inner slot held).
   Stack: 32 bytes here plus the inner 16: [sp - 48, sp).
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Cobs.Decode
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Cobs
-open E5R E5R.Rmk E5R.Rmk.CobsFetch
+namespace NoCompiler.Rmk.Cobs
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.CobsFetch
 
 def wEntry : Word := 0x8001e006
 
@@ -415,4 +415,4 @@ theorem decode_in_place (m₀ : Machine) (h : WEnv m₀) :
         · rfl
         · exact horig j hj
 
-end E5R.Rmk.Cobs
+end NoCompiler.Rmk.Cobs

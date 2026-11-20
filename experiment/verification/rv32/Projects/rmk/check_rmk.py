@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Check the RMK proofs the way `e5r check` checks a job, until the job
+"""Check the RMK proofs the way `nocompiler check` checks a job, until the job
 runner can export RAM-resident images (main owns job.rs; the exporter worker
 owns `ram-image`).
 
-Original e5r code, Apache-2.0. Stages, all in a fresh scratch tree in /dev/shm
+Original nocompiler code, Apache-2.0. Stages, all in a fresh scratch tree in /dev/shm
 (no .olean is reused from the working tree):
 
 1. the ELF's sha256 must be the pin; Elf.lean is regenerated from it
    (gen_elf.py, main's 64-byte little-endian packing rule);
 2. a forbidden-word scan of every module (comments and strings stripped), with
-   the runner's list (crates/e5r-verify/src/job.rs FORBIDDEN);
+   the runner's list (crates/nocompiler-verify/src/job.rs FORBIDDEN);
 3. every module compiled from source with the pinned Lean, in import order;
 4. every module replayed by `leanchecker` (fresh kernel);
 5. `#print axioms` of every theorem in the named namespaces: only propext,
@@ -86,9 +86,9 @@ def run(cmd, cwd, env=None):
 
 def main():
     elf, out = Path(sys.argv[1]), Path(sys.argv[2])
-    spaces = sys.argv[3:] or ['E5R.Rmk']
+    spaces = sys.argv[3:] or ['NoCompiler.Rmk']
     digest = hashlib.sha256(elf.read_bytes()).hexdigest()
-    receipt = {'schema': 'e5r.rmk.review-check.v1', 'elf_sha256': digest, 'stages': [], 'status': 'error'}
+    receipt = {'schema': 'nocompiler.rmk.review-check.v1', 'elf_sha256': digest, 'stages': [], 'status': 'error'}
     def done(status, msg=''):
         receipt['status'] = status
         if msg:

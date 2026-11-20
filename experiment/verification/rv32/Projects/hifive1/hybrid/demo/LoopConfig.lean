@@ -5,14 +5,14 @@
   directly proved summary; the abstract summary (`enterOk`, `post`) says what
   the region needs from, and gives back to, the abstract states around it.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Theories.Absint
 import Theories.Board.Hifive1Revb
 import Projects.hifive1.hybrid.demo.LoopImage
 
-namespace E5R.HybridLoop.Job
-open E5R E5R.AI
+namespace NoCompiler.HybridLoop.Job
+open NoCompiler NoCompiler.AI
 
 def pwmcmp1 : Nat := 0x10015024
 
@@ -24,7 +24,7 @@ def cfg : Config where
   allow := [⟨pwmcmp1, 0, 100⟩]
   hdepth := 0x400
 
-/-- Every boot state the board allows (as `E5R.Hifive1.Job.boot`). -/
+/-- Every boot state the board allows (as `NoCompiler.Hifive1.Job.boot`). -/
 def boot : AState where
   pc := HybridLoop.entry
   regs := List.replicate 31 .top
@@ -64,4 +64,4 @@ def post (s : AState) : AState :=
     pc := regionExit
     mem := storeStrong s.mem .abs a .w headAV }
 
-end E5R.HybridLoop.Job
+end NoCompiler.HybridLoop.Job

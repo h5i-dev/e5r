@@ -5,7 +5,7 @@ The checkpoint source/job changes start at `d21b694`.
 
 Validation on 2026-10-30, in the isolated `prepare/rmk-main` worktree:
 
-* `cargo test --release -p e5r-verify -j 2`: **24 passed**, including tests
+* `cargo test --release -p nocompiler-verify -j 2`: **24 passed**, including tests
   against the supplied pinned RMK ELF.
 * `cargo fmt --all -- --check`: **passed** (includes formatting an existing
   dashboard match).
@@ -13,18 +13,18 @@ Validation on 2026-10-30, in the isolated `prepare/rmk-main` worktree:
   **passed**.
 * `cargo-deny check`: **advisories, bans, licenses and sources passed** with
   the committed license policy. A temporary config copy set only the advisory
-  database path to `/tmp/e5r-rmk-advisory-db`, because this machine's NFS home
+  database path to `/tmp/nocompiler-rmk-advisory-db`, because this machine's NFS home
   does not support its locking. Cargo also emitted a package-cache lock
   diagnostic; the checker exited 0.
 * `cargo test --release --workspace --no-fail-fast -j 2`: **not green**:
   1,050 passed, 21 failed, 20 ignored across 116 test/doc-test targets.
   The failures are the missing-input/tool gates below, not accepted passes.
-* `e5r-exp check .../rmk-checkpoint.json` **without `--resume`**:
+* `nocompiler-exp check .../rmk-checkpoint.json` **without `--resume`**:
   **`proved`**. All 110 modules compiled from source and all 110 replayed
   through `leanchecker` (220 stages; no resumed stages). The audit checked
   the 17 requested endpoints and four image-binding theorems. Only
   `propext`, `Classical.choice` and `Quot.sound` were reported.
-* `e5r-exp verify-result .../checkpoint.json`: **current**, exit 0.
+* `nocompiler-exp verify-result .../checkpoint.json`: **current**, exit 0.
   The receipt binds the supplied ELF, board, job, Lean version, verifier
   binary and proof sources. Proof sources are at `0c75c31`; this validation
   commit adds only documentation and the receipt.
@@ -39,13 +39,13 @@ that subsequent run.
 
 | Failing target | Missing prerequisite |
 | --- | --- |
-| `e5r-analysis` / `jumptable_a64` | AArch64 system-library fixture builds |
-| `e5r-api` / `classes` | C++/Microsoft ABI fixtures |
-| `e5r-api` / `dataflow` | Dataflow fixtures |
-| `e5r-arch` / `a64_logical_imm` | `llvm-mc` |
-| `e5r-asm` / `oracle` | Disassembler oracle |
-| `e5r-format` / `overlay` | Binary fixture corpus |
-| `e5r-format` / `pdb` | PDB fixture corpus and `llvm-pdbutil` |
+| `nocompiler-analysis` / `jumptable_a64` | AArch64 system-library fixture builds |
+| `nocompiler-api` / `classes` | C++/Microsoft ABI fixtures |
+| `nocompiler-api` / `dataflow` | Dataflow fixtures |
+| `nocompiler-arch` / `a64_logical_imm` | `llvm-mc` |
+| `nocompiler-asm` / `oracle` | Disassembler oracle |
+| `nocompiler-format` / `overlay` | Binary fixture corpus |
+| `nocompiler-format` / `pdb` | PDB fixture corpus and `llvm-pdbutil` |
 
 These seven test files have no changes relative to the integration's main
 base, `a211e10`. The CI test job already installs the toolchains and builds

@@ -1,7 +1,7 @@
 /-
   Quiet deterministic runs, for machine-code contracts on the RMK firmware.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   On QEMU virt the RMK firmware may run with `mstatus.MIE` set while the
   `mie` CSR is zero, so "masked" (`mie_ = false`, Theories/Hybrid/Basic) is
@@ -14,8 +14,8 @@
 -/
 import Theories.Logic
 
-namespace E5R.Rmk
-open E5R
+namespace NoCompiler.Rmk
+open NoCompiler
 
 def Quiet (c : Core) : Prop := ∀ code, irqEnabled c code = false
 
@@ -46,4 +46,4 @@ theorem QRun.toDetSteps {B img n m m'} (h : QRun B img n m m') : DetSteps B img 
   | refl m => exact .refl m
   | step _ hs _ ih => exact .step hs ih
 
-end E5R.Rmk
+end NoCompiler.Rmk

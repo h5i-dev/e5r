@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Negative controls for the RMK memmove proofs (Projects/rmk).
 
-Original e5r code, Apache-2.0. Each control changes one thing in a scratch
+Original nocompiler code, Apache-2.0. Each control changes one thing in a scratch
 copy (an instruction byte of the packed image, the claimed result, the copy
 direction condition, the size bound, a stack separation premise, a fetch
 claim) and recompiles the affected modules with the pinned Lean. A control
@@ -24,7 +24,7 @@ import tempfile
 
 RV32 = Path(__file__).resolve().parents[2]
 R = 'Projects/rmk'
-ELF = Path('/home/ht2673/.local/state/e5r-claude-isa-review-20261029T042314Z/rmk/rmk-qemu-riscv-f39d833f.elf')
+ELF = Path('/home/ht2673/.local/state/nocompiler-claude-isa-review-20261029T042314Z/rmk/rmk-qemu-riscv-f39d833f.elf')
 CHAIN = [f'{R}/Elf.lean', f'{R}/Fetch.lean', f'{R}/MemmoveFetch.lean', f'{R}/Run.lean', f'{R}/Copy.lean',
          f'{R}/MemmoveLoops.lean', f'{R}/MemmoveSmall.lean', f'{R}/MemmoveBigLoops.lean',
          f'{R}/MemmoveAligned.lean', f'{R}/MemmoveContract.lean', f'{R}/Merge.lean', f'{R}/MemmoveMisLoop.lean',

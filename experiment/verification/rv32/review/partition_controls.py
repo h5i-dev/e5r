@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Independent review of the partitioned interrupt invariant (support-lean4 e41afad).
 
-Original e5r code, Apache-2.0. Each control makes one of the new checker
+Original nocompiler code, Apache-2.0. Each control makes one of the new checker
 conditions trivially true (same term shape) in Theories/Absint.lean (scratch copy in /dev/shm) and recompiles
 Absint.lean and AbsintSound.lean with the pinned Lean. A condition is
 load-bearing if the soundness proof no longer goes through: the first error

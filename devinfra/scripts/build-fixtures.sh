@@ -213,7 +213,7 @@ done
 if command -v go > /dev/null; then
   mkdir -p "$out/gosrc"
   cat > "$out/gosrc/go.mod" <<'EOF'
-module e5rfixture
+module nocompilerfixture
 
 go 1.16
 EOF
@@ -611,7 +611,7 @@ fi
 # plus R_386_PLT32. Relocatable objects only: the binutils here is built for
 # aarch64 alone and there is no lld, so nothing on this machine can link an
 # i386 image. The dynamic case with a real PLT is synthesized inside
-# crates/e5r-format/tests/ instead.
+# crates/nocompiler-format/tests/ instead.
 cat > "$out/relocs32.c" <<'EOF'
 /* One call that stays inside the file, one that leaves it, a reference to a
    local datum, to a local string and to an external datum, and a function

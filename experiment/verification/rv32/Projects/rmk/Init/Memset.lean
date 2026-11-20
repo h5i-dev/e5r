@@ -1,7 +1,7 @@
 /-
   compiler_builtins `memset` (0x80020bb2) on the pinned RMK image, word-store path: PROVED.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here: `memset_words`: from `MemsetEnv` (destination a0 word-aligned, length a2 ≥ 16 and a
   multiple of 4, [a0, a0+a2) RAM, even return address), every behaviour returns to ra, quiet, with sp
@@ -15,8 +15,8 @@ import Projects.rmk.DevRead
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Init
-open E5R E5R.Rmk E5R.Rmk.Deframer E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Init
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.Deframer NoCompiler.Rmk.Deframer.Tail
 
 structure MemsetEnv (m : Machine) : Prop where
   pc : m.core.pc = 0x80020bb2
@@ -166,4 +166,4 @@ theorem memset_words (m₀ : Machine) (E : MemsetEnv m₀) : Lands B img (Memset
       Core.wr_get_ne _ _ _ _ _ (show (12 : Reg) ≠ 16 by decide), Core.wr_get_self _ _ _ _ (show (12 : Reg).val ≠ 0 by decide),
       alu_sub, Memmove.alu_and, hh, z1]
 
-end E5R.Rmk.Init
+end NoCompiler.Rmk.Init

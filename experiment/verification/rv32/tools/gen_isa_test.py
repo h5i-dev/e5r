@@ -8,7 +8,7 @@ load and store width, all of M (division by zero and overflow included),
 every AMO, LR/SC, FENCE/FENCE.I and the RV32C forms compilers emit. The
 program runs under `qemu-riscv32 -one-insn-per-tb -d cpu`; tools/ReplayIsa
 then replays that trace in the Lean model and compares every register after
-every instruction. Original e5r test code, Apache-2.0.
+every instruction. Original nocompiler test code, Apache-2.0.
 """
 import random
 import sys

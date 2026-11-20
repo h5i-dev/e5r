@@ -10,7 +10,7 @@ Date: 2026-09-13. Reproduce with `scripts/bench.sh` and `cargo test --release`.
 
 `scripts/bench.sh`, best of three runs.
 
-| binary | size | e5r (full analysis) | objdump (disassembly only) | functions / complete |
+| binary | size | nocompiler (full analysis) | objdump (disassembly only) | functions / complete |
 | --- | --- | --- | --- | --- |
 | hello.a64.O2 | 71K | 0.00s, 3.3 MB | 0.00s, 4.9 MB | 15 / 8 |
 | wide.a64.O2.o | 22K | 0.00s, 3.6 MB | 0.00s, 5.0 MB | 32 / 30 |
@@ -21,13 +21,13 @@ Date: 2026-09-13. Reproduce with `scripts/bench.sh` and `cargo test --release`.
 | libstdc++.so.6 | 2.5M | 0.14s, 56 MB | 0.34s, 7.5 MB | 5,610 / 2,920 |
 | libcrypto.so.3 | 4.5M | 0.12s, 61 MB | aborted (SIGABRT) | 10,835 / 10,355 |
 
-e5r is doing considerably more than objdump: recovering functions, building
+nocompiler is doing considerably more than objdump: recovering functions, building
 control flow, resolving jump tables, tracking cross references and extracting
 strings, where objdump disassembles linearly and does none of it. That it is
 also two to three times faster on the larger inputs is the point, but the
 comparison is not like for like and saying so matters more than the number.
 
-Memory is the axis where e5r is worse, by roughly ten times. It keeps the
+Memory is the axis where nocompiler is worse, by roughly ten times. It keeps the
 whole analysis in memory; objdump streams. On a 7.5 GB machine that is a
 tradeoff rather than a problem, and it is what M11's incremental analysis is
 for.
@@ -40,13 +40,13 @@ not yet made. That is a gap in the scorecard, not a result.
 `scripts/compare-tools.sh`, measured 2026-09-14 against **rizin 0.8.2-1 arm64**
 from the project's own Ubuntu repository. Both tools are given the invocation
 their own documentation recommends: `rizin -N -q -A -c aflj <file>` against
-`e5rx stats <file> --json`, with the function list for scoring taken from an
-untimed `e5rx funcs`. Fastest of three runs, except the two largest libraries,
+`nocompiler-x stats <file> --json`, with the function list for scoring taken from an
+untimed `nocompiler-x funcs`. Fastest of three runs, except the two largest libraries,
 measured once because a single `rizin -A` on `libstdc++` takes over twelve
 minutes. Full method, every command, and the recall breakdown are in
 [`benchmarks.md`](benchmarks.md).
 
-| binary | e5r | rizin -A | faster by | e5r peak | rizin peak |
+| binary | nocompiler | rizin -A | faster by | nocompiler peak | rizin peak |
 | --- | --- | --- | --- | --- | --- |
 | ls | 0.02s | 0.91s | 45x | 12 MB | 35 MB |
 | objdump | 0.03s | 0.62s | 21x | 16 MB | 52 MB |
@@ -59,10 +59,10 @@ minutes. Full method, every command, and the recall breakdown are in
 
 Three things have to be said with that table or it is not honest.
 
-**`rizin -A` runs `aaa`, which does more than e5r's analysis does.** It also
+**`rizin -A` runs `aaa`, which does more than nocompiler's analysis does.** It also
 autonames functions, recovers variables and signatures per function, and
-searches the image for values, none of which e5r produces. rizin's own `aa`,
-function recovery without those passes, is 1.3x to 54x slower than e5r rather
+searches the image for values, none of which nocompiler produces. rizin's own `aa`,
+function recovery without those passes, is 1.3x to 54x slower than nocompiler rather
 than 21x to 3,291x, and that comparison is in `benchmarks.md` too.
 
 **`libstdc++` is an outlier and should not be read as a typical ratio.** rizin
@@ -72,14 +72,14 @@ that never become executable; `aa` on the same file takes 5.55s and reports
 is scanning non-code, and most of the twelve minutes is that.
 
 **Memory points the other way from the objdump table above.** Against objdump,
-e5r uses about ten times the memory; against rizin it uses 2.4x to 8.6x less,
-on every binary measured. objdump streams and keeps nothing; e5r and rizin
+nocompiler uses about ten times the memory; against rizin it uses 2.4x to 8.6x less,
+on every binary measured. objdump streams and keeps nothing; nocompiler and rizin
 both hold a program model.
 
 Function recovery against the symbol table, on the fixtures where the oracle is
 a complete `.symtab` so recall and false positives are separable:
 
-| fixture | e5r recall | rizin recall | e5r unnamed | rizin unnamed |
+| fixture | nocompiler recall | rizin recall | nocompiler unnamed | rizin unnamed |
 | --- | --- | --- | --- | --- |
 | hello.static.a64 | 99.6% | 96.5% | 8 | 89 |
 | hello.static.a64.stripped | 99.5% | 78.9% | 7 | 102 |
@@ -91,11 +91,11 @@ Most of rizin's misses are boundary disagreements rather than functions it
 never found: on `bash` all 291 are its entry placed one instruction into the
 function, because aarch64 `_init` starts with a `nop`. The `cpp-hierarchy` row
 is not that. It is a stripped C++ binary whose boundaries survive stripping in
-`.eh_frame`; e5r reads those FDEs and rizin does not, so rizin is left with
+`.eh_frame`; nocompiler reads those FDEs and rizin does not, so rizin is left with
 recursive descent through virtual dispatch and finds two functions.
 
-**One row goes against us.** `e5rx info` on `panicky` takes 0.08s and 56 MB
-where `rz-bin -I` takes 0.02s and 19 MB, because `e5rx info` parses the
+**One row goes against us.** `nocompiler-x info` on `panicky` takes 0.08s and 56 MB
+where `rz-bin -I` takes 0.02s and 19 MB, because `nocompiler-x info` parses the
 binary's 2.8 MB of DWARF to print a container header that needs none of it.
 Stripping the debug sections takes it to 0.00s and 5.4 MB.
 
@@ -387,14 +387,14 @@ static analysis resolves.
 Against Ghidra 12.1.3 headless, on the same binaries, counting only functions
 inside the file (Ghidra puts imports in a synthetic block past the end):
 
-| binary | Ghidra | e5r | agreed | Ghidra only | e5r only | e5r time |
+| binary | Ghidra | nocompiler | agreed | Ghidra only | nocompiler only | nocompiler time |
 | --- | --- | --- | --- | --- | --- | --- |
 | driver.a64.O2 | 38 | 38 | 38 | 0 | 0 | 0.020s |
 | driver.x64.O2 | 38 | 38 | 38 | 0 | 0 | 0.019s |
 | hello.a64.O2 | 17 | 16 | 15 | 2 | 1 | 0.019s |
 
 Ghidra's two extras on `hello` are the PLT resolver stub and a padding `nop`;
-e5r's one extra is `__wrap_main`, a real function whose symbol has no type.
+nocompiler's one extra is `__wrap_main`, a real function whose symbol has no type.
 Ghidra's analysis of the same binary takes about ten seconds. Reproduce with
 `scripts/compare-ghidra.sh`.
 
@@ -470,7 +470,7 @@ Percent of functions perfect on each metric, higher better.
 | | Union | Structure (GED) | Types | Recompile |
 | --- | --- | --- | --- | --- |
 | angr 9.3.4 | 37.0 | 34.6 | 10.2 | 0.66 |
-| e5r 0.1.0 | 23.4 | 22.9 | 5.6 | 0.64 |
+| nocompiler 0.1.0 | 23.4 | 22.9 | 5.6 | 0.64 |
 
 Behind on structure, behind on types, level on recompilation, which is the axis
 the roadmap bet was open. **M6's exit criterion is not met:** it asks for
@@ -495,7 +495,7 @@ disagreed with the machine on over a thousand calls; both were true of the same
 output. That gate is at zero now, so the caveat about what byte_match does not
 see stands while the particular disagreement behind it does not.
 
-Not scored by DecBench but measured in the same run: e5r returned C for 780
+Not scored by DecBench but measured in the same run: nocompiler returned C for 780
 of 780 requested functions in 21s against angr's 760 and 278s, and 96.1% of
 its functions recompiled after DecBench's fixup pass against angr's 88.5%.
 DecBench scores each decompiler over the functions it returned, so angr's
@@ -507,13 +507,13 @@ The comparison stops at angr. Ghidra 12.1.3 is installed here but ships its
 decompiler as an x86-64 binary only, so it cannot decompile on this arm64
 machine at all; IDA and Binary Ninja are not installed. DecBench's published
 leaderboard is x86-64 and is not comparable to this run: angr scores 45.7 union
-there against 37.0 here, so the slice, not e5r, accounts for the difference.
-e5r reaches 63% of angr's union on the binaries where both ran, and that ratio
+there against 37.0 here, so the slice, not nocompiler, accounts for the difference.
+nocompiler reaches 63% of angr's union on the binaries where both ran, and that ratio
 is the only honest cross-reference until the corpus is built for x86-64 or the
 250-function sample set is submitted.
 
 What costs the score, in order: goto density (1.98 per function against angr's
-0.57; functions e5r structures without a goto score 36.2% GED-perfect, above
+0.57; functions nocompiler structures without a goto score 36.2% GED-perfect, above
 angr's whole-set 34.6%, and functions with three or more score 0.0%); locals
 reaching the metric with no name, offset or type, because `decompile --json`
 emits only a count of them, which makes 58% of the type ground truth

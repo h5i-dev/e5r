@@ -1,8 +1,8 @@
-# e5r
+# nocompiler
 
-This is the command reference for `e5rx`, the binary analysis toolkit that
-serves as development infrastructure for the e5r Lean 4 verifier. The
-verifier, `e5r`, is documented in
+This is the command reference for `nocompiler-x`, the binary analysis toolkit that
+serves as development infrastructure for the nocompiler Lean 4 verifier. The
+verifier, `nocompiler`, is documented in
 [verification-ptx.md](../../experiment/docs/ptx.md) for PTX kernels and
 [firmware-verification.md](../../experiment/docs/firmware.md) for firmware binaries.
 
@@ -16,7 +16,7 @@ a bad command line, and `3` for input that could not be read.
 
 ```
 cargo build --release
-./target/release/e5rx info /bin/ls
+./target/release/nocompiler-x info /bin/ls
 ```
 
 ## Installing
@@ -24,11 +24,11 @@ cargo build --release
 ### A release binary
 
 Every release attaches one archive per platform, a `SHA256SUMS` file and a
-signature over it. Unpack and put `e5rx` on your path:
+signature over it. Unpack and put `nocompiler-x` on your path:
 
 ```
-tar -xzf e5r-0.1.0-x86_64-unknown-linux-musl.tar.gz
-install -m755 e5r-0.1.0-x86_64-unknown-linux-musl/e5rx /usr/local/bin/
+tar -xzf nocompiler-0.1.0-x86_64-unknown-linux-musl.tar.gz
+install -m755 nocompiler-0.1.0-x86_64-unknown-linux-musl/nocompiler-x /usr/local/bin/
 ```
 
 Check what you downloaded first. The checksums cover the archives, and the
@@ -38,18 +38,18 @@ identity is the release workflow itself and there is no key to distribute:
 ```
 sha256sum -c SHA256SUMS
 cosign verify-blob --signature SHA256SUMS.sig --certificate SHA256SUMS.pem \
-  --certificate-identity-regexp '^https://github.com/h5i-dev/e5r/' \
+  --certificate-identity-regexp '^https://github.com/h5i-dev/NoCompiler/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   SHA256SUMS
 ```
 
 | Platform | Archive |
 | --- | --- |
-| Linux x86-64 | `e5r-VERSION-x86_64-unknown-linux-musl.tar.gz` |
-| Linux AArch64 | `e5r-VERSION-aarch64-unknown-linux-musl.tar.gz` |
-| macOS Apple silicon | `e5r-VERSION-aarch64-apple-darwin.tar.gz` |
-| macOS Intel | `e5r-VERSION-x86_64-apple-darwin.tar.gz` |
-| Windows x86-64 | `e5r-VERSION-x86_64-pc-windows-msvc.zip` |
+| Linux x86-64 | `nocompiler-VERSION-x86_64-unknown-linux-musl.tar.gz` |
+| Linux AArch64 | `nocompiler-VERSION-aarch64-unknown-linux-musl.tar.gz` |
+| macOS Apple silicon | `nocompiler-VERSION-aarch64-apple-darwin.tar.gz` |
+| macOS Intel | `nocompiler-VERSION-x86_64-apple-darwin.tar.gz` |
+| Windows x86-64 | `nocompiler-VERSION-x86_64-pc-windows-msvc.zip` |
 
 ### What the Linux build guarantees
 
@@ -60,20 +60,20 @@ Alpine, a distroless container, or a rescue initramfs. `ldd` on it says it is
 not a dynamic executable, and that is the whole claim:
 
 ```
-$ file e5rx
-e5rx: ELF 64-bit LSB pie executable, x86-64, static-pie linked, stripped
+$ file nocompiler-x
+nocompiler-x: ELF 64-bit LSB pie executable, x86-64, static-pie linked, stripped
 ```
 
 Nothing outside the binary is needed at run time. The fixture corpus under
-`fixtures/` is what the test suite measures against; an installed `e5rx` never
+`fixtures/` is what the test suite measures against; an installed `nocompiler-x` never
 reads it, and no data file, configuration or cache directory is required to
 start.
 
 ### From source
 
 ```
-cargo install --git https://github.com/h5i-dev/e5r e5r-cli
-cargo install --path crates/e5r-cli          # from a checkout
+cargo install --git https://github.com/h5i-dev/NoCompiler nocompiler-cli
+cargo install --path crates/nocompiler-cli          # from a checkout
 ```
 
 The dependency list is deliberately short (`serde` and `serde_json`, `clap`,
@@ -99,7 +99,7 @@ timestamps are zeroed, so the same binary always packs to the same checksum.
 ### install.sh
 
 ```
-curl -fsSL https://raw.githubusercontent.com/h5i-dev/e5r/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/h5i-dev/NoCompiler/main/install.sh | sh
 ```
 
 It works out the platform, asks the releases API for the latest tag, downloads
@@ -112,10 +112,10 @@ Four environment variables, all of them for a case the default does not cover:
 
 | | |
 | --- | --- |
-| `E5R_INSTALL_DIR` | somewhere other than `/usr/local/bin` |
-| `E5R_VERSION` | a tag other than the latest |
-| `E5R_BASE_URL` | a mirror, or a staged release that is not published yet |
-| `E5R_SKIP_CHECKSUM` | install without verifying, said out loud on stderr |
+| `NOCOMPILER_INSTALL_DIR` | somewhere other than `/usr/local/bin` |
+| `NOCOMPILER_VERSION` | a tag other than the latest |
+| `NOCOMPILER_BASE_URL` | a mirror, or a staged release that is not published yet |
+| `NOCOMPILER_SKIP_CHECKSUM` | install without verifying, said out loud on stderr |
 
 There is no Homebrew formula. There was a draft one, and it was deleted rather
 than published: it had never been run against `brew`, and a tap is a second
@@ -144,13 +144,13 @@ the output rather than being approximated.
 ## Looking at a file
 
 ```
-e5rx info FILE           container, architecture, entry, what the loader noticed
-e5rx sections FILE       sections and where they are mapped
-e5rx symbols FILE        symbols the container names
-e5rx imports FILE        what it needs from elsewhere
-e5rx exports FILE        what it offers
-e5rx strings FILE        strings found in the image, by section
-e5rx stats FILE          counts: functions, blocks, instructions, references
+nocompiler-x info FILE           container, architecture, entry, what the loader noticed
+nocompiler-x sections FILE       sections and where they are mapped
+nocompiler-x symbols FILE        symbols the container names
+nocompiler-x imports FILE        what it needs from elsewhere
+nocompiler-x exports FILE        what it offers
+nocompiler-x strings FILE        strings found in the image, by section
+nocompiler-x stats FILE          counts: functions, blocks, instructions, references
 ```
 
 `info` and the listings above need only the container, so they are instant
@@ -159,11 +159,11 @@ whatever the size of the file.
 ## Code
 
 ```
-e5rx funcs FILE                     every recovered function and its evidence
-e5rx disas FILE TARGET              disassemble a function, an address, or `all`
-e5rx xrefs FILE TARGET [--from]     references to an address, or from one
-e5rx decompile FILE TARGET          pseudo-C for a function, or for `all`
-e5rx emulate FILE TARGET [ARGS...]  run a function and report what it did
+nocompiler-x funcs FILE                     every recovered function and its evidence
+nocompiler-x disas FILE TARGET              disassemble a function, an address, or `all`
+nocompiler-x xrefs FILE TARGET [--from]     references to an address, or from one
+nocompiler-x decompile FILE TARGET          pseudo-C for a function, or for `all`
+nocompiler-x emulate FILE TARGET [ARGS...]  run a function and report what it did
 ```
 
 `TARGET` is an address (`0x401000`, `401000`), a symbol name, or `all`.
@@ -192,21 +192,21 @@ wrong, so the identity the image asks for is checked before anything in the
 database is believed.
 
 ```
-$ e5rx funcs prog.exe
+$ nocompiler-x funcs prog.exe
 0x140001000  ...  proven  program database  compare_points
 0x140001020  ...  proven  program database  walk
 ```
 
 Without it, the same binary yields only its entry point.
 
-`e5rx info` reports `pe.pdb`, `pe.pdb.key` and `pe.pdb.age`, which together
+`nocompiler-x info` reports `pe.pdb`, `pe.pdb.key` and `pe.pdb.age`, which together
 are what a symbol server is indexed by.
 
 ## C++
 
 ```
-e5rx classes prog                # the hierarchy
-e5rx classes prog --members      # and every member function, with its `this`
+nocompiler-x classes prog                # the hierarchy
+nocompiler-x classes prog --members      # and every member function, with its `this`
 ```
 
 Classes come from the type information where a binary has it, and from the
@@ -229,8 +229,8 @@ default.
 ## Structure and types
 
 ```
-e5rx shapes FILE TARGET     what the pointers a function takes point at
-e5rx vtables FILE           virtual tables and the classes they belong to
+nocompiler-x shapes FILE TARGET     what the pointers a function takes point at
+nocompiler-x vtables FILE           virtual tables and the classes they belong to
 ```
 
 `shapes` reports the offsets a function touches through each pointer it is
@@ -241,9 +241,9 @@ two disagreeing strides into one.
 ## Asking questions
 
 ```
-e5rx query FILE 'functions where insns > 100 and name ~ "crypt"'
-e5rx query FILE 'strings where length >= 20 and text ~ "/etc/"'
-e5rx query FILE 'xrefs where kind = call and to = 0x401000 limit 20'
+nocompiler-x query FILE 'functions where insns > 100 and name ~ "crypt"'
+nocompiler-x query FILE 'strings where length >= 20 and text ~ "/etc/"'
+nocompiler-x query FILE 'xrefs where kind = call and to = 0x401000 limit 20'
 ```
 
 Entities: `functions`, `strings`, `symbols`, `imports`, `exports`, `sections`,
@@ -255,7 +255,7 @@ and is reported as one, with the fields there are.
 ## Comparing builds
 
 ```
-e5rx diff OLD NEW [--all]
+nocompiler-x diff OLD NEW [--all]
 ```
 
 Functions are matched across the two builds by a fingerprint of their
@@ -266,8 +266,8 @@ Given a vulnerable build and a patched one, this points at the change.
 ## Naming a stripped binary
 
 ```
-e5rx sig FILE create -o LIBRARY      a signature for every named function
-e5rx sig FILE apply LIBRARY          name what the library recognizes
+nocompiler-x sig FILE create -o LIBRARY      a signature for every named function
+nocompiler-x sig FILE apply LIBRARY          name what the library recognizes
 ```
 
 A signature identifies a function by its content rather than its address, so a
@@ -281,7 +281,7 @@ The file is sorted text, so a signature library reviews in a diff.
 ## An interactive session
 
 ```
-$ e5rx repl prog
+$ nocompiler-x repl prog
 38 function(s) in prog. `help` lists the commands, `quit` leaves.
 0x400144> f
 0x400144> seek parse_header
@@ -308,17 +308,17 @@ An assertion is not a note on the side: it changes the analysis. Decompile,
 see what the engine could not work out, say what it is, decompile again.
 
 ```
-$ e5rx decompile prog nestedoffset
+$ nocompiler-x decompile prog nestedoffset
 uint64_t nestedoffset(uint64_t arg0, uint64_t arg1, uint64_t arg2)
 {
     return (uint64_t)((uint64_t)(uint32_t)*(uint32_t *)(arg0 +
         ((int64_t)(int32_t)((uint32_t)arg1 + (uint32_t)arg2) << 2) + 12));
 }
 
-$ e5rx annotate prog type nestedoffset \
+$ nocompiler-x annotate prog type nestedoffset \
     "int nestedoffset(struct outer { int header; int pad; int array[8]; } *ptr, int a, int b)"
 
-$ e5rx decompile prog nestedoffset
+$ nocompiler-x decompile prog nestedoffset
 struct outer { int32_t header; int32_t pad; int32_t array[8]; };
 
 int32_t nestedoffset(struct outer *ptr, int32_t a, int32_t b)
@@ -341,7 +341,7 @@ where the machine kept it, so a program driving this can see what there is to
 assert:
 
 ```
-$ e5rx decompile prog nestedoffset --json
+$ nocompiler-x decompile prog nestedoffset --json
   ...
   "asserted": true,
   "variables": [
@@ -354,10 +354,10 @@ $ e5rx decompile prog nestedoffset --json
 ## Annotations
 
 ```
-e5rx annotate FILE name TARGET NAME
-e5rx annotate FILE comment TARGET TEXT
-e5rx annotate FILE list
-e5rx annotate FILE undo
+nocompiler-x annotate FILE name TARGET NAME
+nocompiler-x annotate FILE comment TARGET TEXT
+nocompiler-x annotate FILE list
+nocompiler-x annotate FILE undo
 ```
 
 Annotations are written to a log beside the binary, keyed to a content anchor
@@ -366,7 +366,7 @@ by that anchor, so two analysts on separate branches merge without conflict
 markers. Add this to `.gitattributes`:
 
 ```
-*.e5r merge=union
+*.nocompiler merge=union
 ```
 
 ## Containers that are not one program
@@ -376,8 +376,8 @@ than loaded: picking a member silently would make every later answer about
 bytes you did not choose.
 
 ```
-e5rx archive libfoo.a              # members, sizes and offsets
-e5rx archive libfoo.a --symbols    # and what each one defines
+nocompiler-x archive libfoo.a              # members, sizes and offsets
+nocompiler-x archive libfoo.a --symbols    # and what each one defines
 ```
 
 GNU and BSD archives, long names, both symbol index forms, and thin archives.
@@ -389,8 +389,8 @@ last `\n---- Bun! ----\n` marker, the offsets just before it, and either
 record size that layout has shipped.
 
 ```
-e5rx bun prog                      # modules, loaders, sizes
-e5rx bun prog --extract a.js       # that module's bytes on stdout
+nocompiler-x bun prog                      # modules, loaders, sizes
+nocompiler-x bun prog --extract a.js       # that module's bytes on stdout
 ```
 
 `--extract` takes the path the graph stores, a decimal index, or a unique
@@ -398,7 +398,7 @@ suffix that begins at a `/`. It writes the bytes and nothing else, so it is
 not combined with `--json`.
 
 ```
-e5rx overlay firmware.exe
+nocompiler-x overlay firmware.exe
 ```
 
 reports where the headers stop describing the file, what is appended past that
@@ -416,17 +416,17 @@ find, so a patch written against one build still lands on the right
 instruction in the next one, and says how it found it.
 
 ```
-e5rx patch prog record 0x401234 --asm "nop" --note "skip the check" -o fix.e5r-patch
-e5rx patch prog record 0x401234 --bytes 90909090 -o fix.e5r-patch
-e5rx patch prog record 0x401234 --asm "mov eax, 1" --pad-to 8 -o fix.e5r-patch
-e5rx patch prog preview fix.e5r-patch     # where it lands, what it overwrites
-e5rx patch prog apply   fix.e5r-patch -o prog.patched
-e5rx patch prog.patched revert fix.e5r-patch -o prog
-e5rx patch prog merge a.e5r-patch b.e5r-patch -o both.e5r-patch
+nocompiler-x patch prog record 0x401234 --asm "nop" --note "skip the check" -o fix.nocompiler-patch
+nocompiler-x patch prog record 0x401234 --bytes 90909090 -o fix.nocompiler-patch
+nocompiler-x patch prog record 0x401234 --asm "mov eax, 1" --pad-to 8 -o fix.nocompiler-patch
+nocompiler-x patch prog preview fix.nocompiler-patch     # where it lands, what it overwrites
+nocompiler-x patch prog apply   fix.nocompiler-patch -o prog.patched
+nocompiler-x patch prog.patched revert fix.nocompiler-patch -o prog
+nocompiler-x patch prog merge a.nocompiler-patch b.nocompiler-patch -o both.nocompiler-patch
 ```
 
 `--asm` assembles at the target address, because a branch encodes a
-displacement from where it sits. It accepts what `e5rx disas` prints, so a
+displacement from where it sits. It accepts what `nocompiler-x disas` prints, so a
 line can be copied out, changed, and assembled back. `--pad-to` fills the rest
 with no-ops: an instruction that encodes shorter than the one it replaces
 would otherwise leave the bytes after it meaning something they did not mean.
@@ -444,10 +444,10 @@ the bytes the anchor fingerprinted, which is exactly what applying it did.
 ## Saving a session
 
 ```
-e5rx project new prog -o prog.e5r-proj --set scan_gaps=true
-e5rx project add prog.e5r-proj --signatures libc.e5r-sig --patch fix.e5r-patch
-e5rx project verify prog.e5r-proj
-e5rx project show prog.e5r-proj
+nocompiler-x project new prog -o prog.nocompiler-proj --set scan_gaps=true
+nocompiler-x project add prog.nocompiler-proj --signatures libc.nocompiler-sig --patch fix.nocompiler-patch
+nocompiler-x project verify prog.nocompiler-proj
+nocompiler-x project show prog.nocompiler-proj
 ```
 
 A project names its binary by content as well as by path. Opening it against a
@@ -457,37 +457,37 @@ and a binary that only moved is still the right one.
 ## Project dashboard and tasks
 
 ```bash
-e5rx project new prog --name investigation     # global project, absolute references
-e5rx project list --json
-e5rx ui                                      # every registered project
-e5rx project import prog.e5r-proj --name imported
-e5rx project task investigation list --json
-e5rx project dashboard prog.e5r-proj             # local overview + decompiler pane
-e5rx project dashboard prog.e5r-proj --port 0    # choose a free loopback port
-e5rx project task prog.e5r-proj add "Trace parser" --owner agent-a --next "Inspect main"
-e5rx project task prog.e5r-proj list --json
-e5rx project task prog.e5r-proj update T-0001 --revision 1 --input task.json
+nocompiler-x project new prog --name investigation     # global project, absolute references
+nocompiler-x project list --json
+nocompiler-x ui                                      # every registered project
+nocompiler-x project import prog.nocompiler-proj --name imported
+nocompiler-x project task investigation list --json
+nocompiler-x project dashboard prog.nocompiler-proj             # local overview + decompiler pane
+nocompiler-x project dashboard prog.nocompiler-proj --port 0    # choose a free loopback port
+nocompiler-x project task prog.nocompiler-proj add "Trace parser" --owner agent-a --next "Inspect main"
+nocompiler-x project task prog.nocompiler-proj list --json
+nocompiler-x project task prog.nocompiler-proj update T-0001 --revision 1 --input task.json
 ```
 
 The browser and CLI share durable tasks with revision checks, owners, blockers,
 prerequisites, next actions and evidence. Analysis loads on demand; tasks refresh live across all projects. Global
-projects live under `E5R_PROJECT_HOME`, `$XDG_DATA_HOME/e5r/projects`, or
-`~/.local/share/e5r/projects`. See [devinfra/docs/dashboard.md](dashboard.md)
+projects live under `NOCOMPILER_PROJECT_HOME`, `$XDG_DATA_HOME/nocompiler/projects`, or
+`~/.local/share/nocompiler/projects`. See [devinfra/docs/dashboard.md](dashboard.md)
 for the content format and supported project options.
 
 ## Driving it from a program
 
 Every command takes `--json`. The schema is named in every document
-(`"schema": "e5r/1"`) and addresses are hex strings so nothing is lost to a
+(`"schema": "nocompiler/1"`) and addresses are hex strings so nothing is lost to a
 float.
 
 ## Shell integration
 
 ```
-e5rx completions bash > /etc/bash_completion.d/e5rx
-e5rx completions zsh  > ~/.zsh/completions/_e5r
-e5rx completions fish > ~/.config/fish/completions/e5r.fish
-e5rx manpage          > /usr/local/share/man/man1/e5rx.1
+nocompiler-x completions bash > /etc/bash_completion.d/nocompiler-x
+nocompiler-x completions zsh  > ~/.zsh/completions/_nocompiler
+nocompiler-x completions fish > ~/.config/fish/completions/nocompiler.fish
+nocompiler-x manpage          > /usr/local/share/man/man1/nocompiler-x.1
 ```
 
 Both are generated from the command tree, so they cannot describe a command
@@ -502,7 +502,7 @@ that does not exist.
 | `--arch NAME` | The architecture of a raw image, which has no header to say. |
 | `--threads N` | How much of the analysis to run in parallel. The output does not depend on this. |
 | `--color WHEN` | `auto` (a terminal only), `always`, or `never`. `NO_COLOR` is honoured. |
-| `--no-pager` | Do not page, even when a terminal is reading. `PAGER` and `E5R_PAGER` choose the pager. |
+| `--no-pager` | Do not page, even when a terminal is reading. `PAGER` and `NOCOMPILER_PAGER` choose the pager. |
 | `--budget SECONDS` | Stop after this long and report what was finished. |
 | `--limit N` | Stop after this many items and report what was finished. |
 | `--progress` | Show a counter on stderr. Silent when stderr is not a terminal. |
@@ -511,8 +511,8 @@ A job that runs out of budget prints why on stderr and how much is left, and
 the output it already produced is still a valid document:
 
 ```
-$ e5rx decompile libstdc++.so.6 all --budget 3 > partial.c
-e5rx: out of time after 3.5s and 1024 of 5609 function(s); 4585 not done.
+$ nocompiler-x decompile libstdc++.so.6 all --budget 3 > partial.c
+nocompiler-x: out of time after 3.5s and 1024 of 5609 function(s); 4585 not done.
 Raise --budget or --limit, or narrow the target.
 ```
 

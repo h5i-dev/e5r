@@ -7,7 +7,7 @@
   the number of FAILs. Run: `lake env lean --run review/Repro.lean`.
 -/
 import Theories.Board.Hifive1Revb
-open E5R
+open NoCompiler
 
 namespace Repro
 

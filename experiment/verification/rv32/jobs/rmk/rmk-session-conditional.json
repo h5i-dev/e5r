@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.verify.job.v1",
+  "schema": "nocompiler.verify.job.v1",
   "id": "rmk-session-conditional",
   "root": "../..",
   "board": "boards/qemu-virt-rv32.json",
@@ -8,7 +8,7 @@
   "image": {
     "kind": "ram",
     "module": "Projects.rmk.Elf",
-    "namespace": "E5R.Rmk.Image"
+    "namespace": "NoCompiler.Rmk.Image"
   },
   "modules": [
     "Theories/Absint.lean",
@@ -63,21 +63,21 @@
     "Projects/ramimage/Session.lean"
   ],
   "theorems": [
-    "E5R.Rmk.Closure.*",
-    "E5R.Rmk.reach_on_runs",
-    "E5R.Rmk.reach_avoids",
-    "E5R.Rmk.Deframer.Tail.tail_from_copy",
-    "E5R.Rmk.Deframer.Park.park_from_copy",
-    "E5R.Rmk.Deframer.Unpark.unpark_from_copy",
-    "E5R.Rmk.Deframer.next_from_copy",
-    "E5R.Rmk.Deframer.cobs_report",
-    "E5R.Rmk.Cobs.cobs_report_contract",
-    "E5R.Rmk.Deframer.Session.recv_step",
-    "E5R.Rmk.Deframer.Session.unpark_step",
-    "E5R.Rmk.Deframer.Session.callEnv_of",
-    "E5R.RmkSession.*",
-    "E5R.RmkDeframer.img_eq",
-    "E5R.RmkDeframer.board_eq"
+    "NoCompiler.Rmk.Closure.*",
+    "NoCompiler.Rmk.reach_on_runs",
+    "NoCompiler.Rmk.reach_avoids",
+    "NoCompiler.Rmk.Deframer.Tail.tail_from_copy",
+    "NoCompiler.Rmk.Deframer.Park.park_from_copy",
+    "NoCompiler.Rmk.Deframer.Unpark.unpark_from_copy",
+    "NoCompiler.Rmk.Deframer.next_from_copy",
+    "NoCompiler.Rmk.Deframer.cobs_report",
+    "NoCompiler.Rmk.Cobs.cobs_report_contract",
+    "NoCompiler.Rmk.Deframer.Session.recv_step",
+    "NoCompiler.Rmk.Deframer.Session.unpark_step",
+    "NoCompiler.Rmk.Deframer.Session.callEnv_of",
+    "NoCompiler.RmkSession.*",
+    "NoCompiler.RmkDeframer.img_eq",
+    "NoCompiler.RmkDeframer.board_eq"
   ],
   "symbols": {
     "0x8001d576": "8Deframer4tail",

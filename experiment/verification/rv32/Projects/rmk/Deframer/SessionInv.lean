@@ -3,7 +3,7 @@
   at the loop head, every behaviour of the model (any UART value) comes back to the loop head with
   the invariant, or stops at an EXPLICIT boundary.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   `SessInv` = `SessPre` and the RAM facts the None path reads, with their addresses placed outside
   everything the proved steps write (`SW`):
@@ -36,8 +36,8 @@ import Projects.rmk.Deframer.CopyDischarge
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.SessionI
-open E5R E5R.Rmk E5R.Rmk.Deframer.Tail E5R.Rmk.Deframer.Session E5R.Rmk.Deframer.NoneP
+namespace NoCompiler.Rmk.Deframer.SessionI
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.Deframer.Tail NoCompiler.Rmk.Deframer.Session NoCompiler.Rmk.Deframer.NoneP
 
 /-- Everything the proved session steps may write, for a session at sp (the poll's own segments;
     the dispatch and encode_frame calls are covered by their contracts' `Kept`, not by `SW`). -/
@@ -281,4 +281,4 @@ theorem unpark_round (m₀ : Machine) (h : UnparkAt m₀) (E : Extras m₀) :
   · exact .inr (.inl hw)
   · exact .inr (.inr (.inl ⟨by omega, hw.2⟩))
 
-end E5R.Rmk.Deframer.SessionI
+end NoCompiler.Rmk.Deframer.SessionI

@@ -143,173 +143,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
 
 [[package]]
-name = "e5r"
-version = "0.1.0"
-
-[[package]]
-name = "e5r-analysis"
-version = "0.1.0"
-dependencies = [
- "e5r-arch",
- "e5r-core",
- "e5r-format",
- "e5r-types",
- "rayon",
- "serde",
-]
-
-[[package]]
-name = "e5r-api"
-version = "0.1.0"
-dependencies = [
- "e5r-analysis",
- "e5r-core",
- "e5r-db",
- "e5r-decomp",
- "e5r-format",
- "e5r-ir",
- "e5r-types",
-]
-
-[[package]]
-name = "e5r-arch"
-version = "0.1.0"
-dependencies = [
- "e5r-core",
-]
-
-[[package]]
-name = "e5r-asm"
-version = "0.1.0"
-dependencies = [
- "e5r-arch",
- "e5r-core",
-]
-
-[[package]]
-name = "e5r-cli"
-version = "0.1.0"
-dependencies = [
- "clap",
- "e5r-analysis",
- "e5r-api",
- "e5r-arch",
- "e5r-asm",
- "e5r-core",
- "e5r-db",
- "e5r-decomp",
- "e5r-diff",
- "e5r-format",
- "e5r-ir",
- "e5r-types",
- "memmap2",
- "serde",
- "serde_json",
- "tiny_http",
-]
-
-[[package]]
-name = "e5r-core"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "e5r-db"
-version = "0.1.0"
-dependencies = [
- "e5r-analysis",
- "e5r-arch",
- "e5r-core",
- "e5r-format",
- "e5r-types",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "e5r-decomp"
-version = "0.1.0"
-dependencies = [
- "e5r-analysis",
- "e5r-api",
- "e5r-arch",
- "e5r-core",
- "e5r-decomp",
- "e5r-format",
- "e5r-ir",
- "serde",
-]
-
-[[package]]
-name = "e5r-diff"
-version = "0.1.0"
-dependencies = [
- "e5r-analysis",
- "e5r-arch",
- "e5r-core",
- "e5r-db",
- "e5r-format",
- "serde",
-]
-
-[[package]]
-name = "e5r-format"
-version = "0.1.0"
-dependencies = [
- "e5r-core",
- "e5r-types",
- "serde",
-]
-
-[[package]]
-name = "e5r-ir"
-version = "0.1.0"
-dependencies = [
- "e5r-analysis",
- "e5r-arch",
- "e5r-core",
- "e5r-format",
- "e5r-types",
- "serde",
-]
-
-[[package]]
-name = "e5r-ptx"
-version = "0.1.0"
-
-[[package]]
-name = "e5r-sla"
-version = "0.1.0"
-dependencies = [
- "e5r-sleigh",
-]
-
-[[package]]
-name = "e5r-sleigh"
-version = "0.1.0"
-dependencies = [
- "e5r-arch",
- "e5r-core",
-]
-
-[[package]]
-name = "e5r-types"
-version = "0.1.0"
-
-[[package]]
-name = "e5r-verify"
-version = "0.1.0"
-dependencies = [
- "e5r-core",
- "e5r-format",
- "e5r-ptx",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "either"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -380,6 +213,173 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1219ed1b7f229ee7104d281dd01d6802fe28bb6e95d292942c4daacdeb798c0"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "nocompiler"
+version = "0.1.0"
+
+[[package]]
+name = "nocompiler-analysis"
+version = "0.1.0"
+dependencies = [
+ "nocompiler-arch",
+ "nocompiler-core",
+ "nocompiler-format",
+ "nocompiler-types",
+ "rayon",
+ "serde",
+]
+
+[[package]]
+name = "nocompiler-api"
+version = "0.1.0"
+dependencies = [
+ "nocompiler-analysis",
+ "nocompiler-core",
+ "nocompiler-db",
+ "nocompiler-decomp",
+ "nocompiler-format",
+ "nocompiler-ir",
+ "nocompiler-types",
+]
+
+[[package]]
+name = "nocompiler-arch"
+version = "0.1.0"
+dependencies = [
+ "nocompiler-core",
+]
+
+[[package]]
+name = "nocompiler-asm"
+version = "0.1.0"
+dependencies = [
+ "nocompiler-arch",
+ "nocompiler-core",
+]
+
+[[package]]
+name = "nocompiler-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "memmap2",
+ "nocompiler-analysis",
+ "nocompiler-api",
+ "nocompiler-arch",
+ "nocompiler-asm",
+ "nocompiler-core",
+ "nocompiler-db",
+ "nocompiler-decomp",
+ "nocompiler-diff",
+ "nocompiler-format",
+ "nocompiler-ir",
+ "nocompiler-types",
+ "serde",
+ "serde_json",
+ "tiny_http",
+]
+
+[[package]]
+name = "nocompiler-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "nocompiler-db"
+version = "0.1.0"
+dependencies = [
+ "nocompiler-analysis",
+ "nocompiler-arch",
+ "nocompiler-core",
+ "nocompiler-format",
+ "nocompiler-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nocompiler-decomp"
+version = "0.1.0"
+dependencies = [
+ "nocompiler-analysis",
+ "nocompiler-api",
+ "nocompiler-arch",
+ "nocompiler-core",
+ "nocompiler-decomp",
+ "nocompiler-format",
+ "nocompiler-ir",
+ "serde",
+]
+
+[[package]]
+name = "nocompiler-diff"
+version = "0.1.0"
+dependencies = [
+ "nocompiler-analysis",
+ "nocompiler-arch",
+ "nocompiler-core",
+ "nocompiler-db",
+ "nocompiler-format",
+ "serde",
+]
+
+[[package]]
+name = "nocompiler-format"
+version = "0.1.0"
+dependencies = [
+ "nocompiler-core",
+ "nocompiler-types",
+ "serde",
+]
+
+[[package]]
+name = "nocompiler-ir"
+version = "0.1.0"
+dependencies = [
+ "nocompiler-analysis",
+ "nocompiler-arch",
+ "nocompiler-core",
+ "nocompiler-format",
+ "nocompiler-types",
+ "serde",
+]
+
+[[package]]
+name = "nocompiler-ptx"
+version = "0.1.0"
+
+[[package]]
+name = "nocompiler-sla"
+version = "0.1.0"
+dependencies = [
+ "nocompiler-sleigh",
+]
+
+[[package]]
+name = "nocompiler-sleigh"
+version = "0.1.0"
+dependencies = [
+ "nocompiler-arch",
+ "nocompiler-core",
+]
+
+[[package]]
+name = "nocompiler-types"
+version = "0.1.0"
+
+[[package]]
+name = "nocompiler-verify"
+version = "0.1.0"
+dependencies = [
+ "nocompiler-core",
+ "nocompiler-format",
+ "nocompiler-ptx",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

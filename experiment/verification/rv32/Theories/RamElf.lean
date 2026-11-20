@@ -1,6 +1,6 @@
 /-
   Independent reader of a RAM-resident ELF32 image (QEMU `virt`, `-bios
-  none`), for RAM-image boards. Original e5r code, Apache-2.0.
+  none`), for RAM-image boards. Original nocompiler code, Apache-2.0.
 
   Written against the ELF specification and the board's image placement
   (`boards/qemu-virt-rv32.json`), not translated from the Rust exporter.
@@ -20,8 +20,8 @@
 -/
 import Theories.Platform
 
-namespace E5R.RamElf
-open E5R
+namespace NoCompiler.RamElf
+open NoCompiler
 
 /-- A file: `len` bytes, packed little-endian into 64-byte words. -/
 structure File where
@@ -138,4 +138,4 @@ def imageOf (base size : Nat) (f : File) : Image :=
       rw := (loads.filter (·.write)).map fun l => (l.vaddr, f.slice l.off l.filesz, l.memsz) }
   | .error _ => ⟨0, [], [], base + size⟩
 
-end E5R.RamElf
+end NoCompiler.RamElf

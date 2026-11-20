@@ -5,15 +5,15 @@
   (`hwhy_8001c3c8`: len ≥ 3, else the panic at 0x8001c3ec), the memory side conditions and the
   return address are hypotheses, discharged in Deframer/Session.lean.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Deframer.TailNoCopy
 import Projects.rmk.Deframer.FromDecodedFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Session
-open E5R E5R.Rmk.FromDecodedFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.Session
+open NoCompiler NoCompiler.Rmk.FromDecodedFetch NoCompiler.Rmk.Deframer.Tail
 
 def sfromCore (e : Core) (M : Word → BitVec 8) : Core :=
   ((((((((((((e.wr 14 (alu .add (0) 0x00000003#32) 0x8001c3c8).goto 0x8001c3cc).wr 14 (extend .b false (ramRead M (e.get 11 + 0x00000001#32) .b)) 0x8001c3d0).wr 15 (extend .b false (ramRead M (e.get 11) .b)) 0x8001c3d4).wr 16 (extend .b false (ramRead M (e.get 11 + 0x00000002#32) .b)) 0x8001c3d8).wr 14 (alu .sll (extend .b false (ramRead M (e.get 11 + 0x00000001#32) .b)) 0x00000008#32) 0x8001c3da).wr 14 (alu .or (alu .sll (extend .b false (ramRead M (e.get 11 + 0x00000001#32) .b)) 0x00000008#32) (extend .b false (ramRead M (e.get 11) .b))) 0x8001c3dc).goto 0x8001c3de).goto 0x8001c3e0).goto 0x8001c3e4).goto 0x8001c3e8).goto 0x8001c3ea).goto (e.get 1)
@@ -113,4 +113,4 @@ theorem sfrom (e : Core) (M : Word → BitVec 8) (hpc : e.pc = 0x8001c3c6) (hq :
     rw [exec_jalr, Core.set_zero, (show fd12.get 1 = e.get 1 by simp [fd1, fd2, fd3, fd4, fd5, fd6, fd7, fdR1, fd8, fdR2, fd9, fdR3, fd10, fdR4, fd11, fdR5, fd12, Core.wr_get_ne, Core.wr_get_self]), BitVec.add_zero, Memmove.and_not_one _ hra_8001c3ea, jump_ok _ _ hra_8001c3ea]; rfl
   exact .step hq s0 (.step qfd1 s1 (.step qfd2 s2 (.step qfd3 s3 (.step qfd4 s4 (.step qfd5 s5 (.step qfd6 s6 (.step qfd7 s7 (.step qfd8 s8 (.step qfd9 s9 (.step qfd10 s10 (.step qfd11 s11 (.single qfd12 s12))))))))))))
 
-end E5R.Rmk.Deframer.Session
+end NoCompiler.Rmk.Deframer.Session

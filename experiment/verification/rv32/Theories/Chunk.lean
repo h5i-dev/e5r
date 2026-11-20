@@ -1,6 +1,6 @@
 /-
   Splitting an image into small segments changes no byte the model reads.
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   `romByte?` looks a byte up in the first segment containing it, and
   `romRead?`/`fetch` read byte by byte, so an image whose segments are cut
@@ -10,7 +10,7 @@
 -/
 import Theories.Platform
 
-namespace E5R
+namespace NoCompiler
 
 /-- Segment `⟨base, bytes, exec⟩` cut into pieces of at most `k` bytes. -/
 def chunkSeg (k : Nat) (exec : Bool) (base : Nat) (bytes : List Nat) : List Segment :=
@@ -185,4 +185,4 @@ theorem stepInstr_chunk (k : Nat) (hk : 0 < k) (B : Board) (img : List Segment) 
     (o : Oracle) : stepInstr B (chunkImg k img) m o = stepInstr B img m o := by
   simp only [stepInstr, fetch_chunk k hk, interp_chunk k hk]
 
-end E5R
+end NoCompiler

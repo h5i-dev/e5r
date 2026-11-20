@@ -1,7 +1,7 @@
 /-
   Word arithmetic of memmove's misaligned shift/merge copy.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   The misaligned loop stores `(prev >>> 8o) ||| (next <<< (32 - 8o))` for
   a source misalignment `o ∈ {1,2,3}`. `merge_byte` says which byte of
@@ -13,8 +13,8 @@ import Projects.rmk.Copy
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk
-open E5R
+namespace NoCompiler.Rmk
+open NoCompiler
 
 theorem merge_toNat (p q : Word) (a : Nat) (ha : 0 < a) (ha' : a < 32) :
     ((p >>> a) ||| (q <<< (32 - a))).toNat = p.toNat / 2 ^ a + q.toNat * 2 ^ (32 - a) % 2 ^ 32 := by
@@ -111,4 +111,4 @@ theorem asm_byte (x y z : Word) (hx : x.toNat < 256) (hy : y.toNat < 256) (hz : 
   have h := asm_toNat x y z hx hy hz
   refine ⟨?_, ?_, ?_⟩ <;> apply BitVec.eq_of_toNat_eq <;> simp only [byteOf, BitVec.toNat_ofNat, h] <;> omega
 
-end E5R.Rmk
+end NoCompiler.Rmk

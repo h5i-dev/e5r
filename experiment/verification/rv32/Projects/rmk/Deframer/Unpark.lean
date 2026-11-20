@@ -2,7 +2,7 @@
   `Deframer::unpark_pending` on the pinned RMK image, proved against memmove's contract as an
   explicit hypothesis.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here, CONDITIONAL ON `CopyContract` (a hypothesis of each theorem, not proved here):
   `unpark_from_copy : UnparkFromCopy`, i.e. `CopyContract → UnparkContract`: from every machine at
@@ -14,8 +14,8 @@ import Projects.rmk.Deframer.Park
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Unpark
-open E5R E5R.Rmk.ParkFetch E5R.Rmk.Deframer.Tail E5R.Rmk.Deframer.Park
+namespace NoCompiler.Rmk.Deframer.Unpark
+open NoCompiler NoCompiler.Rmk.ParkFetch NoCompiler.Rmk.Deframer.Tail NoCompiler.Rmk.Deframer.Park
 
 /-! ## To memmove's entry: 0x8001d3f2 .. 0x8001d414 -/
 
@@ -379,4 +379,4 @@ theorem unpark_from_copy : UnparkFromCopy := by
     rw [keep (c.get 10 + 8) (by omega) (by omega) (by omega)]
     exact congrArg BitVec.toNat (psave_other c R0 hs (c.get 10 + 8) (.inl (by omega)))
 
-end E5R.Rmk.Deframer.Unpark
+end NoCompiler.Rmk.Deframer.Unpark

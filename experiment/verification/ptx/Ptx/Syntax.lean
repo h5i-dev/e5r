@@ -3,7 +3,7 @@ PTX abstract syntax for the supported subset.
 
 One constructor per supported instruction form. Register, parameter and label
 names are kept as the strings written in the `.ptx` file, so a generated
-`Kernel` value reads like the source it came from. `crates/e5r-ptx` produces
+`Kernel` value reads like the source it came from. `crates/nocompiler-ptx` produces
 these values; it is untrusted, and its output is checked by a token-level
 round trip against the original file (experiment/docs/ptx.md, "Parser").
 

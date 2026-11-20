@@ -8,17 +8,17 @@
 # riscv64 binutils (CROSS_COMPILE prefix, default riscv64-linux-gnu-),
 # qemu-riscv32 and qemu-system-riscv32 8.2.2.
 #
-# E5R_VERIFY names an existing e5r binary (CI builds its own, in the
+# NOCOMPILER_VERIFY names an existing nocompiler binary (CI builds its own, in the
 # dev profile). Otherwise this builds the release one, as this checkout must.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 verify=verification/rv32
 
-if [ -z "${E5R_VERIFY:-}" ]; then
-  CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-2} cargo build --release -p e5r-verify
-  E5R_VERIFY="$(cd .. && pwd)/target/release/e5r-exp"
+if [ -z "${NOCOMPILER_VERIFY:-}" ]; then
+  CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-2} cargo build --release -p nocompiler-verify
+  NOCOMPILER_VERIFY="$(cd .. && pwd)/target/release/nocompiler-exp"
 fi
-export E5R_VERIFY
+export NOCOMPILER_VERIFY
 
 # CI's workspace RUSTFLAGS (-D warnings) override the firmware's target
 # rustflags, dropping -Tmemory.x and -Tlink.x. Build the pinned ELF with its
@@ -35,8 +35,8 @@ status=0
 for job in "$verify"/jobs/*.json; do
   name=$(basename "$job" .json)
   echo "== job $name"
-  if "$E5R_VERIFY" check "$job" --out "$results/$name.json" > /dev/null; then
-    "$E5R_VERIFY" verify-result "$results/$name.json"
+  if "$NOCOMPILER_VERIFY" check "$job" --out "$results/$name.json" > /dev/null; then
+    "$NOCOMPILER_VERIFY" verify-result "$results/$name.json"
   else
     status=1
     python3 -c "import json,sys; r=json.load(open(sys.argv[1])); print(r['status'], r.get('message',''))" \

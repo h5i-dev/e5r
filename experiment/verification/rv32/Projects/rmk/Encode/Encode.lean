@@ -4,7 +4,7 @@
   (0x80011a46) and `RynkError::serialize` (0x80014078, jump table 0x80026410). No callee is
   assumed.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   The caller is the session's Some path (0x80003f1a, `jalr` to encode_frame; returns to 0x80003f1e).
   It encodes a 7-byte COBS frame into the buffer 0x8002a7b1:
@@ -30,8 +30,8 @@ import Projects.rmk.Encode.Table
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Encode
-open E5R E5R.Rmk E5R.RamElf E5R.Rmk.Sym
+namespace NoCompiler.Rmk.Encode
+open NoCompiler NoCompiler.Rmk NoCompiler.RamElf NoCompiler.Rmk.Sym
 
 /-! ## The contract -/
 
@@ -240,4 +240,4 @@ theorem enc_check : respVals.all (fun r => check encE encTbl encRom (leafE r) 60
     enc_check_0, enc_check_1, enc_check_2, enc_check_3, enc_check_4,
     enc_check_5, enc_check_6, enc_check_7, enc_check_8, enc_check_9, Bool.and_self]
 
-end E5R.Rmk.Encode
+end NoCompiler.Rmk.Encode

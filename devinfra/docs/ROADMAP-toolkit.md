@@ -1,14 +1,14 @@
 # Roadmap
 
-Status: in progress, 2026-09-13. This file is the scope authority for e5r:
+Status: in progress, 2026-09-13. This file is the scope authority for nocompiler:
 what it is, what gets built in what order, and what will be refused in review
 rather than argued about again.
 
-**Repositioning (owner decision, 2026-11-03).** e5r is now presented as
-*assembly-level formal verification with Lean 4*. The verifier, `e5r`,
+**Repositioning (owner decision, 2026-11-03).** nocompiler is now presented as
+*assembly-level formal verification with Lean 4*. The verifier, `nocompiler`,
 with the PTX scope P and the RISC-V scopes V0, F and R below, is the product.
 The binary analysis toolkit described by M0 to M12 (loaders, decoders, IR,
-decompiler, differ, annotation log) ships as the `e5rx` binary and
+decompiler, differ, annotation log) ships as the `nocompiler-x` binary and
 is development infrastructure for the verifier. Its milestones and the "Not
 building" list stay in force; when the two compete for effort, the verifier
 comes first. No output of the toolkit is an input to any proof. The sections
@@ -42,9 +42,9 @@ including the ones that go against us. In short: `libc.so.6` analyzes in 0.10s
 and 58 MB, finding 3,517 functions with 95.3% analyzed completely, where
 `objdump -d` takes 0.26s and only disassembles; both decoders are at zero
 disagreements with their oracle; memory use is about ten times objdump's, which
-is the axis e5r is worse on. 164 tests, clippy clean.
+is the axis nocompiler is worse on. 164 tests, clippy clean.
 
-e5r is a reverse engineering toolkit with a command line and an optional local
+nocompiler is a reverse engineering toolkit with a command line and an optional local
 project workspace.
 It loads a binary, recovers functions, disassembles, lifts to an IR, decompiles
 to C, diffs two builds, and writes an analyst's findings to a text log that git
@@ -57,13 +57,13 @@ x86-64 and ELF notes in `MEMO.md` survive the rewrite and move under `docs/`.
 
 ## The bets
 
-Ghidra, rizin and IDA are each better than e5r will be for years at breadth of
+Ghidra, rizin and IDA are each better than nocompiler will be for years at breadth of
 architecture and at accumulated analysis lore. Beating them means picking the
 axes where their design, not their effort, is the limit.
 
 1. **Startup and throughput:** Ghidra pays JVM startup and a project import
    before it shows a function. rizin is single-threaded through most of its
-   analysis. e5r memory-maps the image, analyzes functions in parallel, and
+   analysis. nocompiler memory-maps the image, analyzes functions in parallel, and
    analyzes a function only when something asks for it. The target is first
    useful output in under 200 ms on a 100 MB binary, and full analysis of
    `/bin/bash` faster than `rizin -A` by a factor we publish and regression-test.
@@ -90,7 +90,7 @@ axes where their design, not their effort, is the limit.
    a headless mode retrofitted onto a GUI.
 
 6. **Breadth through SLEIGH, depth by hand:** Writing 40 instruction decoders is
-   not a good use of the next two years. e5r ships a Rust SLEIGH runtime and
+   not a good use of the next two years. nocompiler ships a Rust SLEIGH runtime and
    compiler so Ghidra's processor specifications load directly, plus
    hand-written decoders for x86-64 and AArch64 where speed matters. Kuna proved
    the SLEIGH port is tractable.
@@ -101,23 +101,23 @@ The library owns every fact. The CLI and any future UI compute
 nothing of their own.
 
 ```
-e5r-core      addresses, spaces, memory map, ids, error model, provenance
-e5r-format    ELF, PE/COFF, Mach-O, raw, archives, overlays
-e5r-arch      decoder trait, hand-written x86/x86-64 and AArch64/ARM
-e5r-sleigh    .sla runtime plus the SLEIGH compiler (breadth)
-e5r-ir        p-code-style IR, SSA, dataflow framework
-e5r-analysis  partition, function discovery, CFG, jump tables, xrefs, strings
-e5r-types     type model, DWARF, PDB, demanglers, type archives
-e5r-decomp    regions, structuring, expression rebuild, C emission
-e5r-db        content anchors, the annotation log, git merge semantics
-e5r-diff      function matching, build-to-build diff
-e5r-patch     assembler-backed patch sets
-e5r-api       stable library surface and the versioned JSON schema
-e5r-cli       the e5rx binary (the toolkit)
+nocompiler-core      addresses, spaces, memory map, ids, error model, provenance
+nocompiler-format    ELF, PE/COFF, Mach-O, raw, archives, overlays
+nocompiler-arch      decoder trait, hand-written x86/x86-64 and AArch64/ARM
+nocompiler-sleigh    .sla runtime plus the SLEIGH compiler (breadth)
+nocompiler-ir        p-code-style IR, SSA, dataflow framework
+nocompiler-analysis  partition, function discovery, CFG, jump tables, xrefs, strings
+nocompiler-types     type model, DWARF, PDB, demanglers, type archives
+nocompiler-decomp    regions, structuring, expression rebuild, C emission
+nocompiler-db        content anchors, the annotation log, git merge semantics
+nocompiler-diff      function matching, build-to-build diff
+nocompiler-patch     assembler-backed patch sets
+nocompiler-api       stable library surface and the versioned JSON schema
+nocompiler-cli       the nocompiler-x binary (the toolkit)
 ```
 
-Dependency edges run downward only. `e5r-cli` may depend on everything;
-`e5r-core` depends on nothing in the workspace.
+Dependency edges run downward only. `nocompiler-cli` may depend on everything;
+`nocompiler-core` depends on nothing in the workspace.
 
 ## Milestones
 
@@ -259,7 +259,7 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       space table and 148 on the constructor count.
 - [x] Assembler for x86-64 and AArch64, needed by M10 patching. Encoding only,
       from public manuals, built around the decoder so it accepts our own
-      disassembly verbatim: a user can copy a line out of `e5rx disas`, change
+      disassembly verbatim: a user can copy a line out of `nocompiler-x disas`, change
       it, and assemble it back. Round trip over the whole fixture corpus, 0
       wrong on both architectures; byte-identical to `as` and
       `aarch64-linux-gnu-as` on every one of 2,535 and 1,272 comparable forms.
@@ -499,7 +499,7 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       the fixture corpus is decompiled into one translation unit that `clang`
       has to accept. Density is zero at O0, O1 and Os on both architectures and
       0.24 per function at O2 and O3.
-- [ ] M6 does not close until DecBench scores e5r above Ghidra on the
+- [ ] M6 does not close until DecBench scores nocompiler above Ghidra on the
       unoptimized set: 32.2 union, 29.3 structure. **Measured 2026-09-13: 23.4
       union, 22.9 structure.** Not met. The gap is structuring: 1.98 gotos per
       function against angr's 0.57, and the 124 functions with three or more
@@ -509,7 +509,7 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
 
 ### M7. The annotation store
 
-This is the feature that distinguishes e5r from every incumbent, so it gets
+This is the feature that distinguishes nocompiler from every incumbent, so it gets
 designed before it gets coded, and the design lives in
 [`devinfra/docs/design/db.md`](design/db.md).
 
@@ -557,7 +557,7 @@ designed before it gets coded, and the design lives in
 - [x] Paging, color, and a terminal-width-aware listing that stays diffable when
       piped. All three are decided once from whether standard output is a
       terminal, so piped output is byte-identical to what it was before they
-      existed. `NO_COLOR`, `PAGER` and `E5R_PAGER` are honoured; `--color` and
+      existed. `NO_COLOR`, `PAGER` and `NOCOMPILER_PAGER` are honoured; `--color` and
       `--no-pager` override. JSON is never coloured or paged.
 - [x] Shell completion for bash, zsh and fish, and a generated man page, both
       generated from the command tree so neither can describe a command that
@@ -572,7 +572,7 @@ designed before it gets coded, and the design lives in
 
 ### M9. Automation and agents
 
-- [x] `e5r-api`: the library surface the CLI and the tests share, so a
+- [x] `nocompiler-api`: the library surface the CLI and the tests share, so a
       difference between what a test checks and what a user gets is a
       difference a user will find. Decompilation, shapes, signatures,
       emulation and queries go through it.
@@ -654,7 +654,7 @@ designed before it gets coded, and the design lives in
       distribution's development packages carry the same code under the same
       names, are what a statically linked binary was built from, and need no
       reading of anyone's format.
-- [x] Emulation, built on the M4 IR interpreter: `e5rx emulate` runs a
+- [x] Emulation, built on the M4 IR interpreter: `nocompiler-x emulate` runs a
       function with given arguments and reports what came back and what it
       touched. Nothing escapes the process. Gated against the processor by
       running the oracle's case table through it.
@@ -680,7 +680,7 @@ designed before it gets coded, and the design lives in
 - [x] Published benchmark numbers against `rizin -A` on the fixture corpus,
       rerun in CI, with a regression budget. 16 binaries, 21x to 3,291x faster
       and 2.4x to 8.6x less memory, with the three qualifications that ratio
-      needs in the table rather than under it, and the one row e5r loses left
+      needs in the table rather than under it, and the one row nocompiler loses left
       in. `devinfra/docs/benchmarks.md`, `scripts/bench-budget.json`. Ghidra's headless
       analyzer is wired and opt-in behind `GHIDRA_INSTALL_DIR`, but its
       decompiler ships x86-64 only, so on this aarch64 host the comparison that
@@ -700,7 +700,7 @@ designed before it gets coded, and the design lives in
       stored blocks were 2.69M distinct ranges, held once per function that
       could reach them. Wall time is unchanged and is not claimed as a win.
 - [x] Profiling as a habit, with `scripts/flamegraph.sh` checked in and run
-      rather than merely written. It found that `e5rx funcs` spends 12.3% of
+      rather than merely written. It found that `nocompiler-x funcs` spends 12.3% of
       its time computing content anchors for every function before printing
       anything.
 
@@ -717,7 +717,7 @@ designed before it gets coded, and the design lives in
       the file first, then by the cap, check the cursor advanced, and read
       through the reader. Checked by the mutation fuzzer in the ordinary test
       suite rather than by review.
-- [x] `#![forbid(unsafe_code)]` on every crate except `e5r-cli`, which is
+- [x] `#![forbid(unsafe_code)]` on every crate except `nocompiler-cli`, which is
       `#![deny(unsafe_code)]` so one audited call can opt in. There is exactly
       one exception, the memory map, and its justification is in
       [`devinfra/docs/design/limits.md`](design/limits.md).
@@ -757,7 +757,7 @@ verification experiment, using the existing ELF loader rather than trusting
 heuristic CFGs, IR or decompiled C. This does not reorder the general decoder
 or decompiler roadmap or authorize a firmware framework.
 
-- [x] Small real bare-metal RV32I ELF, loaded through e5r and exported with
+- [x] Small real bare-metal RV32I ELF, loaded through nocompiler and exported with
       original file bytes, initial mapped memory, permissions and file offsets.
 - [x] Lean decodes the original fetched instruction words; an independent Lean
       ELF reader checks the exported memory against the original-byte literal.
@@ -777,14 +777,14 @@ or decompiler roadmap or authorize a firmware framework.
 The supported subset, exact statements, build commands, assumptions, provenance
 and trusted computing base are together in
 [`verification-rv32.md`](../../experiment/docs/rv32-research.md). Implementation is isolated in
-`e5r` and `verification/rv32`; no empty firmware crate or CI profile change.
+`nocompiler` and `verification/rv32`; no empty firmware crate or CI profile change.
 
 ## F. Scoped firmware verification (2026-10-28 owner authorization)
 
 The owner expanded V0 into a production tool for one scope: a binary-level,
 Lean-kernel-checked safety guarantee for firmware on one RISC-V board. This is
 the only architecture exception; it does not reorder M1-M12 or the decoder
-priorities, and nothing in it trusts e5r's decompiler, CFG recovery or IR.
+priorities, and nothing in it trusts nocompiler's decompiler, CFG recovery or IR.
 Product documentation is [`firmware-verification.md`](../../experiment/docs/firmware.md).
 Each item is checked only when its acceptance criterion has been run.
 
@@ -815,7 +815,7 @@ Each item is checked only when its acceptance criterion has been run.
       execution is exhibited (nonvacuity); the axiom audit shows only
       `propext`, `Quot.sound` and `Classical.choice`. (Accepted 2026-10-29:
       `clamp_all`, `duty_contract`, both `nonvacuous`.)
-- [ ] **F5. General workflow.** *Accepted:* `e5r check` takes a job
+- [ ] **F5. General workflow.** *Accepted:* `nocompiler check` takes a job
       file (ELF, board, property, entry/boot model) and returns structured JSON
       with one of `proved`, `counterexample`, `unknown`, `unsupported`,
       `resource_exhausted`, `error`; resource limits and resumable runs; a new
@@ -855,7 +855,7 @@ Each item is checked only when its acceptance criterion has been run.
       result binding and staleness, CI job (not yet run on a runner),
       malformed-input and runner controls, schema names, docs, an
       installation guide (`firmware-verification-install.md`), Lean-only
-      offline recheck bundles (`e5r bundle`), kernel replay of every
+      offline recheck bundles (`nocompiler bundle`), kernel replay of every
       module (`leanchecker`), and an independent review by a separate
       reviewer agent session (findings fixed and recorded in
       `firmware-verification.md`). *Open:* a review by a human RISC-V or
@@ -924,7 +924,7 @@ optional; direct and hybrid proofs are equally valid routes.
       *Status (partial, not accepted):* `jobs/rmk/rmk-memmove-small.json`
       is proved on `f39d833f` (memmove n < 16, both directions; 7 negative
       controls). `jobs/rmk/rmk-memmove-contractB.json` is proved on
-      `f39d833f` (`E5R.Rmk.Memmove.contractB`: n < 16 either direction, or
+      `f39d833f` (`NoCompiler.Rmk.Memmove.contractB`: n < 16 either direction, or
       n ≥ 16 forward with src ≡ dst mod 4; 7 mutation controls; re-run on
       the integrated tree: 430 s, 6.3 GB). Not covered: n ≥ 16 backward and
       the misaligned forward path, both reachable from the 488-byte deframer
@@ -1062,8 +1062,8 @@ without trusting the LLM or a high-level compiler? Design, theorem statements,
 assumptions and the trusted base are in
 [`verification-ptx.md`](../../experiment/docs/ptx.md). The Lean project is
 `verification/ptx` (core Lean v4.35.0, no Mathlib); the parser and exporter are
-`crates/e5r-ptx`, reached through `e5r ptx`. It does not reorder M1-M12
-and adds nothing to e5r's disassembler, lifter or decompiler. Each item is
+`crates/nocompiler-ptx`, reached through `nocompiler ptx`. It does not reorder M1-M12
+and adds nothing to nocompiler's disassembler, lifter or decompiler. Each item is
 checked only when its acceptance criterion has been run.
 
 - [x] **P0. Prior work studied.** `facebookresearch/lean_kernel_verify`,
@@ -1096,8 +1096,8 @@ checked only when its acceptance criterion has been run.
       without a hand-written proof; wrong PTX yields a replayed counterexample
       where one exists. (Accepted 2026-11-01, for the `map32` class:
       elementwise maps over 32-bit arrays, guarded or grid-stride, 1-D.
-      `e5r ptx check` generates `spec.Correct K` from an
-      `e5r.ptx.spec.v1` spec whose loop invariant is register roles at the
+      `nocompiler ptx check` generates `spec.Correct K` from an
+      `nocompiler.ptx.spec.v1` spec whose loop invariant is register roles at the
       loop head, proves it with `Ptx/Auto` (class theorem proved once,
       per-thread obligations by `ptx_guarded`/`ptx_stride_*`), and otherwise
       replays a counterexample from the interpreter search as `¬ spec.Correct
@@ -1115,7 +1115,7 @@ checked only when its acceptance criterion has been run.
       `phase_sound` composes per-thread, per-phase derivations with atomic
       accumulator cells; `reduce_correct` (every power-of-two block up to 1024),
       `scan_correct` (every block up to 1024) and `reduce_atomic_correct` on
-      nvcc 13.2's PTX. `e5r ptx check` classes `reduce32` and `scan32`:
+      nvcc 13.2's PTX. `nocompiler ptx check` classes `reduce32` and `scan32`:
       class theorems proved once, phase obligations generated from register
       roles at each barrier, a barrier-aware search replayed in Lean through
       `Cfg.exec`. Measured: the three benchmarks proved; 0 of 14 M4 mutants
@@ -1155,7 +1155,7 @@ checked only when its acceptance criterion has been run.
       toolchain hashes, and records in the JSON that the proof was supplied;
       a weaker or different statement, `sorry`, an added axiom and a stale
       hash are refused; two kernels unsupported only because of class shape
-      proved. (Accepted 2026-11-01: `--proof`, generated module `E5rSpec`,
+      proved. (Accepted 2026-11-01: `--proof`, generated module `NoCompilerSpec`,
       checker `proofcheck` replaying every declaration through the Lean
       kernel; `a_direct` and `s_pingpong` proved; `proofs/controls.sh`: 2
       accepted, 10 refused, among them `debug.skipKernelTC`, `native_decide`,
@@ -1235,7 +1235,7 @@ Green before every merge to main. Each one is a command, not a judgment call.
 Ghidra has 1,946 test files and 18,999 `@Test` methods. Copying that number is
 the wrong target and it would take a decade. Look at where those tests actually
 are: 615 files cover `Features/Base`, 399 cover the framework, and most of the
-rest are GUI and integration tests for a UI e5r does not have. The decompiler,
+rest are GUI and integration tests for a UI nocompiler does not have. The decompiler,
 which is the hardest thing in the product, has 15 Java test files, because the
 real decompiler tests are 89 XML datatests driving the C++ engine. Processors
 have 17.
@@ -1246,10 +1246,10 @@ writing more assertions about our own behavior.
 
 ### Oracle-backed suites
 
-| Suite | What the oracle is | Reference point | e5r target |
+| Suite | What the oracle is | Reference point | nocompiler target |
 | --- | --- | --- | --- |
 | Decoder parity | `objdump` and `iced-x86` on the same bytes | rizin ships 6,333 named cases and 24,625 lines of assembly vectors | every instruction in the fixture corpus, plus 10^8 randomly generated encodings per architecture, with zero unexplained disagreements |
-| Semantic lift | native execution of the same code | Ghidra's PCodeTest compiles 21 C bodies per target and emulates them | the same C bodies plus our own, executed natively and under the e5r emulator, compared on every observable |
+| Semantic lift | native execution of the same code | Ghidra's PCodeTest compiles 21 C bodies per target and emulates them | the same C bodies plus our own, executed natively and under the nocompiler emulator, compared on every observable |
 | Function boundaries | DWARF and PE unwind records | none published | precision and recall per fixture, tracked per release |
 | Decompiler behavior | recorded baseline, reviewed on change | Ghidra 89 datatests, kuna 83 files and 675 assertions | 89 ported cases before the M6 gate opens, then one case per fixed bug, permanently |
 | Type recovery | DWARF types in the fixture that has them | none published | agreement rate per type category, tracked per release |
@@ -1273,10 +1273,10 @@ single workspace number lets a well-tested decoder hide an untested loader.
 
 | Crate | Line | Branch |
 | --- | --- | --- |
-| `e5r-format`, `e5r-arch`, `e5r-sleigh` | 90% | 85% |
-| `e5r-core`, `e5r-ir`, `e5r-db`, `e5r-types` | 85% | 80% |
-| `e5r-analysis`, `e5r-decomp`, `e5r-diff`, `e5r-patch` | 75% | 65% |
-| `e5r-cli` | 60% | 50% |
+| `nocompiler-format`, `nocompiler-arch`, `nocompiler-sleigh` | 90% | 85% |
+| `nocompiler-core`, `nocompiler-ir`, `nocompiler-db`, `nocompiler-types` | 85% | 80% |
+| `nocompiler-analysis`, `nocompiler-decomp`, `nocompiler-diff`, `nocompiler-patch` | 75% | 65% |
+| `nocompiler-cli` | 60% | 50% |
 
 Parsers and decoders get the high floor because their inputs are hostile and
 their failure mode is silent. The decompiler gets a lower one because a
@@ -1294,8 +1294,8 @@ reports whether the suite failed. The score is the fraction of mutants killed.
 
 | Crate | Floor |
 | --- | --- |
-| `e5r-format`, `e5r-arch`, `e5r-core` | 85% |
-| `e5r-ir`, `e5r-db`, `e5r-types` | 75% |
+| `nocompiler-format`, `nocompiler-arch`, `nocompiler-core` | 85% |
+| `nocompiler-ir`, `nocompiler-db`, `nocompiler-types` | 75% |
 | everything else | 60%, or an exemption with a written reason |
 
 Full mutation runs are slow, so CI mutates only the diff on a pull request and
@@ -1328,7 +1328,7 @@ Counted by what it finds, not by whether it runs.
 
 ## Scorecard
 
-The claim is that e5r is better than the incumbents, so it needs numbers that
+The claim is that nocompiler is better than the incumbents, so it needs numbers that
 can prove it wrong. These get recorded in `devinfra/docs/scorecard.md` from the first
 release and rerun every release.
 
@@ -1421,7 +1421,7 @@ Tasks:
       with `.eh_frame` removed as well, which is the number that says what the
       analysis can do with nothing but code. See
       [`devinfra/docs/boundaries.md`](boundaries.md).
-- [x] A DecBench backend for e5r, as `scripts/decbench_e5r.py`. Out of tree,
+- [x] A DecBench backend for nocompiler, as `scripts/decbench_nocompiler.py`. Out of tree,
       which DecBench's own documentation permits, so the benchmark checkout
       stays untouched. Driven by `scripts/decbench.sh`.
 - [ ] Submit to the 250-function sample set as soon as M6 produces output at all.
@@ -1452,7 +1452,7 @@ it was closed.
   (binary-level proofs of RISC-V firmware: one board, then RMK on QEMU `virt`)
   and P (NVIDIA PTX kernels as a Lean verification subject, 2026-10-31).
   Neither is a general architecture expansion: P adds no PTX or SASS
-  disassembly, lifting or decompilation to e5r's analysis.
+  disassembly, lifting or decompilation to nocompiler's analysis.
 - **Reverse engineering the incumbents' internals:** Clean-room: public
   specifications, published papers, and the source of permissively licensed
   projects used within their licenses.

@@ -6,8 +6,8 @@
       "Quot.sound"
     ],
     "board_sha256": "6fe2d0db63ed5756db3ca2845b00931154c84359002daf47cff906b0df64287b",
-    "e5r_verify": "0.1.0",
-    "e5r_verify_sha256": "45be2c143cb6c8b02d844b8dd1f81e35e8633596f1dd040aebcdf4689be166bf",
+    "nocompiler_verify": "0.1.0",
+    "nocompiler_verify_sha256": "45be2c143cb6c8b02d844b8dd1f81e35e8633596f1dd040aebcdf4689be166bf",
     "elf": {
       "bytes": 454024,
       "path": "build/rmk-qemu-riscv-rynk.elf",
@@ -169,7 +169,7 @@
     "Projects/rmk/DevRead.lean",
     "Projects/rmk/Uart/SendBytes.lean"
   ],
-  "schema": "e5r.verify.result.v1",
+  "schema": "nocompiler.verify.result.v1",
   "seconds": 373.118414351,
   "stages": [
     {
@@ -406,50 +406,42 @@
         "Classical.choice",
         "Quot.sound"
       ],
-      "name": "E5R.RmkUart.send_bytes"
+      "name": "NoCompiler.RmkUart.send_bytes"
     },
     {
       "axioms": [
         "propext",
         "Quot.sound"
       ],
-      "name": "E5R.RmkUart.env_iff"
+      "name": "NoCompiler.RmkUart.env_iff"
     },
     {
       "axioms": [
         "propext",
         "Quot.sound"
       ],
-      "name": "E5R.RmkUart.post_iff"
+      "name": "NoCompiler.RmkUart.post_iff"
     },
     {
       "axioms": [
         "propext",
         "Quot.sound"
       ],
-      "name": "E5R.RmkUart.wQuiet"
+      "name": "NoCompiler.RmkUart.wQuiet"
     },
     {
       "axioms": [
         "propext",
         "Quot.sound"
       ],
-      "name": "E5R.RmkUart.w0"
+      "name": "NoCompiler.RmkUart.w0"
     },
     {
       "axioms": [
         "propext",
         "Quot.sound"
       ],
-      "name": "E5R.RmkUart.w16"
-    },
-    {
-      "axioms": [
-        "propext",
-        "Classical.choice",
-        "Quot.sound"
-      ],
-      "name": "E5R.RmkUart.w16_lands"
+      "name": "NoCompiler.RmkUart.w16"
     },
     {
       "axioms": [
@@ -457,43 +449,51 @@
         "Classical.choice",
         "Quot.sound"
       ],
-      "name": "E5R.Rmk.Uart.send_bytes"
+      "name": "NoCompiler.RmkUart.w16_lands"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "NoCompiler.Rmk.Uart.send_bytes"
     },
     {
       "axioms": [
         "propext"
       ],
-      "name": "E5R.RmkDeframer.img_eq"
+      "name": "NoCompiler.RmkDeframer.img_eq"
     },
     {
       "axioms": [
         "propext"
       ],
-      "name": "E5R.RmkDeframer.board_eq"
+      "name": "NoCompiler.RmkDeframer.board_eq"
     },
     {
       "axioms": [
         "propext"
       ],
-      "name": "E5R.Rmk.Image.image_accepted"
+      "name": "NoCompiler.Rmk.Image.image_accepted"
     },
     {
       "axioms": [
         "propext"
       ],
-      "name": "E5R.Rmk.Image.image_agrees"
+      "name": "NoCompiler.Rmk.Image.image_agrees"
     },
     {
       "axioms": [
         "propext"
       ],
-      "name": "E5R.Rmk.Image.image_entry"
+      "name": "NoCompiler.Rmk.Image.image_entry"
     },
     {
       "axioms": [
         "propext"
       ],
-      "name": "E5R.Rmk.Image.image_rwBase"
+      "name": "NoCompiler.Rmk.Image.image_rwBase"
     }
   ]
 }

@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-// Original e5r fixture, Apache-2.0. Absolute memory addresses are the explicit
+// Original nocompiler fixture, Apache-2.0. Absolute memory addresses are the explicit
 // bare-metal ABI for this experiment, not a proof about arbitrary Rust callers.
 core::arch::global_asm!(
     ".option norvc",

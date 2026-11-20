@@ -4,7 +4,7 @@
   tools/gen_seg_next2.py (tools/gen_seg.py) from the kernel-checked facts in
   Projects/rmk/Deframer/NextFetch.lean; do not edit by hand.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   Each theorem is a quiet run of fixed length from a core at its start pc. Every branch outcome and
   memory side condition that depends on `next`'s state is a HYPOTHESIS of its segment, named
@@ -16,8 +16,8 @@ import Projects.rmk.Deframer.NextFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Next
-open E5R E5R.Rmk.NextFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.Next
+open NoCompiler NoCompiler.Rmk.NextFetch NoCompiler.Rmk.Deframer.Tail
 
 def nheadCore (d : Core) (M : Word → BitVec 8) : Core :=
   ((((d.goto 0x8001d47a).wr 12 (alu .add (0) 0x00000000#32) 0x8001d47c).wr 11 (alu .add (d.get 20) (d.get 9)) 0x8001d480).wr 13 (alu .add (d.get 24) (d.get 9)) 0x8001d484).wr 14 (alu .add (0) (d.get 20)) 0x8001d486
@@ -790,4 +790,4 @@ theorem nepi (e : Core) (M : Word → BitVec 8) (hpc : e.pc = 0x8001d510) (hq : 
     rw [exec_jalr, Core.set_zero, (show ne15.get 1 = ramRead M (e.get 2 + 0x0000003c#32) .w by simp [ne1, ne2, ne3, ne4, ne5, ne6, ne7, ne8, ne9, ne10, ne11, ne12, ne13, ne14, ne15, Core.wr_get_ne, Core.wr_get_self]), BitVec.add_zero, Memmove.and_not_one _ hra_8001d52e, jump_ok _ _ hra_8001d52e]; rfl
   exact .step hq s0 (.step qne1 s1 (.step qne2 s2 (.step qne3 s3 (.step qne4 s4 (.step qne5 s5 (.step qne6 s6 (.step qne7 s7 (.step qne8 s8 (.step qne9 s9 (.step qne10 s10 (.step qne11 s11 (.step qne12 s12 (.step qne13 s13 (.step qne14 s14 (.single qne15 s15)))))))))))))))
 
-end E5R.Rmk.Deframer.Next
+end NoCompiler.Rmk.Deframer.Next

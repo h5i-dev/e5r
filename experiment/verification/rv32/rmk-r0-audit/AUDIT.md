@@ -13,20 +13,20 @@ fresh shallow checkout and a fresh private `CARGO_HOME` under `/dev/shm`,
 removed after the build. The full environment is in `env-canonical.txt`.
 
 The original ELF `f39d833f…` was preserved before any build, at
-`~/.local/state/e5r-claude-rmk-export-20261029T174012Z/rmk-qemu-riscv-f39d833f.elf`
+`~/.local/state/nocompiler-claude-rmk-export-20261029T174012Z/rmk-qemu-riscv-f39d833f.elf`
 and in the RMK jobs' `build/` directory.
 
 ## Build matrix (`scripts/rmk-r0/run-matrix.sh`, log `build-matrix.log`)
 
 | Build | Recipe | Checkout path | Remap | sha256 |
 | --- | --- | --- | --- | --- |
-| main canonical #1, #2 | main's `build-canonical.sh`, verbatim | `/dev/shm/e5r-rmk-canonical/rmk` | yes | `5871dceee5aa302705f4d3ef423ee6765951c0c7d314e996559641630bf16a06` (both) |
-| mine, canonical path | `scripts/rmk-r0/build.sh` (written separately) | `/dev/shm/e5r-rmk-canonical/rmk` | yes | `5871dcee…` (same bytes) |
-| mine, recon path | `build.sh plain` | `/dev/shm/e5r-rmk-recon/rmk` | no | `e95989308a27531733b766913d2e2d01f88bfdebd0f1c044368d667c3bccc39a` (= main's recon row) |
-| mine, path A | `build.sh remap` | `/dev/shm/e5r-claude-r0x/a/rmkA/rmk` | yes | `48aefe786b47aea76da66e6c352426deb058b504b410ec1d81436e33b25ae9c1` |
-| mine, path B | `build.sh remap` | `/dev/shm/e5r-claude-r0x/b-longer-name/rmkB/rmk` | yes | `8a57bf625572d1240c30fbf37ad81fa87eb33c2aaa4f503c3a86f5ec171265ff` |
-| mine, path A | `build.sh plain` | `/dev/shm/e5r-claude-r0x/a/rmkA/rmk` | no | `321a40dc8d00cbfde708fb5fbeef3280a325903312e9b694521a9fdcda41dc35` |
-| pinned evidence (peer) | recon recipe | `/dev/shm/e5r-isa-review-20261029T042314Z/rmk` | no | `f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30` |
+| main canonical #1, #2 | main's `build-canonical.sh`, verbatim | `/dev/shm/nocompiler-rmk-canonical/rmk` | yes | `5871dceee5aa302705f4d3ef423ee6765951c0c7d314e996559641630bf16a06` (both) |
+| mine, canonical path | `scripts/rmk-r0/build.sh` (written separately) | `/dev/shm/nocompiler-rmk-canonical/rmk` | yes | `5871dcee…` (same bytes) |
+| mine, recon path | `build.sh plain` | `/dev/shm/nocompiler-rmk-recon/rmk` | no | `e95989308a27531733b766913d2e2d01f88bfdebd0f1c044368d667c3bccc39a` (= main's recon row) |
+| mine, path A | `build.sh remap` | `/dev/shm/nocompiler-claude-r0x/a/rmkA/rmk` | yes | `48aefe786b47aea76da66e6c352426deb058b504b410ec1d81436e33b25ae9c1` |
+| mine, path B | `build.sh remap` | `/dev/shm/nocompiler-claude-r0x/b-longer-name/rmkB/rmk` | yes | `8a57bf625572d1240c30fbf37ad81fa87eb33c2aaa4f503c3a86f5ec171265ff` |
+| mine, path A | `build.sh plain` | `/dev/shm/nocompiler-claude-r0x/a/rmkA/rmk` | no | `321a40dc8d00cbfde708fb5fbeef3280a325903312e9b694521a9fdcda41dc35` |
+| pinned evidence (peer) | recon recipe | `/dev/shm/nocompiler-isa-review-20261029T042314Z/rmk` | no | `f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30` |
 
 Each build took about 21 s.
 
@@ -74,7 +74,7 @@ What this establishes:
 
 Not as a clean-room rebuild by me.
 * The original checkout and `CARGO_HOME` paths are inside the peer's live tree
-  (`/dev/shm/e5r-isa-review-20261029T042314Z/{rmk,cargo-home}`, embedded 24 and
+  (`/dev/shm/nocompiler-isa-review-20261029T042314Z/{rmk,cargo-home}`, embedded 24 and
   14 times in the ELF), which I must not change.
 * User namespaces are not permitted here (`unshare -rm` fails on `uid_map`), so I
   cannot bind a private scratch tree onto that path. No `proot` or `bwrap` is
@@ -99,7 +99,7 @@ user namespaces.
 
 * **May be claimed:** `build-canonical.sh` reproduces `5871dcee…` byte for byte
   from a clean checkout and cache on this machine, at the fixed path
-  `/dev/shm/e5r-rmk-canonical`, with Rust 1.98.1. Checked three times, by two
+  `/dev/shm/nocompiler-rmk-canonical`, with Rust 1.98.1. Checked three times, by two
   scripts.
 * **Must not be claimed:** reproducibility from an arbitrary checkout path; it
   fails, and changes code, not just layout.
@@ -144,7 +144,7 @@ crate hashes and `.llvm.<n>` suffixes ignored:
   the expected bytes in `Entry.lean` if any change (the entry bytes are the same).
   The generated fidelity module derives `rwBase` itself.
 * **Checked here, without migrating anything:** a throwaway RAM-image job on
-  5871dcee (`e5r-exp check`, board `qemu-virt-rv32`) is `proved`. The
+  5871dcee (`nocompiler-exp check`, board `qemu-virt-rv32`) is `proved`. The
   exporter accepts the ELF, and the kernel proves `RamElf.accepts`, the manifest
   agreement, entry 0x80000000, `rwBase` 0x80029590 and the same first four bytes
   at the entry.

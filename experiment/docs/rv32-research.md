@@ -1,7 +1,7 @@
 # Binary-level RV32I verification research
 
 The proof subject is a particular loaded ELF image and the instructions fetched
-from it. e5r's decompiler, CFG recovery, IR and SLEIGH decoder are not proof
+from it. nocompiler's decompiler, CFG recovery, IR and SLEIGH decoder are not proof
 inputs. This is the owner-authorized V0 research exception in the roadmap, not
 a claim to verify Rust, its compiler, a CPU or Embassy.
 
@@ -15,9 +15,9 @@ From the repository root, install Lean using elan and the pinned
 rustup toolchain install 1.98.1 --profile minimal
 rustup target add --toolchain 1.98.1 riscv32i-unknown-none-elf
 ./scripts/check-lean-rv32.sh
-CARGO_BUILD_JOBS=1 cargo test --release -p e5r-verify
-cargo fmt -p e5r-verify --check
-CARGO_BUILD_JOBS=1 cargo clippy --release -p e5r-verify --all-targets -- -D warnings
+CARGO_BUILD_JOBS=1 cargo test --release -p nocompiler-verify
+cargo fmt -p nocompiler-verify --check
+CARGO_BUILD_JOBS=1 cargo clippy --release -p nocompiler-verify --all-targets -- -D warnings
 ```
 
 `CROSS_COMPILE` selects the binutils prefix (default
@@ -27,7 +27,7 @@ Ubuntu binutils `2.42-4ubuntu2.10` and qemu-user `1:8.2.2+ds-0ubuntu1.18`, local
 extracted without system installation. To use those downloaded prerequisites:
 
 ```sh
-tools_root="$HOME/.local/state/e5r-lean-agent-20261028/tools/root"
+tools_root="$HOME/.local/state/nocompiler-lean-agent-20261028/tools/root"
 export PATH="$tools_root/usr/bin:$PATH"
 export LD_LIBRARY_PATH="$tools_root/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 ./scripts/check-lean-rv32.sh
@@ -62,7 +62,7 @@ no checked result is inferred from an existing olean or a checksum alone.
 
 | Path | Role |
 | --- | --- |
-| `crates/e5r-verify` | Strict static ELF export using the existing e5r loader |
+| `crates/nocompiler-verify` | Strict static ELF export using the existing nocompiler loader |
 | `verification/rv32/Theories/RV32.lean` | Memory, byte fetch, word decoding and instruction execution |
 | `verification/rv32/Theories/ELF.lean` | Independent bounded ELF32 memory-image reader |
 | `verification/rv32/Projects/ClampSpec.lean` | Shared exact output, access, reachability and frame specification |
@@ -126,7 +126,7 @@ These proofs do not cover all 32-bit inputs, arbitrary initial registers,
 arbitrary images or behavior after that boundary.
 
 Each project's `image_fidelity` also establishes that the independent Lean ELF
-reader reconstructs exactly the entry and memory image exported by e5r from the
+reader reconstructs exactly the entry and memory image exported by nocompiler from the
 original file-byte literal. The runner parses that literal from the actual Lean
 source and compares it with every input ELF byte. SHA-256 supplies a convenient
 identity record, not a substitute for this correspondence check.
@@ -192,7 +192,7 @@ The trusted boundaries are explicit:
 2. The original-file read, literal injection, runner, filesystem, tools and hash
    recording bind formal literals to the external files. These are not formally
    verified. The Lean image-equality theorem removes reliance on a hash or on
-   e5r's loader alone for the checked image, but both ELF-reader specifications
+   nocompiler's loader alone for the checked image, but both ELF-reader specifications
    and the checking orchestration still need review. The minimal Lean reader
    models PT_LOAD and selected header checks, not the complete ELF standard.
 3. The ISA/memory model and the exact specification are part of the semantic

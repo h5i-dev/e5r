@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Negative controls for the COBS decoder job (jobs/rmk/rmk-cobs-decode.json): both
-contracts, `E5R.Rmk.Cobs.decode` (decode_in_place_report) and `decode_in_place`.
+contracts, `NoCompiler.Rmk.Cobs.decode` (decode_in_place_report) and `decode_in_place`.
 
-Usage: python3 -I experiment/scripts/test-rmk-cobs-job.py E5R_VERIFY
+Usage: python3 -I experiment/scripts/test-rmk-cobs-job.py NOCOMPILER_VERIFY
 
 Proof mutations edit COPIES of Projects/rmk/Cobs/{Basic,Empty,Scan,Copy,Spec,Loop,Decode,
 Wrapper}.lean, written to verification/rv32/build/testjobs/cobsmut/ with their imports
@@ -63,7 +63,7 @@ def run(name, chain=True, elf=None, modules=None):
                 if m[len("Projects/rmk/Cobs/"):-5] in CHAIN and m.startswith("Projects/rmk/Cobs/") else m
                 for m in mods]
     j["modules"] = modules or mods
-    j["theorems"] = ["E5R.Rmk.Cobs.decode", "E5R.Rmk.Cobs.decode_in_place"]
+    j["theorems"] = ["NoCompiler.Rmk.Cobs.decode", "NoCompiler.Rmk.Cobs.decode_in_place"]
     if elf:
         j["elf"] = elf
         j.pop("elf_sha256")

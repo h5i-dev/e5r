@@ -1,9 +1,9 @@
 /-
   The COBS decoder contract (Projects/rmk/Cobs/Decode.lean) stated on the image the job
-  runner generates (`jobs/rmk/rmk-cobs-decode.json`). Original e5r code, Apache-2.0.
+  runner generates (`jobs/rmk/rmk-cobs-decode.json`). Original nocompiler code, Apache-2.0.
 
-  The runner writes the pinned ELF as `E5R.Rmk.Image.elf` (Projects/rmk/Elf.lean) and binds
-  `E5R.Rmk.Image.image := RamElf.imageOf 0x80000000 0x1000000 elf` with kernel-checked
+  The runner writes the pinned ELF as `NoCompiler.Rmk.Image.elf` (Projects/rmk/Elf.lean) and binds
+  `NoCompiler.Rmk.Image.image := RamElf.imageOf 0x80000000 0x1000000 elf` with kernel-checked
   `image_accepted`, `image_agrees`, `image_rwBase` (Projects/rmk/ElfFidelity.lean). The
   proofs' `img` and `B` are that image and the QEMU virt board at its rwBase (checked
   equalities below); `decode` is the proofs' contract over them.
@@ -15,26 +15,26 @@
 import Projects.rmk.ElfFidelity
 import Projects.rmk.Cobs.Wrapper
 
-namespace E5R.RmkCobs
-open E5R
+namespace NoCompiler.RmkCobs
+open NoCompiler
 
-theorem img_eq : E5R.Rmk.img = E5R.Rmk.Image.image.ro := rfl
+theorem img_eq : NoCompiler.Rmk.img = NoCompiler.Rmk.Image.image.ro := rfl
 
-theorem board_eq : E5R.Rmk.B = QemuVirtRv32.board E5R.Rmk.Image.image.rwBase := by
-  rw [E5R.Rmk.Image.image_rwBase]
+theorem board_eq : NoCompiler.Rmk.B = QemuVirtRv32.board NoCompiler.Rmk.Image.image.rwBase := by
+  rw [NoCompiler.Rmk.Image.image_rwBase]
 
 /-- The decoder on the runner's image and board. -/
-theorem decode (m₀ : Machine) (h : E5R.Rmk.Cobs.CobsEnv m₀) :
-    ∃ k m, E5R.Rmk.QRun (QemuVirtRv32.board E5R.Rmk.Image.image.rwBase) E5R.Rmk.Image.image.ro k m₀ m ∧
-      E5R.Rmk.Cobs.Returns m₀ m ∧ E5R.Rmk.Cobs.Res m₀ m := by
+theorem decode (m₀ : Machine) (h : NoCompiler.Rmk.Cobs.CobsEnv m₀) :
+    ∃ k m, NoCompiler.Rmk.QRun (QemuVirtRv32.board NoCompiler.Rmk.Image.image.rwBase) NoCompiler.Rmk.Image.image.ro k m₀ m ∧
+      NoCompiler.Rmk.Cobs.Returns m₀ m ∧ NoCompiler.Rmk.Cobs.Res m₀ m := by
   rw [← img_eq, ← board_eq]
-  exact E5R.Rmk.Cobs.decode m₀ h
+  exact NoCompiler.Rmk.Cobs.decode m₀ h
 
 /-- `decode_in_place` (the function `next` calls) on the runner's image and board. -/
-theorem decode_in_place (m₀ : Machine) (h : E5R.Rmk.Cobs.WEnv m₀) :
-    ∃ k m, E5R.Rmk.QRun (QemuVirtRv32.board E5R.Rmk.Image.image.rwBase) E5R.Rmk.Image.image.ro k m₀ m ∧
-      E5R.Rmk.Cobs.WReturns m₀ m ∧ E5R.Rmk.Cobs.WRes m₀ m := by
+theorem decode_in_place (m₀ : Machine) (h : NoCompiler.Rmk.Cobs.WEnv m₀) :
+    ∃ k m, NoCompiler.Rmk.QRun (QemuVirtRv32.board NoCompiler.Rmk.Image.image.rwBase) NoCompiler.Rmk.Image.image.ro k m₀ m ∧
+      NoCompiler.Rmk.Cobs.WReturns m₀ m ∧ NoCompiler.Rmk.Cobs.WRes m₀ m := by
   rw [← img_eq, ← board_eq]
-  exact E5R.Rmk.Cobs.decode_in_place m₀ h
+  exact NoCompiler.Rmk.Cobs.decode_in_place m₀ h
 
-end E5R.RmkCobs
+end NoCompiler.RmkCobs

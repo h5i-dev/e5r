@@ -1,5 +1,5 @@
 {
- "schema": "e5r.ptx.spec.v1",
+ "schema": "nocompiler.ptx.spec.v1",
  "kernel": "fbug_axpy_fused",
  "class": "map32",
  "element_type": "f32",

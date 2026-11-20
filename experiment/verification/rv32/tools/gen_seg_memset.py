@@ -54,15 +54,15 @@ print('''/-
   do not edit by hand. Branch outcomes and memory side conditions are hypotheses, discharged in
   Init/Memset.lean.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Deframer.TailNoCopy
 import Projects.rmk.Init.MemsetFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Init
-open E5R E5R.Rmk.MemsetFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Init
+open NoCompiler NoCompiler.Rmk.MemsetFetch NoCompiler.Rmk.Deframer.Tail
 ''')
 # entry: length >= 16, destination aligned (no head bytes), at least one word
 seg('mPre', 0x80020bb2, 0x80020bf4, {0x80020bb4: F, 0x80020bc4: T, 0x80020be0: F}, 'mp')
@@ -71,4 +71,4 @@ seg('mWord', 0x80020bf4, 0x80020bf8, {0x80020bf4: MEM}, 'mw')
 seg('mBack', 0x80020bf8, 0x80020bf4, {0x80020bf8: T}, 'mb')
 # no tail bytes (length a multiple of 4): return
 seg('mExit', 0x80020bf8, None, {0x80020bf8: F, 0x80020c02: F, 0x80020c1c: {'ra': H}}, 'mx')
-print('end E5R.Rmk.Init')
+print('end NoCompiler.Rmk.Init')

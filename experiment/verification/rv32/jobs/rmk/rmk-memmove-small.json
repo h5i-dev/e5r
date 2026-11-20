@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.verify.job.v1",
+  "schema": "nocompiler.verify.job.v1",
   "id": "rmk-memmove-small",
   "root": "../..",
   "board": "boards/qemu-virt-rv32.json",
@@ -8,7 +8,7 @@
   "image": {
     "kind": "ram",
     "module": "Projects.rmk.Elf",
-    "namespace": "E5R.Rmk.Image"
+    "namespace": "NoCompiler.Rmk.Image"
   },
   "modules": [
     "Theories/Absint.lean",
@@ -22,8 +22,8 @@
     "Projects/ramimage/Memmove.lean"
   ],
   "theorems": [
-    "E5R.Rmk.Memmove.contract",
-    "E5R.RmkMemmove.*"
+    "NoCompiler.Rmk.Memmove.contract",
+    "NoCompiler.RmkMemmove.*"
   ],
   "symbols": {
     "0x80020c1e": "memmove",

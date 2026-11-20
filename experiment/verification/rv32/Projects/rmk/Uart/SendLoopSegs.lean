@@ -4,15 +4,15 @@
   Projects/rmk/Uart/SendLoopFetch.lean; do not edit by hand. Branch outcomes and memory side conditions
   are hypotheses, discharged in Uart/SendRound.lean.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Deframer.TailNoCopy
 import Projects.rmk.Uart.SendLoopFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Uart
-open E5R E5R.Rmk.SendLoopFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Uart
+open NoCompiler NoCompiler.Rmk.SendLoopFetch NoCompiler.Rmk.Deframer.Tail
 
 def lEntCore (e : Core) (M : Word → BitVec 8) : Core :=
   ((((((((((((((((((e.wr 12 (ramRead M (e.get 22 + 0x00000307#32) .w) 0x800042a2).goto 0x800042a6).goto 0x800042aa).goto 0x800042ae).goto 0x800042b2).goto 0x80004262).wr 10 (alu .add (0) 0x00000000#32) 0x80004264).goto 0x80004268).goto 0x8000426c).goto 0x80004270).goto 0x80004274).goto 0x800042e2).wr 14 (ramRead (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite M (e.get 22 + 0x0000031b#32) (e.get 8) .w) (e.get 22 + 0x0000031f#32) (e.get 11) .w) (e.get 22 + 0x0000032b#32) (ramRead M (e.get 22 + 0x00000307#32) .w) .w) (e.get 22 + 0x00000330#32) (0) .b) (e.get 22 + 0x00000313#32) (e.get 8) .w) (e.get 22 + 0x00000317#32) (e.get 11) .w) (e.get 22 + 0x00000323#32) (ramRead M (e.get 22 + 0x00000307#32) .w) .w) (e.get 22 + 0x00000327#32) (0) .w) (e.get 22 + 0x00000313#32) .w) 0x800042e6).wr 13 (ramRead (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite M (e.get 22 + 0x0000031b#32) (e.get 8) .w) (e.get 22 + 0x0000031f#32) (e.get 11) .w) (e.get 22 + 0x0000032b#32) (ramRead M (e.get 22 + 0x00000307#32) .w) .w) (e.get 22 + 0x00000330#32) (0) .b) (e.get 22 + 0x00000313#32) (e.get 8) .w) (e.get 22 + 0x00000317#32) (e.get 11) .w) (e.get 22 + 0x00000323#32) (ramRead M (e.get 22 + 0x00000307#32) .w) .w) (e.get 22 + 0x00000327#32) (0) .w) (e.get 22 + 0x00000323#32) .w) 0x800042ea).wr 12 (alu .sub (e.get 11) (alu .add (0) 0x00000000#32)) 0x800042ee).wr 11 (alu .add (ramRead (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite M (e.get 22 + 0x0000031b#32) (e.get 8) .w) (e.get 22 + 0x0000031f#32) (e.get 11) .w) (e.get 22 + 0x0000032b#32) (ramRead M (e.get 22 + 0x00000307#32) .w) .w) (e.get 22 + 0x00000330#32) (0) .b) (e.get 22 + 0x00000313#32) (e.get 8) .w) (e.get 22 + 0x00000317#32) (e.get 11) .w) (e.get 22 + 0x00000323#32) (ramRead M (e.get 22 + 0x00000307#32) .w) .w) (e.get 22 + 0x00000327#32) (0) .w) (e.get 22 + 0x00000313#32) .w) (alu .add (0) 0x00000000#32)) 0x800042f2).wr 10 (alu .add (0) (ramRead (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite (ramWrite M (e.get 22 + 0x0000031b#32) (e.get 8) .w) (e.get 22 + 0x0000031f#32) (e.get 11) .w) (e.get 22 + 0x0000032b#32) (ramRead M (e.get 22 + 0x00000307#32) .w) .w) (e.get 22 + 0x00000330#32) (0) .b) (e.get 22 + 0x00000313#32) (e.get 8) .w) (e.get 22 + 0x00000317#32) (e.get 11) .w) (e.get 22 + 0x00000323#32) (ramRead M (e.get 22 + 0x00000307#32) .w) .w) (e.get 22 + 0x00000327#32) (0) .w) (e.get 22 + 0x00000323#32) .w)) 0x800042f4).wr 1 (0x800042f4 + 0x00005000#32) 0x800042f8).wr 1 0x800042fc 0x800098a6
@@ -499,4 +499,4 @@ theorem lDn2 (e : Core) (M : Word → BitVec 8) (hpc : e.pc = 0x80004282) (hq : 
 theorem lDn2Csr (e : Core) (M : Word → BitVec 8) : (lDn2Core e M).sameCsr e :=
   ((Core.sameCsr_goto _ _).trans ((Core.sameCsr_goto _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_goto _ _).trans ((Core.sameCsr_goto _ _).trans ((Core.sameCsr_goto _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_goto _ _).trans (Core.sameCsr_wr _ _ _ _)))))))))))
 
-end E5R.Rmk.Uart
+end NoCompiler.Rmk.Uart

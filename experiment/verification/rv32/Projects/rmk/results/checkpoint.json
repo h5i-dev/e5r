@@ -6,8 +6,8 @@
       "Quot.sound"
     ],
     "board_sha256": "6fe2d0db63ed5756db3ca2845b00931154c84359002daf47cff906b0df64287b",
-    "e5r_verify": "0.1.0",
-    "e5r_verify_sha256": "88ed587976c006e0c61075a499f69293e30da5da24587d318bc166ddaa49633e",
+    "nocompiler_verify": "0.1.0",
+    "nocompiler_verify_sha256": "88ed587976c006e0c61075a499f69293e30da5da24587d318bc166ddaa49633e",
     "elf": {
       "bytes": 454024,
       "path": "build/rmk-qemu-riscv-rynk.elf",
@@ -257,7 +257,7 @@
     "Projects/ramimage/RmkCheckpoint.lean"
   ],
   "resumed": [],
-  "schema": "e5r.verify.result.v1",
+  "schema": "nocompiler.verify.result.v1",
   "seconds": 2258.013986923,
   "stages": [
     {
@@ -1369,7 +1369,7 @@
         "Classical.choice",
         "Quot.sound"
       ],
-      "name": "E5R.RmkSessionDischarged.copy"
+      "name": "NoCompiler.RmkSessionDischarged.copy"
     },
     {
       "axioms": [
@@ -1377,7 +1377,7 @@
         "Classical.choice",
         "Quot.sound"
       ],
-      "name": "E5R.RmkSessionDischarged.deframer"
+      "name": "NoCompiler.RmkSessionDischarged.deframer"
     },
     {
       "axioms": [
@@ -1385,7 +1385,7 @@
         "Classical.choice",
         "Quot.sound"
       ],
-      "name": "E5R.RmkSessionDischarged.recv"
+      "name": "NoCompiler.RmkSessionDischarged.recv"
     },
     {
       "axioms": [
@@ -1393,7 +1393,7 @@
         "Classical.choice",
         "Quot.sound"
       ],
-      "name": "E5R.RmkSessionDischarged.unpark"
+      "name": "NoCompiler.RmkSessionDischarged.unpark"
     },
     {
       "axioms": [
@@ -1401,7 +1401,7 @@
         "Classical.choice",
         "Quot.sound"
       ],
-      "name": "E5R.RmkSessionDischarged.unpark_then_recv"
+      "name": "NoCompiler.RmkSessionDischarged.unpark_then_recv"
     },
     {
       "axioms": [
@@ -1409,7 +1409,7 @@
         "Classical.choice",
         "Quot.sound"
       ],
-      "name": "E5R.RmkFragments.round"
+      "name": "NoCompiler.RmkFragments.round"
     },
     {
       "axioms": [
@@ -1417,22 +1417,14 @@
         "Classical.choice",
         "Quot.sound"
       ],
-      "name": "E5R.RmkFragments.unpark_lands"
+      "name": "NoCompiler.RmkFragments.unpark_lands"
     },
     {
       "axioms": [
         "propext",
         "Quot.sound"
       ],
-      "name": "E5R.RmkFragments.reach_sound"
-    },
-    {
-      "axioms": [
-        "propext",
-        "Classical.choice",
-        "Quot.sound"
-      ],
-      "name": "E5R.RmkSend.send_round"
+      "name": "NoCompiler.RmkFragments.reach_sound"
     },
     {
       "axioms": [
@@ -1440,14 +1432,7 @@
         "Classical.choice",
         "Quot.sound"
       ],
-      "name": "E5R.RmkSend.send_to_loop"
-    },
-    {
-      "axioms": [
-        "propext",
-        "Quot.sound"
-      ],
-      "name": "E5R.RmkSend.nonvacuous"
+      "name": "NoCompiler.RmkSend.send_round"
     },
     {
       "axioms": [
@@ -1455,7 +1440,14 @@
         "Classical.choice",
         "Quot.sound"
       ],
-      "name": "E5R.Rmk.Encode.encode_spec"
+      "name": "NoCompiler.RmkSend.send_to_loop"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "NoCompiler.RmkSend.nonvacuous"
     },
     {
       "axioms": [
@@ -1463,14 +1455,7 @@
         "Classical.choice",
         "Quot.sound"
       ],
-      "name": "E5R.Rmk.Encode.encode_callPost"
-    },
-    {
-      "axioms": [
-        "propext",
-        "Quot.sound"
-      ],
-      "name": "E5R.Rmk.Encode.encPre_witness"
+      "name": "NoCompiler.Rmk.Encode.encode_spec"
     },
     {
       "axioms": [
@@ -1478,7 +1463,14 @@
         "Classical.choice",
         "Quot.sound"
       ],
-      "name": "E5R.Rmk.Encode.encode_reaches"
+      "name": "NoCompiler.Rmk.Encode.encode_callPost"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Quot.sound"
+      ],
+      "name": "NoCompiler.Rmk.Encode.encPre_witness"
     },
     {
       "axioms": [
@@ -1486,38 +1478,46 @@
         "Classical.choice",
         "Quot.sound"
       ],
-      "name": "E5R.Rmk.Init.init_round"
+      "name": "NoCompiler.Rmk.Encode.encode_reaches"
+    },
+    {
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "name": "NoCompiler.Rmk.Init.init_round"
     },
     {
       "axioms": [
         "propext",
         "Quot.sound"
       ],
-      "name": "E5R.Rmk.Init.initAt_real"
+      "name": "NoCompiler.Rmk.Init.initAt_real"
     },
     {
       "axioms": [
         "propext"
       ],
-      "name": "E5R.Rmk.Image.image_accepted"
+      "name": "NoCompiler.Rmk.Image.image_accepted"
     },
     {
       "axioms": [
         "propext"
       ],
-      "name": "E5R.Rmk.Image.image_agrees"
+      "name": "NoCompiler.Rmk.Image.image_agrees"
     },
     {
       "axioms": [
         "propext"
       ],
-      "name": "E5R.Rmk.Image.image_entry"
+      "name": "NoCompiler.Rmk.Image.image_entry"
     },
     {
       "axioms": [
         "propext"
       ],
-      "name": "E5R.Rmk.Image.image_rwBase"
+      "name": "NoCompiler.Rmk.Image.image_rwBase"
     }
   ]
 }

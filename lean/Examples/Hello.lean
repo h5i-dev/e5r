@@ -34,7 +34,7 @@ the prefix is the whole message exactly when the status is 0.
 import Examples.Hello.Image
 
 namespace Examples.Hello
-open E5R Examples.Hello.Image
+open NoCompiler Examples.Hello.Image
 
 /-- The logical arguments of `write_all`. -/
 structure Args where
@@ -63,7 +63,7 @@ theorem write_all_verified : Verified code write_all_dom write_all_entry spec :=
   have hpc : s.pc = 0x11164#64 := he.pc
   have hx := he.live
   -- mv a3, a0; li a7, 64
-  e5r_steps 2 [hpc]
+  nocompiler_steps 2 [hpc]
   let I : State → Prop := fun u => ∃ k evs, k ≤ n ∧ u.pc = 0x1116c#64 ∧ u.exit = none ∧
     u.reg 11 = buf + BitVec.ofNat 64 k ∧ u.reg 12 = BitVec.ofNat 64 (n - k) ∧ u.reg 13 = fd ∧
     u.reg 17 = 64#64 ∧ Same s u [10, 11, 12, 13, 17] ∧ u.mem = s.mem ∧
@@ -71,18 +71,18 @@ theorem write_all_verified : Verified code write_all_dom write_all_entry spec :=
   refine Reach.loop I (fun u => (u.reg 12).toNat) ?_ _ ?_
   · rintro u ⟨k, evs, hk, hpc', hx', h11, h12, h13, h17, hsame, hmem, htr, hw⟩
     -- beqz a2, done
-    e5r_step [hpc', h12]
+    nocompiler_step [hpc', h12]
     have hra : u.reg 1 = s.reg 1 := hsame 1 (by decide)
     by_cases hz : k = n
     · -- n bytes written: return 0.
       subst hz
       simp only [Nat.sub_self, BitVec.ofNat_eq_ofNat, beq_self_eq_true, ite_true, Reach.opt_some]
-      e5r_steps 2 [hra]
+      nocompiler_steps 2 [hra]
       rw [ret_mask he.retAligned]
       simp only [he.retAligned, ite_true, Reach.opt_some]
-      refine .done (.inl ⟨.inl (by e5r_norm; exact he.ret), .inl ⟨by e5r_norm [hx'], by e5r_norm, ?_, ?_⟩⟩)
-      · refine Same.preserved (rs := [10, 11, 12, 13, 17]) ?_ (by decide); e5r_same
-      · exact ⟨evs, k, Nat.le_refl _, by e5r_norm [htr], hw, .inl ⟨rfl, by e5r_norm⟩⟩
+      refine .done (.inl ⟨.inl (by nocompiler_norm; exact he.ret), .inl ⟨by nocompiler_norm [hx'], by nocompiler_norm, ?_, ?_⟩⟩)
+      · refine Same.preserved (rs := [10, 11, 12, 13, 17]) ?_ (by decide); nocompiler_same
+      · exact ⟨evs, k, Nat.le_refl _, by nocompiler_norm [htr], hw, .inl ⟨rfl, by nocompiler_norm⟩⟩
     · -- Some left: one write.
       have hnk : 0 < n - k := by omega
       have hne : (BitVec.ofNat 64 (n - k) == 0) = false := by
@@ -90,60 +90,60 @@ theorem write_all_verified : Verified code write_all_dom write_all_entry spec :=
         rw [ofNat_eq_zero_iff (by omega)]; omega
       simp only [hne, Bool.false_eq_true, ite_false, Reach.opt_some]
       -- mv a0, a3
-      e5r_step [h13]
+      nocompiler_step [h13]
       -- ecall
-      refine Reach.sys_step (by e5r_norm <;> decide) (by e5r_norm [hx']) (by e5r_norm <;> rfl)
-        ⟨fun _ => ?_, fun h => ?_⟩ ⟨_, Sys.writeErr 1 (by e5r_norm [h17]) (by decide) (by decide)⟩ ?_
+      refine Reach.sys_step (by nocompiler_norm <;> decide) (by nocompiler_norm [hx']) (by nocompiler_norm <;> rfl)
+        ⟨fun _ => ?_, fun h => ?_⟩ ⟨_, Sys.writeErr 1 (by nocompiler_norm [h17]) (by decide) (by decide)⟩ ?_
       · right
         refine ⟨⟨buf, n⟩, by simp [Spec.perm, spec], ?_⟩
         unfold Region.covers
-        e5r_norm [h11, h12]
+        nocompiler_norm [h11, h12]
         rw [add_ofNat_sub_toNat buf (by omega), toNat_ofNat_of_lt (by omega)]
         omega
-      · e5r_norm [h17] at h <;> exact absurd h (by decide)
+      · nocompiler_norm [h17] at h <;> exact absurd h (by decide)
       intro s' hs
       cases hs with
       | writeOk r h7 hle hmax hpos =>
         have hr : 1 ≤ r := by
-          have := hpos (by e5r_norm [h12]; rw [toNat_ofNat_of_lt (by omega)]; omega); omega
+          have := hpos (by nocompiler_norm [h12]; rw [toNat_ofNat_of_lt (by omega)]; omega); omega
         have hle' : r ≤ n - k := by
-          e5r_norm [h12] at hle; rwa [toNat_ofNat_of_lt (by omega)] at hle
+          nocompiler_norm [h12] at hle; rwa [toNat_ofNat_of_lt (by omega)] at hle
         -- add a1, a1, a0; sub a2, a2, a0; bgez a0, loop
-        e5r_steps 3 [h11, h12, h13, ofNat_not_slt_zero hmax]
+        nocompiler_steps 3 [h11, h12, h13, ofNat_not_slt_zero hmax]
         refine .done (.inr ⟨⟨k + r, evs ++ [.write fd (readBytes s.mem (buf + BitVec.ofNat 64 k) r)],
-          by omega, by e5r_norm, by e5r_norm [hx'], ?_, ?_, by e5r_norm [h13], by e5r_norm [h17], ?_,
-          by e5r_norm [hmem], ?_, ?_⟩, ?_⟩)
-        · e5r_norm [h11]; exact add_ofNat_add buf k r
-        · e5r_norm [h12]
+          by omega, by nocompiler_norm, by nocompiler_norm [hx'], ?_, ?_, by nocompiler_norm [h13], by nocompiler_norm [h17], ?_,
+          by nocompiler_norm [hmem], ?_, ?_⟩, ?_⟩)
+        · nocompiler_norm [h11]; exact add_ofNat_add buf k r
+        · nocompiler_norm [h12]
           apply BitVec.eq_of_toNat_eq
           rw [BitVec.toNat_sub, toNat_ofNat_of_lt (by omega), toNat_ofNat_of_lt (by omega),
             toNat_ofNat_of_lt (by omega)]
           omega
-        · e5r_same
-        · e5r_norm [htr, h13, h11, hmem]; simp
+        · nocompiler_same
+        · nocompiler_norm [htr, h13, h11, hmem]; simp
         · rw [writtenTo_append_write, hw, readBytes_add]; rfl
-        · e5r_norm [h12]
+        · nocompiler_norm [h12]
           simp only [BitVec.toNat_sub, toNat_ofNat_of_lt (show n - k < 2 ^ 64 by omega),
             toNat_ofNat_of_lt (show r < 2 ^ 64 by omega)]
           omega
       | writeErr e h7 he1 he2 =>
         -- add a1, a1, a0; sub a2, a2, a0; bgez a0 not taken; ret
-        e5r_steps 4 [h11, h12, h13, hra, neg_ofNat_slt_zero he1 he2]
+        nocompiler_steps 4 [h11, h12, h13, hra, neg_ofNat_slt_zero he1 he2]
         rw [ret_mask he.retAligned]
         simp only [he.retAligned, ite_true, Reach.opt_some]
-        refine .done (.inl ⟨.inl (by e5r_norm; exact he.ret), .inl ⟨by e5r_norm [hx'], by e5r_norm, ?_, ?_⟩⟩)
-        · refine Same.preserved (rs := [10, 11, 12, 13, 17]) ?_ (by decide); e5r_same
-        · exact ⟨evs, k, hk, by e5r_norm [htr], hw, .inr ⟨e, he1, he2, by e5r_norm⟩⟩
-      | readOk ds h7 => e5r_norm [h17] at h7 <;> exact absurd h7 (by decide)
-      | readErr e h7 => e5r_norm [h17] at h7 <;> exact absurd h7 (by decide)
-      | exit h7 => e5r_norm [h17] at h7 <;> exact absurd h7 (by decide)
-  · refine ⟨0, [], by omega, by e5r_norm, by e5r_norm [hx], by e5r_norm [ha1], ?_, by e5r_norm [ha0],
-      by e5r_norm, ?_, by e5r_norm, by e5r_norm; simp, by simp [readBytes]⟩
-    · e5r_norm [ha2]; simp
-    · e5r_same
+        refine .done (.inl ⟨.inl (by nocompiler_norm; exact he.ret), .inl ⟨by nocompiler_norm [hx'], by nocompiler_norm, ?_, ?_⟩⟩)
+        · refine Same.preserved (rs := [10, 11, 12, 13, 17]) ?_ (by decide); nocompiler_same
+        · exact ⟨evs, k, hk, by nocompiler_norm [htr], hw, .inr ⟨e, he1, he2, by nocompiler_norm⟩⟩
+      | readOk ds h7 => nocompiler_norm [h17] at h7 <;> exact absurd h7 (by decide)
+      | readErr e h7 => nocompiler_norm [h17] at h7 <;> exact absurd h7 (by decide)
+      | exit h7 => nocompiler_norm [h17] at h7 <;> exact absurd h7 (by decide)
+  · refine ⟨0, [], by omega, by nocompiler_norm, by nocompiler_norm [hx], by nocompiler_norm [ha1], ?_, by nocompiler_norm [ha0],
+      by nocompiler_norm, ?_, by nocompiler_norm, by nocompiler_norm; simp, by simp [readBytes]⟩
+    · nocompiler_norm [ha2]; simp
+    · nocompiler_same
 
 /-- The message in `.rodata`. -/
-def message : List Byte := "hello, e5r\n".toList.map fun c => BitVec.ofNat 8 c.toNat
+def message : List Byte := "hello, nocompiler\n".toList.map fun c => BitVec.ofNat 8 c.toNat
 
 theorem message_in_rodata : seg_rodata.bytes.toList.take 11 = message := by decide
 
@@ -188,8 +188,8 @@ theorem hello_verified : Verified code hello_dom hello_entry helloSpec := by
   have hal8 : aligned (fb + 8#64) 8 :=
     aligned_add_ofNat (a := fb) (m := 8) (by unfold aligned at hfal ⊢; omega) (by decide) (by decide)
   -- addi sp, sp, -16; sd ra, 8(sp)
-  e5r_step [hpc, hfb]
-  e5r_step
+  nocompiler_step [hpc, hfb]
+  nocompiler_step
   · right
     exact ⟨Spec.stackRegion s 16, by simp [Spec.perm, helloSpec], hcov⟩
   simp only [hal8, ite_true, Reach.opt_some]
@@ -204,7 +204,7 @@ theorem hello_verified : Verified code hello_dom hello_entry helloSpec := by
       exact hi
   have hM8 : read64 M (fb + 8#64) = s.reg 1 := by rw [← hM]; exact read64_writeLE_same _ _ _
   -- la a1, message; li a0, 1; li a2, 11; call write_all
-  e5r_steps 6
+  nocompiler_steps 6
   have hPle : (spec.perm ⟨1#64, 0x10158#64, 11⟩
       (((((((((((((((s.setReg 2 fb).setMem M).setPc 70040#64).setReg 10 65536#64).setPc 70044#64).setReg 11
         65880#64).setPc 70048#64).setReg 10 1#64).setPc 70052#64).setReg 12 11#64).setPc 70056#64).setReg 1
@@ -220,20 +220,20 @@ theorem hello_verified : Verified code hello_dom hello_entry helloSpec := by
       subst hr
       refine ⟨Spec.stackRegion s 16, by simp [Spec.perm, helloSpec], ?_⟩
       unfold Region.within Spec.stackRegion
-      e5r_norm [hF]
+      nocompiler_norm [hF]
       have : fb - BitVec.ofNat 64 0 - fb = 0 := by bv_omega
       rw [this]; simp
-  refine Verified.call write_all_verified ⟨1#64, 0x10158#64, 11⟩ ⟨by e5r_norm <;> rfl,
-    by e5r_norm [hx], by e5r_norm <;> decide, by e5r_norm <;> decide, by e5r_norm <;> exact hfal⟩
-    ⟨by e5r_norm, by e5r_norm, by e5r_norm, by decide⟩ (Dom.sub_of_ranges (by decide)) hPle ?_
+  refine Verified.call write_all_verified ⟨1#64, 0x10158#64, 11⟩ ⟨by nocompiler_norm <;> rfl,
+    by nocompiler_norm [hx], by nocompiler_norm <;> decide, by nocompiler_norm <;> decide, by nocompiler_norm <;> exact hfal⟩
+    ⟨by nocompiler_norm, by nocompiler_norm, by nocompiler_norm, by decide⟩ (Dom.sub_of_ranges (by decide)) hPle ?_
   intro s1 hdone hfr
   obtain ⟨hx1, hpc1, hpres1, evs, k, hk, htr, hw, hout⟩ := hdone.resolve_right fun h => h.2.elim
-  have h1pc : s1.pc = 70064#64 := by rw [hpc1]; e5r_norm
-  have h1tr : s1.trace = s.trace ++ evs := by rw [htr]; e5r_norm
+  have h1pc : s1.pc = 70064#64 := by rw [hpc1]; nocompiler_norm
+  have h1tr : s1.trace = s.trace ++ evs := by rw [htr]; nocompiler_norm
   have hm1 : s1.mem = M := by
     funext x
     rw [hfr x ?_]
-    · e5r_norm
+    · nocompiler_norm
     · rintro ⟨r, hr, hm⟩
       simp only [Spec.perm, spec, List.nil_append, List.mem_singleton] at hr
       subst hr
@@ -242,7 +242,7 @@ theorem hello_verified : Verified code hello_dom hello_entry helloSpec := by
       (((((((((((((((s.setReg 2 fb).setMem M).setPc 70040#64).setReg 10 65536#64).setPc 70044#64).setReg 11
         65880#64).setPc 70048#64).setReg 10 1#64).setPc 70052#64).setReg 12 11#64).setPc 70056#64).setReg 1
         70056#64).setPc 70060#64).setReg 1 70064#64).setPc 69988#64).mem 0x10158#64 k = message.take k := by
-    e5r_norm
+    nocompiler_norm
     have := Segment.readBytes_of_loaded hMro 0 k (by simp [seg_rodata]; omega)
     simp only [BitVec.add_zero, List.drop_zero] at this
     rw [show (0x10158#64 : Word) = seg_rodata.base from rfl, this, ← message_in_rodata,
@@ -255,21 +255,21 @@ theorem hello_verified : Verified code hello_dom hello_entry helloSpec := by
     · exact .inl ⟨hk11, by rw [← hc, h0]; decide⟩
     · exact .inr ⟨hk, by rw [← hc, herr]; exact srl63_err he1 he2⟩
   -- srli; li a7, 93; li a1, 0; li a2, 0
-  e5r_steps 4 [h1pc, hc]
+  nocompiler_steps 4 [h1pc, hc]
   -- ecall: exit
-  refine Reach.sys_step (by e5r_norm <;> decide) (by e5r_norm [hx1]) (by e5r_norm <;> rfl)
-    ⟨fun h => by e5r_norm at h <;> exact absurd h (by decide),
-     fun h => by e5r_norm at h <;> exact absurd h (by decide)⟩
-    ⟨_, Sys.exit (.inl (by e5r_norm))⟩ ?_
+  refine Reach.sys_step (by nocompiler_norm <;> decide) (by nocompiler_norm [hx1]) (by nocompiler_norm <;> rfl)
+    ⟨fun h => by nocompiler_norm at h <;> exact absurd h (by decide),
+     fun h => by nocompiler_norm at h <;> exact absurd h (by decide)⟩
+    ⟨_, Sys.exit (.inl (by nocompiler_norm))⟩ ?_
   intro s' hs
   cases hs with
   | exit _ =>
-    refine .done ⟨.inr (by e5r_norm <;> simp), .inr ⟨by e5r_norm <;> simp,
-      ⟨evs, k, c, ?_, by e5r_norm, hw, hcases⟩⟩⟩
-    e5r_norm [h1tr]
-  | writeOk r h7 => e5r_norm at h7 <;> exact absurd h7 (by decide)
-  | writeErr e h7 => e5r_norm at h7 <;> exact absurd h7 (by decide)
-  | readOk ds h7 => e5r_norm at h7 <;> exact absurd h7 (by decide)
-  | readErr e h7 => e5r_norm at h7 <;> exact absurd h7 (by decide)
+    refine .done ⟨.inr (by nocompiler_norm <;> simp), .inr ⟨by nocompiler_norm <;> simp,
+      ⟨evs, k, c, ?_, by nocompiler_norm, hw, hcases⟩⟩⟩
+    nocompiler_norm [h1tr]
+  | writeOk r h7 => nocompiler_norm at h7 <;> exact absurd h7 (by decide)
+  | writeErr e h7 => nocompiler_norm at h7 <;> exact absurd h7 (by decide)
+  | readOk ds h7 => nocompiler_norm at h7 <;> exact absurd h7 (by decide)
+  | readErr e h7 => nocompiler_norm at h7 <;> exact absurd h7 (by decide)
 
 end Examples.Hello

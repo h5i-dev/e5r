@@ -2,7 +2,7 @@
   Non-vacuity of the initialization entry `InitAt` (Init/InitPath.lean): a concrete machine with
   the values observed on QEMU virt satisfies it.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here: `initAt_real : InitAt mI`. NOT shown: that the task's first poll reaches it.
 -/
@@ -11,8 +11,8 @@ import Projects.rmk.Deframer.SomeWitness
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Init
-open E5R E5R.Rmk E5R.Rmk.Deframer.Session E5R.Rmk.Deframer.SomeW
+namespace NoCompiler.Rmk.Init
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.Deframer.Session NoCompiler.Rmk.Deframer.SomeW
 
 /-- sp = 0x80fffe10; arguments [sp+0x1c] = RX 0x8002a1c0, [sp+0x18] = TX 0x8002a1e4; the flag pointer
     [sp+0x24] = 0x8002a7c9; both UART structs at base 0x10000000, stride 1. -/
@@ -28,4 +28,4 @@ theorem initAt_real : InitAt mI :=
   ⟨rfl, mkCore_quiet _ _, by decide, by decide, by decide, by decide, by decide, by decide, by decide,
     by decide, by decide, by decide, by decide, by decide⟩
 
-end E5R.Rmk.Init
+end NoCompiler.Rmk.Init

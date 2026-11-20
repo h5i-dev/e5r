@@ -5,15 +5,15 @@
   not edit by hand. Branch outcomes and memory side conditions are hypotheses, discharged in
   Uart/SendBytes.lean.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Deframer.TailNoCopy
 import Projects.rmk.Uart.SendFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Uart
-open E5R E5R.Rmk.SendFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Uart
+open NoCompiler NoCompiler.Rmk.SendFetch NoCompiler.Rmk.Deframer.Tail
 
 def bProCore (e : Core) (M : Word → BitVec 8) : Core :=
   (((((((((e.wr 2 (alu .add (e.get 2) 0xffffffd0#32) 0x800098a8).goto 0x800098aa).goto 0x800098ac).goto 0x800098ae).goto 0x800098b0).goto 0x800098b2).goto 0x800098b4).goto 0x800098b6).goto 0x800098b8).goto 0x800098ba
@@ -1131,4 +1131,4 @@ theorem bEpi (e : Core) (M : Word → BitVec 8) (hpc : e.pc = 0x80009986) (hq : 
 theorem bEpiCsr (e : Core) (M : Word → BitVec 8) : (bEpiCore e M).sameCsr e :=
   ((Core.sameCsr_goto _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans (Core.sameCsr_wr _ _ _ _))))))))))))
 
-end E5R.Rmk.Uart
+end NoCompiler.Rmk.Uart

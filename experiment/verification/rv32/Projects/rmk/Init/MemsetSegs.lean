@@ -5,15 +5,15 @@
   do not edit by hand. Branch outcomes and memory side conditions are hypotheses, discharged in
   Init/Memset.lean.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Deframer.TailNoCopy
 import Projects.rmk.Init.MemsetFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Init
-open E5R E5R.Rmk.MemsetFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Init
+open NoCompiler NoCompiler.Rmk.MemsetFetch NoCompiler.Rmk.Deframer.Tail
 
 def mPreCore (e : Core) (M : Word → BitVec 8) : Core :=
   (((((((((((((e.wr 13 (alu .add (0) 0x00000010#32) 0x80020bb4).goto 0x80020bb8).wr 13 (alu .sub (0) (e.get 10)) 0x80020bbc).wr 16 (alu .and (alu .sub (0) (e.get 10)) 0x00000003#32) 0x80020bc0).wr 14 (alu .add (e.get 10) (alu .and (alu .sub (0) (e.get 10)) 0x00000003#32)) 0x80020bc4).goto 0x80020bd6).wr 12 (alu .sub (e.get 12) (alu .and (alu .sub (0) (e.get 10)) 0x00000003#32)) 0x80020bda).wr 13 (alu .and (alu .sub (e.get 12) (alu .and (alu .sub (0) (e.get 10)) 0x00000003#32)) 0xfffffffc#32) 0x80020bde).wr 13 (alu .add (alu .and (alu .sub (e.get 12) (alu .and (alu .sub (0) (e.get 10)) 0x00000003#32)) 0xfffffffc#32) (alu .add (e.get 10) (alu .and (alu .sub (0) (e.get 10)) 0x00000003#32))) 0x80020be0).goto 0x80020be4).wr 16 (alu .and (e.get 11) 0x000000ff#32) 0x80020be8).wr 15 0x01010000#32 0x80020bec).wr 15 (alu .add (0x01010000#32) 0x00000101#32) 0x80020bf0).wr 15 (muldiv .mul (alu .and (e.get 11) 0x000000ff#32) (alu .add (0x01010000#32) 0x00000101#32)) 0x80020bf4
@@ -192,4 +192,4 @@ theorem mExit (e : Core) (M : Word → BitVec 8) (hpc : e.pc = 0x80020bf8) (hq :
 theorem mExitCsr (e : Core) (M : Word → BitVec 8) : (mExitCore e M).sameCsr e :=
   ((Core.sameCsr_goto _ _).trans ((Core.sameCsr_goto _ _).trans ((Core.sameCsr_goto _ _).trans ((Core.sameCsr_wr _ _ _ _).trans ((Core.sameCsr_wr _ _ _ _).trans (Core.sameCsr_goto _ _))))))
 
-end E5R.Rmk.Init
+end NoCompiler.Rmk.Init

@@ -1,6 +1,6 @@
 # RMK (QEMU virt, RV32) — direct machine-code proofs
 
-Original e5r code, Apache-2.0. Target: upstream rmk @ 71556128, example `qemu-riscv-rynk`, release ELF
+Original nocompiler code, Apache-2.0. Target: upstream rmk @ 71556128, example `qemu-riscv-rynk`, release ELF
 sha256 `f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30` (recipe: review worker's
 BUILD-RECEIPT; deterministic only at fixed absolute paths). Board `QemuVirtRv32.board 0x80029bc8`,
 image `(RamElf.imageOf 0x80000000 0x1000000 elf).ro` (main's independent reader, support-lean4 d96ca45).
@@ -27,5 +27,5 @@ Checks (from verification/rv32):
     python3 -I Projects/rmk/check_rmk.py ELF Projects/rmk/results/memmove-small.json  # proved, 93 theorems
     python3 -I Projects/rmk/test_controls.py                                           # 7/7 + baseline
 
-`check_rmk.py` does what `e5r-exp check` does (pin check, forbidden words, fresh compile, leanchecker,
+`check_rmk.py` does what `nocompiler-exp check` does (pin check, forbidden words, fresh compile, leanchecker,
 axiom audit) because the runner cannot export RAM-resident images yet.

@@ -1,5 +1,5 @@
 {
-  "schema": "e5r.verify.job.v1",
+  "schema": "nocompiler.verify.job.v1",
   "root": "../..",
   "board": "boards/qemu-virt-rv32.json",
   "elf": "build/rmk-qemu-riscv-rynk.elf",
@@ -7,7 +7,7 @@
   "image": {
     "kind": "ram",
     "module": "Projects.rmk.Elf",
-    "namespace": "E5R.Rmk.Image"
+    "namespace": "NoCompiler.Rmk.Image"
   },
   "id": "rmk-uart-send-round",
   "modules": [
@@ -92,19 +92,19 @@
     "Projects/ramimage/Send.lean"
   ],
   "theorems": [
-    "E5R.RmkSend.*",
-    "E5R.RmkUart.*",
-    "E5R.Rmk.Uart.send_round",
-    "E5R.Rmk.Uart.send_to_loop",
-    "E5R.Rmk.Uart.send_loop",
-    "E5R.Rmk.Uart.w_sendAt",
-    "E5R.Rmk.Uart.w_sendLoop",
-    "E5R.Rmk.Uart.send_bytes",
-    "E5R.Rmk.Deframer.SessionI.unpark_round",
-    "E5R.Rmk.Deframer.copy_contract",
-    "E5R.Rmk.Deframer.cobs_report",
-    "E5R.RmkDeframer.img_eq",
-    "E5R.RmkDeframer.board_eq"
+    "NoCompiler.RmkSend.*",
+    "NoCompiler.RmkUart.*",
+    "NoCompiler.Rmk.Uart.send_round",
+    "NoCompiler.Rmk.Uart.send_to_loop",
+    "NoCompiler.Rmk.Uart.send_loop",
+    "NoCompiler.Rmk.Uart.w_sendAt",
+    "NoCompiler.Rmk.Uart.w_sendLoop",
+    "NoCompiler.Rmk.Uart.send_bytes",
+    "NoCompiler.Rmk.Deframer.SessionI.unpark_round",
+    "NoCompiler.Rmk.Deframer.copy_contract",
+    "NoCompiler.Rmk.Deframer.cobs_report",
+    "NoCompiler.RmkDeframer.img_eq",
+    "NoCompiler.RmkDeframer.board_eq"
   ],
   "symbols": {
     "0x800098a6": "send_bytes"

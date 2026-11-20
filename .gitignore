@@ -261,7 +261,7 @@ __marimo__/
 *.work/*/.lock
 *.work/*/*.tmp
 
-# e5r core
+# nocompiler core
 /examples/build/
 /lean/.lake/
 # The committed binaries the proofs are about (`*.elf` is ignored above).

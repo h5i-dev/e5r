@@ -1,7 +1,7 @@
 -- UNTRUSTED simulation (#eval of the model's stepInstr on the pinned image), review of 07a17e5, G7.
 -- Run: cd verification/rv32 && lake env lean <this file renamed .lean>.  Output recorded at the end.
 import Projects.rmk.Fetch
-open E5R E5R.Rmk
+open NoCompiler NoCompiler.Rmk
 def memT (t : List (Nat × Nat)) (a : Word) : BitVec 8 :=
   match t.find? (fun p => p.1 == a.toNat) with
   | some p => BitVec.ofNat 8 p.2
@@ -41,9 +41,9 @@ def mk (kind : Nat) : Machine := ⟨mkCore 0x800001f2 [(1,0x80003e9e),(2,0x80fff
     IO.println s!"kind {k}: {l.length} steps, tail: {l.drop (l.length - 4)}"
 
 /- output:
-kind 514: 446 steps, tail: [0x8001693c, 0x8001693e, 0x800098d4 ROM 32 1, FAULT E5R.Fault.unsupported "load from an unmodeled address"]
-kind 257: 410 steps, tail: [0x8001693c, 0x8001693e, 0x800098d4 ROM 32 1, FAULT E5R.Fault.unsupported "load from an unmodeled address"]
-kind 258: 442 steps, tail: [0x8001693c, 0x8001693e, 0x800098d4 ROM 32 1, FAULT E5R.Fault.unsupported "load from an unmodeled address"]
-kind 4: 35 steps, tail: [0x800020ee, 0x800020f0, 0x80002490 ROM 30 1, FAULT E5R.Fault.unsupported "load from an unmodeled address"]
-kind 770: 410 steps, tail: [0x8001693c, 0x8001693e, 0x800098d4 ROM 32 1, FAULT E5R.Fault.unsupported "load from an unmodeled address"]
+kind 514: 446 steps, tail: [0x8001693c, 0x8001693e, 0x800098d4 ROM 32 1, FAULT NoCompiler.Fault.unsupported "load from an unmodeled address"]
+kind 257: 410 steps, tail: [0x8001693c, 0x8001693e, 0x800098d4 ROM 32 1, FAULT NoCompiler.Fault.unsupported "load from an unmodeled address"]
+kind 258: 442 steps, tail: [0x8001693c, 0x8001693e, 0x800098d4 ROM 32 1, FAULT NoCompiler.Fault.unsupported "load from an unmodeled address"]
+kind 4: 35 steps, tail: [0x800020ee, 0x800020f0, 0x80002490 ROM 30 1, FAULT NoCompiler.Fault.unsupported "load from an unmodeled address"]
+kind 770: 410 steps, tail: [0x8001693c, 0x8001693e, 0x800098d4 ROM 32 1, FAULT NoCompiler.Fault.unsupported "load from an unmodeled address"]
 -/

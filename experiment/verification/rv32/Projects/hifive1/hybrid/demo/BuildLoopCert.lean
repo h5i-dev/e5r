@@ -10,7 +10,7 @@
 -/
 import tools.Analyze
 import Projects.hifive1.hybrid.demo.LoopConfig
-open E5R E5R.AI E5R.HybridLoop.Job
+open NoCompiler NoCompiler.AI NoCompiler.HybridLoop.Job
 
 def main (args : List String) : IO UInt32 := do
   let delegate := !args.contains "--no-delegate"
@@ -50,7 +50,7 @@ def main (args : List String) : IO UInt32 := do
   IO.eprintln s!"{nodes.size} nodes, {errors} errors"
   if errors > 0 then return 1
   let st : Analyze.St := { nodes := nodes, edges := edges }
-  let src := Analyze.certSource "E5R.HybridLoop.Cert" st []
+  let src := Analyze.certSource "NoCompiler.HybridLoop.Cert" st []
   let dl := if delegate then s!"  delegate := [({regionEntry}, 0)]\n" else ""
-  IO.FS.writeFile args[0]! (src.replace "end E5R.HybridLoop.Cert" (dl ++ "end E5R.HybridLoop.Cert"))
+  IO.FS.writeFile args[0]! (src.replace "end NoCompiler.HybridLoop.Cert" (dl ++ "end NoCompiler.HybridLoop.Cert"))
   return 0

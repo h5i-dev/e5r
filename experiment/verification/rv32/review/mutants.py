@@ -98,8 +98,8 @@ def apply(src, old, new):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--out', default='/dev/shm/e5r-isa-review-20261029T042314Z/diff')
-    ap.add_argument('--work', default='/dev/shm/e5r-isa-review-20261029T042314Z/mutants')
+    ap.add_argument('--out', default='/dev/shm/nocompiler-isa-review-20261029T042314Z/diff')
+    ap.add_argument('--work', default='/dev/shm/nocompiler-isa-review-20261029T042314Z/mutants')
     ap.add_argument('--only', default='')
     ap.add_argument('--summary', default='')
     args = ap.parse_args()

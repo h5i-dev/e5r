@@ -1,7 +1,7 @@
-checkout=/dev/shm/e5r-rmk-canonical/rmk mode=remap
-CARGO_HOME=/dev/shm/e5r-rmk-canonical/cargo-home
+checkout=/dev/shm/nocompiler-rmk-canonical/rmk mode=remap
+CARGO_HOME=/dev/shm/nocompiler-rmk-canonical/cargo-home
 CARGO_TERM_COLOR=never
-RUSTFLAGS=--remap-path-prefix=/dev/shm/e5r-rmk-canonical/rmk=/rmk --remap-path-prefix=/dev/shm/e5r-rmk-canonical/cargo-home=/cargo --remap-path-prefix=/home/ht2673/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu=/rustup-toolchain
+RUSTFLAGS=--remap-path-prefix=/dev/shm/nocompiler-rmk-canonical/rmk=/rmk --remap-path-prefix=/dev/shm/nocompiler-rmk-canonical/cargo-home=/cargo --remap-path-prefix=/home/ht2673/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu=/rustup-toolchain
 RUSTUP_TOOLCHAIN=1.98.1
 rustc 1.98.1 (48a229cea 2026-09-01)
 binary: rustc

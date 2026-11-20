@@ -3,7 +3,7 @@
 Owner: exporter/runner worker. Files: `Projects/rmk/Cobs/*.lean` only. No main
 (Deframer) or peer (Memmove) file is edited. Image: the runner's packed ELF
 (`Projects.rmk.Elf`, sha256 `f39d833f…`), board `QemuVirtRv32.board 0x80029bc8`
-(`E5R.Rmk.B`), instruction fetch through `Projects/rmk/Fetch.lean`.
+(`NoCompiler.Rmk.B`), instruction fetch through `Projects/rmk/Fetch.lean`.
 
 ## The code (read from the bytes, 0x8001e02e..0x8001e148, 97 instructions)
 
@@ -37,7 +37,7 @@ Owner: exporter/runner worker. Files: `Projects/rmk/Cobs/*.lean` only. No main
 
 ## Proved (kernel-checked; axioms propext, Classical.choice, Quot.sound; no sorry)
 
-**`E5R.Rmk.Cobs.decode` (Decode.lean): the whole function.** For every machine meeting
+**`NoCompiler.Rmk.Cobs.decode` (Decode.lean): the whole function.** For every machine meeting
 `CobsEnv` (len ≤ 488), a quiet deterministic run returns to ra, and:
 * `Returns` holds: frame, registers, CSRs, and RAM unchanged outside slot/buffer/frame.
 * `Res` holds:
@@ -72,7 +72,7 @@ Building blocks:
   * `iter` and `loop`, the latter by fuel induction against `run`.
 
 **Runner job** `jobs/rmk/rmk-cobs-decode.json`, with
-wrapper `Projects/ramimage/Cobs.lean` (`E5R.RmkCobs.decode` on the runner's image and board via
+wrapper `Projects/ramimage/Cobs.lean` (`NoCompiler.RmkCobs.decode` on the runner's image and board via
 checked `img_eq`/`board_eq`).
 * Status: `proved` in 258 s (Lean compile, `leanchecker` replay of every module, axiom
   audit), peak 6.5 GB in the shared `Fetch.lean`.
@@ -81,7 +81,7 @@ checked `img_eq`/`board_eq`).
 
 ## `decode_in_place` (0x8001e006), the function `next` calls: PROVED
 
-`E5R.Rmk.Cobs.decode_in_place` (Wrapper.lean):
+`NoCompiler.Rmk.Cobs.decode_in_place` (Wrapper.lean):
 
 ```lean
 structure WEnv (m : Machine) : Prop where     -- a0 = out (8 bytes), a1 = buf, a2 = len
@@ -136,7 +136,7 @@ structure Returns (m₀ m : Machine) : Prop where
 ```
 
 Top-level theorem (proved):
-`E5R.Rmk.Cobs.decode : ∀ m₀, CobsEnv m₀ → ∃ k m, QRun B img k m₀ m ∧ Returns m₀ m ∧ Res m₀ m`.
+`NoCompiler.Rmk.Cobs.decode : ∀ m₀, CobsEnv m₀ → ∃ k m, QRun B img k m₀ m ∧ Returns m₀ m ∧ Res m₀ m`.
 
 For `next`, the wrapper adds 32 bytes of frame on top of these 16, so 48 bytes
 below sp at the wrapper's entry. The `decode_in_place` contract (0x8001e006,
@@ -146,7 +146,7 @@ straight-line around this call) is not proved yet. It should give
 
 ## Negative controls, bundle and recheck (both contracts, runner image)
 
-Controls: `python3 -I scripts/test-rmk-cobs-job.py E5R_VERIFY`; transcript
+Controls: `python3 -I scripts/test-rmk-cobs-job.py NOCOMPILER_VERIFY`; transcript
 `verification/rv32/ram-image/rmk-qemu-riscv-rynk/cobs-job-controls.txt`.
 * **How proof mutations are run:** each edits copies of the Cobs modules (renamed into
   `build/testjobs/cobsmut/`) and runs the job on them.
@@ -169,7 +169,7 @@ Controls: `python3 -I scripts/test-rmk-cobs-job.py E5R_VERIFY`; transcript
 A rejected precondition mutation shows the proof needs that hypothesis. It does not show
 the weakened statement is false.
 
-Bundle: `e5r-exp bundle jobs/rmk/rmk-cobs-decode.json` (281 s), then `recheck.sh`
+Bundle: `nocompiler-exp bundle jobs/rmk/rmk-cobs-decode.json` (281 s), then `recheck.sh`
 (158 s).
 * The packing check passed: all 454,024 ELF bytes equal the Lean literal.
 * Every theorem rechecks with exactly the recorded axioms, the 10 in `axioms.expected`.

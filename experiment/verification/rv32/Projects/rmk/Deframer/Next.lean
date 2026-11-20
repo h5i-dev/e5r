@@ -1,7 +1,7 @@
 /-
   `Deframer::next` (0x8001d43a) on the pinned RMK image: the whole method.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here, CONDITIONAL ON `CopyContract` AND `CobsReportContract` (hypotheses here;
   CobsReportContract is discharged in CobsDischarge.lean, `next_from_copy`): `next_from_deps : NextFromDeps`, i.e. `CopyContract → CobsReportContract →
@@ -19,8 +19,8 @@ import Projects.rmk.Deframer.NextBody2
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Next
-open E5R E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.Next
+open NoCompiler NoCompiler.Rmk.Deframer.Tail
 
 theorem loop (hC : CopyContract) (hR : CobsReportContract) (c : Core) (R0 : Word → BitVec 8)
     (E : CallEnv nextPc nextStack ⟨c, R0⟩) :
@@ -60,4 +60,4 @@ theorem next_from_deps : NextFromDeps := by
   obtain ⟨k', m, r', post⟩ := loop hC hR c R0 E _ d M (Nat.le_refl _) li
   exact ⟨_, m, r.trans r', post⟩
 
-end E5R.Rmk.Deframer.Next
+end NoCompiler.Rmk.Deframer.Next

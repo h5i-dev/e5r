@@ -12,14 +12,14 @@
   dst ≤ src, so every byte read is buf[src+1+i] < len and every byte written is
   buf[dst+i] < len.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Cobs.Scan
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Cobs
-open E5R E5R.Rmk E5R.Rmk.CobsFetch
+namespace NoCompiler.Rmk.Cobs
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.CobsFetch
 
 theorem byteOf_byte (b : BitVec 8) : byteOf (BitVec.ofNat 32 b.toNat) 0 = b := by
   have := b.isLt
@@ -252,4 +252,4 @@ theorem copy (buf : Word) (len src dst code : Nat)
       rw [hout j (by omega) hl, put_other S buf len (dst + i) j _ hbuf (by omega) hl (by omega)]
     · intro x hxx; rw [hx x hxx]; exact put_outside S buf len (dst + i) _ x hbuf (by omega) hxx
 
-end E5R.Rmk.Cobs
+end NoCompiler.Rmk.Cobs

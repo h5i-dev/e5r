@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-// Original e5r fixture, Apache-2.0: the V0 clamp, on the HiFive1 memory map.
+// Original nocompiler fixture, Apache-2.0: the V0 clamp, on the HiFive1 memory map.
 // The input and output words are the first two words of DTIM.
 core::arch::global_asm!(
     ".section .text.done",

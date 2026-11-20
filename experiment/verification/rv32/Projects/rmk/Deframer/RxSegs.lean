@@ -4,15 +4,15 @@
   from Projects/rmk/Deframer/RxFetch.lean; do not edit by hand. Branch outcomes, memory side
   conditions and return addresses are hypotheses, discharged in Deframer/Rx.lean.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Deframer.TailNoCopy
 import Projects.rmk.Deframer.RxFetch
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Rx
-open E5R E5R.Rmk.RxFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.Rx
+open NoCompiler NoCompiler.Rmk.RxFetch NoCompiler.Rmk.Deframer.Tail
 
 def rxACore (e : Core) (M : Word → BitVec 8) : Core :=
   (((e.wr 10 (alu .add (0) 0x00000005#32) 0x80004376).wr 11 (alu .add (0) (e.get 24)) 0x80004378).wr 1 (0x80004378 + 0x00012000#32) 0x8000437c).wr 1 0x80004380 0x8001692e
@@ -224,4 +224,4 @@ theorem rxEnd (e : Core) (M : Word → BitVec 8) (hpc : e.pc = 0x8000439c) (hq :
     rw [exec_op, Core.get_zero, (show re3.get 20 = e.get 20 by simp [re1, reR1, re2, re3, Core.wr_get_ne, Core.wr_get_self])]; rfl
   exact .step hq s0 (.step qre1 s1 (.step qre2 s2 (.single qre3 s3)))
 
-end E5R.Rmk.Deframer.Rx
+end NoCompiler.Rmk.Deframer.Rx

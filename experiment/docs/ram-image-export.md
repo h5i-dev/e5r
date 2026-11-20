@@ -1,4 +1,4 @@
-# RAM-image export (`e5r-exp ram-image`)
+# RAM-image export (`nocompiler-exp ram-image`)
 
 Exports a RAM-resident, statically linked RV32 ELF as the initial RAM a loader
 writes, for machines without flash such as QEMU `-M virt -bios none -kernel`.
@@ -6,14 +6,14 @@ Built for the RMK milestone (R0-R1 in [`ROADMAP.md`](../../devinfra/docs/ROADMAP
 target is the pinned `qemu-riscv-rynk` example. It is a loader, not a proof:
 nothing about RMK is verified by exporting it.
 
-The flash exporter (`e5r-exp flash`) and the plain V0 export are unchanged
+The flash exporter (`nocompiler-exp flash`) and the plain V0 export are unchanged
 and still refuse this ELF (`physical address 0x80000000 is not in flash`,
 `ELF must be between 52 and 65536 bytes`).
 
 ## Command
 
 ```
-e5r-exp ram-image (--ram BASE:SIZE | --board BOARD.json) --mapping paddr=vaddr \
+nocompiler-exp ram-image (--ram BASE:SIZE | --board BOARD.json) --mapping paddr=vaddr \
     [--max-file N] [--max-file-bytes N] [--namespace NS] --out DIR IMAGE.elf
 ```
 
@@ -34,9 +34,9 @@ Output:
 
 | file | content |
 | --- | --- |
-| `manifest.json` | `e5r.ram-image.v1`, below |
+| `manifest.json` | `nocompiler.ram-image.v1`, below |
 | `seg-<i>.bin` | `ELF[p_offset, p_offset + p_filesz)` of program header `i`, exactly |
-| `image.lean` | only the packed file: `import Theories.RamElf`, then in namespace NS `def elf : E5R.RamElf.File := ⟨len, [w0, w1, ...]⟩`, word `i` = Σ_{k<64} byte(64i+k)·256^k (decimal; the last word is short). Packing is one function, `ram::pack`. |
+| `image.lean` | only the packed file: `import Theories.RamElf`, then in namespace NS `def elf : NoCompiler.RamElf.File := ⟨len, [w0, w1, ...]⟩`, word `i` = Σ_{k<64} byte(64i+k)·256^k (decimal; the last word is short). Packing is one function, `ram::pack`. |
 
 ## What the image means
 
@@ -78,7 +78,7 @@ and its first halfword lies in the file bytes of an executable segment.
 window with RAM left above it, and every writable segment must start at or above
 it: the checker models read-only segments as the immutable image and
 `[rw_base, RAM end)` as RAM.
-`Tag_RISCV_arch` must start with `rv32`. Finally e5r's analysis loader, a
+`Tag_RISCV_arch` must start with `rv32`. Finally nocompiler's analysis loader, a
 second reader, must map the same bytes with the same execute bit and see no
 relocation or dynamic sections.
 
@@ -94,7 +94,7 @@ relocation or dynamic sections.
   and the image module with plain `lean`, and has the kernel decide
   (`decide +kernel`) that `RamElf.accepts` holds and that `RamElf.check`
   returns exactly the manifest's entry, PT_LOAD table and `rw_base`.
-- `python3 -I scripts/check-ram-image-negative.py E5R_VERIFY IMAGE.elf RV32_DIR`:
+- `python3 -I scripts/check-ram-image-negative.py NOCOMPILER_VERIFY IMAGE.elf RV32_DIR`:
   11 header mutations of the ELF (load != run address, W+X, overlap, odd or
   stray entry, past RAM, truncated, float ABI, PT_DYNAMIC, filesz > memsz,
   writable below read-only); each must be refused by `ram-image` (nothing
@@ -115,7 +115,7 @@ ELF: rmk `71556128fa72881fc35f0bf6c292d5e28ad9568d`,
 `f39d833f520ba4de6c7085423a8dc3ee475ec19bdfb55c10c81c6ae868f43c30`.
 
 ```
-e5r-exp ram-image --ram 0x80000000:0x1000000 --mapping paddr=vaddr \
+nocompiler-exp ram-image --ram 0x80000000:0x1000000 --mapping paddr=vaddr \
     --namespace Rmk.QemuRiscvRynk --out OUT rmk-qemu-riscv
 OUT: 4 PT_LOADs, 170955 file bytes, 16606256 zero bytes, ELF sha256 f39d833f...
 ```
@@ -133,12 +133,12 @@ oracle transcripts are in
 [`verification/rv32/ram-image/rmk-qemu-riscv-rynk/`](../verification/rv32/ram-image/rmk-qemu-riscv-rynk/).
 Two exports, and one of a copy at another path, are byte-identical. The unit
 test `ram::tests::pinned_rmk_qemu_riscv_rynk` re-checks the layout and hashes
-when `E5R_RMK_ELF` names the ELF (it passes vacuously otherwise).
+when `NOCOMPILER_RMK_ELF` names the ELF (it passes vacuously otherwise).
 
 ## Handoff to the Lean side
 
 The image the model runs is **defined** by the checker's reader,
-`E5R.RamElf.imageOf base size elf` (`Theories/RamElf.lean`, written
+`NoCompiler.RamElf.imageOf base size elf` (`Theories/RamElf.lean`, written
 independently of this Rust), so `image.lean` carries only the file. Nothing the
 exporter parses is trusted by Lean; the manifest's `entry`, `segments` and
 `rw_base` are a cross-check, which `check-ram-image-lean.py` turns into
@@ -166,11 +166,11 @@ bytes).
 
 ## Verification jobs over RAM images (`image.kind: "ram"`)
 
-`e5r-exp check JOB.json` runs RAM-image jobs alongside flash ones. The job
-format is still `e5r.verify.job.v1`; one field is added:
+`nocompiler-exp check JOB.json` runs RAM-image jobs alongside flash ones. The job
+format is still `nocompiler.verify.job.v1`; one field is added:
 
 ```json
-"image": { "kind": "ram", "module": "Projects.ramimage.Image", "namespace": "E5R.RmkImage" }
+"image": { "kind": "ram", "module": "Projects.ramimage.Image", "namespace": "NoCompiler.RmkImage" }
 ```
 
 `kind` absent means `"flash"`, and flash jobs run exactly as before (their
@@ -181,18 +181,18 @@ results carry `"image": null`). A `ram` job:
    on such a board, or a RAM job on a flash board, is an `error`;
 2. deletes the previous generated files, then exports with the board's window
    (`ram::ram_image`); a refusal is `unsupported`;
-3. writes `<module>.lean` (the packed `E5R.RamElf.File`),
+3. writes `<module>.lean` (the packed `NoCompiler.RamElf.File`),
    `build/jobs/<id>/ram-image.json` (the manifest) and `<module>Fidelity.lean`:
    ```lean
-   def image : E5R.RamElf.Image := E5R.RamElf.imageOf BASE SIZE elf
-   theorem image_accepted : E5R.RamElf.accepts BASE SIZE elf = true := by decide +kernel
-   theorem image_agrees : (match E5R.RamElf.check BASE SIZE elf with ...) = true  -- = manifest
+   def image : NoCompiler.RamElf.Image := NoCompiler.RamElf.imageOf BASE SIZE elf
+   theorem image_accepted : NoCompiler.RamElf.accepts BASE SIZE elf = true := by decide +kernel
+   theorem image_agrees : (match NoCompiler.RamElf.check BASE SIZE elf with ...) = true  -- = manifest
    theorem image_entry : image.entry = ENTRY := by decide +kernel
    theorem image_rwBase : image.rwBase = RWBASE := by decide +kernel
    ```
    in the image's namespace. Proof modules import the fidelity module and state
    properties of `NS.image` (the checker's reader applied to the file), with
-   the board `E5R.QemuVirtRv32.board NS.image.rwBase`;
+   the board `NoCompiler.QemuVirtRv32.board NS.image.rwBase`;
 4. checks the model (plus `Theories/RamElf.lean`), board, image, fidelity and
    job modules from source, replays them with `leanchecker`, and audits the
    axioms of the job's theorems and of the four binding theorems.
@@ -217,8 +217,8 @@ at `verification/rv32/build/rmk-qemu-riscv-rynk.elf`:
 cd verification/rv32
 cp <rmk>/examples/use_rust/qemu-riscv-rynk/target/riscv32imac-unknown-none-elf/release/rmk-qemu-riscv \
    build/rmk-qemu-riscv-rynk.elf
-e5r-exp check jobs/rmk/rmk-qemu-virt-image.json --out build/rmk-result.json   # proved
-e5r-exp verify-result build/rmk-result.json                                   # current
+nocompiler-exp check jobs/rmk/rmk-qemu-virt-image.json --out build/rmk-result.json   # proved
+nocompiler-exp verify-result build/rmk-result.json                                   # current
 ```
 
 It proves six theorems (the four bindings, plus `Projects/ramimage/Entry.lean`:
@@ -229,7 +229,7 @@ RMK does; nothing here is a safety property. Stating `fetch` at the entry by
 segment computes the length of the whole 135 KB segment; proofs over this
 image need a cheaper path to its bytes (main's model).
 
-`python3 -I scripts/test-ram-image-job.py E5R_VERIFY IMAGE.elf` runs the
+`python3 -I scripts/test-ram-image-job.py NOCOMPILER_VERIFY IMAGE.elf` runs the
 lifecycle tests (19 cases, about 90 s): a proved job and a current result;
 the fidelity theorems with a wrong entry, `rwBase` or exec bit failing in
 `image_agrees` while the unmodified copy checks; an edited packed module or
@@ -243,18 +243,18 @@ does not check (`failed`). The transcript and the RMK job's result are in
 ## The RMK memmove job (`jobs/rmk/rmk-memmove-small.json`)
 
 This job checks the peer's proof of the emitted `memmove` for copies of fewer
-than 16 bytes (`Projects/rmk/MemmoveSmall.lean`, `E5R.Rmk.Memmove.contract`)
+than 16 bytes (`Projects/rmk/MemmoveSmall.lean`, `NoCompiler.Rmk.Memmove.contract`)
 against the image the runner generates. Its `image.module` is
-`Projects.rmk.Elf` in namespace `E5R.Rmk.Image`, which is the module the
+`Projects.rmk.Elf` in namespace `NoCompiler.Rmk.Image`, which is the module the
 proofs already import (`Projects/rmk/Fetch.lean`). So the runner's packed file
 is the only image input. `Projects/rmk/gen_elf.py`, which wrote that module by
 hand, is not used, and a run replaces any `Elf.lean` it left (the file is
 gitignored).
 
 `Projects/ramimage/Memmove.lean` connects the proofs to the runner's binding.
-`img_eq : E5R.Rmk.img = E5R.Rmk.Image.image.ro` holds by `rfl`, and
-`board_eq : E5R.Rmk.B = QemuVirtRv32.board E5R.Rmk.Image.image.rwBase` follows
-from `image_rwBase`. `E5R.RmkMemmove.contract` restates the contract over that
+`img_eq : NoCompiler.Rmk.img = NoCompiler.Rmk.Image.image.ro` holds by `rfl`, and
+`board_eq : NoCompiler.Rmk.B = QemuVirtRv32.board NoCompiler.Rmk.Image.image.rwBase` follows
+from `image_rwBase`. `NoCompiler.RmkMemmove.contract` restates the contract over that
 image and board: from every machine meeting `Memmove.Pre` (pc at the trampoline
 0x80020c1e, a quiet core, n < 16, dst and src in model RAM, aligned save slots
 in RAM and separate from dst and src, an even return address), a quiet,
@@ -268,7 +268,7 @@ Result (`verification/rv32/ram-image/rmk-qemu-riscv-rynk/rmk-memmove-small.resul
 `proved` in 237 s. It checks eight theorems (the contract, the restated
 contract, the two equalities and the four image bindings), with the axioms
 `propext`, `Classical.choice` and `Quot.sound`. Every module is replayed by
-`leanchecker`. `e5r-exp bundle` plus `recheck.sh` recheck it offline in
+`leanchecker`. `nocompiler-exp bundle` plus `recheck.sh` recheck it offline in
 137 s.
 
 Limits. The runner enforces `rss_mib` by sampling resident memory and passes
@@ -280,7 +280,7 @@ peaks at 6.5 GB RSS for 50 s, in the proof and again in its `leanchecker`
 replay. With `rss_mib` 6144 (Lean `-M 5632`) it fails with "(kernel) excessive
 memory consumption", so the job sets 10240.
 
-Controls (`python3 -I scripts/test-rmk-memmove-job.py E5R_VERIFY [BUNDLE]`,
+Controls (`python3 -I scripts/test-rmk-memmove-job.py NOCOMPILER_VERIFY [BUNDLE]`,
 transcript `memmove-job-controls.txt`):
 - One instruction of memmove changed (0x80020da6 `sub a3,a0,a1` → `sub a5,a0,a1`):
   - with the pin, this is an `error`;
@@ -294,7 +294,7 @@ transcript `memmove-job-controls.txt`):
 
 ## The RMK memmove contractB job (`jobs/rmk/rmk-memmove-contractB.json`)
 
-This job checks the peer's `E5R.Rmk.Memmove.contractB`
+This job checks the peer's `NoCompiler.Rmk.Memmove.contractB`
 (`Projects/rmk/MemmoveContract.lean`, peer commit `60d2f96`) on the runner's
 image. It is **bounded, not full memmove**. `PreB` admits n < 16 in either
 direction, or n ≥ 16 copied forward ((dst − src) ≥ n, unsigned) with
@@ -310,14 +310,14 @@ CSRs unchanged and RAM outside the save slots equal to the memmove of the entry
 RAM.
 
 `Projects/ramimage/MemmoveB.lean` restates it over the runner's image and board
-(`E5R.RmkMemmoveB.contractB`), reusing `img_eq` and `board_eq`. The job audits
+(`NoCompiler.RmkMemmoveB.contractB`), reusing `img_eq` and `board_eq`. The job audits
 both contracts, the two equalities and the four image bindings: `proved` in
 377 s, peak 6.5 GB RSS (in `Fetch.lean`), standard axioms only. Its bundle
 rechecks offline in 220 s, including the packing check. After merging the
 peer's larger `MemmoveFetch.lean` (259 instruction facts), the n < 16 job still
 proves (`rmk-memmove-small.result.json`).
 
-Mutations (`python3 -I scripts/test-rmk-memmoveB-job.py E5R_VERIFY`, transcript
+Mutations (`python3 -I scripts/test-rmk-memmoveB-job.py NOCOMPILER_VERIFY`, transcript
 `memmoveB-mutations.txt`). Each proof mutation edits a copy of the peer's
 module, never the module itself. "Rejected" means status `failed`, with the
 first Lean error in the named theorem:

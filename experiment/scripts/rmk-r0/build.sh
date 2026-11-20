@@ -1,6 +1,6 @@
 #!/bin/bash
 # One audited build of RMK examples/use_rust/qemu-riscv-rynk for the R0 audit.
-# Original e5r code, Apache-2.0. Written independently of
+# Original nocompiler code, Apache-2.0. Written independently of
 # verification/rv32/rmk/build-canonical.sh, to check its claims.
 #
 # usage: build.sh CHECKOUT_ROOT remap|plain OUT_DIR

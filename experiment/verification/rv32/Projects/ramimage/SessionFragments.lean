@@ -1,5 +1,5 @@
 /-
-  RMK session fragments on the runner-generated pinned image. Original e5r code, Apache-2.0.
+  RMK session fragments on the runner-generated pinned image. Original nocompiler code, Apache-2.0.
 
   `round`, `unpark`, `some_negative`, `none_path` and `unpark_lands` have discharged
   memmove/COBS dependencies. Entry invariants, Quiet, and explicit boundary exits remain.
@@ -14,10 +14,10 @@
 import Projects.ramimage.Deframer
 import Projects.rmk.Deframer.SomeRound
 
-namespace E5R.RmkFragments
-open E5R E5R.Rmk.Deframer E5R.Rmk.Deframer.Session E5R.Rmk.Deframer.SessionI
-open E5R.Rmk (Lands Lands1 QRun Quiet reach_no_escape lands_seq lands1_seq lands_of_qrun)
-open E5R.Rmk.Deframer.SomeP (DispatchContract EncodeContract DispEnv EncEnv CallPost EncRes SomeQ WAt)
+namespace NoCompiler.RmkFragments
+open NoCompiler NoCompiler.Rmk.Deframer NoCompiler.Rmk.Deframer.Session NoCompiler.Rmk.Deframer.SessionI
+open NoCompiler.Rmk (Lands Lands1 QRun Quiet reach_no_escape lands_seq lands1_seq lands_of_qrun)
+open NoCompiler.Rmk.Deframer.SomeP (DispatchContract EncodeContract DispEnv EncEnv CallPost EncRes SomeQ WAt)
 
 /-- One round from the loop head: every behaviour (every UART value) lands at the loop head
     with `SessInv` again or at an explicit boundary. -/
@@ -101,4 +101,4 @@ theorem round_some (W : (Word → BitVec 8) → Prop) (hD : DispatchContract W)
     · exact .done (.inr (.inr (.inr (.inr (.inl c)))))
     · exact .done (.inr (.inr (.inr (.inr (.inr d)))))
 
-end E5R.RmkFragments
+end NoCompiler.RmkFragments

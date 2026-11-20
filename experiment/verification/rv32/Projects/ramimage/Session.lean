@@ -1,24 +1,24 @@
 /-
   RMK session steps (main's Projects/rmk/Deframer/{Session,SessionLoop}.lean), CONDITIONAL, on
   the image the job runner generates (`jobs/rmk/rmk-session-conditional.json`).
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   NOT a safety claim and NOT `SessionSafe`. Every statement takes memmove's `CopyContract` as an
   explicit hypothesis (discharged separately by `CopyDischarge.copy_contract`). The COBS
-  dependency is discharged (main's `cobs_report`; also `E5R.Rmk.Cobs.cobs_report_contract`).
+  dependency is discharged (main's `cobs_report`; also `NoCompiler.Rmk.Cobs.cobs_report_contract`).
   Not covered at all: the path 0x80003e70 -> 0x80003fd8 (dispatch, encode, UART send, yields),
   the path 0x80003f7c -> loop head (UART read future, executor), interrupts (`Quiet` is assumed
   at every point). See verification/rv32/rmk-audit/SESSION-BOUNDARY.md.
 
-  Image and board: the runner's (`E5R.RmkDeframer.img_eq`, `board_eq`).
+  Image and board: the runner's (`NoCompiler.RmkDeframer.img_eq`, `board_eq`).
 -/
 import Projects.ramimage.Deframer
 import Projects.rmk.Deframer.SessionLoop
 import Projects.rmk.Cobs.Bridge
 
-namespace E5R.RmkSession
-open E5R E5R.Rmk.Deframer E5R.Rmk.Deframer.Session
-open E5R.Rmk (QRun QRun.trans)
+namespace NoCompiler.RmkSession
+open NoCompiler NoCompiler.Rmk.Deframer NoCompiler.Rmk.Deframer.Session
+open NoCompiler.Rmk (QRun QRun.trans)
 
 /-- **CONDITIONAL on `CopyContract`**: the receive step from the loop head. -/
 theorem recv_conditional :
@@ -46,6 +46,6 @@ theorem unpark_then_recv (hC : CopyContract) (m₀ : Machine) (h : UnparkAt m₀
 
 /-- Main's COBS discharge and the independent one state the same interface. -/
 theorem cobs_both : CobsReportContract ∧ CobsReportContract :=
-  ⟨cobs_report, E5R.Rmk.Cobs.cobs_report_contract⟩
+  ⟨cobs_report, NoCompiler.Rmk.Cobs.cobs_report_contract⟩
 
-end E5R.RmkSession
+end NoCompiler.RmkSession

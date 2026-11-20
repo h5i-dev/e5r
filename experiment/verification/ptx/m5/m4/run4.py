@@ -6,7 +6,7 @@ For each kernel (kernels/NAME.ptx, compiled from kernels/NAME.cu by nvcc 13.2
 -O3 -arch=sm_86 --ptx; specs/NAME.json):
 
   1. ptxas -arch=sm_86 must assemble the PTX;
-  2. `e5r ptx check` gives proved / refuted / unknown / unsupported;
+  2. `nocompiler ptx check` gives proved / refuted / unknown / unsupported;
   3. on the GPU: the kernel runs on random inputs at several lengths and
      launch shapes inside the class's range, and the output words are
      compared with the class's result (numpy, uint32 wrap-around): `per_block`
@@ -17,8 +17,8 @@ For each kernel (kernels/NAME.ptx, compiled from kernels/NAME.cu by nvcc 13.2
 No speed is measured: every kernel here is nvcc's own output, so a baseline
 compiled by nvcc would be the same code.
 
-  run4.py E5R_VERIFY OUTDIR [NAME ...]          the corpus
-  run4.py --mutants E5R_VERIFY OUTDIR           mutants.json from mutate.py
+  run4.py NOCOMPILER_VERIFY OUTDIR [NAME ...]          the corpus
+  run4.py --mutants NOCOMPILER_VERIFY OUTDIR           mutants.json from mutate.py
 """
 import ctypes
 import json

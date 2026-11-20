@@ -2,7 +2,7 @@
   `cobs::dec::decode_in_place_report` on an empty input (len = 0): the path
   0x8001e02e → 0x8001e03a (beqz a2) → 0x8001e0f8 → 0x8001e102 → ra.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   Result: `Err(DecodeError)` with tag word 1 at a0 and error code 0 at a0+4
   (the empty-frame error), nothing else written but the frame; callee-saved
@@ -14,8 +14,8 @@ import Projects.rmk.Cobs.Basic
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Cobs
-open E5R E5R.Rmk E5R.Rmk.CobsFetch
+namespace NoCompiler.Rmk.Cobs
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.CobsFetch
 
 theorem empty (m₀ : Machine) (h : CobsEnv m₀) (hn : (m₀.core.get 12).toNat = 0) :
     ∃ k m, QRun B img k m₀ m ∧ Returns m₀ m ∧
@@ -68,4 +68,4 @@ theorem empty (m₀ : Machine) (h : CobsEnv m₀) (hn : (m₀.core.get 12).toNat
   · rw [r0, v11]
   · rw [← v16, r4, v7]
 
-end E5R.Rmk.Cobs
+end NoCompiler.Rmk.Cobs

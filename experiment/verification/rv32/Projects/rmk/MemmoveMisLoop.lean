@@ -11,15 +11,15 @@
   a1 + o (`merge_store`), so the loop computes `words` (Copy.lean); every
   load is an aligned word inside the source range.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Merge
 import Projects.rmk.MemmoveBigLoops
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk
-open E5R E5R.Rmk.MemmoveFetch
+namespace NoCompiler.Rmk
+open NoCompiler NoCompiler.Rmk.MemmoveFetch
 
 /-- The shift amounts the loop computes. -/
 theorem shifts (o : Nat) (ho : 0 < o ∧ o < 4) :
@@ -242,4 +242,4 @@ theorem mis_loop (o : Nat) (ho : 0 < o ∧ o < 4) : ∀ (j : Nat) (c : Core) (ra
     · intro r a b d e f
       rw [hfr r a b d e f, Core.goto_get]; exact misBody_get c ram r a b d e f
 
-end E5R.Rmk
+end NoCompiler.Rmk

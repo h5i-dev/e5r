@@ -1,10 +1,10 @@
 /-
   The memmove dependency of the deframer, discharged: `CopyContract` (Deframer/Spec.lean) from the
   peer's proved contract of the emitted memmove for every size, direction and alignment
-  (`E5R.Rmk.Memmove.contractAll`, Projects/rmk/MemmoveBwdAll.lean), and with it every deframer
+  (`NoCompiler.Rmk.Memmove.contractAll`, Projects/rmk/MemmoveBwdAll.lean), and with it every deframer
   method and session step UNCONDITIONALLY.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   The bridge is exact, with no weakening:
   * `CopyEnv` gives `PreM` field by field. The callee frame `B.inRam (sp - 48) 48` gives
@@ -18,8 +18,8 @@
 import Projects.rmk.Deframer.SessionLoop
 import Projects.rmk.MemmoveBwdAll
 
-namespace E5R.Rmk.Deframer
-open E5R E5R.Rmk
+namespace NoCompiler.Rmk.Deframer
+open NoCompiler NoCompiler.Rmk
 
 theorem copy_contract : CopyContract := by
   intro m₀ E
@@ -52,4 +52,4 @@ theorem unpark_step' (m₀ : Machine) (h : Session.UnparkAt m₀) :
         m.ram x = m₀.ram x :=
   Session.unpark_step copy_contract m₀ h
 
-end E5R.Rmk.Deframer
+end NoCompiler.Rmk.Deframer

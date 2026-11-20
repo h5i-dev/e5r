@@ -3,7 +3,7 @@
   emitted firmware (actuator task poll), for hybrid composition with the
   abstract-interpretation checker.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   embassy-sync's `Channel<_, u8, 4>` receive side, as rustc emitted it inside
   `TaskStorage<actuator>::poll`, in a critical section (`csrrci a0, mstatus, 8`
@@ -32,8 +32,8 @@ import Projects.hifive1.Image
 
 set_option maxRecDepth 100000
 
-namespace E5R.Hifive1.Hybrid.Ring
-open E5R E5R.Hybrid
+namespace NoCompiler.Hifive1.Hybrid.Ring
+open NoCompiler NoCompiler.Hybrid
 
 abbrev B := Hifive1Revb.board
 abbrev img := Firmware.segments
@@ -178,4 +178,4 @@ def summary : Summary B img where
 theorem post_head_lt {m₀ m : Machine} (h : Pre m₀) (hs : Spec m₀ m) : (m.core.get 10).toNat < 4 := by
   rw [hs.head]; exact next_lt h.head
 
-end E5R.Hifive1.Hybrid.Ring
+end NoCompiler.Hifive1.Hybrid.Ring

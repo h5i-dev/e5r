@@ -2,7 +2,7 @@
   The session's UART receive poll (0x80004374..0x800043a8, the None path's read of incoming bytes)
   on the pinned RMK image: EVERY behaviour, for every value the UART's LSR and RBR registers return.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   The loop: `assert_offset(5)`; read LSR (0x10000005); if bit 0 (data ready) is clear, stop; else
   `assert_offset(0)`, read RBR (0x10000000) into buf[i], i += 1, and go on while i ≠ cap.
@@ -23,8 +23,8 @@ import Projects.rmk.Deframer.RxSegs
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.Rx
-open E5R E5R.Rmk E5R.Rmk.RxFetch E5R.Rmk.Deframer.Tail
+namespace NoCompiler.Rmk.Deframer.Rx
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.RxFetch NoCompiler.Rmk.Deframer.Tail
 
 /-- The loop's entry facts, about the core c0 that first reaches 0x80004374. -/
 structure RxEnv (c0 : Core) : Prop where
@@ -253,4 +253,4 @@ theorem rx_loop (c0 : Core) (M0 : Word → BitVec 8) (E : RxEnv c0) :
           exact kU r hr
         · simp [L, rxLoopCore, Core.wr_get_self, U9]; exact hi1
 
-end E5R.Rmk.Deframer.Rx
+end NoCompiler.Rmk.Deframer.Rx

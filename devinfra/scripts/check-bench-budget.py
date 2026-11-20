@@ -74,10 +74,10 @@ def load(path: Path) -> dict:
 
 
 def measured_rows(results: dict) -> dict[str, dict]:
-    """The e5r measurement per binary, keyed by binary name."""
+    """The nocompiler measurement per binary, keyed by binary name."""
     rows = {}
     for row in results["results"]:
-        tool = row["tools"].get("e5r")
+        tool = row["tools"].get("nocompiler")
         if tool and tool.get("ran"):
             rows[row["binary"]] = {
                 "seconds": tool["seconds"],
@@ -92,10 +92,10 @@ def measured_rows(results: dict) -> dict[str, dict]:
 
 
 def ratios(results: dict) -> dict[str, dict[str, float]]:
-    """e5r's wall time as a fraction of each other tool's, per binary."""
+    """nocompiler's wall time as a fraction of each other tool's, per binary."""
     out = {}
     for row in results["results"]:
-        ours = row["tools"].get("e5r")
+        ours = row["tools"].get("nocompiler")
         # A ratio against a time at the timer's resolution is arithmetic on
         # noise, so the small fixtures contribute no speedup floor.
         if not ours or not ours.get("ran"):
@@ -205,7 +205,7 @@ def timing_breaches(name: str, entry: dict, got: dict, notes: list[str]) -> list
 # three of them are the Go runtime. A patch release of the compiler adds or
 # removes a handful, which is what a CI runner one Go release ahead of the
 # maintainer reported: recall a fifth of a percent higher than the floor and one
-# more entry no symbol names. Neither is a fact about e5r, and a floor that
+# more entry no symbol names. Neither is a fact about nocompiler, and a floor that
 # tracks somebody's `apt upgrade` is not a ratchet. Measured everywhere, checked
 # where the toolchain is the recorded one.
 TOOLCHAIN_OWNED = ("hello.go",)
@@ -243,7 +243,7 @@ def update(budget: dict, results: dict) -> dict:
         if got["recall"] is not None:
             entry["recall_floor"] = got["recall"]
     # The speedup floor is deliberately slack, and capped. It exists to catch
-    # e5r losing a standing advantage, not to bet that another tool will never
+    # nocompiler losing a standing advantage, not to bet that another tool will never
     # get faster: rizin takes twelve minutes on libstdc++ here, and pinning a
     # floor near that ratio would fail the day rizin fixes it, which is not our
     # regression. An order of magnitude is the most this claims.

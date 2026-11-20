@@ -1,8 +1,8 @@
 # Runner interface for a future full memmove contract (proposal; no such theorem exists)
 
 Status: **interface only**. No full memmove contract is proved. The proved
-contracts are `E5R.Rmk.Memmove.contract` (n < 16) and
-`E5R.Rmk.Memmove.contractB` (n < 16 either way, or n ≥ 16 forward with
+contracts are `NoCompiler.Rmk.Memmove.contract` (n < 16) and
+`NoCompiler.Rmk.Memmove.contractB` (n < 16 either way, or n ≥ 16 forward with
 src ≡ dst mod 4). Each has its own job, and neither changes. This file says
 what the runner needs when the peer (proofs) and main (specification) produce
 a contract for every n, every alignment and both directions, and how it will be
@@ -41,14 +41,14 @@ the whole frame is simpler and is what callers can rely on.
 
 ## Runner job (template `rmk-memmove-full.json.template`, not a job yet)
 
-* Same image module (`Projects.rmk.Elf`, namespace `E5R.Rmk.Image`, the runner's
+* Same image module (`Projects.rmk.Elf`, namespace `NoCompiler.Rmk.Image`, the runner's
   packed file) and the same `img_eq`/`board_eq` wrapper equalities as the n < 16
   and contractB jobs.
 * A new wrapper `Projects/ramimage/MemmoveFull.lean` (mine, written when the
-  theorem exists) restates the contract over `E5R.Rmk.Image.image.ro` and
-  `QemuVirtRv32.board E5R.Rmk.Image.image.rwBase`.
-* `theorems`: the peer's full contract name, `E5R.RmkMemmove.img_eq`,
-  `E5R.RmkMemmove.board_eq`, and `E5R.RmkMemmoveFull.*`. All are axiom-audited,
+  theorem exists) restates the contract over `NoCompiler.Rmk.Image.image.ro` and
+  `QemuVirtRv32.board NoCompiler.Rmk.Image.image.rwBase`.
+* `theorems`: the peer's full contract name, `NoCompiler.RmkMemmove.img_eq`,
+  `NoCompiler.RmkMemmove.board_eq`, and `NoCompiler.RmkMemmoveFull.*`. All are axiom-audited,
   along with the four image bindings.
 * `limits`: `rss_mib` 10240 (Fetch.lean peaks at 6.5 GB). The runner limits
   resident memory, never address space.

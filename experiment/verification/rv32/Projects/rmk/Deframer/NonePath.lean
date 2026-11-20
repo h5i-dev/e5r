@@ -2,7 +2,7 @@
   The session's None path, from `recv_step`'s None point (0x80003f7c, after `tail`) through the UART
   receive poll, on the pinned RMK image: EVERY behaviour, for every value the UART returns.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 
   PROVED here: `none_step`: from `NoneAt` every behaviour of `Step` (`Lands`: no fault, no
   interrupt on the way) reaches either
@@ -22,8 +22,8 @@ import Projects.rmk.Deframer.Session
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Deframer.NoneP
-open E5R E5R.Rmk E5R.Rmk.Deframer.Tail E5R.Rmk.Deframer.Session E5R.Rmk.Deframer.Rx
+namespace NoCompiler.Rmk.Deframer.NoneP
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.Deframer.Tail NoCompiler.Rmk.Deframer.Session NoCompiler.Rmk.Deframer.Rx
 
 structure NoneAt (m : Machine) : Prop where
   pc : m.core.pc = 0x80003f7c
@@ -254,4 +254,4 @@ theorem none_step (m : Machine) (h : NoneAt m) : Lands B img (NoneQ m.core m.ram
     simp [nCommitCore, Core.wr_get_ne]
     exact xs 26 (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
 
-end E5R.Rmk.Deframer.NoneP
+end NoCompiler.Rmk.Deframer.NoneP

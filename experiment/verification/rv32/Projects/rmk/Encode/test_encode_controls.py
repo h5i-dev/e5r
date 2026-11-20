@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Negative controls for the encode_frame proof (Projects/rmk/Encode).
 
-Original e5r code, Apache-2.0. Each control drops or weakens ONE hypothesis (or strengthens one
+Original nocompiler code, Apache-2.0. Each control drops or weakens ONE hypothesis (or strengthens one
 claim) in a scratch copy of main's sources and recompiles from the changed module to the end of
 the chain. It passes only if the first error is in the expected declaration and is a proof
 failure (REJECTED), not an elaboration failure. Main's tree is never modified.
@@ -58,8 +58,8 @@ CONTROLS = [
      [replace(f'{R}/Encode/Encode.lean', '[(0x80026410, .w, 0x80014096)', '[(0x80026410, .w, 0x80014098)')],
      f'{R}/Encode/Encode.lean', 'encRom_ok'),
     ('image: encode_frame entry instruction misstated (addi sp,-0x40)',
-     [replace(f'{R}/Encode/Table.lean', '(0x80008d5c#32, E5R.Instr.opimm (E5R.AluOp.add) 2 2 0xffffffb0#32',
-              '(0x80008d5c#32, E5R.Instr.opimm (E5R.AluOp.add) 2 2 0xffffffc0#32')],
+     [replace(f'{R}/Encode/Table.lean', '(0x80008d5c#32, NoCompiler.Instr.opimm (NoCompiler.AluOp.add) 2 2 0xffffffb0#32',
+              '(0x80008d5c#32, NoCompiler.Instr.opimm (NoCompiler.AluOp.add) 2 2 0xffffffc0#32')],
      f'{R}/Encode/Encode.lean', 'encTbl_ok'),
     ('executor: older writes read through a non-disjoint newer write',
      [replace(f'{R}/Encode/Sym.lean', '    else if disj E b w\'.bytes a w.bytes then rdW E ws a w\n    else rdCat',

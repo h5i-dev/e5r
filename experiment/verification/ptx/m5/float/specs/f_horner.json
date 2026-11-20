@@ -1,5 +1,5 @@
 {
- "schema": "e5r.ptx.spec.v1",
+ "schema": "nocompiler.ptx.spec.v1",
  "kernel": "f_horner",
  "class": "map32",
  "element_type": "f32",

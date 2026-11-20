@@ -9,8 +9,8 @@ import Theories.Board.Hifive1Revb
 
 set_option maxRecDepth 100000
 
-namespace E5R.Controls
-open E5R
+namespace NoCompiler.Controls
+open NoCompiler
 
 abbrev B := Hifive1Revb.board
 
@@ -112,4 +112,4 @@ theorem irq_when_enabled : irqEnabled (core 0 0 (mie := true) (mieReg := 0x80)) 
 theorem only_enabled_source : irqEnabled (core 0 0 (mie := true) (mieReg := 0x80)) 11 = false := by
   decide +kernel
 
-end E5R.Controls
+end NoCompiler.Controls

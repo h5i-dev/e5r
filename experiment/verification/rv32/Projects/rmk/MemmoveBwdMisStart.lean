@@ -5,15 +5,15 @@
   the top `o` source bytes in `a5` (through the stack temporaries at
   sp+0x1a and sp+0x1c of the callee frame) and set up the loop registers.
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.MemmoveBwdMisLoop
 import Projects.rmk.MemmoveMisStart
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk
-open E5R E5R.Rmk.MemmoveFetch
+namespace NoCompiler.Rmk
+open NoCompiler NoCompiler.Rmk.MemmoveFetch
 
 /-- The core at the loop head 0x80021012 after a start block from `g`
     (at 0x80020e00); the RAM changed only at the temporaries. -/
@@ -735,4 +735,4 @@ theorem bstart3 (g : Core) (R : Word → BitVec 8) (hpc : g.pc = 0x80020e00) (hq
     have h31 : r ≠ 31 := fun e => hr (by subst e; decide)
     simp [b29, b28, b27, b26, b25, b24, b23, b22, b21, b20, b19, b18, b17, b16, b15, b14, b13, b12, b11, b10, b9, b8, b7, b6, b5, b4, b3, b2, b1, Core.wr_get_ne, h8, h12, h13, h15, h28, h29, h30, h31]
 
-end E5R.Rmk
+end NoCompiler.Rmk

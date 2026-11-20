@@ -5,14 +5,14 @@
   a concrete machine with the observed call-site layout satisfies `EncPre` (`encPre_witness`), and
   some real run from it reaches `EncPost` (`encode_reaches`).
 
-  Original e5r code, Apache-2.0.
+  Original nocompiler code, Apache-2.0.
 -/
 import Projects.rmk.Encode.Encode
 
 set_option maxRecDepth 100000
 
-namespace E5R.Rmk.Encode
-open E5R E5R.Rmk E5R.Rmk.Sym
+namespace NoCompiler.Rmk.Encode
+open NoCompiler NoCompiler.Rmk NoCompiler.Rmk.Sym
 
 /-- The entry registers as a valuation. -/
 def valR (m : Machine) : Nat → Word := fun q => if h : q < 32 then m.core.get ⟨q, h⟩ else 0
@@ -196,4 +196,4 @@ theorem lands_hits {P : Machine → Prop} :
 theorem encode_reaches : ∃ x evs, Reach B img (· = witMachine) x evs ∧ EncPost witMachine x :=
   lands_hits (encode_spec _ encPre_witness)
 
-end E5R.Rmk.Encode
+end NoCompiler.Rmk.Encode

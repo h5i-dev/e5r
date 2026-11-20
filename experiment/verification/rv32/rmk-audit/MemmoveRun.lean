@@ -2,7 +2,7 @@
   Audit (not a proof): run the emitted memmove of the pinned RMK image in the
   model on concrete inputs and compare the result with memmove's meaning.
 
-  Original e5r code, Apache-2.0. Independent of the proofs under
+  Original nocompiler code, Apache-2.0. Independent of the proofs under
   Projects/rmk: it uses only the model (`stepInstr`), the board, and the
   checker's reader applied to the runner-generated packed file. Execution
   evidence about chosen inputs; it proves nothing for other inputs.
@@ -18,9 +18,9 @@
 import Theories.Chunk
 import Theories.Board.QemuVirtRv32
 import Projects.rmk.Elf
-open E5R
+open NoCompiler
 
-def image : RamElf.Image := RamElf.imageOf 0x80000000 0x1000000 E5R.Rmk.Image.elf
+def image : RamElf.Image := RamElf.imageOf 0x80000000 0x1000000 NoCompiler.Rmk.Image.elf
 def img : List Segment := chunkImg 256 image.ro
 def B : Board := QemuVirtRv32.board image.rwBase
 
@@ -68,7 +68,7 @@ def case_ (name : String) (dst src n sp : Nat) (bd : Board := B) : IO Bool := do
     return inDst.isEmpty
 
 def main : IO UInt32 := do
-  IO.println s!"rwBase {image.rwBase}, reader accepts: {RamElf.accepts 0x80000000 0x1000000 E5R.Rmk.Image.elf}"
+  IO.println s!"rwBase {image.rwBase}, reader accepts: {RamElf.accepts 0x80000000 0x1000000 NoCompiler.Rmk.Image.elf}"
   let b := 0x80100000
   let sp := 0x80800000
   let mut ok := true

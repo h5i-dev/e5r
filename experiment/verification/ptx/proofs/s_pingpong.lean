@@ -1,4 +1,4 @@
-/- e5r-proof ptx=98e5d7357ce97b779e2ed7267c36d14b67db5d9bb1dcac5c52e44232c38449d6 spec=8f9da26877a81ec6873eb5d85d5cfc2c8848f380fa023b148eeda702bff5de9d toolchain=leanprover/lean4:v4.35.0 -/
+/- nocompiler-proof ptx=98e5d7357ce97b779e2ed7267c36d14b67db5d9bb1dcac5c52e44232c38449d6 spec=8f9da26877a81ec6873eb5d85d5cfc2c8848f380fa023b148eeda702bff5de9d toolchain=leanprover/lean4:v4.35.0 -/
 /-
 A supplied proof (experiment/docs/ptx.md, "Supplied proofs") for
 `m5/m4/kernels/s_pingpong.ptx`, a Hillis-Steele scan with two shared
@@ -19,16 +19,16 @@ the same. Round `k` reads buffer `k % 2` and writes buffer `(k+1) % 2`, so
 the window values `Scan32.V` of the library hold: after round `k`, buffer
 `(k+1) % 2` holds `V (k+1)` and buffer `k % 2` still holds `V k`.
 -/
-import E5rSpec
+import NoCompilerSpec
 
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
-namespace E5rProof
-open Ptx Ptx.Auto Ptx.Auto.Block Ptx.Auto.Scan32 E5rSpec
+namespace NoCompilerProof
+open Ptx Ptx.Auto Ptx.Auto.Block Ptx.Auto.Scan32 NoCompilerSpec
 open Ptx.Auto.Reduce32 (accUpTo_congr)
 
-abbrev K := E5rSpec.«s_pingpong»
+abbrev K := NoCompilerSpec.«s_pingpong»
 
 section
 variable (A : Block.Args spec)
@@ -88,7 +88,7 @@ def phased (m₀ : Mem) (sh₀ : Dim3 → Mem) : Phased where
 
 theorem fits_sb (hpre : Pre K A) :
     A.sb.toNat % 4 = 0 ∧ Fits A.sb 2048 ∧ A.B.toNat ≤ 1024 ∧ A.sb.toNat + 8192 ≤ 2 ^ 32 := by
-  have := A.sb_facts (K := K) (W := 2048) ⟨4, by simp [K, E5rSpec.«s_pingpong»], by decide, by decide,
+  have := A.sb_facts (K := K) (W := 2048) ⟨4, by simp [K, NoCompilerSpec.«s_pingpong»], by decide, by decide,
     by simp [spec]⟩ hpre.2.2.2.2.2.2.2.2.2.2.2
   have hB := hpre.2.1
   simp only [spec_maxJ] at hB
@@ -100,7 +100,7 @@ theorem fits_bf (hpre : Pre K A) (s : Nat) (hs : s < 2) : Fits (bf A s) A.B.toNa
   exact fits_tail f (by omega)
 
 theorem sb_alloc : ⟨A.sb, 4 * 2048⟩ ∈ (A.launch A.n.toNat).allocs K .shared :=
-  A.sb_alloc (K := K) (al := 4) (by simp [K, E5rSpec.«s_pingpong», spec])
+  A.sb_alloc (K := K) (al := 4) (by simp [K, NoCompilerSpec.«s_pingpong», spec])
 
 theorem lo32_ofInt_zero : lo32 (BitVec.ofInt 64 0) = 0 := by decide
 
@@ -119,7 +119,7 @@ theorem phase_load (hpre : Pre K A) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Tid
   have hcB' : t.ctaid.x.toNat * A.B.toNat < 2 ^ 32 := by omega
   have hg := A.gid_toNat hcB hGB
   refine (wpR_sound (cut := fun _ => false) ?_).weaken fun s h d hq => hq.1
-  simp only [ptx_eval, K, E5rSpec.«s_pingpong», Block.Args.launch, Block.Args.params, spec_input,
+  simp only [ptx_eval, K, NoCompilerSpec.«s_pingpong», Block.Args.launch, Block.Args.params, spec_input,
     spec_output, spec_length, mem, Phased.J, phased, foot, gid, ↓reduceIte, List.map_cons, List.map_nil]
   try simp only [show A.sh "_ZZ10s_pingpongE3buf" = A.sb from rfl]
   ptx_branches4
@@ -206,7 +206,7 @@ theorem phase_round (hpre : Pre K A) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Ti
   · subst hk0
     rw [foot_round A t hk]
     refine (wpR_sound (cut := fun _ => false) ?_).weaken fun s h d hq => hq.1
-    simp only [ptx_eval, K, E5rSpec.«s_pingpong», Block.Args.launch, Block.Args.params, spec_input,
+    simp only [ptx_eval, K, NoCompilerSpec.«s_pingpong», Block.Args.launch, Block.Args.params, spec_input,
       spec_output, spec_length, mem, Phased.J, phased, foot_round A t hk, hmin, hmin1, sm, gid,
       hr1, hr2, hr3, hr18, hr19, hrd2, hr51, ↓reduceIte, List.map_cons, List.map_nil,
       show (0 : Nat) ≠ A.j + 1 by omega, Nat.zero_mod, Nat.mul_zero, Nat.zero_add, Nat.pow_zero,
@@ -251,7 +251,7 @@ theorem phase_round (hpre : Pre K A) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Ti
     done
   · rw [foot_round A t hk]
     refine (wpR_sound (cut := fun _ => false) ?_).weaken fun s h d hq => hq.1
-    simp only [ptx_eval, K, E5rSpec.«s_pingpong», Block.Args.launch, Block.Args.params, spec_input,
+    simp only [ptx_eval, K, NoCompilerSpec.«s_pingpong», Block.Args.launch, Block.Args.params, spec_input,
       spec_output, spec_length, mem, Phased.J, phased, foot_round A t hk, hmin, hmin1, sm, gid,
       hr1, hr2, hr3, hr18, hr19, hrd2, hr48, hr51, ↓reduceIte, List.map_cons, List.map_nil,
       show k ≠ 0 by omega, show k + 1 ≠ 0 by omega, show k ≠ A.j + 1 by omega, Nat.add_sub_cancel]
@@ -343,7 +343,7 @@ theorem phase_store (hpre : Pre K A) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Ti
     | rw [show decide (A.n.toNat ≤ gid A t) = false from decide_eq_false (by omega)] at hp1
     | rw [show decide (A.n.toNat ≤ gid A t) = true from decide_eq_true (by omega)] at hp1
   · have hB1 := hR0 hj0
-    simp only [ptx_eval, K, E5rSpec.«s_pingpong», Block.Args.launch, Block.Args.params, spec_input,
+    simp only [ptx_eval, K, NoCompilerSpec.«s_pingpong», Block.Args.launch, Block.Args.params, spec_input,
       spec_output, spec_length, mem, Phased.J, phased, foot_store A t, gid, Nat.min_self,
       hr1, hr2, hr3, hr18, hr19, hrd2, hp1, hr51, ↓reduceIte, List.map_cons, List.map_nil,
       show ¬ (A.j + 1 + 1 < A.j + 2) by omega]
@@ -373,7 +373,7 @@ theorem phase_store (hpre : Pre K A) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Ti
          exact hrd)
     done
   · have hB1 := hR0 hj0
-    simp only [ptx_eval, K, E5rSpec.«s_pingpong», Block.Args.launch, Block.Args.params, spec_input,
+    simp only [ptx_eval, K, NoCompilerSpec.«s_pingpong», Block.Args.launch, Block.Args.params, spec_input,
       spec_output, spec_length, mem, Phased.J, phased, foot_store A t, gid, Nat.min_self,
       hr1, hr2, hr3, hr18, hr19, hrd2, hp1, hr51, ↓reduceIte, List.map_cons, List.map_nil,
       show ¬ (A.j + 1 + 1 < A.j + 2) by omega]
@@ -404,7 +404,7 @@ theorem phase_store (hpre : Pre K A) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Ti
     done
   · have h1 := hpw1 hj1
     have h2' := h2 hj1
-    simp only [ptx_eval, K, E5rSpec.«s_pingpong», Block.Args.launch, Block.Args.params, spec_input,
+    simp only [ptx_eval, K, NoCompilerSpec.«s_pingpong», Block.Args.launch, Block.Args.params, spec_input,
       spec_output, spec_length, mem, Phased.J, phased, foot_store A t, gid, Nat.min_self,
       hr1, hr2, hr3, hr18, hr19, hrd2, hp1, hr48, hr51, ↓reduceIte, List.map_cons, List.map_nil,
       show ¬ (A.j + 1 + 1 < A.j + 2) by omega]
@@ -436,7 +436,7 @@ theorem phase_store (hpre : Pre K A) (m₀ : Mem) (sh₀ : Dim3 → Mem) {t : Ti
 
   · have h1 := hpw1 hj1
     have h2' := h2 hj1
-    simp only [ptx_eval, K, E5rSpec.«s_pingpong», Block.Args.launch, Block.Args.params, spec_input,
+    simp only [ptx_eval, K, NoCompilerSpec.«s_pingpong», Block.Args.launch, Block.Args.params, spec_input,
       spec_output, spec_length, mem, Phased.J, phased, foot_store A t, gid, Nat.min_self,
       hr1, hr2, hr3, hr18, hr19, hrd2, hp1, hr48, hr51, ↓reduceIte, List.map_cons, List.map_nil,
       show ¬ (A.j + 1 + 1 < A.j + 2) by omega]
@@ -630,7 +630,7 @@ theorem ok (hpre : Pre K A) (m₀ : Mem) (sh₀ : Dim3 → Mem) (r₀ : Tid → 
 
 end
 
-theorem correct : E5rSpec.statement := by
+theorem correct : NoCompilerSpec.statement := by
   intro A hpre m₀ sh₀ r₀ p₀ L c₀
   have R := Phased.phase_sound (ok A hpre m₀ sh₀ r₀ p₀)
   have hB1 := hpre.1
@@ -675,4 +675,4 @@ theorem correct : E5rSpec.statement := by
     · rw [foot_store] at hwk
       exact hy _ hwk.2.1 hwk.2.2
 
-end E5rProof
+end NoCompilerProof
