@@ -196,6 +196,25 @@ pub enum Command {
         #[arg(long, value_name = "N")]
         fuel: Option<u64>,
     },
+    /// Diff a function's block/loop trees in two binaries: lockstep pairs and changed regions
+    /// for a refinement proof (docs/isa/refine.md).
+    Refine {
+        /// A, the original (the specification).
+        a: PathBuf,
+        /// B, the edited binary.
+        b: PathBuf,
+        /// The function (in A, and in B unless --func-b).
+        func: String,
+        /// The function's name in B.
+        #[arg(long, value_name = "NAME")]
+        func_b: Option<String>,
+        /// The Lean namespace of the generated file.
+        #[arg(long, value_name = "NS")]
+        namespace: Option<String>,
+        /// Write the certificate and regions as Lean here.
+        #[arg(short = 'o', value_name = "OUT.lean")]
+        out: Option<PathBuf>,
+    },
     /// Assemble structured text (what `disasm` prints) into a relocatable object (docs/isa/asm.md).
     Asm {
         /// The structured text.
@@ -718,7 +737,8 @@ impl Command {
             | Command::Module { .. }
             | Command::Ledger { .. }
             | Command::Asm { .. }
-            | Command::Sim { .. } => None,
+            | Command::Sim { .. }
+            | Command::Refine { .. } => None,
             Command::Project { .. } | Command::Ui { .. } => Some((out::When::Auto, false)),
             _ => {
                 let c = self.common();
@@ -753,7 +773,8 @@ impl Command {
             | Command::Module { .. }
             | Command::Ledger { .. }
             | Command::Asm { .. }
-            | Command::Sim { .. } => {
+            | Command::Sim { .. }
+            | Command::Refine { .. } => {
                 unreachable!("handled before a file is opened")
             }
             Command::Vtables { common, .. }
@@ -814,6 +835,22 @@ fn core(cli: &Cli, w: &mut out::Out) -> Option<Result<u8, String>> {
         } => cmd::module(file, namespace, out.as_deref(), &mut text),
         Command::Ledger { file, proofs } => cmd::ledger(file, proofs.as_deref(), &mut text),
         Command::Asm { file, out } => cmd::asm(file, out, &mut text),
+        Command::Refine {
+            a,
+            b,
+            func,
+            func_b,
+            namespace,
+            out,
+        } => cmd::refine(
+            a,
+            b,
+            func,
+            func_b.as_deref(),
+            namespace.as_deref(),
+            out.as_deref(),
+            &mut text,
+        ),
         Command::Sim {
             file,
             stdin,

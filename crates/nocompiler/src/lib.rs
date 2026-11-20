@@ -19,6 +19,7 @@ pub mod profile;
 pub mod sha256;
 pub mod sim;
 pub mod text;
+pub mod treediff;
 
 use profile::{Func, FuncMeta, Violation};
 use std::collections::BTreeSet;

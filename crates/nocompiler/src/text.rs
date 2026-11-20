@@ -43,6 +43,11 @@ const ABI: [&str; 32] = [
     "t5", "t6",
 ];
 
+/// A register's ABI name.
+pub fn reg_name(r: u8) -> &'static str {
+    ABI[r as usize & 31]
+}
+
 // ---------------------------------------------------------------- printing
 
 fn sym_ref(sym: &str, addend: i64) -> String {

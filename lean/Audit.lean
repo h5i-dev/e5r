@@ -126,6 +126,7 @@ example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] =
 #assert_standard_axioms Examples.Refine.Straight.live_temp_refuted
 #assert_standard_axioms NoCompiler.RRegion.ok_of_seqEquiv
 #assert_standard_axioms Examples.Refine.Straight.mulRegion_ok
+#assert_standard_axioms Examples.Refine.Diff.region0_ok
 #assert_bv_tier Examples.Refine.Straight.branchless_min
 #assert_bv_tier Examples.Refine.Straight.round8
 -- The control: the standard check rejects a bv_decide theorem.
@@ -159,7 +160,10 @@ def images : List (String × Code × List Segment) :=
    ("examples/demo/elf/sum.b.elf", Demo.Sum.ImageB.code, Demo.Sum.ImageB.segments),
    ("examples/demo/elf/cobs.b.elf", Demo.Cobs.ImageB.code, Demo.Cobs.ImageB.segments),
    ("examples/elf/sum.link1.elf", Examples.Link.Img1.code, Examples.Link.Img1.segments),
-   ("examples/elf/sum.link2.elf", Examples.Link.Img2.code, Examples.Link.Img2.segments)]
+   ("examples/elf/sum.link2.elf", Examples.Link.Img2.code, Examples.Link.Img2.segments),
+   ("examples/elf/refine-sum-a.elf", Examples.Refine.Diff.ImgA.code, Examples.Refine.Diff.ImgA.segments),
+   ("examples/elf/refine-sum-b.elf", Examples.Refine.Diff.ImgB.code, Examples.Refine.Diff.ImgB.segments),
+   ("examples/elf/refine-sum-c.elf", Examples.Refine.Diff.ImgC.code, Examples.Refine.Diff.ImgC.segments)]
 
 /-- Modules and the layouts their theorems are instantiated at, with the ELF
     each layout is read from (docs/isa/v1.md, criterion 3). -/

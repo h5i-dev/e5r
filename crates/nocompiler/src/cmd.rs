@@ -325,6 +325,69 @@ pub fn sim(
     })
 }
 
+/// `nocompiler refine A.elf B.elf FUNC [--func-b NAME] [--namespace NS -o OUT.lean]`:
+/// the diff of the two functions' block/loop trees (docs/isa/refine.md, item
+/// 5): the unchanged instructions as lockstep pairs and the changed
+/// intervals as regions, printed, and with `-o` as Lean.
+pub fn refine(
+    a_file: &Path,
+    b_file: &Path,
+    func: &str,
+    func_b: Option<&str>,
+    ns: Option<&str>,
+    dst: Option<&Path>,
+    out: &mut String,
+) -> Result<u8, String> {
+    let (ab, bb) = (read(a_file)?, read(b_file)?);
+    let (ba, bbn) = (crate::load(&ab)?, crate::load(&bb)?);
+    let pick = |bin: &crate::Binary,
+                name: &str,
+                file: &Path|
+     -> Result<(u64, Vec<u32>, Vec<crate::profile::Node>), String> {
+        let f = bin
+            .funcs
+            .iter()
+            .find(|f| f.name == name)
+            .ok_or_else(|| format!("{}: no function {name}", file.display()))?;
+        let r = bin
+            .check()
+            .into_iter()
+            .find(|r| r.entry == f.entry)
+            .unwrap();
+        let nodes = r
+            .result
+            .map(|m| m.nodes)
+            .map_err(|_| format!("{}: {name} is below L1", file.display()))?;
+        Ok((f.entry, f.words.clone(), nodes))
+    };
+    let (ea, wa, na) = pick(&ba, func, a_file)?;
+    let (eb, wb, nb) = pick(&bbn, func_b.unwrap_or(func), b_file)?;
+    let a = crate::treediff::Side {
+        entry: ea,
+        words: &wa,
+        nodes: &na,
+    };
+    let b = crate::treediff::Side {
+        entry: eb,
+        words: &wb,
+        nodes: &nb,
+    };
+    let d = crate::treediff::diff(&a, &b)?;
+    out.push_str(&crate::treediff::summary(&d, &a, &b));
+    if let Some(dst) = dst {
+        let ns = ns.ok_or("refine: -o needs --namespace NS")?;
+        let title = format!(
+            "{} in {} (A) against {} (B)",
+            func,
+            file_name(a_file),
+            file_name(b_file)
+        );
+        std::fs::write(dst, crate::treediff::lean(&d, &a, &b, ns, &title))
+            .map_err(|e| format!("{}: {e}", dst.display()))?;
+    }
+    Ok(0)
+}
+
 /// `nocompiler disasm FILE [FUNC]`: list the code with its block/loop
 /// structure; every function, or only the one named `only`.
 pub fn disasm(file: &Path, only: Option<&str>, out: &mut String) -> Result<u8, String> {

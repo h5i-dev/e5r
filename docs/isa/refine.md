@@ -121,11 +121,48 @@ instructions) = Zbb `min`; rounding up to 8 by shifts = by `andi`. Controls,
 refuted in the kernel by a counterexample: `slli 3` is not `slli 2`, and
 the strength reduction is not an equivalence when the temporary is live out.
 
+## Item 5: the tree diff (B)
+
+`nocompiler refine A.elf B.elf FUNC [--func-b NAME] [--namespace NS -o OUT.lean]`
+(`crates/nocompiler/src/treediff.rs`). It aligns the two functions' words
+(longest common subsequence of identical words). Runs of identical words
+become lockstep pairs; the gaps between them become changed intervals, each
+grown until it is an `RRegion`:
+
+- every branch of a pair targets a pair or a region's entry, or it joins
+  the region;
+- one entry: nothing outside jumps into the interior (the source joins);
+- one exit: nothing inside jumps out other than to the end (the target
+  joins);
+- no node cut: a region lies inside a block or loop of each tree, or covers
+  it whole.
+
+A `ret` inside a change is refused: a region has one exit. Live sets come
+from backward liveness on each side, with `Instr.uses`/`Instr.defs` as in
+RefineCongr.lean, and a return's observed registers live; a pair's set, and
+a region's live-in and live-out, are the union of the two sides'. The output
+is the data the proof is built from: `cert : Lockstep.Cert` (the pairs),
+`region<k> : RRegion` and `regions`, and for each straight-line region its
+two instruction lists, `region<k>_as` and `region<k>_bs`. None of it is
+trusted: the kernel checks the certificate and each region's proof.
+
+**Example** (`examples/refine/diff/`, `lean/Examples/Refine/Diff.lean`):
+
+- `sum` with the loop's `add` commuted: 8 pairs and 1 straight-line region,
+  which `region0_ok` proves Ok with `RRegion.ok_of_seqEquiv` and `seq_equiv`
+  (kernel tier), from the generated data and the two images.
+- `sum` with an extra instruction in the loop: the branch offsets move, so
+  the region is the whole block (6 instructions against 7, structured),
+  leaving 3 pairs. Proving it is item 4's.
+- `sum` against itself: 9 pairs, no region.
+
+`crates/nocompiler/tests/treediff.rs` checks these numbers and that the
+generated Lean is the committed one.
+
 ## Open (plan: STATUS-C)
 
 - **Item 3, paired execution (rest).** Same-shaped loops with relational invariants at the paired heads (by default, the live state is equal), as a way to prove `RRegion.Ok`.
 - **Item 6 (B), loads and stores** in straight-line sequences (above: registers only).
-- **Item 5 (B), tree diff.** `nocompiler refine A.elf B.elf FUNC`: pairs the two block/loop trees, prints the changed intervals, and writes the certificate and the obligations.
 - **Item 4, region equivalence.** A differently shaped interval is cut out as a subtree on both sides, with an exit relation (k:1 unrolling, local summaries). Assumptions not derivable from A become explicit, reported preconditions.
 - **Frames.** Memory equal outside the dead stack, with different frame layouts in A and B (after A's T2).
 - **Calls.**
