@@ -1,0 +1,275 @@
+{
+ "version": 1,
+ "tasks": [
+  {
+   "id": "r01-naive_count-peephole",
+   "function": "naive_count",
+   "driver": "bench_naive_count",
+   "symbol": "bytecount::naive::naive_count",
+   "what": "count the bytes of a slice equal to a needle (bytecount::naive_count)",
+   "family": "peephole",
+   "goal": "Peephole: replace instruction sequences by shorter or cheaper equivalent ones, without changing the control flow."
+  },
+  {
+   "id": "r02-naive_count-unroll",
+   "function": "naive_count",
+   "driver": "bench_naive_count",
+   "symbol": "bytecount::naive::naive_count",
+   "what": "count the bytes of a slice equal to a needle (bytecount::naive_count)",
+   "family": "unroll",
+   "goal": "Loop unrolling or reshaping: process several elements per iteration of the main loop (with the remainder handled), or restructure the loop."
+  },
+  {
+   "id": "r03-naive_count-algorithm",
+   "function": "naive_count",
+   "driver": "bench_naive_count",
+   "symbol": "bytecount::naive::naive_count",
+   "what": "count the bytes of a slice equal to a needle (bytecount::naive_count)",
+   "family": "algorithm",
+   "goal": "Algorithm replacement: compute the same result by a different algorithm (e.g. word-at-a-time / SWAR with Zbb orc.b, cpop, or a table)."
+  },
+  {
+   "id": "r04-naive_count_32-unroll",
+   "function": "naive_count_32",
+   "driver": "bench_naive_count_32",
+   "symbol": "bytecount::naive::naive_count_32",
+   "what": "the same, with a 32-bit counter (bytecount::naive_count_32)",
+   "family": "unroll",
+   "goal": "Loop unrolling or reshaping: process several elements per iteration of the main loop (with the remainder handled), or restructure the loop."
+  },
+  {
+   "id": "r05-naive_count_32-strength",
+   "function": "naive_count_32",
+   "driver": "bench_naive_count_32",
+   "symbol": "bytecount::naive::naive_count_32",
+   "what": "the same, with a 32-bit counter (bytecount::naive_count_32)",
+   "family": "strength",
+   "goal": "Strength reduction: replace multiplications, divisions or index computations by cheaper operations (shifts, Zba sh*add, pointer increments)."
+  },
+  {
+   "id": "r06-naive_count_32-algorithm",
+   "function": "naive_count_32",
+   "driver": "bench_naive_count_32",
+   "symbol": "bytecount::naive::naive_count_32",
+   "what": "the same, with a 32-bit counter (bytecount::naive_count_32)",
+   "family": "algorithm",
+   "goal": "Algorithm replacement: compute the same result by a different algorithm (e.g. word-at-a-time / SWAR with Zbb orc.b, cpop, or a table)."
+  },
+  {
+   "id": "r07-naive_num_chars-peephole",
+   "function": "naive_num_chars",
+   "driver": "bench_naive_num_chars",
+   "symbol": "bytecount::naive::naive_num_chars",
+   "what": "count the UTF-8 characters of a slice (bytecount::naive_num_chars)",
+   "family": "peephole",
+   "goal": "Peephole: replace instruction sequences by shorter or cheaper equivalent ones, without changing the control flow."
+  },
+  {
+   "id": "r08-naive_num_chars-unroll",
+   "function": "naive_num_chars",
+   "driver": "bench_naive_num_chars",
+   "symbol": "bytecount::naive::naive_num_chars",
+   "what": "count the UTF-8 characters of a slice (bytecount::naive_num_chars)",
+   "family": "unroll",
+   "goal": "Loop unrolling or reshaping: process several elements per iteration of the main loop (with the remainder handled), or restructure the loop."
+  },
+  {
+   "id": "r09-naive_num_chars-algorithm",
+   "function": "naive_num_chars",
+   "driver": "bench_naive_num_chars",
+   "symbol": "bytecount::naive::naive_num_chars",
+   "what": "count the UTF-8 characters of a slice (bytecount::naive_num_chars)",
+   "family": "algorithm",
+   "goal": "Algorithm replacement: compute the same result by a different algorithm (e.g. word-at-a-time / SWAR with Zbb orc.b, cpop, or a table)."
+  },
+  {
+   "id": "r10-adler32-check-removal",
+   "function": "adler32",
+   "driver": "bench_adler32",
+   "symbol": "<adler::Adler32>::write_slice",
+   "what": "the Adler-32 checksum (adler::adler32_slice)",
+   "family": "check-removal",
+   "goal": "Check removal: remove a test or branch that A performs but that cannot change the result (say why in a comment)."
+  },
+  {
+   "id": "r11-adler32-strength",
+   "function": "adler32",
+   "driver": "bench_adler32",
+   "symbol": "<adler::Adler32>::write_slice",
+   "what": "the Adler-32 checksum (adler::adler32_slice)",
+   "family": "strength",
+   "goal": "Strength reduction: replace multiplications, divisions or index computations by cheaper operations (shifts, Zba sh*add, pointer increments)."
+  },
+  {
+   "id": "r12-adler32-unroll",
+   "function": "adler32",
+   "driver": "bench_adler32",
+   "symbol": "<adler::Adler32>::write_slice",
+   "what": "the Adler-32 checksum (adler::adler32_slice)",
+   "family": "unroll",
+   "goal": "Loop unrolling or reshaping: process several elements per iteration of the main loop (with the remainder handled), or restructure the loop."
+  },
+  {
+   "id": "r13-fnv-strength",
+   "function": "fnv",
+   "driver": "bench_fnv",
+   "symbol": "bench_fnv",
+   "what": "the 64-bit FNV-1a hash of a slice (fnv::FnvHasher), inlined into its driver",
+   "family": "strength",
+   "goal": "Strength reduction: replace multiplications, divisions or index computations by cheaper operations (shifts, Zba sh*add, pointer increments)."
+  },
+  {
+   "id": "r14-fnv-unroll",
+   "function": "fnv",
+   "driver": "bench_fnv",
+   "symbol": "bench_fnv",
+   "what": "the 64-bit FNV-1a hash of a slice (fnv::FnvHasher), inlined into its driver",
+   "family": "unroll",
+   "goal": "Loop unrolling or reshaping: process several elements per iteration of the main loop (with the remainder handled), or restructure the loop."
+  },
+  {
+   "id": "r15-fnv-peephole",
+   "function": "fnv",
+   "driver": "bench_fnv",
+   "symbol": "bench_fnv",
+   "what": "the 64-bit FNV-1a hash of a slice (fnv::FnvHasher), inlined into its driver",
+   "family": "peephole",
+   "goal": "Peephole: replace instruction sequences by shorter or cheaper equivalent ones, without changing the control flow."
+  },
+  {
+   "id": "r16-xxh64-peephole",
+   "function": "xxh64",
+   "driver": "bench_xxh64",
+   "symbol": "bench_xxh64",
+   "what": "XXH64 of a slice (twox_hash::XxHash64::oneshot), inlined into its driver",
+   "family": "peephole",
+   "goal": "Peephole: replace instruction sequences by shorter or cheaper equivalent ones, without changing the control flow."
+  },
+  {
+   "id": "r17-xxh64-unroll",
+   "function": "xxh64",
+   "driver": "bench_xxh64",
+   "symbol": "bench_xxh64",
+   "what": "XXH64 of a slice (twox_hash::XxHash64::oneshot), inlined into its driver",
+   "family": "unroll",
+   "goal": "Loop unrolling or reshaping: process several elements per iteration of the main loop (with the remainder handled), or restructure the loop."
+  },
+  {
+   "id": "r18-xxh64-check-removal",
+   "function": "xxh64",
+   "driver": "bench_xxh64",
+   "symbol": "bench_xxh64",
+   "what": "XXH64 of a slice (twox_hash::XxHash64::oneshot), inlined into its driver",
+   "family": "check-removal",
+   "goal": "Check removal: remove a test or branch that A performs but that cannot change the result (say why in a comment)."
+  },
+  {
+   "id": "r19-xxh32-peephole",
+   "function": "xxh32",
+   "driver": "bench_xxh32",
+   "symbol": "bench_xxh32",
+   "what": "XXH32 of a slice (twox_hash::XxHash32::oneshot), inlined into its driver",
+   "family": "peephole",
+   "goal": "Peephole: replace instruction sequences by shorter or cheaper equivalent ones, without changing the control flow."
+  },
+  {
+   "id": "r20-xxh32-unroll",
+   "function": "xxh32",
+   "driver": "bench_xxh32",
+   "symbol": "bench_xxh32",
+   "what": "XXH32 of a slice (twox_hash::XxHash32::oneshot), inlined into its driver",
+   "family": "unroll",
+   "goal": "Loop unrolling or reshaping: process several elements per iteration of the main loop (with the remainder handled), or restructure the loop."
+  },
+  {
+   "id": "r21-xxh32-strength",
+   "function": "xxh32",
+   "driver": "bench_xxh32",
+   "symbol": "bench_xxh32",
+   "what": "XXH32 of a slice (twox_hash::XxHash32::oneshot), inlined into its driver",
+   "family": "strength",
+   "goal": "Strength reduction: replace multiplications, divisions or index computations by cheaper operations (shifts, Zba sh*add, pointer increments)."
+  },
+  {
+   "id": "r22-hex-algorithm",
+   "function": "hex",
+   "driver": "bench_hex",
+   "symbol": "bench_hex",
+   "what": "hex-encode a slice (hex::encode_to_slice), inlined into its driver",
+   "family": "algorithm",
+   "goal": "Algorithm replacement: compute the same result by a different algorithm (e.g. word-at-a-time / SWAR with Zbb orc.b, cpop, or a table)."
+  },
+  {
+   "id": "r23-hex-unroll",
+   "function": "hex",
+   "driver": "bench_hex",
+   "symbol": "bench_hex",
+   "what": "hex-encode a slice (hex::encode_to_slice), inlined into its driver",
+   "family": "unroll",
+   "goal": "Loop unrolling or reshaping: process several elements per iteration of the main loop (with the remainder handled), or restructure the loop."
+  },
+  {
+   "id": "r24-hex-check-removal",
+   "function": "hex",
+   "driver": "bench_hex",
+   "symbol": "bench_hex",
+   "what": "hex-encode a slice (hex::encode_to_slice), inlined into its driver",
+   "family": "check-removal",
+   "goal": "Check removal: remove a test or branch that A performs but that cannot change the result (say why in a comment)."
+  },
+  {
+   "id": "r25-memset-algorithm",
+   "function": "memset",
+   "driver": "bench_memset",
+   "symbol": "memset",
+   "what": "compiler-builtins' memset",
+   "family": "algorithm",
+   "goal": "Algorithm replacement: compute the same result by a different algorithm (e.g. word-at-a-time / SWAR with Zbb orc.b, cpop, or a table)."
+  },
+  {
+   "id": "r26-memset-unroll",
+   "function": "memset",
+   "driver": "bench_memset",
+   "symbol": "memset",
+   "what": "compiler-builtins' memset",
+   "family": "unroll",
+   "goal": "Loop unrolling or reshaping: process several elements per iteration of the main loop (with the remainder handled), or restructure the loop."
+  },
+  {
+   "id": "r27-bcmp-algorithm",
+   "function": "bcmp",
+   "driver": "bench_bcmp",
+   "symbol": "bcmp",
+   "what": "compiler-builtins' bcmp (memcmp)",
+   "family": "algorithm",
+   "goal": "Algorithm replacement: compute the same result by a different algorithm (e.g. word-at-a-time / SWAR with Zbb orc.b, cpop, or a table)."
+  },
+  {
+   "id": "r28-bcmp-check-removal",
+   "function": "bcmp",
+   "driver": "bench_bcmp",
+   "symbol": "bcmp",
+   "what": "compiler-builtins' bcmp (memcmp)",
+   "family": "check-removal",
+   "goal": "Check removal: remove a test or branch that A performs but that cannot change the result (say why in a comment)."
+  },
+  {
+   "id": "r29-strlen-algorithm",
+   "function": "strlen",
+   "driver": "bench_strlen",
+   "symbol": "strlen",
+   "what": "compiler-builtins' strlen",
+   "family": "algorithm",
+   "goal": "Algorithm replacement: compute the same result by a different algorithm (e.g. word-at-a-time / SWAR with Zbb orc.b, cpop, or a table)."
+  },
+  {
+   "id": "r30-strlen-unroll",
+   "function": "strlen",
+   "driver": "bench_strlen",
+   "symbol": "strlen",
+   "what": "compiler-builtins' strlen",
+   "family": "unroll",
+   "goal": "Loop unrolling or reshaping: process several elements per iteration of the main loop (with the remainder handled), or restructure the loop."
+  }
+ ]
+}

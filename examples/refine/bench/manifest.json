@@ -1,0 +1,90 @@
+{
+ "adler32": {
+  "driver": "bench_adler32",
+  "elf": "examples/elf/bench-adler32.elf",
+  "functions": 3,
+  "level": "L1",
+  "sha256": "2ab813e1d297876378f3de36df6a51b4cb9cbcb3588037ec2608ede64bbb2f68",
+  "symbol": "_RNvMCsbaf82rQuSkW_5adlerNtB2_7Adler3211write_slice"
+ },
+ "bcmp": {
+  "driver": "bench_bcmp",
+  "elf": "examples/elf/bench-bcmp.elf",
+  "functions": 2,
+  "level": "L2",
+  "sha256": "aef5ecde7f998136d68b9633ce1226dc862310c2431c0329a530f6500df4b1a8",
+  "symbol": "bcmp"
+ },
+ "fnv": {
+  "driver": "bench_fnv",
+  "elf": "examples/elf/bench-fnv.elf",
+  "functions": 1,
+  "level": "L2",
+  "sha256": "0ec447cce7476e7a6df653ffa3c48b088c382446e7a0099853eef939ac2e0cd0",
+  "symbol": "bench_fnv"
+ },
+ "hex": {
+  "driver": "bench_hex",
+  "elf": "examples/elf/bench-hex.elf",
+  "functions": 1,
+  "level": "L2",
+  "sha256": "2b43cc1f222cfd174b577fe1cea597736ef478671de3a5c69f64d9affdc9224f",
+  "symbol": "bench_hex"
+ },
+ "memset": {
+  "driver": "bench_memset",
+  "elf": "examples/elf/bench-memset.elf",
+  "functions": 2,
+  "level": "L2",
+  "sha256": "2fd7f0988b2744c60026cfd4ba03f30d55706b73d3b38345fc8fd47286fdfef7",
+  "symbol": "memset"
+ },
+ "naive_count": {
+  "driver": "bench_naive_count",
+  "elf": "examples/elf/bench-naive_count.elf",
+  "functions": 2,
+  "level": "L2",
+  "sha256": "e58e01db0435de056302b419c16a6fbf28da16dc6f72ab1db0dc627bdd88408d",
+  "symbol": "_RNvNtCsg1gXY7vjCCS_9bytecount5naive11naive_count"
+ },
+ "naive_count_32": {
+  "driver": "bench_naive_count_32",
+  "elf": "examples/elf/bench-naive_count_32.elf",
+  "functions": 2,
+  "level": "L2",
+  "sha256": "7cc32c2b8d7f4f702899836e287e9bc1e264c9d04f3954aa9f6ed8f54a17cb9f",
+  "symbol": "_RNvNtCsg1gXY7vjCCS_9bytecount5naive14naive_count_32"
+ },
+ "naive_num_chars": {
+  "driver": "bench_naive_num_chars",
+  "elf": "examples/elf/bench-naive_num_chars.elf",
+  "functions": 2,
+  "level": "L2",
+  "sha256": "8c3a28944682fd0b48bac5f553e6f26576f5cd48f4789dcb60d77368b08c726c",
+  "symbol": "_RNvNtCsg1gXY7vjCCS_9bytecount5naive15naive_num_chars"
+ },
+ "strlen": {
+  "driver": "bench_strlen",
+  "elf": "examples/elf/bench-strlen.elf",
+  "functions": 2,
+  "level": "L2",
+  "sha256": "fe7e676991c3cc23a7376f03e69932c060245c6398381a934e10bd9a7d3b3384",
+  "symbol": "strlen"
+ },
+ "xxh32": {
+  "driver": "bench_xxh32",
+  "elf": "examples/elf/bench-xxh32.elf",
+  "functions": 1,
+  "level": "L2",
+  "sha256": "cba52202e2ba7b85a9edecc1517624c4f91674be29dfd614d45ede6881dc096a",
+  "symbol": "bench_xxh32"
+ },
+ "xxh64": {
+  "driver": "bench_xxh64",
+  "elf": "examples/elf/bench-xxh64.elf",
+  "functions": 1,
+  "level": "L2",
+  "sha256": "f20e71d40e5a9deb6f777f9ed9fa8d34377623f4093d1ee05a8d62ec9cabc8ca",
+  "symbol": "bench_xxh64"
+ }
+}

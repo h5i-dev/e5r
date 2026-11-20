@@ -169,8 +169,12 @@ pub fn of_binary(bin: &Binary) -> Result<Module, String> {
                         f.entry + 4 * j as u64
                     ));
                 }
+                // Across branches too (clang and rustc hoist an auipc above a
+                // branch): until the register is written again. A wrong
+                // attribution would disagree on the low part, and the module
+                // audit relinks and compares every byte.
                 let (_, w) = reads_or_writes(&i, rd);
-                if w || matches!(i, Instr::Branch(..) | Instr::Jal(..) | Instr::Jalr(..)) {
+                if w || matches!(i, Instr::Jalr(..)) {
                     break;
                 }
             }
