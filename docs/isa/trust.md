@@ -10,7 +10,7 @@ trusting the following, and nothing else.
 | --- | --- | --- |
 | The Lean 4 kernel (v4.35.0) | `lean/lean-toolchain` | The kernel is small and widely used; `lean/Audit.lean` fails the build if a listed theorem uses an axiom beyond `propext`, `Classical.choice` and `Quot.sound` |
 | Instruction decoding | `lean/E5R/Isa.lean` | Against llvm-mc (`crates/e5r/tests/decode.rs`, through the Rust decoder) and against the Rust decoder directly (`crates/e5r/tests/semantics.rs`) |
-| Instruction semantics | `lean/E5R/Machine.lean` | Against qemu-riscv64 on random programs over every instruction (`crates/e5r/tests/semantics.rs`) |
+| Instruction semantics | `lean/E5R/Machine.lean` | Against qemu-riscv64 (`crates/e5r/tests/semantics.rs`) and against the official Sail RISC-V model's C emulator (`crates/e5r/tests/sail.rs`), each on random programs over every instruction |
 | The machine model | `HwStep` in `lean/E5R/Step.lean` | By reading: fetch from memory, decode, execute, or hand ECALL to the environment |
 | The environment model | `lean/E5R/Env.lean` | By reading against the Linux syscall ABI; its assumptions are listed in [environment.md](environment.md) |
 | The meaning of the definitions a theorem is stated with | `Reach`, `Exec`, `Spec`, `Verified`, `Preserved`, `Entry` | By reading [spec.md](spec.md) and the files |
@@ -49,6 +49,10 @@ trusting the following, and nothing else.
 
 - The link between the ELF file and the process image (that the loader maps
   `.text` at its address) is an assumption, `Code.Loaded`.
-- Nothing checks the semantics against the official Sail model of RISC-V
-  yet; qemu is the oracle. Generating the Lean definitions from Sail and
-  proving them equal to these is on the [roadmap](../ROADMAP.md).
+- The semantics are tested against the Sail model, not proved equal to it.
+  The test runs the C emulator generated from Sail (release
+  2026-11-16-a2ad4b5) on random programs; it covers what the programs
+  exercise, every instruction with chosen and random operands, not every
+  state. Proving `E5R.exec` equal to the Lean that Sail's Lean backend
+  generates is on the [roadmap](../ROADMAP.md); it needs the Sail toolchain
+  (OCaml, opam) built here, and the generated model is large.

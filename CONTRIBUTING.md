@@ -71,8 +71,9 @@ bash devinfra/scripts/check-determinism.sh      # the same input must give the s
 ```
 
 The core's oracle tests (`crates/e5r/tests`) need llvm-mc, clang, ld.lld,
-qemu-riscv64 and lake; each tool can be named by an environment variable
-(`LLVM_MC`, `CLANG`, `LLD`, `QEMU_RISCV64`, `LAKE`). A test whose tool is
+qemu-riscv64, lake and the Sail RISC-V emulator; each tool can be named by an
+environment variable (`LLVM_MC`, `CLANG`, `LLD`, `QEMU_RISCV64`, `LAKE`,
+`SAIL_RISCV_SIM`; the CI workflow shows which Sail release). A test whose tool is
 missing prints `SKIPPED` and its reason.
 
 Where things go: the core is `crates/e5r`, `lean/`, `examples/` and

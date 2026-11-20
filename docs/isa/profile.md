@@ -73,8 +73,9 @@ the model smaller than the hardware, never larger:
   multiple of 4 has no successor (instruction-address-misaligned: there is no
   C extension).
 
-The semantics are compared with qemu-riscv64 on random programs covering
-every instruction (`crates/e5r/tests/semantics.rs`).
+The semantics are compared with qemu-riscv64 (`crates/e5r/tests/semantics.rs`)
+and with the C emulator generated from the official Sail RISC-V model
+(`crates/e5r/tests/sail.rs`), on random programs covering every instruction.
 
 ## 4. Structural rules
 

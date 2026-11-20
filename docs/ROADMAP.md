@@ -43,7 +43,8 @@ milestones and its "not building" list, is kept as
 | The structural checker in Lean (R1 to R3), `<name>_checked` theorems for every exported function, and `Struct.cfi`: a checked function only transfers control as the rules allow | done |
 | R4 and R5 (registers, stack discipline) in Lean | next |
 | Loop invariants placed from `.e5r.struct` by the tactics instead of by hand | next |
-| Lean semantics generated from the Sail RISC-V model and proved equal to `E5R.exec` | planned |
+| Differential test against the Sail RISC-V model's C emulator (pinned release), random programs over every instruction | done |
+| Lean semantics generated from the Sail RISC-V model (its Lean backend) and proved equal to `E5R.exec` | planned: needs the Sail toolchain built (OCaml 5, opam) and a generated model of tens of thousands of lines |
 
 ## Version 1
 

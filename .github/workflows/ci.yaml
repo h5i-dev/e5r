@@ -29,7 +29,7 @@ concurrency:
 # apt options below retain retries and fail with the actual download error.
 jobs:
   # The core: the e5r tool's tests with every oracle installed (llvm-mc for the
-  # decoder, qemu-riscv64 and Lean for the semantics), then the Lean library,
+  # decoder, qemu-riscv64 and the Sail model for the semantics), then the Lean library,
   # the example proofs and their audit, then the example build compared with
   # the committed binaries.
   core:
@@ -48,6 +48,15 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/leanprover/elan/v4.1.2/elan-init.sh -o elan-init.sh
           sh elan-init.sh -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      # The Sail RISC-V model's C emulator, pinned by release and checksum:
+      # the oracle for crates/e5r/tests/sail.rs.
+      - name: Sail RISC-V emulator (2026-11-16-a2ad4b5)
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/sail.tar.gz" \
+            https://github.com/riscv/sail-riscv/releases/download/2026-11-16-a2ad4b5/sail-riscv-Linux-x86_64.tar.gz
+          echo "c84d705711319112888f91315f3e4d93843b5b9c0de7f0dceac5f438d013c1dc  $RUNNER_TEMP/sail.tar.gz" | sha256sum -c
+          tar -xzf "$RUNNER_TEMP/sail.tar.gz" -C "$RUNNER_TEMP"
+          echo "SAIL_RISCV_SIM=$RUNNER_TEMP/sail-riscv-Linux-x86_64/bin/sail_riscv_sim" >> "$GITHUB_ENV"
       - name: Lean library, example proofs and the axiom audit
         working-directory: lean
         run: lake build
