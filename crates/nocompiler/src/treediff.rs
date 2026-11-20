@@ -44,6 +44,68 @@ pub struct Region {
     pub live_out: Vec<u8>,
     /// Both sides are register instructions only (`RRegion.ok_of_seqEquiv` applies).
     pub straight: bool,
+    /// A straight-line region whose two sides differ on a live-out register
+    /// when run from the same registers (random tests): the register. Its
+    /// `Ok` is not attempted; B is likely wrong there (or the live set too
+    /// large).
+    pub differs: Option<u8>,
+}
+
+/// Run a sequence of register instructions on a register file.
+fn run_alu(is: &[Instr], g: &mut [u64; 32]) {
+    for i in is {
+        let r = *g;
+        if let Some((rd, v)) =
+            crate::sim::alu(i, &|x: Reg| if x.0 == 0 { 0 } else { r[x.0 as usize] })
+            && rd.0 != 0
+        {
+            g[rd.0 as usize] = v;
+        }
+    }
+}
+
+/// A live-out register on which the two sequences differ from equal
+/// registers, by random (and edge-value) tests; deterministic.
+fn differs(a: &[u32], b: &[u32], out: &[u8]) -> Option<u8> {
+    let dec = |w: &[u32]| -> Vec<Instr> { w.iter().filter_map(|x| isa::decode(*x)).collect() };
+    let (ia, ib) = (dec(a), dec(b));
+    let mut seed: u64 = 0x9e37_79b9_7f4a_7c15;
+    let edges = [
+        0u64,
+        1,
+        2,
+        u64::MAX,
+        1 << 63,
+        (1 << 63) - 1,
+        0xff,
+        0x8000_0000,
+        0xffff_ffff,
+    ];
+    for t in 0..256 {
+        let mut g = [0u64; 32];
+        for v in g.iter_mut().skip(1) {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            *v = if t % 4 == 0 {
+                edges[(seed % edges.len() as u64) as usize]
+            } else if t % 4 == 1 {
+                seed & 0xff
+            } else {
+                seed
+            };
+        }
+        let (mut ga, mut gb) = (g, g);
+        run_alu(&ia, &mut ga);
+        run_alu(&ib, &mut gb);
+        if let Some(&r) = out
+            .iter()
+            .find(|&&r| r != 0 && ga[r as usize] != gb[r as usize])
+        {
+            return Some(r);
+        }
+    }
+    None
 }
 
 /// The result: lockstep pairs (A index, B index, live registers) and regions.
@@ -346,37 +408,58 @@ pub fn diff(a: &Side, b: &Side) -> Result<Diff, String> {
                     un(i, j)
                 }
             };
+            let alu = |w: &[u32], lo: usize, hi: usize| {
+                w[lo..hi].iter().all(|x| {
+                    isa::decode(*x).is_some_and(|i| {
+                        matches!(
+                            i,
+                            Instr::Lui(..)
+                                | Instr::IOp(..)
+                                | Instr::Addiw(..)
+                                | Instr::Shift(..)
+                                | Instr::ShiftW(..)
+                                | Instr::ROp(..)
+                                | Instr::RWOp(..)
+                                | Instr::UOp(..)
+                        )
+                    })
+                })
+            };
             let regions = rs
                 .iter()
-                .map(|&(a0, a1, b0, b1)| {
-                    let alu = |w: &[u32], lo: usize, hi: usize| {
-                        w[lo..hi].iter().all(|x| {
-                            isa::decode(*x).is_some_and(|i| {
-                                matches!(
-                                    i,
-                                    Instr::Lui(..)
-                                        | Instr::IOp(..)
-                                        | Instr::Addiw(..)
-                                        | Instr::Shift(..)
-                                        | Instr::ShiftW(..)
-                                        | Instr::ROp(..)
-                                        | Instr::RWOp(..)
-                                        | Instr::UOp(..)
-                                )
-                            })
-                        })
-                    };
-                    Region {
-                        a0,
-                        a1,
-                        b0,
-                        b1,
-                        live_in: un(a0, b0),
-                        live_out: at_exit(a1, b1),
-                        straight: alu(a.words, a0, a1) && alu(b.words, b0, b1),
-                    }
+                .map(|&(a0, a1, b0, b1)| Region {
+                    a0,
+                    a1,
+                    b0,
+                    b1,
+                    live_in: un(a0, b0),
+                    live_out: at_exit(a1, b1),
+                    straight: alu(a.words, a0, a1) && alu(b.words, b0, b1),
+                    differs: None,
                 })
-                .collect();
+                .collect::<Vec<Region>>();
+            // A straight-line region whose sides differ at its exit may agree
+            // further on (`xor; sltiu` against `sub; sltiu`: a4 differs after
+            // the first instruction, not after the second): take in the next
+            // pair while it is a register instruction, and settle again.
+            let mut regions = regions;
+            let mut grown = false;
+            for r in regions.iter_mut().filter(|r| r.straight) {
+                r.differs = differs(&a.words[r.a0..r.a1], &b.words[r.b0..r.b1], &r.live_out);
+                if r.differs.is_some()
+                    && r.a1 < na
+                    && r.b1 < nb
+                    && paired(r.a1, r.b1)
+                    && alu(a.words, r.a1, r.a1 + 1)
+                {
+                    drop.insert((r.a1, r.b1));
+                    grown = true;
+                }
+            }
+            if grown {
+                pairs.retain(|p| !drop.contains(p));
+                continue;
+            }
             let pairs = pairs.iter().map(|&(i, j)| (i, j, un(i, j))).collect();
             return Ok(Diff { pairs, regions });
         }
@@ -525,7 +608,7 @@ pub fn lean(
         };
         let (mut hyps, mut uses) = (Vec::new(), Vec::new());
         for (k, r) in d.regions.iter().enumerate() {
-            if r.straight {
+            if r.straight && r.differs.is_none() {
                 let _ = writeln!(
                     o,
                     "\ntheorem region{k}_ok : region{k}.Ok {ca} {cb} := by\n  {tac} region{k} [{}]\n    [{}]",
@@ -588,10 +671,13 @@ pub fn summary(d: &Diff, a: &Side, b: &Side) -> String {
             b.entry + 4 * r.b0 as u64,
             b.entry + 4 * r.b1 as u64,
             r.b1 - r.b0,
-            if r.straight {
-                "straight-line"
-            } else {
-                "structured (subtree)"
+            match (r.straight, r.differs) {
+                (true, None) => "straight-line".to_string(),
+                (true, Some(x)) => format!(
+                    "straight-line, DIFFERS on {} from equal registers",
+                    crate::text::reg_name(x)
+                ),
+                _ => "structured (subtree)".to_string(),
             },
             r.live_in
                 .iter()

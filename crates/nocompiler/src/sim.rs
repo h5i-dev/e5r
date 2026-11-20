@@ -246,6 +246,58 @@ fn eval_u(op: UOp, x: u64) -> u64 {
 }
 
 /// The registers an instruction reads.
+/// A register instruction's result: the register it writes and the value,
+/// from the source registers' values (`None` for any other instruction).
+pub(crate) fn alu(i: &Instr, rx: &dyn Fn(Reg) -> u64) -> Option<(Reg, u64)> {
+    match *i {
+        Instr::Lui(rd, im) => Some((rd, sext((im.value as u64) << 12, 32))),
+        Instr::IOp(op, rd, rs1, im) => {
+            let (v, k) = (rx(rs1), imm(im));
+            Some((
+                rd,
+                match op {
+                    IOp::Addi => v.wrapping_add(k),
+                    IOp::Slti => ((v as i64) < (k as i64)) as u64,
+                    IOp::Sltiu => (v < k) as u64,
+                    IOp::Xori => v ^ k,
+                    IOp::Ori => v | k,
+                    IOp::Andi => v & k,
+                },
+            ))
+        }
+        Instr::Addiw(rd, rs1, im) => Some((rd, sext32(rx(rs1).wrapping_add(imm(im))))),
+        Instr::Shift(op, rd, rs1, sh) => {
+            let (v, n) = (rx(rs1), sh.value);
+            Some((
+                rd,
+                match op {
+                    ShOp::Slli => v << n,
+                    ShOp::Srli => v >> n,
+                    ShOp::Srai => ((v as i64) >> n) as u64,
+                    ShOp::Rori => v.rotate_right(n),
+                    ShOp::Slliuw => (v & 0xffff_ffff) << n,
+                },
+            ))
+        }
+        Instr::ShiftW(op, rd, rs1, sh) => {
+            let (v, n) = (rx(rs1) as u32, sh.value);
+            Some((
+                rd,
+                sext32(match op {
+                    ShWOp::Slliw => (v << n) as u64,
+                    ShWOp::Srliw => (v >> n) as u64,
+                    ShWOp::Sraiw => ((v as i32) >> n) as u32 as u64,
+                    ShWOp::Roriw => v.rotate_right(n) as u64,
+                }),
+            ))
+        }
+        Instr::ROp(op, rd, a, b) => Some((rd, eval_r(op, rx(a), rx(b)))),
+        Instr::RWOp(op, rd, a, b) => Some((rd, eval_rw(op, rx(a), rx(b)))),
+        Instr::UOp(op, rd, rs1) => Some((rd, eval_u(op, rx(rs1)))),
+        _ => None,
+    }
+}
+
 fn sources(i: &Instr) -> [Option<Reg>; 2] {
     match *i {
         Instr::Jalr(_, a, _)
@@ -375,7 +427,14 @@ pub fn run(
         let mut dest: Option<(Reg, u64)> = None;
         let mut fault = None;
         match i {
-            Instr::Lui(rd, im) => dest = Some((rd, sext((im.value as u64) << 12, 32))),
+            Instr::Lui(..)
+            | Instr::IOp(..)
+            | Instr::Addiw(..)
+            | Instr::Shift(..)
+            | Instr::ShiftW(..)
+            | Instr::ROp(..)
+            | Instr::RWOp(..)
+            | Instr::UOp(..) => dest = alu(&i, &rx),
             Instr::Auipc(rd, im) => {
                 dest = Some((rd, pc.wrapping_add(sext((im.value as u64) << 12, 32))))
             }
@@ -466,49 +525,6 @@ pub fn run(
                     mem.write(a, rx(rs2), n);
                 }
             }
-            Instr::IOp(op, rd, rs1, im) => {
-                let (v, k) = (rx(rs1), imm(im));
-                dest = Some((
-                    rd,
-                    match op {
-                        IOp::Addi => v.wrapping_add(k),
-                        IOp::Slti => ((v as i64) < (k as i64)) as u64,
-                        IOp::Sltiu => (v < k) as u64,
-                        IOp::Xori => v ^ k,
-                        IOp::Ori => v | k,
-                        IOp::Andi => v & k,
-                    },
-                ));
-            }
-            Instr::Addiw(rd, rs1, im) => dest = Some((rd, sext32(rx(rs1).wrapping_add(imm(im))))),
-            Instr::Shift(op, rd, rs1, sh) => {
-                let (v, n) = (rx(rs1), sh.value);
-                dest = Some((
-                    rd,
-                    match op {
-                        ShOp::Slli => v << n,
-                        ShOp::Srli => v >> n,
-                        ShOp::Srai => ((v as i64) >> n) as u64,
-                        ShOp::Rori => v.rotate_right(n),
-                        ShOp::Slliuw => (v & 0xffff_ffff) << n,
-                    },
-                ));
-            }
-            Instr::ShiftW(op, rd, rs1, sh) => {
-                let (v, n) = (rx(rs1) as u32, sh.value);
-                dest = Some((
-                    rd,
-                    sext32(match op {
-                        ShWOp::Slliw => (v << n) as u64,
-                        ShWOp::Srliw => (v >> n) as u64,
-                        ShWOp::Sraiw => ((v as i32) >> n) as u32 as u64,
-                        ShWOp::Roriw => v.rotate_right(n) as u64,
-                    }),
-                ));
-            }
-            Instr::ROp(op, rd, a, b) => dest = Some((rd, eval_r(op, rx(a), rx(b)))),
-            Instr::RWOp(op, rd, a, b) => dest = Some((rd, eval_rw(op, rx(a), rx(b)))),
-            Instr::UOp(op, rd, rs1) => dest = Some((rd, eval_u(op, rx(rs1)))),
             Instr::Ecall => {
                 r.ecalls += 1;
                 match x[17] {

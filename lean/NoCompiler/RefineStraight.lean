@@ -156,17 +156,17 @@ macro "seq_equiv_split" : tactic => `(tactic| (
   simp only [runRegs, Instr.aluOut, RegFile.get, RegFile.set, evalI, evalR, evalRW, evalSh, evalShW, evalU, bool64,
     Fin.isValue, Fin.reduceEq, ite_true, ite_false, reduceIte] at hin ⊢
   simp only [hin]
-  repeat' constructor))
+  repeat' apply And.intro))
 
 /-- Kernel tier: standard axioms only. -/
 macro "seq_equiv" : tactic => `(tactic| (
   seq_equiv_split
-  all_goals first | rfl | (bv_normalize; done) | bv_omega | (simp; done) | ac_rfl))
+  all_goals first | with_reducible rfl | (bv_normalize; done) | bv_omega | (simp; done) | ac_rfl))
 
 /-- With `bv_decide` where the kernel tier fails: the theorem depends on an
     axiom of native computation (docs/isa/trust.md, the bv_decide tier). -/
 macro "seq_equiv_bv" : tactic => `(tactic| (
   seq_equiv_split
-  all_goals first | rfl | (bv_normalize; done) | bv_omega | (simp; done) | ac_rfl | bv_decide))
+  all_goals first | with_reducible rfl | (bv_normalize; done) | bv_omega | (simp; done) | ac_rfl | bv_decide))
 
 end NoCompiler

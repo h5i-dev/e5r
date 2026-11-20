@@ -83,6 +83,23 @@ fn an_inserted_instruction_is_a_straight_line_region_with_jump_pairs() {
 }
 
 #[test]
+fn a_region_grows_until_its_sides_agree() {
+    // D steps the counter by -2 then +1: `addi a1,-1` against `addi a1,-2`
+    // alone differs on a1; with the next pair and D's extra `addi a1,1` it
+    // does not.
+    let (out, lean) = diff("a", "d");
+    assert!(
+        out.contains(
+            "A [0x11130, 0x11138) 2 instr  <->  B [0x11130, 0x1113c) 3 instr  straight-line "
+        ),
+        "{out}"
+    );
+    assert!(lean.contains("theorem region0_ok"), "{lean}");
+    let want = std::fs::read_to_string(root().join("lean/Examples/Refine/Diff/AD.lean")).unwrap();
+    assert_eq!(lean, want);
+}
+
+#[test]
 fn a_function_against_itself_has_no_region() {
     let mut out = String::new();
     let a = root().join("examples/elf/refine-sum-a.elf");

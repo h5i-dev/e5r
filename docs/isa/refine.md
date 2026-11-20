@@ -141,6 +141,14 @@ until it is an `RRegion`:
 - no node cut: a region lies inside a block or loop of each tree, or covers
   it whole.
 
+A straight-line region whose two sides, run from equal registers, differ on
+a live-out register (random and edge-value tests, in the simulator's ALU)
+takes in the next pair while that is a register instruction, and the diff
+settles again: `xor a4,a4,a2; sltiu a4,a4,1` against `sub a4,a4,a2; sltiu
+a4,a4,1` is one region, not `xor` against `sub` (which differ on a4). If it
+cannot grow, the summary says `DIFFERS on <reg>` and its `Ok` becomes a
+hypothesis of `refines` (B is likely wrong there).
+
 A `ret` inside a change is refused: a region has one exit. Live sets come
 from backward liveness on each side, with `Instr.uses`/`Instr.defs` as in
 RefineCongr.lean, x0 always live, and a return's observed registers live;
@@ -164,6 +172,9 @@ certificate and every proof.
   `bne` keep their op and registers but move their targets, so they are jump
   pairs; 8 pairs and 1 straight-line region (A's `add` against C's `xor;
   add`), proved by the generated `AC.refines`.
+- `sum` counting down by 2 then up by 1 (`addi a1,a1,-2; addi a0,a0,8; addi
+  a1,a1,1` against `addi a1,a1,-1; addi a0,a0,8`): the changed `addi` alone
+  differs on a1, so the region grows to 2 against 3 instructions; `AD.refines`.
 - `sum` against itself: 9 pairs, no region.
 
 `crates/nocompiler/tests/treediff.rs` checks these numbers and that the
