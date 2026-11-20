@@ -75,6 +75,16 @@ example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] =
 #assert_standard_axioms Examples.Link.sum_relocatable
 #assert_standard_axioms Examples.Link.sum_link1
 #assert_standard_axioms Examples.Link.sum_link2
+-- Refinement (docs/isa/refine.md): the meta-theorems, the lockstep certificate, the example.
+#assert_standard_axioms NoCompiler.Refines.refl
+#assert_standard_axioms NoCompiler.Refines.trans
+#assert_standard_axioms NoCompiler.Refines.verified
+#assert_standard_axioms NoCompiler.Refines.of_sim
+#assert_standard_axioms NoCompiler.Refines.of_lockstep
+#assert_standard_axioms NoCompiler.exec_congr
+#assert_standard_axioms NoCompiler.sys_congr
+#assert_standard_axioms Examples.Refine.Relink.sum_link2_refines
+#assert_standard_axioms Examples.Refine.Relink.sum_link2'
 
 -- The demo (demo/README.md): each function on the nocompiler build (B, `VerifiedImg`)
 -- and on the ordinary rv64gc build (A, `VerifiedC`, NoCompiler/Ext/Rvc.lean).

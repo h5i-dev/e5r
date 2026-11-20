@@ -19,3 +19,6 @@ import NoCompiler.Vocab
 import NoCompiler.Module
 import NoCompiler.Shift
 import NoCompiler.Relocate
+import NoCompiler.Refine
+import NoCompiler.RefineCongr
+import NoCompiler.RefineLockstep

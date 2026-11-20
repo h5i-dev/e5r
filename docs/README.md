@@ -28,6 +28,7 @@ Where things are, and where they are documented. [ROADMAP.md](ROADMAP.md) is the
 - [isa/metadata.md](isa/metadata.md): the `.nocompiler.struct` section (v2)
 - [isa/toolchain.md](isa/toolchain.md): building conforming code, the proof workflow, the LLVM and Rust plan
 - [isa/ledger.md](isa/ledger.md): the ledger of verified functions
+- [isa/refine.md](isa/refine.md): refinement, B refines A with A as the specification (the relational layer of the optimisation benchmark)
 - [isa/trust.md](isa/trust.md): what a result depends on, and what it does not
 - [isa/related-work.md](isa/related-work.md): where the ideas come from
 
