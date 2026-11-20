@@ -52,6 +52,17 @@ theorem Same.setReg {s0 s : State} {rs : List Nat} (h : Same s0 s rs) {q : Reg} 
 theorem Same.setPc {s0 s : State} {rs : List Nat} (h : Same s0 s rs) (p : Word) :
     Same s0 (s.setPc p) rs := h
 
+theorem Same.emit {s0 s : State} {rs : List Nat} (h : Same s0 s rs) (e : Event) :
+    Same s0 (s.emit e) rs := h
+
+theorem Same.setMem {s0 s : State} {rs : List Nat} (h : Same s0 s rs) (m : Word → Byte) :
+    Same s0 (s.setMem m) rs := h
+
+/-- A syscall's result goes to a0. -/
+theorem Same.sysRet {s0 s : State} {rs : List Nat} (h : Same s0 s rs) (v : Word)
+    (h10 : 10 ∈ rs) : Same s0 (s.sysRet v) rs :=
+  (h.setReg (q := 10) v h10).setPc _
+
 structure Spec (α : Type) where
   pre : α → State → Prop
   /-- On return: the entry state, the state at the return address. -/

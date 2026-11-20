@@ -35,7 +35,8 @@ states what a function adds to it, for example that the bytes of every
 `write` to fd 1, concatenated, are the message, or that an error was
 returned. A short write is one of the outcomes, so a function that prints a
 buffer has to loop until it is all written, and its proof has to show that
-the loop terminates. That is what `r >= 1` gives.
+the loop terminates. That is what `r >= 1` gives. `write_all` in
+`lean/Examples/Hello.lean` is that loop, proved.
 
 ## Assumptions
 

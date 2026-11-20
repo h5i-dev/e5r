@@ -38,11 +38,14 @@ elab "#assert_standard_axioms " id:ident : command => do
 #assert_standard_axioms Examples.Sum.sum_verified
 #assert_standard_axioms Examples.Sum.sum_hw
 #assert_standard_axioms Examples.Sum2.sum2_verified
+#assert_standard_axioms Examples.Hello.write_all_verified
+#assert_standard_axioms Examples.Hello.hello_verified
 
 /-- Each committed binary (relative to the repository root), and the code
     image and data segments its proofs use. -/
 def images : List (String × Code × List Segment) :=
-  [("examples/elf/sum.elf", Examples.Sum.Image.code, Examples.Sum.Image.segments)]
+  [("examples/elf/sum.elf", Examples.Sum.Image.code, Examples.Sum.Image.segments),
+   ("examples/elf/hello.elf", Examples.Hello.Image.code, Examples.Hello.Image.segments)]
 
 def checkImage (root : System.FilePath) (path : String) (c : Code) (segs : List Segment) :
     IO Bool := do

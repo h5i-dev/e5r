@@ -26,6 +26,11 @@ mutations=(
   "sum Examples.Sum2 0x111f4 0x01013403 0x00813403 sum2-restores-s0-from-the-wrong-slot"
   "sum Examples.Sum2 0x11200 0x02010113 0x01010113 sum2-frees-16-of-32-bytes"
   "sum Examples.Sum2 0x111e8 0xfac080e7 0xfb0080e7 sum2-calls-past-the-entry"
+  "hello Examples.Hello 0x11180 0xfe0556e3 0xfe0546e3 write_all-loops-on-errors"
+  "hello Examples.Hello 0x1117c 0x40a60633 0x00a60633 write_all-adds-to-the-count"
+  "hello Examples.Hello 0x11178 0x00a585b3 0x40a585b3 write_all-moves-buf-backwards"
+  "hello Examples.Hello 0x111a4 0x00b00613 0x00a00613 hello-writes-10-bytes"
+  "hello Examples.Hello 0x111b0 0x03f55513 0x03e55513 hello-exit-status-2-on-error"
 )
 
 cp -r lean "$work/lean"

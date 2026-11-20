@@ -100,7 +100,11 @@ compiler chose, and the proof over the compiled instructions.
 `ra` and three callee-saved registers, two calls through `Verified.call`, and
 the frame reloaded with the lemmas of `lean/E5R/Mem.lean` (a load after a
 store at the same and at a disjoint slot, an array untouched by writes
-outside it). The tactics:
+outside it). `lean/Examples/Hello.lean` is the example for syscalls: a
+`write_all` loop whose invariant is the trace (`writtenTo` in
+`lean/E5R/Trace.lean`), an `ecall` stepped with `Reach.sys_step` and taken
+apart by the outcomes `Sys` allows, and a function that ends the process
+(`onExit`) and reads `.rodata` (`Segment.Loaded`). The tactics:
 
 | Tactic | Does |
 | --- | --- |

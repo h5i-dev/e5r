@@ -11,3 +11,4 @@ import E5R.Elf
 import E5R.Run
 import E5R.Mem
 import E5R.Image
+import E5R.Trace

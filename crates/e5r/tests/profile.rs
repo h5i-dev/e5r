@@ -257,22 +257,23 @@ fn cli_check_annotate_export() {
         "{s}"
     );
 
-    // Export is what the committed Lean image was generated from.
-    let out = Command::new(exe)
-        .args(["export", elf, "--namespace", "Examples.Sum.Image"])
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    let committed = std::fs::read_to_string(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../lean/Examples/Sum/Image.lean"
-    ))
-    .unwrap();
-    assert_eq!(
-        String::from_utf8(out.stdout).unwrap(),
-        committed,
-        "lean/Examples/Sum/Image.lean is stale: run examples/build.sh --update"
-    );
+    // Export is what each committed Lean image was generated from.
+    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    for (name, module) in [("sum", "Sum"), ("hello", "Hello")] {
+        let out = Command::new(exe)
+            .args(["export", &format!("{root}/examples/elf/{name}.elf")])
+            .args(["--namespace", &format!("Examples.{module}.Image")])
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        let committed =
+            std::fs::read_to_string(format!("{root}/lean/Examples/{module}/Image.lean")).unwrap();
+        assert_eq!(
+            String::from_utf8(out.stdout).unwrap(),
+            committed,
+            "lean/Examples/{module}/Image.lean is stale: run examples/build.sh --update"
+        );
+    }
 
     assert_eq!(
         Command::new(exe)

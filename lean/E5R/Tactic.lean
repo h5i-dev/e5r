@@ -34,6 +34,9 @@ theorem and_not_one_of_aligned {x : Word} (h : aligned x 4) : x &&& ~~~1#64 = x 
     simpa [BitVec.getLsbD_eq_getElem] using this
   · simp [h0, hi]
 
+@[simp] theorem sysRet_reg (s : State) (r : Word) (q : Reg) :
+    (s.sysRet r).reg q = (s.setReg Reg.a0 r).reg q := rfl
+
 theorem ret_mask {x : Word} (h : aligned x 4) : x &&& 0xfffffffffffffffe#64 = x :=
   and_not_one_of_aligned h
 
@@ -60,7 +63,7 @@ attribute [e5r_state] State.setPc_setPc State.setMem_setMem State.setPc_setMem S
   State.emit_pc State.emit_mem State.emit_trace State.emit_exit State.emit_reg
   State.halt_pc State.halt_mem State.halt_trace State.halt_exit State.halt_reg
   State.reg_zero State.setReg_zero State.reg_setReg_same State.reg_setReg_other
-  sysRet_pc sysRet_mem sysRet_trace sysRet_exit Reach.opt_some Reach.opt_none
+  sysRet_pc sysRet_mem sysRet_trace sysRet_exit sysRet_reg Reach.opt_some Reach.opt_none
   ite_true ite_false reduceIte
 
 attribute [e5r_sem] exec jumpTo ea evalI evalR evalRW evalU evalSh evalShW evalBr loadVal
@@ -76,16 +79,24 @@ attribute [e5r_lit] BitVec.reduceNeg BitVec.reduceNot BitVec.reduceAnd BitVec.re
   Fin.isValue Nat.reduceMod Nat.reduceDiv Nat.reduceAdd Nat.reduceMul Nat.reduceSub
   BitVec.add_zero BitVec.zero_add
 
-/-- Normalise the goal: the four passes, each allowed to make no progress. -/
-syntax "e5r_norm" (" [" Lean.Parser.Tactic.simpArg,* "]")? : tactic
+/-- Normalise the goal (or `at h`): the four passes, each allowed to make no
+    progress, and none an error once the goal is closed. -/
+syntax "e5r_norm" (" [" Lean.Parser.Tactic.simpArg,* "]")? (Lean.Parser.Tactic.location)? : tactic
 macro_rules
   | `(tactic| e5r_norm) => `(tactic| e5r_norm [])
+  | `(tactic| e5r_norm $loc:location) => `(tactic| e5r_norm [] $loc:location)
   | `(tactic| e5r_norm [$ts,*]) =>
     `(tactic| (
-      (try simp only [e5r_sem])
-      (try simp (config := { decide := true }) only [e5r_state, e5r_image, $ts,*])
-      (try simp only [e5r_lit])
-      (try simp (config := { decide := true }) only [e5r_state, e5r_image, $ts,*])))
+      all_goals (try simp only [e5r_sem])
+      all_goals (try simp (config := { decide := true }) only [e5r_state, e5r_image, $ts,*])
+      all_goals (try simp only [e5r_lit])
+      all_goals (try simp (config := { decide := true }) only [e5r_state, e5r_image, $ts,*])))
+  | `(tactic| e5r_norm [$ts,*] $loc:location) =>
+    `(tactic| (
+      (try simp only [e5r_sem] $loc:location)
+      (try simp (config := { decide := true }) only [e5r_state, e5r_image, $ts,*] $loc:location)
+      (try simp only [e5r_lit] $loc:location)
+      (try simp (config := { decide := true }) only [e5r_state, e5r_image, $ts,*] $loc:location)))
 
 syntax "e5r_step" (" [" Lean.Parser.Tactic.simpArg,* "]")? : tactic
 macro_rules
@@ -104,6 +115,9 @@ macro_rules
 macro "e5r_same" : tactic => `(tactic| (
   repeat (first
     | with_reducible refine Same.setPc ?_ _
+    | with_reducible refine Same.setMem ?_ _
+    | with_reducible refine Same.emit ?_ _
+    | with_reducible refine Same.sysRet ?_ _ (by decide)
     | with_reducible refine Same.setReg ?_ _ (by decide))
   first | with_reducible assumption | with_reducible exact Same.refl _ _))
 

@@ -61,6 +61,21 @@ theorem read64_writeLE_other (m : Word → Byte) (base : Word) (v : Nat) {i j : 
   rw [e, BitVec.toNat_sub, toNat_ofNat_of_lt (by omega), toNat_ofNat_of_lt (by omega)]
   omega
 
+theorem readBytes_congr {m m' : Word → Byte} {a : Word} {n : Nat}
+    (h : ∀ k, k < n → m (a + BitVec.ofNat 64 k) = m' (a + BitVec.ofNat 64 k)) :
+    readBytes m a n = readBytes m' a n := by
+  induction n generalizing a with
+  | zero => rfl
+  | succ n ih =>
+    simp only [readBytes]
+    have h0 := h 0 (by omega)
+    simp only [BitVec.add_zero] at h0
+    rw [h0, ih]
+    intro k hk
+    have e : a + 1 + BitVec.ofNat 64 k = a + BitVec.ofNat 64 (k + 1) := by
+      apply BitVec.eq_of_toNat_eq; simp; omega
+    rw [e]; exact h (k + 1) (by omega)
+
 /-- Memory holds `xs` as consecutive little-endian words from `a`. -/
 def arr64 (m : Word → Byte) (a : Word) (xs : List Word) : Prop :=
   ∀ i (h : i < xs.length), read64 m (a + BitVec.ofNat 64 (8 * i)) = xs[i]

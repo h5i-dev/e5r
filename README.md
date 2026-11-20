@@ -30,7 +30,10 @@ theorem sum_verified : Verified code sum_dom sum_entry spec
 [lean/Examples/Sum.lean](lean/Examples/Sum.lean) has the specification and
 the proof. [lean/Examples/Sum2.lean](lean/Examples/Sum2.lean) proves a caller,
 `sum(a, n) + sum(b, m)` with its stack frame, from `sum`'s specification
-alone. [lean/E5R/Adequacy.lean](lean/E5R/Adequacy.lean) proves, once for all
+alone. [lean/Examples/Hello.lean](lean/Examples/Hello.lean) proves a
+`write_all` loop over the kernel's short writes, and a `hello` that writes a
+message from `.rodata` through it and exits.
+[lean/E5R/Adequacy.lean](lean/E5R/Adequacy.lean) proves, once for all
 programs, what such a theorem means for the machine.
 `scripts/check-proof-controls.sh` checks that mutated binaries break the proofs.
 

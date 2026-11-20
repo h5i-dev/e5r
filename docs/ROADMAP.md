@@ -39,7 +39,7 @@ milestones and its "not building" list, is kept as
 | Lean ELF reader and `e5r-audit`: `.text` and every data section match the binary, axioms | done |
 | Worked examples from clang `-O2`: `sum` (a loop over an array) and `sum2` (a stack frame and two calls to `sum`, proved from its specification alone) | done |
 | Negative controls: mutated binaries must break their proofs (`scripts/check-proof-controls.sh`) | done |
-| An example with a syscall (a `write_all` loop over short writes) | next |
+| Syscall examples: `write_all` (a loop over short writes, with errors) and `hello` (writes a `.rodata` message through it, then exits) | done |
 | The structural checker in Lean, with a theorem that a checked function only transfers control as R2 allows | next |
 | Loop invariants placed from `.e5r.struct` by the tactics instead of by hand | next |
 | Lean semantics generated from the Sail RISC-V model and proved equal to `E5R.exec` | planned |
