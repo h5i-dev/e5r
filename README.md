@@ -1,42 +1,65 @@
 # nocompiler
 
-`nocompiler` is a RISC-V profile in which machine code is proved correct in Lean 4, and nothing that produced the code or the proof has to be trusted.
+`nocompiler` is a RISC-V profile whose machine code is proved correct in Lean 4.
+Nothing that produced the code or the proof has to be trusted.
 
 **Motivation**
 
-- Compilers, code generators and now LLMs write the code that runs. Which of them do you trust?
-- A proof about the C source says nothing about the bytes the compiler emitted. Can the claim be about the bytes?
-- Proofs about machine code are usually written once, by experts, for one binary at one address. Can they be routine?
+- Compilers, code generators and LLMs write the code that runs. Which of them do you trust?
+- A proof about C source says nothing about the emitted bytes. Can the claim be about the bytes?
+- Machine-code proofs are usually one-off expert work. Can they be routine?
 
 **Our Answer**
 
-- A subset of RV64 (RV64IM + Zba + Zbb) with structured control flow (a WebAssembly-style block/loop tree) and a fixed stack discipline. It is ordinary RISC-V: it runs unchanged on any RV64 Linux machine, follows the LP64 calling convention and links with ordinary code.
-- One theorem per function, about the bytes of the binary: correct for every input its precondition allows, memory-safe, terminating, and it follows the calling convention.
-- The Lean kernel is the only judge. The compiler, the tools in this repository, the tactics and whoever wrote the proof are all untrusted. What *is* trusted is listed in [docs/isa/trust.md](docs/isa/trust.md).
-- Functions are checked against the profile at levels L0/L1/L2. Each level comes with theorems that are proved once for all programs, so less is left to each function's proof.
+- A subset of RV64: RV64IM + Zba + Zbb, structured control flow, a fixed stack discipline.
+- It is ordinary RISC-V. It runs on any RV64 Linux machine and follows the LP64 calling convention.
+- One theorem per function, about the bytes: correct, memory-safe, terminating, ABI-preserving.
+- The Lean kernel is the only judge. Compilers, tools, tactics and proof authors are untrusted.
+- What is trusted is listed in [docs/isa/trust.md](docs/isa/trust.md).
+- Functions are checked at levels L0/L1/L2. Each level brings theorems proved once for all programs.
 
 **Potential pushback**
 
-- *"Is the proof actually shorter on the profile?"* → No, as far as we have measured. With the same automation on both sides, the proofs about the profile build and about a plain rv64gc build of the same C have the same length. That holds for the leaf functions of the [A/B demo](examples/demo/README.md) and, since criterion 8 of [spec v1](docs/isa/v1.md), for `sum2` with calls and a frame (4 lines each). We do not claim "easier to prove" on proof length. What the profile changes is what the proof rests on: a block/loop structure and frame rules the kernel has checked, the code region coming from metadata, no compressed-instruction semantics in the trusted base, and adequacy theorems linking the proof to the machine ([v1-results](docs/isa/v1-results.md), criterion 8).
-- *"Why not verify the C source?"* → Then the compiler, and the C semantics it implements, are part of what you trust, or you need a verified compiler. Here the claim is about the instructions that run. A miscompilation makes a proof fail; it cannot make one succeed.
-- *"Isn't this NaCl / eBPF / WebAssembly?"* → It borrows from all three ([related work](docs/isa/related-work.md)). From NaCl, restrict the code so checking is easy. From eBPF, a verifier-style rule set. From WebAssembly, structured control flow, applied here to real RISC-V machine code with no new bytecode and no runtime. Nothing is enforced at load time. A function that breaks the rules still runs, and the guarantee comes from a proof, not from a checker.
-- *"Why trust your semantics?"* → The decoder and semantics are hand-written in Lean for the subset. They are tested against llvm-mc (decoding), qemu-riscv64 and the official Sail RISC-V model's emulator (execution, on random programs over every instruction). They are tested, not proved equal to Sail. That proof is on the [roadmap](docs/ROADMAP.md).
-- *"Does it run on real hardware?"* → The binaries are plain static RV64 Linux ELFs. In this repository they are run under qemu-riscv64 and the Sail emulator, not on silicon. The theorems assume a machine that implements RV64IM + Zba + Zbb as specified.
-- *"What about libc and the heap?"* → Neither is modelled. Code is built `-ffreestanding -nostdlib`, and the environment model admits four syscalls: `read`, `write`, `exit` and `exit_group` ([environment.md](docs/isa/environment.md)). `mmap`/`brk` are on the roadmap. A heap model is out of scope for v1.
+- *"Is the proof actually shorter on the profile?"* → No, as far as we have measured.
+  - With equal automation, the profile build and a plain rv64gc build need proofs of the same length.
+  - This holds for the leaf functions of the [A/B demo](examples/demo/README.md), and for `sum2` with calls and a frame (4 lines each).
+  - We do not claim "easier to prove" on proof length ([v1-results](docs/isa/v1-results.md), criterion 8).
+  - What changes is what the proof rests on: kernel-checked structure and frame rules, metadata for the code region, no compressed-instruction semantics, and adequacy theorems.
+- *"Why not verify the C source?"* → Then you trust the compiler, or need a verified one.
+  - Here the claim is about the instructions that run.
+  - A miscompilation makes a proof fail. It cannot make one succeed.
+- *"Isn't this NaCl / eBPF / WebAssembly?"* → It borrows from all three ([related work](docs/isa/related-work.md)).
+  - NaCl: restrict the code so checking is easy.
+  - eBPF: a verifier-style rule set.
+  - WebAssembly: structured control flow, applied to real RISC-V with no bytecode and no runtime.
+  - Nothing is enforced at load time. The guarantee comes from a proof, not a checker.
+- *"Why trust your semantics?"* → They are tested, not proved.
+  - The decoder and semantics are hand-written in Lean.
+  - They are tested against llvm-mc, qemu-riscv64 and the Sail RISC-V emulator.
+  - A proof of equality with Sail is on the [roadmap](docs/ROADMAP.md).
+- *"Does it run on real hardware?"* → The binaries are plain static RV64 Linux ELFs.
+  - Here they run under qemu-riscv64 and the Sail emulator, not on silicon.
+  - The theorems assume a machine that implements RV64IM + Zba + Zbb as specified.
+- *"What about libc and the heap?"* → Neither is modelled yet.
+  - Code is built `-ffreestanding -nostdlib`.
+  - The environment admits four syscalls: `read`, `write`, `exit`, `exit_group` ([environment.md](docs/isa/environment.md)).
+  - `mmap`/`brk` are on the roadmap. A heap model is out of scope for v1.
 
 ## CLI example
 
-One binary, `nocompiler`. The core commands check, record and export a RISC-V binary for proof. The rest are a general binary analysis toolkit ([docs/toolkit/](docs/toolkit/README.md)) whose output is never an input to a proof.
+One binary, `nocompiler`.
+The core commands check, record and export a binary for proof.
+The rest is a binary analysis toolkit ([docs/toolkit/](docs/toolkit/README.md)). Its output never enters a proof.
 
 ```sh
 cargo build --release -p nocompiler-cli                     # target/release/nocompiler
 
 # The profile (cc needs clang and ld.lld)
-nocompiler cc -O2 examples/sum.c -o sum.elf                 # compile into the profile, record its structure, check
-nocompiler check examples/elf/sum.elf                       # the level of every function: L0, L1 or L2
-nocompiler disasm examples/elf/sum.elf sum                  # the code, nested by its block/loop structure
+nocompiler cc -O2 examples/sum.c -o sum.elf                 # compile into the profile and check
+nocompiler check examples/elf/sum.elf                       # the level of every function
+nocompiler disasm examples/elf/sum.elf sum                  # the code as a block/loop tree
 nocompiler export examples/elf/sum.elf --namespace Examples.Sum.Image -o lean/Examples/Sum/Image.lean
-nocompiler module examples/elf/sum.link1.elf --namespace Examples.Link.One   # the relocatable module and its layout
+nocompiler module examples/elf/sum.link1.elf --namespace Examples.Link.One   # the relocatable module
 
 # The proofs, and the check that they are about the committed binaries
 cd lean && lake build && lake exe nocompiler-audit && cd ..
@@ -50,33 +73,52 @@ nocompiler repl /bin/ls
 
 ## Measurements
 
-Each number comes from the repository, with its source.
+Every number comes from the repository.
 
-| What | Result | Conditions, source |
+| What | Result | Source |
 | --- | --- | --- |
-| Proof size, `sum`: profile build vs rv64gc build | 12 vs 12 lines (168 vs 159 tokens) | same spec, same automation; [examples/demo](examples/demo/README.md) |
-| Proof size, `cobs_decode` (in-place COBS decoding) | 95 vs 95 lines (1412 vs 1413 tokens) | same; specification lemmas shared and counted once |
-| Proof size, `sum2` (2 calls, 32-byte frame): profile vs rv64gc | 4 vs 4 lines (60 vs 61 tokens), plus 1 line on rv64gc for the code region | same automation; criterion 8, **not met** (no difference); [v1-results](docs/isa/v1-results.md) |
-| Lean check time, `cobs_decode` | 27.8 s vs 31.8 s | wall clock per file, shared machine, ±15%; same source |
-| Proofs with calls, syscalls and frames, by hand vs `nocompiler_auto` | `sum2` 193 → 5 lines, `write_all` 84 → 16, `hello` 102 → 18 | same specifications; automation versus hand proofs, both on the profile binary, so this does not compare the profile with plain RV64; [v1-results](docs/isa/v1-results.md), criteria 1–2 |
-| Corpus conformance | 58 functions: 54 at L2, 2 at L1, 2 at L0 | every C file in the repository through `nocompiler cc`, clang 15.0.7; [v1-results](docs/isa/v1-results.md), criterion 4 |
-| Negative controls | every mutated binary breaks its proof (25 mutations); every mutated spec breaks its proofs (23) | `scripts/core/check-proof-controls.sh`, `scripts/core/check-spec-mutations.py --skip demo-cobs` |
-| Round trip `asm(disasm(x))` | the same relocatable function for 17 + 53 functions | committed binaries and the C corpus, every function at L1 or above; criterion 5 |
-| Semantics vs qemu-riscv64 and vs Sail | identical register and memory dumps | 48 random programs per run each (default), every instruction of the profile; `crates/nocompiler/tests/{semantics,sail}.rs` |
-| Relocation | `sum`: one theorem valid at every layout. `sum2` (with calls): one address-free proof text that checks at both links | two links (`.text` at 0x11190 and 0x40000). No every-layout theorem for functions with calls yet; [v1-results](docs/isa/v1-results.md), criterion 3 |
-| PTX kernels (experiment) | 102 `map32` kernels proved; 20 of 21 mutants refuted | [experiment/docs/ptx.md](experiment/docs/ptx.md) |
+| `sum` proof: profile vs rv64gc | 12 vs 12 lines | same spec and automation; [demo](examples/demo/README.md) |
+| `cobs_decode` proof: profile vs rv64gc | 95 vs 95 lines | same; spec lemmas counted once |
+| `sum2` proof (2 calls, a frame): profile vs rv64gc | 4 vs 4 lines (+1 on rv64gc) | criterion 8, **not met**; [v1-results](docs/isa/v1-results.md) |
+| Lean check time, `cobs_decode` | 27.8 s vs 31.8 s | wall clock, shared machine, ±15% |
+| Hand proof → `nocompiler_auto` | `sum2` 193 → 5, `write_all` 84 → 16, `hello` 102 → 18 lines | both on the profile build; criteria 1–2 |
+| Corpus conformance | 58 functions: 54 L2, 2 L1, 2 L0 | the C corpus via `nocompiler cc`; criterion 4 |
+| Negative controls | 25 mutated binaries and 23 mutated specs all break their proofs | `scripts/core/check-proof-controls.sh`, `check-spec-mutations.py` |
+| Round trip `asm(disasm(x))` | identical for 17 + 53 functions | every function at L1 or above; criterion 5 |
+| Semantics vs qemu and Sail | identical dumps | 48 random programs per run; `crates/nocompiler/tests/` |
+| Relocation | `sum`: one theorem for every layout. `sum2`: one proof text at two links | criterion 3 |
+| PTX kernels (experiment) | 102 kernels proved; 20 of 21 mutants refuted | [experiment/docs/ptx.md](experiment/docs/ptx.md) |
 
-The full table of the spec v1 acceptance criteria, including the open ones, is in [docs/isa/v1-results.md](docs/isa/v1-results.md).
+All acceptance criteria, open ones included, are in [docs/isa/v1-results.md](docs/isa/v1-results.md).
 
 ## Formally verified in Lean 4
 
-All of the following are checked by the kernel with the standard axioms only ([lean/Audit.lean](lean/Audit.lean)). Unless stated otherwise, each trusts what [trust.md](docs/isa/trust.md) lists: the Lean kernel, the decoder and instruction semantics, the machine model `HwStep`, the environment model, and the definitions and specification the theorem is stated with.
+The kernel checks all of these. They use only the standard axioms, except the `bv_decide` tier below ([lean/Audit.lean](lean/Audit.lean)).
+Each also trusts what [trust.md](docs/isa/trust.md) lists: the kernel, the semantics, the machine and environment models, and the spec.
 
-- **The example functions.** `Examples.Sum.sum_verified` (the sum of an array, as clang `-O2` compiled it). `Examples.Sum2.sum2_verified` (a caller with a stack frame, proved from `sum`'s specification alone). `Examples.Hello.write_all_verified` (a `write` loop over short writes) and `hello_verified`. The audit checks that each image is byte for byte the committed ELF.
-- **Adequacy.** `VerifiedImg.hw` and `Exec.hw_safe`, `hw_final`, `hw_terminates` ([Adequacy.lean](lean/NoCompiler/Adequacy.lean)), proved once for all programs: the machine fetching from memory never faults inside the function, ends in the postcondition, and terminates. These add the assumptions that the image is loaded and that writable memory does not overlap the code.
-- **Structured control.** `Struct.cfi`: for a function whose `<name>_checked` the kernel has decided, every control transfer is structured (R1–R3). `Struct.level … = some .l2` adds the frame rules R4–R6 ([Frame.lean](lean/NoCompiler/Frame.lean)) and holds for all 11 functions of the committed images.
-- **Relocatable proofs.** `Examples.Link.sum_relocatable : Verified One.module "sum" spec` holds over every layout. It is obtained from the fixed-address proof through `VerifiedImg.shift`. Leaf functions only: `Examples.LinkCalls` proves `sum2` at each of the two links with one proof text, not over every layout. `nocompiler-audit` checks that each linked ELF is its module linked at the ELF's layout.
-- **Refinement** ([refine.md](docs/isa/refine.md)). `Refines sp A B` makes A the specification: wherever A runs safely, B runs safely under the same permission and ends as A can, up to what a caller observes. `Refines.verified` turns a proof about A into one about B. `Refines.of_lockstep` checks a lockstep certificate in the kernel. Example: `sum` at link 2 refines `sum` in sum.elf (`Examples.Refine.Relink`). Edits that change instructions (paired execution, straight-line equivalence) are not covered yet.
-- **The demo.** `sum_b`/`cobs_b` (profile builds, `VerifiedImg`) and `sum_a`/`cobs_a` (rv64gc builds, `VerifiedC`). The `_a` theorems also trust the compressed-instruction extension `Ext/Rvc.lean`, which is tested against llvm-mc and qemu, and they have no adequacy theorem yet.
+- **Example functions.**
+  - `sum_verified`: the sum of an array, as clang `-O2` compiled it.
+  - `sum2_verified`: a caller with a frame, proved from `sum`'s spec alone.
+  - `write_all_verified` and `hello_verified`: a `write` loop over short writes, and a program that exits.
+  - The audit checks each image against the committed ELF, byte for byte.
+- **Adequacy** ([Adequacy.lean](lean/NoCompiler/Adequacy.lean)), proved once for all programs.
+  - On the real fetch-from-memory machine, the function never faults, ends in its postcondition and terminates.
+  - It assumes the image is loaded and writable memory does not overlap the code.
+- **Structured control.**
+  - `Struct.cfi`: every control transfer of a checked function is structured (R1–R3).
+  - `Struct.level … = some .l2` adds the frame rules R4–R6 ([Frame.lean](lean/NoCompiler/Frame.lean)). All 11 committed functions reach L2.
+- **Relocatable proofs.**
+  - `sum_relocatable` holds at every layout. It comes from the fixed-address proof via `VerifiedImg.shift`.
+  - Leaf functions only. `sum2` is proved at two links with one proof text, not at every layout.
+  - The audit checks each linked ELF against its module.
+- **Refinement** ([refine.md](docs/isa/refine.md)).
+  - `Refines sp A B` makes A the spec: where A runs safely, B runs safely and ends as A can.
+  - `Refines.verified` turns a proof about A into one about B.
+  - Lockstep certificates and straight-line equivalences are checked in the kernel.
+  - Loop-reshaping edits are not covered yet.
+- **`bv_decide` tier.** Some straight-line equivalences use `bv_decide`. Its check runs native code, so the audit lists these theorems separately.
+- **The demo.** Profile builds (`sum_b`, `cobs_b`) and rv64gc builds (`sum_a`, `cobs_a`).
+  - The rv64gc proofs also trust the compressed-instruction extension (`Ext/Rvc.lean`).
+  - That extension is tested against llvm-mc and qemu. It has no adequacy theorem yet.
 
 [Docs](docs/README.md) · [Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md) · Apache-2.0
