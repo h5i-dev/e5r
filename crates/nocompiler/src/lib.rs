@@ -17,6 +17,7 @@ pub mod meta;
 pub mod module;
 pub mod profile;
 pub mod sha256;
+pub mod sim;
 pub mod text;
 
 use profile::{Func, FuncMeta, Violation};

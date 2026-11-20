@@ -294,6 +294,37 @@ pub fn asm(file: &Path, dst: &Path, out: &mut String) -> Result<u8, String> {
     Ok(0)
 }
 
+/// `nocompiler sim FILE [--stdin IN] [--function F] [--json] [--fuel N]`: run
+/// the binary in the simulated performance oracle (docs/isa/sim.md). The
+/// program's own output goes to standard output, the report to standard
+/// error. Status: the program's exit status, or 3 if it faulted.
+pub fn sim(
+    file: &Path,
+    stdin: Option<&Path>,
+    function: Option<&str>,
+    json: bool,
+    fuel: Option<u64>,
+) -> Result<u8, String> {
+    let bytes = read(file)?;
+    let input = match stdin {
+        Some(p) => std::fs::read(p).map_err(|e| format!("{}: {e}", p.display()))?,
+        None => Vec::new(),
+    };
+    let m = crate::sim::Model::inorder5();
+    let mut out = Vec::new();
+    let r = crate::sim::run(&bytes, &input, &mut out, &m, fuel.unwrap_or(10_000_000_000))?;
+    crate::sim::write_out(&out);
+    if json {
+        eprintln!("{}", crate::sim::report_json(&r, &m));
+    } else {
+        eprint!("{}", crate::sim::report_text(&r, &m, function));
+    }
+    Ok(match r.exit {
+        Some(c) => c as u8,
+        None => 3,
+    })
+}
+
 /// `nocompiler disasm FILE [FUNC]`: list the code with its block/loop
 /// structure; every function, or only the one named `only`.
 pub fn disasm(file: &Path, only: Option<&str>, out: &mut String) -> Result<u8, String> {

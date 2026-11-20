@@ -178,6 +178,24 @@ pub enum Command {
         #[arg(short = 'o', value_name = "OUT.lean")]
         out: Option<PathBuf>,
     },
+    /// Run a profile binary in the simulated performance oracle: instruction counts and
+    /// modelled cycles (docs/isa/sim.md). The report goes to standard error.
+    Sim {
+        /// The static RV64 ELF.
+        file: PathBuf,
+        /// Feed this file to the program's reads.
+        #[arg(long, value_name = "IN")]
+        stdin: Option<PathBuf>,
+        /// Report only this function.
+        #[arg(long, value_name = "NAME")]
+        function: Option<String>,
+        /// The report as JSON.
+        #[arg(long)]
+        json: bool,
+        /// Stop after this many instructions.
+        #[arg(long, value_name = "N")]
+        fuel: Option<u64>,
+    },
     /// Assemble structured text (what `disasm` prints) into a relocatable object (docs/isa/asm.md).
     Asm {
         /// The structured text.
@@ -699,7 +717,8 @@ impl Command {
             | Command::Export { .. }
             | Command::Module { .. }
             | Command::Ledger { .. }
-            | Command::Asm { .. } => None,
+            | Command::Asm { .. }
+            | Command::Sim { .. } => None,
             Command::Project { .. } | Command::Ui { .. } => Some((out::When::Auto, false)),
             _ => {
                 let c = self.common();
@@ -733,7 +752,8 @@ impl Command {
             | Command::Export { .. }
             | Command::Module { .. }
             | Command::Ledger { .. }
-            | Command::Asm { .. } => {
+            | Command::Asm { .. }
+            | Command::Sim { .. } => {
                 unreachable!("handled before a file is opened")
             }
             Command::Vtables { common, .. }
@@ -794,6 +814,13 @@ fn core(cli: &Cli, w: &mut out::Out) -> Option<Result<u8, String>> {
         } => cmd::module(file, namespace, out.as_deref(), &mut text),
         Command::Ledger { file, proofs } => cmd::ledger(file, proofs.as_deref(), &mut text),
         Command::Asm { file, out } => cmd::asm(file, out, &mut text),
+        Command::Sim {
+            file,
+            stdin,
+            function,
+            json,
+            fuel,
+        } => cmd::sim(file, stdin.as_deref(), function.as_deref(), *json, *fuel),
         Command::Disasm { common, .. } if common.json && is_risc_v(&common.file) => {
             Err("disasm: --json is not available for a RISC-V binary".into())
         }
