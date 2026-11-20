@@ -69,6 +69,8 @@ example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] =
 #assert_standard_axioms NoCompiler.Module.fetch_link
 #assert_standard_axioms NoCompiler.Verified.mono
 #assert_standard_axioms Examples.Link.sum_in_any_program
+#assert_standard_axioms Examples.Link.L1.sum2_here
+#assert_standard_axioms Examples.Link.L2.sum2_here
 #assert_standard_axioms Examples.Link.same_module
 #assert_standard_axioms Examples.Link.sum_relocatable
 #assert_standard_axioms Examples.Link.sum_link1
@@ -89,7 +91,9 @@ def images : List (String × Code × List Segment) :=
   [("examples/elf/sum.elf", Examples.Sum.Image.code, Examples.Sum.Image.segments),
    ("examples/elf/hello.elf", Examples.Hello.Image.code, Examples.Hello.Image.segments),
    ("examples/demo/elf/sum.b.elf", Demo.Sum.ImageB.code, Demo.Sum.ImageB.segments),
-   ("examples/demo/elf/cobs.b.elf", Demo.Cobs.ImageB.code, Demo.Cobs.ImageB.segments)]
+   ("examples/demo/elf/cobs.b.elf", Demo.Cobs.ImageB.code, Demo.Cobs.ImageB.segments),
+   ("examples/elf/sum.link1.elf", Examples.Link.Img1.code, Examples.Link.Img1.segments),
+   ("examples/elf/sum.link2.elf", Examples.Link.Img2.code, Examples.Link.Img2.segments)]
 
 /-- Modules and the layouts their theorems are instantiated at, with the ELF
     each layout is read from (docs/isa/v1.md, criterion 3). -/

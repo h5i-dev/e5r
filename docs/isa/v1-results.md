@@ -105,11 +105,21 @@ save (R6e), and a saved-and-restored register (L2).
   uses it. The ledger entry format is `docs/isa/ledger.md`
   (`nocompiler ledger`; `examples/link/ledger.jsonl`, the same for both links).
 
-**Not done:** `sum2` and `_start` call `sum`, so their words differ between
-the layouts; a proof of them over every layout needs the call-distance
-reasoning at a symbolic layout (T1, owned by A). Functions that read data
-(`hello`) need their specification to name the layout (the data's address);
-also open.
+**With calls (`sum2`), at both links, the same proof text.**
+`lean/Examples/LinkCalls.lean` proves `sum2` (two calls to `sum`, a 32-byte
+frame) at each link with one proof block, identical in both and naming no
+address (`crates/nocompiler/tests/module.rs` checks it), elaborated against
+each link's image (`nocompiler export`, audited against the ELF), with `sum`
+at that link taken from `sum_relocatable`. Both pass the audit.
+
+**What this is not:** a single theorem `Verified M "sum2" spec2` over every
+layout. For `sum` that theorem exists, by translation. For a function with
+calls a translation argument does not apply: its call words change with the
+callee's distance, the callee moves independently of it, and the return
+address it saves in its frame differs between layouts. A single theorem needs
+the call distance and the patched `auipc`/`jalr` reasoned about at a symbolic
+layout (by the tactic, or a code-pointer-aware simulation). Open. Functions
+that read data (`hello`) need a specification that names the layout; also open.
 
 ## 6. Negative controls, audit side (agent B, 2026-11-20)
 

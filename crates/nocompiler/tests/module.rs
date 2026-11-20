@@ -65,3 +65,14 @@ fn both_links_give_the_committed_ledger() {
         assert_eq!(out, want, "{e}");
     }
 }
+
+/// Criterion 3 with calls: `sum2` is proved at both links by the same text.
+#[test]
+fn sum2_has_one_proof_text_for_both_links() {
+    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../lean/Examples/LinkCalls.lean");
+    let s = std::fs::read_to_string(p).unwrap();
+    let blocks: Vec<&str> = s.split("-- PROOF\n").skip(1).map(|b| b.split("-- END PROOF").next().unwrap()).collect();
+    assert_eq!(blocks.len(), 2);
+    assert_eq!(blocks[0], blocks[1]);
+    assert!(!blocks[0].contains("0x"), "the proof names an address");
+}
