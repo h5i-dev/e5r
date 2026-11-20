@@ -92,6 +92,17 @@ MUTATIONS = [
      "writtenTo 1 evs = some (message.take k)", "writtenTo 2 evs = some (message.take k)"),
     ("Examples/Hello.lean", ["Examples.Hello"], "frame", "hello-stack-8",
      "stack := 16", "stack := 8"),
+    # memset, hand-written and clang-built, one spec (examples/asm/README.md)
+    ("Examples/MemsetSpec.lean", ["Examples.Memset", "Examples.MemsetCc"], "post", "memset-byte-plus-one",
+     "List.replicate n (BitVec.ofNat 8 c.toNat)", "List.replicate n (BitVec.ofNat 8 (c.toNat + 1))"),
+    ("Examples/MemsetSpec.lean", ["Examples.Memset", "Examples.MemsetCc"], "post", "memset-returns-p-plus-1",
+     "s'.reg Reg.a0 = p ∧ readBytes", "s'.reg Reg.a0 = p + 1 ∧ readBytes"),
+    ("Examples/MemsetSpec.lean", ["Examples.Memset", "Examples.MemsetCc"], "post", "memset-one-byte-more",
+     "readBytes s'.mem p n = List.replicate n", "readBytes s'.mem p (n + 1) = List.replicate (n + 1)"),
+    ("Examples/MemsetSpec.lean", ["Examples.Memset", "Examples.MemsetCc"], "frame", "memset-writes-one-short",
+     "writes := fun ⟨p, _, n⟩ _ => [⟨p, n⟩]", "writes := fun ⟨p, _, n⟩ _ => [⟨p, n - 1⟩]"),
+    ("Examples/MemsetSpec.lean", ["Examples.Memset", "Examples.MemsetCc"], "pre", "memset-drops-length-bound",
+     "s.reg Reg.a2 = BitVec.ofNat 64 n ∧ n < 2 ^ 64", "s.reg Reg.a2 = BitVec.ofNat 64 n ∧ True"),
     # The demo: one spec, two binaries (demo/README.md)
     ("Demo/SumSpec.lean", ["Demo.SumB", "Demo.SumA"], "post", "demo-sum-post-plus-one",
      "post := fun ⟨_, xs⟩ _ s' => s'.reg Reg.a0 = sumW xs",

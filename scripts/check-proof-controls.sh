@@ -33,6 +33,14 @@ mutations=(
   "hello Examples.Hello 0x11178 0x00a585b3 0x40a585b3 write_all-moves-buf-backwards"
   "hello Examples.Hello 0x111a4 0x00b00613 0x00a00613 hello-writes-10-bytes"
   "hello Examples.Hello 0x111b0 0x03f55513 0x03e55513 hello-exit-status-2-on-error"
+  # examples/asm/README.md: memset written in structured assembly, and its clang build.
+  "memset Examples.Memset 0x11008 0x00b68023 0x00c68023 memset-asm-stores-the-count"
+  "memset Examples.Memset 0x1100c 0x00168693 0x00268693 memset-asm-stride-2"
+  "memset Examples.Memset 0x11014 0xfe061ae3 0xfe060ae3 memset-asm-bne-becomes-beq"
+  "memset Examples.Memset 0x11000 0x00050693 0x00150693 memset-asm-starts-at-p-plus-1"
+  "memset_cc Examples.MemsetCc 0x111a0 0x00b68023 0x00c68023 memset-cc-stores-the-count"
+  "memset_cc Examples.MemsetCc 0x1119c 0x00168713 0x00268713 memset-cc-stride-2"
+  "memset_cc Examples.MemsetCc 0x111a8 0xfe0618e3 0xfe0608e3 memset-cc-bne-becomes-beq"
   # demo/README.md: the same mutations on the nocompiler build (B) and the ordinary build (A).
   "demo/elf/sum.b Demo.SumB 0x1119c 0x00c68633 0x40c68633 demo-B-sum-add-becomes-sub"
   "demo/elf/sum.b Demo.SumB 0x111a4 0x00850513 0x00450513 demo-B-sum-stride-8-becomes-4"

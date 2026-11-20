@@ -143,6 +143,7 @@ struct Source {
     data: Vec<AData>,
     imports: Vec<String>,
     opens: Vec<String>,
+    namespace: Option<String>,
 }
 
 /// Which annotation a `#` continuation line extends.
@@ -207,6 +208,7 @@ fn parse_source(text: &str) -> Result<Source, String> {
             match key {
                 "import" => src.imports.push(body.to_string()),
                 "open" => src.opens.push(body.to_string()),
+                "namespace" => src.namespace = Some(body.to_string()),
                 "spec" | "intro" => {
                     let f = f.ok_or_else(|| err(line, format!("#{key} outside a function")))?;
                     if key == "spec" {
@@ -976,6 +978,8 @@ pub struct Assembled {
     pub metas: Vec<FuncMeta>,
     pub imports: Vec<String>,
     pub opens: Vec<String>,
+    /// The namespace the skeleton's theorems go in (`#namespace`).
+    pub namespace: Option<String>,
 }
 
 impl Assembled {
@@ -1293,6 +1297,7 @@ pub fn assemble(text: &str) -> Result<Assembled, String> {
         metas,
         imports: src.imports,
         opens: src.opens,
+        namespace: src.namespace,
     })
 }
 
@@ -1559,6 +1564,9 @@ pub fn skeleton(a: &Assembled, image: &str, source: &str) -> String {
         image.to_string(),
     ];
     opens.extend(a.opens.iter().cloned());
+    if let Some(ns) = &a.namespace {
+        let _ = writeln!(o, "namespace {ns}");
+    }
     let _ = writeln!(o, "open {}", opens.join(" "));
     for f in &a.funcs {
         let Some(spec) = &f.spec else { continue };

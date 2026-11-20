@@ -63,6 +63,11 @@ example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] =
 #assert_standard_axioms Examples.Sum2.sum2_verified
 #assert_standard_axioms Examples.Hello.write_all_verified
 #assert_standard_axioms Examples.Hello.hello_verified
+-- examples/asm/README.md: memset written in structured assembly, and the clang build.
+#assert_standard_axioms Examples.Memset.Image.memset_checked
+#assert_standard_axioms Examples.MemsetCc.Image.memset_checked
+#assert_standard_axioms Examples.Memset.memset_verified
+#assert_standard_axioms Examples.Memset.memset_cc_verified
 
 -- The demo (demo/README.md): each function on the nocompiler build (B, `Verified`)
 -- and on the ordinary rv64gc build (A, `VerifiedC`, NoCompiler/Ext/Rvc.lean).
@@ -79,7 +84,9 @@ def images : List (String × Code × List Segment) :=
   [("examples/elf/sum.elf", Examples.Sum.Image.code, Examples.Sum.Image.segments),
    ("examples/elf/hello.elf", Examples.Hello.Image.code, Examples.Hello.Image.segments),
    ("demo/elf/sum.b.elf", Demo.Sum.ImageB.code, Demo.Sum.ImageB.segments),
-   ("demo/elf/cobs.b.elf", Demo.Cobs.ImageB.code, Demo.Cobs.ImageB.segments)]
+   ("demo/elf/cobs.b.elf", Demo.Cobs.ImageB.code, Demo.Cobs.ImageB.segments),
+   ("examples/elf/memset.elf", Examples.Memset.Image.code, Examples.Memset.Image.segments),
+   ("examples/elf/memset_cc.elf", Examples.MemsetCc.Image.code, Examples.MemsetCc.Image.segments)]
 
 /-- The compressed binaries of the demo and their halfword images. Their
     proofs read no data section, so only `.text` is compared. -/
