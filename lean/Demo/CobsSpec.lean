@@ -144,4 +144,87 @@ theorem getD_of_drop_eq {L M : List Byte} {d i : Nat} (h : L.drop d = M.drop d) 
 theorem getD_take (l : List Byte) (n i : Nat) (h : i < n) : (l.take n).getD i 0 = l.getD i 0 := by
   simp [List.getD_eq_getElem?_getD, h]
 
+/-! ### Lists at the write index -/
+
+theorem drop_set_succ (L : List Byte) (d : Nat) (x : Byte) :
+    (L.set d x).drop (d + 1) = L.drop (d + 1) := by
+  apply List.ext_getElem
+  · simp
+  · intro i h1 h2; simp [List.getElem_set]; omega
+
+theorem drop_succ_of_drop {L M : List Byte} {d : Nat} (h : L.drop d = M.drop d) :
+    L.drop (d + 1) = M.drop (d + 1) := by
+  have := congrArg (List.drop 1) h; simpa [List.drop_drop, Nat.add_comm] using this
+
+theorem take_set_le (L : List Byte) (d k : Nat) (x : Byte) (h : k ≤ d) :
+    (L.set d x).take k = L.take k := by
+  apply List.ext_getElem
+  · simp
+  · intro i h1 h2; simp only [List.length_take, List.length_set] at h1
+    rw [List.getElem_take, List.getElem_take, List.getElem_set]; simp; omega
+
+theorem take_set_succ (L : List Byte) (d : Nat) (x : Byte) (h : d < L.length) :
+    (L.set d x).take (d + 1) = L.take d ++ [x] := by
+  rw [List.take_add_one, take_set_le L d d x (Nat.le_refl _), List.getElem?_set_self h]; rfl
+
+theorem take_drop_succ (l : List Byte) (p cnt : Nat) (hp : p < l.length) (hc : 0 < cnt) :
+    (l.drop p).take cnt = l.getD p 0 :: (l.drop (p + 1)).take (cnt - 1) := by
+  obtain ⟨k, rfl⟩ : ∃ k, cnt = k + 1 := ⟨cnt - 1, by omega⟩
+  rw [List.drop_eq_getElem_cons hp, List.take_succ_cons]
+  simp [List.getD_eq_getElem?_getD, hp]
+
+theorem take_append_drop_of {L M : List Byte} {d : Nat} (h : L.drop d = M.drop d) :
+    L.take d ++ M.drop d = L := by rw [← h, List.take_append_drop]
+
+/-! ### The decode loop, one block at a time -/
+
+/-- The code byte: the buffer's at `src` (not yet overwritten) is the frame's,
+    and not zero. -/
+theorem code_eq {orig L : List Byte} {src dst : Nat} (hsrc : src < frameLen orig)
+    (hds : dst ≤ src) (hL : L.drop dst = orig.drop dst) :
+    L.getD src 0 = (orig.take (frameLen orig)).getD src 0 := by
+  rw [getD_of_drop_eq hL hds, getD_take _ _ _ hsrc]
+
+theorem code_pos {orig L : List Byte} {src dst : Nat} (hsrc : src < frameLen orig)
+    (hds : dst ≤ src) (hL : L.drop dst = orig.drop dst) : 1 ≤ (L.getD src 0).toNat := by
+  rw [getD_of_drop_eq hL hds]
+  have := getD_ne_zero_of_lt orig src hsrc
+  have : (orig.getD src 0).toNat ≠ 0 := fun h => this (BitVec.eq_of_toNat_eq (by simpa using h))
+  omega
+
+/-- The invariant of the decode loop at `src`, unfolded by one block. -/
+theorem inv_block {orig L : List Byte} {src dst : Nat}
+    (hsrc : src < frameLen orig) (hds : dst ≤ src) (hL : L.drop dst = orig.drop dst)
+    (hdec : decodeFrame (orig.take (frameLen orig)) =
+      prepend (L.take dst) (decodeFrame ((orig.take (frameLen orig)).drop src))) :
+    decodeFrame (orig.take (frameLen orig)) =
+      if frameLen orig < src + (L.getD src 0).toNat then prepend (L.take dst) (false, [])
+      else prepend (L.take dst ++ (orig.drop (src + 1)).take ((L.getD src 0).toNat - 1) ++
+          zeroAfter (L.getD src 0).toNat (src + (L.getD src 0).toNat) (frameLen orig))
+        (decodeFrame ((orig.take (frameLen orig)).drop (src + (L.getD src 0).toNat))) := by
+  have hn : (orig.take (frameLen orig)).length = frameLen orig := by
+    simp [frameLen_le]
+  have hc := code_pos hsrc hds hL
+  rw [code_eq hsrc hds hL] at hc ⊢
+  rw [hdec, decodeFrame_drop _ src (by omega) hc, hn]
+  split
+  · rfl
+  · rename_i h
+    have e : ((orig.take (frameLen orig)).drop (src + 1)).take
+          (((orig.take (frameLen orig)).getD src 0).toNat - 1) =
+        (orig.drop (src + 1)).take (((orig.take (frameLen orig)).getD src 0).toNat - 1) := by
+      rw [List.drop_take, List.take_take, Nat.min_eq_left (by omega)]
+    rw [prepend_prepend, e, List.append_assoc]
+
+/-- What the report is, given how the frame decodes. -/
+theorem report_of {orig : List Byte} (hne : orig.length ≠ 0) {ok : Bool} {out : List Byte}
+    (h : decodeFrame (orig.take (frameLen orig)) = (ok, out)) :
+    report orig = ((if ok then 0 else 1, if ok then frameLen orig else 1, some out.length),
+      out ++ orig.drop out.length) := by
+  have : orig ≠ [] := fun e => hne (by simp [e])
+  simp [report, this, h]
+
+theorem report_empty {orig : List Byte} (h : orig.length = 0) : report orig = ((1, 0, none), orig) := by
+  simp_all [report, List.length_eq_zero_iff]
+
 end Demo.Cobs

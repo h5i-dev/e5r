@@ -63,6 +63,35 @@ theorem Reach.opt_aligned {c : Code} {P : Perm} {D : Dom} {Q : State → Prop} {
     Reach.opt c P D Q (if aligned a w then some s else none) = Reach c P D Q s := by
   simp [h]
 
+/-! Proof-carrying forms of the state projections. The originals
+(E5R/Lemmas.lean) are `rfl` lemmas, which `simp` applies as definitional
+steps without a proof; the kernel then rechecks each such step by comparing
+two different state terms, and on a long run that comparison unfolds the
+pending memory writes. These are proved by cases, so `simp` writes the
+rewrite into the proof instead. -/
+namespace State
+@[e5r_state high] theorem setPc_pc' (s : State) (p) : (s.setPc p).pc = p := by cases s; rfl
+@[e5r_state high] theorem setPc_mem' (s : State) (p) : (s.setPc p).mem = s.mem := by cases s; rfl
+@[e5r_state high] theorem setPc_trace' (s : State) (p) : (s.setPc p).trace = s.trace := by cases s; rfl
+@[e5r_state high] theorem setPc_exit' (s : State) (p) : (s.setPc p).exit = s.exit := by cases s; rfl
+@[e5r_state high] theorem setPc_reg' (s : State) (p r) : (s.setPc p).reg r = s.reg r := by cases s; rfl
+@[e5r_state high] theorem setMem_pc' (s : State) (m) : (s.setMem m).pc = s.pc := by cases s; rfl
+@[e5r_state high] theorem setMem_mem' (s : State) (m) : (s.setMem m).mem = m := by cases s; rfl
+@[e5r_state high] theorem setMem_trace' (s : State) (m) : (s.setMem m).trace = s.trace := by cases s; rfl
+@[e5r_state high] theorem setMem_exit' (s : State) (m) : (s.setMem m).exit = s.exit := by cases s; rfl
+@[e5r_state high] theorem setMem_reg' (s : State) (m r) : (s.setMem m).reg r = s.reg r := by cases s; rfl
+@[e5r_state high] theorem emit_pc' (s : State) (e) : (s.emit e).pc = s.pc := by cases s; rfl
+@[e5r_state high] theorem emit_mem' (s : State) (e) : (s.emit e).mem = s.mem := by cases s; rfl
+@[e5r_state high] theorem emit_exit' (s : State) (e) : (s.emit e).exit = s.exit := by cases s; rfl
+@[e5r_state high] theorem emit_reg' (s : State) (e r) : (s.emit e).reg r = s.reg r := by cases s; rfl
+@[e5r_state high] theorem setPc_setPc' (s : State) (p q : Word) : (s.setPc p).setPc q = s.setPc q := by
+  cases s; rfl
+@[e5r_state high] theorem setMem_setMem' (s : State) (m m' : Word → Byte) :
+    (s.setMem m).setMem m' = s.setMem m' := by cases s; rfl
+@[e5r_state high] theorem setPc_setMem' (s : State) (p : Word) (m : Word → Byte) :
+    (s.setPc p).setMem m = (s.setMem m).setPc p := by cases s; rfl
+end State
+
 /-- Two regions share no byte. -/
 def Region.Disjoint (r r' : Region) : Prop :=
   r.size ≤ (r'.base - r.base).toNat ∧ r'.size ≤ (r.base - r'.base).toNat
@@ -376,13 +405,51 @@ elab "e5r_decide_closed" : tactic => do
   if t.hasFVar || t.hasMVar then throwError "e5r_decide_closed: not closed"
   evalTactic (← `(tactic| decide))
 
+/-- Whether `e` mentions `% 2^64`. -/
+def hasWordMod (e : Expr) : Bool :=
+  (e.find? fun x => x.isAppOfArity ``HMod.hMod 6 &&
+    (x.getArg! 5).nat? == some 18446744073709551616 ||
+    (x.isAppOfArity ``HMod.hMod 6 && match (x.getArg! 5).rawNatLit? with
+      | some n => n == 18446744073709551616 | none => false)).isSome
+
+/-- `omega` on the hypotheses that bear on the goal: those sharing a variable
+    with it (two rounds), and none with `% 2^64` unless the goal has it.
+    `omega` reads every arithmetic hypothesis in context, and the proofs it
+    writes grow with them; along a run there are many, and thousands of side
+    conditions. -/
+elab "e5r_omega" : tactic => do
+  let g ← getMainGoal
+  g.withContext do
+    let t ← instantiateMVars (← g.getType)
+    let goalMod := hasWordMod t
+    let mut vars := (collectFVars {} t).fvarSet
+    let hyps ← (← getLCtx).getFVarIds.filterM fun f => do
+      let d ← f.getDecl
+      if d.isImplementationDetail then return false
+      return (← isProp d.type)
+    for _ in [0:2] do
+      for f in hyps do
+        let ty ← instantiateMVars (← f.getType)
+        let fv := (collectFVars {} ty).fvarSet
+        if fv.toList.any (vars.contains ·) && (goalMod || !hasWordMod ty) then
+          vars := fv.toList.foldl (fun acc x => acc.insert x) vars
+    let mut g := g
+    for f in hyps.reverse do
+      let ty ← instantiateMVars (← f.getType)
+      let fv := (collectFVars {} ty).fvarSet
+      let keep := fv.toList.any (vars.contains ·) && (goalMod || !hasWordMod ty)
+      unless keep do
+        try g ← g.clear f catch _ => pure ()
+    let gs ← evalTacticAt (← `(tactic| omega)) g
+    unless gs.isEmpty do throwError "e5r_omega: goals left"
+
 /-- Side conditions of the normal form's rewrites: bounds, by evaluation or
     linear arithmetic over the hypotheses in context. -/
 macro "e5r_disch" : tactic => `(tactic| first
   | e5r_decide_closed
-  | omega
+  | e5r_omega
   | (simp only [Region.covers, Region.mem, e5r_nat, Nat.reducePow, Nat.reduceAdd, Nat.reduceSub,
-      Nat.reduceMod]; omega))
+      Nat.reduceMod]; e5r_omega))
 
 /-- The step normaliser of E5R/Tactic.lean (`e5r_norm`), followed by the word
     normal form. Every pass may make no progress. -/
@@ -426,6 +493,7 @@ macro_rules
       (try simp only [decide_eq_true_eq, decide_eq_false_iff_not, Bool.not_eq_true',
         Bool.not_eq_false', Bool.and_eq_true, Bool.or_eq_true, Bool.not_eq_eq_eq_not, Bool.not_true,
         Bool.not_false, decide_not, Bool.not_not, not_and, not_or, Classical.not_not, ne_eq,
+        Bool.and_eq_false_iff, Bool.or_eq_false_iff, decide_eq_false_iff_not,
         Bool.false_eq_true, false_and, and_false, not_false_eq_true, true_and, and_true] $loc:location)))
 
 /-- A load or store's permission, from the specification's regions. -/
@@ -462,6 +530,10 @@ structure Flavor where
 
 structure Ctx where
   fl : Flavor := {}
+  /-- Debugging (`e5r.auto.debugKernel`): the goals of the run, in order. -/
+  log : Option (IO.Ref (Array (MVarId × String))) := none
+  /-- How many runs have ended at each (origin, end), for distinct goal names. -/
+  ends : Option (IO.Ref (Std.HashMap String Nat)) := none
   /-- The loop heads: where a run stops and the invariant is due. -/
   cuts : List Nat
   /-- Rewrites for every normalisation: the caller's facts, the pc and the
@@ -491,6 +563,12 @@ def simpArgs (ts : Array Term) : TacticM SimpArgs := do
   return Syntax.TSepArray.ofElems arr
 
 register_option e5r.auto.trace : Bool := { defValue := false, descr := "trace e5r_auto" }
+register_option e5r.auto.debugSkip : String :=
+  { defValue := "", descr := "debugging only: close the runs from these origins (`entry`, `0x...`) with sorry" }
+register_option e5r.auto.debugKernel : Bool :=
+  { defValue := false, descr := "debugging only: kernel-check each step's proof alone, and trace the time" }
+register_option e5r.auto.debugNoClose : Bool :=
+  { defValue := false, descr := "debugging only: close every cut point and return with sorry" }
 register_option e5r.auto.traceFile : String :=
   { defValue := "", descr := "append e5r_auto's trace to this file as it runs" }
 
@@ -501,6 +579,48 @@ def traceLine (msg : String) : CoreM Unit := do
   h.putStrLn msg
   h.flush
 
+
+
+/-- Debugging: the size of `e` as a tree (without sharing), by dynamic
+    programming over its DAG. -/
+partial def treeSize (e : Expr) : StateM (Std.HashMap UInt64 Nat) Nat := do
+  let k := hash e
+  if let some n := (← get)[k]? then return n
+  let n ← match e with
+    | .app f a => return 1 + (← treeSize f) + (← treeSize a)
+    | .lam _ t b _ | .forallE _ t b _ => return 1 + (← treeSize t) + (← treeSize b)
+    | .letE _ t v b _ => return 1 + (← treeSize t) + (← treeSize v) + (← treeSize b)
+    | .mdata _ b | .proj _ _ b => return 1 + (← treeSize b)
+    | _ => return 1
+  modify (·.insert k n)
+  return n
+
+/-- Debugging: the proof a step assigned to `g`, with what is still open
+    replaced by `sorry`, checked by the kernel as a theorem of its own. -/
+partial def zapMVars (e : Expr) : MetaM Expr := do
+  let e ← instantiateMVars e
+  if !e.hasMVar then return e
+  Meta.transform e (pre := fun x => do
+    if x.getAppFn.isMVar then
+      return .done (← mkSorry (← zapMVars (← inferType x)) false)
+    else return .continue)
+
+def kernelCheckStep (g : MVarId) : TermElabM Nat := g.withContext do
+  let e ← zapMVars (mkMVar g)
+  let ty ← zapMVars (← g.getType)
+  let fvs := (← getLCtx).getFVars
+  let val ← zapMVars (← mkLambdaFVars fvs e)
+  let typ ← zapMVars (← mkForallFVars fvs ty)
+  let val ← instantiateMVars val
+  let typ ← instantiateMVars typ
+  if val.hasMVar || typ.hasMVar then traceLine s!"[kernel] still mvars: level {val.hasLevelMVar || typ.hasLevelMVar}"
+  let base := (← Term.getDeclName?).getD `e5r
+  let n := base ++ (← mkFreshUserName `e5r_debug_step).eraseMacroScopes ++ Name.mkSimple s!"s{← IO.monoNanosNow}"
+  let t0 ← IO.monoMsNow
+  try addDecl (.thmDecl { name := n, levelParams := [], type := typ, value := val })
+  catch ex => traceLine s!"[kernel] error {(← ex.toMessageData.toString).take 300}"
+  return (← IO.monoMsNow) - t0
+
 def run (g : MVarId) (tac : TSyntax `tactic) : TacticM (List MVarId) := do
   if e5r.auto.trace.get (← getOptions) then
     let t ← IO.monoMsNow
@@ -508,7 +628,8 @@ def run (g : MVarId) (tac : TSyntax `tactic) : TacticM (List MVarId) := do
       let gt := toString (← g.withContext (Meta.ppExpr (← instantiateMVars (← g.getType))))
       traceLine s!"[goal] {(gt.replace "\n" " ").take 400}"
     let gs ← withEnableInfoTree false (evalTacticAt tac g)
-    traceLine s!"[e5r_auto {(← IO.monoMsNow) - t} ms] {tac.raw.prettyPrint.pretty 100 |>.take 160}"
+    let kt := 0
+    traceLine s!"[e5r_auto {(← IO.monoMsNow) - t} ms, kernel {kt} ms] {tac.raw.prettyPrint.pretty 100 |>.take 160}"
     return ← gs.filterM fun g => return !(← g.isAssigned)
   -- No info tree: it would keep every intermediate goal of every step.
   let gs ← withEnableInfoTree false (evalTacticAt tac g)
@@ -535,6 +656,13 @@ def pcOf (s : Expr) : MetaM (Option Nat) := do
       if l.isAppOfArity ``State.pc 1 && l.appArg! == s then
         if let some ⟨_, v⟩ ← getBitVecValue? r then return some v.toNat
   return none
+
+/-- `tag`, or `tag_b`, `tag_c`, ... when several runs end at the same place. -/
+def endTag (cx : Ctx) (tag : String) : IO String := do
+  let some r := cx.ends | return tag
+  let n := (← r.get).getD tag 0
+  r.modify (·.insert tag (n + 1))
+  return if n = 0 then tag else s!"{tag}_{Char.ofNat (97 + n)}"
 
 def tagged (gs : List MVarId) (tag : String) : MetaM (List MVarId) := do
   let mut i := 0
@@ -577,6 +705,7 @@ def finish (cx : Ctx) (gs : List MVarId) : TacticM (List MVarId) := do
   let mut out := []
   for g in gs do
     if ← g.isAssigned then continue
+    if let some r := cx.log then r.modify (·.push (g, s!"finish conjunct"))
     -- Each attempt bounded: a verification condition is about the
     -- specification's own functions, which nothing here should unfold.
     let r ← run g (← `(tactic| first
@@ -600,15 +729,18 @@ def finish (cx : Ctx) (gs : List MVarId) : TacticM (List MVarId) := do
 /-- The run has reached a cut point: the invariant (and the measure) of the
     state reached. -/
 def closeCut (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (List MVarId) := do
+  if let some r := cx.log then r.modify (·.push (g, s!"cut {cx.origin} -> {hex pc}"))
+  if e5r.auto.debugNoClose.get (← getOptions) then let _ ← run g (← `(tactic| sorry)); return []
   let fs ← simpArgs cx.facts
   let hR := cx.hR
-  let tag := s!"{cx.origin}_to_{hex pc}"
+  let tag ← endTag cx s!"{cx.origin}_to_{hex pc}"
   let gs ← run g (← `(tactic| (subst $hR:ident; refine $(mkIdent cx.fl.done) ?_; (try dsimp only); right)))
   let some g := gs.head? | return []
   match cx.mode with
   | .start =>
     let [gx, gsame, gi] ← run g (← `(tactic| refine ⟨?_, ?_, ?_⟩)) | throwError "e5r_auto: cut"
-    let r1 ← run gx (← `(tactic| e5r_anorm [$fs,*]))
+    let r1 ← run gx (← `(tactic| (simp only [State.setReg_exit, State.setPc_exit',
+      State.setMem_exit', State.emit_exit', sysRet_exit, $(mkIdent `e5r_hx):ident])))
     let r2 ← run gsame (← `(tactic| e5r_same))
     let r3 ← run gi (← `(tactic| e5r_vnorm [$fs,*]))
     let r3 ← r3.foldlM (fun acc g => return acc ++ (← splitGoal g)) []
@@ -617,7 +749,8 @@ def closeCut (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (List MVarId) := do
   | .body =>
     let [gx, gsame, gi, gm] ← run g (← `(tactic| refine ⟨⟨?_, ?_, ?_⟩, ?_⟩))
       | throwError "e5r_auto: cut"
-    let r1 ← run gx (← `(tactic| e5r_anorm [$fs,*]))
+    let r1 ← run gx (← `(tactic| (simp only [State.setReg_exit, State.setPc_exit',
+      State.setMem_exit', State.emit_exit', sysRet_exit, $(mkIdent `e5r_hx):ident])))
     let r2 ← run gsame (← `(tactic| e5r_same))
     let r3 ← run gi (← `(tactic| e5r_vnorm [$fs,*]))
     let r3 ← r3.foldlM (fun acc g => return acc ++ (← splitGoal g)) []
@@ -628,18 +761,24 @@ def closeCut (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (List MVarId) := do
 
 /-- The run has returned (`jalr zero, 0(ra)`): the postcondition. -/
 def closeRet (cx : Ctx) (g : MVarId) (from_ : Nat) : TacticM (List MVarId) := do
+  if let some r := cx.log then r.modify (·.push (g, s!"ret {cx.origin} at {hex from_}"))
+  if e5r.auto.debugNoClose.get (← getOptions) then let _ ← run g (← `(tactic| sorry)); return []
   let fs ← simpArgs cx.facts
   let hR := cx.hR
   let he := cx.he
   let rs := cx.rs
   let sp := cx.spec
-  let tag := s!"{cx.origin}_ret_{hex from_}"
+  let tag ← endTag cx s!"{cx.origin}_ret_{hex from_}"
   let gs ← run g (← `(tactic| (subst $hR:ident; refine $(mkIdent cx.fl.done) ?_; (try dsimp only); left)))
   let some g := gs.head? | return []
   let [gf, gx, gp, gpres, gpost] ← run g (← `(tactic| refine ⟨.inl ?_, .inl ⟨?_, ?_, ?_, ?_⟩⟩))
     | throwError "e5r_auto: ret"
+  if let some r := cx.log then
+    for (x, nm) in [(gf, "final"), (gx, "exit"), (gp, "pc"), (gpres, "preserved"), (gpost, "post")] do
+      r.modify (·.push (x, s!"ret {nm}"))
   let r1 ← run gf (← `(tactic| (e5r_anorm [$fs,*]; exact ($he).ret)))
-  let r2 ← run gx (← `(tactic| e5r_anorm [$fs,*]))
+  let r2 ← run gx (← `(tactic| (simp only [State.setReg_exit, State.setPc_exit',
+      State.setMem_exit', State.emit_exit', sysRet_exit, $(mkIdent `e5r_hx):ident])))
   let r3 ← run gp (← `(tactic| (e5r_anorm [$fs,*]; (try rfl))))
   let r4 ← run gpres (← `(tactic| exact Same.preserved (rs := $rs) (by e5r_same) (by decide)))
   let r5 ← run gpost (← `(tactic| (simp only [$sp:ident]; e5r_vnorm [$fs,*])))
@@ -650,6 +789,7 @@ def closeRet (cx : Ctx) (g : MVarId) (from_ : Nat) : TacticM (List MVarId) := do
 /-- One instruction: its side conditions discharged (or left, named), and
     the goal for the state after it. -/
 def step (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (MVarId × List MVarId) := do
+  if let some r := cx.log then r.modify (·.push (g, s!"step at {hex pc}"))
   let fs ← simpArgs cx.facts
   let sp := cx.spec
   let gs ← run g (← `(tactic| refine' $(mkIdent cx.fl.execStep) ?_ ?_ ?_ ?_ ?_))
@@ -663,12 +803,18 @@ def step (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (MVarId × List MVarId) :=
       else `i
     return h == n
   let some ghi ← find `hi | throwError "e5r_auto: step at {hex pc}"
+  if let some r := cx.log then
+    for (n, nm) in [(`hi, "hi"), (`hd, "hd"), (`hx, "hx"), (`hok, "hok")] do
+      if let some x ← find n then r.modify (·.push (x, s!"{nm} at {hex pc}"))
   let _ ← run ghi (← `(tactic| ((try e5r_anorm [$fs,*]) <;> rfl)))
   let mut left := []
   if let some ghd ← find `hd then
     left := left ++ (← run ghd (← `(tactic| ((try e5r_anorm [$fs,*]) <;> decide))))
   if let some ghx ← find `hx then
-    left := left ++ (← run ghx (← `(tactic| ((try e5r_anorm [$fs,*]) <;> assumption))))
+    -- By the projection lemmas, not by `assumption` up to unfolding: the kernel
+    -- would replay that unfolding through every update of the state.
+    left := left ++ (← run ghx (← `(tactic| (simp only [State.setReg_exit, State.setPc_exit',
+      State.setMem_exit', State.emit_exit', sysRet_exit, $(mkIdent `e5r_hx):ident]))))
   if let some ghok ← find `hok then
     unless ← ghok.isAssigned do
       let r ← run ghok (← `(tactic| (e5r_anorm [$fs,*]; (try trivial))))
@@ -676,8 +822,20 @@ def step (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (MVarId × List MVarId) :=
         return acc ++ (← run g (← `(tactic| first | (e5r_perm [$sp:ident, $fs,*]) | skip)))) []
       left := left ++ (← tagged r s!"perm_{hex pc}")
   let some gh ← find `h | throwError "e5r_auto: step at {hex pc}"
-  let [gh] ← run gh (← `(tactic| e5r_anorm [$fs,*]))
-    | throwError "e5r_auto: the step at {hex pc} closed or split its goal"
+  let passes : List (TSyntax `tactic) := [
+    ← `(tactic| (try simp only [e5r_sem])),
+    ← `(tactic| (try simp (config := { decide := true }) only [e5r_state, e5r_image, $fs,*])),
+    ← `(tactic| (try simp only [e5r_lit])),
+    ← `(tactic| (try simp (disch := e5r_disch) only [e5r_nat, e5r_lit,
+        Nat.add_zero, Nat.zero_add, Nat.sub_self, Nat.sub_zero, Nat.mul_zero, Nat.zero_mod, $fs,*])),
+    ← `(tactic| (try simp (config := { decide := true }) only [e5r_state, e5r_image, $fs,*]))]
+  let mut gh := gh
+  let mut k := 0
+  for t in passes do
+    if let some r := cx.log then r.modify (·.push (gh, s!"pass {k} at {hex pc}"))
+    let [g'] ← run gh t | throwError "e5r_auto: the step at {hex pc} closed or split its goal"
+    gh := g'
+    k := k + 1
   return (gh, left)
 
 /-- Run from the goal's state to the next cut points or returns. -/
@@ -706,16 +864,22 @@ partial def drive (cx : Ctx) (first : Bool) (fuel : Nat) (g : MVarId) (last : Na
       let gs ← run g (← `(tactic| split))
       let mut out := []
       for g' in gs do
-        let hb := mkIdent `hb
+        -- Named after the branch: unique along a run, which visits no address twice.
+        let hb := mkIdent (Name.mkSimple s!"hb_{(hex last).drop 2}")
         let r ← run g' (← `(tactic| (rename_i $hb:ident)))
+        let showHb (g : MVarId) (what : String) : TacticM Unit := g.withContext do
+          if let some d := (← getLCtx).findFromUserName? hb.getId then
+            traceLine s!"[cond {what} at {hex last}] {← Meta.ppExpr (← instantiateMVars d.type)}"
+        for g in r do showHb g "before"
         let r ← r.foldlM (fun acc g => do
           return acc ++ (← run g (← `(tactic| e5r_cond [$fs,*] at $hb:ident)))) []
+        for g in r do showHb g "after"
         let r ← r.foldlM (fun acc g => do
           return acc ++ (← run g (← `(tactic| (try (exfalso; omega)))))) []
         let r ← r.foldlM (fun acc g => do
           return acc ++ (← run g (← `(tactic| (try simp only [$(mkIdent cx.fl.optSome):ident]))))) []
         for g'' in r do
-          out := out ++ (← drive { cx with facts := cx.facts.push hb } false (fuel - 1) g'' last)
+          out := out ++ (← drive cx false (fuel - 1) g'' last)
       return out
   traceLine "[drive] head"
   let some pc ← pcOf a
@@ -799,7 +963,7 @@ def parseCall (fl : Flavor) (s0 he : Syntax) (factsStx : Syntax) (cutStx : Array
   let userFacts : Array Term := if factsStx.isNone then #[] else
     factsStx[1].getSepArgs.map fun a => ⟨a[2]!⟩
   let g ← getMainGoal
-  let gt ← instantiateMVars (← g.getType)
+  let gt := (← instantiateMVars (← g.getType)).consumeMData
   unless gt.isAppOfArity fl.exec 5 do
     throwError "e5r_auto: expected `{fl.exec} c P D Q s` (after `intro a s he hpre` on a `Verified` goal)"
   let code := gt.getArg! 0
@@ -825,6 +989,10 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
   let userFacts := call.userFacts
   let specName := call.specName
   let cuts := call.cuts
+  let gTop ← getMainGoal
+  let logRef ← IO.mkRef (#[] : Array (MVarId × String))
+  let logOpt := if e5r.auto.debugKernel.get (← getOptions) then some logRef else none
+  let endsRef ← IO.mkRef ({} : Std.HashMap String Nat)
   traceLine "[e5r_auto] let rs ← `([$(rsList.toArray.map natLit)"
   let rs ← `([$(rsList.toArray.map natLit),*])
   let pcIdent := mkIdent `pc
@@ -870,6 +1038,8 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
       let fs ← contextFacts [s0E]
       let cx : Ctx := {
         fl := fl
+        log := logOpt
+        ends := some endsRef
         cuts := heads
         facts := userFacts ++ retFacts ++ fs ++ own
         rs := rs
@@ -879,8 +1049,11 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
         hR := hR
         mode := .start
         origin := "entry" }
+      if ((e5r.auto.debugSkip.get (← getOptions)).splitOn ",").contains "entry" then
+        let _ ← run gStart (← `(tactic| sorry)); return []
       drive cx false 400 gStart entryN
   -- From each loop head.
+  let gBody0 := gBody
   let [gBody] ← run gBody (← `(tactic| intro $uIdent:ident $hI:ident $R:ident $hR:ident))
     | throwError "e5r_auto: body"
   let [gBody] ← run gBody (← `(tactic| obtain ⟨$hx:ident, $hS:ident, $hI:ident⟩ := $hI:ident))
@@ -912,6 +1085,7 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
     let some g := gs.head? | continue
     -- Take the invariant apart: ghosts by their names, facts as hypotheses.
     let mut g := g
+    let mut k := 1
     repeat
       let t ← g.withContext do
         let some d := (← getLCtx).findFromUserName? `e5r_hI | throwError "e5r_auto: hI"
@@ -922,10 +1096,15 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
           | throwError "e5r_auto: invariant"
         g := g'
       | .app (.app (.const ``And _) _) _ =>
-        let [g'] ← run g (← `(tactic| obtain ⟨e5r_hf, $hI:ident⟩ := $hI:ident))
+        -- The invariant's facts, by position: h1, h2, ...
+        let [g'] ← run g (← `(tactic| obtain ⟨$(mkIdent (Name.mkSimple s!"h{k}")):ident, $hI:ident⟩ := $hI:ident))
           | throwError "e5r_auto: invariant"
+        k := k + 1
         g := g'
       | _ => break
+    let [g'] ← run g (← `(tactic| have $(mkIdent (Name.mkSimple s!"h{k}")):ident := $hI:ident))
+      | throwError "e5r_auto: invariant"
+    g := g'
     let (pc, cx) ← g.withContext do
       let some ud := (← getLCtx).findFromUserName? `u | throwError "e5r_auto: u"
       let some pc ← pcOf (mkFVar ud.fvarId) | throwError "e5r_auto: pc of a loop head"
@@ -933,6 +1112,8 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
       let own : Array Term := #[hpc, hx, hra]
       let cx : Ctx := {
         fl := fl
+        log := logOpt
+        ends := some endsRef
         cuts := heads
         facts := userFacts ++ retFacts ++ fs ++ own
         rs := rs
@@ -943,8 +1124,26 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
         mode := .body
         origin := hex 0 }
       return (pc, cx)
+    if ((e5r.auto.debugSkip.get (← getOptions)).splitOn ",").contains (hex pc) then
+      let _ ← run g (← `(tactic| sorry)); continue
     let gs ← g.withContext do drive { cx with origin := hex pc } true 400 g pc
+    if !(e5r.auto.traceFile.get (← getOptions)).isEmpty then
+      let e ← instantiateMVars (mkMVar g)
+      traceLine s!"[size] body {hex pc}: {← e.numObjs} objects, {(treeSize e).run' {}} as a tree"
+      if e5r.auto.debugKernel.get (← getOptions) then
+        traceLine s!"[kernel] body {hex pc}: {← kernelCheckStep g} ms"
     bodyGoals := bodyGoals ++ gs
+  traceLine s!"[auto] done, {startGoals.length + bodyGoals.length} goals left"
+  if e5r.auto.debugKernel.get (← getOptions) then
+    for g in startGoals ++ bodyGoals do
+      unless ← g.isAssigned do g.withContext do g.assign (← mkSorry (← g.getType) false)
+    let log ← logRef.get
+    for i in [0:log.size] do
+      let (g, t) := log[log.size - 1 - i]!
+      traceLine s!"[kstep] checking step {log.size - 1 - i}: {t}"
+      traceLine s!"[kstep] {← kernelCheckStep g} ms"
+    traceLine s!"[kernel] whole body goal: {← kernelCheckStep gBody0} ms"
+    traceLine s!"[kernel] whole goal: {← kernelCheckStep gTop} ms"
   replaceMainGoal (startGoals ++ bodyGoals)
 
 @[tactic e5rAuto] def evalE5rAuto : Tactic := fun stx => do
@@ -967,5 +1166,7 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
 end E5R.Auto
 
 namespace E5R.Auto
-attribute [e5r_nat] BitVec.ofNat_eq_ofNat
+/-- Word literals in the normal form (bytes keep their literals, as written). -/
+@[e5r_nat] theorem ofNat_word (n : Nat) :
+    (OfNat.ofNat n : Word) = BitVec.ofNat 64 n := rfl
 end E5R.Auto
