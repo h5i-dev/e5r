@@ -109,6 +109,22 @@ namespace State
     (s.setPc p).setMem m = (s.setMem m).setPc p := by cases s; rfl
 end State
 
+/-! Moving `emit`, `halt` and `sysRet` out of the way of the pc, for the
+states a syscall leaves. -/
+namespace State
+@[nocompiler_state high] theorem emit_setPc' (s : State) (p : Word) (e : Event) :
+    (s.setPc p).emit e = (s.emit e).setPc p := by cases s; rfl
+@[nocompiler_state high] theorem emit_setMem' (s : State) (m : Word → Byte) (e : Event) :
+    (s.setMem m).emit e = (s.emit e).setMem m := by cases s; rfl
+@[nocompiler_state high] theorem emit_setReg' (s : State) (r : Reg) (v : Word) (e : Event) :
+    (s.setReg r v).emit e = (s.emit e).setReg r v := by
+  unfold setReg; split <;> cases s <;> rfl
+@[nocompiler_state high] theorem sysRet_eq' (s : State) (r : Word) :
+    s.sysRet r = (s.setReg Reg.a0 r).setPc (s.pc + 4) := rfl
+@[nocompiler_state high] theorem emit_exit_halt (s : State) (c : Word) (e : Event) :
+    ((s.halt c).emit e).exit = some c := by cases s; rfl
+end State
+
 /-- Two regions share no byte. -/
 def Region.Disjoint (r r' : Region) : Prop :=
   r.size ≤ (r'.base - r.base).toNat ∧ r'.size ≤ (r.base - r'.base).toNat
@@ -116,6 +132,79 @@ def Region.Disjoint (r r' : Region) : Prop :=
 theorem Region.Disjoint.symm {r r' : Region} (h : r.Disjoint r') : r'.Disjoint r := ⟨h.2, h.1⟩
 
 namespace Auto
+
+/-! ## Calls, frames, syscalls -/
+
+/-- After a call: registers the caller keeps unchanged stay so if the callee
+    preserves every register outside `rs`. -/
+theorem Same.after_call {s0 s1 s' : State} {rs : List Nat} (h : Same s0 s1 rs) (hp : Preserved s1 s')
+    (hrs : ∀ r : Reg, r.val ∉ rs → r = 0 ∨ r ∈ preservedRegs) : Same s0 s' rs := by
+  intro r hr
+  rcases hrs r hr with rfl | hm
+  · simp
+  · rw [hp r hm]; exact h r hr
+
+/-- `Preserved` from `Same`, with the registers in `rs` (saved and restored by
+    the function) shown one by one. -/
+theorem Same.preserved_of {s0 s' : State} {rs : List Nat} (h : Same s0 s' rs)
+    (hr : ∀ r ∈ preservedRegs, r.val ∈ rs → s'.reg r = s0.reg r) : Preserved s0 s' := by
+  intro r hm
+  by_cases hin : r.val ∈ rs
+  · exact hr r hm hin
+  · exact h r hin
+
+theorem Same.reg_eq {s0 s : State} {rs : List Nat} (h : Same s0 s rs) (r : Reg) (hr : r.val ∉ rs) :
+    s.reg r = s0.reg r := h r hr
+
+/-- `Preserved`, one register at a time. -/
+theorem preserved_of_regs {s0 s : State}
+    (h2 : s.reg 2 = s0.reg 2) (h3 : s.reg 3 = s0.reg 3) (h4 : s.reg 4 = s0.reg 4)
+    (h8 : s.reg 8 = s0.reg 8) (h9 : s.reg 9 = s0.reg 9) (h18 : s.reg 18 = s0.reg 18)
+    (h19 : s.reg 19 = s0.reg 19) (h20 : s.reg 20 = s0.reg 20) (h21 : s.reg 21 = s0.reg 21)
+    (h22 : s.reg 22 = s0.reg 22) (h23 : s.reg 23 = s0.reg 23) (h24 : s.reg 24 = s0.reg 24)
+    (h25 : s.reg 25 = s0.reg 25) (h26 : s.reg 26 = s0.reg 26) (h27 : s.reg 27 = s0.reg 27) :
+    Preserved s0 s := by
+  intro r hr
+  simp only [preservedRegs, List.mem_cons, List.mem_nil_iff, or_false] at hr
+  rcases hr with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+    assumption
+
+theorem Dom.not_mem_of_sub {D E : Dom} {x : Word} (h : D.sub E) (hx : ¬ E.mem x) : ¬ D.mem x :=
+  fun hd => hx (h x hd)
+
+/-- The registers a callee preserves (`preservedRegs`), as numbers. -/
+def preservedNats : List Nat := [2, 3, 4, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+
+/-- The registers a callee may change: everything but sp, gp, tp, s0 to s11. -/
+def nonPreserved : List Nat := [1, 5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 28, 29, 30, 31]
+
+theorem nonPreserved_spec (rs : List Nat) (h : nonPreserved.all (fun r => rs.contains r) = true) :
+    ∀ r : Reg, r.val ∉ rs → r = 0 ∨ r ∈ preservedRegs := by
+  have key : ∀ r : Reg, r.val ∉ nonPreserved → r = 0 ∨ r ∈ preservedRegs := by decide
+  intro r hr
+  exact key r fun hm => hr (by have := List.all_eq_true.1 h r.val hm; simpa using this)
+
+/-- The addresses of `f` holding an ECALL. -/
+def ecalls (c : Code) (f : Struct.Func) : List Nat :=
+  (List.range f.len).filterMap fun i =>
+    let pc := f.entry + BitVec.ofNat 64 (4 * i)
+    if c.instr pc == some .ecall then some pc.toNat else none
+
+/-- The prologue of `f`: `addi sp, sp, -N` and the `sd r, k(sp)` after it, as
+    `[N, k₁, r₁, k₂, r₂, ...]`; `[]` without a frame. -/
+def frameOf (c : Code) (f : Struct.Func) : List Nat :=
+  match c.instr f.entry with
+  | some (.iop .addi 2 2 imm) =>
+    if 2048 ≤ imm.toNat then
+      let rec go : Nat → Word → List Nat
+        | 0, _ => []
+        | fuel + 1, pc =>
+          match c.instr pc with
+          | some (.store .sd 2 r off) => off.toNat :: r.val :: go fuel (pc + 4)
+          | _ => []
+      (4096 - imm.toNat) :: go 32 (f.entry + 4)
+    else []
+  | _ => []
 
 /-! ## The registers a function writes -/
 
@@ -244,6 +333,84 @@ theorem eq_add_ofNat_iff (a : Word) (y : Nat) : a = a + BitVec.ofNat 64 y ↔ y 
 theorem add_ofNat_eq_iff (a : Word) (y : Nat) : a + BitVec.ofNat 64 y = a ↔ y % W = 0 := by
   rw [eq_comm, eq_add_ofNat_iff]
 
+/-! ### More operations on the normal form: 32-bit words, products, shifts, signed arguments -/
+
+@[nocompiler_nat] theorem ofNat_mul_ofNat (x y : Nat) :
+    BitVec.ofNat 64 x * BitVec.ofNat 64 y = BitVec.ofNat 64 (x * y) := BitVec.ofNat_mul_ofNat x y
+
+/-- `sext32` (addiw, sext.w) of a value that fits in 31 bits. -/
+@[nocompiler_nat] theorem sext32_ofNat (x : Nat) (h : x < 2147483648) :
+    sext32 (BitVec.ofNat 64 x) = BitVec.ofNat 64 x := by
+  unfold sext32
+  apply BitVec.eq_of_toNat_eq
+  rw [BitVec.toNat_signExtend, BitVec.msb_eq_decide]
+  simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceSub]
+  rw [ite_eq_right (by simp; omega)]; omega
+
+@[nocompiler_nat] theorem zext32_ofNat (x : Nat) : zext32 (BitVec.ofNat 64 x) = BitVec.ofNat 64 (x % 4294967296) := by
+  unfold zext32
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.reducePow]; omega
+
+@[nocompiler_nat] theorem ofNat_shiftRight (x k : Nat) (h : x < W) :
+    BitVec.ofNat 64 x >>> k = BitVec.ofNat 64 (x / 2 ^ k) := by
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_ushiftRight, toNat_ofNat_lt x h, Nat.shiftRight_eq_div_pow]
+  rw [toNat_ofNat_lt]; exact Nat.lt_of_le_of_lt (Nat.div_le_self _ _) h
+
+@[nocompiler_nat] theorem ofNat_shiftLeft (x k : Nat) :
+    BitVec.ofNat 64 x <<< k = BitVec.ofNat 64 (x * 2 ^ k) := by
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_shiftLeft, BitVec.toNat_ofNat, Nat.shiftLeft_eq, Nat.reducePow]
+  rw [Nat.mul_mod, Nat.mod_mod, ← Nat.mul_mod]
+  all_goals omega
+
+@[nocompiler_nat] theorem mulhUU_ofNat (x y : Nat) (hx : x < W) (hy : y < W) :
+    mulhUU (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = BitVec.ofNat 64 (x * y / W) := by
+  unfold mulhUU
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_setWidth, BitVec.toNat_ushiftRight, BitVec.toNat_mul, BitVec.toNat_ofNat,
+    Nat.reducePow, Nat.shiftRight_eq_div_pow]
+  rw [Nat.mod_eq_of_lt hx, Nat.mod_eq_of_lt hy, Nat.mod_eq_of_lt (by omega : x < 340282366920938463463374607431768211456),
+    Nat.mod_eq_of_lt (by omega : y < 340282366920938463463374607431768211456)]
+  have hxy : x * y < 340282366920938463463374607431768211456 := by
+    have := Nat.mul_lt_mul_of_lt_of_lt hx hy; omega
+  rw [Nat.mod_eq_of_lt hxy]
+
+@[nocompiler_nat low] theorem mulhUU_ofNat_mod (x y : Nat) :
+    mulhUU (BitVec.ofNat 64 x) (BitVec.ofNat 64 y) = BitVec.ofNat 64 (x % W * (y % W) / W) := by
+  rw [← ofNat_mod x, ← ofNat_mod y, mulhUU_ofNat _ _ (Nat.mod_lt _ (by decide)) (Nat.mod_lt _ (by decide))]
+
+
+@[nocompiler_nat low] theorem ofNat_shiftRight_mod (x k : Nat) :
+    BitVec.ofNat 64 x >>> k = BitVec.ofNat 64 (x % W / 2 ^ k) := by
+  rw [← ofNat_mod x, ofNat_shiftRight _ _ (Nat.mod_lt _ (by decide))]
+
+/-- `maxu` (and the `max` of two words in the normal form). -/
+@[nocompiler_nat] theorem maxu_ofNat (x y : Nat) :
+    (if decide (x < y) = true then BitVec.ofNat 64 y else BitVec.ofNat 64 x) = BitVec.ofNat 64 (max x y) := by
+  rw [Nat.max_def]
+  by_cases h : x < y
+  · simp only [h, decide_true, ite_true]; rw [ite_eq_left (by omega)]
+  · simp only [h, decide_false, Bool.false_eq_true, ite_false]; split <;> first | rfl | (congr 1; omega)
+
+/-- A 32-bit signed argument that is not negative. -/
+@[nocompiler_nat] theorem ofInt_of_nonneg (x : Int) (h : 0 ≤ x) : BitVec.ofInt 64 x = BitVec.ofNat 64 x.toNat := by
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_ofInt, BitVec.toNat_ofNat, Nat.reducePow]
+  omega
+
+/-- The sign test of a signed argument in range. -/
+@[nocompiler_nat] theorem zero_slt_ofInt (x : Int) (h1 : -9223372036854775808 ≤ x) (h2 : x < 9223372036854775808) :
+    (BitVec.ofNat 64 0).slt (BitVec.ofInt 64 x) = decide (0 < x) := by
+  rw [BitVec.slt_eq_decide, BitVec.toInt_ofInt, show (BitVec.ofNat 64 0).toInt = 0 from rfl]
+  simp only [Nat.reducePow]
+  rw [Int.bmod_eq_of_le h1 h2]
+
+@[nocompiler_nat] theorem ofNat64_toNat (x : Word) : BitVec.ofNat 64 x.toNat = x := by simp
+
+@[nocompiler_nat] theorem intToNat_natCast (n : Nat) : (n : Int).toNat = n := rfl
+
 /-! ## Pointer differences, for region and disjointness checks -/
 
 @[nocompiler_nat] theorem toNat_add_ofNat_sub (a b : Word) (i : Nat) :
@@ -255,6 +422,15 @@ theorem add_ofNat_eq_iff (a : Word) (y : Nat) : a + BitVec.ofNat 64 y = a ↔ y 
   have : a - (b + BitVec.ofNat 64 j) = (a - b) - BitVec.ofNat 64 j := by bv_omega
   rw [this, BitVec.toNat_sub, toNat_ofNat_mod]; simp only [Nat.reducePow]; omega
 @[nocompiler_nat] theorem toNat_sub_self (a : Word) : (a - a).toNat = 0 := by simp
+
+@[nocompiler_nat] theorem sub_ofNat_zero (a : Word) : a - BitVec.ofNat 64 0 = a := by simp
+
+/-- A stack base below sp, in the normal form. -/
+@[nocompiler_nat] theorem sub_ofNat_eq_add (a : Word) (k : Nat) (h : 0 < k) (h' : k < W) :
+    a - BitVec.ofNat 64 k = a + BitVec.ofNat 64 (W - k) := by
+  apply BitVec.eq_of_toNat_eq
+  rw [BitVec.toNat_sub, BitVec.toNat_add, toNat_ofNat_lt _ h', toNat_ofNat_lt _ (by omega)]
+  simp only [Nat.reducePow]; omega
 
 @[nocompiler_nat] theorem toNat_add_ofNat (a : Word) (i : Nat) :
     (a + BitVec.ofNat 64 i).toNat = (a.toNat + i) % W := by
@@ -385,6 +561,63 @@ theorem read64_writeLE_of_disjoint {R : Region} {a : Word} (hd : R.Disjoint ⟨a
   intro k hk
   exact writeLE_of_not_mem hc (not_mem_of_disjoint hd hk)
 
+/-- A byte of a buffer, under a store into a region disjoint from it. -/
+theorem writeLE_apply_of_disjoint {R : Region} {a : Word} {n : Nat} (hd : R.Disjoint ⟨a, n⟩)
+    (m : Word → Byte) (p : Word) (v w : Nat) (hc : R.covers p w) (k : Nat) (hk : k < n) :
+    writeLE m p v w (a + BitVec.ofNat 64 k) = m (a + BitVec.ofNat 64 k) :=
+  writeLE_of_not_mem hc (not_mem_of_disjoint hd hk)
+
+theorem writeLE_apply_base_of_disjoint {R : Region} {a : Word} {n : Nat} (hd : R.Disjoint ⟨a, n⟩)
+    (m : Word → Byte) (p : Word) (v w : Nat) (hc : R.covers p w) (hn : 0 < n) :
+    writeLE m p v w a = m a := by
+  have := writeLE_apply_of_disjoint hd m p v w hc 0 hn
+  rwa [add_ofNat_zero] at this
+
+/-- A loaded segment stays loaded under a store into a region disjoint from it. -/
+theorem loaded_writeLE_iff {g : Segment} {R : Region} (hd : R.Disjoint g.region)
+    (m : Word → Byte) (p : Word) (v w : Nat) (hc : R.covers p w) :
+    g.Loaded (writeLE m p v w) ↔ g.Loaded m := by
+  have hd' : R.Disjoint ⟨g.base, g.bytes.size⟩ := hd
+  unfold Segment.Loaded
+  constructor <;> intro h i hi
+  · rw [← writeLE_of_not_mem (m := m) (v := v) hc (not_mem_of_disjoint hd' hi)]; exact h i hi
+  · rw [writeLE_of_not_mem (m := m) (v := v) hc (not_mem_of_disjoint hd' hi)]; exact h i hi
+
+/-- An array stays in memory under a store into a region that has none of its
+    bytes (the form a specification states it in: `∀ x, in the array → not in R`). -/
+theorem arr64_writeLE_of_outside {R : Region} {a : Word} {xs : List Word}
+    (hd : ∀ x, (arrRegion a xs).mem x → ¬ R.mem x)
+    (m : Word → Byte) (p : Word) (v w : Nat) (hc : R.covers p w) :
+    arr64 (writeLE m p v w) a xs ↔ arr64 m a xs := by
+  have key : ∀ i, i < xs.length →
+      read64 (writeLE m p v w) (a + BitVec.ofNat 64 (8 * i)) = read64 m (a + BitVec.ofNat 64 (8 * i)) := by
+    intro i hi
+    unfold read64; congr 1
+    apply readLE_congr
+    intro k hk
+    apply writeLE_of_not_mem hc
+    apply hd
+    show (_ - a).toNat < 8 * xs.length
+    have e : a + BitVec.ofNat 64 (8 * i) + BitVec.ofNat 64 k - a = BitVec.ofNat 64 (8 * i + k) := by
+      bv_omega
+    rw [e, BitVec.toNat_ofNat]
+    exact Nat.lt_of_le_of_lt (Nat.mod_le _ _) (by omega)
+  unfold arr64
+  constructor <;> intro h i hi
+  · rw [← key i hi]; exact h i hi
+  · rw [key i hi]; exact h i hi
+
+/-- The same, from `Region.Disjoint`. -/
+theorem arr64_writeLE_iff {R : Region} {a : Word} {xs : List Word} (hd : R.Disjoint (arrRegion a xs))
+    (m : Word → Byte) (p : Word) (v w : Nat) (hc : R.covers p w) :
+    arr64 (writeLE m p v w) a xs ↔ arr64 m a xs := by
+  refine arr64_writeLE_of_outside (fun x hx hR => ?_) m p v w hc
+  have hd' : R.Disjoint ⟨a, 8 * xs.length⟩ := hd
+  have hx' : (x - a).toNat < 8 * xs.length := hx
+  have e : x = a + BitVec.ofNat 64 (x - a).toNat := by rw [BitVec.ofNat_toNat, BitVec.setWidth_eq]; bv_omega
+  rw [e] at hR
+  exact not_mem_of_disjoint hd' hx' hR
+
 /-- Reading back an 8-byte store. -/
 @[nocompiler_nat] theorem read64_writeLE_same' (m : Word → Byte) (a : Word) (v : Nat) :
     read64 (writeLE m a v 8) a = BitVec.ofNat 64 v := by
@@ -400,6 +633,22 @@ theorem read64_writeLE_of_disjoint {R : Region} {a : Word} (hd : R.Disjoint ⟨a
     read64 (writeLE m p v w) q = read64 m q := by
   have hd : Region.Disjoint ⟨p, w⟩ ⟨q, 8⟩ := ⟨h1, h2⟩
   exact read64_writeLE_of_disjoint hd m p v w (by simp [Region.covers])
+
+/-- The little-endian value of `n` bytes of a segment from offset `o`. -/
+def _root_.NoCompiler.Segment.leAt (g : Segment) (o : Nat) : Nat → Nat
+  | 0 => 0
+  | n + 1 => (g.bytes.getD o 0).toNat + 256 * g.leAt (o + 1) n
+
+/-- Reading a constant out of a loaded segment (a table, a magic number). -/
+theorem _root_.NoCompiler.Segment.readLE_of_loaded {g : Segment} {m : Word → Byte} (h : g.Loaded m) :
+    ∀ (n o : Nat), o + n ≤ g.bytes.size → readLE m (g.base + BitVec.ofNat 64 o) n = g.leAt o n
+  | 0, _, _ => rfl
+  | n + 1, o, hon => by
+    simp only [readLE, Segment.leAt]
+    have e : g.base + BitVec.ofNat 64 o + 1 = g.base + BitVec.ofNat 64 (o + 1) := by
+      apply BitVec.eq_of_toNat_eq; simp; omega
+    rw [h o (by omega), e, Segment.readLE_of_loaded h n (o + 1) (by omega)]
+    simp [Array.getD, show o < g.bytes.size by omega]
 
 /-- An array of words, as `simp` uses it. -/
 theorem arr64.read {m : Word → Byte} {a : Word} {xs : List Word} (h : arr64 m a xs) :
@@ -465,8 +714,8 @@ elab "nocompiler_omega" : tactic => do
 macro "nocompiler_disch" : tactic => `(tactic| first
   | nocompiler_decide_closed
   | nocompiler_omega
-  | (simp only [Region.covers, Region.mem, nocompiler_nat, Nat.reducePow, Nat.reduceAdd, Nat.reduceSub,
-      Nat.reduceMod]; nocompiler_omega))
+  | (simp (disch := nocompiler_decide_closed) only [Region.covers, Region.mem, Spec.stackRegion, Reg.sp,
+      nocompiler_nat, Nat.reducePow, Nat.reduceAdd, Nat.reduceSub, Nat.reduceMod]; nocompiler_omega))
 
 /-- The step normaliser of NoCompiler/Tactic.lean (`nocompiler_norm`), followed by the word
     normal form. Every pass may make no progress. -/
@@ -518,7 +767,7 @@ syntax "nocompiler_perm" (" [" Lean.Parser.Tactic.simpArg,* "]")? : tactic
 macro_rules
   | `(tactic| nocompiler_perm [$ts,*]) => `(tactic| (
       simp (disch := nocompiler_disch) only [Perm.canRead, Perm.canWrite, Spec.perm, Spec.stackRegion,
-        arrRegion, List.cons_append, List.nil_append, List.append_nil, List.exists_mem_cons, List.mem_cons, exists_eq_or_imp, exists_eq_left, List.mem_nil_iff,
+        arrRegion, Segment.region, List.size_toArray, List.length_cons, List.length_nil, List.cons_append, List.nil_append, List.append_nil, List.exists_mem_cons, List.mem_cons, exists_eq_or_imp, exists_eq_left, List.mem_nil_iff,
         List.not_mem_nil, exists_false, false_and, or_false, false_or, Region.covers, nocompiler_nat,
         Nat.reducePow, Nat.reduceAdd, Nat.reduceSub, Nat.reduceMod, Nat.add_zero, Nat.zero_add, $ts,*]
       omega))
@@ -551,6 +800,12 @@ structure Ctx where
   log : Option (IO.Ref (Array (MVarId × String))) := none
   /-- How many runs have ended at each (origin, end), for distinct goal names. -/
   ends : Option (IO.Ref (Std.HashMap String Nat)) := none
+  /-- The functions it calls: entry, `Verified` theorem, specification. -/
+  callees : Array (Nat × Term × Name) := #[]
+  /-- The addresses of its ECALLs. -/
+  ecalls : List Nat := []
+  /-- Its frame: the conjuncts `nocompiler_auto` adds to every invariant (empty if none). -/
+  frameN : Nat := 0
   /-- The loop heads: where a run stops and the invariant is due. -/
   cuts : List Nat
   /-- Rewrites for every normalisation: the caller's facts, the pc and the
@@ -626,7 +881,7 @@ def run (g : MVarId) (tac : TSyntax `tactic) : TacticM (List MVarId) := do
     let t ← IO.monoMsNow
     if !(nocompiler.auto.traceFile.get (← getOptions)).isEmpty then
       let gt := toString (← g.withContext (Meta.ppExpr (← instantiateMVars (← g.getType))))
-      traceLine s!"[goal] {(gt.replace "\n" " ").take 400}"
+      traceLine s!"[goal] {(gt.replace "\n" " ").take 40000}"
     let gs ← withEnableInfoTree false (evalTacticAt tac g)
     let kt := 0
     traceLine s!"[nocompiler_auto {(← IO.monoMsNow) - t} ms, kernel {kt} ms] {tac.raw.prettyPrint.pretty 100 |>.take 160}"
@@ -710,6 +965,7 @@ def finish (cx : Ctx) (gs : List MVarId) : TacticM (List MVarId) := do
     -- specification's own functions, which nothing here should unfold.
     let r ← run g (← `(tactic| first
         | (set_option maxHeartbeats 200000 in with_reducible rfl)
+        | (set_option maxHeartbeats 200000 in with_reducible assumption)
         | (set_option maxHeartbeats 200000 in omega)
         | skip))
     let r ← r.foldlM (fun acc g => do return acc ++ (← run g (← `(tactic|
@@ -726,6 +982,13 @@ def finish (cx : Ctx) (gs : List MVarId) : TacticM (List MVarId) := do
     out := out ++ r
   return out
 
+/-- The names of the syscall numbers, for the simp sets of a syscall step. -/
+def sysNames : TacticM (Array Term) := return #[← `(sysExit), ← `(sysExitGroup), ← `(sysRead), ← `(sysWrite)]
+
+def exitTac : TacticM (TSyntax `tactic) :=
+  `(tactic| simp only [State.setReg_exit, State.setPc_exit', State.setMem_exit', State.emit_exit',
+      sysRet_exit, $(mkIdent `nocompiler_hx):ident])
+
 /-- The run has reached a cut point: the invariant (and the measure) of the
     state reached. -/
 def closeCut (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (List MVarId) := do
@@ -735,28 +998,28 @@ def closeCut (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (List MVarId) := do
   let tag ← endTag cx s!"{cx.origin}_to_{hex pc}"
   let gs ← run g (← `(tactic| (subst $hR:ident; refine $(mkIdent cx.fl.done) ?_; (try dsimp only); right)))
   let some g := gs.head? | return []
+  let vc (g : MVarId) : TacticM (List MVarId) := do
+    let r ← run g (← `(tactic| nocompiler_vnorm [$fs,*]))
+    let r ← r.foldlM (fun acc g => return acc ++ (← splitGoal g)) []
+    finish cx r
   match cx.mode with
   | .start =>
-    let [gx, gsame, gi] ← run g (← `(tactic| refine ⟨?_, ?_, ?_⟩)) | throwError "nocompiler_auto: cut"
-    let r1 ← run gx (← `(tactic| (simp only [State.setReg_exit, State.setPc_exit',
-      State.setMem_exit', State.emit_exit', sysRet_exit, $(mkIdent `nocompiler_hx):ident])))
+    let [gx, gsame, gf, gi] ← run g (← `(tactic| refine ⟨?_, ?_, ?_, ?_⟩)) | throwError "nocompiler_auto: cut"
+    let r1 ← run gx (← exitTac)
     let r2 ← run gsame (← `(tactic| nocompiler_same))
-    let r3 ← run gi (← `(tactic| nocompiler_vnorm [$fs,*]))
-    let r3 ← r3.foldlM (fun acc g => return acc ++ (← splitGoal g)) []
-    let r3 ← finish cx r3
-    tagged (r1 ++ r2 ++ r3) tag
+    let rf ← vc gf
+    let r3 ← vc gi
+    return (← tagged (r1 ++ r2 ++ r3) tag) ++ (← tagged rf (tag ++ "_frame"))
   | .body =>
-    let [gx, gsame, gi, gm] ← run g (← `(tactic| refine ⟨⟨?_, ?_, ?_⟩, ?_⟩))
+    let [gx, gsame, gf, gi, gm] ← run g (← `(tactic| refine ⟨⟨?_, ?_, ?_, ?_⟩, ?_⟩))
       | throwError "nocompiler_auto: cut"
-    let r1 ← run gx (← `(tactic| (simp only [State.setReg_exit, State.setPc_exit',
-      State.setMem_exit', State.emit_exit', sysRet_exit, $(mkIdent `nocompiler_hx):ident])))
+    let r1 ← run gx (← exitTac)
     let r2 ← run gsame (← `(tactic| nocompiler_same))
-    let r3 ← run gi (← `(tactic| nocompiler_vnorm [$fs,*]))
-    let r3 ← r3.foldlM (fun acc g => return acc ++ (← splitGoal g)) []
-    let r3 ← finish cx r3
+    let rf ← vc gf
+    let r3 ← vc gi
     let r4 ← run gm (← `(tactic| (nocompiler_vnorm [$fs,*]; (try omega))))
     let r4 ← tagged r4 (tag ++ "_measure")
-    return (← tagged (r1 ++ r2 ++ r3) tag) ++ r4
+    return (← tagged (r1 ++ r2 ++ r3) tag) ++ (← tagged rf (tag ++ "_frame")) ++ r4
 
 /-- The run has returned (`jalr zero, 0(ra)`): the postcondition. -/
 def closeRet (cx : Ctx) (g : MVarId) (from_ : Nat) : TacticM (List MVarId) := do
@@ -775,10 +1038,16 @@ def closeRet (cx : Ctx) (g : MVarId) (from_ : Nat) : TacticM (List MVarId) := do
     for (x, nm) in [(gf, "final"), (gx, "exit"), (gp, "pc"), (gpres, "preserved"), (gpost, "post")] do
       r.modify (·.push (x, s!"ret {nm}"))
   let r1 ← run gf (← `(tactic| (nocompiler_anorm [$fs,*]; exact ($he).ret)))
-  let r2 ← run gx (← `(tactic| (simp only [State.setReg_exit, State.setPc_exit',
-      State.setMem_exit', State.emit_exit', sysRet_exit, $(mkIdent `nocompiler_hx):ident])))
+  let r2 ← run gx (← exitTac)
   let r3 ← run gp (← `(tactic| (nocompiler_anorm [$fs,*]; (try rfl))))
-  let r4 ← run gpres (← `(tactic| exact Same.preserved (rs := $rs) (by nocompiler_same) (by decide)))
+  let r4 ← run gpres (← `(tactic| first
+    | exact Same.preserved (rs := $rs) (by nocompiler_same) (by decide)
+    | (refine preserved_of_regs ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ <;>
+       first
+        | (refine Same.reg_eq (rs := $rs) ?_ _ (by decide); nocompiler_same)
+        | (nocompiler_vnorm [$fs,*]; done)
+        | skip)))
+  let r4 ← tagged r4 s!"{tag}_preserved"
   let r5 ← run gpost (← `(tactic| (simp only [$sp:ident]; nocompiler_vnorm [$fs,*])))
   let r5 ← r5.foldlM (fun acc g => return acc ++ (← splitGoal g)) []
   let r5 ← finish cx r5
@@ -836,6 +1105,225 @@ def step (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (MVarId × List MVarId) :=
     k := k + 1
   return (gh, left)
 
+set_option hygiene false in
+/-- The run has ended the process: the specification's `onExit`. -/
+def closeExit (cx : Ctx) (g : MVarId) (at_ : Nat) : TacticM (List MVarId) := do
+  let fs ← simpArgs cx.facts
+  let hR := cx.hR
+  let sp := cx.spec
+  let tag ← endTag cx s!"{cx.origin}_exit_{hex at_}"
+  let gs ← run g (← `(tactic| (subst $hR:ident; refine $(mkIdent cx.fl.done) ?_; (try dsimp only); left)))
+  let some g := gs.head? | return []
+  let [g1, g2, g3] ← run g (← `(tactic| refine ⟨.inr ?_, .inr ⟨?_, ?_⟩⟩)) | throwError "nocompiler_auto: exit"
+  let ne ← `(tactic| (simp only [State.emit_exit_halt, State.setPc_exit', State.setMem_exit',
+      State.setReg_exit, State.emit_exit']; exact Option.some_ne_none _))
+  let r1 ← run g1 ne
+  let r2 ← run g2 ne
+  let r3 ← run g3 (← `(tactic| (simp only [$sp:ident]; nocompiler_vnorm [State.emit_exit_halt, $fs,*])))
+  let r3 ← r3.foldlM (fun acc g => return acc ++ (← splitGoal g)) []
+  let r3 ← finish cx r3
+  tagged (r1 ++ r2 ++ r3) tag
+
+set_option hygiene false in
+/-- An ECALL: every outcome the environment model allows. Returns the goals to
+    run on (one per outcome that is possible here) and the goals left. -/
+def stepSys (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (List MVarId × List MVarId) := do
+  let fs ← simpArgs (cx.facts ++ (← sysNames))
+  let sp := cx.spec
+  let gs ← run g (← `(tactic| refine Reach.sys_step ?_ ?_ ?_ ?_ ?_ ?_))
+  let kind (g : MVarId) : MetaM String := do
+    let t ← whnfR (← instantiateMVars (← g.getType))
+    if t.isAppOf ``Dom.mem then return "hd"
+    if t.isAppOf ``SysOk then return "hok"
+    if t.isAppOf ``Exists then return "hex"
+    if t.isForall then return "k"
+    if t.isAppOf ``Eq then
+      return if (t.getArg! 1).isAppOf ``Code.instr then "hi" else "hx"
+    return "?"
+  let mut left := []
+  let mut cont := []
+  for g in gs do
+    if ← g.isAssigned then continue
+    match ← kind g with
+    | "hd" => left := left ++ (← run g (← `(tactic| ((try nocompiler_anorm [$fs,*]) <;> decide))))
+    | "hx" => left := left ++ (← run g (← exitTac))
+    | "hi" => left := left ++ (← run g (← `(tactic| ((try nocompiler_anorm [$fs,*]) <;> rfl))))
+    | "hok" =>
+      let r ← run g (← `(tactic| (simp only [SysOk]; nocompiler_anorm [$fs,*])))
+      let r ← r.foldlM (fun acc g => do
+        return acc ++ (← run g (← `(tactic| (try simp only [false_implies, true_implies, and_true, true_and, and_self]))))) []
+      let r ← r.foldlM (fun acc g => do
+        return acc ++ (← run g (← `(tactic| first | trivial | (nocompiler_perm [$sp:ident, $fs,*]) | skip)))) []
+      left := left ++ (← tagged r s!"perm_{hex pc}")
+    | "hex" =>
+      left := left ++ (← run g (← `(tactic| first
+        | exact ⟨_, Sys.exit (Or.inr (by nocompiler_anorm [$fs,*]))⟩
+        | exact ⟨_, Sys.exit (Or.inl (by nocompiler_anorm [$fs,*]))⟩
+        | exact ⟨_, Sys.readErr 1 (by nocompiler_anorm [$fs,*]) (by decide) (by decide)⟩
+        | exact ⟨_, Sys.writeErr 1 (by nocompiler_anorm [$fs,*]) (by decide) (by decide)⟩)))
+    | _ =>
+      let ds := mkIdent `ds
+      let r ← run g (← `(tactic| intro nocompiler_s' nocompiler_hs))
+      let r ← r.foldlM (fun acc g => do return acc ++ (← run g (← `(tactic|
+        rcases nocompiler_hs with ⟨n, nocompiler_h7, nocompiler_hle, nocompiler_hmax, nocompiler_hpos⟩ | ⟨err, nocompiler_h7, nocompiler_he1, nocompiler_he2⟩ |
+          ⟨$ds:ident, nocompiler_h7, nocompiler_hlen, nocompiler_hmax⟩ | ⟨err, nocompiler_h7, nocompiler_he1, nocompiler_he2⟩ | ⟨nocompiler_h7⟩)))) []
+      for g' in r do
+        -- An outcome for another syscall number: its hypothesis is false.
+        let r' ← run g' (← `(tactic| nocompiler_cond [$fs,*] at nocompiler_h7))
+        for g'' in r' do
+          let mut gg := [g'']
+          for t in [← `(tactic| (try nocompiler_cond [$fs,*] at nocompiler_hlen)), ← `(tactic| (try nocompiler_cond [$fs,*] at nocompiler_hle)),
+              ← `(tactic| (try nocompiler_cond [$fs,*] at nocompiler_he1)), ← `(tactic| (try nocompiler_cond [$fs,*] at nocompiler_he2)),
+              ← `(tactic| (try nocompiler_anorm [$fs,*]))] do
+            gg ← gg.foldlM (fun acc g => return acc ++ (← run g t)) []
+          cont := cont ++ gg
+  return (cont, left)
+
+/-- Destructure a hypothesis that is a conjunction into `name_1`, `name_2`, ... -/
+partial def destructAnd (g : MVarId) (h : Ident) (name : String) (k : Nat := 1) : TacticM (MVarId × Array Term) := do
+  let t ← g.withContext do
+    let some d := (← getLCtx).findFromUserName? h.getId | return Expr.const ``True []
+    whnfR (← instantiateMVars d.type)
+  if t.isAppOfArity ``And 2 then
+    let hk := mkIdent (Name.mkSimple s!"{name}_{k}")
+    let [g'] ← run g (← `(tactic| obtain ⟨$hk:ident, $h:ident⟩ := $h:ident)) | return (g, #[])
+    let (g'', fs) ← destructAnd g' h name (k + 1)
+    return (g'', #[(← `($hk))] ++ fs)
+  else
+    return (g, #[← `($h)])
+
+set_option hygiene false in
+/-- A call (or tail call) to a function with a `Verified` theorem: the
+    callee's specification in place of its code. Returns the goals to run on
+    after the call, with their contexts, and the goals left. -/
+def closeCall (cx : Ctx) (g : MVarId) (pc : Nat) (thm : Term) (calleeSpec : Name) (s1 : Expr) :
+    TacticM (List (MVarId × Ctx) × List MVarId) := do
+  let fs ← simpArgs cx.facts
+  let sp := cx.spec
+  let he := cx.he
+  let rs := cx.rs
+  let csp := mkIdent calleeSpec
+  let tag ← endTag cx s!"{cx.origin}_call_{hex pc}"
+  let cdoneI := mkIdent (Name.mkSimple s!"nocompiler_cdone_{tag}")
+  let cframeI := mkIdent (Name.mkSimple s!"nocompiler_cframe_{tag}")
+  let cxI := mkIdent (Name.mkSimple s!"nocompiler_cx_{tag}")
+  let cpcI := mkIdent (Name.mkSimple s!"nocompiler_cpc_{tag}")
+  let cpresI := mkIdent (Name.mkSimple s!"nocompiler_cpres_{tag}")
+  let cpostI := mkIdent (Name.mkSimple s!"nocompiler_cpost_{tag}")
+  let cexI := mkIdent (Name.mkSimple s!"nocompiler_cex_{tag}")
+  let conI := mkIdent (Name.mkSimple s!"nocompiler_con_{tag}")
+  let cpI := mkIdent (Name.mkSimple s!"nocompiler_cp_{tag}")
+  let cmemI := mkIdent (Name.mkSimple s!"nocompiler_cmem_{tag}")
+  let cS := mkIdent (Name.mkSimple s!"nocompiler_sc_{tag}")
+  let gs ← run g (← `(tactic| refine' Verified.call $thm _ ?_ ?_ ?_ ?_ ?_))
+  let kind (g : MVarId) : MetaM String := do
+    let t0 ← instantiateMVars (← g.getType)
+    if t0.isAppOf ``Spec.pre then return "pre"
+    let t ← whnfR t0
+    if t.isAppOf ``Entry then return "he"
+    if t.isAppOf ``Dom.sub then return "hD"
+    if t.isAppOf ``Perm.le then return "hP"
+    if t.isForall then return "k"
+    return "arg"
+  let mut byKind : Std.HashMap String MVarId := {}
+  for g in gs do
+    let k ← kind g
+    byKind := byKind.insert k g
+  -- The callee's arguments: a structure of unknowns, found by unification below.
+  if let some ga := byKind["arg"]? then
+    ga.withContext do
+      let ty ← whnf (← instantiateMVars (← ga.getType))
+      -- A structure, or any inductive with one constructor (PUnit is not a structure).
+      if let .const n lvls := ty.getAppFn then
+        if let some (.inductInfo iv) := (← getEnv).find? n then
+          if let [ctorName] := iv.ctors then
+            let c := mkConst ctorName lvls
+            let (ms, _, _) ← forallMetaTelescope (← instantiateForall (← inferType c) ty.getAppArgs)
+            ga.assign (mkAppN (mkAppN c ty.getAppArgs) ms)
+  let mut left := []
+  if let some gp := byKind["pre"]? then
+    let r ← run gp (← `(tactic| (simp only [$csp:ident]; nocompiler_vnorm [$fs,*])))
+    let r ← r.foldlM (fun acc g => return acc ++ (← splitGoal g)) []
+    let r ← finish cx r
+    left := left ++ (← tagged r s!"{tag}_pre")
+  if let some gh := byKind["he"]? then
+    let [g1, g2, g3, g4, g5] ← run gh (← `(tactic| refine ⟨?_, ?_, ?_, ?_, ?_⟩)) | throwError "nocompiler_auto: Entry"
+    left := left ++ (← run g1 (← `(tactic| ((try nocompiler_anorm [$fs,*]) <;> rfl))))
+    left := left ++ (← run g2 (← exitTac))
+    left := left ++ (← run g3 (← `(tactic| ((try nocompiler_anorm [$fs,*]) <;> first
+      | decide | exact NoCompiler.Auto.Dom.not_mem_of_sub (Dom.sub_of_ranges (by decide)) ($he).ret))))
+    left := left ++ (← run g4 (← `(tactic| ((try nocompiler_anorm [$fs,*]) <;> first
+      | decide | exact ($he).retAligned | trivial))))
+    left := left ++ (← run g5 (← `(tactic| ((try nocompiler_anorm [$fs,*]) <;> nocompiler_align))))
+  if let some gd := byKind["hD"]? then
+    left := left ++ (← run gd (← `(tactic| exact Dom.sub_of_ranges (by decide))))
+  if let some gP := byKind["hP"]? then
+    let r ← run gP (← `(tactic| (refine Perm.le_of ?_ ?_ <;>
+      simp (disch := nocompiler_disch) only [Spec.perm, Spec.stackRegion, $csp:ident, $sp:ident, Segment.region,
+        List.size_toArray, List.length_cons, List.length_nil, List.cons_append, List.nil_append,
+        List.append_nil, List.mem_cons, List.mem_append, List.mem_nil_iff, or_false, false_or,
+        forall_eq_or_imp, forall_eq, exists_eq_or_imp, exists_eq_left, List.not_mem_nil, false_and,
+        exists_false, imp_false, not_false_eq_true, true_and, and_true, false_implies, implies_true,
+        forall_const, Region.within, nocompiler_state, nocompiler_nat, Nat.reducePow, Nat.reduceAdd, Nat.reduceSub, Nat.reduceMod, $fs,*] <;>
+      (try omega))))
+    left := left ++ (← tagged r s!"{tag}_perm")
+  let mut cont := []
+  if let some gk := byKind["k"]? then
+    let s1T ← gk.withContext do Term.exprToSyntax s1
+    let r ← run gk (← `(tactic| intro $cS:ident $cdoneI:ident $cframeI:ident))
+    let r ← r.foldlM (fun acc g => do return acc ++ (← run g (← `(tactic|
+      rcases $cdoneI:ident with ⟨$cxI:ident, $cpcI:ident, $cpresI:ident, $cpostI:ident⟩ | ⟨$cexI:ident, $conI:ident⟩)))) []
+    for g' in r do
+      let isRet ← g'.withContext do return ((← getLCtx).findFromUserName? cpostI.getId).isSome
+      if isRet then
+        let r1 ← run g' (← `(tactic| ((try simp only [$csp:ident] at $cpostI:ident); (try exact ($cpostI).elim))))
+        for g1 in r1 do
+          -- What the callee leaves: the pc, the registers it preserves, its postcondition, memory.
+          let steps : List (TSyntax `tactic) := [
+            ← `(tactic| have $(mkIdent `nocompiler_hx):ident := $cxI),
+            ← `(tactic| have $cpI:ident : ∀ r, r ∈ preservedRegs → ($cS).reg r = State.reg $s1T r := $cpresI),
+            ← `(tactic| (try have $cmemI:ident : ($cS).mem = State.mem $s1T := funext fun x => $cframeI x (by
+                simp [Perm.writable, Spec.perm, Spec.stackRegion, $csp:ident, Region.mem]))),
+            ← `(tactic| (try have $(mkIdent `nocompiler_hS):ident : Same $(cx.s0) $cS:ident $rs :=
+                Same.after_call (by nocompiler_same) $cpresI (nonPreserved_spec _ (by decide)))),
+            ← `(tactic| nocompiler_anorm [$fs,*] at $cpcI:ident),
+            ← `(tactic| (try nocompiler_anorm [$fs,*] at $cmemI:ident))]
+          -- One equation per callee-saved register, normalised now with what is
+          -- known at the call: a later normalisation then never has to go back
+          -- through this call (or an earlier one) to find a register.
+          let mut regSteps : Array (TSyntax `tactic) := #[]
+          for r in preservedNats do
+            let ci := mkIdent (Name.mkSimple s!"nocompiler_cp{r}_{tag}")
+            regSteps := regSteps.push (← `(tactic|
+              have $ci:ident : ($cS).reg $(natLit r) = State.reg $s1T $(natLit r) := $cpI _ (by decide)))
+            regSteps := regSteps.push (← `(tactic| (try nocompiler_anorm [$fs,*] at $ci:ident)))
+          let steps := steps ++ regSteps.toList
+          let mut r2 := [g1]
+          for t in steps do
+            r2 ← r2.foldlM (fun acc g => return acc ++ (← run g t)) []
+          for g2 in r2 do
+            let (g3, postFacts) ← destructAnd g2 cpostI s!"hc_{(hex pc).drop 2}"
+            let (newFacts) ← g3.withContext do
+              let mut out : Array Term := #[← `($cpcI), ← `(nocompiler_hx)]
+              for r in preservedNats do
+                out := out.push (← `($(mkIdent (Name.mkSimple s!"nocompiler_cp{r}_{tag}")):ident))
+              if ((← getLCtx).findFromUserName? cmemI.getId).isSome then out := out.push (← `($cmemI))
+              return out ++ postFacts
+            cont := cont ++ [(g3, { cx with facts := cx.facts ++ newFacts })]
+      else
+        -- The callee ended the process: this function's `onExit`.
+        let r1 ← run g' (← `(tactic| (subst $(cx.hR):ident; refine $(mkIdent cx.fl.done) ?_; (try dsimp only); left)))
+        let r1 ← r1.foldlM (fun acc g => do
+          return acc ++ (← run g (← `(tactic| refine ⟨.inr $cexI, .inr ⟨$cexI, ?_⟩⟩)))) []
+        let r2 ← r1.foldlM (fun acc g => do
+          return acc ++ (← run g (← `(tactic| ((try simp only [$csp:ident] at $conI:ident) <;> (try simp only [$sp:ident])))))) []
+        let r2 ← r2.foldlM (fun acc g => do
+          return acc ++ (← run g (← `(tactic| (try nocompiler_vnorm [$conI:ident, $fs,*]))))) []
+        let r2 ← r2.foldlM (fun acc g => return acc ++ (← splitGoal g)) []
+        let r2 ← finish cx r2
+        left := left ++ (← tagged r2 s!"{tag}_exit")
+  return (cont, left)
+
 /-- Run from the goal's state to the next cut points or returns. -/
 partial def drive (cx : Ctx) (first : Bool) (fuel : Nat) (g : MVarId) (last : Nat) :
     TacticM (List MVarId) := do
@@ -880,11 +1368,25 @@ partial def drive (cx : Ctx) (first : Bool) (fuel : Nat) (g : MVarId) (last : Na
           out := out ++ (← drive cx false (fuel - 1) g'' last)
       return out
   traceLine "[drive] head"
+  if (a.find? (·.isAppOf ``State.halt)).isSome then
+    return ← closeExit cx g last
   let some pc ← pcOf a
     | closeRet cx g last
   traceLine s!"[drive] at {hex pc}"
   if !first && cx.cuts.contains pc then
     return ← closeCut cx g pc
+  if let some (_, thm, csp) := cx.callees.find? (·.1 == pc) then
+    let (cont, left) ← closeCall cx g pc thm csp a
+    let mut out := left
+    for (g', cx') in cont do
+      out := out ++ (← g'.withContext do drive cx' false (fuel - 1) g' pc)
+    return out
+  if cx.ecalls.contains pc then
+    let (cont, left) ← stepSys cx g pc
+    let mut out := left
+    for g' in cont do
+      out := out ++ (← g'.withContext do drive cx false (fuel - 1) g' pc)
+    return out
   let (g', left) ← step cx g pc
   return left ++ (← drive cx false (fuel - 1) g' pc)
 
@@ -899,13 +1401,31 @@ syntax nocompilerCut := "loop_inv " term:max ppSpace term:max " measure " term:m
     cannot close is left as goals named after the path: `entry_to_0x…`,
     `0x…_to_0x…`, `…_ret_0x…`, `…_measure`. -/
 syntax (name := nocompilerAuto) "nocompiler_auto " term:max ident ident (" [" Lean.Parser.Tactic.simpArg,* "]")?
-  (ppLine nocompilerCut)* : tactic
+  (" calls " "[" term,* "]")? (ppLine nocompilerCut)* : tactic
 
 unsafe def evalNatListImpl (e : Expr) : MetaM (List Nat) :=
   evalExpr (List Nat) (mkApp (mkConst ``List [Level.zero]) (mkConst ``Nat)) e
 @[implemented_by evalNatListImpl] opaque evalNatList (e : Expr) : MetaM (List Nat)
 unsafe def evalNatImpl (e : Expr) : MetaM Nat := evalExpr Nat (mkConst ``Nat) e
 @[implemented_by evalNatImpl] opaque evalNat (e : Expr) : MetaM Nat
+
+/-- `simp only [t]` accepts `t` (it elaborates and is a rewrite rule). -/
+def simpAccepts (t : Term) : TermElabM Bool := do
+  let st ← saveState
+  let n0 := (← getThe Core.State).messages.toList.length
+  try
+    let g ← mkFreshExprMVar (mkConst ``True)
+    let l ← `(Lean.Parser.Tactic.simpLemma| $t:term)
+    let args : Syntax.TSepArray [``Lean.Parser.Tactic.simpStar, ``Lean.Parser.Tactic.simpErase,
+      ``Lean.Parser.Tactic.simpLemma] "," := Syntax.TSepArray.ofElems #[⟨l.raw⟩]
+    let tac ← `(tactic| simp only [$args,*])
+    let _ ← Term.withoutErrToSorry <| Tactic.run g.mvarId! (Tactic.evalTactic tac)
+    let bad := (← getThe Core.State).messages.toList.length != n0
+    st.restore
+    return !bad
+  catch _ =>
+    st.restore
+    return false
 
 /-- Facts every normalisation uses, from the hypotheses of the context. -/
 def contextFacts (us : List Expr) : TermElabM (Array Term) := do
@@ -924,16 +1444,20 @@ def contextFacts (us : List Expr) : TermElabM (Array Term) := do
       let t ← Term.exprToSyntax x
       out := out.push (← `(readBytes_writeLE_of_disjoint $t))
       out := out.push (← `(readBytes_writeLE_of_disjoint (Region.Disjoint.symm $t)))
+      out := out.push (← `(writeLE_apply_of_disjoint $t))
+      out := out.push (← `(writeLE_apply_base_of_disjoint $t))
+      out := out.push (← `(loaded_writeLE_iff $t))
+      out := out.push (← `(arr64_writeLE_iff $t))
     if ty.isAppOfArity ``arr64 3 then
       out := out.push (← `(arr64.read $(← Term.exprToSyntax x)))
-  -- Keep what elaborates: one ill-typed simp argument would void a whole pass.
-  out.filterM fun t => do
-    try
-      let s ← saveState
-      let _ ← Term.elabTerm t none
-      s.restore
-      return true
-    catch _ => return false
+    -- `∀ x, (arrRegion a xs).mem x → ¬ R.mem x`: the array survives stores into R.
+    if ty.isForall then
+      if let .forallE _ _ b _ := ty then
+        if b.isArrow && b.bindingDomain!.isAppOfArity ``Region.mem 2 &&
+            (b.bindingDomain!.getArg! 0).isAppOfArity ``arrRegion 2 then
+          out := out.push (← `(arr64_writeLE_of_outside $(← Term.exprToSyntax x)))
+  -- Keep what `simp` accepts: one bad simp argument would void a whole pass.
+  out.filterM fun t => simpAccepts t
 
 /-- Alignment hypotheses as the arithmetic `omega` reads. -/
 def alignFacts : TacticM Unit := withMainContext do
@@ -981,7 +1505,9 @@ def parseCall (fl : Flavor) (s0 he : Syntax) (factsStx : Syntax) (cutStx : Array
   return { s0 := ⟨s0⟩, he := ⟨he⟩, userFacts, code, specName, cuts }
 
 /-- The run, from the cut points on. -/
-def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat) : TacticM Unit := do
+def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat)
+    (callees : Array (Nat × Term × Name) := #[]) (ecallList : List Nat := []) (frameList : List Nat := []) :
+    TacticM Unit := do
   let s0 := call.s0
   let he := call.he
   let userFacts := call.userFacts
@@ -1001,10 +1527,20 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
     let pcL := natLit pcN
     invChain ← `(if $pcIdent = BitVec.ofNat 64 $pcL then $iT $uIdent else $invChain)
     muChain ← `(if $pcIdent = BitVec.ofNat 64 $pcL then $mT $uIdent else $muChain)
+  -- The frame: sp, and every register the prologue saved, still in its slot.
+  let mut frameT ← `(True)
+  if let n :: slots := frameList then
+    let W := 18446744073709551616
+    let pairs := (List.range (slots.length / 2)).map fun i => (slots[2 * i]!, slots[2 * i + 1]!)
+    for (k, r) in pairs.reverse do
+      frameT ← `(read64 (State.mem $uIdent) (State.reg $s0 2 + BitVec.ofNat 64 $(natLit (W - n + k))) =
+        State.reg $s0 $(natLit r) ∧ $frameT)
+    frameT ← `(State.reg $uIdent 2 = State.reg $s0 2 + BitVec.ofNat 64 $(natLit (W - n)) ∧ $frameT)
   let invT ← `(fun ($pcIdent : Word) ($uIdent : State) =>
-    State.exit $uIdent = none ∧ Same $s0 $uIdent $rs ∧ $invChain)
+    State.exit $uIdent = none ∧ Same $s0 $uIdent $rs ∧ $frameT ∧ $invChain)
   let muT ← `(fun ($pcIdent : Word) ($uIdent : State) => $muChain)
   traceLine "[nocompiler_auto] alignFacts"
+  evalTactic (← `(tactic| have := (show (State.reg $s0 2).toNat % 16 = 0 from ($he).sp)))
   alignFacts
   let hR := mkIdent `nocompiler_hR
   let R := mkIdent `nocompiler_R
@@ -1038,6 +1574,8 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
         fl := fl
         log := logOpt
         ends := some endsRef
+        callees := callees
+        ecalls := ecallList
         cuts := heads
         facts := userFacts ++ retFacts ++ fs ++ own
         rs := rs
@@ -1052,11 +1590,15 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
   let gBody0 := gBody
   let [gBody] ← run gBody (← `(tactic| intro $uIdent:ident $hI:ident $R:ident $hR:ident))
     | throwError "nocompiler_auto: body"
-  let [gBody] ← run gBody (← `(tactic| obtain ⟨$hx:ident, $hS:ident, $hI:ident⟩ := $hI:ident))
+  let hF := mkIdent `nocompiler_hF
+  let [gBody] ← run gBody (← `(tactic| obtain ⟨$hx:ident, $hS:ident, $hF:ident, $hI:ident⟩ := $hI:ident))
     | throwError "nocompiler_auto: body"
-  let [gBody] ← run gBody (← `(tactic|
-      have $hra:ident : ($uIdent).reg 1 = ($s0).reg 1 := $hS:ident 1 (by decide)))
-    | throwError "nocompiler_auto: body"
+  let (gBody, frameFacts) ← destructAnd gBody hF "nocompiler_fr"
+  let gBody ← if rsList.contains 1 then pure gBody else do
+    let [g'] ← run gBody (← `(tactic|
+        have $hra:ident : ($uIdent).reg 1 = ($s0).reg 1 := $hS:ident 1 (by decide)))
+      | throwError "nocompiler_auto: body"
+    pure g'
   let mut bodyGoals := []
   let mut pending := [gBody]
   let mut done := []
@@ -1105,11 +1647,13 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
       let some ud := (← getLCtx).findFromUserName? `u | throwError "nocompiler_auto: u"
       let some pc ← pcOf (mkFVar ud.fvarId) | throwError "nocompiler_auto: pc of a loop head"
       let fs ← contextFacts [mkFVar ud.fvarId, ← Term.elabTerm s0 none]
-      let own : Array Term := #[hpc, hx, hra]
+      let own : Array Term := (if rsList.contains 1 then #[hpc, hx] else #[hpc, hx, hra]) ++ frameFacts
       let cx : Ctx := {
         fl := fl
         log := logOpt
         ends := some endsRef
+        callees := callees
+        ecalls := ecallList
         cuts := heads
         facts := userFacts ++ retFacts ++ fs ++ own
         rs := rs
@@ -1143,18 +1687,32 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
 @[tactic nocompilerAuto] def evalNoCompilerAuto : Tactic := fun stx => do
   traceLine "[nocompiler_auto] start"
   let f : Term := ⟨stx[1]⟩
-  let call ← parseCall {} stx[2] stx[3] stx[4] stx[5].getArgs
+  let call ← parseCall {} stx[2] stx[3] stx[4] stx[6].getArgs
+  -- The callees: entry, theorem, specification.
+  let calleeTerms : Array Term := if stx[5].isNone then #[] else stx[5][2].getSepArgs.map (⟨·⟩)
+  let mut callees : Array (Nat × Term × Name) := #[]
+  for t in calleeTerms do
+    let ty ← instantiateMVars (← inferType (← Term.elabTerm t none))
+    unless ty.isAppOfArity ``Verified 5 do throwError "nocompiler_auto: {t} is not a `Verified` theorem"
+    let entry := ty.getArg! 3
+    let some spN := (ty.getArg! 4).getAppFn.constName? | throwError "nocompiler_auto: the spec of {t} must be a constant"
+    callees := callees.push (← evalNat (← mkAppM ``BitVec.toNat #[entry]), t, spN)
   -- The function's tree: its loop heads are the cut points.
   let fE ← Term.elabTerm f (some (mkConst ``Struct.Func))
   let heads ← evalNatList (mkApp (mkConst ``loopHeads) fE)
   let rsList ← evalNatList (mkApp2 (mkConst ``writes) call.code fE)
+  -- A function that calls may lose every caller-saved register to its callee.
+  let rsList := if callees.isEmpty then rsList else
+    (rsList ++ nonPreserved.filter (fun r => r != 1 || rsList.contains 1)).eraseDups
+  let ecallList ← evalNatList (mkApp2 (mkConst ``ecalls) call.code fE)
+  let frameList ← evalNatList (mkApp2 (mkConst ``frameOf) call.code fE)
   let entryN ← evalNat (← mkAppM ``BitVec.toNat #[mkApp (mkConst ``Struct.Func.entry) fE])
   let given := call.cuts.toList.map (·.1)
   for h in heads do
     unless given.contains h do throwError "nocompiler_auto: no invariant for the loop at {hex h}"
   for h in given do
     unless heads.contains h do throwError "nocompiler_auto: {hex h} is not a loop head of {f}"
-  autoCore {} call heads rsList entryN
+  autoCore {} call heads rsList entryN callees ecallList frameList
 
 
 end NoCompiler.Auto
