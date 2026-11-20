@@ -190,7 +190,7 @@ pub enum Command {
         #[arg(long, value_name = "NAME")]
         function: Option<String>,
         /// The report as JSON.
-        #[arg(long)]
+        #[arg(long, global = true)]
         json: bool,
         /// Stop after this many instructions.
         #[arg(long, value_name = "N")]
