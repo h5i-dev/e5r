@@ -309,4 +309,97 @@ theorem Refines.of_sim {α : Type} {sp : Spec α} {eA eB : Word}
 
 end Sim
 
+/-! ## Big-step simulation -/
+
+section BigSim
+variable {cA cB : Code} {P : Perm} {DA DB : Dom}
+
+/-- One or more `P`-steps of A inside `DA`. -/
+def RunPlus (c : Code) (P : Perm) (D : Dom) (s t : State) : Prop :=
+  ∃ s₁, D.mem s.pc ∧ Step c P s s₁ ∧ Run c P D s₁ t
+
+/-- A big-step simulation: from related states, if B has finished then A can
+    finish with the same observations; otherwise B's run (every run) reaches
+    states related to states A reaches by one or more steps. Single steps,
+    straight-line blocks and whole regions are all instances. The obligation
+    may use that A's run from `sa` is safe and terminates. -/
+structure BigSim (cA : Code) (DA : Dom) (cB : Code) (DB : Dom) (P : Perm) (dead : Region)
+    (R : State → State → Prop) : Prop where
+  fin : ∀ sa sb, R sa sb → Final DB sb →
+    ∃ ta, Run cA P DA sa ta ∧ Final DA ta ∧ Obs dead ta sb
+  move : ∀ sa sb, R sa sb → ¬ Final DB sb → Exec cA P DA (fun _ => True) sa →
+    Reach cB P DB (fun tb => ∃ ta, RunPlus cA P DA sa ta ∧ R ta tb) sb
+
+theorem RunPlus.not_final {c : Code} {P : Perm} {D : Dom} {s t : State} (h : RunPlus c P D s t) :
+    ¬ Final D s := by
+  obtain ⟨_, hd, hs, _⟩ := h
+  obtain ⟨_, _, _, hx⟩ := hs.instrOk
+  intro hf; rcases hf with h | h
+  · exact h hd
+  · exact h hx
+
+theorem BigSim.exec {dead : Region} {R : State → State → Prop}
+    (hs : BigSim cA DA cB DB P dead R) {s₀ : State} {Q : State → Prop}
+    (hA : Exec cA P DA Q s₀) :
+    ∀ sb, R s₀ sb →
+      Exec cB P DB (fun tb => ∃ ta, Run cA P DA s₀ ta ∧ Final DA ta ∧ Obs dead ta tb) sb := by
+  suffices H : ∀ sa, Reach cA P DA (fun s => Final DA s ∧ Q s) sa → ∀ sx, Run cA P DA sa sx →
+      Run cA P DA s₀ sx → ∀ sb, R sx sb →
+      Exec cB P DB (fun tb => ∃ ta, Run cA P DA s₀ ta ∧ Final DA ta ∧ Obs dead ta tb) sb from
+    fun sb hr => H s₀ hA s₀ (.refl _) (.refl _) sb hr
+  intro sa hA
+  induction hA with
+  | @done sa hq =>
+    intro sx hrun h0 sb hr
+    rw [hrun.of_final hq.1] at hr h0
+    by_cases hf : Final DB sb
+    · obtain ⟨ta, hra, hfa, ho⟩ := hs.fin _ _ hr hf
+      exact .done ⟨hf, ta, h0.trans hra, hfa, ho⟩
+    · exact Reach.mono (fun _ ⟨_, hp, _⟩ => absurd hq.1 hp.not_final)
+        (hs.move _ _ hr hf (.done ⟨hq.1, trivial⟩))
+  | @step sa hdA hex hall ih =>
+    intro sx hrun h0 sb hr
+    cases hrun with
+    | step _ hst hrun' => exact ih _ hst sx hrun' h0 sb hr
+    | refl =>
+      by_cases hf : Final DB sb
+      · obtain ⟨ta, hra, hfa, ho⟩ := hs.fin _ _ hr hf
+        exact .done ⟨hf, ta, h0.trans hra, hfa, ho⟩
+      · have hA' : Exec cA P DA (fun _ => True) sa :=
+          Exec.mono (fun _ _ => trivial) (Reach.step hdA hex hall)
+        refine Reach.trans (hs.move _ _ hr hf hA') (fun tb ⟨ta, ⟨s₁, _, hst, hrun₁⟩, hr'⟩ => ?_)
+        exact ih s₁ hst ta hrun₁ (h0.trans (.step hdA hst hrun₁)) tb hr'
+
+theorem Refines.of_bigSim {α : Type} {sp : Spec α} {eA eB : Word}
+    (R : α → State → State → State → Prop)
+    (hsim : ∀ a s, Entry DA eA s → ¬ DB.mem (s.reg Reg.ra) → sp.pre a s →
+      BigSim cA DA cB DB (sp.perm a s) (sp.dead s) (R a s))
+    (hR : ∀ a s, Entry DA eA s → sp.pre a s → R a s s (s.setPc eB)) :
+    Refines sp cA DA eA cB DB eB := by
+  intro a s he hb hp hA
+  exact (hsim a s he hb hp).exec hA _ (hR a s he hp)
+
+/-- A safe run in `D` is a safe run in any `E ⊆ D`, stopped at `E`'s exit. -/
+theorem Exec.restrict {c : Code} {P : Perm} {D E : Dom} {Q : State → Prop} {s : State}
+    (h : Exec c P D Q s) (hE : E.sub D) : Exec c P E (fun _ => True) s := by
+  induction h with
+  | done hq =>
+    refine .done ⟨?_, trivial⟩
+    rcases hq.1 with h | h
+    · exact .inl (fun hm => h (hE _ hm))
+    · exact .inr h
+  | @step s hd hex _ ih =>
+    by_cases hm : E.mem s.pc
+    · exact .step hm hex ih
+    · exact .done ⟨.inl hm, trivial⟩
+
+/-- A run inside `E ⊆ D` is a run inside `D`. -/
+theorem Run.mono_dom {c : Code} {P : Perm} {D E : Dom} {s t : State} (h : Run c P E s t)
+    (hE : E.sub D) : Run c P D s t := by
+  induction h with
+  | refl => exact .refl _
+  | step hd hs _ ih => exact .step (hE _ hd) hs ih
+
+end BigSim
+
 end NoCompiler

@@ -1,4 +1,4 @@
-import NoCompiler.RefineCongr
+import NoCompiler.RefineRegion
 
 /-
 Refinement by a checked lockstep certificate (docs/isa/refine.md).
@@ -38,13 +38,21 @@ structure Pair where
   live : List Reg
   deriving DecidableEq, Repr
 
-abbrev Cert := List Pair
+/-- A certificate: pairs of identical instructions, and regions (changed
+    intervals, each proved separately by `RRegion.Ok`). -/
+structure Cert where
+  pairs : List Pair
+  regions : List RRegion := []
+
+/-- The program points: every pair, and every region's entry with its live set. -/
+def Cert.points (k : Cert) : List Pair :=
+  k.pairs ++ k.regions.map fun r => ⟨r.pb, r.pa, r.liveIn⟩
 
 def Cert.find (k : Cert) (pb pa : Word) : Option Pair :=
-  k.find? fun e => e.pb == pb && e.pa == pa
+  k.points.find? fun e => e.pb == pb && e.pa == pa
 
 theorem Cert.find_some {k : Cert} {pb pa : Word} {e : Pair} (h : k.find pb pa = some e) :
-    e ∈ k ∧ e.pb = pb ∧ e.pa = pa := by
+    e ∈ k.points ∧ e.pb = pb ∧ e.pa = pa := by
   unfold Cert.find at h
   have hm := List.mem_of_find?_eq_some h
   have hp := List.find?_some h
@@ -71,7 +79,7 @@ def succOk (k : Cert) (i : Instr) (L : List Reg) (pb pa : Word) : Bool :=
   | none => false
 
 theorem succOk_sound {k : Cert} {i : Instr} {L : List Reg} {pb pa : Word}
-    (h : succOk k i L pb pa = true) : ∃ e ∈ k, e.pb = pb ∧ e.pa = pa ∧ i.transfer e.live L := by
+    (h : succOk k i L pb pa = true) : ∃ e ∈ k.points, e.pb = pb ∧ e.pa = pa ∧ i.transfer e.live L := by
   unfold succOk at h
   split at h
   · rename_i e he
@@ -105,9 +113,17 @@ def pairOk (cA cB : Code) (DA DB : Dom) (k : Cert) (e : Pair) : Bool :=
   | some ia => !(ia.defs.contains 1) && kindOk k e ia
   | none => false
 
+/-- What the kernel decides of a region: its shape, and that its exit is a
+    point whose live set its `liveOut` covers. -/
+def regionOk (DA DB : Dom) (k : Cert) (r : RRegion) : Bool :=
+  r.shapeOk DA DB &&
+  match k.find r.pbExit r.paExit with
+  | some e => e.live.all r.liveOut.contains
+  | none => false
+
 /-- The certificate check. -/
 def check (cA cB : Code) (DA DB : Dom) (eA eB : Word) (k : Cert) : Bool :=
-  k.all (pairOk cA cB DA DB k) && (k.find eB eA).isSome
+  k.pairs.all (pairOk cA cB DA DB k) && k.regions.all (regionOk DA DB k) && (k.find eB eA).isSome
 
 /-! ## Soundness -/
 
@@ -117,7 +133,7 @@ variable {cA cB : Code} {DA DB : Dom} {k : Cert}
 /-- The relation the certificate is a simulation for, from entry state `s0`:
     running in step at a pair, both returned to `s0`'s ra, or both exited. -/
 def Rel (k : Cert) (s0 sa sb : State) : Prop :=
-  (sa.exit = none ∧ sa.reg 1 = s0.reg 1 ∧ ∃ e ∈ k, sb.pc = e.pb ∧ sa.pc = e.pa ∧ Agree e.live sa sb) ∨
+  (sa.exit = none ∧ sa.reg 1 = s0.reg 1 ∧ ∃ e ∈ k.points, sb.pc = e.pb ∧ sa.pc = e.pa ∧ Agree e.live sa sb) ∨
   (sa.exit = none ∧ sa.pc = s0.reg 1 ∧ sb.pc = s0.reg 1 ∧ Agree obsRegs sa sb) ∨
   (sa.exit ≠ none ∧ Agree [] sa sb)
 
@@ -213,7 +229,7 @@ theorem step_pair {P : Perm} {s0 : State} (hral : aligned (s0.reg 1) 4) {e : Pai
   have hiA : cA.instr sa.pc = some i := hpa ▸ hf.instrA
   have hk := hf.kind
   -- the next pair, for an instruction that falls through
-  have next : ∀ {sa' sb' : State} {L : List Reg}, (∃ e' ∈ k, e'.pb = e.pb + 4 ∧ e'.pa = e.pa + 4 ∧
+  have next : ∀ {sa' sb' : State} {L : List Reg}, (∃ e' ∈ k.points, e'.pb = e.pb + 4 ∧ e'.pa = e.pa + 4 ∧
       i.transfer e'.live e.live) → sa'.exit = none → sa'.reg 1 = s0.reg 1 → sa'.pc = sa.pc + 4 →
       sb'.pc = sb.pc + 4 → (∀ {e' : Pair}, i.transfer e'.live e.live → Agree e'.live sa' sb') →
       Rel k s0 sa' sb' := by
@@ -345,53 +361,101 @@ theorem progress_pair {P : Perm} {e : Pair} {i : Instr} (hf : PairFacts cA cB DA
       | none => rw [← hnone] at h; rw [h] at hexa; cases hexa
       | some sb' => exact ⟨sb', rfl⟩
 
-/-- Soundness of the certificate check: a lockstep certificate proves that B
-    refines A, for every specification. -/
-theorem _root_.NoCompiler.Refines.of_lockstep {α : Type} {sp : Spec α} {eA eB : Word}
-    (hc : check cA cB DA DB eA eB k = true) : Refines sp cA DA eA cB DB eB := by
+theorem shapeOk_facts {r : RRegion} (h : r.shapeOk DA DB = true) :
+    r.domB.mem r.pb ∧ r.domA.mem r.pa ∧ ¬ r.domB.mem r.pbExit ∧ ¬ r.domA.mem r.paExit ∧
+      r.domB.sub DB ∧ r.domA.sub DA := by
+  unfold RRegion.shapeOk at h
+  simp only [Bool.and_eq_true, decide_eq_true_eq, Bool.not_eq_true', decide_eq_false_iff_not] at h
+  obtain ⟨⟨⟨⟨⟨h1, h2⟩, h3⟩, h4⟩, h5⟩, h6⟩ := h
+  exact ⟨h1, h2, h3, h4, Dom.sub_of_rangeIn h5, Dom.sub_of_rangeIn h6⟩
+
+/-- Soundness of the certificate check: a certificate whose regions are all
+    proved gives `Refines sp A B`, for every specification. -/
+theorem _root_.NoCompiler.Refines.of_cert {α : Type} {sp : Spec α} {eA eB : Word}
+    (hc : check cA cB DA DB eA eB k = true) (hreg : ∀ r ∈ k.regions, r.Ok cA cB) :
+    Refines sp cA DA eA cB DB eB := by
   unfold check at hc
   simp only [Bool.and_eq_true, List.all_eq_true, Option.isSome_iff_exists] at hc
-  obtain ⟨hall, e0, he0⟩ := hc
+  obtain ⟨⟨hall, hrall⟩, e0, he0⟩ := hc
   obtain ⟨hm0, hb0, ha0⟩ := Cert.find_some he0
-  have facts : ∀ e ∈ k, ∃ i, PairFacts cA cB DA DB k e i := fun e he => pairOk_facts (hall e he)
-  refine Refines.of_sim (fun _ s => Rel k s) (fun _ => 0) (fun a s he hraB _ => ?_)
+  have facts : ∀ e ∈ k.pairs, ∃ i, PairFacts cA cB DA DB k e i := fun e he => pairOk_facts (hall e he)
+  -- a point is a pair or a region's entry
+  have point : ∀ e ∈ k.points, e ∈ k.pairs ∨ ∃ r ∈ k.regions, e = ⟨r.pb, r.pa, r.liveIn⟩ := by
+    intro e he
+    simp only [Cert.points, List.mem_append, List.mem_map] at he
+    rcases he with h | ⟨r, hr, rfl⟩
+    · exact .inl h
+    · exact .inr ⟨r, hr, rfl⟩
+  have pointMem : ∀ e ∈ k.points, DB.mem e.pb ∧ DA.mem e.pa := by
+    intro e he
+    rcases point e he with h | ⟨r, hr, rfl⟩
+    · obtain ⟨i, hfi⟩ := facts e h; exact ⟨hfi.memB, hfi.memA⟩
+    · simp only [regionOk, Bool.and_eq_true] at hrall
+      obtain ⟨h1, h2, _, _, h5, h6⟩ := shapeOk_facts (hrall r hr).1
+      exact ⟨h5 _ h1, h6 _ h2⟩
+  refine Refines.of_bigSim (fun _ s => Rel k s) (fun a s he hraB _ => ?_)
     (fun a s he _ => .inl ⟨he.live, rfl, e0, hm0, by simp [hb0], by rw [he.pc, ha0],
       ⟨fun _ _ => rfl, rfl, rfl, rfl⟩⟩)
   have hraA := he.ret
   have hral := he.retAligned
-  -- the three ways the relation holds, and finality
-  have runningNotFinal : ∀ {sa sb : State} {e : Pair}, e ∈ k → sb.pc = e.pb → sa.exit = none →
-      Agree e.live sa sb → ¬ Final DB sb := by
-    intro sa sb e he hpb hx hag hf
-    obtain ⟨i, hfi⟩ := facts e he
-    rcases hf with h | h
-    · exact h (hpb ▸ hfi.memB)
-    · exact h (hag.exit ▸ hx)
-  refine ⟨?fin, ?progress, ?step⟩
+  refine ⟨?fin, ?move⟩
   · intro sa sb hr hf
     rcases hr with ⟨hx, _, e, he, hpb, _, hag⟩ | ⟨hx, hpa, hpb, hag⟩ | ⟨hx, hag⟩
-    · exact absurd hf (runningNotFinal he hpb hx hag)
+    · exfalso
+      rcases hf with h | h
+      · exact h (hpb ▸ (pointMem e he).1)
+      · exact h (hag.exit ▸ hx)
     · refine ⟨sa, .refl _, .inl (hpa ▸ hraA), hag.trace, hag.exit, fun _ => ⟨hpa.trans hpb.symm,
-        fun r hr => hag.regs r (List.mem_cons_of_mem _ hr),
-        fun x _ => by rw [hag.mem]⟩⟩
+        fun r hr => hag.regs r (List.mem_cons_of_mem _ hr), fun x _ => by rw [hag.mem]⟩⟩
     · exact ⟨sa, .refl _, .inr hx, hag.trace, hag.exit, fun h => absurd h hx⟩
   · intro sa sb hr hf hA
-    rcases hr with ⟨hx, _, e, he, hpb, hpa, hag⟩ | ⟨_, _, hpb, _⟩ | ⟨hx, hag⟩
-    · obtain ⟨i, hfi⟩ := facts e he
-      rcases hA with hfa | ⟨sa', hst⟩
-      · rcases hfa with h | h
-        · exact absurd (hpa ▸ hfi.memA) h
-        · exact absurd hx h
-      · exact progress_pair hfi hpb hpa hag hst
-    · exact absurd (.inl (hpb ▸ hraB)) hf
-    · exact absurd (.inr (hag.exit ▸ hx)) hf
-  · intro sa sb hr hf _ sb' hst
     rcases hr with ⟨hx, hra, e, he, hpb, hpa, hag⟩ | ⟨_, _, hpb, _⟩ | ⟨hx, hag⟩
-    · obtain ⟨i, hfi⟩ := facts e he
-      obtain ⟨sa', hsa, hr'⟩ := step_pair hral hfi hx hra hpb hpa hag hst
-      exact .inl ⟨sa', sa', hpa ▸ hfi.memA, hsa, .refl _, hr'⟩
+    · rcases point e he with hp | ⟨r, hr, rfl⟩
+      · -- a pair: one step of each
+        obtain ⟨i, hfi⟩ := facts e hp
+        have hdA : DA.mem sa.pc := hpa ▸ hfi.memA
+        have hdB : DB.mem sb.pc := hpb ▸ hfi.memB
+        cases hA with
+        | done hq =>
+          rcases hq.1 with h | h
+          · exact absurd hdA h
+          · exact absurd hx h
+        | step _ hex _ =>
+          obtain ⟨sa₁, hst⟩ := hex
+          refine .step hdB (progress_pair hfi hpb hpa hag hst) (fun sb' h' => ?_)
+          obtain ⟨sa', hsa, hr'⟩ := step_pair hral hfi hx hra hpb hpa hag h'
+          exact .done ⟨sa', ⟨sa', hdA, hsa, .refl _⟩, hr'⟩
+      · -- a region: its proof
+        simp only [regionOk, Bool.and_eq_true] at hrall
+        obtain ⟨hrs, hexit⟩ := hrall r hr
+        obtain ⟨h1, h2, _, h4, h5, h6⟩ := shapeOk_facts hrs
+        split at hexit
+        · rename_i e' he'
+          obtain ⟨hm', hb', ha'⟩ := Cert.find_some he'
+          simp only [List.all_eq_true, List.contains_iff_mem] at hexit
+          have hB := hreg r hr _ sa sb hx hpa hpb hag trivial (hA.restrict h6)
+          refine Reach.bind hB (Perm.le_refl _) h5 (fun tb ⟨_, ta, hrun, hfa, hex⟩ => ?_)
+          -- A's run leaves the region, so it took at least one step
+          have hplus : RunPlus cA (sp.perm a s) DA sa ta := by
+            cases hrun with
+            | refl =>
+              exfalso; rcases hfa with h | h
+              · exact h (hpa ▸ h2)
+              · exact h hx
+            | step hd hs hrun' => exact ⟨_, h6 _ hd, hs, hrun'.mono_dom h6⟩
+          refine .done ⟨ta, hplus, ?_⟩
+          rcases hex with ⟨hxa, hpa', hpb', hra', hag'⟩ | ⟨hxa, hag'⟩
+          · exact .inl ⟨hxa, hra'.trans hra, e', hm', by rw [hpb', hb'], by rw [hpa', ha'],
+              hag'.mono hexit⟩
+          · exact .inr (.inr ⟨hxa, hag'⟩)
+        · simp at hexit
     · exact absurd (.inl (hpb ▸ hraB)) hf
     · exact absurd (.inr (hag.exit ▸ hx)) hf
+
+/-- A certificate without regions: lockstep. -/
+theorem _root_.NoCompiler.Refines.of_lockstep {α : Type} {sp : Spec α} {eA eB : Word}
+    (hc : check cA cB DA DB eA eB ⟨k.pairs, []⟩ = true) : Refines sp cA DA eA cB DB eB :=
+  Refines.of_cert hc (fun _ h => by simp at h)
 
 end
 

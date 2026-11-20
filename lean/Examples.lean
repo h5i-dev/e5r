@@ -6,3 +6,4 @@ import Examples.Link
 import Examples.LinkCalls
 import Examples.Refine.Relink
 import Examples.Refine.Straight
+import Examples.Refine.Peephole

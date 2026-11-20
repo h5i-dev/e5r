@@ -134,6 +134,11 @@ example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] =
 /-- The bv_decide tier: every theorem above checked with `#assert_bv_tier`. -/
 def bvTier : List String :=
   ["Examples.Refine.Straight.branchless_min", "Examples.Refine.Straight.round8"]
+#assert_standard_axioms NoCompiler.Refines.of_bigSim
+#assert_standard_axioms NoCompiler.Refines.of_cert
+#assert_standard_axioms NoCompiler.RRegion.Ok.of_instr
+#assert_standard_axioms Examples.Refine.Peephole.refines
+#assert_standard_axioms Examples.Refine.Peephole.sum_peephole
 
 -- The demo (demo/README.md): each function on the nocompiler build (B, `VerifiedImg`)
 -- and on the ordinary rv64gc build (A, `VerifiedC`, NoCompiler/Ext/Rvc.lean).

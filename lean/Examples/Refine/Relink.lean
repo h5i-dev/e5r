@@ -28,13 +28,13 @@ def eB : Word := Examples.Link.Img2.sum_entry
 def allRegs : List Reg := List.finRange 32
 
 /-- Pair i: B's i-th instruction with A's. -/
-def cert : Cert := (List.range 9).map fun i =>
-  ⟨eB + BitVec.ofNat 64 (4 * i), eA + BitVec.ofNat 64 (4 * i), allRegs⟩
+def cert : Cert := ⟨(List.range 9).map fun i =>
+  ⟨eB + BitVec.ofNat 64 (4 * i), eA + BitVec.ofNat 64 (4 * i), allRegs⟩, []⟩
 
 theorem cert_ok : check cA cB DA DB eA eB cert = true := by decide +kernel
 
 theorem sum_link2_refines : Refines Examples.Sum.spec cA DA eA cB DB eB :=
-  Refines.of_lockstep cert_ok
+  Refines.of_lockstep (k := cert) cert_ok
 
 theorem spec_pcFree : Examples.Sum.spec.PcFree where
   pre := fun _ _ _ => Iff.rfl
