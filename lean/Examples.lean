@@ -5,3 +5,4 @@ import Examples.FrameControls
 import Examples.Link
 import Examples.LinkCalls
 import Examples.Refine.Relink
+import Examples.Refine.Straight

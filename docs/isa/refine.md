@@ -61,10 +61,46 @@ A certificate is a list of pairs `(pb, pa, live)`: B at `pb` runs in step with A
 
 All theorems use only the standard axioms (`lean/Audit.lean`).
 
+## Item 6: straight-line equivalence (B)
+
+`lean/NoCompiler/RefineStraight.lean`. Two sequences of register
+instructions (`Instr.alu`: `lui`, the immediate and register ALU operations,
+the W forms, shifts, Zbb's unary operations; no loads, stores, jumps or
+`ecall` in this first version) are equivalent from live-in registers `L` to
+live-out registers `L'`:
+
+```lean
+def SeqEquiv (L L' : List Reg) (as bs : List Instr) : Prop :=
+  ∀ ga gb : RegFile, (∀ r ∈ L, ga.get r = gb.get r) →
+    ∀ r ∈ L', (runRegs as ga).get r = (runRegs bs gb).get r
+```
+
+`SeqEquiv.agree` lifts it to machine states and `Agree` (RefineCongr.lean):
+from states agreeing on `L`, both sequences run without faulting
+(`execSeq`), end agreeing on `L'` with memory, trace and exit status
+unchanged, at `pc + 4 * length` on each side. That is the obligation a pair
+of different straight-line intervals leaves in paired execution (item 3).
+
+Two tactics, two trust tiers ([trust.md](trust.md)):
+
+- `seq_equiv`: one bit-vector equation per live-out register, closed in the
+  kernel (`rfl`, `bv_normalize`, `bv_omega`, `simp`, `ac_rfl`). Standard axioms.
+- `seq_equiv_bv`: the same, then `bv_decide`. The theorem depends on an axiom
+  of native computation; the audit checks it with `#assert_bv_tier` and lists
+  it separately.
+
+**Examples** (`lean/Examples/Refine/Straight.lean`): in the kernel tier,
+`slli a0,a0,3` = `sh3add a0,a0,zero`; strength reduction `li t0,8; mul
+a0,a0,t0` = `slli a0,a0,3` (t0 dead); `slli t0,a1,3; add a0,a0,t0` =
+`sh3add a0,a1,a0`. In the bv_decide tier: a branchless minimum (5
+instructions) = Zbb `min`; rounding up to 8 by shifts = by `andi`. Controls,
+refuted in the kernel by a counterexample: `slli 3` is not `slli 2`, and
+the strength reduction is not an equivalence when the temporary is live out.
+
 ## Open (plan: STATUS-C)
 
 - **Item 3, paired execution.** Pairs of different instructions with a straight-line equivalence obligation, and relational invariants at loop heads (by default, the live state is equal).
-- **Item 6, straight-line equivalence.** Kernel normalisation first, `bv_decide` where it fails. Every theorem that depends on `Lean.ofReduceBool` goes into a separate trust tier, listed separately by the audit and in [trust.md](trust.md).
+- **Item 6, loads and stores** in straight-line sequences (above: registers only).
 - **Item 5, tree diff.** `nocompiler refine A.elf B.elf FUNC`: pairs the two block/loop trees, prints the changed intervals, and writes the certificate and the obligations.
 - **Item 4, region equivalence.** A differently shaped interval is cut out as a subtree on both sides, with an exit relation (k:1 unrolling, local summaries). Assumptions not derivable from A become explicit, reported preconditions.
 - **Frames.** Memory equal outside the dead stack, with different frame layouts in A and B (after A's T2).

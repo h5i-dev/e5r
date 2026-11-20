@@ -23,3 +23,4 @@ import NoCompiler.Refine
 import NoCompiler.RefineCongr
 import NoCompiler.RefineLockstep
 import NoCompiler.RefineRegion
+import NoCompiler.RefineStraight

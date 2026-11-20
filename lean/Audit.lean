@@ -23,6 +23,36 @@ elab "#assert_standard_axioms " id:ident : command => do
   let bad := axs.filter (fun a => !([``propext, ``Classical.choice, ``Quot.sound].contains a))
   unless bad.isEmpty do throwError "{n} depends on {bad.toList}"
 
+/-- An axiom of native computation: what `native_decide` and `bv_decide`
+    rest on (`Lean.ofReduceBool`, `Lean.trustCompiler`, and the per-theorem
+    `<thm>._native.*` axioms Lean 4.35 generates for them). -/
+def isNativeAxiom (n : Lean.Name) : Bool :=
+  n == `Lean.ofReduceBool || n == `Lean.trustCompiler ||
+    n.components.any (fun c => c == `_native)
+
+open Lean Elab Command in
+/-- The bv_decide tier (docs/isa/trust.md): fail unless the theorem's axioms
+    are the standard three plus axioms of native computation, at least one of
+    them. Such a theorem rests on the compiled evaluation of a SAT
+    certificate checker as well as on the kernel. -/
+elab "#assert_bv_tier " id:ident : command => do
+  let n ← liftCoreM (realizeGlobalConstNoOverload id)
+  let axs ← liftCoreM (Lean.collectAxioms n)
+  let other := axs.filter fun a =>
+    !([``propext, ``Classical.choice, ``Quot.sound].contains a) && !isNativeAxiom a
+  unless other.isEmpty do throwError "{n} depends on {other.toList}, outside the bv_decide tier"
+  unless axs.any isNativeAxiom do throwError "{n} uses no native computation: assert it standard"
+
+open Lean Elab Command in
+/-- A control for the audit: fail unless the theorem depends on an axiom
+    beyond the standard three, i.e. unless `#assert_standard_axioms` rejects
+    it. -/
+elab "#assert_not_standard " id:ident : command => do
+  let n ← liftCoreM (realizeGlobalConstNoOverload id)
+  let axs ← liftCoreM (Lean.collectAxioms n)
+  let bad := axs.filter (fun a => !([``propext, ``Classical.choice, ``Quot.sound].contains a))
+  if bad.isEmpty then throwError "{n} has only the standard axioms: the audit would not flag it"
+
 -- The adequacy theorems and the program-logic rules every proof builds on.
 #assert_standard_axioms NoCompiler.Exec.hw_safe
 #assert_standard_axioms NoCompiler.Exec.hw_final
@@ -85,6 +115,23 @@ example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] =
 #assert_standard_axioms NoCompiler.sys_congr
 #assert_standard_axioms Examples.Refine.Relink.sum_link2_refines
 #assert_standard_axioms Examples.Refine.Relink.sum_link2'
+-- Straight-line equivalence (refinement item 6): the kernel tier, then the
+-- bv_decide tier, listed separately (and printed by the audit at run time).
+#assert_standard_axioms NoCompiler.execSeq_alu
+#assert_standard_axioms NoCompiler.SeqEquiv.agree
+#assert_standard_axioms Examples.Refine.Straight.slli_sh3add
+#assert_standard_axioms Examples.Refine.Straight.mul8_slli
+#assert_standard_axioms Examples.Refine.Straight.index_sh3add
+#assert_standard_axioms Examples.Refine.Straight.shift_refuted
+#assert_standard_axioms Examples.Refine.Straight.live_temp_refuted
+#assert_bv_tier Examples.Refine.Straight.branchless_min
+#assert_bv_tier Examples.Refine.Straight.round8
+-- The control: the standard check rejects a bv_decide theorem.
+#assert_not_standard Examples.Refine.Straight.branchless_min
+
+/-- The bv_decide tier: every theorem above checked with `#assert_bv_tier`. -/
+def bvTier : List String :=
+  ["Examples.Refine.Straight.branchless_min", "Examples.Refine.Straight.round8"]
 
 -- The demo (demo/README.md): each function on the nocompiler build (B, `VerifiedImg`)
 -- and on the ordinary rv64gc build (A, `VerifiedC`, NoCompiler/Ext/Rvc.lean).
@@ -199,4 +246,7 @@ def main (args : List String) : IO UInt32 := do
     ok := (← checkImageC root p c) && ok
   for (p, M, L) in modules do
     ok := (← checkModule root p M L) && ok
+  IO.println s!"bv_decide tier ({bvTier.length} theorems; they rest on native evaluation too, docs/isa/trust.md):"
+  for t in bvTier do
+    IO.println s!"  {t}"
   return if ok then 0 else 1
