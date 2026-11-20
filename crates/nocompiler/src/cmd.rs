@@ -329,6 +329,7 @@ pub fn sim(
 /// the diff of the two functions' block/loop trees (docs/isa/refine.md, item
 /// 5): the unchanged instructions as lockstep pairs and the changed
 /// intervals as regions, printed, and with `-o` as Lean.
+#[allow(clippy::too_many_arguments)] // one per CLI option
 pub fn refine(
     a_file: &Path,
     b_file: &Path,
@@ -336,6 +337,8 @@ pub fn refine(
     func_b: Option<&str>,
     ns: Option<&str>,
     dst: Option<&Path>,
+    images: Option<(&str, &str)>,
+    bv: bool,
     out: &mut String,
 ) -> Result<u8, String> {
     let (ab, bb) = (read(a_file)?, read(b_file)?);
@@ -382,8 +385,18 @@ pub fn refine(
             file_name(a_file),
             file_name(b_file)
         );
-        std::fs::write(dst, crate::treediff::lean(&d, &a, &b, ns, &title))
-            .map_err(|e| format!("{}: {e}", dst.display()))?;
+        let proofs = images.map(|(ia, ib)| crate::treediff::Proofs {
+            img_a: ia,
+            img_b: ib,
+            id_a: crate::lean::ident(func),
+            id_b: crate::lean::ident(func_b.unwrap_or(func)),
+            bv,
+        });
+        std::fs::write(
+            dst,
+            crate::treediff::lean(&d, &a, &b, ns, &title, proofs.as_ref()),
+        )
+        .map_err(|e| format!("{}: {e}", dst.display()))?;
     }
     Ok(0)
 }

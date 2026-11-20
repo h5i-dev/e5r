@@ -126,8 +126,10 @@ example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] =
 #assert_standard_axioms Examples.Refine.Straight.live_temp_refuted
 #assert_standard_axioms NoCompiler.RRegion.ok_of_seqEquiv
 #assert_standard_axioms Examples.Refine.Straight.mulRegion_ok
-#assert_standard_axioms Examples.Refine.Diff.region0_ok
-#assert_standard_axioms Examples.Refine.Diff.refines
+#assert_standard_axioms Examples.Refine.Diff.refines_b
+#assert_standard_axioms Examples.Refine.Diff.AB.region0_ok
+#assert_standard_axioms Examples.Refine.Diff.refines_c
+#assert_standard_axioms Examples.Refine.Diff.AC.region0_ok
 #assert_bv_tier Examples.Refine.Straight.branchless_min
 #assert_bv_tier Examples.Refine.Straight.round8
 -- The control: the standard check rejects a bv_decide theorem.

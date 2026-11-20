@@ -110,8 +110,16 @@ fn succs(w: &[u32], k: usize) -> Vec<Option<usize>> {
     }
 }
 
-/// Backward liveness: the live registers at each instruction's entry.
-fn liveness(w: &[u32]) -> Vec<BTreeSet<u8>> {
+/// `xor rd, rs, rs` / `sub rd, rs, rs`: writes 0 whatever rs holds.
+fn zero_idiom(i: &Instr) -> bool {
+    use isa::ROp;
+    matches!(*i, Instr::ROp(ROp::Xor | ROp::Sub, _, a, b) if a == b)
+}
+
+/// Backward liveness: the live registers at each instruction's entry. An
+/// instruction `inside` a region is not checked against `Instr.uses` (its
+/// region has its own proof), so a zeroing idiom there reads nothing.
+fn liveness(w: &[u32], inside: &dyn Fn(usize) -> bool) -> Vec<BTreeSet<u8>> {
     let n = w.len();
     let mut live = vec![BTreeSet::new(); n];
     loop {
@@ -131,7 +139,9 @@ fn liveness(w: &[u32]) -> Vec<BTreeSet<u8>> {
             for d in defs(&i) {
                 out.remove(&d);
             }
-            out.extend(uses(&i));
+            if !(inside(k) && zero_idiom(&i)) {
+                out.extend(uses(&i));
+            }
             out.insert(0); // x0 reads 0 on both sides; the check wants every use live
             if out != live[k] {
                 live[k] = out;
@@ -144,8 +154,22 @@ fn liveness(w: &[u32]) -> Vec<BTreeSet<u8>> {
     }
 }
 
-/// Longest common subsequence of identical words: matched index pairs.
+/// What the alignment compares: the word, except that a conditional branch
+/// and a `jal zero` are compared without their offsets (C's jump pairs: the
+/// same branch on both sides, each with its own offset; the diff then requires
+/// the two targets to correspond).
+fn key(w: u32) -> u32 {
+    match w & 0x7f {
+        0x63 => w & 0x01ff_f07f,
+        0x6f if (w >> 7) & 0x1f == 0 => w & 0xfff,
+        _ => w,
+    }
+}
+
+/// Longest common subsequence of the words' keys: matched index pairs.
 fn lcs(a: &[u32], b: &[u32]) -> Vec<(usize, usize)> {
+    let a: Vec<u32> = a.iter().map(|&w| key(w)).collect();
+    let b: Vec<u32> = b.iter().map(|&w| key(w)).collect();
     let (n, m) = (a.len(), b.len());
     let mut t = vec![vec![0u32; m + 1]; n + 1];
     for i in (0..n).rev() {
@@ -229,7 +253,34 @@ pub fn diff(a: &Side, b: &Side) -> Result<Diff, String> {
                 }
             }
         }
-        // 2-4. Each region: single entry, single exit, no node cut. A
+        // 2. A region is non-empty on both sides (A must move; an interval
+        // has words): a pure insertion or deletion takes in a neighbour pair,
+        // the one after it if that is a register instruction, else the one
+        // before.
+        for &(a0, a1, b0, b1) in &rs {
+            if a0 < a1 && b0 < b1 {
+                continue;
+            }
+            let after = (a1 < na && b1 < nb).then_some((a1, b1));
+            let before = (a0 > 0 && b0 > 0).then_some((a0 - 1, b0 - 1));
+            let simple = |p: (usize, usize)| {
+                isa::decode(a.words[p.0]).is_some_and(|i| {
+                    !matches!(i, Instr::Branch(..) | Instr::Jal(..) | Instr::Jalr(..))
+                })
+            };
+            let pick = match (after, before) {
+                (Some(x), _) if simple(x) => Some(x),
+                (_, Some(y)) => Some(y),
+                (x, None) => x,
+            };
+            match pick {
+                Some(p) => {
+                    drop.insert(p);
+                }
+                None => return Err("a change with no neighbour to anchor it".into()),
+            }
+        }
+        // 3-5. Each region: single entry, single exit, no node cut. A
         // violation grows the region just enough on the side it is on: to
         // the source of a jump into it, to the target of a jump out of it,
         // to the bounds of a node it cuts.
@@ -281,8 +332,8 @@ pub fn diff(a: &Side, b: &Side) -> Result<Diff, String> {
             }
         }
         if drop.is_empty() {
-            let live_a = liveness(a.words);
-            let live_b = liveness(b.words);
+            let live_a = liveness(a.words, &|k| rs.iter().any(|r| k >= r.0 && k < r.1));
+            let live_b = liveness(b.words, &|k| rs.iter().any(|r| k >= r.2 && k < r.3));
             let un = |i: usize, j: usize| -> Vec<u8> {
                 let mut s: BTreeSet<u8> = live_a.get(i).cloned().unwrap_or_default();
                 s.extend(live_b.get(j).cloned().unwrap_or_default());
@@ -344,7 +395,29 @@ fn t_is_ret(w: &[u32], k: usize) -> bool {
 /// The diff as Lean definitions: the certificate's pairs (`Lockstep.Cert`),
 /// the regions (`RRegion`), and for each straight-line region its two
 /// instruction lists (for `RRegion.ok_of_seqEquiv`).
-pub fn lean(d: &Diff, a: &Side, b: &Side, ns: &str, title: &str) -> String {
+/// With the images (`nocompiler export`'s modules, namespaced as their
+/// module names), `lean` also writes the proofs C's automation
+/// (NoCompiler/RefineAuto.lean) gives: `region<k>_ok` for each straight-line
+/// region, and `refines`, with the other regions' `Ok` as hypotheses.
+pub struct Proofs<'a> {
+    pub img_a: &'a str,
+    pub img_b: &'a str,
+    /// The function's identifier in each image (`lean::ident`).
+    pub id_a: String,
+    pub id_b: String,
+    /// Close straight-line regions with `nocompiler_region_bv` (the
+    /// bv_decide tier) instead of the kernel tier.
+    pub bv: bool,
+}
+
+pub fn lean(
+    d: &Diff,
+    a: &Side,
+    b: &Side,
+    ns: &str,
+    title: &str,
+    proofs: Option<&Proofs>,
+) -> String {
     let mut o = String::new();
     let regs = |r: &[u8]| {
         r.iter()
@@ -361,8 +434,16 @@ pub fn lean(d: &Diff, a: &Side, b: &Side, ns: &str, title: &str) -> String {
     );
     let _ = writeln!(
         o,
-        "import NoCompiler.RefineStraightRegion\nimport NoCompiler.RefineLockstep\n\nnamespace {ns}\nopen NoCompiler\n"
+        "import NoCompiler.RefineStraightRegion\nimport NoCompiler.RefineLockstep"
     );
+    if let Some(p) = proofs {
+        let _ = writeln!(
+            o,
+            "import NoCompiler.RefineAuto\nimport {}\nimport {}",
+            p.img_a, p.img_b
+        );
+    }
+    let _ = writeln!(o, "\nnamespace {ns}\nopen NoCompiler\n");
     for (k, r) in d.regions.iter().enumerate() {
         let dom = |p: u64, n: usize| format!("[(0x{p:x}#64, {})]", 4 * n);
         let kind = if r.straight {
@@ -427,6 +508,61 @@ pub fn lean(d: &Diff, a: &Side, b: &Side, ns: &str, title: &str) -> String {
             o,
             "def region{k}_bs : List Instr := [{}]",
             list(&b.words[r.b0..r.b1])
+        );
+    }
+    if let Some(p) = proofs {
+        let (ca, cb) = (format!("{}.code", p.img_a), format!("{}.code", p.img_b));
+        let tac = if p.bv {
+            "nocompiler_region_bv"
+        } else {
+            "nocompiler_region"
+        };
+        let list = |w: &[u32]| {
+            w.iter()
+                .map(|x| isa::decode(*x).unwrap().lean())
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let (mut hyps, mut uses) = (Vec::new(), Vec::new());
+        for (k, r) in d.regions.iter().enumerate() {
+            if r.straight {
+                let _ = writeln!(
+                    o,
+                    "\ntheorem region{k}_ok : region{k}.Ok {ca} {cb} := by\n  {tac} region{k} [{}]\n    [{}]",
+                    list(&a.words[r.a0..r.a1]),
+                    list(&b.words[r.b0..r.b1])
+                );
+                uses.push(format!("region{k}_ok"));
+            } else {
+                hyps.push(format!(" (h{k} : region{k}.Ok {ca} {cb})"));
+                uses.push(format!("h{k}"));
+            }
+        }
+        let _ = writeln!(
+            o,
+            "\n/-- B refines A, for every specification{}. -/",
+            if hyps.is_empty() {
+                ""
+            } else {
+                ", given the structured regions' proofs"
+            }
+        );
+        let body = if uses.is_empty() {
+            "\n  Refines.of_cert (k := cert) (by decide +kernel) (by intro r h; simp [cert] at h)"
+                .to_string()
+        } else {
+            format!(" by\n  nocompiler_refine cert [{}]", uses.join(", "))
+        };
+        let _ = writeln!(
+            o,
+            "theorem refines {{α : Type}} (sp : Spec α){} :\n    Refines sp {ca} {ia}.{}_dom {ia}.{}_entry\n      {cb} {ib}.{}_dom {ib}.{}_entry :={body}",
+            hyps.concat(),
+            p.id_a,
+            p.id_a,
+            p.id_b,
+            p.id_b,
+            ia = p.img_a,
+            ib = p.img_b,
         );
     }
     let _ = writeln!(o, "\nend {ns}");

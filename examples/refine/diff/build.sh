@@ -2,9 +2,10 @@
 # The tree-diff example (docs/isa/refine.md, item 5): `sum` written in the
 # structured text (sum_a.s, the disasm of examples/elf/sum.elf's sum), and two
 # edits of it: sum_b.s commutes the loop's add (a straight-line region),
-# sum_c.s adds an instruction to the loop body (the loop's offsets change, so
-# the region is the whole block). Assembles each, links it, exports the images
-# and writes what `nocompiler refine` finds (lean/Examples/Refine/Diff/).
+# sum_c.s adds an instruction to the loop body (a straight-line region, the
+# moved branches jump pairs). Assembles each, links it, exports the images and
+# writes what `nocompiler refine` finds, with its proofs
+# (lean/Examples/Refine/Diff/).
 #
 #   examples/refine/diff/build.sh [--update]      (NOCOMPILER, LLD override the tools)
 set -euo pipefail
@@ -28,8 +29,10 @@ for x in a b c; do
 done
 if [ "${1:-}" = --update ]; then
   "$NOCOMPILER" refine examples/elf/refine-sum-a.elf examples/elf/refine-sum-b.elf sum \
-    --namespace Examples.Refine.Diff.AB -o lean/Examples/Refine/Diff/AB.lean
+    --namespace Examples.Refine.Diff.AB -o lean/Examples/Refine/Diff/AB.lean \
+    --images Examples.Refine.Diff.ImgA Examples.Refine.Diff.ImgB
   "$NOCOMPILER" refine examples/elf/refine-sum-a.elf examples/elf/refine-sum-c.elf sum \
-    --namespace Examples.Refine.Diff.AC -o lean/Examples/Refine/Diff/AC.lean
+    --namespace Examples.Refine.Diff.AC -o lean/Examples/Refine/Diff/AC.lean \
+    --images Examples.Refine.Diff.ImgA Examples.Refine.Diff.ImgC
 fi
 exit $status

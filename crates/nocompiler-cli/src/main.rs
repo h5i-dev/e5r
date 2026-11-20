@@ -214,6 +214,14 @@ pub enum Command {
         /// Write the certificate and regions as Lean here.
         #[arg(short = 'o', value_name = "OUT.lean")]
         out: Option<PathBuf>,
+        /// The Lean modules of A's and B's images (`nocompiler export`):
+        /// also write the proofs (`region<k>_ok`, `refines`, by
+        /// NoCompiler.RefineAuto).
+        #[arg(long, num_args = 2, value_names = ["IMG_A", "IMG_B"])]
+        images: Option<Vec<String>>,
+        /// Close straight-line regions in the bv_decide tier.
+        #[arg(long)]
+        bv: bool,
     },
     /// Assemble structured text (what `disasm` prints) into a relocatable object (docs/isa/asm.md).
     Asm {
@@ -842,6 +850,8 @@ fn core(cli: &Cli, w: &mut out::Out) -> Option<Result<u8, String>> {
             func_b,
             namespace,
             out,
+            images,
+            bv,
         } => cmd::refine(
             a,
             b,
@@ -849,6 +859,8 @@ fn core(cli: &Cli, w: &mut out::Out) -> Option<Result<u8, String>> {
             func_b.as_deref(),
             namespace.as_deref(),
             out.as_deref(),
+            images.as_deref().map(|v| (v[0].as_str(), v[1].as_str())),
+            *bv,
             &mut text,
         ),
         Command::Sim {

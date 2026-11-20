@@ -123,14 +123,18 @@ the strength reduction is not an equivalence when the temporary is live out.
 
 ## Item 5: the tree diff (B)
 
-`nocompiler refine A.elf B.elf FUNC [--func-b NAME] [--namespace NS -o OUT.lean]`
-(`crates/nocompiler/src/treediff.rs`). It aligns the two functions' words
-(longest common subsequence of identical words). Runs of identical words
-become lockstep pairs; the gaps between them become changed intervals, each
-grown until it is an `RRegion`:
+`nocompiler refine A.elf B.elf FUNC [--func-b NAME] [--namespace NS -o OUT.lean
+[--images IMG_A IMG_B] [--bv]]` (`crates/nocompiler/src/treediff.rs`). It
+aligns the two functions' words (longest common subsequence; a conditional
+branch or a `jal zero` is compared without its offset, so the same branch
+with a moved target aligns and becomes a jump pair). Aligned words become
+lockstep pairs; the gaps between them become changed intervals, each grown
+until it is an `RRegion`:
 
-- every branch of a pair targets a pair or a region's entry, or it joins
-  the region;
+- every branch of a pair (each side with its own offset) targets a pair or a
+  region's entry, or it joins the region;
+- a region is non-empty on both sides: a pure insertion or deletion takes in
+  a neighbour (the next instruction if it is not a jump, else the previous);
 - one entry: nothing outside jumps into the interior (the source joins);
 - one exit: nothing inside jumps out other than to the end (the target
   joins);
@@ -139,21 +143,27 @@ grown until it is an `RRegion`:
 
 A `ret` inside a change is refused: a region has one exit. Live sets come
 from backward liveness on each side, with `Instr.uses`/`Instr.defs` as in
-RefineCongr.lean, and a return's observed registers live; a pair's set, and
-a region's live-in and live-out, are the union of the two sides'. The output
-is the data the proof is built from: `cert : Lockstep.Cert` (the pairs),
-`region<k> : RRegion` and `regions`, and for each straight-line region its
-two instruction lists, `region<k>_as` and `region<k>_bs`. None of it is
-trusted: the kernel checks the certificate and each region's proof.
+RefineCongr.lean, x0 always live, and a return's observed registers live;
+inside a region (not checked against `uses`) a zeroing idiom (`xor`/`sub rd,
+rs, rs`) reads nothing. A pair's set, and a region's live-in and live-out,
+are the union of the two sides'. The output: `region<k> : RRegion`, `cert :
+Lockstep.Cert` (pairs and regions), and for each straight-line region its two
+instruction lists `region<k>_as`/`_bs`. With `--images` (the modules of
+`nocompiler export`'s images of A and B) also the proofs, by the automation
+below: `region<k>_ok` by `nocompiler_region` (`nocompiler_region_bv` with
+`--bv`) for each straight-line region, and `refines {α} (sp : Spec α) :
+Refines sp A B` by `nocompiler_refine`, taking each structured region's `Ok`
+as a hypothesis `h<k>`. None of it is trusted: the kernel checks the
+certificate and every proof.
 
 **Example** (`examples/refine/diff/`, `lean/Examples/Refine/Diff.lean`):
 
-- `sum` with the loop's `add` commuted: 8 pairs and 1 straight-line region,
-  which `region0_ok` proves Ok with `RRegion.ok_of_seqEquiv` and `seq_equiv`
-  (kernel tier), from the generated data and the two images.
-- `sum` with an extra instruction in the loop: the branch offsets move, so
-  the region is the whole block (6 instructions against 7, structured),
-  leaving 3 pairs. Proving it is item 4's.
+- `sum` with the loop's `add` commuted: 8 pairs and 1 straight-line region;
+  the generated `AB.refines` is the whole proof.
+- `sum` with `xor t5, t5, t5` inserted in the loop: the loop's `beq` and
+  `bne` keep their op and registers but move their targets, so they are jump
+  pairs; 8 pairs and 1 straight-line region (A's `add` against C's `xor;
+  add`), proved by the generated `AC.refines`.
 - `sum` against itself: 9 pairs, no region.
 
 `crates/nocompiler/tests/treediff.rs` checks these numbers and that the

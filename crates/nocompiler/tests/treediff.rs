@@ -1,7 +1,7 @@
 //! The tree diff (`nocompiler refine`, docs/isa/refine.md item 5) on the
 //! committed example binaries (examples/refine/diff/build.sh): an edit that
-//! keeps the shape is a straight-line region; one that moves the loop's
-//! branch offsets is a region covering the block; a function against itself
+//! keeps the shape is a straight-line region; an inserted instruction is a
+//! straight-line region, the moved branches jump pairs; a function against itself
 //! has no region. And the generated Lean is the committed one.
 
 use std::path::PathBuf;
@@ -31,6 +31,11 @@ fn diff(a: &str, b: &str) -> (String, String) {
             b.to_uppercase()
         )),
         Some(&tmp),
+        Some((
+            "Examples.Refine.Diff.ImgA",
+            &format!("Examples.Refine.Diff.Img{}", b.to_uppercase()),
+        )),
+        false,
         &mut out,
     )
     .unwrap();
@@ -58,16 +63,21 @@ fn a_commuted_add_is_one_straight_line_region() {
 }
 
 #[test]
-fn a_longer_loop_body_makes_the_block_a_region() {
+fn an_inserted_instruction_is_a_straight_line_region_with_jump_pairs() {
     let (out, lean) = diff("a", "c");
     assert!(
-        out.starts_with("3 instructions paired; 1 changed interval(s)"),
+        out.starts_with("8 instructions paired; 1 changed interval(s)"),
         "{out}"
     );
     assert!(
-        out.contains("A [0x11124, 0x1113c) 6 instr  <->  B [0x11124, 0x11140) 7 instr  structured"),
+        out.contains(
+            "A [0x1112c, 0x11130) 1 instr  <->  B [0x1112c, 0x11134) 2 instr  straight-line"
+        ),
         "{out}"
     );
+    // The loop's branches are jump pairs: the same branch, each side its own offset.
+    assert!(lean.contains("⟨0x11140#64, 0x1113c#64,"), "{lean}");
+    assert!(lean.contains("theorem refines"), "{lean}");
     let want = std::fs::read_to_string(root().join("lean/Examples/Refine/Diff/AC.lean")).unwrap();
     assert_eq!(lean, want);
 }
@@ -76,7 +86,7 @@ fn a_longer_loop_body_makes_the_block_a_region() {
 fn a_function_against_itself_has_no_region() {
     let mut out = String::new();
     let a = root().join("examples/elf/refine-sum-a.elf");
-    nocompiler::cmd::refine(&a, &a, "sum", None, None, None, &mut out).unwrap();
+    nocompiler::cmd::refine(&a, &a, "sum", None, None, None, None, false, &mut out).unwrap();
     assert!(
         out.starts_with("9 instructions paired; 0 changed interval(s)"),
         "{out}"

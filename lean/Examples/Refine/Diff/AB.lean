@@ -4,6 +4,9 @@ sum in refine-sum-a.elf (A) against refine-sum-b.elf (B)
 -/
 import NoCompiler.RefineStraightRegion
 import NoCompiler.RefineLockstep
+import NoCompiler.RefineAuto
+import Examples.Refine.Diff.ImgA
+import Examples.Refine.Diff.ImgB
 
 namespace Examples.Refine.Diff.AB
 open NoCompiler
@@ -37,5 +40,15 @@ def cert : Lockstep.Cert where
 /-- Region 0, straight-line: A's and B's instructions. -/
 def region0_as : List Instr := [.rop .add 12 13 12]
 def region0_bs : List Instr := [.rop .add 12 12 13]
+
+theorem region0_ok : region0.Ok Examples.Refine.Diff.ImgA.code Examples.Refine.Diff.ImgB.code := by
+  nocompiler_region region0 [.rop .add 12 13 12]
+    [.rop .add 12 12 13]
+
+/-- B refines A, for every specification. -/
+theorem refines {α : Type} (sp : Spec α) :
+    Refines sp Examples.Refine.Diff.ImgA.code Examples.Refine.Diff.ImgA.sum_dom Examples.Refine.Diff.ImgA.sum_entry
+      Examples.Refine.Diff.ImgB.code Examples.Refine.Diff.ImgB.sum_dom Examples.Refine.Diff.ImgB.sum_entry := by
+  nocompiler_refine cert [region0_ok]
 
 end Examples.Refine.Diff.AB

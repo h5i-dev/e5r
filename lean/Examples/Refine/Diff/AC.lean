@@ -4,29 +4,51 @@ sum in refine-sum-a.elf (A) against refine-sum-c.elf (B)
 -/
 import NoCompiler.RefineStraightRegion
 import NoCompiler.RefineLockstep
+import NoCompiler.RefineAuto
+import Examples.Refine.Diff.ImgA
+import Examples.Refine.Diff.ImgC
 
 namespace Examples.Refine.Diff.AC
 open NoCompiler
 
-/-- Changed interval 0 (structured). -/
+/-- Changed interval 0 (straight-line). -/
 def region0 : RRegion where
-  pa := 0x11124#64
-  pb := 0x11124#64
-  paExit := 0x1113c#64
-  pbExit := 0x11140#64
-  domA := [(0x11124#64, 24)]
-  domB := [(0x11124#64, 28)]
-  liveIn := [0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 30]
-  liveOut := [0, 1, 2, 3, 4, 8, 9, 11, 12, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+  pa := 0x1112c#64
+  pb := 0x1112c#64
+  paExit := 0x11130#64
+  pbExit := 0x11134#64
+  domA := [(0x1112c#64, 4)]
+  domB := [(0x1112c#64, 8)]
+  liveIn := [0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 13, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+  liveOut := [0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
 
 /-- The certificate: the unchanged instructions as pairs (B at `pb` in step
     with A at `pa`), and the changed intervals as regions. -/
 def cert : Lockstep.Cert where
   pairs := [
-    ⟨0x11120#64, 0x11120#64, [0, 1, 2, 3, 4, 8, 9, 10, 11, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 30]⟩,
+    ⟨0x11120#64, 0x11120#64, [0, 1, 2, 3, 4, 8, 9, 10, 11, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]⟩,
+    ⟨0x11124#64, 0x11124#64, [0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]⟩,
+    ⟨0x11128#64, 0x11128#64, [0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]⟩,
+    ⟨0x11134#64, 0x11130#64, [0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]⟩,
+    ⟨0x11138#64, 0x11134#64, [0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]⟩,
+    ⟨0x1113c#64, 0x11138#64, [0, 1, 2, 3, 4, 8, 9, 10, 11, 12, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]⟩,
     ⟨0x11140#64, 0x1113c#64, [0, 1, 2, 3, 4, 8, 9, 11, 12, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]⟩,
     ⟨0x11144#64, 0x11140#64, [0, 1, 2, 3, 4, 8, 9, 10, 11, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]⟩
   ]
   regions := [region0]
+
+/-- Region 0, straight-line: A's and B's instructions. -/
+def region0_as : List Instr := [.rop .add 12 13 12]
+def region0_bs : List Instr := [.rop .xor 30 30 30, .rop .add 12 13 12]
+
+theorem region0_ok : region0.Ok Examples.Refine.Diff.ImgA.code Examples.Refine.Diff.ImgC.code := by
+  nocompiler_region region0 [.rop .add 12 13 12]
+    [.rop .xor 30 30 30, .rop .add 12 13 12]
+
+/-- B refines A, for every specification. -/
+theorem refines {α : Type} (sp : Spec α) :
+    Refines sp Examples.Refine.Diff.ImgA.code Examples.Refine.Diff.ImgA.sum_dom Examples.Refine.Diff.ImgA.sum_entry
+      Examples.Refine.Diff.ImgC.code Examples.Refine.Diff.ImgC.sum_dom Examples.Refine.Diff.ImgC.sum_entry := by
+  nocompiler_refine cert [region0_ok]
 
 end Examples.Refine.Diff.AC
