@@ -18,7 +18,10 @@ const PROGRAMS: &[(&str, &[&str])] = &[
     ("switch", &["crates/nocompiler/tests/cc/switch.c"]),
     ("sum", &["examples/sum.c"]),
     ("hello", &["examples/hello.c"]),
-    ("cobs", &["examples/demo/src/cobs.c", "examples/demo/src/cobs_start.c"]),
+    (
+        "cobs",
+        &["examples/demo/src/cobs.c", "examples/demo/src/cobs_start.c"],
+    ),
 ];
 
 /// Below L2 on purpose: function, the level, a rule that must be among the reasons.

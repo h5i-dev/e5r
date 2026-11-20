@@ -208,7 +208,10 @@ fn corpus_round_trips() {
         ("structs", &["crates/nocompiler/tests/cc/structs.c"]),
         ("switch", &["crates/nocompiler/tests/cc/switch.c"]),
         ("hello", &["examples/hello.c"]),
-        ("cobs", &["examples/demo/src/cobs.c", "examples/demo/src/cobs_start.c"]),
+        (
+            "cobs",
+            &["examples/demo/src/cobs.c", "examples/demo/src/cobs_start.c"],
+        ),
     ];
     let dir = tmp("corpus");
     let mut total = 0;
