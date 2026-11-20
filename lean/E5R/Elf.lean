@@ -1,12 +1,14 @@
-import E5R.Step
+import E5R.Image
 
 /-
-Reading `.text` out of an ELF64 little-endian file, in Lean.
+Reading `.text` and the data sections out of an ELF64 little-endian file,
+in Lean.
 
-Used by Audit.lean to check that the code image a proof is about (exported
-by the Rust tool) holds exactly the words of the binary on disk, so neither
-the exporter nor its ELF reader has to be trusted. Only what that check
-needs is read: the section headers, their names, and `.text`.
+Used by Audit.lean to check that the code image and the data segments a
+proof is about (exported by the Rust tool) hold exactly the bytes of the
+binary on disk, so neither the exporter nor its ELF reader has to be
+trusted. Only what that check needs is read: the section headers, their
+names, types and flags, and the sections' bytes.
 -/
 namespace E5R.Elf
 
@@ -28,6 +30,8 @@ def cstr (b : ByteArray) (o : Nat) : Except String String := do
 
 structure Section where
   name : String
+  kind : Nat
+  flags : Nat
   addr : Nat
   offset : Nat
   size : Nat
@@ -42,13 +46,14 @@ def sections (b : ByteArray) : Except String (List Section) := do
   let shentsize ← le b 58 2
   let shnum ← le b 60 2
   let shstrndx ← le b 62 2
-  let hdr (i : Nat) : Except String (Nat × Nat × Nat × Nat) := do
+  let hdr (i : Nat) : Except String (Nat × Nat × Nat × Nat × Nat × Nat) := do
     let o := shoff + i * shentsize
-    return (← le b o 4, ← le b (o + 16) 8, ← le b (o + 24) 8, ← le b (o + 32) 8)
-  let (_, _, stroff, _) ← hdr shstrndx
+    return (← le b o 4, ← le b (o + 4) 4, ← le b (o + 8) 8, ← le b (o + 16) 8,
+      ← le b (o + 24) 8, ← le b (o + 32) 8)
+  let (_, _, _, _, stroff, _) ← hdr shstrndx
   (List.range shnum).mapM fun i => do
-    let (name, addr, offset, size) ← hdr i
-    return { name := ← cstr b (stroff + name), addr, offset, size }
+    let (name, kind, flags, addr, offset, size) ← hdr i
+    return { name := ← cstr b (stroff + name), kind, flags, addr, offset, size }
 
 /-- The `.text` section as a code image. -/
 def text (b : ByteArray) : Except String Code := do
@@ -58,5 +63,26 @@ def text (b : ByteArray) : Except String Code := do
   let words ← (List.range (t.size / 4)).mapM fun i => do
     return BitVec.ofNat 32 (← le b (t.offset + 4 * i) 4)
   return ⟨BitVec.ofNat 64 t.addr, words.toArray⟩
+
+def SHT_PROGBITS : Nat := 1
+def SHT_NOBITS : Nat := 8
+def SHF_WRITE : Nat := 1
+def SHF_ALLOC : Nat := 2
+def SHF_EXECINSTR : Nat := 4
+
+def flag (flags f : Nat) : Bool := flags / f % 2 == 1
+
+/-- Every allocated, non-executable PROGBITS or NOBITS section with bytes in
+    it, in section-header order: what the process image holds besides code.
+    NOBITS (`.bss`) is zeros. -/
+def segments (b : ByteArray) : Except String (List Segment) := do
+  let secs := (← sections b).filter fun s =>
+    flag s.flags SHF_ALLOC && !flag s.flags SHF_EXECINSTR && s.size > 0 &&
+      (s.kind == SHT_PROGBITS || s.kind == SHT_NOBITS)
+  secs.mapM fun s => do
+    let bytes ← if s.kind == SHT_NOBITS then pure (Array.replicate s.size 0) else do
+      if s.offset + s.size > b.size then throw s!"{s.name} extends past the end of the file"
+      pure ((List.range s.size).map fun i => BitVec.ofNat 8 (b.get! (s.offset + i)).toNat).toArray
+    return { name := s.name, base := BitVec.ofNat 64 s.addr, bytes, writable := flag s.flags SHF_WRITE }
 
 end E5R.Elf

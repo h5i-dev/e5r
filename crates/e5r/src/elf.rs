@@ -23,8 +23,11 @@ fn err<T>(m: impl Into<String>) -> Result<T, Error> {
 }
 
 pub const EM_RISCV: u16 = 243;
+pub const SHT_PROGBITS: u32 = 1;
 pub const SHT_SYMTAB: u32 = 2;
 pub const SHT_NOBITS: u32 = 8;
+pub const SHF_WRITE: u64 = 1;
+pub const SHF_ALLOC: u64 = 2;
 pub const SHF_EXECINSTR: u64 = 4;
 pub const STT_FUNC: u8 = 2;
 

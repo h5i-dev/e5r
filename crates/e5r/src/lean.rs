@@ -102,6 +102,45 @@ pub fn export(
         write!(o, "0x{w:08x}#32").unwrap();
     }
     writeln!(o, "]⟩\n").unwrap();
+    let mut names = Vec::new();
+    for g in &bin.segments {
+        let id = format!("seg{}", ident(&g.name.replace('.', "_")));
+        writeln!(
+            o,
+            "/-- `{}`, {} bytes from {:#x}{}. -/",
+            g.name,
+            g.bytes.len(),
+            g.addr,
+            if g.writable { ", writable" } else { "" }
+        )
+        .unwrap();
+        let bytes = if g.zero {
+            format!("Array.replicate {} 0", g.bytes.len())
+        } else {
+            let mut b = String::from("#[");
+            for (i, x) in g.bytes.iter().enumerate() {
+                b.push_str(if i == 0 {
+                    "\n    "
+                } else if i % 12 == 0 {
+                    ",\n    "
+                } else {
+                    ", "
+                });
+                write!(b, "0x{x:02x}#8").unwrap();
+            }
+            b.push(']');
+            b
+        };
+        writeln!(
+            o,
+            "def {id} : Segment :=\n  {{ name := \"{}\", base := 0x{:x}#64, writable := {},\n    bytes := {bytes} }}\n",
+            g.name, g.addr, g.writable
+        )
+        .unwrap();
+        names.push(id);
+    }
+    writeln!(o, "/-- Every allocated section that is not code. -/").unwrap();
+    writeln!(o, "def segments : List Segment := [{}]\n", names.join(", ")).unwrap();
     for (i, &w) in bin.text.iter().enumerate() {
         let pc = bin.text_addr + 4 * i as u64;
         if let Some(ins) = isa::decode(w) {

@@ -36,13 +36,12 @@ milestones and its "not building" list, is kept as
 | Function specifications with the LP64 calling convention | done |
 | Step tactics and word-arithmetic lemmas | done |
 | `e5r` tool: check R1 to R5, recover structure, `.e5r.struct`, export, disasm | done |
-| Lean ELF reader and `e5r-audit` (image matches binary, axioms) | done |
+| Lean ELF reader and `e5r-audit`: `.text` and every data section match the binary, axioms | done |
 | Worked examples from clang `-O2`: `sum` (a loop over an array) and `sum2` (a stack frame and two calls to `sum`, proved from its specification alone) | done |
 | Negative controls: mutated binaries must break their proofs (`scripts/check-proof-controls.sh`) | done |
 | An example with a syscall (a `write_all` loop over short writes) | next |
 | The structural checker in Lean, with a theorem that a checked function only transfers control as R2 allows | next |
 | Loop invariants placed from `.e5r.struct` by the tactics instead of by hand | next |
-| `.rodata` and `.data` in the image audit | next |
 | Lean semantics generated from the Sail RISC-V model and proved equal to `E5R.exec` | planned |
 
 ## Version 1

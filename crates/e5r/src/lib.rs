@@ -27,6 +27,20 @@ pub struct Binary<'a> {
     pub funcs: Vec<Func>,
     /// `.e5r.struct`, if the file has one.
     pub recorded: Option<Vec<FuncMeta>>,
+    /// Every allocated section that is not code, in header order.
+    pub segments: Vec<DataSegment>,
+}
+
+/// An allocated, non-executable section: `.rodata`, `.data`, `.bss`, ...
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DataSegment {
+    pub name: String,
+    pub addr: u64,
+    /// The bytes; zeros for NOBITS.
+    pub bytes: Vec<u8>,
+    /// NOBITS (`.bss`): exported as zeros of `bytes.len()`.
+    pub zero: bool,
+    pub writable: bool,
 }
 
 pub fn load(bytes: &[u8]) -> Result<Binary<'_>, String> {
@@ -75,6 +89,27 @@ pub fn load(bytes: &[u8]) -> Result<Binary<'_>, String> {
             words: words[i..i + (s.size / 4) as usize].to_vec(),
         });
     }
+    let segments = e
+        .sections
+        .iter()
+        .filter(|s| {
+            s.flags & elf::SHF_ALLOC != 0
+                && s.flags & elf::SHF_EXECINSTR == 0
+                && s.size > 0
+                && (s.kind == elf::SHT_PROGBITS || s.kind == elf::SHT_NOBITS)
+        })
+        .map(|s| DataSegment {
+            name: s.name.clone(),
+            addr: s.addr,
+            bytes: if s.kind == elf::SHT_NOBITS {
+                vec![0; s.size as usize]
+            } else {
+                e.bytes(s).to_vec()
+            },
+            zero: s.kind == elf::SHT_NOBITS,
+            writable: s.flags & elf::SHF_WRITE != 0,
+        })
+        .collect();
     let recorded = match e.section(meta::SECTION) {
         Some(s) => Some(meta::decode(e.bytes(s))?),
         None => None,
@@ -85,6 +120,7 @@ pub fn load(bytes: &[u8]) -> Result<Binary<'_>, String> {
         text: words,
         funcs,
         recorded,
+        segments,
     })
 }
 

@@ -10,3 +10,4 @@ import E5R.Arith
 import E5R.Elf
 import E5R.Run
 import E5R.Mem
+import E5R.Image
