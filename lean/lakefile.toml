@@ -22,3 +22,8 @@ root = "Audit"
 [[lean_exe]]
 name = "rvc-run"
 root = "RvcRun"
+
+# Evaluates the example specifications for scripts/check-spec-references.py.
+[[lean_exe]]
+name = "spec-eval"
+root = "SpecEval"
