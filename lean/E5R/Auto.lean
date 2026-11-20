@@ -214,6 +214,14 @@ theorem add_ofNat_eq_iff (a : Word) (y : Nat) : a + BitVec.ofNat 64 y = a ↔ y 
     (a + BitVec.ofNat 64 i).toNat = (a.toNat + i) % W := by
   rw [BitVec.toNat_add, toNat_ofNat_mod]; simp only [Nat.reducePow]; omega
 
+/-- `aligned` of an address in the normal form, as arithmetic (a literal jump
+    target then reduces to `True` or `False`). -/
+@[e5r_state, e5r_nat] theorem aligned_ofNat (n k : Nat) :
+    aligned (BitVec.ofNat 64 n) k = (n % W % k = 0) := by
+  simp only [aligned, toNat_ofNat_mod]
+
+attribute [e5r_state] Nat.reduceMod Nat.reduceEqDiff
+
 @[e5r_nat] theorem aligned_one (a : Word) : aligned a 1 = True := by
   simp [aligned, Nat.mod_one]
 
@@ -359,10 +367,19 @@ end E5R
 namespace E5R.Auto
 open Lean Elab Tactic Meta
 
+
+/-- `decide`, on a goal without variables only. On `x < 2^64` with `x`
+    symbolic, `decide` would unfold `Nat.ble` along the literal: the blow-up
+    E5R/Arith.lean is about. -/
+elab "e5r_decide_closed" : tactic => do
+  let t ← instantiateMVars (← getMainTarget)
+  if t.hasFVar || t.hasMVar then throwError "e5r_decide_closed: not closed"
+  evalTactic (← `(tactic| decide))
+
 /-- Side conditions of the normal form's rewrites: bounds, by evaluation or
     linear arithmetic over the hypotheses in context. -/
 macro "e5r_disch" : tactic => `(tactic| first
-  | decide
+  | e5r_decide_closed
   | omega
   | (simp only [Region.covers, Region.mem, e5r_nat, Nat.reducePow, Nat.reduceAdd, Nat.reduceSub,
       Nat.reduceMod]; omega))
@@ -377,14 +394,14 @@ macro_rules
       (try simp only [e5r_sem])
       (try simp (config := { decide := true }) only [e5r_state, e5r_image, $ts,*])
       (try simp only [e5r_lit])
-      (try simp (config := { decide := true }) (disch := e5r_disch) only [e5r_nat, e5r_lit,
+      (try simp (disch := e5r_disch) only [e5r_nat, e5r_lit,
         Nat.add_zero, Nat.zero_add, Nat.sub_self, Nat.sub_zero, Nat.mul_zero, Nat.zero_mod, $ts,*])
       (try simp (config := { decide := true }) only [e5r_state, e5r_image, $ts,*])))
   | `(tactic| e5r_anorm [$ts,*] $loc:location) => `(tactic| (
       (try simp only [e5r_sem] $loc:location)
       (try simp (config := { decide := true }) only [e5r_state, e5r_image, $ts,*] $loc:location)
       (try simp only [e5r_lit] $loc:location)
-      (try simp (config := { decide := true }) (disch := e5r_disch) only [e5r_nat, e5r_lit,
+      (try simp (disch := e5r_disch) only [e5r_nat, e5r_lit,
         Nat.add_zero, Nat.zero_add, Nat.sub_self, Nat.sub_zero, Nat.mul_zero, Nat.zero_mod, $ts,*]
         $loc:location)
       (try simp (config := { decide := true }) only [e5r_state, e5r_image, $ts,*] $loc:location)))
@@ -395,11 +412,11 @@ syntax "e5r_vnorm" (" [" Lean.Parser.Tactic.simpArg,* "]")? : tactic
 macro_rules
   | `(tactic| e5r_vnorm [$ts,*]) => `(tactic| (
       (try simp only [e5r_sem])
-      (try simp (disch := decide) only [e5r_state, e5r_image, $ts,*])
+      (try simp (disch := e5r_decide_closed) only [e5r_state, e5r_image, $ts,*])
       (try simp only [e5r_lit])
       (try simp (disch := e5r_disch) only [e5r_nat, e5r_lit,
         Nat.add_zero, Nat.zero_add, Nat.sub_self, Nat.sub_zero, Nat.mul_zero, Nat.zero_mod, $ts,*])
-      (try simp (disch := decide) only [e5r_state, e5r_image, e5r_lit, $ts,*])))
+      (try simp (disch := e5r_decide_closed) only [e5r_state, e5r_image, e5r_lit, $ts,*])))
 
 /-- A branch condition as a fact about the normal form. -/
 syntax "e5r_cond" (" [" Lean.Parser.Tactic.simpArg,* "]")? Lean.Parser.Tactic.location : tactic
@@ -487,10 +504,14 @@ def traceLine (msg : String) : CoreM Unit := do
 def run (g : MVarId) (tac : TSyntax `tactic) : TacticM (List MVarId) := do
   if e5r.auto.trace.get (← getOptions) then
     let t ← IO.monoMsNow
-    let gs ← evalTacticAt tac g
+    if !(e5r.auto.traceFile.get (← getOptions)).isEmpty then
+      let gt := toString (← g.withContext (Meta.ppExpr (← instantiateMVars (← g.getType))))
+      traceLine s!"[goal] {(gt.replace "\n" " ").take 400}"
+    let gs ← withEnableInfoTree false (evalTacticAt tac g)
     traceLine s!"[e5r_auto {(← IO.monoMsNow) - t} ms] {tac.raw.prettyPrint.pretty 100 |>.take 160}"
     return ← gs.filterM fun g => return !(← g.isAssigned)
-  let gs ← evalTacticAt tac g
+  -- No info tree: it would keep every intermediate goal of every step.
+  let gs ← withEnableInfoTree false (evalTacticAt tac g)
   gs.filterM fun g => return !(← g.isAssigned)
 
 /-- `Reach c P D R s` or `Reach.opt c P D R os`. -/
@@ -556,16 +577,24 @@ def finish (cx : Ctx) (gs : List MVarId) : TacticM (List MVarId) := do
   let mut out := []
   for g in gs do
     if ← g.isAssigned then continue
-    let gs' ← run g (← `(tactic| (
-      first
-        | with_reducible rfl
-        | omega
-        | (e5r_vnorm [$fs,*]
-           (try simp (disch := e5r_disch) only [ofNat_inj, add_ofNat_inj, eq_add_ofNat_iff,
-             add_ofNat_eq_iff, List.length_set, readBytes_length])
-           (try with_reducible rfl)
-           (try omega)))))
-    out := out ++ gs'
+    -- Each attempt bounded: a verification condition is about the
+    -- specification's own functions, which nothing here should unfold.
+    let r ← run g (← `(tactic| first
+        | (set_option maxHeartbeats 200000 in with_reducible rfl)
+        | (set_option maxHeartbeats 200000 in omega)
+        | skip))
+    let r ← r.foldlM (fun acc g => do return acc ++ (← run g (← `(tactic|
+        first | (set_option maxHeartbeats 2000000 in e5r_vnorm [$fs,*]) | skip)))) []
+    let r ← r.foldlM (fun acc g => do return acc ++ (← run g (← `(tactic| first
+        | (set_option maxHeartbeats 1000000 in
+            simp (disch := e5r_disch) only [ofNat_inj, add_ofNat_inj, eq_add_ofNat_iff,
+              add_ofNat_eq_iff, List.length_set, readBytes_length])
+        | skip)))) []
+    let r ← r.foldlM (fun acc g => do return acc ++ (← run g (← `(tactic| first
+        | (set_option maxHeartbeats 200000 in with_reducible rfl)
+        | (set_option maxHeartbeats 200000 in omega)
+        | skip)))) []
+    out := out ++ r
   return out
 
 /-- The run has reached a cut point: the invariant (and the measure) of the
@@ -654,6 +683,7 @@ def step (cx : Ctx) (g : MVarId) (pc : Nat) : TacticM (MVarId × List MVarId) :=
 /-- Run from the goal's state to the next cut points or returns. -/
 partial def drive (cx : Ctx) (first : Bool) (fuel : Nat) (g : MVarId) (last : Nat) :
     TacticM (List MVarId) := do
+  traceLine s!"[drive] after {hex last}, fuel {fuel}"
   if fuel = 0 then
     throwError "e5r_auto: no cut point within 400 steps of {cx.origin}: is every loop given an invariant?"
   let some (h, a) ← goalHead cx.fl g
@@ -687,8 +717,10 @@ partial def drive (cx : Ctx) (first : Bool) (fuel : Nat) (g : MVarId) (last : Na
         for g'' in r do
           out := out ++ (← drive { cx with facts := cx.facts.push hb } false (fuel - 1) g'' last)
       return out
+  traceLine "[drive] head"
   let some pc ← pcOf a
     | closeRet cx g last
+  traceLine s!"[drive] at {hex pc}"
   if !first && cx.cuts.contains pc then
     return ← closeCut cx g pc
   let (g', left) ← step cx g pc

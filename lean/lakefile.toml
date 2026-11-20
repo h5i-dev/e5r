@@ -1,6 +1,6 @@
 name = "e5r"
 version = "0.1.0"
-defaultTargets = ["E5R", "Examples", "Demo", "e5r-audit"]
+defaultTargets = ["E5R", "Examples", "e5r-audit"]
 
 # No dependencies on purpose: the trusted base of an e5r proof is the Lean
 # kernel plus the definitions docs/isa/trust.md lists.
@@ -17,3 +17,8 @@ name = "Demo"
 [[lean_exe]]
 name = "e5r-audit"
 root = "Audit"
+
+# Runs compressed code in the extension's semantics, for demo/test/rvc_exec.py.
+[[lean_exe]]
+name = "rvc-run"
+root = "RvcRun"
