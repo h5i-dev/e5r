@@ -176,8 +176,8 @@ fn committed_binaries_round_trip() {
         "examples/elf/hello.elf",
         "examples/elf/sum.link1.elf",
         "examples/elf/sum.link2.elf",
-        "demo/elf/sum.b.elf",
-        "demo/elf/cobs.b.elf",
+        "examples/demo/elf/sum.b.elf",
+        "examples/demo/elf/cobs.b.elf",
     ] {
         let bytes = std::fs::read(root().join(e)).unwrap();
         let (n, all) = round_trip(e, &bytes, &dir);
@@ -208,7 +208,7 @@ fn corpus_round_trips() {
         ("structs", &["crates/nocompiler/tests/cc/structs.c"]),
         ("switch", &["crates/nocompiler/tests/cc/switch.c"]),
         ("hello", &["examples/hello.c"]),
-        ("cobs", &["demo/src/cobs.c", "demo/src/cobs_start.c"]),
+        ("cobs", &["examples/demo/src/cobs.c", "examples/demo/src/cobs_start.c"]),
     ];
     let dir = tmp("corpus");
     let mut total = 0;

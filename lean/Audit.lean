@@ -88,8 +88,8 @@ example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] =
 def images : List (String × Code × List Segment) :=
   [("examples/elf/sum.elf", Examples.Sum.Image.code, Examples.Sum.Image.segments),
    ("examples/elf/hello.elf", Examples.Hello.Image.code, Examples.Hello.Image.segments),
-   ("demo/elf/sum.b.elf", Demo.Sum.ImageB.code, Demo.Sum.ImageB.segments),
-   ("demo/elf/cobs.b.elf", Demo.Cobs.ImageB.code, Demo.Cobs.ImageB.segments)]
+   ("examples/demo/elf/sum.b.elf", Demo.Sum.ImageB.code, Demo.Sum.ImageB.segments),
+   ("examples/demo/elf/cobs.b.elf", Demo.Cobs.ImageB.code, Demo.Cobs.ImageB.segments)]
 
 /-- Modules and the layouts their theorems are instantiated at, with the ELF
     each layout is read from (docs/isa/v1.md, criterion 3). -/
@@ -100,7 +100,7 @@ def modules : List (String × Module × Layout) :=
 /-- The compressed binaries of the demo and their halfword images. Their
     proofs read no data section, so only `.text` is compared. -/
 def imagesC : List (String × CCode) :=
-  [("demo/elf/sum.a.elf", Demo.Sum.ImageA.code), ("demo/elf/cobs.a.elf", Demo.Cobs.ImageA.code)]
+  [("examples/demo/elf/sum.a.elf", Demo.Sum.ImageA.code), ("examples/demo/elf/cobs.a.elf", Demo.Cobs.ImageA.code)]
 
 def checkImageC (root : System.FilePath) (path : String) (c : CCode) : IO Bool := do
   let b ← IO.FS.readBinFile (root / path)

@@ -7,7 +7,7 @@
 #
 #   scripts/check-audit-controls.sh        (needs lake; builds nocompiler-audit)
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 (cd lean && lake build nocompiler-audit >/dev/null)
@@ -28,8 +28,8 @@ mutations=(
 fail=0
 for m in "${mutations[@]}"; do
   IFS='|' read -r elf what desc reason <<< "$m"
-  rm -rf "$work/root"; mkdir -p "$work/root/examples" "$work/root/demo"
-  cp -r examples/elf "$work/root/examples/elf"; cp -r demo/elf "$work/root/demo/elf"
+  rm -rf "$work/root"; mkdir -p "$work/root/examples"
+  cp -r examples/elf "$work/root/examples/elf"; mkdir -p "$work/root/examples/demo"; cp -r examples/demo/elf "$work/root/examples/demo/elf"
   python3 -I - "$work/root/$elf" $what <<'PY'
 import struct, sys
 path, kind = sys.argv[1], sys.argv[2]
@@ -66,7 +66,7 @@ PY
     echo "FAIL $desc: the audit fails, but not for '$reason':"; grep FAIL <<< "$out"; fail=1
   fi
 done
-rm -rf "$work/root"; mkdir -p "$work/root/examples" "$work/root/demo"
-cp -r examples/elf "$work/root/examples/elf"; cp -r demo/elf "$work/root/demo/elf"
+rm -rf "$work/root"; mkdir -p "$work/root/examples"
+cp -r examples/elf "$work/root/examples/elf"; mkdir -p "$work/root/examples/demo"; cp -r examples/demo/elf "$work/root/examples/demo/elf"
 if "$audit" "$work/root" >/dev/null; then echo "ok   unpatched: the audit passes"; else echo "FAIL unpatched copy"; fail=1; fi
 exit $fail
