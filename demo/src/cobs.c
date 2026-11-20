@@ -7,7 +7,8 @@
  *   invalid frame    tag 1, a = 1, b = bytes decoded before the bad code
  *   success          tag 0, a = source bytes used (n), b = bytes decoded
  *
- * demo/Cobs.lean proves `cobs_decode` as `e5r cc -O2` compiles it.
+ * lean/Demo/CobsB.lean and CobsA.lean prove `cobs_decode` as e5r cc and
+ * as plain clang -march=rv64gc compile it (demo/build.sh).
  * "Target too small", the crate's third error, cannot happen in place: the
  * output never overtakes the input. */
 typedef unsigned long u64;
