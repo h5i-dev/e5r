@@ -56,9 +56,10 @@ step "Lean: dependencies, then each proof file timed"
 (cd lean && "${LAKE[@]}" build E5R E5R.Ext.Rvc Demo.SumSpec Demo.CobsSpec Demo.Sum.ImageA Demo.Sum.ImageB \
   Demo.Cobs.ImageA Demo.Cobs.ImageB >/dev/null)
 for m in SumB SumA CobsB CobsA; do
-  t0=$(date +%s.%N)
+  t0=$(date +%s%N)
   (cd lean && "${LAKE[@]}" env lean "Demo/$m.lean")
-  printf 'ok   Demo/%s.lean checks in %.1f s\n' "$m" "$(echo "$(date +%s.%N) - $t0" | bc)"
+  python3 -c "import sys; print(f'ok   Demo/{sys.argv[1]}.lean checks in {(int(sys.argv[3]) - int(sys.argv[2])) / 1e9:.1f} s')" \
+    "$m" "$t0" "$(date +%s%N)"
 done
 (cd lean && "${LAKE[@]}" build Demo e5r-audit >/dev/null && lake exe e5r-audit)
 

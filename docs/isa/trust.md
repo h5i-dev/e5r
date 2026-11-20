@@ -45,6 +45,15 @@ trusting the following, and nothing else.
 - **The adequacy theorems** (`lean/E5R/Adequacy.lean`): proved, once, for
   every program.
 
+## Extensions outside the profile
+
+`lean/E5R/Ext/Rvc.lean` extends the semantics to compressed (RVC) code, for
+the comparison in [demo/README.md](../../demo/README.md): `decodeC`,
+`CCode.instr` and `execC` are trusted *for the results stated with
+`VerifiedC`*, and are checked against llvm-mc (every 16-bit word) and qemu
+(the demo's compressed binary). Results about e5r binaries (`Verified`) do
+not depend on it. The adequacy theorems are not proved for it.
+
 ## Known gaps
 
 - The link between the ELF file and the process image (that the loader maps

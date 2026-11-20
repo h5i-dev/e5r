@@ -112,6 +112,7 @@ apart by the outcomes `Sys` allows, and a function that ends the process
 | `e5r_steps n [facts]` | `e5r_step` n times |
 | `e5r_norm [facts]` | the normaliser on its own |
 | `e5r_same` | closes `Same s0 s' rs` (registers outside `rs` unchanged) along a sequence of writes |
+| `e5r_auto f s he (loop_inv pc inv measure μ)*` | the whole run of a leaf function (`lean/E5R/Auto.lean`): steps every path between the loop heads of its block/loop tree `f`, discharges the permission, alignment, `Same`/`Preserved` and return conditions, and leaves each invariant, measure and postcondition as a goal named after its path, in a normal form of natural numbers and lists |
 
 A conditional branch leaves an `if` on its condition, taken apart with
 `by_cases` or `split`. `lean/E5R/Arith.lean` has the word-arithmetic

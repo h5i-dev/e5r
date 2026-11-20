@@ -38,6 +38,12 @@ mutations=(
   "demo/elf/sum.b Demo.SumB 0x111a4 0x00850513 0x00450513 demo-B-sum-stride-8-becomes-4"
   "demo/elf/sum.a Demo.SumA 0x11196 0x9636 0x8e15 demo-A-sum-add-becomes-sub"
   "demo/elf/sum.a Demo.SumA 0x1119a 0x0521 0x0511 demo-A-sum-stride-8-becomes-4"
+  "demo/elf/cobs.b Demo.CobsB 0x111c8 0x00158713 0x00258713 demo-B-cobs-copies-from-one-byte-late"
+  "demo/elf/cobs.b Demo.CobsB 0x1124c 0x00053023 0x00f53023 demo-B-cobs-success-tag-is-src"
+  "demo/elf/cobs.b Demo.CobsB 0x11244 0x00080023 0x00b80023 demo-B-cobs-decodes-nonzero-separator"
+  "demo/elf/cobs.a Demo.CobsA 0x111ae 0x00158813 0x00258813 demo-A-cobs-copies-from-one-byte-late"
+  "demo/elf/cobs.a Demo.CobsA 0x1121c 0x00053023 0x00553023 demo-A-cobs-success-tag-is-src"
+  "demo/elf/cobs.a Demo.CobsA 0x11208 0x00068023 0x00b68023 demo-A-cobs-decodes-nonzero-separator"
 )
 
 cp -r lean "$work/lean"
@@ -83,7 +89,12 @@ PY
       img=Examples/$(echo "$name" | sed -E 's/(^|_)([a-z])/\U\2/g')/Image.lean
       "$E5R" export "$work/$name.elf" --namespace "$mod.Image" -o "$work/lean/$img" 2>/dev/null ;;
   esac
-  if run "$mod"; then
+  # The mutated image must itself build: a proof that fails because its
+  # image is broken (a failed export) would be no evidence.
+  imgmod=$(echo "${img%.lean}" | tr / .)
+  if ! run "$imgmod"; then
+    echo "FAIL $what: the mutated image $imgmod does not build"; fail=1
+  elif run "$mod"; then
     echo "FAIL $what: $mod still checks"; fail=1
   else
     echo "ok   $what: $mod no longer checks"

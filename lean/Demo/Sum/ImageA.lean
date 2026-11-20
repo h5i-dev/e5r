@@ -31,4 +31,29 @@ def sum_entry : Word := 0x11190#64
 def sum_size : Nat := 18
 def sum_dom : Dom := [(0x11190#64, 18)]
 
+@[e5r_image] theorem instr_111a2 : code.instr 0x111a2#64 = some (E5R.Instr.iop (E5R.IOp.addi) 2 2 0xfe0#12, 2) := by rfl
+@[e5r_image] theorem instr_111a4 : code.instr 0x111a4#64 = some (E5R.Instr.store (E5R.StOp.sd) 2 1 0x018#12, 2) := by rfl
+@[e5r_image] theorem instr_111a6 : code.instr 0x111a6#64 = some (E5R.Instr.store (E5R.StOp.sd) 2 8 0x010#12, 2) := by rfl
+@[e5r_image] theorem instr_111a8 : code.instr 0x111a8#64 = some (E5R.Instr.store (E5R.StOp.sd) 2 9 0x008#12, 2) := by rfl
+@[e5r_image] theorem instr_111aa : code.instr 0x111aa#64 = some (E5R.Instr.store (E5R.StOp.sd) 2 18 0x000#12, 2) := by rfl
+@[e5r_image] theorem instr_111ac : code.instr 0x111ac#64 = some (E5R.Instr.rop (E5R.ROp.add) 18 0 13, 2) := by rfl
+@[e5r_image] theorem instr_111ae : code.instr 0x111ae#64 = some (E5R.Instr.rop (E5R.ROp.add) 9 0 12, 2) := by rfl
+@[e5r_image] theorem instr_111b0 : code.instr 0x111b0#64 = some (E5R.Instr.jal 1 0x1fffe0#21, 4) := by rfl
+@[e5r_image] theorem instr_111b4 : code.instr 0x111b4#64 = some (E5R.Instr.rop (E5R.ROp.add) 8 0 10, 2) := by rfl
+@[e5r_image] theorem instr_111b6 : code.instr 0x111b6#64 = some (E5R.Instr.rop (E5R.ROp.add) 10 0 9, 2) := by rfl
+@[e5r_image] theorem instr_111b8 : code.instr 0x111b8#64 = some (E5R.Instr.rop (E5R.ROp.add) 11 0 18, 2) := by rfl
+@[e5r_image] theorem instr_111ba : code.instr 0x111ba#64 = some (E5R.Instr.jal 1 0x1fffd6#21, 4) := by rfl
+@[e5r_image] theorem instr_111be : code.instr 0x111be#64 = some (E5R.Instr.rop (E5R.ROp.add) 10 10 8, 2) := by rfl
+@[e5r_image] theorem instr_111c0 : code.instr 0x111c0#64 = some (E5R.Instr.load (E5R.LdOp.ld) 1 2 0x018#12, 2) := by rfl
+@[e5r_image] theorem instr_111c2 : code.instr 0x111c2#64 = some (E5R.Instr.load (E5R.LdOp.ld) 8 2 0x010#12, 2) := by rfl
+@[e5r_image] theorem instr_111c4 : code.instr 0x111c4#64 = some (E5R.Instr.load (E5R.LdOp.ld) 9 2 0x008#12, 2) := by rfl
+@[e5r_image] theorem instr_111c6 : code.instr 0x111c6#64 = some (E5R.Instr.load (E5R.LdOp.ld) 18 2 0x000#12, 2) := by rfl
+@[e5r_image] theorem instr_111c8 : code.instr 0x111c8#64 = some (E5R.Instr.iop (E5R.IOp.addi) 2 2 0x020#12, 2) := by rfl
+@[e5r_image] theorem instr_111ca : code.instr 0x111ca#64 = some (E5R.Instr.jalr 0 1 0x000#12, 2) := by rfl
+
+/-- `sum2`: [0x111a2, 0x111cc), 19 instructions. -/
+def sum2_entry : Word := 0x111a2#64
+def sum2_size : Nat := 42
+def sum2_dom : Dom := [(0x111a2#64, 42)]
+
 end Demo.Sum.ImageA

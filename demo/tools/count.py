@@ -77,7 +77,13 @@ def main():
             inv, script, lemmas = split_proof(p)
             rows.append((f, side, len(inv), tokens(inv), len(script), tokens(script),
                          len(lemmas), tokens(lemmas)))
-    shared = [(f, *count_file(os.path.join(LEAN, "Demo", f"{f}Spec.lean"))) for f in ["Sum", "Cobs"]]
+    shared = []
+    for f in ["Sum", "Cobs"]:
+        text = open(os.path.join(LEAN, "Demo", f"{f}Spec.lean")).read()
+        k = text.index("/-! ## Facts") if "/-! ## Facts" in text else text.index("/-! Facts")
+        a, b = code_lines(text[:k]), code_lines(text[k:])
+        shared.append((f"{f}Spec.lean: specification", len(a), tokens(a)))
+        shared.append((f"{f}Spec.lean: lemmas about it", len(b), tokens(b)))
     core = [os.path.join(dp, n) for dp, _, ns in os.walk(os.path.join(LEAN, "E5R")) for n in ns
             if n.endswith(".lean") and "Ext" not in dp and n != "Auto.lean"]
     libs = [("core lean/E5R (without Auto.lean, Ext/)", core),
@@ -92,7 +98,7 @@ def main():
         print()
         print("| shared (counted once) | lines | tokens |\n| --- | --- | --- |")
         for f, n, t in shared:
-            print(f"| lean/Demo/{f}Spec.lean | {n} | {t} |")
+            print(f"| lean/Demo/{f} | {n} | {t} |")
         print()
         print("| library | lines | tokens |\n| --- | --- | --- |")
         for name, fs in libs:
@@ -105,7 +111,7 @@ def main():
             print(f"{f:5} {side}: invariants {il:3} lines {it:5} tokens | script {sl:3} lines {st:5} tokens"
                   f" | lemmas {ll:3} lines {lt:5} tokens")
         for f, n, t in shared:
-            print(f"shared Demo/{f}Spec.lean: {n} lines, {t} tokens")
+            print(f"shared Demo/{f}: {n} lines, {t} tokens")
         for name, fs in libs:
             n = t = 0
             for x in fs:
