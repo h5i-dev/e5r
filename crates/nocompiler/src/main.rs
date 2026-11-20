@@ -16,6 +16,10 @@ usage:
   nocompiler export FILE --namespace NS [-o OUT.lean]
                                    export .text and every conforming function to Lean
   nocompiler disasm FILE                  list the code with its block/loop structure
+  nocompiler asm FILE.s -o OUT [--skeleton OUT.lean --namespace NS]
+                                   assemble structured assembly (the disasm listing,
+                                   docs/isa/asm.md) into a checked binary; optionally
+                                   write a Lean proof skeleton from its annotations
   nocompiler --version
 
 Exit status: 0 success, 1 a function violates the profile, 2 usage or input error.
@@ -249,57 +253,54 @@ fn run(args: &[String], out: &mut String) -> Result<ExitCode, String> {
             let file = args.get(1).ok_or("disasm: FILE missing")?;
             let bytes = read(file)?;
             let bin = nocompiler::load(&bytes)?;
-            for (f, r) in bin.funcs.iter().zip(bin.check()) {
-                say!(out, "\n{} {:#x}:", f.name, f.entry);
-                let nodes = match &r.result {
-                    Ok(m) => m.nodes.clone(),
-                    Err(vs) => {
-                        for v in vs {
-                            say!(out, "  ; {v}");
-                        }
-                        vec![]
-                    }
-                };
-                let mut marks: Vec<(u64, bool, usize, &'static str)> = Vec::new();
-                fn walk(
-                    ns: &[nocompiler::profile::Node],
-                    d: usize,
-                    m: &mut Vec<(u64, bool, usize, &'static str)>,
-                ) {
-                    for n in ns {
-                        let k = match n.kind {
-                            nocompiler::profile::Kind::Block => "block",
-                            nocompiler::profile::Kind::Loop => "loop",
-                        };
-                        m.push((n.start, true, d, k));
-                        walk(&n.children, d + 1, m);
-                        m.push((n.end, false, d, k));
-                    }
+            out.push_str(&nocompiler::asm::listing(&bin));
+            Ok(ExitCode::SUCCESS)
+        }
+        "asm" => {
+            let file = args.get(1).ok_or("asm: FILE missing")?;
+            let dst = opt(args, "-o").ok_or("asm: -o OUT missing")?;
+            let text = std::fs::read_to_string(file).map_err(|e| format!("{file}: {e}"))?;
+            let a = match nocompiler::asm::assemble(&text) {
+                Ok(a) => a,
+                Err(e) => {
+                    eprintln!("{file}: {e}");
+                    return Ok(ExitCode::from(1));
                 }
-                walk(&nodes, 0, &mut marks);
-                for (i, &w) in f.words.iter().enumerate() {
-                    let pc = f.entry + 4 * i as u64;
-                    for &(_, _, d, k) in marks.iter().filter(|m| m.0 == pc && !m.1) {
-                        say!(out, "  {:ind$}end {k}", "", ind = 2 * d);
-                    }
-                    for &(_, _, d, k) in marks.iter().filter(|m| m.0 == pc && m.1) {
-                        say!(out, "  {:ind$}{k} {{", "", ind = 2 * d);
-                    }
-                    let depth = marks.iter().filter(|m| m.1 && m.0 <= pc).count()
-                        - marks.iter().filter(|m| !m.1 && m.0 <= pc).count();
-                    let text = nocompiler::isa::decode(w)
-                        .map(|i| i.asm(pc))
-                        .unwrap_or_else(|| format!(".word {w:#010x}"));
-                    say!(
-                        out,
-                        "  {:ind$}{pc:8x}: {w:08x}  {text}",
-                        "",
-                        ind = 2 * depth
-                    );
-                }
-                for &(_, _, d, k) in marks.iter().filter(|m| m.0 == f.end() && !m.1) {
-                    say!(out, "  {:ind$}end {k}", "", ind = 2 * d);
-                }
+            };
+            let elf = nocompiler::asm::write_elf(&a)?;
+            std::fs::write(dst, &elf).map_err(|e| format!("{dst}: {e}"))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt as _;
+                std::fs::set_permissions(dst, std::fs::Permissions::from_mode(0o755))
+                    .map_err(|e| format!("{dst}: {e}"))?;
+            }
+            // Read back and check what was written, as `check` would.
+            let bin = nocompiler::load(&elf)?;
+            let bad: Vec<_> = bin
+                .check()
+                .into_iter()
+                .filter(|r| r.result.is_err())
+                .collect();
+            if !bad.is_empty() {
+                return Err(format!(
+                    "{dst}: the written binary does not check ({} functions)",
+                    bad.len()
+                ));
+            }
+            say!(
+                out,
+                "{dst}: {} functions, {} bytes of .text, checked against {}",
+                a.funcs.len(),
+                4 * a.text().len(),
+                nocompiler::meta::SECTION
+            );
+            if let Some(sk) = opt(args, "--skeleton") {
+                let ns = opt(args, "--namespace")
+                    .ok_or("asm: --skeleton needs --namespace NS (the image's)")?;
+                std::fs::write(sk, nocompiler::asm::skeleton(&a, ns, file))
+                    .map_err(|e| format!("{sk}: {e}"))?;
+                say!(out, "{sk}: proof skeleton");
             }
             Ok(ExitCode::SUCCESS)
         }

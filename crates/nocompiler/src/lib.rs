@@ -6,6 +6,7 @@
 //! one the proof tactics handle well; what a proof establishes is checked by
 //! the Lean kernel against the bytes of the binary (see docs/isa/trust.md).
 
+pub mod asm;
 pub mod cc;
 pub mod elf;
 pub mod isa;
