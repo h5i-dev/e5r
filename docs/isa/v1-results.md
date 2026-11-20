@@ -7,8 +7,8 @@ claim "easier to prove".
 
 | # | Item | Status | Result |
 | --- | --- | --- | --- |
-| 1 | `sum2` proof size | open | |
-| 2 | syscall functions through `nocompiler_auto` | open | |
+| 1 | `sum2` proof size | passed (image-level `VerifiedImg`; see below) | below |
+| 2 | syscall functions through `nocompiler_auto` | passed | below |
 | 3 | relocation (two links, one proof) | partial (leaf functions) | below |
 | 4 | corpus conformance levels | passed | below |
 | 5 | `asm(disasm(x)) = x` | open | |
@@ -124,3 +124,26 @@ must pass. All pass:
 | _start's data address is a page off | the same |
 | the symbol table moves sum by 4 | the layout is not the ELF's |
 | a byte of .data changes | the module's data at the ELF's layout is not its data sections |
+
+## 1 and 2. Calls, syscalls and frames through `nocompiler_auto`
+
+`nocompiler_auto` (lean/NoCompiler/Auto.lean) now takes calls through the
+callees' theorems (`calls [...]`), every syscall outcome, and the frame. Lines
+of the proof (from `theorem` to its end, nonblank), before and after, with
+the specifications unchanged:
+
+| Proof | Before (by hand) | After (`nocompiler_auto`) | Written by hand after |
+| --- | --- | --- | --- |
+| `sum2_verified` (2 calls, 32-byte frame, 4 saves) | 193 | 5 | that the two sums commute |
+| `write_all_verified` (syscall in a loop) | 84 | 16 | the loop invariant, its witnesses, the two outcomes |
+| `hello_verified` (frame, call, exit syscall) | 102 | 18 | the message bytes in `.rodata`, the exit status |
+
+Whole files: lean/Examples/Sum2.lean 254 to 71 lines, Hello.lean 275 to 128.
+For comparison, `sum`'s automated proof on the demo (lean/Demo/SumB.lean) is
+12 lines. None of the new proofs states register preservation, the frame's
+saves and restores, or the stack's separation from the arrays (the
+specifications still carry it as a precondition; moving it into `Entry` is
+step 3's).
+
+The proofs are at the image level (`VerifiedImg code dom entry spec`); the
+module-level `Verified M f spec` of step 3 is B's.

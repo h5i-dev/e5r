@@ -81,6 +81,12 @@ pub fn export(
     writeln!(o, "SHA-256: {sha}").unwrap();
     writeln!(o, "-/").unwrap();
     writeln!(o, "import NoCompiler\n").unwrap();
+    if bin.text.len() > 128 {
+        // Each `instr_` lemma evaluates `Code.instr` on the array literal, which
+        // recurses once per element before its index; the default depth runs
+        // out a little past 128 words.
+        writeln!(o, "set_option maxRecDepth {}\n", 64 * bin.text.len()).unwrap();
+    }
     writeln!(o, "namespace {namespace}").unwrap();
     writeln!(o, "open NoCompiler\n").unwrap();
     writeln!(
