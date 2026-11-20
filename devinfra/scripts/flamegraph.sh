@@ -19,7 +19,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-nocompiler=${NoCompiler:-../target/release/nocompiler-x}
+nocompiler=${NOCOMPILER:-../target/release/nocompiler-x}
 top=${TOP:-20}
 freq=${FREQ:-997}
 

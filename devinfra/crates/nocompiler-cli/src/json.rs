@@ -366,11 +366,12 @@ pub fn decompiled(items: Vec<(&Function, &nocompiler_api::Decompiled)>) -> Listi
                     d.variables
                         .iter()
                         .map(|v| {
-                            let index = (v.role == nocompiler_decomp::expr::Role::Parameter).then(|| {
-                                let index = argument;
-                                argument += 1;
-                                index
-                            });
+                            let index =
+                                (v.role == nocompiler_decomp::expr::Role::Parameter).then(|| {
+                                    let index = argument;
+                                    argument += 1;
+                                    index
+                                });
                             variable_out(v, index)
                         })
                         .collect()
@@ -652,8 +653,7 @@ pub fn diff(d: &nocompiler_diff::Diff) -> DiffOut {
             "new_insns": m.new_insns,
         })
     };
-    let side =
-        |(a, n): &(nocompiler_core::Addr, String)| json!({ "addr": format!("{:#x}", a.get()), "name": n });
+    let side = |(a, n): &(nocompiler_core::Addr, String)| json!({ "addr": format!("{:#x}", a.get()), "name": n });
     DiffOut {
         schema: SCHEMA,
         matched: d.matched.len(),

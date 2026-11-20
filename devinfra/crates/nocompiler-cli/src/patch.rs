@@ -216,9 +216,8 @@ pub fn record(
     let at = addr::resolve(p, target).ok_or_else(|| format!("{target}: no such address"))?;
     let mut bytes = match replace.source {
         Source::Bytes(b) => b,
-        Source::Asm(text) => {
-            nocompiler_asm::assemble_all(&p.object.arch, text, at).map_err(|e| format!("{target}: {e}"))?
-        }
+        Source::Asm(text) => nocompiler_asm::assemble_all(&p.object.arch, text, at)
+            .map_err(|e| format!("{target}: {e}"))?,
     };
     if let Some(n) = replace.pad_to {
         if bytes.len() > n {
@@ -227,7 +226,9 @@ pub fn record(
                 bytes.len()
             ));
         }
-        bytes.extend(nocompiler_asm::pad(&p.object.arch, n - bytes.len()).map_err(|e| e.to_string())?);
+        bytes.extend(
+            nocompiler_asm::pad(&p.object.arch, n - bytes.len()).map_err(|e| e.to_string())?,
+        );
     }
     let replace = &bytes[..];
     let base = file_base(&p.object, at)

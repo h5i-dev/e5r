@@ -28,7 +28,9 @@ pub mod windirs;
 
 use std::collections::BTreeMap;
 
-use nocompiler_core::{Addr, AddrRange, Arch, Bits, Caps, Endian, Error, MemoryMap, Provenance, Result};
+use nocompiler_core::{
+    Addr, AddrRange, Arch, Bits, Caps, Endian, Error, MemoryMap, Provenance, Result,
+};
 use serde::{Deserialize, Serialize};
 
 /// Which container a file turned out to be.

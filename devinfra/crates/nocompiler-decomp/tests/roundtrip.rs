@@ -245,7 +245,8 @@ fn harness(cands: &[Candidate]) -> String {
 /// Compile and run the harness, returning `(function, vector) -> result`.
 fn execute(text: &str, tag: &str) -> Option<Vec<(usize, usize, u64)>> {
     let cc = cc()?;
-    let dir = std::env::temp_dir().join(format!("nocompiler-roundtrip-{tag}-{}", std::process::id()));
+    let dir =
+        std::env::temp_dir().join(format!("nocompiler-roundtrip-{tag}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).ok()?;
     let src = dir.join("r.c");
     let bin = dir.join("r");

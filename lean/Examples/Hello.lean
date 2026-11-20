@@ -143,7 +143,7 @@ theorem write_all_verified : Verified code write_all_dom write_all_entry spec :=
     · nocompiler_same
 
 /-- The message in `.rodata`. -/
-def message : List Byte := "hello, nocompiler\n".toList.map fun c => BitVec.ofNat 8 c.toNat
+def message : List Byte := "nocompiler\n".toList.map fun c => BitVec.ofNat 8 c.toNat
 
 theorem message_in_rodata : seg_rodata.bytes.toList.take 11 = message := by decide
 

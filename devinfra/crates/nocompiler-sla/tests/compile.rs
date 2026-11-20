@@ -228,7 +228,11 @@ fn every_slaspec_compiles_and_reads_back() {
 }
 
 /// What the compiled file says must be what the specification said.
-fn agrees(spec: &nocompiler_sleigh::Spec, back: &Sla, report: &sleighc::Report) -> Result<(), String> {
+fn agrees(
+    spec: &nocompiler_sleigh::Spec,
+    back: &Sla,
+    report: &sleighc::Report,
+) -> Result<(), String> {
     let p = &back.program;
 
     let declared = spec
@@ -237,7 +241,8 @@ fn agrees(spec: &nocompiler_sleigh::Spec, back: &Sla, report: &sleighc::Report) 
         .filter(|s| {
             !matches!(
                 s.kind,
-                nocompiler_sleigh::model::SpaceKind::Constant | nocompiler_sleigh::model::SpaceKind::Unique
+                nocompiler_sleigh::model::SpaceKind::Constant
+                    | nocompiler_sleigh::model::SpaceKind::Unique
             )
         })
         .count();
@@ -581,7 +586,11 @@ struct DecodeParity {
 }
 
 /// Decode the same sweep with two specifications and compare what came out.
-fn compare_decodes(a: &nocompiler_sleigh::Spec, b: &nocompiler_sleigh::Spec, width: usize) -> DecodeParity {
+fn compare_decodes(
+    a: &nocompiler_sleigh::Spec,
+    b: &nocompiler_sleigh::Spec,
+    width: usize,
+) -> DecodeParity {
     const CASES: usize = 20_000;
     let mut r = DecodeParity {
         cases: 0,

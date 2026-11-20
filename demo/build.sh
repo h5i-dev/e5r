@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 CLANG=${CLANG:-clang}
 LLD=${LLD:-$(command -v ld.lld || command -v ld.lld-20)}
-NoCompiler=${NoCompiler:-target/release/nocompiler}
+NOCOMPILER=${NOCOMPILER:-target/release/nocompiler}
 out=demo/build
 mkdir -p "$out"
 acflags=(--target=riscv64-unknown-elf -march=rv64gc -O2 -ffreestanding -nostdlib)
@@ -21,7 +21,7 @@ build_a() {  # output, sources...
   done
   "$LLD" -static -e _start "${objs[@]}" -o "$out/$name"
 }
-build_b() { local name=$1; shift; LLD=$LLD "$NoCompiler" cc -O2 "$@" -o "$out/$name" >/dev/null 2>&1 || true; }
+build_b() { local name=$1; shift; LLD=$LLD "$NOCOMPILER" cc -O2 "$@" -o "$out/$name" >/dev/null 2>&1 || true; }
 build_a sum.a.elf demo/src/sum.c
 build_b sum.b.elf demo/src/sum.c
 build_a cobs.a.elf demo/src/cobs.c demo/src/cobs_start.c
@@ -30,9 +30,9 @@ build_b cobs.b.elf demo/src/cobs.c demo/src/cobs_start.c
 # (demo/test/cobs_test.py checks), and their own _start need not conform.
 build_a cobs_test.a.elf demo/src/cobs.c demo/src/cobs_test_main.c
 build_b cobs_test.b.elf demo/src/cobs.c demo/src/cobs_test_main.c
-for e in sum.b cobs.b; do "$NoCompiler" check "$out/$e.elf" | tail -1; done
+for e in sum.b cobs.b; do "$NOCOMPILER" check "$out/$e.elf" | tail -1; done
 for e in sum.a cobs.a; do
-  echo "$out/$e.elf: $("$NoCompiler" check "$out/$e.elf" 2>&1 | head -1 | sed 's/^nocompiler: //') (ordinary code)"
+  echo "$out/$e.elf: $("$NOCOMPILER" check "$out/$e.elf" 2>&1 | head -1 | sed 's/^nocompiler: //') (ordinary code)"
 done
 if [ "${1:-}" = --update ]; then
   cp "$out"/{sum,cobs}.{a,b}.elf demo/elf/

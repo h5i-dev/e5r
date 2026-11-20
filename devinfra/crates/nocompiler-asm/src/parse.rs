@@ -6,7 +6,9 @@
 
 use nocompiler_core::{Addr, Arch};
 
-use nocompiler_arch::insn::{AddrMode, Cond, Extend, Flow, Insn, MAX_OPERANDS, Mem, Operand, Reg, Shift};
+use nocompiler_arch::insn::{
+    AddrMode, Cond, Extend, Flow, Insn, MAX_OPERANDS, Mem, Operand, Reg, Shift,
+};
 
 use crate::error::AsmError;
 use crate::lex::{Spanned, Tok, lex};

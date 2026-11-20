@@ -229,7 +229,9 @@ fn run(args: &[String], out: &mut String) -> Result<ExitCode, String> {
             for r in bin.check() {
                 match r.result {
                     Ok(m) => metas.push(m),
-                    Err(vs) => eprintln!("nocompiler: skipping {} ({} violations)", r.name, vs.len()),
+                    Err(vs) => {
+                        eprintln!("nocompiler: skipping {} ({} violations)", r.name, vs.len())
+                    }
                 }
             }
             let name = Path::new(file)

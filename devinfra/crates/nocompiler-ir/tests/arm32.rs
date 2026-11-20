@@ -295,7 +295,8 @@ fn on_hardware(cases: &[(&str, &str)], thumb: bool) -> Option<Vec<u32>> {
 fn assemble(text: &str, thumb: bool) -> Option<(Vec<u8>, usize)> {
     let cc = tool("clang")?;
     let set = if thumb { "t32" } else { "a32" };
-    let dir = std::env::temp_dir().join(format!("nocompiler-arm32asm-{set}-{}", std::process::id()));
+    let dir =
+        std::env::temp_dir().join(format!("nocompiler-arm32asm-{set}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).ok()?;
     let src = dir.join("a.s");
     let obj = dir.join("a.o");
@@ -370,7 +371,8 @@ fn interpreted(bytes: &[u8], end: usize, thumb: bool) -> Option<u32> {
     while at < end {
         let arch = if thumb { Arch::Thumb } else { Arch::Arm };
         let insn = if thumb {
-            let (i, next) = nocompiler_arch::arm::decode_thumb(&bytes[at..], Addr(BASE + at as u64), it)?;
+            let (i, next) =
+                nocompiler_arch::arm::decode_thumb(&bytes[at..], Addr(BASE + at as u64), it)?;
             it = next;
             i
         } else {

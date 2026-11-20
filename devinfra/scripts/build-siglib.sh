@@ -36,7 +36,7 @@
 # they need no reverse engineering of anyone's format.
 set -euo pipefail
 
-nocompiler=${NoCompiler:-../target/release/nocompiler-x}
+nocompiler=${NOCOMPILER:-../target/release/nocompiler-x}
 out=
 inputs=()
 

@@ -967,8 +967,10 @@ fn returned_call(target: Option<&str>) {
     else {
         return;
     };
-    let dir =
-        std::env::temp_dir().join(format!("nocompiler-returned-call-{}", target.unwrap_or("native")));
+    let dir = std::env::temp_dir().join(format!(
+        "nocompiler-returned-call-{}",
+        target.unwrap_or("native")
+    ));
     std::fs::create_dir_all(&dir).unwrap();
     let src = dir.join("w.c");
     std::fs::write(

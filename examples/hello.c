@@ -25,7 +25,7 @@ __attribute__((noinline)) long write_all(long fd, const char *buf, u64 n) {
   return 0;
 }
 
-static const char msg[] = "hello, nocompiler\n";
+static const char msg[] = "nocompiler\n";
 
 /* Not declared noreturn, so the code after the exit ecall is an ordinary
  * return: the profile's rule R2 cannot see that the ecall does not return,

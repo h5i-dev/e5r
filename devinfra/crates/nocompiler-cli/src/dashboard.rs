@@ -198,9 +198,11 @@ impl Analysis {
                 "successors":block.successors.iter().map(|a|a.to_string()).collect::<Vec<_>>(),
                 "terminator":format!("{:?}", block.terminator), "unresolved":block.unresolved
             })).collect();
-            return Ok(json!({"schema":"nocompiler.context.v1", "function":at.to_string(),
+            return Ok(
+                json!({"schema":"nocompiler.context.v1", "function":at.to_string(),
                 "annotations":annotations, "references":references, "blocks":blocks,
-                "complete":function.is_complete(), "halt":function.cfg.halt.as_str()}));
+                "complete":function.is_complete(), "halt":function.cfg.halt.as_str()}),
+            );
         }
         if kind == "callgraph" {
             let edges: Vec<_> = self
@@ -483,7 +485,8 @@ fn serve_inner(
                 let mut records = Vec::new();
                 for kind in ["finding", "note", "report"] {
                     for record in
-                        Store::new(nocompiler_db::work::beside(&workspace.path).join(kind)).list()?
+                        Store::new(nocompiler_db::work::beside(&workspace.path).join(kind))
+                            .list()?
                     {
                         records.push(json!({"kind":kind,"record":record}));
                     }

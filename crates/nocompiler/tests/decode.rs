@@ -182,12 +182,16 @@ fn decoder_agrees_with_llvm_mc() {
             (Some(i), Some(t)) => {
                 decoded += 1;
                 if i.asm_rel() != *t {
-                    wrong.push(format!("{w:#010x}: nocompiler `{}`, llvm-mc `{t}`", i.asm_rel()));
+                    wrong.push(format!(
+                        "{w:#010x}: nocompiler `{}`, llvm-mc `{t}`",
+                        i.asm_rel()
+                    ));
                 }
             }
-            (Some(i), None) => {
-                wrong.push(format!("{w:#010x}: nocompiler `{}`, llvm-mc invalid", i.asm_rel()))
-            }
+            (Some(i), None) => wrong.push(format!(
+                "{w:#010x}: nocompiler `{}`, llvm-mc invalid",
+                i.asm_rel()
+            )),
             (None, Some(t)) => {
                 let m = t.split_whitespace().next().unwrap_or("");
                 if is_excluded(m) {

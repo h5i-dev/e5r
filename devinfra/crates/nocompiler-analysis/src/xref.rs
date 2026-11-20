@@ -360,7 +360,9 @@ mod tests {
         let insns: Vec<Insn> = [0x9000_00e0u32, 0x9104_8c00]
             .iter()
             .enumerate()
-            .filter_map(|(n, w)| nocompiler_arch::aarch64::decode_word(*w, Addr(0x400000 + n as u64 * 4)))
+            .filter_map(|(n, w)| {
+                nocompiler_arch::aarch64::decode_word(*w, Addr(0x400000 + n as u64 * 4))
+            })
             .collect();
         let mut out = Vec::new();
         collect(&insns, &mem, &mut out);
@@ -378,7 +380,9 @@ mod tests {
         let insns: Vec<Insn> = words
             .iter()
             .enumerate()
-            .filter_map(|(n, w)| nocompiler_arch::aarch64::decode_word(*w, Addr(0x400000 + n as u64 * 4)))
+            .filter_map(|(n, w)| {
+                nocompiler_arch::aarch64::decode_word(*w, Addr(0x400000 + n as u64 * 4))
+            })
             .collect();
         let mut out = Vec::new();
         collect(&insns, &mem, &mut out);
@@ -391,7 +395,9 @@ mod tests {
         let insns: Vec<Insn> = [0x9000_00e0u32, 0x9104_8c00]
             .iter()
             .enumerate()
-            .filter_map(|(n, w)| nocompiler_arch::aarch64::decode_word(*w, Addr(0x400000 + n as u64 * 4)))
+            .filter_map(|(n, w)| {
+                nocompiler_arch::aarch64::decode_word(*w, Addr(0x400000 + n as u64 * 4))
+            })
             .collect();
         let mut out = Vec::new();
         collect(&insns, &mem, &mut out);

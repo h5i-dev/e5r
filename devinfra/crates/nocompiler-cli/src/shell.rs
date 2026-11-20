@@ -258,7 +258,7 @@ mod tests {
                 sub.get_name()
             );
         }
-        assert!(page.starts_with(".TH NoCompilerX 1"));
+        assert!(page.starts_with(".TH NOCOMPILER-X 1"));
     }
 
     #[test]

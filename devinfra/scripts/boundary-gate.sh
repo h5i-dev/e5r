@@ -34,14 +34,14 @@
 #   scripts/boundary-gate.sh --csv        # machine-readable, for docs/
 #   scripts/boundary-gate.sh zlib         # only manifest rows matching zlib
 #
-# Env: NoCompiler  the executable (default ../target/release/nocompiler-x)
+# Env: NOCOMPILER  the executable (default ../target/release/nocompiler-x)
 #
 # Degrades rather than fails: no corpus is a skip and a zero exit, like every
 # other gate here. A non-zero exit means a floor below was missed.
 set -euo pipefail
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-nocompiler=${NoCompiler:-$repo/../target/release/nocompiler-x}
+nocompiler=${NOCOMPILER:-$repo/../target/release/nocompiler-x}
 
 csv=0
 if [ "${1:-}" = "--csv" ]; then csv=1; shift; fi

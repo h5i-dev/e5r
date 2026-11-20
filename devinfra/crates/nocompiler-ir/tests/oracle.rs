@@ -132,7 +132,12 @@ fn widen(raw: u64, kind: &str) -> u64 {
 ///
 /// Integer and floating arguments have separate sequences of registers, which
 /// is how both calling conventions work.
-fn call(p: &Program, entry: Addr, args: &[Value], float_result: bool) -> (u64, nocompiler_ir::Outcome) {
+fn call(
+    p: &Program,
+    entry: Addr,
+    args: &[Value],
+    float_result: bool,
+) -> (u64, nocompiler_ir::Outcome) {
     let mut m = Machine::over(&p.object.memory);
     m.budget = 1 << 24;
     // Real storage under the stack pointer, so a spill and its reload agree.

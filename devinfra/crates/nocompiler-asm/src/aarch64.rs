@@ -1938,8 +1938,10 @@ mod tests {
             let bytes = asm(text, 0x1000).to_le_bytes();
             let back = nocompiler_arch::aarch64::decode(&bytes, Addr(0x1000))
                 .unwrap_or_else(|| panic!("{text} does not decode"));
-            let printed =
-                nocompiler_arch::aarch64::format(&back, nocompiler_arch::aarch64::text::Style { objdump: false });
+            let printed = nocompiler_arch::aarch64::format(
+                &back,
+                nocompiler_arch::aarch64::text::Style { objdump: false },
+            );
             assert_eq!(&printed, text, "{text}");
         }
     }
@@ -1997,7 +1999,8 @@ mod tests {
             "cbz\tx0, 0x200000",
             "tbz\tx0, #1, 0x20000",
         ] {
-            let e = crate::assemble(&nocompiler_core::Arch::AArch64, text, Addr(0)).expect_err(text);
+            let e =
+                crate::assemble(&nocompiler_core::Arch::AArch64, text, Addr(0)).expect_err(text);
             assert!(matches!(e, AsmError::BranchRange { .. }), "{text}: {e}");
         }
         // An unaligned target is its own error, not a rounded displacement.
@@ -2008,13 +2011,25 @@ mod tests {
 
     #[test]
     fn a_value_no_immediate_can_build_is_refused_rather_than_approximated() {
-        let e = crate::assemble(&nocompiler_core::Arch::AArch64, "mov\tx0, #0x123456789", Addr(0))
-            .expect_err("no single immediate builds this");
+        let e = crate::assemble(
+            &nocompiler_core::Arch::AArch64,
+            "mov\tx0, #0x123456789",
+            Addr(0),
+        )
+        .expect_err("no single immediate builds this");
         assert!(matches!(e, AsmError::NoEncoding { .. }), "{e}");
-        let e = crate::assemble(&nocompiler_core::Arch::AArch64, "and\tx0, x1, #0x3", Addr(0));
+        let e = crate::assemble(
+            &nocompiler_core::Arch::AArch64,
+            "and\tx0, x1, #0x3",
+            Addr(0),
+        );
         assert!(e.is_ok(), "a rotated run of ones does encode");
-        let e = crate::assemble(&nocompiler_core::Arch::AArch64, "and\tx0, x1, #0x5", Addr(0))
-            .expect_err("0x5 is not a rotated run of ones");
+        let e = crate::assemble(
+            &nocompiler_core::Arch::AArch64,
+            "and\tx0, x1, #0x5",
+            Addr(0),
+        )
+        .expect_err("0x5 is not a rotated run of ones");
         assert!(matches!(e, AsmError::NoEncoding { .. }), "{e}");
     }
 

@@ -1007,7 +1007,8 @@ pub fn dispatch(
             let other_data = std::fs::File::open(other)
                 .and_then(|f| map_file(&f))
                 .map_err(|e| format!("{}: {e}", other.display()))?;
-            let other_obj = nocompiler_format::load(&other_data, load_opts).map_err(|e| e.to_string())?;
+            let other_obj =
+                nocompiler_format::load(&other_data, load_opts).map_err(|e| e.to_string())?;
             let other_prog = nocompiler_analysis::analyze(other_obj, opts);
             print::diff(w, program, &other_prog, *all, common.json)
         }

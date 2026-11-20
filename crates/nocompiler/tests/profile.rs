@@ -29,7 +29,8 @@ struct Tools {
 fn tools(test: &str) -> Option<Tools> {
     let clang = tool("CLANG", &["clang"])?;
     let lld = tool("LLD", &["ld.lld", "ld.lld-20", "ld.lld-19", "ld.lld-18"])?;
-    let dir = std::env::temp_dir().join(format!("nocompiler-profile-{test}-{}", std::process::id()));
+    let dir =
+        std::env::temp_dir().join(format!("nocompiler-profile-{test}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     Some(Tools { clang, lld, dir })
 }

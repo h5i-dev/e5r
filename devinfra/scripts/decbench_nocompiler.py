@@ -114,8 +114,8 @@ def variable_info(item: dict[str, Any]) -> list[VariableInfo]:
 
 
 def nocompiler_binary() -> Path | None:
-    """The nocompiler executable: $NoCompiler, the release build, or one on $PATH."""
-    env = os.environ.get("NoCompiler")
+    """The nocompiler executable: $NOCOMPILER, the release build, or one on $PATH."""
+    env = os.environ.get("NOCOMPILER")
     if env:
         p = Path(env).expanduser()
         return p if p.is_file() and os.access(p, os.X_OK) else None

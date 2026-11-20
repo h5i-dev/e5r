@@ -10,7 +10,7 @@
 #   scripts/check-proof-controls.sh        (needs target/release/nocompiler and lake)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-NoCompiler=${NoCompiler:-$PWD/target/release/nocompiler}
+NOCOMPILER=${NOCOMPILER:-$PWD/target/release/nocompiler}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
@@ -83,11 +83,11 @@ PY
         (cd "$work/lean" && lake env lean --run ../demo/tools/ExportC.lean "$work/$base.elf" "Demo.$F.ImageA" \
           $(demo_funcs "$work/$base.elf") > "$img")
       else
-        "$NoCompiler" export "$work/$base.elf" --namespace "Demo.$F.ImageB" -o "$work/lean/$img" 2>/dev/null
+        "$NOCOMPILER" export "$work/$base.elf" --namespace "Demo.$F.ImageB" -o "$work/lean/$img" 2>/dev/null
       fi ;;
     *)
       img=Examples/$(echo "$name" | sed -E 's/(^|_)([a-z])/\U\2/g')/Image.lean
-      "$NoCompiler" export "$work/$name.elf" --namespace "$mod.Image" -o "$work/lean/$img" 2>/dev/null ;;
+      "$NOCOMPILER" export "$work/$name.elf" --namespace "$mod.Image" -o "$work/lean/$img" 2>/dev/null ;;
   esac
   # The mutated image must itself build: a proof that fails because its
   # image is broken (a failed export) would be no evidence.

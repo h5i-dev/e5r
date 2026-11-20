@@ -782,8 +782,8 @@ fn a_macho_section_off_the_end_is_reported() {
 fn a_macho_relocatable_layout_stays_inside_the_address_space() {
     let bytes = tiny_macho(3, 0x9393_9393_9393_9393);
     assert!(bytes.len() < 512, "the reproduction is meant to be tiny");
-    let obj =
-        nocompiler_format::load(&bytes, &LoadOptions::default()).expect("a 344-byte Mach-O still loads");
+    let obj = nocompiler_format::load(&bytes, &LoadOptions::default())
+        .expect("a 344-byte Mach-O still loads");
     let mut ranges: Vec<_> = obj
         .sections
         .iter()

@@ -644,7 +644,8 @@ fn real_encodings_land_in_the_right_bits() {
         if !path.is_file() {
             continue;
         }
-        let spec = nocompiler_sleigh::parse_file(&path).unwrap_or_else(|e| panic!("{spec_path}: {e}"));
+        let spec =
+            nocompiler_sleigh::parse_file(&path).unwrap_or_else(|e| panic!("{spec_path}: {e}"));
         let constructors = &spec.table(spec.root()).constructors;
         for (mnemonic, bytes) in *words {
             checked += 1;

@@ -97,7 +97,11 @@ pub fn compile(spec: &sl::Spec) -> (sla::Program, Report) {
 /// Only if the model holds something the tag encoding cannot carry.
 pub fn compile_to_bytes(spec: &sl::Spec) -> Result<(Vec<u8>, Report), nocompiler_sla::SlaError> {
     let (p, r) = compile(spec);
-    let bytes = nocompiler_sla::emit::write(&p, nocompiler_sla::KNOWN_VERSION, nocompiler_sla::Level::Fixed)?;
+    let bytes = nocompiler_sla::emit::write(
+        &p,
+        nocompiler_sla::KNOWN_VERSION,
+        nocompiler_sla::Level::Fixed,
+    )?;
     Ok((bytes, r))
 }
 

@@ -107,7 +107,8 @@ fn the_build_info_says_which_go_built_it() {
     let v = t.build_version.expect("no build version");
     assert!(v.starts_with("go1."), "{v}");
     assert!(
-        t.module_info.is_some_and(|m| m.contains("nocompilerfixture")),
+        t.module_info
+            .is_some_and(|m| m.contains("nocompilerfixture")),
         "the module line should name the fixture module"
     );
 }

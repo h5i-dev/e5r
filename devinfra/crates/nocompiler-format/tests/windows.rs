@@ -898,7 +898,8 @@ fn an_unwind_prologue_is_decoded_in_order() {
     assert_eq!(info.version, 1);
     assert_eq!(info.prolog_size, 9);
     assert_eq!(
-        info.frame_register.map(nocompiler_format::pdata::x64_register),
+        info.frame_register
+            .map(nocompiler_format::pdata::x64_register),
         Some("rbp")
     );
     assert_eq!(info.frame_offset, 0x20);

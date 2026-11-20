@@ -331,7 +331,10 @@ fn a_string_the_length_encoding_cannot_carry_is_refused_not_truncated() {
     // real name comes near; the writer has to say so rather than write a
     // length that does not match the bytes.
     let mut out = Vec::new();
-    let ok = nocompiler_sla::encode::push_value(&mut out, &nocompiler_sla::Value::Text("a".repeat(1000)));
+    let ok = nocompiler_sla::encode::push_value(
+        &mut out,
+        &nocompiler_sla::Value::Text("a".repeat(1000)),
+    );
     assert!(ok.is_ok());
     assert_eq!(out.len(), 1 + 2 + 1000);
 }

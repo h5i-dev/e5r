@@ -609,7 +609,10 @@ fn bsd_index(
 /// Pick the byte order whose reading of the leading length fits the member.
 fn bsd_endian(data: &[u8], wide: bool) -> Option<nocompiler_core::Endian> {
     let avail = data.len() as u64;
-    for endian in [nocompiler_core::Endian::Little, nocompiler_core::Endian::Big] {
+    for endian in [
+        nocompiler_core::Endian::Little,
+        nocompiler_core::Endian::Big,
+    ] {
         let mut c = Reader::new(data, endian);
         if let Ok(n) = c.uword("__.SYMDEF ranlib bytes", wide) {
             if n <= avail.saturating_sub(if wide { 16 } else { 8 }) {

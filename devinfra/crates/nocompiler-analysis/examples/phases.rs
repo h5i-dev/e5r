@@ -78,7 +78,8 @@ fn account(functions: &BTreeMap<Addr, Function>) {
     let mut insns = 0u64;
     for f in functions.values() {
         names += f.name.as_ref().map_or(0, |n| n.capacity());
-        provenance += f.provenance.corroborating.capacity() * size_of::<nocompiler_core::Evidence>();
+        provenance +=
+            f.provenance.corroborating.capacity() * size_of::<nocompiler_core::Evidence>();
         nblocks += f.cfg.blocks.len();
         // Four bytes per stored block: the block itself is in the shared
         // table, counted once below.

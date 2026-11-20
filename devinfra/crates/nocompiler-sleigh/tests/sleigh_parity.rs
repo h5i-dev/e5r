@@ -756,7 +756,8 @@ fn aarch64_agrees_with_the_hand_written_decoder() {
         let mut d = Decoder::new(&spec);
         for line in &lines {
             let sleigh = d.decode(&line.bytes, line.addr).ok();
-            let hand = nocompiler_arch::aarch64::decode(&line.bytes, nocompiler_core::Addr(line.addr));
+            let hand =
+                nocompiler_arch::aarch64::decode(&line.bytes, nocompiler_core::Addr(line.addr));
             match (&sleigh, hand) {
                 (Some(s), Some(h)) => {
                     let ours = s.text(&spec);

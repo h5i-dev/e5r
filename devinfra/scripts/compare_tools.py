@@ -780,7 +780,7 @@ def build_tools(args) -> tuple[list, list[str]]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("binaries", nargs="*", type=Path)
-    ap.add_argument("--nocompiler", default=os.environ.get("NoCompiler", "../target/release/nocompiler-x"))
+    ap.add_argument("--nocompiler", default=os.environ.get("NOCOMPILER", "../target/release/nocompiler-x"))
     ap.add_argument(
         "--nocompiler-name",
         default="",

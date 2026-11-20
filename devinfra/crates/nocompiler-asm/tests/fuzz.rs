@@ -157,7 +157,10 @@ fn mutated_assembly_text_never_panics() {
         // The contract: bytes or a typed error, nothing else. A successful
         // encode has to fit the architecture's own limit.
         if let Ok(e) = assemble(&arch, &text, at) {
-            assert!(!e.is_empty() && e.len() <= nocompiler_asm::MAX_INSN, "{text:?}");
+            assert!(
+                !e.is_empty() && e.len() <= nocompiler_asm::MAX_INSN,
+                "{text:?}"
+            );
             if arch == Arch::AArch64 {
                 assert_eq!(e.len(), 4, "{text:?}");
             }

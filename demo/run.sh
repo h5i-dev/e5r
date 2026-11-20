@@ -14,8 +14,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 export LLD=${LLD:-$(command -v ld.lld || command -v ld.lld-20)}
 cargo build --release -q -p nocompiler
-NoCompiler=${CARGO_TARGET_DIR:-target}/release/nocompiler
-export NoCompiler
+NOCOMPILER=${CARGO_TARGET_DIR:-target}/release/nocompiler
+export NOCOMPILER
 LAKE=(lake)
 if command -v systemd-run >/dev/null && [ -n "${NOCOMPILER_MEM:-}" ]; then
   LAKE=(systemd-run --user --scope --quiet -p MemoryMax="$NOCOMPILER_MEM" -p MemorySwapMax=0 --setenv=PATH="$PATH" lake)
@@ -26,7 +26,7 @@ step "build (demo/build.sh)"
 demo/build.sh
 
 step "the profile, on B"
-for f in sum cobs; do "$NoCompiler" check "demo/elf/$f.b.elf" | tail -1; done
+for f in sum cobs; do "$NOCOMPILER" check "demo/elf/$f.b.elf" | tail -1; done
 
 step "cobs_decode against a reference, under qemu (A and B)"
 for x in a b; do python3 -I demo/test/cobs_test.py "demo/build/cobs_test.$x.elf" "demo/elf/cobs.$x.elf"; done
@@ -37,7 +37,7 @@ tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 (cd lean && "${LAKE[@]}" build NoCompiler.Ext.Rvc NoCompiler.Elf rvc-run >/dev/null)
 for f in sum cobs; do
   F=$(echo "$f" | sed -E 's/(^|_)([a-z])/\U\2/g')
-  "$NoCompiler" export "demo/elf/$f.b.elf" --namespace "Demo.$F.ImageB" -o "$tmp/$F.B.lean"
+  "$NOCOMPILER" export "demo/elf/$f.b.elf" --namespace "Demo.$F.ImageB" -o "$tmp/$F.B.lean"
   (cd lean && lake env lean --run ../demo/tools/ExportC.lean "../demo/elf/$f.a.elf" "Demo.$F.ImageA" \
     $(demo_funcs "../demo/elf/$f.a.elf") > "$tmp/$F.A.lean")
   for S in A B; do

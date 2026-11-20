@@ -179,7 +179,10 @@ fn step(
 }
 
 fn help(w: &mut Out) {
-    outln!(w, "Commands are the ones nocompiler-x takes, without the file:");
+    outln!(
+        w,
+        "Commands are the ones nocompiler-x takes, without the file:"
+    );
     outln!(w, "");
     outln!(
         w,

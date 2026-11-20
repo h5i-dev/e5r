@@ -1467,7 +1467,8 @@ mod tests {
     }
 
     fn refused(text: &str) -> AsmError {
-        crate::assemble(&nocompiler_core::Arch::X86_64, text, Addr(0x1000)).expect_err("should refuse")
+        crate::assemble(&nocompiler_core::Arch::X86_64, text, Addr(0x1000))
+            .expect_err("should refuse")
     }
 
     #[test]
@@ -1563,7 +1564,9 @@ mod tests {
             .expect_err("out of range");
         assert!(matches!(e, AsmError::BranchRange { .. }), "{e}");
         // A truncated displacement is the one mistake this must never make.
-        assert!(crate::assemble(&nocompiler_core::Arch::X86_64, "call 0x7ffffffc", Addr(0)).is_ok());
+        assert!(
+            crate::assemble(&nocompiler_core::Arch::X86_64, "call 0x7ffffffc", Addr(0)).is_ok()
+        );
     }
 
     #[test]

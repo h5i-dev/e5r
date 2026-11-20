@@ -310,9 +310,11 @@ pub fn check(o: &Options) -> (Verdict, Value) {
     );
     let dir = match &o.keep {
         Some(d) => d.clone(),
-        None => {
-            std::env::temp_dir().join(format!("nocompiler-ptx-{}-{}", std::process::id(), &phash[..12]))
-        }
+        None => std::env::temp_dir().join(format!(
+            "nocompiler-ptx-{}-{}",
+            std::process::id(),
+            &phash[..12]
+        )),
     };
     if let Err(e) = std::fs::create_dir_all(&dir) {
         return finish(doc, Verdict::Error, Some(format!("{}: {e}", dir.display())));
@@ -664,9 +666,11 @@ fn check_block(
     };
     let dir = match &o.keep {
         Some(d) => d.clone(),
-        None => {
-            std::env::temp_dir().join(format!("nocompiler-ptx-{}-{}", std::process::id(), &phash[..12]))
-        }
+        None => std::env::temp_dir().join(format!(
+            "nocompiler-ptx-{}-{}",
+            std::process::id(),
+            &phash[..12]
+        )),
     };
     if let Err(e) = std::fs::create_dir_all(&dir) {
         return finish(doc, Verdict::Error, Some(format!("{}: {e}", dir.display())));

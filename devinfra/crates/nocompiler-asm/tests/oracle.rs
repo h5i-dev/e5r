@@ -228,9 +228,9 @@ fn compare(arch: &Arch, texts: &[(String, Vec<u8>)], dir: &Path, t: &mut Tally) 
                     ))
                     .or_default() += 1;
             }
-            _ => t
-                .wrong
-                .push(format!("{text:?}: nocompiler {ours:02x?}, system {theirs:02x?}")),
+            _ => t.wrong.push(format!(
+                "{text:?}: nocompiler {ours:02x?}, system {theirs:02x?}"
+            )),
         }
     }
 }

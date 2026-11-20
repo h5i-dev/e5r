@@ -388,9 +388,15 @@ fn one(
         shape.prototype = borrowed.cloned();
     }
     let name = f.display_name();
-    let output =
-        nocompiler_decomp::decompile_full(&name, &ssa, shape.prototype.as_ref(), callees, &switches);
-    let mut variables = nocompiler_decomp::expr::variables(&ssa, shape.prototype.as_ref(), &output.text);
+    let output = nocompiler_decomp::decompile_full(
+        &name,
+        &ssa,
+        shape.prototype.as_ref(),
+        callees,
+        &switches,
+    );
+    let mut variables =
+        nocompiler_decomp::expr::variables(&ssa, shape.prototype.as_ref(), &output.text);
     // Stack promotion deliberately gives up when any stack address escapes:
     // rewriting in that case could hide writes through the pointer. Direct
     // loads and stores still prove that a slot of this width exists, though,
@@ -632,7 +638,10 @@ fn recovered(p: &Program, f: &Function, ssa: &SsaFunction) -> Option<Prototype> 
         // The name carries the function, because two functions rarely hand
         // the same structure to the same argument register and a shared name
         // would claim they did.
-        let tag = format!("{}_{name}", nocompiler_decomp::identifier(&f.display_name()));
+        let tag = format!(
+            "{}_{name}",
+            nocompiler_decomp::identifier(&f.display_name())
+        );
         // The register is eight bytes; the argument is as wide as the body
         // reads it, which is what stops every parameter being `uint64_t` and
         // what lets a caller's `-512` print as itself rather than as
@@ -644,7 +653,10 @@ fn recovered(p: &Program, f: &Function, ssa: &SsaFunction) -> Option<Prototype> 
                 (format!("struct s_{tag} *{name}"), true)
             }
             (true, Some(size)) => (format!("{} *{name}", nocompiler_decomp::c_type(size)), true),
-            (true, None) => (format!("{} {name}", nocompiler_decomp::c_type(width)), false),
+            (true, None) => (
+                format!("{} {name}", nocompiler_decomp::c_type(width)),
+                false,
+            ),
         };
         parameters.push(Param {
             decl,
@@ -736,7 +748,10 @@ fn structure(name: &str, fields: &[(i64, u8)]) -> String {
             4 => "uint32_t",
             _ => "uint64_t",
         };
-        out.push_str(&format!(" {ty} {};", nocompiler_decomp::field_name(*offset)));
+        out.push_str(&format!(
+            " {ty} {};",
+            nocompiler_decomp::field_name(*offset)
+        ));
         at = offset + *size as i64;
     }
     out.push_str(" };");

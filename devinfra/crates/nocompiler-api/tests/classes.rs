@@ -423,7 +423,8 @@ fn the_rtti_build_recovers_strictly_more_than_the_one_without() {
             0,
             "{without}"
         );
-        let named = |c: &nocompiler_api::Classes| c.classes.iter().filter(|x| x.name.is_some()).count();
+        let named =
+            |c: &nocompiler_api::Classes| c.classes.iter().filter(|x| x.name.is_some()).count();
         assert!(
             named(&rtti) >= named(&none),
             "{with}: type information named {} classes, without it {} were named",

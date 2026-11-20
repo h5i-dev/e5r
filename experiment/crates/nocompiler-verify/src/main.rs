@@ -101,7 +101,9 @@ fn run(args: Vec<String>) -> Result<String, String> {
                 Err(format!("{path}: stale: {}", changed.join(", ")))
             }
         }
-        Some(path) if args.len() == 1 && !path.starts_with('-') => nocompiler_verify::export(&read(path)?),
+        Some(path) if args.len() == 1 && !path.starts_with('-') => {
+            nocompiler_verify::export(&read(path)?)
+        }
         _ => Err(
             "usage: nocompiler-exp (ptx check|check|verify-result|bundle|flash|ram-image) ... \
                   or IMAGE.elf; run `nocompiler-exp --help`"

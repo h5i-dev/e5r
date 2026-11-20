@@ -433,7 +433,9 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        Store::new(std::env::temp_dir().join(format!("nocompiler-work-{}-{unique}", std::process::id())))
+        Store::new(
+            std::env::temp_dir().join(format!("nocompiler-work-{}-{unique}", std::process::id())),
+        )
     }
     fn draft(title: &str) -> Draft {
         Draft {

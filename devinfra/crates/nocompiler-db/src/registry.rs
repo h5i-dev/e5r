@@ -389,7 +389,10 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        std::env::temp_dir().join(format!("nocompiler-registry-{}-{stamp}", std::process::id()))
+        std::env::temp_dir().join(format!(
+            "nocompiler-registry-{}-{stamp}",
+            std::process::id()
+        ))
     }
     #[test]
     fn storage_precedence_and_names_are_predictable() {

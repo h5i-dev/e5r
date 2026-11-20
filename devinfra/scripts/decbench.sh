@@ -15,7 +15,7 @@
 #
 # Env: DECBENCH_REPO   the DecBench checkout (default ~/Ref/decbench)
 #      DECBENCH_VENV   virtualenv with decbench installed (default ~/.venvs/decbench)
-#      NoCompiler            the nocompiler executable (default ../target/release/nocompiler-x)
+#      NOCOMPILER            the nocompiler executable (default ../target/release/nocompiler-x)
 #      GHIDRA_INSTALL_DIR  needed only when ghidra is one of the decompilers
 set -euo pipefail
 
@@ -27,7 +27,7 @@ decs=${4:-nocompiler}
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 decbench=${DECBENCH_REPO:-$HOME/Ref/decbench}
 venv=${DECBENCH_VENV:-$HOME/.venvs/decbench}
-nocompiler=${NoCompiler:-$repo/../target/release/nocompiler-x}
+nocompiler=${NOCOMPILER:-$repo/../target/release/nocompiler-x}
 
 [ -d "$decbench/decbench" ] || {
   echo "no DecBench checkout at $decbench; set DECBENCH_REPO" >&2
@@ -48,7 +48,7 @@ nocompiler=${NoCompiler:-$repo/../target/release/nocompiler-x}
 
 # Importing the out-of-tree backend would otherwise leave a __pycache__ in
 # scripts/, which is not ours to litter.
-export DECBENCH_REPO="$decbench" NoCompiler="$nocompiler" PYTHONDONTWRITEBYTECODE=1
+export DECBENCH_REPO="$decbench" NOCOMPILER="$nocompiler" PYTHONDONTWRITEBYTECODE=1
 python="$venv/bin/python"
 
 # The corpus projects are built from their own upstream sources, so the first

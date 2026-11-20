@@ -67,10 +67,10 @@ jobs:
       - run: cargo build -p nocompiler
       - name: Negative controls, every mutated binary breaks its proof
         env:
-          NoCompiler: ${{ github.workspace }}/target/debug/nocompiler
+          NOCOMPILER: ${{ github.workspace }}/target/debug/nocompiler
         run: ./scripts/check-proof-controls.sh
       - name: Rebuild the examples (a different clang may differ; reported, not gated)
-        run: NoCompiler=target/debug/nocompiler ./examples/build.sh || echo "::warning::examples/build.sh, the build differs from examples/elf/"
+        run: NOCOMPILER=target/debug/nocompiler ./examples/build.sh || echo "::warning::examples/build.sh, the build differs from examples/elf/"
 
   # Runners are disposable, so these build the dev profile on purpose. The
   # release-only rule in CONTRIBUTING.md is about the maintainer's machine.
