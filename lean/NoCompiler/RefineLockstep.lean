@@ -104,14 +104,33 @@ def kindOk (k : Cert) (e : Pair) (i : Instr) : Bool :=
   | .ecall | .lui .. | .load .. | .store .. | .iop .. | .addiw .. | .shift .. | .shiftw ..
   | .rop .. | .rwop .. | .uop .. => succOk k i e.live (e.pb + 4) (e.pa + 4)
 
-/-- What the kernel decides at one pair. -/
+/-- A jump pair: the same branch (or `jal zero`) on both sides, but with its own
+    offset on each, so the two layouts may differ (an instruction inserted
+    before a branch target moves it). Each side's target is its own; the two
+    targets must be a pair. -/
+def jumpOk (k : Cert) (e : Pair) : Instr → Instr → Bool
+  | .branch op a b offA, .branch op' a' b' offB =>
+    op == op' && a == a' && b == b' && [a, b].all e.live.contains &&
+    succOk k (.branch op a b offA) e.live (e.pb + 4) (e.pa + 4) &&
+    decide (aligned (e.pb + offB.signExtend 64) 4) && decide (aligned (e.pa + offA.signExtend 64) 4) &&
+    succOk k (.branch op a b offA) e.live (e.pb + offB.signExtend 64) (e.pa + offA.signExtend 64)
+  | .jal rdA offA, .jal rdB offB =>
+    rdA == 0 && rdB == 0 &&
+    decide (aligned (e.pb + offB.signExtend 64) 4) && decide (aligned (e.pa + offA.signExtend 64) 4) &&
+    succOk k (.jal 0 offA) e.live (e.pb + offB.signExtend 64) (e.pa + offA.signExtend 64)
+  | _, _ => false
+
+/-- What the kernel decides at one pair: the same word on both sides (cheaper
+    for the kernel than comparing instructions), or a jump pair. -/
 def pairOk (cA cB : Code) (DA DB : Dom) (k : Cert) (e : Pair) : Bool :=
   decide (DB.mem e.pb) && decide (DA.mem e.pa) &&
-  -- the same word on both sides (cheaper for the kernel than comparing instructions)
-  cA.fetch e.pa == cB.fetch e.pb &&
-  match cA.instr e.pa with
-  | some ia => !(ia.defs.contains 1) && kindOk k e ia
-  | none => false
+  ((cA.fetch e.pa == cB.fetch e.pb &&
+    match cA.instr e.pa with
+    | some ia => !(ia.defs.contains 1) && kindOk k e ia
+    | none => false) ||
+   match cA.instr e.pa, cB.instr e.pb with
+   | some ia, some ib => jumpOk k e ia ib
+   | _, _ => false)
 
 /-- What the kernel decides of a region: its shape, and that its exit is a
     point whose live set its `liveOut` covers. -/
@@ -146,19 +165,32 @@ structure PairFacts (cA cB : Code) (DA DB : Dom) (k : Cert) (e : Pair) (i : Inst
   noRa : 1 ∉ i.defs
   kind : kindOk k e i = true
 
+/-- What a jump pair gives. -/
+structure JumpFacts (cA cB : Code) (DA DB : Dom) (k : Cert) (e : Pair) (ia ib : Instr) : Prop where
+  memB : DB.mem e.pb
+  memA : DA.mem e.pa
+  instrA : cA.instr e.pa = some ia
+  instrB : cB.instr e.pb = some ib
+  kind : jumpOk k e ia ib = true
+
 theorem pairOk_facts {e : Pair} (h : pairOk cA cB DA DB k e = true) :
-    ∃ i, PairFacts cA cB DA DB k e i := by
+    (∃ i, PairFacts cA cB DA DB k e i) ∨ ∃ ia ib, JumpFacts cA cB DA DB k e ia ib := by
   unfold pairOk at h
-  simp only [Bool.and_eq_true, decide_eq_true_eq, beq_iff_eq] at h
-  obtain ⟨⟨⟨hb, ha⟩, hw⟩, h⟩ := h
-  split at h
-  · rename_i ia hia
-    simp only [Bool.and_eq_true, Bool.not_eq_true'] at h
-    obtain ⟨hra, hk⟩ := h
-    have hib : cB.instr e.pb = some ia := by
-      unfold Code.instr at hia ⊢; rw [← hw]; exact hia
-    exact ⟨ia, hb, ha, hia, hib, by simpa using hra, hk⟩
-  · simp at h
+  simp only [Bool.and_eq_true, decide_eq_true_eq, Bool.or_eq_true, beq_iff_eq] at h
+  obtain ⟨⟨hb, ha⟩, h | h⟩ := h
+  · obtain ⟨hw, h⟩ := h
+    split at h
+    · rename_i ia hia
+      simp only [Bool.and_eq_true, Bool.not_eq_true'] at h
+      obtain ⟨hra, hk⟩ := h
+      have hib : cB.instr e.pb = some ia := by
+        unfold Code.instr at hia ⊢; rw [← hw]; exact hia
+      exact .inl ⟨ia, hb, ha, hia, hib, by simpa using hra, hk⟩
+    · simp at h
+  · split at h
+    · rename_i ia ib hia hib
+      exact .inr ⟨ia, ib, hb, ha, hia, hib, h⟩
+    · simp at h
 
 theorem exec_exit {i : Instr} {s s' : State} (h : exec i s = some s') : s'.exit = s.exit := by
   cases i <;> simp only [exec, jumpTo] at h <;> (try split at h) <;> (try split at h) <;>
@@ -361,6 +393,74 @@ theorem progress_pair {P : Perm} {e : Pair} {i : Instr} (hf : PairFacts cA cB DA
       | none => rw [← hnone] at h; rw [h] at hexa; cases hexa
       | some sb' => exact ⟨sb', rfl⟩
 
+/-- One B step from a jump pair is matched by one A step. -/
+theorem step_jpair {P : Perm} {s0 : State} {e : Pair} {ia ib : Instr}
+    (hf : JumpFacts cA cB DA DB k e ia ib)
+    {sa sb : State} (hx : sa.exit = none) (hra : sa.reg 1 = s0.reg 1) (hpb : sb.pc = e.pb)
+    (hpa : sa.pc = e.pa) (hag : Agree e.live sa sb) {sb' : State} (hst : Step cB P sb sb') :
+    ∃ sa', Step cA P sa sa' ∧ Rel k s0 sa' sb' := by
+  have hiA : cA.instr sa.pc = some ia := hpa ▸ hf.instrA
+  have hk := hf.kind
+  have e0 : ∀ (u : State) v, u.setReg 0 v = u := fun u v => by simp [State.setReg]
+  cases hst with
+  | sys _ hib _ _ =>
+    rw [hpb, hf.instrB] at hib; cases hib
+    cases ia <;> simp [jumpOk] at hk
+  | exec hxb hib hokb hexb =>
+    rw [hpb, hf.instrB] at hib; cases hib
+    cases ia <;> cases ib <;> simp only [jumpOk, Bool.false_eq_true] at hk
+    case branch.branch op a b offA op' a' b' offB =>
+      simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq, List.all_eq_true, List.contains_iff_mem]
+        at hk
+      obtain ⟨⟨⟨⟨⟨⟨⟨rfl, rfl⟩, rfl⟩, hu⟩, hn⟩, halb⟩, hala⟩, htk⟩ := hk
+      have hbr := evalBr_congr (op := op) (a := a) (b := b) (by simpa [Instr.uses] using hu) hag
+      simp only [exec, jumpTo] at hexb
+      by_cases hc : evalBr op (sb.reg a) (sb.reg b) = true
+      · rw [hpb] at hexb; simp only [hc, halb, ite_true, Option.some.injEq] at hexb; subst hexb
+        obtain ⟨e', he', hb', ha', ht⟩ := succOk_sound htk
+        refine ⟨sa.setPc (e.pa + offA.signExtend 64), .exec hx hiA trivial ?_, .inl ⟨hx, hra, e', he',
+          by simp [hb'], by simp [ha'], ?_⟩⟩
+        · simp only [exec, jumpTo, hbr, hc, hpa, hala, ite_true]
+        · exact (hag.mono (fun r hr => ht.2 r hr (by simp [Instr.defs]))).setPc _ _
+      · simp only [hc, ite_false, Option.some.injEq, Bool.false_eq_true] at hexb; subst hexb
+        obtain ⟨e', he', hb', ha', ht⟩ := succOk_sound hn
+        refine ⟨sa.setPc (sa.pc + 4), .exec hx hiA trivial ?_, .inl ⟨hx, hra, e', he',
+          by simp [hb', hpb], by simp [ha', hpa], ?_⟩⟩
+        · simp only [exec, jumpTo, hbr, hc, ite_false, Bool.false_eq_true]
+        · exact (hag.mono (fun r hr => ht.2 r hr (by simp [Instr.defs]))).setPc _ _
+    case jal.jal rdA offA rdB offB =>
+      simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at hk
+      obtain ⟨⟨⟨⟨rfl, rfl⟩, halb⟩, hala⟩, htk⟩ := hk
+      simp only [exec, jumpTo, e0, hpb, halb, ite_true, Option.some.injEq] at hexb; subst hexb
+      obtain ⟨e', he', hb', ha', ht⟩ := succOk_sound htk
+      refine ⟨sa.setPc (e.pa + offA.signExtend 64), .exec hx hiA trivial ?_, .inl ⟨hx, hra, e', he',
+        by simp [hb'], by simp [ha'], ?_⟩⟩
+      · simp only [exec, jumpTo, e0, hpa, hala, ite_true]
+      · exact (hag.mono0 (fun r hr h0 => ht.2 r hr (by simp [Instr.defs, h0]))).setPc _ _
+
+/-- Where A can step from a jump pair, B can. -/
+theorem progress_jpair {P : Perm} {e : Pair} {ia ib : Instr} (hf : JumpFacts cA cB DA DB k e ia ib)
+    {sa sb : State} (hpb : sb.pc = e.pb) (hag : Agree e.live sa sb)
+    {sa' : State} (hst : Step cA P sa sa') : ∃ sb', Step cB P sb sb' := by
+  have hiB : cB.instr sb.pc = some ib := hpb ▸ hf.instrB
+  have hxb : sb.exit = none := by
+    obtain ⟨_, _, _, hx⟩ := hst.instrOk; rw [← hag.exit]; exact hx
+  have hk := hf.kind
+  have e0 : ∀ (u : State) v, u.setReg 0 v = u := fun u v => by simp [State.setReg]
+  cases ia <;> cases ib <;> simp only [jumpOk, Bool.false_eq_true] at hk
+  case branch.branch op a b offA op' a' b' offB =>
+    simp only [Bool.and_eq_true, decide_eq_true_eq] at hk
+    obtain ⟨⟨⟨_, halb⟩, _⟩, _⟩ := hk
+    refine ⟨_, .exec hxb hiB trivial (s' := if evalBr op' (sb.reg a') (sb.reg b') then
+      sb.setPc (sb.pc + offB.signExtend 64) else sb.setPc (sb.pc + 4)) ?_⟩
+    simp only [exec, jumpTo, hpb, halb, ite_true]
+    split <;> rfl
+  case jal.jal rdA offA rdB offB =>
+    simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at hk
+    obtain ⟨⟨⟨⟨_, rfl⟩, halb⟩, _⟩, _⟩ := hk
+    refine ⟨sb.setPc (sb.pc + offB.signExtend 64), .exec hxb hiB trivial ?_⟩
+    simp only [exec, jumpTo, e0, hpb, halb, ite_true]
+
 theorem shapeOk_facts {r : RRegion} (h : r.shapeOk DA DB = true) :
     r.domB.mem r.pb ∧ r.domA.mem r.pa ∧ ¬ r.domB.mem r.pbExit ∧ ¬ r.domA.mem r.paExit ∧
       r.domB.sub DB ∧ r.domA.sub DA := by
@@ -378,7 +478,8 @@ theorem _root_.NoCompiler.Refines.of_cert {α : Type} {sp : Spec α} {eA eB : Wo
   simp only [Bool.and_eq_true, List.all_eq_true, Option.isSome_iff_exists] at hc
   obtain ⟨⟨hall, hrall⟩, e0, he0⟩ := hc
   obtain ⟨hm0, hb0, ha0⟩ := Cert.find_some he0
-  have facts : ∀ e ∈ k.pairs, ∃ i, PairFacts cA cB DA DB k e i := fun e he => pairOk_facts (hall e he)
+  have facts : ∀ e ∈ k.pairs, (∃ i, PairFacts cA cB DA DB k e i) ∨ ∃ ia ib, JumpFacts cA cB DA DB k e ia ib :=
+    fun e he => pairOk_facts (hall e he)
   -- a point is a pair or a region's entry
   have point : ∀ e ∈ k.points, e ∈ k.pairs ∨ ∃ r ∈ k.regions, e = ⟨r.pb, r.pa, r.liveIn⟩ := by
     intro e he
@@ -389,7 +490,9 @@ theorem _root_.NoCompiler.Refines.of_cert {α : Type} {sp : Spec α} {eA eB : Wo
   have pointMem : ∀ e ∈ k.points, DB.mem e.pb ∧ DA.mem e.pa := by
     intro e he
     rcases point e he with h | ⟨r, hr, rfl⟩
-    · obtain ⟨i, hfi⟩ := facts e h; exact ⟨hfi.memB, hfi.memA⟩
+    · rcases facts e h with ⟨i, hfi⟩ | ⟨ia, ib, hfi⟩
+      · exact ⟨hfi.memB, hfi.memA⟩
+      · exact ⟨hfi.memB, hfi.memA⟩
     · simp only [regionOk, Bool.and_eq_true] at hrall
       obtain ⟨h1, h2, _, _, h5, h6⟩ := shapeOk_facts (hrall r hr).1
       exact ⟨h5 _ h1, h6 _ h2⟩
@@ -412,9 +515,11 @@ theorem _root_.NoCompiler.Refines.of_cert {α : Type} {sp : Spec α} {eA eB : Wo
     rcases hr with ⟨hx, hra, e, he, hpb, hpa, hag⟩ | ⟨_, _, hpb, _⟩ | ⟨hx, hag⟩
     · rcases point e he with hp | ⟨r, hr, rfl⟩
       · -- a pair: one step of each
-        obtain ⟨i, hfi⟩ := facts e hp
-        have hdA : DA.mem sa.pc := hpa ▸ hfi.memA
-        have hdB : DB.mem sb.pc := hpb ▸ hfi.memB
+        have hdAB : DA.mem sa.pc ∧ DB.mem sb.pc := by
+          rcases facts e hp with ⟨i, hfi⟩ | ⟨ia, ib, hfi⟩
+          · exact ⟨hpa ▸ hfi.memA, hpb ▸ hfi.memB⟩
+          · exact ⟨hpa ▸ hfi.memA, hpb ▸ hfi.memB⟩
+        obtain ⟨hdA, hdB⟩ := hdAB
         cases hA with
         | done hq =>
           rcases hq.1 with h | h
@@ -422,9 +527,13 @@ theorem _root_.NoCompiler.Refines.of_cert {α : Type} {sp : Spec α} {eA eB : Wo
           · exact absurd hx h
         | step _ hex _ =>
           obtain ⟨sa₁, hst⟩ := hex
-          refine .step hdB (progress_pair hfi hpb hpa hag hst) (fun sb' h' => ?_)
-          obtain ⟨sa', hsa, hr'⟩ := step_pair hral hfi hx hra hpb hpa hag h'
-          exact .done ⟨sa', ⟨sa', hdA, hsa, .refl _⟩, hr'⟩
+          rcases facts e hp with ⟨i, hfi⟩ | ⟨ia, ib, hfi⟩
+          · refine .step hdB (progress_pair hfi hpb hpa hag hst) (fun sb' h' => ?_)
+            obtain ⟨sa', hsa, hr'⟩ := step_pair hral hfi hx hra hpb hpa hag h'
+            exact .done ⟨sa', ⟨sa', hdA, hsa, .refl _⟩, hr'⟩
+          · refine .step hdB (progress_jpair hfi hpb hag hst) (fun sb' h' => ?_)
+            obtain ⟨sa', hsa, hr'⟩ := step_jpair hfi hx hra hpb hpa hag h'
+            exact .done ⟨sa', ⟨sa', hdA, hsa, .refl _⟩, hr'⟩
       · -- a region: its proof
         simp only [regionOk, Bool.and_eq_true] at hrall
         obtain ⟨hrs, hexit⟩ := hrall r hr

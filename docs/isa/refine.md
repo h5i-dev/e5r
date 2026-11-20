@@ -172,7 +172,9 @@ theorem refines : Refines spec cA DA eA cB DB eB := by nocompiler_refine cert [r
 - `nocompiler_region_bv` does the same with `seq_equiv_bv`, so the result is in the bv_decide tier.
 - `nocompiler_refine cert [h, …]` applies `Refines.of_cert`: the kernel decides the check, and `h, …` are the regions' proofs in the certificate's order.
 
-Example: `Examples.Refine.Peephole.Auto.refines'` is the peephole refinement in two lines. Not automated yet are regions that are not straight-line equivalences: loops whose relation at the heads is not "the live registers are equal" (plan RA2 in STATUS-C: relational cut points). For those, `RRegion.Ok.of_bigSim` is the proof method.
+Example: `Examples.Refine.Peephole.Auto.refines'` is the peephole refinement in two lines.
+
+**Jump pairs.** A pair may also be the same branch (or `jal zero`) with a different offset on each side: an insertion or deletion moves branch targets, and the check then requires the two targets to be a pair. So a loop whose body changed stays a lockstep skeleton, and only the changed straight-line pieces are regions. Example (`lean/Examples/Refine/Jump.lean`): `sum` against `sum` with `xor t5, t5, t5` inserted in its loop (B's example C, which the diff currently makes one 6-against-7 region). It is 8 pairs (two of them jump pairs: the `beq` and the `bne`) and one straight-line region (`xor t5; add` against `add`, t5 dead), proved by `nocompiler_region` and `nocompiler_refine` with nothing written by hand. Controls: dropping the pair formed by the `beq`'s targets fails the check, and with t5 live the region is not an equivalence. Not automated yet are regions that are not straight-line equivalences: loops whose relation at the heads is not "the live registers are equal" (plan RA2 in STATUS-C: relational cut points). For those, `RRegion.Ok.of_bigSim` is the proof method.
 
 ## Open (plan: STATUS-C)
 
