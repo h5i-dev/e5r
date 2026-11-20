@@ -309,7 +309,7 @@ class NoCompiler:
         return secs, rss, {int(f["addr"], 16) for f in data["items"]}
 
     def analyze(self, binary: Path, work: Path):
-        """Time `nocompiler-x stats`, count what `nocompiler-x funcs` lists.
+        """Time `nocompiler stats`, count what `nocompiler funcs` lists.
 
         `stats` is the command that does the whole job -- functions, control
         flow, cross references and strings -- which is what `rizin -A` also
@@ -780,7 +780,7 @@ def build_tools(args) -> tuple[list, list[str]]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("binaries", nargs="*", type=Path)
-    ap.add_argument("--nocompiler", default=os.environ.get("NOCOMPILER", "target/release/nocompiler-x"))
+    ap.add_argument("--nocompiler", default=os.environ.get("NOCOMPILER", "target/release/nocompiler"))
     ap.add_argument(
         "--nocompiler-name",
         default="",

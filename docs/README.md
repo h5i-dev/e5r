@@ -19,5 +19,5 @@ PTX kernel verification and RV32 firmware proofs, the work nocompiler grew from:
 
 ## Development infrastructure ([docs/toolkit/](toolkit/README.md))
 
-The binary analysis toolkit `nocompiler-x` (disassembler, decompiler, differ):
+The binary analysis toolkit `nocompiler` (disassembler, decompiler, differ):
 [docs/toolkit/](toolkit/README.md), starting from [MANUAL.md](toolkit/MANUAL.md).

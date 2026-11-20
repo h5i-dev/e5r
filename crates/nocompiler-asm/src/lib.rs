@@ -3,12 +3,12 @@
 //! The inverse of `nocompiler-arch`, and built on top of it rather than beside it.
 //! Text is parsed into the same [`Insn`] the decoders produce and the encoder
 //! then works from that, so the property that matters for patching falls out
-//! of the structure: a line copied from `nocompiler-x disas` assembles back to the
+//! of the structure: a line copied from `nocompiler disasm` assembles back to the
 //! bytes it came from.
 //!
 //! There is no linker here, no relocation, no object writer and no macro
 //! language. One instruction, one address, one answer, and a typed refusal
-//! everywhere else. `nocompiler-x patch` needs exactly that and nothing more.
+//! everywhere else. `nocompiler patch` needs exactly that and nothing more.
 //!
 //! ```
 //! use nocompiler_asm::assemble;

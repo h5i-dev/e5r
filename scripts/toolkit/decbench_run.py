@@ -17,7 +17,7 @@ Usage:
 
 Env:
     DECBENCH_REPO   the DecBench checkout (required)
-    NOCOMPILER            the nocompiler executable (default: target/release/nocompiler-x)
+    NOCOMPILER            the nocompiler executable (default: target/release/nocompiler)
     DECBENCH_MAXBINS / DECBENCH_MAXFUNCS  cap the work for a smoke run
     DECBENCH_TIMEOUT  seconds per (binary, decompiler), default 1800
     DECBENCH_REDO     decompilers to rerun rather than reuse from the tree

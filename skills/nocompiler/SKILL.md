@@ -1,21 +1,21 @@
 ---
 name: nocompiler
-description: Analyze binaries with nocompiler-x, nocompiler's JSON toolkit CLI, and coordinate reverse engineering projects, evidence, and human/agent handoffs in its shared project workspace.
+description: Analyze binaries with nocompiler, nocompiler's JSON toolkit CLI, and coordinate reverse engineering projects, evidence, and human/agent handoffs in its shared project workspace.
 ---
 
 # Driving nocompiler
 
-Use `nocompiler-x COMMAND --help` before guessing flags. In this checkout the executable
-is `./target/release/nocompiler-x`; build with `cargo build --release`.
+Use `nocompiler COMMAND --help` before guessing flags. In this checkout the executable
+is `./target/release/nocompiler`; build with `cargo build --release`.
 
 ```sh
-nocompiler-x project new ./binary --name investigation
-nocompiler-x project list --json
-nocompiler-x project task investigation list --json
-nocompiler-x funcs ./binary --json
-nocompiler-x decompile ./binary main --json
-nocompiler-x xrefs ./binary main --json
-nocompiler-x ui                              # human view of all global projects
+nocompiler project new ./binary --name investigation
+nocompiler project list --json
+nocompiler project task investigation list --json
+nocompiler funcs ./binary --json
+nocompiler decompile ./binary main --json
+nocompiler xrefs ./binary main --json
+nocompiler ui                              # human view of all global projects
 ```
 
 Projects default to `~/.local/share/nocompiler/projects`; `NOCOMPILER_PROJECT_HOME` overrides
@@ -42,14 +42,14 @@ read [the roadmap](../../docs/toolkit/ROADMAP-toolkit.md) first.
 
 The UI is read-only. Make requested edits through the CLI, including tasks and
 project registration. When a function's purpose is supported by evidence, give
-it a descriptive name with `nocompiler-x annotate BINARY name ADDRESS NAME --db LOG`.
+it a descriptive name with `nocompiler notes BINARY name ADDRESS NAME --db LOG`.
 Use the project's recorded annotation log, then check `funcs` and `decompile`
 with the same `--db LOG`. Record the rationale and uncertainty in a comment.
 Restart the UI server to reload annotations. Do not invent meanings from a
 single call site. Per-variable name annotations are not currently supported;
 record proposed variable names and their storage in a note instead.
 
-Save investigation output with `nocompiler-x project record PROJECT KIND add TITLE
+Save investigation output with `nocompiler project record PROJECT KIND add TITLE
 --description BODY --evidence function:0xADDRESS --author AGENT`, where KIND is
 `finding`, `note` or `report`. Findings describe a claim and its supporting
 evidence; notes retain observations and open questions; reports explain the

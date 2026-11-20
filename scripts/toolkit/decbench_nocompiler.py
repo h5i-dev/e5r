@@ -7,7 +7,7 @@ does. Keeping the class here rather than in the DecBench tree means the
 benchmark checkout stays exactly as upstream shipped it.
 
 nocompiler has no Python API, so the backend shells out to the CLI. One
-`nocompiler-x decompile <binary> all --json` call per binary is far cheaper than one
+`nocompiler decompile <binary> all --json` call per binary is far cheaper than one
 call per function: every invocation re-analyzes the whole image from scratch,
 so `all` amortizes the analysis over every function instead of paying it
 per function (3.4s for 193 functions of zlib's `example`, against 3.4s each).
@@ -119,7 +119,7 @@ def nocompiler_binary() -> Path | None:
     if env:
         p = Path(env).expanduser()
         return p if p.is_file() and os.access(p, os.X_OK) else None
-    built = _REPO.parent / "target" / "release" / "nocompiler-x"
+    built = _REPO.parent / "target" / "release" / "nocompiler"
     if built.is_file() and os.access(built, os.X_OK):
         return built
     found = shutil.which("nocompiler")
@@ -276,7 +276,7 @@ class NoCompilerDecompiler(Decompiler):
         return result
 
     def _run(self, binary_path: Path, target: str) -> list[dict]:
-        """One `nocompiler-x decompile` call, returning its JSON items."""
+        """One `nocompiler decompile` call, returning its JSON items."""
         cmd = [str(self._bin), "decompile", str(binary_path), target, "--json"]
         threads = os.environ.get("NOCOMPILER_THREADS")
         if threads:

@@ -1,6 +1,6 @@
 # Development infrastructure
 
-`nocompiler-x`, the binary analysis toolkit nocompiler started as: ELF, PE/COFF and Mach-O
+`nocompiler`, the binary analysis toolkit nocompiler started as: ELF, PE/COFF and Mach-O
 loaders, x86-64 and AArch64 decoders, a SLEIGH runtime, an IR with lifters,
 function and CFG recovery, a decompiler to C, a binary differ and an
 annotation log that merges in git. It is used to look at binaries while
@@ -16,6 +16,6 @@ working on the core. Nothing it computes is an input to a proof.
 | `install.sh` | installs a released binary |
 
 ```bash
-cargo build --release -p nocompiler-cli     # target/release/nocompiler-x
+cargo build --release -p nocompiler-cli     # target/release/nocompiler
 scripts/toolkit/build-fixtures.sh           # the corpus the oracle-backed tests need
 ```

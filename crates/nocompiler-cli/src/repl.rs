@@ -21,7 +21,7 @@ use crate::{Cli, Command, Common, exit};
 /// an hour; everything else is spelled out, because a grammar of two-letter
 /// pairs is what this is meant to be an alternative to.
 const ALIASES: &[(&str, &str)] = &[
-    ("d", "disas"),
+    ("d", "disasm"),
     ("dec", "decompile"),
     ("f", "funcs"),
     ("i", "info"),
@@ -100,7 +100,7 @@ fn step(
     here: &mut Option<Addr>,
 ) -> Step {
     let Some(words) = crate::batch::split(text) else {
-        eprintln!("nocompiler-x: a quote was never closed");
+        eprintln!("nocompiler: a quote was never closed");
         return Step::Continue;
     };
     let Some(first) = words.first().map(String::as_str) else {
@@ -118,7 +118,7 @@ fn step(
         "seek" | "s@" => {
             match words.get(1).and_then(|t| crate::addr::resolve(program, t)) {
                 Some(a) => *here = Some(a),
-                None => eprintln!("nocompiler-x: no such address"),
+                None => eprintln!("nocompiler: no such address"),
             }
             return Step::Continue;
         }
@@ -134,7 +134,7 @@ fn step(
     // The file comes from the session, not the line, so a command cannot be
     // pointed at a different binary than the one that was analyzed.
     let mut argv: Vec<String> = vec![
-        "nocompiler-x".into(),
+        "nocompiler".into(),
         name.into(),
         common.file.display().to_string(),
     ];
@@ -142,7 +142,7 @@ fn step(
     // A command that takes a target and was given none gets the current
     // address, which is what makes seeking worth anything.
     if rest.is_empty()
-        && matches!(name, "disas" | "decompile" | "shapes" | "xrefs")
+        && matches!(name, "disasm" | "disas" | "decompile" | "shapes" | "xrefs")
         && let Some(a) = here
     {
         rest.push(a.to_string());
@@ -152,7 +152,7 @@ fn step(
     let parsed = match <Cli as clap::Parser>::try_parse_from(&argv) {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("nocompiler-x: {e}");
+            eprintln!("nocompiler: {e}");
             return Step::Continue;
         }
     };
@@ -160,7 +160,7 @@ fn step(
         // Both of these would analyze the file again, which is the cost this
         // exists to avoid, and nesting a session inside one answers nothing.
         Command::Repl { .. } | Command::Batch { .. } => {
-            eprintln!("nocompiler-x: not from a session");
+            eprintln!("nocompiler: not from a session");
             return Step::Continue;
         }
         _ => {}
@@ -172,7 +172,7 @@ fn step(
     let opts = nocompiler_analysis::Options::default();
     let load = nocompiler_format::LoadOptions::default();
     if let Err(e) = crate::dispatch(&parsed, w, program, data, &load, &opts) {
-        eprintln!("nocompiler-x: {e}");
+        eprintln!("nocompiler: {e}");
     }
     let _ = cli;
     Step::Continue
@@ -181,22 +181,19 @@ fn step(
 fn help(w: &mut Out) {
     outln!(
         w,
-        "Commands are the ones nocompiler-x takes, without the file:"
+        "Commands are the ones nocompiler takes, without the file:"
     );
     outln!(w, "");
     outln!(
         w,
         "  info  sections  symbols  imports  exports  funcs  stats"
     );
-    outln!(w, "  disas [where]      decompile [where]   shapes [where]");
+    outln!(w, "  disasm [where]     decompile [where]   shapes [where]");
     outln!(
         w,
         "  xrefs [where]      strings             query <question>"
     );
-    outln!(
-        w,
-        "  classes  vtables  sig  annotate  overlay  archive  bun"
-    );
+    outln!(w, "  classes  vtables  sig  notes  overlay  archive  bun");
     outln!(w, "");
     outln!(
         w,
@@ -204,7 +201,7 @@ fn help(w: &mut Out) {
     );
     outln!(w, "  quit               leave");
     outln!(w, "");
-    outln!(w, "Short forms: d disas, dec decompile, f funcs, i info,");
+    outln!(w, "Short forms: d disasm, dec decompile, f funcs, i info,");
     outln!(w, "             s strings, x xrefs, q query, ? help.");
     outln!(w, "");
     outln!(

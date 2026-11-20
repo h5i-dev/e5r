@@ -235,17 +235,20 @@ pub fn module(file: &Path, ns: &str, dst: Option<&Path>, out: &mut String) -> Re
     Ok(0)
 }
 
-/// Whether FILE is a RISC-V binary the profile loader accepts (`disasm` uses
-/// this to choose between the structured listing and the toolkit's plain one).
-pub fn is_profile_binary(file: &Path) -> bool {
-    read(file).is_ok_and(|b| crate::load(&b).is_ok())
-}
-
-/// `nocompiler disasm FILE`: list the code with its block/loop structure.
-pub fn disasm(file: &Path, out: &mut String) -> Result<u8, String> {
+/// `nocompiler disasm FILE [FUNC]`: list the code with its block/loop
+/// structure; every function, or only the one named `only`.
+pub fn disasm(file: &Path, only: Option<&str>, out: &mut String) -> Result<u8, String> {
     let bytes = read(file)?;
     let bin = crate::load(&bytes)?;
+    if let Some(name) = only
+        && !bin.funcs.iter().any(|f| f.name == name)
+    {
+        return Err(format!("disasm: no function {name} in {}", file.display()));
+    }
     for (f, r) in bin.funcs.iter().zip(bin.check()) {
+        if only.is_some_and(|n| n != f.name) {
+            continue;
+        }
         say!(out, "\n{} {:#x}:", f.name, f.entry);
         let nodes = match &r.result {
             Ok(m) => m.nodes.clone(),

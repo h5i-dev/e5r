@@ -15,7 +15,7 @@
 #
 # Env: DECBENCH_REPO   the DecBench checkout (default ~/Ref/decbench)
 #      DECBENCH_VENV   virtualenv with decbench installed (default ~/.venvs/decbench)
-#      NOCOMPILER            the nocompiler executable (default target/release/nocompiler-x)
+#      NOCOMPILER            the nocompiler executable (default target/release/nocompiler)
 #      GHIDRA_INSTALL_DIR  needed only when ghidra is one of the decompilers
 set -euo pipefail
 
@@ -27,7 +27,7 @@ decs=${4:-nocompiler}
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 decbench=${DECBENCH_REPO:-$HOME/Ref/decbench}
 venv=${DECBENCH_VENV:-$HOME/.venvs/decbench}
-nocompiler=${NOCOMPILER:-$repo/target/release/nocompiler-x}
+nocompiler=${NOCOMPILER:-$repo/target/release/nocompiler}
 
 [ -d "$decbench/decbench" ] || {
   echo "no DecBench checkout at $decbench; set DECBENCH_REPO" >&2

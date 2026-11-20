@@ -1,7 +1,10 @@
-//! The `nocompiler-x` command line, the toolkit binary.
+//! The `nocompiler` command line: the core commands (`check`, `annotate`,
+//! `cc`, `export`, `module`, `disasm`; implemented in `nocompiler::cmd`) and the binary
+//! analysis toolkit (`info`, `funcs`, `decompile`, `diff`, `xrefs`, `repl`, ...).
 //!
-//! A thin client: it parses arguments, calls the library, and prints. Every
-//! command takes `--json`, and the JSON is the same facts the text shows.
+//! A thin client: it parses arguments, calls the libraries, and prints. Every
+//! toolkit command takes `--json`, and the JSON is the same facts the text
+//! shows; of the core commands, `check` does.
 
 // One unsafe block, in `map_file`: memory-mapping a file is inherently
 // unsafe because another process can truncate it underneath us. Denied rather
@@ -39,7 +42,6 @@ mod exit {
     pub const NOT_FOUND: u8 = 1;
     /// The arguments did not make sense. clap exits with this itself; the
     /// constant is here so the documented set is complete.
-    #[allow(dead_code)]
     pub const USAGE: u8 = 2;
     /// The file could not be read or parsed.
     pub const BAD_INPUT: u8 = 3;
@@ -47,14 +49,18 @@ mod exit {
 
 #[derive(Parser)]
 #[command(
-    name = "nocompiler-x",
+    name = "nocompiler",
     version,
-    about = "Binary analysis toolkit for the nocompiler Lean 4 verifier",
-    long_about = "Loads a binary, recovers functions, disassembles, and reports \
-                  what it found and why it believes it. This is the development \
-                  infrastructure of nocompiler; the Lean 4 verifier is the nocompiler binary.\n\n\
-                  Every command takes --json. Exit codes: 0 ok, 1 nothing found, \
-                  2 bad usage, 3 bad input."
+    about = "nocompiler: a formal-verification-friendly RISC-V profile, and a binary analysis toolkit",
+    long_about = "The core commands (check, annotate, cc, export, module, disasm) check a RISC-V \
+                  binary against the nocompiler profile, record its structure and export \
+                  it to Lean 4 for proof (docs/isa/). The other commands are the binary \
+                  analysis toolkit (docs/toolkit/): they load a binary, recover functions, \
+                  disassemble, decompile and diff, and report what they found and why. \
+                  Nothing the toolkit computes is an input to a proof.\n\n\
+                  Exit codes: 0 ok; 1 a function violates the profile (check, annotate, cc) \
+                  or nothing was found; 2 bad usage, and for the core commands also an \
+                  unreadable or unsupported input; 3 bad input (toolkit commands)."
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -103,6 +109,46 @@ pub struct Common {
 
 #[derive(Subcommand)]
 pub enum Command {
+    /// Check every function against the nocompiler profile (docs/isa/profile.md).
+    Check {
+        /// The RISC-V ELF to check.
+        file: PathBuf,
+        /// Emit JSON instead of text.
+        #[arg(long, global = true)]
+        json: bool,
+    },
+    /// Write FILE with a `.nocompiler.struct` section (docs/isa/metadata.md) to OUT.
+    ///
+    /// Not the annotation log; that is `nocompiler notes`.
+    Annotate {
+        /// The RISC-V ELF to annotate.
+        file: PathBuf,
+        /// Where to write the annotated copy.
+        #[arg(short = 'o', value_name = "OUT")]
+        out: PathBuf,
+    },
+    /// Compile and link C or assembly into the profile, record
+    /// `.nocompiler.struct` and check (docs/isa/toolchain.md).
+    ///
+    /// Usage: nocompiler cc [CLANG ARGS] SOURCES... -o OUT. Every argument
+    /// but `-o OUT` goes to clang.
+    #[command(disable_help_flag = true)]
+    Cc {
+        /// Clang arguments and sources, and `-o OUT`.
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, required = true)]
+        args: Vec<String>,
+    },
+    /// Export `.text` and every conforming function to Lean 4.
+    Export {
+        /// The RISC-V ELF to export.
+        file: PathBuf,
+        /// The Lean namespace of the image.
+        #[arg(long, value_name = "NS")]
+        namespace: String,
+        /// Write the Lean file here instead of to standard output.
+        #[arg(short = 'o', value_name = "OUT.lean")]
+        out: Option<PathBuf>,
+    },
     /// Manage and monitor every registered project from one local UI.
     Ui {
         /// Loopback port; zero chooses a free port.
@@ -121,8 +167,23 @@ pub enum Command {
     Exports(Common),
     /// Recovered functions, with the evidence for each.
     Funcs(Common),
+    /// The relocatable module of a linked RISC-V binary, and its layout, as Lean.
+    Module {
+        /// The linked RISC-V ELF.
+        file: PathBuf,
+        /// The Lean namespace of the module.
+        #[arg(long, value_name = "NS")]
+        namespace: String,
+        /// Write the Lean file here instead of to standard output.
+        #[arg(short = 'o', value_name = "OUT.lean")]
+        out: Option<PathBuf>,
+    },
     /// Disassemble a function, a range, or everything.
-    Disas {
+    ///
+    /// A RISC-V binary is listed with its block/loop structure (the profile's
+    /// structured form); any other binary gets the toolkit's disassembly.
+    #[command(alias = "disas")]
+    Disasm {
         #[command(flatten)]
         common: Common,
         /// A symbol name, an address, or `all`. Defaults to every function.
@@ -233,7 +294,7 @@ pub enum Command {
         ///
         /// Not `--budget`, which is global and counts seconds. Two options
         /// with one name and two types is a clap panic at parse time, which is
-        /// what this was: `nocompiler-x emulate` could not be run at all.
+        /// what this was: `nocompiler emulate` could not be run at all.
         #[arg(long, default_value_t = 1 << 22)]
         steps: u64,
     },
@@ -355,12 +416,12 @@ pub enum Command {
         #[command(flatten)]
         common: Common,
     },
-    /// Read and write the annotation log.
+    /// Read and write the annotation log (names, comments, types).
     ///
     /// The log is a text file git can merge: every assertion is one line keyed
     /// to a content anchor, so the work survives a rebuild and two analysts on
     /// separate branches merge without conflict markers.
-    Annotate {
+    Notes {
         #[command(flatten)]
         common: Common,
         #[command(subcommand)]
@@ -615,6 +676,12 @@ impl Command {
             // Both writers are redirected into a file the first time and
             // never read on screen.
             Command::Completions { .. } | Command::Manpage => None,
+            // The core commands print plain text that scripts read.
+            Command::Check { .. }
+            | Command::Annotate { .. }
+            | Command::Cc { .. }
+            | Command::Export { .. }
+            | Command::Module { .. } => None,
             Command::Project { .. } | Command::Ui { .. } => Some((out::When::Auto, false)),
             _ => {
                 let c = self.common();
@@ -635,13 +702,18 @@ impl Command {
             | Command::Exports(c)
             | Command::Funcs(c)
             | Command::Stats(c) => c,
-            Command::Annotate { common, .. }
+            Command::Notes { common, .. }
             | Command::Batch { common, .. }
             | Command::Diff { common, .. } => common,
             Command::Project { .. }
             | Command::Ui { .. }
             | Command::Completions { .. }
-            | Command::Manpage => {
+            | Command::Manpage
+            | Command::Check { .. }
+            | Command::Annotate { .. }
+            | Command::Cc { .. }
+            | Command::Export { .. }
+            | Command::Module { .. } => {
                 unreachable!("handled before a file is opened")
             }
             Command::Vtables { common, .. }
@@ -654,13 +726,82 @@ impl Command {
             | Command::Emulate { common, .. }
             | Command::Query { common, .. }
             | Command::Sig { common, .. }
-            | Command::Disas { common, .. }
+            | Command::Disasm { common, .. }
             | Command::Decompile { common, .. }
             | Command::Shapes { common, .. }
             | Command::Xrefs { common, .. }
             | Command::Strings { common, .. } => common,
         }
     }
+}
+
+/// The core commands, which read the file themselves (`nocompiler::cmd`), and
+/// `disasm` on a RISC-V binary. `None` for every other command.
+///
+/// They keep the exit codes they always had: 0, 1 for a profile violation,
+/// and 2 for an unreadable or unsupported input as well as for bad usage.
+fn core(cli: &Cli, w: &mut out::Out) -> Option<Result<u8, String>> {
+    use nocompiler::cmd;
+    let mut text = String::new();
+    let result = match &cli.command {
+        Command::Check { file, json } => cmd::check(file, *json, &mut text),
+        Command::Annotate { file, out } => cmd::annotate(file, out, &mut text),
+        Command::Cc { args } => {
+            let mut rest = Vec::new();
+            let mut dst = None;
+            let mut it = args.iter();
+            while let Some(a) = it.next() {
+                if a == "-o" {
+                    dst = it.next();
+                } else {
+                    rest.push(a.clone());
+                }
+            }
+            match dst {
+                Some(dst) => cmd::cc(&rest, std::path::Path::new(dst), &mut text),
+                None => Err("cc: -o OUT missing".into()),
+            }
+        }
+        Command::Export {
+            file,
+            namespace,
+            out,
+        } => cmd::export(file, namespace, out.as_deref(), &mut text),
+        Command::Module {
+            file,
+            namespace,
+            out,
+        } => cmd::module(file, namespace, out.as_deref(), &mut text),
+        Command::Disasm { common, .. } if common.json && is_risc_v(&common.file) => {
+            Err("disasm: --json is not available for a RISC-V binary".into())
+        }
+        Command::Disasm { common, target, .. } if is_risc_v(&common.file) => {
+            let only = (target != "all").then_some(target.as_str());
+            cmd::disasm(&common.file, only, &mut text)
+        }
+        _ => return None,
+    };
+    w.raw(&text);
+    Some(match result {
+        Ok(code) => Ok(code),
+        Err(e) => {
+            // Printed here rather than returned, so the status stays 2.
+            eprintln!("nocompiler: {e}");
+            Ok(exit::USAGE)
+        }
+    })
+}
+
+/// Whether FILE is a RISC-V ELF, which the toolkit does not decode and the
+/// core lists in its structured form.
+fn is_risc_v(file: &std::path::Path) -> bool {
+    use std::io::Read as _;
+    let mut head = [0u8; 20];
+    std::fs::File::open(file)
+        .and_then(|mut f| f.read_exact(&mut head))
+        .is_ok()
+        && head[..4] == *b"\x7fELF"
+        && u16::from_le_bytes([head[18], head[19]]) == nocompiler::elf::EM_RISCV
 }
 
 fn parse_u64(s: &str) -> Result<u64, String> {
@@ -681,7 +822,7 @@ fn main() -> ExitCode {
     match result {
         Ok(code) => ExitCode::from(if piped_out { exit::OK } else { code }),
         Err(e) => {
-            eprintln!("nocompiler-x: {e}");
+            eprintln!("nocompiler: {e}");
             ExitCode::from(exit::BAD_INPUT)
         }
     }
@@ -709,6 +850,9 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
             return Ok(exit::OK);
         }
         _ => {}
+    }
+    if let Some(code) = core(cli, w) {
+        return code;
     }
     let common = cli.command.common();
 
@@ -789,7 +933,7 @@ pub fn run(cli: &Cli, w: &mut out::Out) -> Result<u8, String> {
     if matches!(cli.command, Command::Funcs(_) | Command::Stats(_)) {
         opts.strings = matches!(cli.command, Command::Stats(_));
     }
-    if matches!(cli.command, Command::Annotate { .. } | Command::Diff { .. }) {
+    if matches!(cli.command, Command::Notes { .. } | Command::Diff { .. }) {
         opts.strings = false;
         opts.xrefs = false;
     }
@@ -816,6 +960,17 @@ pub fn dispatch(
     load_opts: &LoadOptions,
     opts: &Options,
 ) -> Result<u8, String> {
+    if matches!(
+        cli.command,
+        Command::Check { .. }
+            | Command::Annotate { .. }
+            | Command::Cc { .. }
+            | Command::Export { .. }
+    ) {
+        return Err(
+            "the core commands read the file themselves; run them outside a session".into(),
+        );
+    }
     let common = cli.command.common();
 
     // Names from the log override what the container said, because the point
@@ -826,7 +981,7 @@ pub fn dispatch(
         .unwrap_or_else(|| annotate::default_path(&common.file));
     let mut comments = std::collections::BTreeMap::new();
     let mut declared = std::collections::BTreeMap::new();
-    if !matches!(cli.command, Command::Annotate { .. }) {
+    if !matches!(cli.command, Command::Notes { .. }) {
         for (at, name, _) in annotate::names(program, &db) {
             if let Some(f) = program.functions.get_mut(&at) {
                 f.name = Some(name);
@@ -859,7 +1014,7 @@ pub fn dispatch(
         Command::Funcs(c) => print::funcs(w, program, c.json),
         Command::Stats(c) => print::stats(w, program, c.json),
         Command::Strings { common, .. } => print::strings(w, program, common.json),
-        Command::Disas {
+        Command::Disasm {
             common,
             target,
             bytes,
@@ -1012,7 +1167,7 @@ pub fn dispatch(
             let other_prog = nocompiler_analysis::analyze(other_obj, opts);
             print::diff(w, program, &other_prog, *all, common.json)
         }
-        Command::Annotate { what, common } => {
+        Command::Notes { what, common } => {
             let who = whoami();
             match what {
                 Annotation::Name { target, value } => annotate::set(
@@ -1171,7 +1326,7 @@ mod tests {
     /// runs the subcommand that contains it. `emulate` had one for its whole
     /// life -- a global `--budget` counting seconds and a subcommand
     /// `--budget` counting IR operations, two types under one name -- and
-    /// `nocompiler-x emulate` could not be run at all. Nothing noticed, because
+    /// `nocompiler emulate` could not be run at all. Nothing noticed, because
     /// nothing ever built the parser outside of running the program.
     ///
     /// `debug_assert` is clap's own consistency check, and it is the same one

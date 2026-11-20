@@ -1,6 +1,6 @@
 //! A tokenizer both architectures share.
 //!
-//! The text this has to accept is whatever `nocompiler-x disas` prints, so the rules
+//! The text this has to accept is whatever `nocompiler disasm` prints, so the rules
 //! are set by the two printers in `nocompiler-arch` rather than by any assembler's
 //! grammar: tabs separate the mnemonic from its operands, `#` introduces an
 //! AArch64 immediate, and a mnemonic may contain a dot (`b.eq`).

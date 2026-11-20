@@ -31,7 +31,7 @@ function render() {
         : "Start your first investigation.";
   $("headline-sub").textContent = projects.length
     ? `${projects.length} projects · task updates appear here automatically. Open a project to keep its next step clear.`
-    : "Ask an agent to run nocompiler-x project new PATH --name NAME. Existing manifests can be imported with nocompiler-x project import.";
+    : "Ask an agent to run nocompiler project new PATH --name NAME. Existing manifests can be imported with nocompiler project import.";
   $("counts").replaceChildren();
   for (const [n, label, tone] of [
     [projects.length, "projects", ""],
@@ -71,7 +71,7 @@ function render() {
       el(
         "div",
         p.error ||
-          `${availability[p.availability]} binary: ${p.binary}. Tasks remain available; use nocompiler-x project relocate ${p.name} PATH for a moved binary.`,
+          `${availability[p.availability]} binary: ${p.binary}. Tasks remain available; use nocompiler project relocate ${p.name} PATH for a moved binary.`,
         "work-row-sub",
       ),
     );
@@ -161,7 +161,7 @@ $("search").oninput = renderProjects;
 $("filter").onchange = renderProjects;
 $("copy-command").onclick = async () => {
   try {
-    await navigator.clipboard.writeText("nocompiler-x project list --json");
+    await navigator.clipboard.writeText("nocompiler project list --json");
     $("copy-command").textContent = "Copied";
     setTimeout(() => ($("copy-command").textContent = "Copy command"), 1200);
   } catch {}

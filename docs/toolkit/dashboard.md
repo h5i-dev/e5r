@@ -3,11 +3,11 @@
 Start the global collection from any directory:
 
 ```sh
-nocompiler-x project new ./a.out --name parser
-nocompiler-x ui
+nocompiler project new ./a.out --name parser
+nocompiler ui
 ```
 
-In this checkout, use `./target/release/nocompiler-x` if nocompiler is not installed. Open the
+In this checkout, use `./target/release/nocompiler` if nocompiler is not installed. Open the
 printed `http://127.0.0.1:7879` address. The collection shows every project's
 live tasks, blockers, review requests and binary availability. Select a project
 to open its task dashboard and decompiler; **All projects** returns to the
@@ -28,12 +28,12 @@ Named project commands work from any directory. A registered name takes
 precedence over a same-named local file; use `./FILE` to select a local manifest:
 
 ```sh
-nocompiler-x project list --json
-nocompiler-x project task parser list --json
-nocompiler-x project task parser add 'Trace input validation' --owner agent-a
-nocompiler-x project import ./old.nocompilerproj --name older-investigation
-nocompiler-x project relocate parser /new/path/to/a.out
-nocompiler-x project dashboard parser           # optional single-project mode
+nocompiler project list --json
+nocompiler project task parser list --json
+nocompiler project task parser add 'Trace input validation' --owner agent-a
+nocompiler project import ./old.nocompilerproj --name older-investigation
+nocompiler project relocate parser /new/path/to/a.out
+nocompiler project dashboard parser           # optional single-project mode
 ```
 
 Import copies the manifest and task history, preserving the original files.
@@ -143,11 +143,11 @@ analysis settings are `scan_gaps`, `follow_calls`, `strings`, `xrefs`, `noreturn
 The CLI writes the task store that the browser reads:
 
 ```sh
-nocompiler-x project task investigation.nocompilerproj add 'Trace input validation' \
+nocompiler project task investigation.nocompilerproj add 'Trace input validation' \
   --owner agent-a --next 'Inspect parse_header and its callers' \
   --priority high --evidence function:0x401000 --author agent-a
-nocompiler-x project task investigation.nocompilerproj list --json
-nocompiler-x project task investigation.nocompilerproj update T-0001 \
+nocompiler project task investigation.nocompilerproj list --json
+nocompiler project task investigation.nocompilerproj update T-0001 \
   --revision 1 --input task.json --author agent-a
 ```
 
@@ -257,19 +257,19 @@ Records do not contribute to task readiness or task counts. Imports preserve
 all three stores along with tasks.
 
 ```sh
-nocompiler-x project record parser finding add 'Length check before copy' \
+nocompiler project record parser finding add 'Length check before copy' \
   --description 'The recovered guard rejects lengths above 32 before the copy.' \
   --evidence function:0x401000 --author agent-a
-nocompiler-x project record parser note add 'Open questions' --description 'Check indirect callers.'
-nocompiler-x project record parser report add 'Parser investigation' --description 'Investigation text'
-nocompiler-x project record parser finding list --json
-nocompiler-x project record parser finding update T-0001 --revision 1 --input finding.json
+nocompiler project record parser note add 'Open questions' --description 'Check indirect callers.'
+nocompiler project record parser report add 'Parser investigation' --description 'Investigation text'
+nocompiler project record parser finding list --json
+nocompiler project record parser finding update T-0001 --revision 1 --input finding.json
 ```
 
 Attach a note to a recovered function using its exact address as evidence:
 
 ```sh
-nocompiler-x project record parser note add 'Input length checks' \
+nocompiler project record parser note add 'Input length checks' \
   --description 'The parser rejects lengths above 32 before the copy.' \
   --evidence function:0x401000 --author agent-a
 ```
@@ -281,7 +281,7 @@ seconds without restarting analysis. Records linked to other functions and recor
 without a function link stay in the project overview. Selecting another function
 changes the displayed records. The Records tab is also accessible on narrow screens.
 The CLI command panel supplies a note creation command for the selected function.
-Existing `annotate comment` entries remain analysis annotations, separate from
+Existing `notes comment` entries remain analysis annotations, separate from
 these live project records; comments are shown in disassembly and Annotations.
 
 Full record text lives in `description`; use `--input FILE` for large content.

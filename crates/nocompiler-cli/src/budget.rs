@@ -104,7 +104,7 @@ pub fn report(b: &Budget, why: Stopped, done: usize, total: usize, what: &str) {
         return;
     }
     eprintln!(
-        "nocompiler-x: {} after {:.1}s and {done} of {total} {what}; {} not done. \
+        "nocompiler: {} after {:.1}s and {done} of {total} {what}; {} not done. \
          Raise --budget or --limit, or narrow the target.",
         why.as_str(),
         b.elapsed().as_secs_f64(),

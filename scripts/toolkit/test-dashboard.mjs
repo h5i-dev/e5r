@@ -10,7 +10,7 @@ const { chromium } = await import(
   process.env.NOCOMPILER_PLAYWRIGHT_MODULE || "playwright"
 );
 const root = mkdtempSync(join(tmpdir(), "nocompiler-dashboard-"));
-const executable = resolve(process.env.NOCOMPILER_BINARY || "target/release/nocompiler-x");
+const executable = resolve(process.env.NOCOMPILER_BINARY || "target/release/nocompiler");
 const binary = join(root, "sample"),
   project = join(root, "sample.nocompilerproj");
 let server, browser;

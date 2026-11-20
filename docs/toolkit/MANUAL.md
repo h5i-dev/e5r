@@ -1,6 +1,6 @@
 # nocompiler
 
-This is the command reference for `nocompiler-x`, the binary analysis toolkit that
+This is the command reference for `nocompiler`, the binary analysis toolkit that
 serves as development infrastructure for the nocompiler Lean 4 verifier. The
 verifier, `nocompiler`, is documented in
 [verification-ptx.md](../../experiment/docs/ptx.md) for PTX kernels and
@@ -16,7 +16,7 @@ a bad command line, and `3` for input that could not be read.
 
 ```
 cargo build --release
-./target/release/nocompiler-x info /bin/ls
+./target/release/nocompiler info /bin/ls
 ```
 
 ## Installing
@@ -24,11 +24,11 @@ cargo build --release
 ### A release binary
 
 Every release attaches one archive per platform, a `SHA256SUMS` file and a
-signature over it. Unpack and put `nocompiler-x` on your path:
+signature over it. Unpack and put `nocompiler` on your path:
 
 ```
 tar -xzf nocompiler-0.1.0-x86_64-unknown-linux-musl.tar.gz
-install -m755 nocompiler-0.1.0-x86_64-unknown-linux-musl/nocompiler-x /usr/local/bin/
+install -m755 nocompiler-0.1.0-x86_64-unknown-linux-musl/nocompiler /usr/local/bin/
 ```
 
 Check what you downloaded first. The checksums cover the archives, and the
@@ -60,12 +60,12 @@ Alpine, a distroless container, or a rescue initramfs. `ldd` on it says it is
 not a dynamic executable, and that is the whole claim:
 
 ```
-$ file nocompiler-x
-nocompiler-x: ELF 64-bit LSB pie executable, x86-64, static-pie linked, stripped
+$ file nocompiler
+nocompiler: ELF 64-bit LSB pie executable, x86-64, static-pie linked, stripped
 ```
 
 Nothing outside the binary is needed at run time. The fixture corpus under
-`fixtures/` is what the test suite measures against; an installed `nocompiler-x` never
+`fixtures/` is what the test suite measures against; an installed `nocompiler` never
 reads it, and no data file, configuration or cache directory is required to
 start.
 
@@ -144,13 +144,13 @@ the output rather than being approximated.
 ## Looking at a file
 
 ```
-nocompiler-x info FILE           container, architecture, entry, what the loader noticed
-nocompiler-x sections FILE       sections and where they are mapped
-nocompiler-x symbols FILE        symbols the container names
-nocompiler-x imports FILE        what it needs from elsewhere
-nocompiler-x exports FILE        what it offers
-nocompiler-x strings FILE        strings found in the image, by section
-nocompiler-x stats FILE          counts: functions, blocks, instructions, references
+nocompiler info FILE           container, architecture, entry, what the loader noticed
+nocompiler sections FILE       sections and where they are mapped
+nocompiler symbols FILE        symbols the container names
+nocompiler imports FILE        what it needs from elsewhere
+nocompiler exports FILE        what it offers
+nocompiler strings FILE        strings found in the image, by section
+nocompiler stats FILE          counts: functions, blocks, instructions, references
 ```
 
 `info` and the listings above need only the container, so they are instant
@@ -159,11 +159,11 @@ whatever the size of the file.
 ## Code
 
 ```
-nocompiler-x funcs FILE                     every recovered function and its evidence
-nocompiler-x disas FILE TARGET              disassemble a function, an address, or `all`
-nocompiler-x xrefs FILE TARGET [--from]     references to an address, or from one
-nocompiler-x decompile FILE TARGET          pseudo-C for a function, or for `all`
-nocompiler-x emulate FILE TARGET [ARGS...]  run a function and report what it did
+nocompiler funcs FILE                     every recovered function and its evidence
+nocompiler disasm FILE TARGET              disassemble a function, an address, or `all`
+nocompiler xrefs FILE TARGET [--from]     references to an address, or from one
+nocompiler decompile FILE TARGET          pseudo-C for a function, or for `all`
+nocompiler emulate FILE TARGET [ARGS...]  run a function and report what it did
 ```
 
 `TARGET` is an address (`0x401000`, `401000`), a symbol name, or `all`.
@@ -192,21 +192,21 @@ wrong, so the identity the image asks for is checked before anything in the
 database is believed.
 
 ```
-$ nocompiler-x funcs prog.exe
+$ nocompiler funcs prog.exe
 0x140001000  ...  proven  program database  compare_points
 0x140001020  ...  proven  program database  walk
 ```
 
 Without it, the same binary yields only its entry point.
 
-`nocompiler-x info` reports `pe.pdb`, `pe.pdb.key` and `pe.pdb.age`, which together
+`nocompiler info` reports `pe.pdb`, `pe.pdb.key` and `pe.pdb.age`, which together
 are what a symbol server is indexed by.
 
 ## C++
 
 ```
-nocompiler-x classes prog                # the hierarchy
-nocompiler-x classes prog --members      # and every member function, with its `this`
+nocompiler classes prog                # the hierarchy
+nocompiler classes prog --members      # and every member function, with its `this`
 ```
 
 Classes come from the type information where a binary has it, and from the
@@ -229,8 +229,8 @@ default.
 ## Structure and types
 
 ```
-nocompiler-x shapes FILE TARGET     what the pointers a function takes point at
-nocompiler-x vtables FILE           virtual tables and the classes they belong to
+nocompiler shapes FILE TARGET     what the pointers a function takes point at
+nocompiler vtables FILE           virtual tables and the classes they belong to
 ```
 
 `shapes` reports the offsets a function touches through each pointer it is
@@ -241,9 +241,9 @@ two disagreeing strides into one.
 ## Asking questions
 
 ```
-nocompiler-x query FILE 'functions where insns > 100 and name ~ "crypt"'
-nocompiler-x query FILE 'strings where length >= 20 and text ~ "/etc/"'
-nocompiler-x query FILE 'xrefs where kind = call and to = 0x401000 limit 20'
+nocompiler query FILE 'functions where insns > 100 and name ~ "crypt"'
+nocompiler query FILE 'strings where length >= 20 and text ~ "/etc/"'
+nocompiler query FILE 'xrefs where kind = call and to = 0x401000 limit 20'
 ```
 
 Entities: `functions`, `strings`, `symbols`, `imports`, `exports`, `sections`,
@@ -255,7 +255,7 @@ and is reported as one, with the fields there are.
 ## Comparing builds
 
 ```
-nocompiler-x diff OLD NEW [--all]
+nocompiler diff OLD NEW [--all]
 ```
 
 Functions are matched across the two builds by a fingerprint of their
@@ -266,8 +266,8 @@ Given a vulnerable build and a patched one, this points at the change.
 ## Naming a stripped binary
 
 ```
-nocompiler-x sig FILE create -o LIBRARY      a signature for every named function
-nocompiler-x sig FILE apply LIBRARY          name what the library recognizes
+nocompiler sig FILE create -o LIBRARY      a signature for every named function
+nocompiler sig FILE apply LIBRARY          name what the library recognizes
 ```
 
 A signature identifies a function by its content rather than its address, so a
@@ -281,7 +281,7 @@ The file is sorted text, so a signature library reviews in a diff.
 ## An interactive session
 
 ```
-$ nocompiler-x repl prog
+$ nocompiler repl prog
 38 function(s) in prog. `help` lists the commands, `quit` leaves.
 0x400144> f
 0x400144> seek parse_header
@@ -308,17 +308,17 @@ An assertion is not a note on the side: it changes the analysis. Decompile,
 see what the engine could not work out, say what it is, decompile again.
 
 ```
-$ nocompiler-x decompile prog nestedoffset
+$ nocompiler decompile prog nestedoffset
 uint64_t nestedoffset(uint64_t arg0, uint64_t arg1, uint64_t arg2)
 {
     return (uint64_t)((uint64_t)(uint32_t)*(uint32_t *)(arg0 +
         ((int64_t)(int32_t)((uint32_t)arg1 + (uint32_t)arg2) << 2) + 12));
 }
 
-$ nocompiler-x annotate prog type nestedoffset \
+$ nocompiler notes prog type nestedoffset \
     "int nestedoffset(struct outer { int header; int pad; int array[8]; } *ptr, int a, int b)"
 
-$ nocompiler-x decompile prog nestedoffset
+$ nocompiler decompile prog nestedoffset
 struct outer { int32_t header; int32_t pad; int32_t array[8]; };
 
 int32_t nestedoffset(struct outer *ptr, int32_t a, int32_t b)
@@ -341,7 +341,7 @@ where the machine kept it, so a program driving this can see what there is to
 assert:
 
 ```
-$ nocompiler-x decompile prog nestedoffset --json
+$ nocompiler decompile prog nestedoffset --json
   ...
   "asserted": true,
   "variables": [
@@ -354,10 +354,10 @@ $ nocompiler-x decompile prog nestedoffset --json
 ## Annotations
 
 ```
-nocompiler-x annotate FILE name TARGET NAME
-nocompiler-x annotate FILE comment TARGET TEXT
-nocompiler-x annotate FILE list
-nocompiler-x annotate FILE undo
+nocompiler notes FILE name TARGET NAME
+nocompiler notes FILE comment TARGET TEXT
+nocompiler notes FILE list
+nocompiler notes FILE undo
 ```
 
 Annotations are written to a log beside the binary, keyed to a content anchor
@@ -376,8 +376,8 @@ than loaded: picking a member silently would make every later answer about
 bytes you did not choose.
 
 ```
-nocompiler-x archive libfoo.a              # members, sizes and offsets
-nocompiler-x archive libfoo.a --symbols    # and what each one defines
+nocompiler archive libfoo.a              # members, sizes and offsets
+nocompiler archive libfoo.a --symbols    # and what each one defines
 ```
 
 GNU and BSD archives, long names, both symbol index forms, and thin archives.
@@ -389,8 +389,8 @@ last `\n---- Bun! ----\n` marker, the offsets just before it, and either
 record size that layout has shipped.
 
 ```
-nocompiler-x bun prog                      # modules, loaders, sizes
-nocompiler-x bun prog --extract a.js       # that module's bytes on stdout
+nocompiler bun prog                      # modules, loaders, sizes
+nocompiler bun prog --extract a.js       # that module's bytes on stdout
 ```
 
 `--extract` takes the path the graph stores, a decimal index, or a unique
@@ -398,7 +398,7 @@ suffix that begins at a `/`. It writes the bytes and nothing else, so it is
 not combined with `--json`.
 
 ```
-nocompiler-x overlay firmware.exe
+nocompiler overlay firmware.exe
 ```
 
 reports where the headers stop describing the file, what is appended past that
@@ -416,17 +416,17 @@ find, so a patch written against one build still lands on the right
 instruction in the next one, and says how it found it.
 
 ```
-nocompiler-x patch prog record 0x401234 --asm "nop" --note "skip the check" -o fix.nocompiler-patch
-nocompiler-x patch prog record 0x401234 --bytes 90909090 -o fix.nocompiler-patch
-nocompiler-x patch prog record 0x401234 --asm "mov eax, 1" --pad-to 8 -o fix.nocompiler-patch
-nocompiler-x patch prog preview fix.nocompiler-patch     # where it lands, what it overwrites
-nocompiler-x patch prog apply   fix.nocompiler-patch -o prog.patched
-nocompiler-x patch prog.patched revert fix.nocompiler-patch -o prog
-nocompiler-x patch prog merge a.nocompiler-patch b.nocompiler-patch -o both.nocompiler-patch
+nocompiler patch prog record 0x401234 --asm "nop" --note "skip the check" -o fix.nocompiler-patch
+nocompiler patch prog record 0x401234 --bytes 90909090 -o fix.nocompiler-patch
+nocompiler patch prog record 0x401234 --asm "mov eax, 1" --pad-to 8 -o fix.nocompiler-patch
+nocompiler patch prog preview fix.nocompiler-patch     # where it lands, what it overwrites
+nocompiler patch prog apply   fix.nocompiler-patch -o prog.patched
+nocompiler patch prog.patched revert fix.nocompiler-patch -o prog
+nocompiler patch prog merge a.nocompiler-patch b.nocompiler-patch -o both.nocompiler-patch
 ```
 
 `--asm` assembles at the target address, because a branch encodes a
-displacement from where it sits. It accepts what `nocompiler-x disas` prints, so a
+displacement from where it sits. It accepts what `nocompiler disasm` prints, so a
 line can be copied out, changed, and assembled back. `--pad-to` fills the rest
 with no-ops: an instruction that encodes shorter than the one it replaces
 would otherwise leave the bytes after it meaning something they did not mean.
@@ -444,10 +444,10 @@ the bytes the anchor fingerprinted, which is exactly what applying it did.
 ## Saving a session
 
 ```
-nocompiler-x project new prog -o prog.nocompiler-proj --set scan_gaps=true
-nocompiler-x project add prog.nocompiler-proj --signatures libc.nocompiler-sig --patch fix.nocompiler-patch
-nocompiler-x project verify prog.nocompiler-proj
-nocompiler-x project show prog.nocompiler-proj
+nocompiler project new prog -o prog.nocompiler-proj --set scan_gaps=true
+nocompiler project add prog.nocompiler-proj --signatures libc.nocompiler-sig --patch fix.nocompiler-patch
+nocompiler project verify prog.nocompiler-proj
+nocompiler project show prog.nocompiler-proj
 ```
 
 A project names its binary by content as well as by path. Opening it against a
@@ -457,16 +457,16 @@ and a binary that only moved is still the right one.
 ## Project dashboard and tasks
 
 ```bash
-nocompiler-x project new prog --name investigation     # global project, absolute references
-nocompiler-x project list --json
-nocompiler-x ui                                      # every registered project
-nocompiler-x project import prog.nocompiler-proj --name imported
-nocompiler-x project task investigation list --json
-nocompiler-x project dashboard prog.nocompiler-proj             # local overview + decompiler pane
-nocompiler-x project dashboard prog.nocompiler-proj --port 0    # choose a free loopback port
-nocompiler-x project task prog.nocompiler-proj add "Trace parser" --owner agent-a --next "Inspect main"
-nocompiler-x project task prog.nocompiler-proj list --json
-nocompiler-x project task prog.nocompiler-proj update T-0001 --revision 1 --input task.json
+nocompiler project new prog --name investigation     # global project, absolute references
+nocompiler project list --json
+nocompiler ui                                      # every registered project
+nocompiler project import prog.nocompiler-proj --name imported
+nocompiler project task investigation list --json
+nocompiler project dashboard prog.nocompiler-proj             # local overview + decompiler pane
+nocompiler project dashboard prog.nocompiler-proj --port 0    # choose a free loopback port
+nocompiler project task prog.nocompiler-proj add "Trace parser" --owner agent-a --next "Inspect main"
+nocompiler project task prog.nocompiler-proj list --json
+nocompiler project task prog.nocompiler-proj update T-0001 --revision 1 --input task.json
 ```
 
 The browser and CLI share durable tasks with revision checks, owners, blockers,
@@ -484,10 +484,10 @@ float.
 ## Shell integration
 
 ```
-nocompiler-x completions bash > /etc/bash_completion.d/nocompiler-x
-nocompiler-x completions zsh  > ~/.zsh/completions/_nocompiler
-nocompiler-x completions fish > ~/.config/fish/completions/nocompiler.fish
-nocompiler-x manpage          > /usr/local/share/man/man1/nocompiler-x.1
+nocompiler completions bash > /etc/bash_completion.d/nocompiler
+nocompiler completions zsh  > ~/.zsh/completions/_nocompiler
+nocompiler completions fish > ~/.config/fish/completions/nocompiler.fish
+nocompiler manpage          > /usr/local/share/man/man1/nocompiler.1
 ```
 
 Both are generated from the command tree, so they cannot describe a command
@@ -511,8 +511,8 @@ A job that runs out of budget prints why on stderr and how much is left, and
 the output it already produced is still a valid document:
 
 ```
-$ nocompiler-x decompile libstdc++.so.6 all --budget 3 > partial.c
-nocompiler-x: out of time after 3.5s and 1024 of 5609 function(s); 4585 not done.
+$ nocompiler decompile libstdc++.so.6 all --budget 3 > partial.c
+nocompiler: out of time after 3.5s and 1024 of 5609 function(s); 4585 not done.
 Raise --budget or --limit, or narrow the target.
 ```
 

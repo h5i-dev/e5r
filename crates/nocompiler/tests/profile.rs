@@ -294,80 +294,11 @@ fn metadata_round_trips_and_is_checked() {
 }
 
 #[test]
-fn cli_check_annotate_export() {
-    let exe = env!("CARGO_BIN_EXE_nocompiler");
-    let elf = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/elf/sum.elf");
-    let out = Command::new(exe)
-        .args(["check", elf, "--json"])
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    let s = String::from_utf8(out.stdout).unwrap();
-    assert!(
-        s.contains("\"name\":\"sum\",\"entry\":70032,\"level\":\"L2\",\"conforms\":true"),
-        "{s}"
-    );
-
-    // Export is what each committed Lean image was generated from.
-    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-    for (name, module) in [("sum", "Sum"), ("hello", "Hello")] {
-        let out = Command::new(exe)
-            .args(["export", &format!("{root}/examples/elf/{name}.elf")])
-            .args(["--namespace", &format!("Examples.{module}.Image")])
-            .output()
-            .unwrap();
-        assert!(out.status.success());
-        let committed =
-            std::fs::read_to_string(format!("{root}/lean/Examples/{module}/Image.lean")).unwrap();
-        assert_eq!(
-            String::from_utf8(out.stdout).unwrap(),
-            committed,
-            "lean/Examples/{module}/Image.lean is stale: run examples/build.sh --update"
-        );
-    }
-
-    assert_eq!(
-        Command::new(exe)
-            .args(["check", "/nonexistent"])
-            .status()
-            .unwrap()
-            .code(),
-        Some(2)
-    );
-    assert_eq!(
-        Command::new(exe).arg("frobnicate").status().unwrap().code(),
-        Some(2)
-    );
-}
-
-#[test]
 fn rejects_what_is_not_the_profile() {
     assert!(nocompiler::load(b"not an elf").is_err());
     // An x86-64 ELF: the test binary itself is one on the usual CI host.
     let me = std::fs::read(std::env::current_exe().unwrap()).unwrap();
     if me.get(18..20) == Some(&[0x3e, 0x00]) {
         assert!(nocompiler::load(&me).err().unwrap().contains("not RISC-V"));
-    }
-}
-
-/// A reader that stops early (`nocompiler disasm FILE | head`) must not make the
-/// tool panic: the pipe is closed before the tool writes.
-#[test]
-fn a_closed_pipe_is_not_a_panic() {
-    use std::process::Stdio;
-    let exe = env!("CARGO_BIN_EXE_nocompiler");
-    let elf = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/elf/sum.elf");
-    for cmd in ["disasm", "check"] {
-        let mut child = Command::new(exe)
-            .args([cmd, elf])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .unwrap();
-        drop(child.stdout.take());
-        let out = child.wait_with_output().unwrap();
-        let err = String::from_utf8_lossy(&out.stderr);
-        assert!(!err.contains("panicked"), "{cmd}: {err}");
-        assert_eq!(out.status.code(), Some(0), "{cmd}: {err}");
     }
 }

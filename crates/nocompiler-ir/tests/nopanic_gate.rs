@@ -343,7 +343,9 @@ fn one_case(data: &[u8], opts: &LoadOptions, what: &str) {
 fn the_real_corpus_is_self_consistent() {
     let seeds = seeds();
     if seeds.is_empty() {
-        println!("nopanic gate: no fixtures/build; run scripts/toolkit/build-fixtures.sh. Skipped.");
+        println!(
+            "nopanic gate: no fixtures/build; run scripts/toolkit/build-fixtures.sh. Skipped."
+        );
         return;
     }
     let opts = LoadOptions::default();

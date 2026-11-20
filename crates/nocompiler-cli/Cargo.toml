@@ -1,6 +1,6 @@
 [package]
 name = "nocompiler-cli"
-description = "nocompiler — the binary analysis toolkit behind the nocompiler Lean 4 verifier. Load a binary, recover functions, disassemble, decompile, diff."
+description = "nocompiler: check RISC-V binaries against a formal-verification-friendly profile and export them to Lean 4; and a binary analysis toolkit (load, recover functions, disassemble, decompile, diff)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -20,10 +20,11 @@ categories.workspace = true
 # where fixtures/ and scripts/ do not exist.
 
 [[bin]]
-name = "nocompiler-x"
+name = "nocompiler"
 path = "src/main.rs"
 
 [dependencies]
+nocompiler = { workspace = true }
 nocompiler-core = { workspace = true }
 nocompiler-format = { workspace = true }
 nocompiler-arch = { workspace = true }

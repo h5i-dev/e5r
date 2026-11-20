@@ -16,7 +16,7 @@ $ strip ./prog
 ## 1. Ask what it is before asking anything else
 
 ```
-$ nocompiler-x info prog
+$ nocompiler info prog
 ```
 
 Format, architecture, entry point, image base, whether it is position
@@ -29,7 +29,7 @@ after this point rests on it.
 ## 2. Find the functions, and look at the evidence column
 
 ```
-$ nocompiler-x funcs prog
+$ nocompiler funcs prog
 address                 size  blocks   insns  strength  evidence                    name
 0x400144                  24       1       9  inferred  direct call target          sub_400144
 0x400168                  14       1       5  inferred  direct call target          sub_400168
@@ -49,8 +49,8 @@ into one number.
 To see what is fact and what is a scanner's opinion, run it both ways:
 
 ```
-$ nocompiler-x funcs prog --no-scan | wc -l
-$ nocompiler-x funcs prog | wc -l
+$ nocompiler funcs prog --no-scan | wc -l
+$ nocompiler funcs prog | wc -l
 ```
 
 The difference is the scan's contribution, and if it is large on your binary
@@ -61,9 +61,9 @@ that is worth knowing before you trust it.
 Build a signature library from a binary that has symbols:
 
 ```
-$ nocompiler-x sig fixtures/build/driver.a64.O2 create -o driver.nocompiler-sig
+$ nocompiler sig fixtures/build/driver.a64.O2 create -o driver.nocompiler-sig
 38 signature(s) written
-$ nocompiler-x sig prog apply driver.nocompiler-sig
+$ nocompiler sig prog apply driver.nocompiler-sig
 address              match      name                         was
 0x400144             exact      arith8                       sub_400144
 0x400168             exact      arith16                      sub_400168
@@ -92,8 +92,8 @@ worse than no name, because you will believe it.
 ## 4. Read the code
 
 ```
-$ nocompiler-x disas prog 0x400144
-$ nocompiler-x decompile prog 0x400144
+$ nocompiler disasm prog 0x400144
+$ nocompiler decompile prog 0x400144
 ```
 
 The C is a statement of what the machine does, in C's notation. Where the
@@ -105,17 +105,17 @@ an operation has no C, a named helper appears (`__bits`, `__clobbered`,
 To find the function worth reading first:
 
 ```
-$ nocompiler-x query prog 'functions where insns > 100 and calls > 5'
-$ nocompiler-x strings prog --min 8
-$ nocompiler-x xrefs prog 0x410008
+$ nocompiler query prog 'functions where insns > 100 and calls > 5'
+$ nocompiler strings prog --min 8
+$ nocompiler xrefs prog 0x410008
 ```
 
 ## 5. Write down what you worked out
 
 ```
-$ nocompiler-x annotate prog name 0x400144 parse_header
-$ nocompiler-x annotate prog comment 0x400144 "length is little endian, unlike the rest"
-$ nocompiler-x annotate prog type 0x400144 "int parse_header(const uint8_t *p, size_t n)"
+$ nocompiler notes prog name 0x400144 parse_header
+$ nocompiler notes prog comment 0x400144 "length is little endian, unlike the rest"
+$ nocompiler notes prog type 0x400144 "int parse_header(const uint8_t *p, size_t n)"
 ```
 
 Each one prints what it recorded:
@@ -150,8 +150,8 @@ and its address as a tiebreak. The first two survive a rebase and a relink.
 Made a mistake:
 
 ```
-$ nocompiler-x annotate prog undo
-$ nocompiler-x annotate prog redo
+$ nocompiler notes prog undo
+$ nocompiler notes prog redo
 ```
 
 Undo is a new assertion, not an edit, so the history is never rewritten.
@@ -184,7 +184,7 @@ This is the step the incumbents cannot do.
 
 ```
 $ make -B                      # rebuild the program from changed source
-$ nocompiler-x annotate ./prog list
+$ nocompiler notes ./prog list
 0x400144            name     "parse_header"
 0x400144            comment  "length is little endian, unlike the rest"
 ```
@@ -196,15 +196,15 @@ the same-binary fast path, and `abs=` is the address, used only as a tiebreak.
 
 Where it matters most is the case where an anchor resolves on the address
 alone, because that means the code the annotation was written against is not
-there any more. Nothing hides that. `nocompiler-x sig ... apply` prints the resolution
-per function in its `match` column, and `nocompiler-x patch ... apply` refuses outright
+there any more. Nothing hides that. `nocompiler sig ... apply` prints the resolution
+per function in its `match` column, and `nocompiler patch ... apply` refuses outright
 unless you pass `--allow-address-only`.
 
 ## 8. Save the session
 
 ```
-$ nocompiler-x project new prog -o prog.nocompiler-proj
-$ nocompiler-x project add prog.nocompiler-proj --signatures driver.nocompiler-sig
+$ nocompiler project new prog -o prog.nocompiler-proj
+$ nocompiler project add prog.nocompiler-proj --signatures driver.nocompiler-sig
 $ git add prog.nocompiler-proj && git commit -m "Record the session"
 ```
 

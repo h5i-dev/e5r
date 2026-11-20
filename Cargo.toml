@@ -26,6 +26,7 @@ keywords = ["risc-v", "formal-verification", "lean4", "binary", "elf"]
 categories = ["command-line-utilities", "development-tools::debugging"]
 
 [workspace.dependencies]
+nocompiler = { path = "crates/nocompiler", version = "0.1.0" }
 nocompiler-core = { path = "crates/nocompiler-core", version = "0.1.0" }
 nocompiler-format = { path = "crates/nocompiler-format", version = "0.1.0" }
 nocompiler-arch = { path = "crates/nocompiler-arch", version = "0.1.0" }

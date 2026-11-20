@@ -1,7 +1,7 @@
 //! Text to [`Insn`], the shape the decoders produce.
 //!
 //! The grammar is not an assembler's: it is exactly what the two printers in
-//! `nocompiler-arch` emit, so a line copied out of `nocompiler-x disas` parses. Anything
+//! `nocompiler-arch` emit, so a line copied out of `nocompiler disasm` parses. Anything
 //! else that happens to parse is a bonus, never a promise.
 
 use nocompiler_core::{Addr, Arch};

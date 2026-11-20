@@ -234,7 +234,7 @@ impl Project {
         let mut parts = header.split_whitespace();
         if parts.next() != Some(TAG) {
             return Err(Error::NotRecognized {
-                expected: "nocompiler-x project",
+                expected: "nocompiler project",
             });
         }
         let version: u32 = parts

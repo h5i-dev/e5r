@@ -9,20 +9,17 @@ fn have_tools() -> bool {
 }
 
 fn cc(name: &str) -> (bool, String) {
-    let exe = env!("CARGO_BIN_EXE_nocompiler");
     let src = format!("{}/tests/cc/{name}.c", env!("CARGO_MANIFEST_DIR"));
     let dir = std::env::temp_dir().join(format!("nocompiler-cc-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let out = dir.join(format!("{name}.elf"));
-    let o = Command::new(exe)
-        .args(["cc", &src, "-o"])
-        .arg(&out)
-        .output()
-        .unwrap();
-    let text =
-        String::from_utf8_lossy(&o.stdout).into_owned() + &String::from_utf8_lossy(&o.stderr);
+    let mut text = String::new();
+    let code = nocompiler::cmd::cc(&[src], &out, &mut text).unwrap_or_else(|e| {
+        text.push_str(&e);
+        nocompiler::cmd::USAGE_ERROR
+    });
     assert!(out.exists(), "{name}: no output written\n{text}");
-    (o.status.success(), text)
+    (code == 0, text)
 }
 
 #[test]

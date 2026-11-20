@@ -102,7 +102,7 @@ fn disassemble_file(tool: &str, path: &Path) -> Vec<Line> {
 /// [`Line`] per slot start. The object goes through a temporary file because
 /// llvm-objdump reads a file, not a pipe.
 fn oracle(mc: &str, dump: &str, slots: &[[u8; SLOT]]) -> Option<Vec<Line>> {
-    let dir = std::env::temp_dir().join(format!("nocompiler-x32-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("nocompiler32-{}", std::process::id()));
     std::fs::create_dir_all(&dir).ok()?;
     let src = dir.join("sweep.s");
     let obj = dir.join("sweep.o");

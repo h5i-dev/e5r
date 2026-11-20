@@ -37,7 +37,7 @@ pub fn resolve(reference: &Path) -> Result<PathBuf, String> {
     let path = registry()?.path(name)?;
     if !path.is_file() {
         return Err(format!(
-            "project {name:?} not found; use nocompiler-x project list"
+            "project {name:?} not found; use nocompiler project list"
         ));
     }
     Ok(path)

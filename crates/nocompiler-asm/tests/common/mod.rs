@@ -97,7 +97,7 @@ pub fn decode_for(arch: &Arch, bytes: &[u8], addr: Addr) -> Option<Insn> {
     nocompiler_arch::decode(arch, bytes, addr)
 }
 
-/// The text the assembler has to accept, which is what `nocompiler-x disas` prints.
+/// The text the assembler has to accept, which is what `nocompiler disasm` prints.
 pub fn render(arch: &Arch, i: &Insn) -> String {
     nocompiler_arch::format(arch, i, false)
 }

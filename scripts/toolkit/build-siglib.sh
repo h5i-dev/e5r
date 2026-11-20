@@ -9,7 +9,7 @@
 # of, and those are downloadable, versioned and already on most machines.
 #
 # So this takes packages or static libraries, splits each archive into the
-# objects it holds, fingerprints every named function in them with `nocompiler-x sig
+# objects it holds, fingerprints every named function in them with `nocompiler sig
 # <object> create`, and merges the result into one sorted library. The output is the
 # ordinary text format: one signature per line, sorted, so a library reviews in
 # a diff and merges the way the annotation log does.
@@ -36,7 +36,7 @@
 # they need no reverse engineering of anyone's format.
 set -euo pipefail
 
-nocompiler=${NOCOMPILER:-target/release/nocompiler-x}
+nocompiler=${NOCOMPILER:-target/release/nocompiler}
 out=
 inputs=()
 

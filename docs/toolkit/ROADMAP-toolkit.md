@@ -8,7 +8,7 @@ rather than argued about again.
 *assembly-level formal verification with Lean 4*. The verifier, `nocompiler`,
 with the PTX scope P and the RISC-V scopes V0, F and R below, is the product.
 The binary analysis toolkit described by M0 to M12 (loaders, decoders, IR,
-decompiler, differ, annotation log) ships as the `nocompiler-x` binary and
+decompiler, differ, annotation log) ships as the `nocompiler` binary and
 is development infrastructure for the verifier. Its milestones and the "Not
 building" list stay in force; when the two compete for effort, the verifier
 comes first. No output of the toolkit is an input to any proof. The sections
@@ -113,7 +113,7 @@ nocompiler-db        content anchors, the annotation log, git merge semantics
 nocompiler-diff      function matching, build-to-build diff
 nocompiler-patch     assembler-backed patch sets
 nocompiler-api       stable library surface and the versioned JSON schema
-nocompiler-cli       the nocompiler-x binary (the toolkit)
+nocompiler-cli       the nocompiler binary (the toolkit)
 ```
 
 Dependency edges run downward only. `nocompiler-cli` may depend on everything;
@@ -259,7 +259,7 @@ Depth-first: ELF and PE carry the workload, Mach-O follows, everything else wait
       space table and 148 on the constructor count.
 - [x] Assembler for x86-64 and AArch64, needed by M10 patching. Encoding only,
       from public manuals, built around the decoder so it accepts our own
-      disassembly verbatim: a user can copy a line out of `nocompiler-x disas`, change
+      disassembly verbatim: a user can copy a line out of `nocompiler disasm`, change
       it, and assemble it back. Round trip over the whole fixture corpus, 0
       wrong on both architectures; byte-identical to `as` and
       `aarch64-linux-gnu-as` on every one of 2,535 and 1,272 comparable forms.
@@ -654,7 +654,7 @@ designed before it gets coded, and the design lives in
       distribution's development packages carry the same code under the same
       names, are what a statically linked binary was built from, and need no
       reading of anyone's format.
-- [x] Emulation, built on the M4 IR interpreter: `nocompiler-x emulate` runs a
+- [x] Emulation, built on the M4 IR interpreter: `nocompiler emulate` runs a
       function with given arguments and reports what came back and what it
       touched. Nothing escapes the process. Gated against the processor by
       running the oracle's case table through it.
@@ -700,7 +700,7 @@ designed before it gets coded, and the design lives in
       stored blocks were 2.69M distinct ranges, held once per function that
       could reach them. Wall time is unchanged and is not claimed as a win.
 - [x] Profiling as a habit, with `scripts/toolkit/flamegraph.sh` checked in and run
-      rather than merely written. It found that `nocompiler-x funcs` spends 12.3% of
+      rather than merely written. It found that `nocompiler funcs` spends 12.3% of
       its time computing content anchors for every function before printing
       anything.
 

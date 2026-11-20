@@ -8,10 +8,10 @@
 //! Usage: bench <binary> <mode> [cache-dir]
 //!
 //!   load          parse the header and the symbol table, nothing else
-//!   funcs-eager   what `nocompiler-x funcs` costs today: analyze() with strings off
+//!   funcs-eager   what `nocompiler funcs` costs today: analyze() with strings off
 //!   funcs-lazy    a session asked for functions and nothing else
 //!   strings-lazy  a session asked for strings and nothing else
-//!   all           everything, which is what `nocompiler-x stats` needs
+//!   all           everything, which is what `nocompiler stats` needs
 //!
 //! A cache directory makes the lazy modes read and write it, so running one
 //! twice prints a miss and then a hit.

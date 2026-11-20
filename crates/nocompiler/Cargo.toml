@@ -8,11 +8,10 @@ license.workspace = true
 repository.workspace = true
 readme.workspace = true
 
+# The library only; the `nocompiler` binary is crates/nocompiler-cli, which
+# calls `nocompiler::cmd`.
+#
 # The core depends on nothing else in the workspace and on no external crate:
 # it is small enough to read in one sitting, and none of it is trusted by a
 # proof (the Lean kernel re-checks everything it exports).
 [dependencies]
-
-[[bin]]
-name = "nocompiler"
-path = "src/main.rs"

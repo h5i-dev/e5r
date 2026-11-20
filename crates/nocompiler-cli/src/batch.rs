@@ -78,7 +78,7 @@ fn one(cli: &Cli, common: &Common, line: &str) -> (u8, String) {
         return (exit::USAGE, quote("an empty command"));
     };
     let mut argv: Vec<String> = vec![
-        "nocompiler-x".to_string(),
+        "nocompiler".to_string(),
         subcommand,
         common.file.display().to_string(),
     ];
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn an_empty_argument_survives_splitting() {
-        let words = split("annotate name main ''").expect("splits");
+        let words = split("notes name main ''").expect("splits");
         assert_eq!(words.len(), 4);
         assert_eq!(words[3], "");
     }

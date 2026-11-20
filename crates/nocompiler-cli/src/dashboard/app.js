@@ -315,7 +315,7 @@ async function refreshRecords() {
       $("records").append(details);
     }
     if (!data.records.length)
-      message($("records"), "No records yet.", "Ask an agent to write a finding, note or report with nocompiler-x project record.");
+      message($("records"), "No records yet.", "Ask an agent to write a finding, note or report with nocompiler project record.");
     renderFunctionNotes();
   } catch (e) {
     state.recordsError = e.message;
@@ -485,7 +485,7 @@ function renderNotesPane() {
   const notes = functionNotes();
   $("quality").className = "quality";
   $("quality").textContent = `Function records · ${state.selected.addr} · Live project records, written by people or agents.`;
-  $("analysis-command").textContent = `nocompiler-x project record ${shellQuote(state.project.project)} note add 'Note title' --description 'Note text' --evidence function:${state.selected.addr}`;
+  $("analysis-command").textContent = `nocompiler project record ${shellQuote(state.project.project)} note add 'Note title' --description 'Note text' --evidence function:${state.selected.addr}`;
   $("copy-analysis").disabled = false;
   clear($("code"));
   state.code = "";
@@ -885,7 +885,7 @@ async function loadPane() {
     else if (pane === "annotations") renderAnnotationPane();
     else renderOutgoing();
     $("analysis-command").textContent = pane === "annotations"
-      ? `nocompiler-x annotate ${shellQuote(state.project.binary)} list${state.project.log ? " --db " + shellQuote(state.project.log) : ""}`
+      ? `nocompiler notes ${shellQuote(state.project.binary)} list${state.project.log ? " --db " + shellQuote(state.project.log) : ""}`
       : `Function ${pane === "cfg" ? "control flow" : "outgoing references"} from the analysis snapshot.`;
     $("copy-analysis").disabled = pane !== "annotations";
     return;
@@ -911,7 +911,7 @@ async function loadPane() {
     .filter(Boolean)
     .join(" ");
   $("analysis-command").textContent =
-    `nocompiler-x ${command} ${shellQuote(state.project.binary)} ${f.addr}${options ? " " + options : ""}${pane === "disas" ? " --bytes" : ""}`;
+    `nocompiler ${command} ${shellQuote(state.project.binary)} ${f.addr}${options ? " " + options : ""}${pane === "disas" ? " --bytes" : ""}`;
   $("copy-analysis").disabled = pane === "callgraph";
   if (pane === "callgraph") $("analysis-command").textContent = "Call graph from recovered CFG direct-call edges.";
   try {
@@ -1094,7 +1094,7 @@ async function boot() {
     $("binary-name").textContent = state.project.binary;
     renderBinaryInfo();
     $("agent-command").textContent =
-      `nocompiler-x project task ${shellQuote(state.project.project)} list --json`;
+      `nocompiler project task ${shellQuote(state.project.project)} list --json`;
     renderBoard();
     await refreshTasks();
     await refreshRecords();

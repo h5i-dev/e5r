@@ -15,7 +15,7 @@
 #   scripts/toolkit/compare-tools.sh /bin/ls              # one binary
 #   RUNS=1 scripts/toolkit/compare-tools.sh               # the fast loop
 #
-# Env: NOCOMPILER                the nocompiler executable (default target/release/nocompiler-x)
+# Env: NOCOMPILER                the nocompiler executable (default target/release/nocompiler)
 #      RIZIN               the rizin executable (default whatever is on PATH)
 #      GHIDRA_INSTALL_DIR  a Ghidra installation; Ghidra is left out without one
 #      OUT                 where the JSON goes (default target/bench-tools.json,
@@ -29,7 +29,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
-nocompiler=${NOCOMPILER:-target/release/nocompiler-x}
+nocompiler=${NOCOMPILER:-target/release/nocompiler}
 rizin=${RIZIN:-rizin}
 out=${OUT:-target/bench-tools.json}
 

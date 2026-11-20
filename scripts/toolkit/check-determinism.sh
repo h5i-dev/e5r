@@ -7,7 +7,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-bin=target/release/nocompiler-x
+bin=target/release/nocompiler
 [ -x "$bin" ] || { echo "build first: cargo build --release" >&2; exit 2; }
 
 shopt -s nullglob

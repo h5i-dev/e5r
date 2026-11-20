@@ -138,6 +138,24 @@ impl Out {
         }
     }
 
+    /// Write text as it is, newlines included (the core commands' output).
+    pub fn raw(&mut self, text: &str) {
+        if self.closed || text.is_empty() {
+            return;
+        }
+        let ok = match &mut self.w {
+            Sink::Stdout(w) => w.write_all(text.as_bytes()).is_ok(),
+            Sink::Pager { w, .. } => w.write_all(text.as_bytes()).is_ok(),
+            Sink::Buffer(s) => {
+                s.push_str(text);
+                true
+            }
+        };
+        if !ok {
+            self.closed = true;
+        }
+    }
+
     /// What was collected, for a buffered stream.
     pub fn take(self) -> String {
         match self.w {

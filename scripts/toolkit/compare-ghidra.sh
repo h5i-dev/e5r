@@ -11,7 +11,7 @@ set -euo pipefail
 # A fresh project each run: importing into an existing one is a no-op and
 # would report the previous analysis as if it were this one.
 project=${PROJECT:-nocompilercompare-$$}
-nocompiler=${NOCOMPILER:-target/release/nocompiler-x}
+nocompiler=${NOCOMPILER:-target/release/nocompiler}
 ghidra=${GHIDRA:-ghidra}
 
 command -v "$ghidra" > /dev/null || {

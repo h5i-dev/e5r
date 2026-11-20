@@ -2,7 +2,7 @@
 # The installer against a real archive, end to end.
 #
 # `install.sh` reaches into the archive by name -- it expects
-# `nocompiler-<version>-<target>/nocompiler-x` inside `nocompiler-<version>-<target>.tar.gz`, and it
+# `nocompiler-<version>-<target>/nocompiler` inside `nocompiler-<version>-<target>.tar.gz`, and it
 # expects a `SHA256SUMS` beside it that names that archive. Every one of those
 # is decided by `scripts/toolkit/build-release.sh`, in a different file, and nothing
 # links the two. A change to either that forgot the other is a download that
@@ -66,8 +66,8 @@ run() {
 echo "==> a good archive installs"
 mkdir -p "$work/good"
 run "$work/good"
-[ -x "$work/good/nocompiler-x" ] || { echo "FAIL: the installer left no binary" >&2; exit 1; }
-"$work/good/nocompiler-x" --version | grep -q "$version" ||
+[ -x "$work/good/nocompiler" ] || { echo "FAIL: the installer left no binary" >&2; exit 1; }
+"$work/good/nocompiler" --version | grep -q "$version" ||
   { echo "FAIL: the installed binary does not report $version" >&2; exit 1; }
 
 echo "==> a tampered checksum is refused"
@@ -85,7 +85,7 @@ if run "$work/bad" > /dev/null 2>&1; then
   echo "FAIL: the installer accepted a mismatched checksum" >&2
   exit 1
 fi
-[ -e "$work/bad/nocompiler-x" ] && { echo "FAIL: it installed anyway" >&2; exit 1; }
+[ -e "$work/bad/nocompiler" ] && { echo "FAIL: it installed anyway" >&2; exit 1; }
 cp "$work/SHA256SUMS.good" "$work/SHA256SUMS"
 
 echo "==> a missing SHA256SUMS is refused"

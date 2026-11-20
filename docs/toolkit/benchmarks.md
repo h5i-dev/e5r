@@ -26,7 +26,7 @@ Machine: Linux 6.6.87.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Thu Jun  
 Fastest of 3 runs per binary.
 Measured once rather than 3: `libstdc++.so.6`, `libcrypto.so.3`.
 
-- `nocompiler`: nocompiler 0.1.0 (target/release/nocompiler-x, sha256 6525025002f44172)
+- `nocompiler`: nocompiler 0.1.0 (target/release/nocompiler, sha256 6525025002f44172)
 - `rizin`: rizin 0.8.2 @ linux-arm-64, package: 0.8.2 (RizinOrg)
 - Ghidra: not measured, no GHIDRA_INSTALL_DIR. Its headless analyzer works on this architecture; its decompiler ships x86-64 only, so a decompiler comparison is not available on an aarch64 host either way.
 
@@ -64,9 +64,9 @@ together answers none of them.
 
 | job | nocompiler | rizin |
 | --- | --- | --- |
-| **load**: parse the container, report what is in it, analyze no code | `nocompiler-x info <file> --json` | `rz-bin -I <file>` |
-| **recover**: find the functions and nothing else | `nocompiler-x funcs <file> --json` | `rizin -N -q -c 'aa; aflj' <file>` |
-| **analyze**: the tool's own full analysis, then list the functions | `nocompiler-x stats <file> --json`, timed; the list from a separate untimed `nocompiler-x funcs` | `rizin -N -q -A -c aflj <file>` |
+| **load**: parse the container, report what is in it, analyze no code | `nocompiler info <file> --json` | `rz-bin -I <file>` |
+| **recover**: find the functions and nothing else | `nocompiler funcs <file> --json` | `rizin -N -q -c 'aa; aflj' <file>` |
+| **analyze**: the tool's own full analysis, then list the functions | `nocompiler stats <file> --json`, timed; the list from a separate untimed `nocompiler funcs` | `rizin -N -q -A -c aflj <file>` |
 
 Why each of those:
 
@@ -78,7 +78,7 @@ Why each of those:
   out of the measurement, `-q` quits after the command, and `aflj` is the
   function list as JSON.
 - **`aa` as well as `-A`, and neither row alone is the honest one.** `aaa` is
-  not the same workload as `nocompiler-x stats`: on top of function recovery it
+  not the same workload as `nocompiler stats`: on top of function recovery it
   autonames functions, recovers variables and signatures per function, and
   searches the image for values, none of which nocompiler produces at all. Some of
   its time buys things this table does not score. So rizin's own `aa`,
@@ -90,8 +90,8 @@ Why each of those:
   binary here finds two functions and nothing else. Read the `aa` row as the
   floor on rizin's cost, never as a configuration anyone would analyze a
   stripped binary with. The headline comparison stays `rizin -A` against
-  `nocompiler-x stats`, which is what the roadmap names and what a user would run.
-- `nocompiler-x stats` rather than `nocompiler-x funcs` for the analyze row, even though `funcs`
+  `nocompiler stats`, which is what the roadmap names and what a user would run.
+- `nocompiler stats` rather than `nocompiler funcs` for the analyze row, even though `funcs`
   is the command that produces the list. nocompiler's analysis is lazy, so listing
   functions does not force cross references or strings, and `aaa` computes
   those. Timing the cheaper command against a tool doing more would be the same
@@ -263,7 +263,7 @@ On `bash` every one of rizin's 291 missed entries is of this kind.
 nocompiler's 39 comes from an `.eh_frame` FDE:
 
 ```
-$ nocompiler-x funcs fixtures/build/cpp-hierarchy.a64.O2.rtti.stripped --json | ...
+$ nocompiler funcs fixtures/build/cpp-hierarchy.a64.O2.rtti.stripped --json | ...
 38 ('.eh_frame FDE',)
  1 ('.eh_frame FDE', 'entry point')
 ```
@@ -304,20 +304,20 @@ table already names, which is a boundary split rather than an invention.
 
 ## What nocompiler loses
 
-One row, and it is the load row on `panicky`: `nocompiler-x info` takes 0.08s and
+One row, and it is the load row on `panicky`: `nocompiler info` takes 0.08s and
 56 MB where `rz-bin -I` takes 0.02s and 19 MB. It reproduces, and the cause is
 not the file size:
 
 ```
-$ /usr/bin/time -f '%e s %M KB' nocompiler-x info fixtures/build/panicky
+$ /usr/bin/time -f '%e s %M KB' nocompiler info fixtures/build/panicky
 0.08 s 51332 KB
 $ objcopy --strip-debug panicky panicky.nodebug
-$ /usr/bin/time -f '%e s %M KB' nocompiler-x info panicky.nodebug
+$ /usr/bin/time -f '%e s %M KB' nocompiler info panicky.nodebug
 0.00 s 5376 KB
 ```
 
 `panicky` is a 4.5 MB Rust binary carrying 1.8 MB of `.debug_str` and 1 MB of
-`.debug_info`. `nocompiler-x info`, which prints the container header and nothing that
+`.debug_info`. `nocompiler info`, which prints the container header and nothing that
 needs types, parses the debug information anyway, and pays 0.08 seconds and
 46 MB for it. A 4.5 MB binary without DWARF, `libcrypto.so.3`, loads in 0.01s.
 `rz-bin -I` does not read DWARF unless asked.

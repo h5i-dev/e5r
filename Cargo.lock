@@ -265,6 +265,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "memmap2",
+ "nocompiler",
  "nocompiler-analysis",
  "nocompiler-api",
  "nocompiler-arch",
