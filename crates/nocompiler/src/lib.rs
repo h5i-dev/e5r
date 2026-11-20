@@ -8,7 +8,9 @@
 
 pub mod cc;
 pub mod cmd;
+pub mod dwarf;
 pub mod elf;
+pub mod frame;
 pub mod isa;
 pub mod lean;
 pub mod meta;
@@ -29,6 +31,10 @@ pub struct Binary<'a> {
     pub funcs: Vec<Func>,
     /// `.nocompiler.struct`, if the file has one.
     pub recorded: Option<Vec<FuncMeta>>,
+    /// Functions whose record declares a frame partition (version 2 tables).
+    pub declared: BTreeSet<String>,
+    /// Stack variables the DWARF debug information places in each frame.
+    pub dwarf: dwarf::FrameVars,
     /// Every allocated section that is not code, in header order.
     pub segments: Vec<DataSegment>,
 }
@@ -112,6 +118,7 @@ pub fn load(bytes: &[u8]) -> Result<Binary<'_>, String> {
             writable: s.flags & elf::SHF_WRITE != 0,
         })
         .collect();
+    let mut declared = BTreeSet::new();
     let recorded = match e.section(meta::SECTION) {
         Some(s) => {
             let by_name: std::collections::BTreeMap<String, u64> =
@@ -125,6 +132,9 @@ pub fn load(bytes: &[u8]) -> Result<Binary<'_>, String> {
                         r.meta.name
                     )
                 })?;
+                if r.version >= 2 {
+                    declared.insert(r.meta.name.clone());
+                }
                 out.push(r.place(entry, &by_name)?);
             }
             Some(out)
@@ -137,6 +147,8 @@ pub fn load(bytes: &[u8]) -> Result<Binary<'_>, String> {
         text: words,
         funcs,
         recorded,
+        declared,
+        dwarf: dwarf::frame_vars(&e),
         segments,
     })
 }
@@ -145,7 +157,12 @@ pub fn load(bytes: &[u8]) -> Result<Binary<'_>, String> {
 pub struct Report {
     pub name: String,
     pub entry: u64,
+    /// The level reached: `None` when it does not even decode (R1).
+    pub level: Option<profile::Level>,
+    /// `Ok` at L1 and above, with the metadata to record; otherwise why not.
     pub result: Result<FuncMeta, Vec<Violation>>,
+    /// At L1: why the function is not at L2 (empty at L2).
+    pub missed: Vec<Violation>,
 }
 
 impl Binary<'_> {
@@ -154,43 +171,80 @@ impl Binary<'_> {
     }
 
     /// Check every function: against `.nocompiler.struct` where the file has one,
-    /// otherwise against the recovered tree. A recorded entry whose frame,
-    /// callees or size disagree with the code is a violation.
+    /// otherwise against the recovered tree and an inferred frame partition.
+    /// A recorded entry whose level, frame, callees or size disagree with the
+    /// code is a violation (M1).
     pub fn check(&self) -> Vec<Report> {
         let entries = self.entries();
         self.funcs
             .iter()
             .map(|f| {
                 let recorded = self.recorded.as_ref().map(|r| r.iter().find(|m| m.entry == f.entry));
-                let result = match recorded {
-                    Some(None) => Err(vec![Violation {
-                        addr: f.entry,
-                        rule: "M1 metadata",
-                        detail: format!("{} has no entry in {}", f.name, meta::SECTION),
-                    }]),
-                    Some(Some(m)) => profile::check(f, &m.nodes, &entries).and_then(|got| {
-                        if got.frame == m.frame
-                            && got.callees == m.callees
-                            && got.size == m.size
-                            && got.level == m.level
-                        {
-                            Ok(got)
-                        } else {
-                            Err(vec![Violation {
+                let fail = |level, violations| Report {
+                    name: f.name.clone(),
+                    entry: f.entry,
+                    level,
+                    result: Err(violations),
+                    missed: vec![],
+                };
+                let (nodes, part) = match recorded {
+                    Some(None) => {
+                        return fail(
+                            None,
+                            vec![Violation {
                                 addr: f.entry,
                                 rule: "M1 metadata",
-                                detail: format!(
-                                    "recorded frame {} callees {:x?} size {} level {:?}, the code has {} {:x?} {} {:?}",
-                                    m.frame, m.callees, m.size, m.level, got.frame, got.callees, got.size, got.level
-                                ),
-                            }])
+                                detail: format!("{} has no entry in {}", f.name, meta::SECTION),
+                            }],
+                        )
+                    }
+                    Some(Some(m)) => {
+                        let part = self.declared.contains(&f.name).then(|| frame::Partition {
+                            slots: m.slots.clone(),
+                            ranges: m.ranges.clone(),
+                        });
+                        (m.nodes.clone(), part)
+                    }
+                    None => match profile::recover(f, &entries) {
+                        Ok(nodes) => (nodes, None),
+                        Err(e) => {
+                            let level = (e.rule != "R1 decode").then_some(profile::Level::L0);
+                            return fail(level, vec![e]);
                         }
-                    }),
-                    None => profile::recover(f, &entries)
-                        .map_err(|e| vec![e])
-                        .and_then(|nodes| profile::check(f, &nodes, &entries)),
+                    },
                 };
-                Report { name: f.name.clone(), entry: f.entry, result }
+                match profile::check_with(f, &nodes, part.as_ref(), self.dwarf.get(&f.entry), &entries) {
+                    Err(e) => fail(e.level, e.violations),
+                    Ok(c) => {
+                        let got = c.meta;
+                        if let Some(Some(m)) = recorded {
+                            if got.frame != m.frame
+                                || got.callees != m.callees
+                                || got.size != m.size
+                                || (self.declared.contains(&f.name) && got.level != m.level)
+                            {
+                                return fail(
+                                    Some(profile::Level::L0),
+                                    vec![Violation {
+                                        addr: f.entry,
+                                        rule: "M1 metadata",
+                                        detail: format!(
+                                            "recorded frame {} callees {:x?} size {} level {:?}, the code has {} {:x?} {} {:?}",
+                                            m.frame, m.callees, m.size, m.level, got.frame, got.callees, got.size, got.level
+                                        ),
+                                    }],
+                                );
+                            }
+                        }
+                        Report {
+                            name: f.name.clone(),
+                            entry: f.entry,
+                            level: Some(got.level),
+                            result: Ok(got),
+                            missed: c.missed,
+                        }
+                    }
+                }
             })
             .collect()
     }

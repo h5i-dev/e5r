@@ -470,6 +470,22 @@ impl Instr {
         (rd != ZERO).then_some(rd)
     }
 
+    /// The registers this instruction reads (x0 included when named).
+    pub fn srcs(&self) -> Vec<Reg> {
+        match *self {
+            Instr::Lui(..) | Instr::Auipc(..) | Instr::Jal(..) | Instr::Ecall => vec![],
+            Instr::Jalr(_, rs1, _)
+            | Instr::Load(_, _, rs1, _)
+            | Instr::IOp(_, _, rs1, _)
+            | Instr::Addiw(_, rs1, _)
+            | Instr::Shift(_, _, rs1, _)
+            | Instr::ShiftW(_, _, rs1, _)
+            | Instr::UOp(_, _, rs1) => vec![rs1],
+            Instr::Branch(_, a, b, _) | Instr::Store(_, a, b, _) => vec![a, b],
+            Instr::ROp(_, _, a, b) | Instr::RWOp(_, _, a, b) => vec![a, b],
+        }
+    }
+
     /// The term `lean/NoCompiler/Isa.lean` writes for this instruction.
     pub fn lean(&self) -> String {
         match *self {

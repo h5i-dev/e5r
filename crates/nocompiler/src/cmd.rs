@@ -47,41 +47,61 @@ pub fn json_str(s: &str) -> String {
     o
 }
 
-/// `nocompiler check FILE [--json]`: check every function against the profile.
+fn slot_json(s: &crate::profile::Slot) -> String {
+    match s.kind {
+        crate::profile::SlotKind::Save(r) => format!("{{\"off\":{},\"save\":\"{r}\"}}", s.off),
+        crate::profile::SlotKind::Spill => format!("{{\"off\":{},\"spill\":true}}", s.off),
+    }
+}
+
+/// `nocompiler check FILE [--json]`: check every function against the profile:
+/// its level (L0, L1, L2) and, below L2, why.
 pub fn check(file: &Path, json: bool, out: &mut String) -> Result<u8, String> {
     let bytes = read(file)?;
     let bin = crate::load(&bytes)?;
     let reports = bin.check();
     let bad = reports.iter().filter(|r| r.result.is_err()).count();
+    let viol = |vs: &[crate::profile::Violation]| {
+        vs.iter()
+            .map(|v| {
+                format!(
+                    "{{\"addr\":{},\"rule\":{},\"detail\":{}}}",
+                    v.addr,
+                    json_str(v.rule),
+                    json_str(&v.detail)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",")
+    };
     if json {
         let fs: Vec<String> = reports
             .iter()
             .map(|r| {
+                let level = match r.level {
+                    Some(l) => format!("\"{l:?}\""),
+                    None => "null".into(),
+                };
                 let body = match &r.result {
                     Ok(m) => format!(
-                        "\"conforms\":true,\"frame\":{},\"callees\":[{}]",
+                        "\"conforms\":true,\"frame\":{},\"callees\":[{}],\"slots\":[{}],\"ranges\":[{}],\"missed\":[{}]",
                         m.frame,
-                        m.callees
+                        m.callees.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(","),
+                        m.slots.iter().map(slot_json).collect::<Vec<_>>().join(","),
+                        m.ranges
                             .iter()
-                            .map(|c| c.to_string())
-                            .collect::<Vec<_>>()
-                            .join(",")
-                    ),
-                    Err(vs) => format!(
-                        "\"conforms\":false,\"violations\":[{}]",
-                        vs.iter()
-                            .map(|v| format!(
-                                "{{\"addr\":{},\"rule\":{},\"detail\":{}}}",
-                                v.addr,
-                                json_str(v.rule),
-                                json_str(&v.detail)
+                            .map(|g| format!(
+                                "{{\"off\":{},\"len\":{},\"source\":\"{:?}\"}}",
+                                g.off, g.len, g.source
                             ))
                             .collect::<Vec<_>>()
-                            .join(",")
+                            .join(","),
+                        viol(&r.missed)
                     ),
+                    Err(vs) => format!("\"conforms\":false,\"violations\":[{}]", viol(vs)),
                 };
                 format!(
-                    "{{\"name\":{},\"entry\":{},{body}}}",
+                    "{{\"name\":{},\"entry\":{},\"level\":{level},{body}}}",
                     json_str(&r.name),
                     r.entry
                 )
@@ -96,26 +116,47 @@ pub fn check(file: &Path, json: bool, out: &mut String) -> Result<u8, String> {
         );
     } else {
         for r in &reports {
+            let level = r.level.map_or("--".to_string(), |l| format!("{l:?}"));
             match &r.result {
-                Ok(m) => say!(
-                    out,
-                    "ok   {} {:#x} frame {} callees {}",
-                    r.name,
-                    r.entry,
-                    m.frame,
-                    m.callees.len()
-                ),
+                Ok(m) => {
+                    say!(
+                        out,
+                        "{level}   {} {:#x} frame {} callees {} slots {} ranges {}",
+                        r.name,
+                        r.entry,
+                        m.frame,
+                        m.callees.len(),
+                        m.slots.len(),
+                        m.ranges.len()
+                    );
+                    for g in &m.ranges {
+                        say!(
+                            out,
+                            "     range [{}, {}) length from {:?}",
+                            g.off,
+                            g.off + g.len,
+                            g.source
+                        );
+                    }
+                    for v in &r.missed {
+                        say!(out, "     not L2: {v}");
+                    }
+                }
                 Err(vs) => {
-                    say!(out, "FAIL {} {:#x}", r.name, r.entry);
+                    say!(out, "{level}   FAIL {} {:#x}", r.name, r.entry);
                     for v in vs {
                         say!(out, "     {v}");
                     }
                 }
             }
         }
+        let l2 = reports
+            .iter()
+            .filter(|r| r.level == Some(crate::profile::Level::L2))
+            .count();
         say!(
             out,
-            "{} of {} functions conform ({})",
+            "{} of {} functions conform, {l2} at L2 ({})",
             reports.len() - bad,
             reports.len(),
             if bin.recorded.is_some() {

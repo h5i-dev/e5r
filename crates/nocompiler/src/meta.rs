@@ -48,6 +48,8 @@ pub enum Callee {
 pub struct Record {
     pub meta: FuncMeta,
     pub callees: Vec<Callee>,
+    /// The table's version; version 1 records no frame partition.
+    pub version: u16,
 }
 
 fn shift(nodes: &[Node], by: i128) -> Result<Vec<Node>, String> {
@@ -387,6 +389,7 @@ fn func_v2(r: &mut Reader) -> Result<Record, String> {
             ext,
         },
         callees,
+        version: 2,
     })
 }
 
@@ -437,6 +440,7 @@ fn func_v1(r: &mut Reader) -> Result<Record, String> {
             ext: vec![],
         },
         callees,
+        version: 1,
     })
 }
 

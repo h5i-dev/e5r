@@ -6,6 +6,7 @@
 //! `.nocompiler.struct` section a compiler wrote). The checker is what decides
 //! conformance; `recover` is only a way to produce something for it to check.
 
+use crate::frame;
 use crate::isa::{self, Instr};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -110,6 +111,10 @@ impl Func {
     }
     pub fn contains(&self, a: u64) -> bool {
         a >= self.entry && a < self.end() && (a - self.entry) % 4 == 0
+    }
+    /// The decoded instruction at `a` (an address of the function).
+    pub fn instr(&self, a: u64) -> Option<Instr> {
+        self.at(a)
     }
     fn at(&self, a: u64) -> Option<Instr> {
         isa::decode(self.words[((a - self.entry) / 4) as usize])
@@ -387,22 +392,70 @@ fn check_tree(f: &Func, nodes: &[Node], lo: u64, hi: u64, out: &mut Vec<Violatio
     }
 }
 
-/// Check one function against a tree. Returns the metadata to record, or
-/// every violation found.
+/// The outcome of checking one function that reaches L1: its metadata (the
+/// level it reached, the frame partition used) and, below L2, why it missed
+/// L2.
+#[derive(Clone, Debug)]
+pub struct Checked {
+    pub meta: FuncMeta,
+    pub missed: Vec<Violation>,
+}
+
+/// Why a function is below L1: `level` is L0 when it decodes (R1) but breaks
+/// R2 or R3, `None` when it does not decode.
+#[derive(Clone, Debug)]
+pub struct Failed {
+    pub level: Option<Level>,
+    pub violations: Vec<Violation>,
+}
+
+/// Check one function against a tree, inferring the frame partition (no
+/// debug information). See `check_with`.
 pub fn check(
     f: &Func,
     nodes: &[Node],
     entries: &BTreeSet<u64>,
 ) -> Result<FuncMeta, Vec<Violation>> {
-    let mut out = Vec::new();
-    check_tree(f, nodes, f.entry, f.end(), &mut out);
+    check_with(f, nodes, None, None, entries)
+        .map(|c| c.meta)
+        .map_err(|e| e.violations)
+}
+
+fn sorted(mut out: Vec<Violation>) -> Vec<Violation> {
+    out.sort_by(|a, b| {
+        a.addr
+            .cmp(&b.addr)
+            .then(a.rule.cmp(b.rule))
+            .then(a.detail.cmp(&b.detail))
+    });
+    out.dedup();
+    out
+}
+
+/// Check one function against a tree and a frame partition (`None`: infer
+/// one, with range lengths from `dwarf` where it has them). Reaching L1 is
+/// `Ok`, with the level and, below L2, the rules L2 needs that failed.
+pub fn check_with(
+    f: &Func,
+    nodes: &[Node],
+    part: Option<&frame::Partition>,
+    dwarf: Option<&BTreeMap<u64, u64>>,
+    entries: &BTreeSet<u64>,
+) -> Result<Checked, Failed> {
+    // L1: R1 to R3.
+    let mut l1 = Vec::new();
+    check_tree(f, nodes, f.entry, f.end(), &mut l1);
     let mut flows = BTreeMap::new();
+    let mut decodes = true;
     for pc in f.addrs() {
         match flow(f, pc, entries) {
             Ok(fl) => {
                 flows.insert(pc, fl);
             }
-            Err(e) => out.push(e),
+            Err(e) => {
+                decodes &= e.rule != "R1 decode";
+                l1.push(e)
+            }
         }
     }
     // The jalr of an auipc/jalr pair takes its target from the register the
@@ -416,10 +469,11 @@ pub fn check(
         .map(|(&pc, _)| pc)
         .collect();
     let mut callees = BTreeSet::new();
+    let mut l2 = Vec::new();
     for (&pc, &fl) in &flows {
         if let Flow::Branch(t) | Flow::Jump(t) = fl {
             if pair_jalrs.contains(&t) {
-                out.push(v(
+                l1.push(v(
                     pc,
                     "R2 control",
                     format!("branch to {t:#x}, the jalr of an auipc/jalr pair"),
@@ -436,8 +490,11 @@ pub fn check(
                     Kind::Loop => n.start == t,
                 });
                 if !ok {
-                    out.push(v(pc, "R3 structure", format!(
-                        "target {t:#x} is neither the end of an enclosing block nor the head of an enclosing loop")));
+                    l1.push(v(
+                        pc,
+                        "R3 structure",
+                        format!("target {t:#x} is neither the end of an enclosing block nor the head of an enclosing loop"),
+                    ));
                 }
             }
             Flow::Call(t) | Flow::Tail(t) => {
@@ -447,35 +504,27 @@ pub fn check(
         }
         if let Some(rd) = i.dest() {
             if rd == isa::GP || rd == isa::TP {
-                out.push(v(pc, "R4 registers", format!("writes {rd}")));
+                l2.push(v(pc, "R4 registers", format!("writes {rd}")));
             }
             if rd == isa::SP && !matches!(i, Instr::IOp(isa::IOp::Addi, _, isa::SP, _)) {
-                out.push(v(pc, "R5 stack", "sp written other than by addi sp, sp, k"));
-            }
-            if rd == isa::RA {
-                let ok = matches!(fl, Flow::Call(_))
-                    || matches!(i, Instr::Load(isa::LdOp::Ld, _, isa::SP, _))
-                    || (matches!(i, Instr::Auipc(..))
-                        && f.contains(pc + 4)
-                        && matches!(flows.get(&(pc + 4)), Some(Flow::Call(_))));
-                if !ok {
-                    out.push(v(
-                        pc,
-                        "R4 registers",
-                        "ra written other than by a call or a reload from the stack",
-                    ));
-                }
+                l2.push(v(pc, "R5 stack", "sp written other than by addi sp, sp, k"));
             }
         }
     }
     if let Some((&last, &fl)) = flows.iter().next_back() {
         if !matches!(fl, Flow::Ret | Flow::Jump(_) | Flow::Tail(_)) {
-            out.push(v(
+            l1.push(v(
                 last,
                 "R2 control",
                 "the last instruction falls through past the function",
             ));
         }
+    }
+    if !l1.is_empty() {
+        return Err(Failed {
+            level: decodes.then_some(Level::L0),
+            violations: sorted(l1),
+        });
     }
     // R5: sp offset from the entry sp, the same along every path.
     let mut off: BTreeMap<u64, i64> = BTreeMap::new();
@@ -487,7 +536,7 @@ pub fn check(
         let mut o = off[&pc];
         if let Some(Instr::IOp(isa::IOp::Addi, isa::SP, isa::SP, k)) = f.at(pc) {
             if k.signed() % 16 != 0 {
-                out.push(v(
+                l2.push(v(
                     pc,
                     "R5 stack",
                     format!("sp adjusted by {}, not a multiple of 16", k.signed()),
@@ -498,14 +547,14 @@ pub fn check(
         }
         match fl {
             Flow::Ret | Flow::Tail(_) if o != 0 => {
-                out.push(v(
+                l2.push(v(
                     pc,
                     "R5 stack",
                     format!("leaves with sp {o} from its entry value"),
                 ));
             }
             Flow::Call(_) if o % 16 != 0 => {
-                out.push(v(pc, "R5 stack", format!("calls with sp misaligned ({o})")));
+                l2.push(v(pc, "R5 stack", format!("calls with sp misaligned ({o})")));
             }
             _ => {}
         }
@@ -519,7 +568,7 @@ pub fn check(
                     work.push(s);
                 }
                 Some(&p) if p != o => {
-                    out.push(v(
+                    l2.push(v(
                         s,
                         "R5 stack",
                         format!("sp offset {p} on one path, {o} on another"),
@@ -529,23 +578,33 @@ pub fn check(
             }
         }
     }
-    if out.is_empty() {
-        Ok(FuncMeta {
+    let frame = (-min) as u64;
+    // R6 and R4's ra, against the partition (given or inferred). Only with
+    // R5's offsets well defined.
+    let r5_ok = !l2.iter().any(|x| x.rule == "R5 stack");
+    let part = match part {
+        Some(p) => p.clone(),
+        None if r5_ok => frame::infer(f, &flows, &off, frame, dwarf),
+        None => frame::Partition::default(),
+    };
+    if r5_ok {
+        l2.extend(frame::check(f, &flows, &off, frame, &part));
+    }
+    let l2 = sorted(l2);
+    Ok(Checked {
+        meta: FuncMeta {
             name: f.name.clone(),
             entry: f.entry,
             size: 4 * f.words.len() as u64,
-            level: Level::L1,
-            frame: (-min) as u64,
+            level: if l2.is_empty() { Level::L2 } else { Level::L1 },
+            frame,
             depth: None,
             callees: callees.into_iter().collect(),
             nodes: nodes.to_vec(),
-            slots: vec![],
-            ranges: vec![],
+            slots: part.slots,
+            ranges: part.ranges,
             ext: vec![],
-        })
-    } else {
-        out.sort_by_key(|x| x.addr);
-        out.dedup();
-        Err(out)
-    }
+        },
+        missed: l2,
+    })
 }

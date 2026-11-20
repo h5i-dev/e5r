@@ -81,14 +81,15 @@ fn func(name: &str, code: &str) -> String {
 fn rules(bytes: &[u8]) -> Vec<&'static str> {
     let bin = nocompiler::load(bytes).unwrap();
     let r = bin.check().into_iter().find(|r| r.name == "f").expect("f");
-    match r.result {
-        Ok(_) => vec![],
-        Err(vs) => {
-            let mut v: Vec<&'static str> = vs.iter().map(|v| v.rule).collect();
-            v.dedup();
-            v
-        }
-    }
+    // What stops it at L1 or below, else why it is not at L2.
+    let vs = match r.result {
+        Ok(_) => r.missed,
+        Err(vs) => vs,
+    };
+    let mut v: Vec<&'static str> = vs.iter().map(|v| v.rule).collect();
+    v.sort();
+    v.dedup();
+    v
 }
 
 const CASES: &[(&str, &str, &[&str])] = &[
@@ -136,7 +137,36 @@ const CASES: &[(&str, &str, &[&str])] = &[
         &["R3 structure"],
     ),
     ("writes-gp", "  li gp, 0\n  ret", &["R4 registers"]),
-    ("writes-ra", "  li ra, 0\n  ret", &["R4 registers"]),
+    // Writing ra also loses its entry value at the return (6e).
+    (
+        "writes-ra",
+        "  li ra, 0\n  ret",
+        &["R4 registers", "R6e save"],
+    ),
+    // R6 (v1): the frame rule.
+    ("sp-in-arithmetic", "  add a0, sp, a1\n  ret", &["R6a sp"]),
+    ("sp-stored", "  sd sp, 0(a0)\n  ret", &["R6a sp"]),
+    (
+        "stack-argument",
+        "  ld a0, 0(sp)\n  ret",
+        &["R6c sp access"],
+    ),
+    (
+        "slot-half-read",
+        "  addi sp, sp, -16\n  sd s0, 8(sp)\n  li s0, 1\n  lw a0, 8(sp)\n  ld s0, 8(sp)\n  addi sp, sp, 16\n  ret",
+        &["R6c sp access"],
+    ),
+    (
+        "no-restore",
+        "  addi sp, sp, -16\n  sd s0, 8(sp)\n  li s0, 1\n  addi sp, sp, 16\n  ret",
+        &["R6e save"],
+    ),
+    ("no-save", "  li s1, 1\n  ret", &["R6e save"]),
+    (
+        "saved-and-restored",
+        "  addi sp, sp, -16\n  sd s0, 8(sp)\n  li s0, 1\n  ld s0, 8(sp)\n  addi sp, sp, 16\n  ret",
+        &[],
+    ),
     ("sp-by-add", "  add sp, sp, a0\n  ret", &["R5 stack"]),
     (
         "sp-misaligned",
@@ -274,7 +304,7 @@ fn cli_check_annotate_export() {
     assert!(out.status.success());
     let s = String::from_utf8(out.stdout).unwrap();
     assert!(
-        s.contains("\"name\":\"sum\",\"entry\":70032,\"conforms\":true"),
+        s.contains("\"name\":\"sum\",\"entry\":70032,\"level\":\"L2\",\"conforms\":true"),
         "{s}"
     );
 

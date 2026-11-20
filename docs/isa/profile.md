@@ -105,14 +105,35 @@ decides it; each rule has an identifier in its output.
   jump from outside a loop into its middle has no such tree and fails R3.
 - **R4 registers.** `gp` and `tp` are never written. `ra` is written only by
   a call (including the `auipc ra` half of one) or reloaded with
-  `ld ra, k(sp)`.
+  `ld ra, k(sp)` from its save slot (rule 6e).
 - **R5 stack.** `sp` is written only by `addi sp, sp, k` with `k` a multiple
   of 16. Along every path the offset of `sp` from its value at entry is the
   same at each instruction, is a multiple of 16 at every call, and is 0 at
   every return and tail call. The largest depth is the function's frame.
+- **R6 frame** (v1, [v1.md](v1.md)). The frame (the `frame` bytes below the
+  entry `sp`) is partitioned into 8-byte *slots* (saving a register's entry
+  value, or a spill) and *address-taken ranges*.
+  6a: `sp` is an operand only of `addi sp, sp, k`, as a load/store base, and
+  of `addi rd, sp, k`; its value is never stored or computed with.
+  6b: slots are 8 bytes, 8-aligned, inside the frame, and nothing overlaps.
+  6c: a slot is touched only by `ld`/`sd` at its offset; a range by any access
+  inside it; nothing outside the frame `sp`-based.
+  6d: `addi rd, sp, k` points into a range or at its end.
+  6e: every callee-saved register the function writes, and `ra` if it calls,
+  has one save slot, which only ever receives that register's entry value;
+  at every return and tail call `ra` and `s0` to `s11` hold their entry
+  values (a dataflow over the tree).
 - **M1 metadata.** If the binary has an `.nocompiler.struct` section, each
   function's tree, level, frame size and callees there are the ones the code
   has ([metadata.md](metadata.md); version 2 since v1).
+
+**Levels.** Each function gets the highest level it reaches: L0 when it
+decodes (R1), L1 with R2 and R3, L2 with R4 to R6 as well; `nocompiler check`
+names the rules that kept it lower. Without metadata the frame partition is
+inferred: save slots from what the code stores, ranges from `addi rd, sp, k`
+with lengths from the DWARF debug information when the binary has it (`-g`),
+otherwise up to the next taken address, save slot or the frame's end; `check`
+says which.
 
 `nocompiler check` without `.nocompiler.struct` recovers the tree from the control-flow
 graph and checks against that; with the section, it checks against what the
