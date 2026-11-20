@@ -74,4 +74,8 @@ theorem sum_link2 : VerifiedImg (Two.module.link Two.layout) (Two.module.dom Two
     (Two.layout.addr "sum") Examples.Sum.spec :=
   same_module ▸ sum_relocatable.img (by decide +kernel)
 
+/-- T6: linked with anything else, `sum` keeps its theorem. -/
+theorem sum_in_any_program (M' : Module) : Verified (One.module ++ M') "sum" Examples.Sum.spec :=
+  sum_relocatable.mono
+
 end Examples.Link

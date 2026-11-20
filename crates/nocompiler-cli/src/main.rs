@@ -178,6 +178,14 @@ pub enum Command {
         #[arg(short = 'o', value_name = "OUT.lean")]
         out: Option<PathBuf>,
     },
+    /// The ledger entries of a linked RISC-V binary's functions (docs/isa/ledger.md).
+    Ledger {
+        /// The linked RISC-V ELF.
+        file: PathBuf,
+        /// `function<TAB>theorem<TAB>spec` lines: the functions with a proof.
+        #[arg(long, value_name = "TSV")]
+        proofs: Option<PathBuf>,
+    },
     /// Disassemble a function, a range, or everything.
     ///
     /// A RISC-V binary is listed with its block/loop structure (the profile's
@@ -681,7 +689,8 @@ impl Command {
             | Command::Annotate { .. }
             | Command::Cc { .. }
             | Command::Export { .. }
-            | Command::Module { .. } => None,
+            | Command::Module { .. }
+            | Command::Ledger { .. } => None,
             Command::Project { .. } | Command::Ui { .. } => Some((out::When::Auto, false)),
             _ => {
                 let c = self.common();
@@ -713,7 +722,8 @@ impl Command {
             | Command::Annotate { .. }
             | Command::Cc { .. }
             | Command::Export { .. }
-            | Command::Module { .. } => {
+            | Command::Module { .. }
+            | Command::Ledger { .. } => {
                 unreachable!("handled before a file is opened")
             }
             Command::Vtables { common, .. }
@@ -772,6 +782,7 @@ fn core(cli: &Cli, w: &mut out::Out) -> Option<Result<u8, String>> {
             namespace,
             out,
         } => cmd::module(file, namespace, out.as_deref(), &mut text),
+        Command::Ledger { file, proofs } => cmd::ledger(file, proofs.as_deref(), &mut text),
         Command::Disasm { common, .. } if common.json && is_risc_v(&common.file) => {
             Err("disasm: --json is not available for a RISC-V binary".into())
         }

@@ -67,6 +67,8 @@ example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] =
 #assert_standard_axioms NoCompiler.VerifiedImg.shift
 #assert_standard_axioms NoCompiler.Verified.of_leaf
 #assert_standard_axioms NoCompiler.Module.fetch_link
+#assert_standard_axioms NoCompiler.Verified.mono
+#assert_standard_axioms Examples.Link.sum_in_any_program
 #assert_standard_axioms Examples.Link.same_module
 #assert_standard_axioms Examples.Link.sum_relocatable
 #assert_standard_axioms Examples.Link.sum_link1

@@ -38,4 +38,7 @@ for k in 1 2; do
     echo "sum.link$k.elf: the build differs from examples/elf/"; status=1
   fi
 done
+if [ "${1:-}" = --update ]; then
+  "$NOCOMPILER" ledger examples/elf/sum.link1.elf --proofs examples/link/proofs.tsv > examples/link/ledger.jsonl
+fi
 exit $status

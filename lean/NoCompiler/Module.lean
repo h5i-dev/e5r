@@ -151,12 +151,13 @@ def reach (M : Module) : Nat → Sym → List Sym
 
 /-- The code region of `f` and of everything it calls. -/
 def dom (M : Module) (L : Layout) (f : Sym) : Dom :=
-  ((M.reach M.funcs.length f).filterMap M.func?).map (·.region L) |>.eraseDups
+  ((M.reach M.funcs.length f).filterMap M.func?).map (·.region L)
 
 /-- The layout is one the module can be linked at: the code image is aligned
     and fits the address space, every function is 4-byte aligned, inside the
-    image and disjoint from every other, names are unique, every relocation's
-    target is a symbol of the module and in reach. -/
+    image and disjoint from every other, names are unique, every relocation is
+    in reach and inside its function. (A relocation may name a symbol of
+    another module: `Verified.mono` adds modules.) -/
 structure Ok (M : Module) (L : Layout) : Prop where
   base : aligned L.base 4
   size : 4 * L.size < 2 ^ 64
@@ -165,8 +166,7 @@ structure Ok (M : Module) (L : Layout) : Prop where
     (L.addr f.name - L.base).toNat + 4 * f.words.length ≤ 4 * L.size
   disjoint : ∀ f ∈ M.funcs, ∀ g ∈ M.funcs, f.name ≠ g.name →
     4 * f.words.length ≤ (L.addr g.name - L.addr f.name).toNat
-  relocs : ∀ f ∈ M.funcs, ∀ r ∈ f.relocs,
-    (r.sym ∈ M.funcs.map (·.name) ∨ r.sym ∈ M.data.map (·.name)) ∧ r.InRange L f.name ∧
+  relocs : ∀ f ∈ M.funcs, ∀ r ∈ f.relocs, r.InRange L f.name ∧
     r.off % 4 = 0 ∧ r.off + (if r.kind = .call then 8 else 4) ≤ 4 * f.words.length
 
 instance (M : Module) (L : Layout) : Decidable (M.Ok L) :=
@@ -175,8 +175,7 @@ instance (M : Module) (L : Layout) : Decidable (M.Ok L) :=
         (L.addr f.name - L.base).toNat + 4 * f.words.length ≤ 4 * L.size) ∧
       (∀ f ∈ M.funcs, ∀ g ∈ M.funcs, f.name ≠ g.name →
         4 * f.words.length ≤ (L.addr g.name - L.addr f.name).toNat) ∧
-      (∀ f ∈ M.funcs, ∀ r ∈ f.relocs,
-        (r.sym ∈ M.funcs.map (·.name) ∨ r.sym ∈ M.data.map (·.name)) ∧ r.InRange L f.name ∧
+      (∀ f ∈ M.funcs, ∀ r ∈ f.relocs, r.InRange L f.name ∧
         r.off % 4 = 0 ∧ r.off + (if r.kind = .call then 8 else 4) ≤ 4 * f.words.length))
     ⟨fun ⟨a, b, c, d, e, f⟩ => ⟨a, b, c, d, e, f⟩, fun ⟨a, b, c, d, e, f⟩ => ⟨a, b, c, d, e, f⟩⟩
 

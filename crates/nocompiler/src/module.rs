@@ -346,3 +346,104 @@ pub fn lean(m: &Module, namespace: &str, source: &str, sha: &str) -> String {
     let _ = writeln!(o, "end {namespace}");
     o
 }
+
+/// The canonical bytes of a relocatable function, which its ledger hash is
+/// of: its words (relocated fields zero) and its relocations, in order. Not
+/// its name or address, so the same code has the same hash wherever, and
+/// under whatever name, it is linked. Relocation targets are by symbol.
+pub fn canonical(f: &RFunc) -> Vec<u8> {
+    let mut o = String::from("nocompiler-rfunc 1\n");
+    for w in &f.words {
+        let _ = writeln!(o, "{w:08x}");
+    }
+    for r in &f.relocs {
+        let k = match r.kind {
+            Kind::Call => "call",
+            Kind::PcrelHi => "pcrel_hi",
+            Kind::PcrelLoI => "pcrel_lo_i",
+            Kind::PcrelLoS => "pcrel_lo_s",
+        };
+        let _ = writeln!(o, "reloc {} {k} {} {} {}", r.off, r.sym, r.addend, r.hi_off);
+    }
+    o.into_bytes()
+}
+
+/// One ledger entry (docs/isa/ledger.md).
+pub struct Entry {
+    pub name: String,
+    pub sha256: String,
+    pub level: String,
+    pub depth: Option<u64>,
+    /// The Lean theorem and specification, when the function has a proof.
+    pub theorem: Option<String>,
+    pub spec: Option<String>,
+}
+
+/// The ledger of a binary's module: one entry per function, with the
+/// theorems given (`name -> (theorem, spec)`).
+pub fn ledger(
+    bin: &Binary,
+    m: &Module,
+    proofs: &std::collections::BTreeMap<String, (String, String)>,
+) -> Vec<Entry> {
+    let metas: Vec<_> = bin.check().into_iter().collect();
+    // T4's depth: the frame plus the deepest callee's (the checker's, when it
+    // records one; else computed here over the acyclic call graph).
+    fn depth(e: u64, metas: &[crate::Report], seen: &mut Vec<u64>) -> Option<u64> {
+        let m = metas.iter().find(|r| r.entry == e)?.result.as_ref().ok()?;
+        if let Some(d) = m.depth {
+            return Some(d);
+        }
+        if seen.contains(&e) {
+            return None; // recursion: no static bound
+        }
+        seen.push(e);
+        let mut deepest = 0;
+        for &c in &m.callees {
+            deepest = deepest.max(depth(c, metas, seen)?);
+        }
+        seen.pop();
+        Some(m.frame + deepest)
+    }
+    m.funcs
+        .iter()
+        .map(|f| {
+            let meta = metas
+                .iter()
+                .find(|r| r.entry == f.entry)
+                .and_then(|r| r.result.as_ref().ok());
+            let p = proofs.get(&f.name);
+            Entry {
+                name: f.name.clone(),
+                sha256: crate::sha256::hex(&crate::sha256::digest(&canonical(f))),
+                level: meta
+                    .map(|m| format!("{:?}", m.level))
+                    .unwrap_or_else(|| "none".into()),
+                depth: meta.and_then(|_| depth(f.entry, &metas, &mut Vec::new())),
+                theorem: p.map(|p| p.0.clone()),
+                spec: p.map(|p| p.1.clone()),
+            }
+        })
+        .collect()
+}
+
+pub fn ledger_json(es: &[Entry]) -> String {
+    let q = |s: &str| format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""));
+    let opt = |s: &Option<String>| s.as_deref().map(q).unwrap_or_else(|| "null".into());
+    let mut o = String::new();
+    for e in es {
+        let _ = writeln!(
+            o,
+            "{{\"name\":{},\"sha256\":{},\"level\":{},\"depth\":{},\"theorem\":{},\"spec\":{}}}",
+            q(&e.name),
+            q(&e.sha256),
+            q(&e.level),
+            e.depth
+                .map(|d| d.to_string())
+                .unwrap_or_else(|| "null".into()),
+            opt(&e.theorem),
+            opt(&e.spec)
+        );
+    }
+    o
+}

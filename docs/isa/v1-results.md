@@ -100,6 +100,11 @@ save (R6e), and a saved-and-restored register (L2).
   included: `sum2` and `_start` have relocated words) on both binaries.
 * All axioms standard (`lean/Audit.lean`).
 
+* T6 (`Verified.mono`, `lean/NoCompiler/Relocate.lean`): a theorem about a
+  module holds in any module that extends it; `Examples.Link.sum_in_any_program`
+  uses it. The ledger entry format is `docs/isa/ledger.md`
+  (`nocompiler ledger`; `examples/link/ledger.jsonl`, the same for both links).
+
 **Not done:** `sum2` and `_start` call `sum`, so their words differ between
 the layouts; a proof of them over every layout needs the call-distance
 reasoning at a symbolic layout (T1, owned by A). Functions that read data

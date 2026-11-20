@@ -60,7 +60,7 @@ theorem shift_setReg {r : Reg} (h : r ≠ 1) (v : Word) :
   by_cases h0 : r = 0
   · simp [setReg, h0]
   · apply ext'
-    · funext x; simp only [shift, setReg, h0, if_false, upd]
+    · funext x; simp only [shift, setReg, h0, ite_false, upd]
       by_cases hx : x = 1 <;> by_cases hr : x = r <;> simp_all
     all_goals simp [shift, setReg, h0]
 
@@ -199,7 +199,7 @@ theorem exec_reg_one {i : Instr} (hi : i.pcFree = true) {s s' : State} (h : exec
   cases i <;> simp only [Instr.pcFree, Bool.and_eq_true, beq_iff_eq] at hi <;>
     simp only [exec, jumpTo] at h <;> (repeat' split at h) <;> simp_all <;>
     (try (obtain ⟨⟨rfl, rfl⟩, rfl⟩ := hi)) <;> (try subst_vars) <;>
-    simp_all [State.setReg, State.setPc, State.setMem, State.reg, State.upd]
+    simp_all [State.setReg, State.setPc, State.setMem, State.reg]
 
 theorem Sys.shift {s t : State} (h : Sys s t) (δ : Word) : Sys (s.shift δ) (t.shift δ) := by
   have r : ∀ {r : Reg}, r ≠ 1 → (s.shift δ).reg r = s.reg r := fun h => State.shift_reg _ _ h
@@ -222,7 +222,7 @@ theorem Sys.shift {s t : State} (h : Sys s t) (δ : Word) : Sys (s.shift δ) (t.
     exact .exit (by rw [r (by decide)]; exact h7)
 
 theorem Sys.reg_one {s t : State} (h : Sys s t) : t.reg 1 = s.reg 1 := by
-  cases h <;> simp [State.sysRet, State.reg_setReg, show ¬ (1 : Reg) = Reg.a0 by decide]
+  cases h <;> simp [State.sysRet, show ¬ (1 : Reg) = Reg.a0 by decide]
 
 theorem SysOk_shift {P : Perm} {s : State} (δ : Word) : SysOk P (s.shift δ) ↔ SysOk P s := by
   unfold SysOk

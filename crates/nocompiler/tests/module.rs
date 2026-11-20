@@ -49,3 +49,19 @@ fn every_committed_binary_has_a_module() {
         assert!(!m.funcs.is_empty(), "{e}");
     }
 }
+
+#[test]
+fn both_links_give_the_committed_ledger() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let want = std::fs::read_to_string(root.join("examples/link/ledger.jsonl")).unwrap();
+    for e in ["sum.link1.elf", "sum.link2.elf"] {
+        let mut out = String::new();
+        nocompiler::cmd::ledger(
+            &root.join("examples/elf").join(e),
+            Some(&root.join("examples/link/proofs.tsv")),
+            &mut out,
+        )
+        .unwrap();
+        assert_eq!(out, want, "{e}");
+    }
+}

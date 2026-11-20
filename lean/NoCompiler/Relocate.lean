@@ -104,7 +104,6 @@ theorem dom_leaf {M : Module} {L : Layout} (hL : M.Ok L) {f : RFunc} (hf : f ∈
   | succ n =>
     simp only [reach, func?_eq hL hf, hc, Option.map_some, List.flatMap_nil, Option.getD_some,
       List.filterMap_cons, List.filterMap_nil, List.map_cons, List.map_nil]
-    rfl
 
 end Module
 
@@ -185,5 +184,117 @@ theorem Verified.of_leaf {α : Type} {M : Module} {f : RFunc} (hf : f ∈ M.func
       have := hfree _ hmem
       simp only [Option.bind_some] at hi
       rw [hi] at this; simpa using this
+
+/-! ## T6: adding modules keeps every theorem -/
+
+/-- A larger region: the run returns to the same `ra`, now outside it too. -/
+theorem VerifiedImg.mono_dom {α : Type} {c : Code} {D D' : Dom} {e : Word} {sp : Spec α}
+    (hD : D.sub D') (h : VerifiedImg c D e sp) : VerifiedImg c D' e sp := by
+  intro a s he hpre
+  have he0 : Entry D e s := ⟨he.pc, he.live, fun hm => he.ret (hD _ hm), he.retAligned, he.sp⟩
+  refine Reach.bind (h a s he0 hpre) (Perm.le_refl _) hD ?_
+  rintro t ⟨_, hd⟩
+  refine .done ⟨?_, hd⟩
+  rcases hd with ⟨_, hpc, _⟩ | ⟨hx, _⟩
+  · exact .inl (by rw [hpc]; exact he.ret)
+  · exact .inr hx
+
+namespace Module
+
+theorem func?_append {M M' : Module} {g : Sym} {r : RFunc} (h : M.func? g = some r) :
+    (M ++ M').func? g = some r := by
+  unfold func? at *
+  show (M.funcs ++ M'.funcs).find? _ = _
+  rw [List.find?_append, h]; rfl
+
+theorem reach_sub {M M' : Module} : ∀ (n n' : Nat) (f g : Sym), n ≤ n' →
+    g ∈ M.reach n f → g ∈ (M ++ M').reach n' f
+  | 0, _, f, g, _, h => by
+    simp [reach] at h; subst h
+    cases ‹Nat› <;> simp [reach]
+  | n + 1, 0, _, _, h, _ => absurd h (by omega)
+  | n + 1, n' + 1, f, g, h, hg => by
+    simp only [reach, List.mem_cons] at hg ⊢
+    rcases hg with rfl | hg
+    · exact .inl rfl
+    · right
+      cases hf : M.func? f with
+      | none => simp [hf] at hg
+      | some r =>
+        rw [func?_append hf]
+        simp only [hf, Option.map_some, Option.getD_some, List.mem_flatMap] at hg ⊢
+        obtain ⟨c, hc, hg⟩ := hg
+        exact ⟨c, hc, reach_sub n n' c g (by omega) hg⟩
+
+theorem dom_sub {M M' : Module} (L : Layout) (f : Sym) : (M.dom L f).sub ((M ++ M').dom L f) := by
+  intro x hx
+  unfold Dom.mem dom at *
+  obtain ⟨r, hr, hx⟩ := List.any_eq_true.1 hx
+  refine List.any_eq_true.2 ⟨r, ?_, hx⟩
+  simp only [List.mem_map, List.mem_filterMap] at hr ⊢
+  obtain ⟨g, ⟨h, hh, hg⟩, rfl⟩ := hr
+  exact ⟨g, ⟨h, reach_sub _ _ _ _ (by show M.funcs.length ≤ (M.funcs ++ M'.funcs).length; simp) hh,
+    func?_append hg⟩, rfl⟩
+
+theorem Ok.left {M M' : Module} {L : Layout} (h : (M ++ M').Ok L) : M.Ok L where
+  base := h.base
+  size := h.size
+  names := by
+    have := h.names
+    rw [show (M ++ M').funcs = M.funcs ++ M'.funcs from rfl, List.map_append] at this
+    exact (List.nodup_append.1 this).1
+  funcs := fun f hf => h.funcs f (List.mem_append_left _ hf)
+  disjoint := fun f hf g hg => h.disjoint f (List.mem_append_left _ hf) g (List.mem_append_left _ hg)
+  relocs := fun f hf => h.relocs f (List.mem_append_left _ hf)
+
+/-- Where `M` has a function, `M ++ M'` has the same word. -/
+theorem wordAt_append {M M' : Module} {L : Layout} {y : Word} {r : RFunc} (hr : r ∈ M.funcs)
+    (hy : (y - L.addr r.name).toNat < 4 * r.words.length) : (M ++ M').wordAt L y = M.wordAt L y := by
+  unfold wordAt
+  show (match (M.funcs ++ M'.funcs).find? _ with | some f => _ | none => _) = _
+  rw [List.find?_append]
+  obtain ⟨g, hg⟩ : ∃ g, M.funcs.find? (fun f => decide ((y - L.addr f.name).toNat < 4 * f.words.length)) = some g :=
+    Option.isSome_iff_exists.1 (List.find?_isSome.2 ⟨r, hr, by simpa using hy⟩)
+  rw [hg]; rfl
+
+/-- The images agree on `M`'s code. -/
+theorem instr_append {M M' : Module} {L : Layout} {x : Word} {r : RFunc} (hr : r ∈ M.funcs)
+    (hx : (x - L.addr r.name).toNat < 4 * r.words.length) :
+    ((M ++ M').link L).instr x = (M.link L).instr x := by
+  unfold Code.instr Code.fetch link
+  dsimp only
+  split
+  · rename_i h4
+    rw [List.getElem?_toArray, List.getElem?_toArray, List.getElem?_map, List.getElem?_map]
+    cases hj : (List.range L.size)[(x - L.base).toNat / 4]? with
+    | none => rfl
+    | some j =>
+      simp only [Option.map_some]
+      have hjv : j = (x - L.base).toNat / 4 := by
+        by_cases hk : (x - L.base).toNat / 4 < L.size
+        · rw [List.getElem?_range hk] at hj; exact (Option.some.inj hj).symm
+        · rw [List.getElem?_eq_none (by simpa using hk)] at hj; cases hj
+      have hy : L.base + BitVec.ofNat 64 (4 * j) = x := by
+        rw [hjv, show 4 * ((x - L.base).toNat / 4) = (x - L.base).toNat by omega,
+          BitVec.ofNat_toNat, BitVec.setWidth_eq]; bv_omega
+      rw [hy, wordAt_append hr hx]
+  · rfl
+
+end Module
+
+/-- T6 (docs/isa/v1.md): a theorem about a module holds in any module that
+    extends it. -/
+theorem Verified.mono {α : Type} {M M' : Module} {f : Sym} {sp : Spec α} (h : Verified M f sp) :
+    Verified (M ++ M') f sp := by
+  intro L hL
+  have h0 := h L hL.left
+  refine VerifiedImg.mono_dom (Module.dom_sub L f) (VerifiedImg.congr_code ?_ h0)
+  intro x hx
+  unfold Dom.mem Module.dom at hx
+  obtain ⟨r, hr, hx⟩ := List.any_eq_true.1 hx
+  simp only [List.mem_map, List.mem_filterMap] at hr
+  obtain ⟨g, ⟨_, _, hg⟩, rfl⟩ := hr
+  have hgm : g ∈ M.funcs := List.mem_of_find?_eq_some hg
+  exact Module.instr_append hgm (of_decide_eq_true hx)
 
 end NoCompiler

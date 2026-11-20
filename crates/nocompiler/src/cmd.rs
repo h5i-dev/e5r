@@ -235,6 +235,36 @@ pub fn module(file: &Path, ns: &str, dst: Option<&Path>, out: &mut String) -> Re
     Ok(0)
 }
 
+/// `nocompiler ledger FILE [--proofs TSV]`: the ledger entries of a binary's
+/// module (docs/isa/ledger.md), one JSON object per line. TSV lines are
+/// `function<TAB>theorem<TAB>spec`.
+pub fn ledger(file: &Path, proofs: Option<&Path>, out: &mut String) -> Result<u8, String> {
+    let bytes = read(file)?;
+    let bin = crate::load(&bytes)?;
+    let m = crate::module::of_binary(&bin)?;
+    let mut p = std::collections::BTreeMap::new();
+    if let Some(t) = proofs {
+        let text = std::fs::read_to_string(t).map_err(|e| format!("{}: {e}", t.display()))?;
+        for l in text
+            .lines()
+            .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
+        {
+            let c: Vec<&str> = l.split('\t').collect();
+            let [f, th, sp] = c[..] else {
+                return Err(format!(
+                    "{}: `{l}`: want function, theorem, spec",
+                    t.display()
+                ));
+            };
+            p.insert(f.to_string(), (th.to_string(), sp.to_string()));
+        }
+    }
+    out.push_str(&crate::module::ledger_json(&crate::module::ledger(
+        &bin, &m, &p,
+    )));
+    Ok(0)
+}
+
 /// `nocompiler disasm FILE [FUNC]`: list the code with its block/loop
 /// structure; every function, or only the one named `only`.
 pub fn disasm(file: &Path, only: Option<&str>, out: &mut String) -> Result<u8, String> {
