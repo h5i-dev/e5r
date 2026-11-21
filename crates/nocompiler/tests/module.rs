@@ -195,3 +195,38 @@ fn reuse_lean_handles_a_callee_moved_before_its_caller() {
         "{text}"
     );
 }
+
+/// Recovery is per function: a function whose code cannot be made
+/// relocatable is skipped and reported, and the rest of the module stays
+/// (lead 13:42, D's R-D1). Here `sum` starts with an `auipc` nothing uses as
+/// a base, as musl's `__cos` does with an `fld` low part.
+#[test]
+fn an_unrecoverable_function_is_skipped_not_fatal() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let bytes = std::fs::read(root.join("examples/elf/sum.link1.elf")).unwrap();
+    let mut bin = nocompiler::load(&bytes).unwrap();
+    let f = bin.funcs.iter_mut().find(|f| f.name == "sum").unwrap();
+    f.words[0] = 0x0000_0797; // auipc a5, 0
+    let entry = f.entry;
+    let m = nocompiler::module::of_binary(&bin).unwrap();
+    let names: Vec<&str> = m.funcs.iter().map(|f| f.name.as_str()).collect();
+    assert_eq!(names, ["_start", "sum2"]);
+    assert_eq!(m.skipped.len(), 1);
+    assert_eq!(
+        (m.skipped[0].name.as_str(), m.skipped[0].entry),
+        ("sum", entry)
+    );
+    assert!(
+        m.skipped[0].reason.contains("has no low part"),
+        "{}",
+        m.skipped[0].reason
+    );
+    // The callers keep their calls to `sum`, and the layout still says where it is.
+    assert!(m.funcs[0].relocs.iter().any(|r| r.sym == "sum"));
+    let text = nocompiler::module::lean(&m, "T", "t", "0");
+    assert!(text.contains(&format!(
+        "if s = \"sum\" then 0x{entry:x}#64 else -- not in the module"
+    )));
+    // Unmodified, nothing is skipped.
+    assert!(module("sum.link1.elf").skipped.is_empty());
+}

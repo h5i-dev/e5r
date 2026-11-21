@@ -58,8 +58,16 @@ the other order, at sum.link1.elf's layout, all conditions decided.
 **How a module is recovered** (`module::of_binary`):
 - **Self-check.** Every recovered relocation is checked: the module,
   relinked at the binary's own addresses (`module::patched`, the Rust twin
-  of Lean's `Reloc.apply`), must give back the binary's words, or recovery
-  fails ("a misattributed relocation").
+  of Lean's `Reloc.apply`), must give back the binary's words; a function
+  whose words differ is left out ("a misattributed relocation").
+- **Per function.** A function that cannot be recovered (an `auipc` with no
+  low part, as musl's `__cos` loads a constant with `fld`; a pc-relative
+  address in no section) or fails the self-check is left out of the module
+  and listed in `Module.skipped` with its reason; `nocompiler module` and
+  `ledger` report each on standard error. The rest of the binary is
+  recovered: on jq (swe-bin jqlang__jq-2650 base.jq.elf), 1235 functions
+  kept, 102 skipped, 3.31 s. Calls to a skipped function stay relocations
+  to its symbol, and the Lean layout still gives its address.
 - **Unique names.** Local functions that share a symbol (a crate linked
   twice) get `#k`, their rank by address among the namesakes.
 - **Low parts.** The `%pcrel_lo` users of an `auipc` are the instructions its

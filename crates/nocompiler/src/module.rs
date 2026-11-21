@@ -54,9 +54,20 @@ pub struct RData {
 }
 
 #[derive(Clone, Debug)]
+pub struct Skipped {
+    pub name: String,
+    pub entry: u64,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug)]
 pub struct Module {
     pub funcs: Vec<RFunc>,
     pub data: Vec<RData>,
+    /// The functions left out, with their entry and why: their code could not
+    /// be made relocatable, or did not relink to the binary's words. Calls to
+    /// them stay relocations to their symbol.
+    pub skipped: Vec<Skipped>,
     pub text_addr: u64,
     pub text_words: usize,
 }
@@ -132,31 +143,50 @@ pub fn patched(f: &RFunc, addr: &dyn Fn(&str) -> Option<u64>) -> Option<Vec<u32>
 /// checked against the binary: every function, relinked at the binary's own
 /// addresses, gives back the binary's words.
 pub fn of_binary(bin: &Binary) -> Result<Module, String> {
-    let m = of_binary_unchecked(bin)?;
+    let mut m = of_binary_unchecked(bin)?;
+    // Symbols resolve to every function of the binary, the skipped included.
+    let entries: std::collections::HashMap<String, u64> = m
+        .funcs
+        .iter()
+        .map(|f| (f.name.clone(), f.entry))
+        .chain(m.skipped.iter().map(|f| (f.name.clone(), f.entry)))
+        .collect();
+    let data: Vec<(String, u64)> = m.data.iter().map(|d| (d.name.clone(), d.addr)).collect();
     let addr = |s: &str| -> Option<u64> {
-        m.funcs
-            .iter()
-            .find(|f| f.name == s)
-            .map(|f| f.entry)
-            .or_else(|| m.data.iter().find(|d| d.name == s).map(|d| d.addr))
+        entries
+            .get(s)
+            .copied()
+            .or_else(|| data.iter().find(|d| d.0 == s).map(|d| d.1))
     };
-    for f in &m.funcs {
+    let mut kept = Vec::new();
+    for f in std::mem::take(&mut m.funcs) {
         let b = bin.funcs.iter().find(|g| g.entry == f.entry).unwrap();
-        let w =
-            patched(f, &addr).ok_or_else(|| format!("{}: a relocation names no symbol", f.name))?;
-        if w != b.words {
-            let k = w
-                .iter()
-                .zip(&b.words)
-                .position(|(x, y)| x != y)
-                .unwrap_or(0);
-            return Err(format!(
-                "{}: relinked at its own address, the word at {:#x} differs (a misattributed relocation)",
-                f.name,
-                f.entry + 4 * k as u64
-            ));
+        let bad = match patched(&f, &addr) {
+            None => Some("a relocation names no symbol".to_string()),
+            Some(w) if w != b.words => {
+                let k = w
+                    .iter()
+                    .zip(&b.words)
+                    .position(|(x, y)| x != y)
+                    .unwrap_or(0);
+                Some(format!(
+                    "relinked at its own address, the word at {:#x} differs (a misattributed relocation)",
+                    f.entry + 4 * k as u64
+                ))
+            }
+            Some(_) => None,
+        };
+        match bad {
+            None => kept.push(f),
+            Some(reason) => m.skipped.push(Skipped {
+                name: f.name.clone(),
+                entry: f.entry,
+                reason: format!("{}: {reason}", f.name),
+            }),
         }
     }
+    m.funcs = kept;
+    m.skipped.sort_by_key(|f| f.entry);
     Ok(m)
 }
 
@@ -282,124 +312,136 @@ fn of_binary_unchecked(bin: &Binary) -> Result<Module, String> {
             .map(|g| (g.name.clone(), (t - g.addr) as i64))
     };
     let mut funcs = Vec::new();
+    let mut skipped = Vec::new();
     let mut ordered: Vec<_> = bin.funcs.iter().collect();
     ordered.sort_by(|a, b| names[&a.entry].cmp(&names[&b.entry])); // by name: the same module at every layout
     for f in ordered {
-        let mut words = f.words.clone();
-        let mut relocs = Vec::new();
-        let n = words.len();
-        // The call pairs: auipc rd / jalr _, lo(rd).
-        let calls: std::collections::BTreeSet<usize> = (0..n.saturating_sub(1))
-            .filter(|&k| {
-                matches!((isa::decode(f.words[k]), isa::decode(f.words[k + 1])),
+        let r = (|| -> Result<RFunc, String> {
+            let mut words = f.words.clone();
+            let mut relocs = Vec::new();
+            let n = words.len();
+            // The call pairs: auipc rd / jalr _, lo(rd).
+            let calls: std::collections::BTreeSet<usize> = (0..n.saturating_sub(1))
+                .filter(|&k| {
+                    matches!((isa::decode(f.words[k]), isa::decode(f.words[k + 1])),
                     (Some(Instr::Auipc(rd, _)), Some(Instr::Jalr(_, rs1, _))) if rs1 == rd)
-            })
-            .collect();
-        let reach = reaching_auipcs(&f.words, &calls);
-        let mut k = 0;
-        while k < n {
-            let pc = f.entry + 4 * k as u64;
-            let Some(Instr::Auipc(rd, hi)) = isa::decode(f.words[k]) else {
-                k += 1;
-                continue;
-            };
-            let hi_v = sext(hi.value << 12, 32);
-            // A call: auipc ra / jalr ra, or auipc t1 / jalr zero.
-            if let Some(Instr::Jalr(_, rs1, lo)) = f.words.get(k + 1).and_then(|w| isa::decode(*w))
-            {
-                if rs1 == rd {
-                    let t = pc.wrapping_add((hi_v + lo.signed()) as u64);
-                    let Some(g) = bin.funcs.iter().find(|g| g.entry == t) else {
-                        return Err(format!(
-                            "{}: the call at {pc:#x} goes to {t:#x}, no function entry",
-                            f.name
-                        ));
-                    };
-                    relocs.push(Reloc {
-                        off: 4 * k as u64,
-                        kind: Kind::Call,
-                        sym: names[&g.entry].clone(),
-                        addend: 0,
-                        hi_off: 4 * k as u64,
-                    });
-                    words[k] &= !U_FIELD;
-                    words[k + 1] &= !I_FIELD;
-                    k += 2;
-                    continue;
-                }
-            }
-            // A data address: the instructions the auipc's value reaches, by
-            // dataflow (reaching_auipcs), each a %pcrel_lo user. A read reached
-            // by several definitions is left as it is: its word stays in the
-            // key, a missed reuse but not a wrong one.
-            let mut users = Vec::new();
-            for j in 0..n {
-                if reach[j][rd.0 as usize] != k as u32 + 1 {
-                    continue;
-                }
-                let Some(i) = isa::decode(f.words[j]) else {
+                })
+                .collect();
+            let reach = reaching_auipcs(&f.words, &calls);
+            let mut k = 0;
+            while k < n {
+                let pc = f.entry + 4 * k as u64;
+                let Some(Instr::Auipc(rd, hi)) = isa::decode(f.words[k]) else {
+                    k += 1;
                     continue;
                 };
-                if !reads_or_writes(&i, rd).0 {
-                    continue;
+                let hi_v = sext(hi.value << 12, 32);
+                // A call: auipc ra / jalr ra, or auipc t1 / jalr zero.
+                if let Some(Instr::Jalr(_, rs1, lo)) =
+                    f.words.get(k + 1).and_then(|w| isa::decode(*w))
+                {
+                    if rs1 == rd {
+                        let t = pc.wrapping_add((hi_v + lo.signed()) as u64);
+                        let Some(g) = bin.funcs.iter().find(|g| g.entry == t) else {
+                            return Err(format!(
+                                "{}: the call at {pc:#x} goes to {t:#x}, no function entry",
+                                f.name
+                            ));
+                        };
+                        relocs.push(Reloc {
+                            off: 4 * k as u64,
+                            kind: Kind::Call,
+                            sym: names[&g.entry].clone(),
+                            addend: 0,
+                            hi_off: 4 * k as u64,
+                        });
+                        words[k] &= !U_FIELD;
+                        words[k + 1] &= !I_FIELD;
+                        k += 2;
+                        continue;
+                    }
                 }
-                if let Some((lo, s_type)) = lo_user(&i, rd) {
-                    users.push((j, lo, s_type));
-                } else {
+                // A data address: the instructions the auipc's value reaches, by
+                // dataflow (reaching_auipcs), each a %pcrel_lo user. A read reached
+                // by several definitions is left as it is: its word stays in the
+                // key, a missed reuse but not a wrong one.
+                let mut users = Vec::new();
+                for j in 0..n {
+                    if reach[j][rd.0 as usize] != k as u32 + 1 {
+                        continue;
+                    }
+                    let Some(i) = isa::decode(f.words[j]) else {
+                        continue;
+                    };
+                    if !reads_or_writes(&i, rd).0 {
+                        continue;
+                    }
+                    if let Some((lo, s_type)) = lo_user(&i, rd) {
+                        users.push((j, lo, s_type));
+                    } else {
+                        return Err(format!(
+                            "{}: the auipc at {pc:#x} is used at {:#x} other than as a base",
+                            f.name,
+                            f.entry + 4 * j as u64
+                        ));
+                    }
+                }
+                if users.is_empty() {
+                    return Err(format!("{}: the auipc at {pc:#x} has no low part", f.name));
+                }
+                // Every %pcrel_lo user encodes the low part of the same target.
+                if users.iter().any(|u| u.1 != users[0].1) {
                     return Err(format!(
-                        "{}: the auipc at {pc:#x} is used at {:#x} other than as a base",
-                        f.name,
-                        f.entry + 4 * j as u64
+                        "{}: the users of the auipc at {pc:#x} disagree on its low part",
+                        f.name
                     ));
                 }
-            }
-            if users.is_empty() {
-                return Err(format!("{}: the auipc at {pc:#x} has no low part", f.name));
-            }
-            // Every %pcrel_lo user encodes the low part of the same target.
-            if users.iter().any(|u| u.1 != users[0].1) {
-                return Err(format!(
-                    "{}: the users of the auipc at {pc:#x} disagree on its low part",
-                    f.name
-                ));
-            }
-            let target = pc.wrapping_add((hi_v + users[0].1) as u64);
-            let Some((sym, add0)) = sym_at(target) else {
-                return Err(format!(
-                    "{}: the address formed at {pc:#x} ({target:#x}) is in no section",
-                    f.name
-                ));
-            };
-            relocs.push(Reloc {
-                off: 4 * k as u64,
-                kind: Kind::PcrelHi,
-                sym: sym.clone(),
-                addend: add0,
-                hi_off: 4 * k as u64,
-            });
-            words[k] &= !U_FIELD;
-            for &(j, _, s_type) in &users {
+                let target = pc.wrapping_add((hi_v + users[0].1) as u64);
+                let Some((sym, add0)) = sym_at(target) else {
+                    return Err(format!(
+                        "{}: the address formed at {pc:#x} ({target:#x}) is in no section",
+                        f.name
+                    ));
+                };
                 relocs.push(Reloc {
-                    off: 4 * j as u64,
-                    kind: if s_type {
-                        Kind::PcrelLoS
-                    } else {
-                        Kind::PcrelLoI
-                    },
+                    off: 4 * k as u64,
+                    kind: Kind::PcrelHi,
                     sym: sym.clone(),
                     addend: add0,
                     hi_off: 4 * k as u64,
                 });
-                words[j] &= !if s_type { S_FIELD } else { I_FIELD };
+                words[k] &= !U_FIELD;
+                for &(j, _, s_type) in &users {
+                    relocs.push(Reloc {
+                        off: 4 * j as u64,
+                        kind: if s_type {
+                            Kind::PcrelLoS
+                        } else {
+                            Kind::PcrelLoI
+                        },
+                        sym: sym.clone(),
+                        addend: add0,
+                        hi_off: 4 * k as u64,
+                    });
+                    words[j] &= !if s_type { S_FIELD } else { I_FIELD };
+                }
+                k += 1;
             }
-            k += 1;
+            Ok(RFunc {
+                name: names[&f.entry].clone(),
+                entry: f.entry,
+                words,
+                relocs,
+            })
+        })();
+        match r {
+            Ok(rf) => funcs.push(rf),
+            Err(reason) => skipped.push(Skipped {
+                name: names[&f.entry].clone(),
+                entry: f.entry,
+                reason,
+            }),
         }
-        funcs.push(RFunc {
-            name: names[&f.entry].clone(),
-            entry: f.entry,
-            words,
-            relocs,
-        });
     }
     let data = bin
         .segments
@@ -415,6 +457,7 @@ fn of_binary_unchecked(bin: &Binary) -> Result<Module, String> {
     Ok(Module {
         funcs,
         data,
+        skipped,
         text_addr: bin.text_addr,
         text_words: bin.text.len(),
     })
@@ -507,6 +550,15 @@ pub fn lean(m: &Module, namespace: &str, source: &str, sha: &str) -> String {
             "    if s = {} then 0x{:x}#64 else",
             str_lit(&f.name),
             f.entry
+        );
+    }
+    for f in &m.skipped {
+        let _ = writeln!(
+            o,
+            "    if s = {} then 0x{:x}#64 else -- not in the module: {}",
+            str_lit(&f.name),
+            f.entry,
+            f.reason.replace('\n', " ")
         );
     }
     for d in &m.data {

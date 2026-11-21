@@ -246,6 +246,12 @@ pub fn module(
     let bytes = read(file)?;
     let bin = crate::load(&bytes)?;
     let m = crate::module::of_binary(&bin)?;
+    for f in &m.skipped {
+        eprintln!(
+            "nocompiler: skipping {} (not relocatable: {})",
+            f.name, f.reason
+        );
+    }
     let sha = crate::sha256::hex(&crate::sha256::digest(&bytes));
     let text = if chunks {
         crate::module::lean_chunks(&m, ns, &file_name(file), &sha)?
@@ -266,6 +272,12 @@ pub fn ledger(file: &Path, proofs: Option<&Path>, out: &mut String) -> Result<u8
     let bytes = read(file)?;
     let bin = crate::load(&bytes)?;
     let m = crate::module::of_binary(&bin)?;
+    for f in &m.skipped {
+        eprintln!(
+            "nocompiler: skipping {} (not relocatable: {})",
+            f.name, f.reason
+        );
+    }
     let mut p = std::collections::BTreeMap::new();
     if let Some(t) = proofs {
         let text = std::fs::read_to_string(t).map_err(|e| format!("{}: {e}", t.display()))?;
