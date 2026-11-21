@@ -241,7 +241,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import rusttc  # noqa: E402
 
 RV_RUSTFLAGS = ("-C linker=rv-cc -C link-self-contained=no -C target-feature=+zba,+zbb,-relax "
-                "-C code-model=medium -C relocation-model=static "
+                "-C code-model=medium -C relocation-model=static -C debuginfo=1 "
                 "-C link-arg=-Wl,--emit-relocs -C link-arg=-lgcc -C link-arg=-lswb_lfs64 -Awarnings")
 # -lgcc: old rustc links -nodefaultlibs, and musl's printf needs the long double builtins.
 # -lswb_lfs64: stat64 and the other LFS64 names, which std from 2022 and earlier links
@@ -429,7 +429,7 @@ class RustTests(RustProgram):
         m = re.search(r"RUSTFLAGS=(\"[^\"]*\"|\S+)", envs)
         if m:  # e.g. --cfg tokio_unstable
             rustflags += " " + m.group(1).strip('"').replace("-Awarnings", "")
-        cmd = (f"{rust_env_prefix(rv)}CARGO_PROFILE_DEV_OPT_LEVEL=2 CARGO_PROFILE_DEV_DEBUG=0 "
+        cmd = (f"{rust_env_prefix(rv)}CARGO_PROFILE_DEV_OPT_LEVEL=2 "
                f"RUSTFLAGS='{rustflags}' cargo +{tc} test --no-run -j{JOBS} {' '.join(map(shlex.quote, cargo_opts))} "
                f"-Zbuild-std=std,panic_unwind {self.tcm['json_target_flag']} --target {self.tcm['target']} "
                f"--message-format=json 2>/dev/null")

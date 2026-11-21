@@ -6,6 +6,9 @@ Starts `swe-bin-env`, then with OpenEnv's own `MCPToolClient` (pinned checkout, 
     oracle, not an agent action), submit it: reward 1000, done;
   * the same task, submitting the unchanged base binary: reward 0, done;
   * a step after done is refused.
+In scratch mode the starting binary has the removed functions stubbed: the "gold" episode
+extracts the gold build's versions of them (swb-elf extract, the oracle) and links them in with
+the environment's `link` tool; the "base" episode submits the stubs.
 
   smoke.py --task jqlang__jq-2650 [--mode patch|scratch]
 
@@ -31,6 +34,7 @@ from openenv.core.env_server.types import Action  # noqa: E402
 from openenv.core.mcp_client import MCPToolClient  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+SWB_ELF = os.environ.get("SWB_ELF", "/mnt/scratch/ec2-user/target-nc-d/release/swb-elf")
 BENCH = os.path.dirname(HERE)
 
 
@@ -123,8 +127,21 @@ def main():
                 print(f"[tools] read_file ../x refused: {str(e)[:120]}")
 
             def put_gold():
+                ep = os.path.join(episodes, "smoke-gold")
                 for b, f in zip(task["binaries"], files):
-                    shutil.copy(os.path.join(SWB, b["gold"]["path"]), os.path.join(episodes, "smoke-gold", f))
+                    if a.mode == "patch":
+                        shutil.copy(os.path.join(SWB, b["gold"]["path"]), os.path.join(ep, f))
+                        continue
+                    # scratch: the gold build's versions of the removed functions, as an object
+                    # (the oracle's step), then linked by the environment's own `link` tool
+                    names = b["scratch"]["removes"] + b["scratch"].get("new_functions", [])
+                    if not names:
+                        continue
+                    obj = os.path.join(ep, f"gold-{f}.o")
+                    subprocess.run([SWB_ELF, "extract", os.path.join(SWB, b["gold"]["path"]), obj] + names, check=True,
+                                   stdout=subprocess.DEVNULL)
+                    r = env.call_tool("link", binary=f, object=os.path.basename(obj), out=f)
+                    print(f"[gold] link {os.path.basename(obj)} into {f}: {r}")
 
             gold = episode(env, seed, "smoke-gold", put_gold, files, "gold")
             try:

@@ -51,6 +51,9 @@ pub struct TaskInfo {
     pub issue: String,
     /// Scratch mode: the functions each subject has removed.
     pub removes: Vec<Vec<String>>,
+    /// Scratch mode: what the agent is told about them (FUNCTIONS.md) and the tests (TESTS.patch).
+    pub functions_md: String,
+    pub test_patch: String,
 }
 
 static CONFIG: OnceLock<Arc<Config>> = OnceLock::new();
@@ -66,11 +69,13 @@ pub fn config() -> Option<Arc<Config>> {
 /// Load the kept tasks (`tasks/*.json` with "status": "kept"), in name order.
 pub fn load_tasks(tasks_dir: &Path, swb: &Path, dataset: &Path) -> Result<Vec<TaskInfo>, String> {
     let mut issues = std::collections::HashMap::new();
+    let mut test_patches = std::collections::HashMap::new();
     let ds = std::fs::read_to_string(dataset).map_err(|e| format!("{}: {e}", dataset.display()))?;
     for line in ds.lines() {
         if let Ok(v) = serde_json::from_str::<Value>(line) {
             if let (Some(i), Some(p)) = (v["instance_id"].as_str(), v["problem_statement"].as_str()) {
                 issues.insert(i.to_string(), p.to_string());
+                test_patches.insert(i.to_string(), v["test_patch"].as_str().unwrap_or_default().to_string());
             }
         }
     }
@@ -91,7 +96,27 @@ pub fn load_tasks(tasks_dir: &Path, swb: &Path, dataset: &Path) -> Result<Vec<Ta
         let tests = v["tests"].as_array().cloned().unwrap_or_default();
         let count = |kind: &str| tests.iter().filter(|t| t["kind"] == kind).count() as u32;
         let bins = v["binaries"].as_array().cloned().unwrap_or_default();
+        let mut md = String::from("# The functions to write\n\nScratch mode (SWE-bench-derived, function-level from-scratch): each function below was removed from the binary (it now exits with status 127). Write it as nocompiler structured text, `asm` it, and `link` it into the binary. The source of these functions is not given.\n");
+        for b in &bins {
+            md.push_str(&format!("\n## {}\n", subject_file(b["subject"].as_str().unwrap_or_default())));
+            for f in b["scratch"]["functions"].as_array().cloned().unwrap_or_default() {
+                md.push_str(&format!(
+                    "\n- `{}`: {} instructions in the original build\n  - signature: {}\n  - called by: {}\n",
+                    f["name"].as_str().unwrap_or_default(),
+                    f["instructions"].as_u64().map_or("?".into(), |n| n.to_string()),
+                    f["signature"].as_str().unwrap_or("(no debug information)"),
+                    f["callers"].as_array().map(|c| c.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default(),
+                ));
+            }
+            let data = b["scratch"]["data_to_write"].as_array().cloned().unwrap_or_default();
+            if !data.is_empty() {
+                md.push_str(&format!("\nData the fixed program also changes: {}\n",
+                    data.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>().join(", ")));
+            }
+        }
         out.push(TaskInfo {
+            functions_md: md,
+            test_patch: test_patches.get(&id).cloned().unwrap_or_default(),
             issue: issues.get(&id).cloned().unwrap_or_default(),
             id,
             subjects: bins.iter().map(|b| b["subject"].as_str().unwrap_or_default().to_string()).collect(),
@@ -213,6 +238,11 @@ fn reset(cfg: &Config, seed: Option<i64>, episode_id: &str) -> Result<Episode, E
         tools::write_exe(&dir.join(subject_file(s)), &start).map_err(Error::Setup)?;
     }
     std::fs::write(dir.join("ISSUE.md"), &t.issue).map_err(|e| Error::Setup(e.to_string()))?;
+    if cfg.mode == k::Mode::Scratch {
+        // scratch mode gives the tests and the removed functions' interfaces
+        std::fs::write(dir.join("TESTS.patch"), &t.test_patch).map_err(|e| Error::Setup(e.to_string()))?;
+        std::fs::write(dir.join("FUNCTIONS.md"), &t.functions_md).map_err(|e| Error::Setup(e.to_string()))?;
+    }
     let task = k::Task { id: idx as u32, mode: cfg.mode, f2p: t.f2p, p2p: t.p2p };
     let core = core(&k::initial(), k::Command::Reset { task })?;
     Ok(Episode {

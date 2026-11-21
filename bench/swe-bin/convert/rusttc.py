@@ -24,6 +24,9 @@ CARGO_HOME = "/mnt/scratch/ec2-user/cargo"
 TARGET = "riscv64imafd-unknown-linux-musl"
 # the current nightly: for repositories without a Cargo.lock (recipes.RustProgram.toolchain)
 LOCK_TOOLCHAIN = "nightly-2026-11-01"
+# std's own libc has riscv64 musl from early 2022 (std of nightly-2021-10 does not build for the
+# target: 709 errors in libc 0.2.106, sharkdp__bat-1892). Older commits get this nightly.
+FLOOR = dt.date(2022, 3, 1)
 
 
 def _env():
@@ -63,7 +66,7 @@ def install(date: dt.date) -> str:
 def for_commit(repo_dir: str, commit: str) -> str:
     out = subprocess.run(["git", "-C", repo_dir, "show", "-s", "--format=%cs", commit],
                          stdout=subprocess.PIPE, check=True).stdout.decode().strip()
-    return install(dt.date.fromisoformat(out))
+    return install(max(dt.date.fromisoformat(out), FLOOR))
 
 
 def setup(tc: str) -> dict:

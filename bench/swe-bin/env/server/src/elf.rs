@@ -733,6 +733,249 @@ pub fn isolate(bin: &[u8], keep: &str) -> Result<Vec<u8>, Error> {
     Ok(out)
 }
 
+// ---- extract ---------------------------------------------------------------------------------
+
+/// A relocatable object holding functions `names` of a linked binary that was linked with
+/// `--emit-relocs`: their bytes, and every relocation in them re-targeted to a symbol name (the
+/// named symbol that holds the target address, plus an offset), so that `link` can place them
+/// in another build of the same program. PCREL_LO12 relocations point at their auipc, which
+/// gets a local label. Used to put the gold build's functions into the scratch-mode binary (the
+/// smoke test's "solution"); it is never an agent tool.
+pub fn extract(bin: &[u8], names: &[String]) -> Result<Vec<u8>, Error> {
+    let b = Elf::parse(bin.to_vec())?;
+    let syms = b.symbols()?;
+    let mut named: Vec<&Sym> = syms.iter().filter(|s| !s.name.is_empty() && s.shndx != 0 && s.shndx < 0xff00
+        && s.info & 0xf != 4 && !s.name.starts_with(".L") && !s.name.starts_with('$')).collect();
+    named.sort_by_key(|s| s.value);
+    // anonymous constants (`.L.str.N`, rustc's `anon.<hash>.N`): copied into the object
+    let is_anon = |n: &str| n.starts_with(".L") || n.starts_with("anon.") || n.starts_with("alloc_");
+    let anon: Vec<&Sym> = syms.iter().filter(|s| s.size > 0 && s.shndx != 0 && s.shndx < 0xff00
+        && is_anon(&s.name) && b.shdrs.get(s.shndx as usize).is_some_and(|h| h.flags & SHF_EXECINSTR == 0)).collect();
+    let mut rodata: Vec<u8> = Vec::new();
+    let mut lits: Vec<(u64, String, u64)> = Vec::new(); // (binary address, label, rodata offset)
+    let holder = |a: u64| -> Option<(&str, u64)> {
+        let i = named.partition_point(|s| s.value <= a);
+        let mut j = i;
+        while j > 0 {
+            let s = named[j - 1];
+            if s.value <= a && a < s.value + s.size.max(1) {
+                return Some((s.name.as_str(), a - s.value));
+            }
+            if named[j - 1].value < named[i.saturating_sub(1)].value {
+                break;
+            }
+            j -= 1;
+        }
+        named.get(i.wrapping_sub(1)).map(|s| (s.name.as_str(), a - s.value))
+    };
+    // every relocation that applies to an executable section
+    let mut relocs: Vec<(u64, u32, u64)> = Vec::new(); // (address, type, target address)
+    for (ri, rs) in b.shdrs.iter().enumerate() {
+        if rs.sh_type != SHT_RELA {
+            continue;
+        }
+        let tgt = &b.shdrs[rs.info as usize];
+        if tgt.flags & SHF_EXECINSTR == 0 {
+            continue;
+        }
+        for (off, ty, sym, add) in b.relas(ri)? {
+            let sv = syms.get(sym).map_or(0, |s| s.value);
+            relocs.push((off, ty, (sv as i64 + add) as u64));
+        }
+    }
+    let mut text: Vec<u8> = Vec::new();
+    let mut fsyms: Vec<(String, u64, u64)> = Vec::new(); // name, offset, size
+    let mut labels: Vec<(String, u64)> = Vec::new();
+    let mut rel_out: Vec<(u64, u32, String, i64)> = Vec::new();
+    for n in names {
+        let fs: Vec<&Sym> = syms.iter().filter(|s| s.is_func() && &s.name == n && s.size > 0).collect();
+        let [f] = fs.as_slice() else {
+            return err(format!("{n}: {} functions with that name", fs.len()));
+        };
+        let Some(fo) = b.file_offset(f.value, f.size) else {
+            return err(format!("{n} is not in a loaded segment"));
+        };
+        let base = align_up(text.len() as u64, 4);
+        text.resize(base as usize, 0);
+        text.extend_from_slice(&b.data[fo..fo + f.size as usize]);
+        fsyms.push((n.clone(), base, f.size));
+        // calls and jumps to another function of the same section have no relocation (the
+        // assembler resolved them, -mno-relax): decode them, as CALL / JAL relocations
+        let mut fr: Vec<(u64, u32, u64)> = relocs.iter().filter(|r| f.value <= r.0 && r.0 < f.value + f.size).cloned().collect();
+        let has = |fr: &Vec<(u64, u32, u64)>, a: u64| fr.iter().any(|r| r.0 == a);
+        let words: Vec<u32> = (0..(f.size / 4) as usize).map(|k| rd(&b.data, fo + 4 * k, 4).unwrap_or(0) as u32).collect();
+        for k in 0..words.len() {
+            let a = f.value + 4 * k as u64;
+            let w = words[k];
+            let inside = |t: u64| f.value <= t && t < f.value + f.size;
+            if w & 0x7f == 0x6f && !has(&fr, a) {
+                // jal: imm[20|10:1|11|19:12]
+                let imm = (((w >> 31) & 1) << 20) | (((w >> 21) & 0x3ff) << 1) | (((w >> 20) & 1) << 11) | (((w >> 12) & 0xff) << 12);
+                let t = a.wrapping_add((((imm as i64) << 43) >> 43) as u64);
+                if !inside(t) {
+                    fr.push((a, 17, t));
+                }
+            }
+            if w & 0x7f == 0x17 && k + 1 < words.len() && !has(&fr, a) {
+                let w2 = words[k + 1];
+                let rd_ = (w >> 7) & 0x1f;
+                if w2 & 0x707f == 0x0067 && (w2 >> 15) & 0x1f == rd_ {
+                    let hi = ((w & 0xffff_f000) as i32) as i64;
+                    let lo = ((w2 as i32) >> 20) as i64;
+                    let t = (a as i64 + hi + lo) as u64;
+                    if !inside(t) {
+                        fr.push((a, 18, t));
+                    }
+                }
+            }
+        }
+        for &(a, ty, t) in fr.iter() {
+            if ty == 43 || ty == 51 {
+                continue;
+            }
+            let off = base + a - f.value;
+            if ty == 24 || ty == 25 {
+                let l = format!(".Lswb_hi_{}", base + t - f.value);
+                if !labels.iter().any(|x| x.0 == l) {
+                    labels.push((l.clone(), base + t - f.value));
+                }
+                rel_out.push((off, ty, l, 0));
+            } else if f.value <= t && t < f.value + f.size && (ty == 16 || ty == 17) {
+                // a branch inside the function: its field is already right
+                continue;
+            } else if let Some(l) = anon.iter().find(|l| l.value <= t && t < l.value + l.size) {
+                let lab = match lits.iter().find(|x| x.0 == l.value) {
+                    Some(x) => x.1.clone(),
+                    None => {
+                        let Some(lo) = b.file_offset(l.value, l.size) else {
+                            return err(format!("{} is not in a loaded segment", l.name));
+                        };
+                        let o = align_up(rodata.len() as u64, 8);
+                        rodata.resize(o as usize, 0);
+                        rodata.extend_from_slice(&b.data[lo..lo + l.size as usize]);
+                        let lab = format!(".Lswb_lit_{}", lits.len());
+                        lits.push((l.value, lab.clone(), o));
+                        lab
+                    }
+                };
+                rel_out.push((off, ty, lab, (t - l.value) as i64));
+            } else {
+                let Some((sn, so)) = holder(t) else {
+                    return err(format!("{n}+{:#x}: no symbol holds {t:#x}", a - f.value));
+                };
+                rel_out.push((off, ty, sn.to_string(), so as i64));
+            }
+        }
+    }
+    let lit_labels: Vec<(String, u64)> = lits.iter().map(|x| (x.1.clone(), x.2)).collect();
+    write_object(&text, &rodata, &fsyms, &labels, &lit_labels, &rel_out)
+}
+
+/// A minimal ELF64 RISC-V relocatable: .text, .rodata, .rela.text, .symtab, .strtab, .shstrtab.
+fn write_object(text: &[u8], rodata: &[u8], funcs: &[(String, u64, u64)], labels: &[(String, u64)],
+                lit_labels: &[(String, u64)], rels: &[(u64, u32, String, i64)]) -> Result<Vec<u8>, Error> {
+    // symbols: null, locals (section, labels), globals (functions, then undefined)
+    let mut strtab = vec![0u8];
+    let name = |s: &str, st: &mut Vec<u8>| -> u32 { let n = st.len(); st.extend_from_slice(s.as_bytes()); st.push(0); n as u32 };
+    let mut sy: Vec<(u32, u8, u16, u64, u64)> = vec![(0, 0, 0, 0, 0), (0, 3, 1, 0, 0)]; // null, STT_SECTION .text
+    let mut index: HashMap<String, usize> = HashMap::new();
+    for (l, off) in labels {
+        let n = name(l, &mut strtab);
+        index.insert(l.clone(), sy.len());
+        sy.push((n, 0, 1, *off, 0));
+    }
+    for (l, off) in lit_labels {
+        let n = name(l, &mut strtab);
+        index.insert(l.clone(), sy.len());
+        sy.push((n, 0, 2, *off, 0));
+    }
+    let first_global = sy.len();
+    for (f, off, size) in funcs {
+        let n = name(f, &mut strtab);
+        index.insert(f.clone(), sy.len());
+        sy.push((n, (STB_GLOBAL << 4) | STT_FUNC, 1, *off, *size));
+    }
+    for (_, _, s, _) in rels {
+        if !index.contains_key(s) {
+            let n = name(s, &mut strtab);
+            index.insert(s.clone(), sy.len());
+            sy.push((n, STB_GLOBAL << 4, 0, 0, 0));
+        }
+    }
+    let mut symtab = Vec::new();
+    for (n, info, shndx, v, size) in &sy {
+        let mut e = [0u8; 24];
+        wr(&mut e, 0, 4, *n as u64)?;
+        e[4] = *info;
+        wr(&mut e, 6, 2, *shndx as u64)?;
+        wr(&mut e, 8, 8, *v)?;
+        wr(&mut e, 16, 8, *size)?;
+        symtab.extend_from_slice(&e);
+    }
+    let mut rela = Vec::new();
+    for (off, ty, s, add) in rels {
+        let mut e = [0u8; 24];
+        wr(&mut e, 0, 8, *off)?;
+        wr(&mut e, 8, 8, ((index[s] as u64) << 32) | *ty as u64)?;
+        wr(&mut e, 16, 8, *add as u64)?;
+        rela.extend_from_slice(&e);
+    }
+    // names at 1 .text, 7 .rodata, 15 .rela.text, 26 .symtab, 34 .strtab, 42 .shstrtab
+    let shstr = b"\0.text\0.rodata\0.rela.text\0.symtab\0.strtab\0.shstrtab\0".to_vec();
+    let mut img = vec![0u8; 64];
+    let place = |img: &mut Vec<u8>, d: &[u8], al: u64| -> u64 {
+        let o = align_up(img.len() as u64, al);
+        img.resize(o as usize, 0);
+        img.extend_from_slice(d);
+        o
+    };
+    let t_off = place(&mut img, text, 16);
+    let ro_off = place(&mut img, rodata, 8);
+    let r_off = place(&mut img, &rela, 8);
+    let s_off = place(&mut img, &symtab, 8);
+    let st_off = place(&mut img, &strtab, 1);
+    let sh_off = place(&mut img, &shstr, 1);
+    let shoff = align_up(img.len() as u64, 8);
+    img.resize(shoff as usize, 0);
+    // (name, type, flags, offset, size, link, info, align, entsize)
+    let hdrs: [(u32, u32, u64, u64, u64, u32, u32, u64, u64); 7] = [
+        (0, 0, 0, 0, 0, 0, 0, 0, 0),
+        (1, 1, SHF_ALLOC | SHF_EXECINSTR, t_off, text.len() as u64, 0, 0, 16, 0),
+        (7, 1, SHF_ALLOC, ro_off, rodata.len() as u64, 0, 0, 8, 0),
+        (15, SHT_RELA, 0x40, r_off, rela.len() as u64, 4, 1, 8, 24),
+        (26, SHT_SYMTAB, 0, s_off, symtab.len() as u64, 5, first_global as u32, 8, 24),
+        (34, 3, 0, st_off, strtab.len() as u64, 0, 0, 1, 0),
+        (42, 3, 0, sh_off, shstr.len() as u64, 0, 0, 1, 0),
+    ];
+    for (n, t, fl, o, sz, l, i, al, es) in hdrs {
+        let mut e = [0u8; 64];
+        wr(&mut e, 0, 4, n as u64)?;
+        wr(&mut e, 4, 4, t as u64)?;
+        wr(&mut e, 8, 8, fl)?;
+        wr(&mut e, 24, 8, o)?;
+        wr(&mut e, 32, 8, sz)?;
+        wr(&mut e, 40, 4, l as u64)?;
+        wr(&mut e, 44, 4, i as u64)?;
+        wr(&mut e, 48, 8, al)?;
+        wr(&mut e, 56, 8, es)?;
+        img.extend_from_slice(&e);
+    }
+    img[0..4].copy_from_slice(b"\x7fELF");
+    img[4] = 2;
+    img[5] = 1;
+    img[6] = 1;
+    wr(&mut img, 16, 2, 1)?; // ET_REL
+    wr(&mut img, 18, 2, EM_RISCV as u64)?;
+    wr(&mut img, 20, 4, 1)?;
+    wr(&mut img, 40, 8, shoff)?;
+    wr(&mut img, 48, 4, 0x4)?; // EF_RISCV_FLOAT_ABI_DOUBLE, no RVC
+    wr(&mut img, 52, 2, 64)?;
+    wr(&mut img, 58, 2, 64)?;
+    wr(&mut img, 60, 2, 7)?;
+    wr(&mut img, 62, 2, 6)?;
+    Ok(img)
+}
+
 // ---- stub ------------------------------------------------------------------------------------
 
 /// `addi a0, zero, 127; addi a7, zero, 94; ecall` (exit_group(127)), then `ebreak` to the end.
@@ -758,6 +1001,21 @@ pub fn stub(bin: &[u8], names: &[String]) -> Result<(Vec<u8>, Vec<(String, u64)>
             wr(&mut out, fo + 4 * k, 4, w as u64)?;
         }
         done.push((n.clone(), f.size / 4));
+        // the binary's --emit-relocs entries inside the function would say what it called and
+        // read: they become R_RISCV_NONE at offset 0
+        for (ri, rs) in b.shdrs.iter().enumerate() {
+            if rs.sh_type != SHT_RELA {
+                continue;
+            }
+            for (k, (off, _, _, _)) in b.relas(ri)?.iter().enumerate() {
+                if f.value <= *off && *off < f.value + f.size {
+                    let e = rs.offset as usize + 24 * k;
+                    for x in &mut out[e..e + 24] {
+                        *x = 0;
+                    }
+                }
+            }
+        }
     }
     Ok((out, done))
 }

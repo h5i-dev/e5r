@@ -23,11 +23,16 @@ fn run(args: &[String]) -> Result<String, String> {
             std::fs::write(out, img).map_err(|e| e.to_string())?;
             Ok(format!("{out}: every function but {func} is `ret`"))
         }
+        [cmd, bin, out, names @ ..] if cmd == "extract" && !names.is_empty() => {
+            let obj = elf::extract(&read(bin)?, names).map_err(|e| e.to_string())?;
+            std::fs::write(out, obj).map_err(|e| e.to_string())?;
+            Ok(format!("{out}: {}", names.join(" ")))
+        }
         [cmd, bin] if cmd == "check" => {
             elf::check_submission(&read(bin)?).map_err(|e| e.to_string())?;
             Ok("ok: a static RISC-V 64 executable".into())
         }
-        _ => Err("usage: swb-elf link BIN OBJ OUT | stub BIN OUT NAME... | isolate BIN FUNC OUT | check BIN".into()),
+        _ => Err("usage: swb-elf link BIN OBJ OUT | stub BIN OUT NAME... | isolate BIN FUNC OUT | extract BIN OUT.o NAME... | check BIN".into()),
     }
 }
 

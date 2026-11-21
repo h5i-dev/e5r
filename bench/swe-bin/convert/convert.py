@@ -63,12 +63,34 @@ def levels(elf):
     return count, by_name
 
 
-def analyze(rel, b, g):
-    """Sizes, levels and the gold patch's changes for one subject (base ELF b, gold ELF g)."""
+def analyze(rel, b, g, patch=""):
+    """Sizes, levels and the gold patch's changes for one subject (base ELF b, gold ELF g).
+
+    Two views of the change. `gold_changes` is byte level: functions and data whose
+    relocation-masked form differs. That also catches code the patch did not touch but whose
+    bytes moved, e.g. every assert after an inserted line carries a new __LINE__. `source_changes`
+    is the functions whose code comes from lines the patch touches, by the DWARF line tables of
+    the -g builds (inlined copies included). Scratch mode removes the source-level set."""
     fb, db = funcs.canonical(b)
     fg, dg = funcs.canonical(g)
     mod, add, rem = funcs.changed(fb, fg)
     dmod, dadd, drem = funcs.changed(db, dg)
+    anon = [k for k in dmod + dadd + drem if funcs.ANON.match(k.split("::")[-1])]
+    dmod = [k for k in dmod if k not in anon]
+    dadd = [k for k in dadd if k not in anon]
+    drem = [k for k in drem if k not in anon]
+    pl = funcs.patch_lines(patch)
+    bd, gd = b.replace(".elf", ".debug.elf"), g.replace(".elf", ".debug.elf")
+    src_b = funcs.functions_at_lines(bd, {p: o for p, (o, _) in pl.items()}) if os.path.exists(bd) else []
+    src_g = funcs.functions_at_lines(gd, {p: n for p, (_, n) in pl.items()}) if os.path.exists(gd) else []
+    by_name_b = {f.name: f for f in fb.values()}
+    by_name_g = {f.name: f for f in fg.values()}
+    removes = sorted(set(src_b) | {n for n in src_g if n in by_name_b})
+    basis = "source lines (DWARF)"
+    if not removes:  # no line tables: the byte-level set
+        removes, basis = sorted({fb[k].name for k in mod}), "bytes (no line tables)"
+    sigs = funcs.signatures(bd, removes) if os.path.exists(bd) else {}
+    calls = funcs.callers(b, removes)
     cb, lb = levels(b)
     _, lg = levels(g)
     return {
@@ -93,9 +115,16 @@ def analyze(rel, b, g):
         # scratch mode (SWE-bench-derived, function-level from-scratch): every base function the
         # gold patch modifies is replaced by a stub, and the agent writes it. Data the gold patch
         # changes is listed: the agent has to write that too.
-        "scratch": {"removes": [fb[k].name for k in mod],
-                    "instructions": sum(fb[k].insns for k in mod),
-                    "gold_instructions": sum(fg[k].insns for k in mod) + sum(fg[k].insns for k in add),
+        "anonymous_literals_changed": len(anon),
+        "source_changes": {"base": src_b, "gold": src_g,
+                           "debug_info": os.path.exists(bd) and bool(src_b or src_g)},
+        "scratch": {"removes": removes,
+                    "basis": basis,
+                    "functions": [{"name": n, "instructions": by_name_b[n].insns if n in by_name_b else None,
+                                   "signature": sigs.get(n), "callers": calls.get(n, [])} for n in removes],
+                    "instructions": sum(by_name_b[n].insns for n in removes),
+                    "gold_instructions": sum(by_name_g[n].insns for n in set(removes) | set(src_g) if n in by_name_g),
+                    "new_functions": [n for n in src_g if n not in by_name_b],
                     "data_to_write": [dg[k].name for k in dmod + dadd]},
     }
 
@@ -131,6 +160,11 @@ def judge(task, recipe, base, gold):
                 excluded[t] = ex
                 continue
             b, g = base.get(t, "MISSING"), gold.get(t, "MISSING")
+            if kind == "PASS_TO_PASS" and b == g == "SKIPPED":
+                # the suite itself skips it here (micropython's native emitter tests: there is
+                # no riscv64 emitter in these versions); it cannot pass or fail on this platform
+                excluded[t] = "skipped by the test suite on riscv64 under qemu, at base and at gold"
+                continue
             rows.append({"test": t, "kind": kind, "base": b, "gold": g})
             if g != "PASSED":
                 why.append(f"{kind} {t}: gold {g}")
@@ -197,7 +231,7 @@ def convert(task, keep_work=False):
         rec["tests"] = rows
         rec["excluded_tests"] = excluded
         rec["timing_s"] = {s: {"build": v["build_s"], "test": v["test_s"]} for s, v in sides.items()}
-        rec["binaries"] = [analyze(rel, sides["base"]["elfs"][i], sides["gold"]["elfs"][i])
+        rec["binaries"] = [analyze(rel, sides["base"]["elfs"][i], sides["gold"]["elfs"][i], task["patch"])
                            for i, rel in enumerate(recipe.subjects)]
         if not any(any(b["gold_changes"][k] for k in b["gold_changes"]) for b in rec["binaries"]):
             why.append("the gold patch changes neither code nor data of a subject")
@@ -225,7 +259,24 @@ def main():
     ap.add_argument("--only", nargs="*")
     ap.add_argument("--repo")
     ap.add_argument("--skip-done", action="store_true")
+    ap.add_argument("--reanalyze", action="store_true",
+                    help="recompute the binaries' analysis of converted tasks from their artifacts, without building")
     a = ap.parse_args()
+    if a.reanalyze:
+        for t in [json.loads(line) for line in open(a.dataset)]:
+            p = os.path.join(TASKS, t["instance_id"] + ".json")
+            if not os.path.exists(p) or (a.only and t["instance_id"] not in a.only) or (a.repo and t["repo"] != a.repo):
+                continue
+            rec = json.load(open(p))
+            if "binaries" not in rec:
+                continue
+            rec["binaries"] = [analyze(b["subject"], os.path.join(SWB, b["base"]["path"]),
+                                       os.path.join(SWB, b["gold"]["path"]), t["patch"]) for b in rec["binaries"]]
+            with open(p, "w") as fh:
+                json.dump(rec, fh, indent=1)
+                fh.write("\n")
+            print(t["instance_id"], "reanalyzed:", [len(b["scratch"]["removes"]) for b in rec["binaries"]], flush=True)
+        return
     tasks = [json.loads(line) for line in open(a.dataset)]
     for t in tasks:
         if t["repo"] not in RECIPES:
