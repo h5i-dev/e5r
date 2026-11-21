@@ -13,7 +13,7 @@ claim "easier to prove".
 | 4 | corpus conformance levels | passed | below |
 | 5 | `asm(disasm(x)) = x` | passed | below |
 | 6 | negative controls | checker side passed (Rust and Lean, A); audit side passed (B) | below |
-| 7 | checking cost at 55/160/500 instructions | open | |
+| 7 | checking cost (replaced by 7') | measured; budget not met | see 7' below |
 | 8 | demo A/B with calls and frames | **not met**: no difference | below |
 | 9 | LLM-written structured RV64 | open | |
 
@@ -209,3 +209,35 @@ to 2-aligned addresses).
 
 Mutation controls: scripts/core/check-proof-controls.sh adds `add` becomes
 `sub` and "restores s0 from the wrong slot" for `sum2` on both builds.
+
+## 7'. Scale (replaces the 55/160/500 targets): a real rustc-built artifact
+
+Measured 2026-11-21 on the development host (after a reboot, otherwise idle),
+`nocompiler` release build, Lean 4.35.0. Artifact: examples/refine/targets
+(B's pipeline, docs/isa/refine-targets.md: cobs, memchr, httparse, bytecount,
+crc32fast, base64, compiler_builtins' mem, core), one ELF.
+
+```bash
+examples/refine/conformance.sh                                     # builds it
+scripts/core/bench-scale-build.sh CRATE_DIR OUT.elf                # the same, paths remapped
+python3 -I scripts/core/bench-scale.py A.elf B.elf --json OUT      # check, bytes, refine
+python3 -I scripts/core/bench-gate.py                              # per-instruction proof cost (CI)
+```
+
+| Measurement | Result |
+| --- | --- |
+| Size | 87242 instructions (`.text` 0x55328 bytes), 1235 functions: L2 673, L1 12, L0 527, not decoding 23 |
+| Rust checker (`nocompiler check --json`, all functions) | 0.091 to 0.18 s, i.e. 1.0 to 2.1 µs per instruction |
+| Lean checker / Lean image of the whole binary | **not available**: `nocompiler export` refuses it (a conforming function calls one that does not, so its code region cannot be formed). Smaller evidence: a 500-instruction image alone takes 140 s and 5.2 GB (one `instr_` lemma per instruction over one array of all of `.text`: quadratic) |
+| Proof cost per instruction, current machinery (`nocompiler_auto`, fixed proofs, bench-gate.py) | SumB 344 ms total / 48 ms kernel per instruction (9 instrs); CobsB 825 / 84 (55); Sum2B 365 / 19 (21); Hello 259 / 25 (27). Target: ≤ about 1 ms. No proofs of the rustc functions exist yet |
+| Identical rebuild: bytes | same directory: the ELF is byte-identical. Another directory: NOT identical (the build path is in 16 panic-location strings, so `.rodata` and everything after move); with `--remap-path-prefix` (bench-scale-build.sh): identical. Comparing every function's bytes: 0.0034 s for 2906 symbols |
+| Identical rebuild: `nocompiler refine` (Rust tree diff + certificate), every L1+ function | 685 functions, 25040 instructions, 142.8 s (0.21 s per function, 5.7 ms per instruction): a per-call cost, the tool reloads the binary every time; nothing changed. Lean proofs of these refinements: not run (no images, above) |
+| One small edit (`w_num_chars` returns `+ 1`): bytes | 531 of 2906 symbols change, 191 of the 685 L1+ functions: one function grows, everything after it moves, and every pc-relative `auipc`/call offset that crosses it changes. Byte equality of LINKED functions does not find unchanged code; it has to be on relocatable bytes with relocations masked (the ledger, `RFunc`) |
+| One small edit: `nocompiler refine` on the 191 changed functions | 33.1 s; 17 refused ("a call or jump out of the function inside a change": a callee moved); 170 with changed intervals; 70 with a region whose registers differ (data addresses moved: a real difference at the level of the linked binary) |
+
+Conclusions, as measured: the Rust side already meets the per-instruction
+budget for checking; the proof side is 2 to 3 orders of magnitude over it
+(C's fast representation and VC generator are what this gate will measure);
+the Lean image format and the exporter's code regions do not scale to a whole
+binary; unchanged-code reuse must key on relocatable bytes, not on the linked
+image.
