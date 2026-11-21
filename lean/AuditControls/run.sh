@@ -12,6 +12,10 @@
 #                                                    -> the file does not build
 #   unbuilt     a source file whose module was never built
 #                                                    -> the audit FAILS
+#   refines-rel, refines-rel-and
+#               a theorem under Examples. concluding RefinesRel (alone, or in
+#               a conjunction)                       -> the audit FAILS, naming it
+#   refines     one concluding Refines               -> the audit passes
 # and the unmodified copy passes.
 #
 #   lean/AuditControls/run.sh            (from the repository root; needs lake)
@@ -79,6 +83,45 @@ elif grep -q 'debugKernel is on' "$work/build"; then
   echo "ok   debug-use: a proof with the debugging option on does not build"
 else echo "FAIL debug-use: it fails, but not for the option:"; tail -5 "$work/build"; fail=1; fi
 drop AuditCtlDebugUse
+
+# Decision 3: a refinement is `Refines` (it carries A's run); `RefinesRel` alone
+# is reported, under any A but one the project proves never runs
+# (Examples/Refine/Vacuous.lean, which the unmodified copy passes with).
+rel_decls='import NoCompiler.Refine
+namespace Examples.AuditCtlRel
+open NoCompiler
+def sp0 : Spec Unit where
+  pre := fun _ _ => True
+  post := fun _ _ _ => True
+def c0 : Code := ⟨0x2000#64, #[0x00000013#32]⟩
+def D0 : Dom := [(0x2000#64, 4)]'
+add AuditCtlRel "$rel_decls
+theorem audit_ctl_rel : RefinesRel sp0 c0 D0 0x2000#64 c0 D0 0x2000#64 := RefinesRel.refl _ _ _
+end Examples.AuditCtlRel"
+build AuditCtlRel
+if ! audit && grep -q 'FAIL Examples.AuditCtlRel.audit_ctl_rel concludes RefinesRel' "$work/out"; then
+  echo "ok   refines-rel: the audit fails on a theorem concluding RefinesRel alone"
+else echo "FAIL refines-rel: not caught"; tail -5 "$work/out"; fail=1; fi
+drop AuditCtlRel
+
+add AuditCtlRel "$rel_decls
+theorem audit_ctl_rel_and : RefinesRel sp0 c0 D0 0x2000#64 c0 D0 0x2000#64 ∧ True :=
+  ⟨RefinesRel.refl _ _ _, trivial⟩
+end Examples.AuditCtlRel"
+build AuditCtlRel
+if ! audit && grep -q 'FAIL Examples.AuditCtlRel.audit_ctl_rel_and concludes RefinesRel' "$work/out"; then
+  echo "ok   refines-rel-and: the audit fails on RefinesRel inside a conjunction"
+else echo "FAIL refines-rel-and: not caught"; tail -5 "$work/out"; fail=1; fi
+drop AuditCtlRel
+
+add AuditCtlRel "$rel_decls
+theorem audit_ctl_refines (h : ARuns sp0 c0 D0 0x2000#64) : Refines sp0 c0 D0 0x2000#64 c0 D0 0x2000#64 :=
+  Refines.refl h
+end Examples.AuditCtlRel"
+build AuditCtlRel
+if audit; then echo "ok   refines: a theorem concluding Refines passes"
+else echo "FAIL refines: rejected"; tail -5 "$work/out"; fail=1; fi
+drop AuditCtlRel
 
 add AuditCtlUnbuilt 'theorem audit_ctl_unbuilt : True := trivial'
 if ! audit && grep -q 'FAIL axiom audit: a module of the source tree could not be imported' "$work/out"; then

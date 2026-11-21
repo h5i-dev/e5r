@@ -17,7 +17,9 @@ At run time, `main`
   `Audit.audit` below): standard, the bv_decide tier (printed), or forbidden
   (fails), and fails if a source file's module was not built;
 * fails if committed source turns on `nocompiler_auto`'s debugging option, which
-  closes goals with `sorry`.
+  closes goals with `sorry`;
+* fails on a theorem under `Examples.` that concludes `RefinesRel`, a
+  refinement without A's run (`Audit.bareRefinesRel`).
 -/
 /-
 The axiom audit (docs/isa/trust.md, "The audit"): every declaration of every
@@ -95,6 +97,45 @@ def audit (env : Environment) (mods : Std.HashSet Name) : Report := Id.run do
     | .forbidden => bad := bad.push (n, axs)
   return { checked, bvTier := bv.qsort (·.toString < ·.toString),
            forbidden := bad.qsort (·.1.toString < ·.1.toString) }
+
+/-- A type's conclusion: under its `∀`s and `→`s. -/
+partial def conclusion : Expr → Expr
+  | .forallE _ _ b _ => conclusion b
+  | .mdata _ e => conclusion e
+  | e => e
+
+/-- The conjuncts of a proposition. -/
+partial def conjuncts (e : Expr) : List Expr :=
+  if e.isAppOfArity ``And 2 then conjuncts e.appFn!.appArg! ++ conjuncts e.appArg! else [e]
+
+/-- A's arguments (the type, the spec, `cA`, `DA`, `eA`) of `c` applied in `e`. -/
+def aArgs (c : Name) (e : Expr) : Option (Array Expr) :=
+  if e.isAppOf c && e.getAppNumArgs ≥ 5 then some (e.getAppArgs.extract 0 5) else none
+
+/-- Decision 2026-11-21 (3): a refinement is stated as `Refines`, which carries
+    A's run (`ARuns`); `RefinesRel` alone is conditional on A's run and holds
+    vacuously of an A that never runs. So every theorem under `Examples.` that
+    concludes `RefinesRel` (or a conjunction with it) is reported, unless the
+    project also proves `¬ ARuns` of the same A, the same closed arguments:
+    then it is a demonstration that the relation alone is vacuous (a control),
+    not a claimed refinement. -/
+def bareRefinesRel (env : Environment) (mods : Std.HashSet Name) : Array Name := Id.run do
+  let mut noRuns : Array (Array Expr) := #[]
+  let mut rels : Array (Name × Array Expr) := #[]
+  for (n, ci) in env.constants.map₁.toList do
+    let some idx := env.getModuleIdxFor? n | continue
+    let some m := env.header.moduleNames[idx.toNat]? | continue
+    unless mods.contains m do continue
+    let .thmInfo t := ci | continue
+    for c in conjuncts (conclusion t.type) do
+      if c.isAppOfArity ``Not 1 then
+        if let some a := aArgs `NoCompiler.ARuns c.appArg! then
+          if !a.any (·.hasLooseBVars) then noRuns := noRuns.push a
+      if (`Examples).isPrefixOf n then
+        if let some a := aArgs `NoCompiler.RefinesRel c then rels := rels.push (n, a)
+  let bad := rels.filterMap fun (n, a) =>
+    if !a.any (·.hasLooseBVars) && noRuns.any (· == a) then none else some n
+  return bad.qsort (·.toString < ·.toString)
 
 /-- The modules of the project: every `.lean` file under the given roots
     (`NoCompiler`, `Examples`, `Demo`, and their root files), as module names. -/
@@ -274,6 +315,10 @@ def axiomAudit (root : System.FilePath) : IO Bool := do
       IO.println s!"FAIL axiom audit: a module of the source tree could not be imported (not built?): {e}"
       return false
   let r := Audit.audit env (Std.HashSet.ofArray mods)
+  let rels := Audit.bareRefinesRel env (Std.HashSet.ofArray mods)
+  for n in rels do
+    IO.println s!"FAIL {n} concludes RefinesRel, a refinement without A's run (state it as Refines; decision 3)"
+  ok := ok && rels.isEmpty
   for (n, axs) in r.forbidden do
     IO.println s!"FAIL {n} depends on {axs.toList}"
   if r.forbidden.isEmpty then
