@@ -232,14 +232,26 @@ pub fn export(
     Ok(0)
 }
 
-/// `nocompiler module FILE --namespace NS [-o OUT]`: the relocatable module of a
-/// linked binary and its layout, as Lean (crate::module).
-pub fn module(file: &Path, ns: &str, dst: Option<&Path>, out: &mut String) -> Result<u8, String> {
+/// `nocompiler module FILE --namespace NS [--format chunks] [-o OUT]`: the
+/// relocatable module of a linked binary and its layout, as Lean
+/// (crate::module); with `chunks`, the module in chunks and no layout
+/// (`module::lean_chunks`, lean/NoCompiler/ModuleChunks.lean).
+pub fn module(
+    file: &Path,
+    ns: &str,
+    chunks: bool,
+    dst: Option<&Path>,
+    out: &mut String,
+) -> Result<u8, String> {
     let bytes = read(file)?;
     let bin = crate::load(&bytes)?;
     let m = crate::module::of_binary(&bin)?;
     let sha = crate::sha256::hex(&crate::sha256::digest(&bytes));
-    let text = crate::module::lean(&m, ns, &file_name(file), &sha);
+    let text = if chunks {
+        crate::module::lean_chunks(&m, ns, &file_name(file), &sha)?
+    } else {
+        crate::module::lean(&m, ns, &file_name(file), &sha)
+    };
     match dst {
         Some(dst) => std::fs::write(dst, text).map_err(|e| format!("{}: {e}", dst.display()))?,
         None => out.push_str(&text),

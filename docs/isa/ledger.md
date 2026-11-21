@@ -124,9 +124,11 @@ per binary, self-check included:
   - one literal for `.rodata` (78,496 bytes): 11.2 s for that literal
     alone; parts of 1024 bytes. Relocations as 10,259 structure instances:
     the module took 36.3 s; packed into one number per function, 8-16 s.
-- **Not yet:** a `--format chunks` flag for `nocompiler module` (cmd.rs and
-  main.rs are not B's files; the measurement used a driver over
-  `module::lean_chunks`/`reuse_lean`).
+- **The CLI:** `nocompiler module FILE --namespace NS --format chunks`
+  writes the module in chunks (tests/module_chunks.rs: it is the committed
+  Link/{One,Two}Chunks.lean). The reuse files are written by
+  `module::reuse_lean`, which has no command yet; the measurement used a
+  driver over it.
 - **Callees in another order.** When the new build puts a callee before its
   caller, the closure is found in the new order and the theorem carried
   through `Verified.of_perm` (`of_groups_perm`; the `List.Perm` is between

@@ -178,6 +178,11 @@ pub enum Command {
         /// The Lean namespace of the module.
         #[arg(long, value_name = "NS")]
         namespace: String,
+        /// `chunks`: one `RChunk` per function, all numbers, in groups
+        /// (lean/NoCompiler/ModuleChunks.lean; scales to whole binaries, no
+        /// layout); default: lists of words and the binary's layout.
+        #[arg(long, value_name = "FORMAT", value_parser = ["chunks", "list"], default_value = "list")]
+        format: String,
         /// Write the Lean file here instead of to standard output.
         #[arg(short = 'o', value_name = "OUT.lean")]
         out: Option<PathBuf>,
@@ -850,8 +855,15 @@ fn core(cli: &Cli, w: &mut out::Out) -> Option<Result<u8, String>> {
         Command::Module {
             file,
             namespace,
+            format,
             out,
-        } => cmd::module(file, namespace, out.as_deref(), &mut text),
+        } => cmd::module(
+            file,
+            namespace,
+            format == "chunks",
+            out.as_deref(),
+            &mut text,
+        ),
         Command::Ledger { file, proofs } => cmd::ledger(file, proofs.as_deref(), &mut text),
         Command::Asm { file, out } => cmd::asm(file, out, &mut text),
         Command::Refine {
