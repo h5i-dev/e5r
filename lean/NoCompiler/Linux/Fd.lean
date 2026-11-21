@@ -38,6 +38,11 @@ structure Kern where
   fs : List (List Byte × List Byte) := []
   /-- The descriptors `openat` opened on files of `fs`, with their offsets. -/
   files : List (Word × OpenFile) := []
+  /-- Protection overlays on `maps` (Linux/Prot.lean): ranges that are read-only
+      (PROT_READ or PROT_EXEC without PROT_WRITE), and ranges with no access
+      (PROT_NONE). Everything else mapped is read-write. -/
+  ro : List (Word × Nat) := []
+  noacc : List (Word × Nat) := []
 
 def Kern.init : Kern := { fds := [0, 1, 2] }
 
@@ -71,6 +76,27 @@ theorem unmap_gone {maps : List (Word × Nat)} {a : Word} {n x : Nat}
     · simp only [List.mem_singleton] at hq; subst hq; dsimp only
       rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)]; omega
     · simp at hq
+
+/-- The ranges `l` with every range of `cs` cut out. -/
+def cutAll (l cs : List (Word × Nat)) : List (Word × Nat) :=
+  cs.foldl (fun acc c => unmapRanges acc c.1 c.2) l
+
+/-- The part of `q` inside `p` (as numbers; empty when they do not meet). -/
+def interRange (p q : Word × Nat) : List (Word × Nat) :=
+  let b := max p.1.toNat q.1.toNat
+  let e := min (p.1.toNat + p.2) (q.1.toNat + q.2)
+  if b < e then [(BitVec.ofNat 64 b, e - b)] else []
+
+/-- The parts of the ranges `qs` inside some range of `ps`. -/
+def interAll (ps qs : List (Word × Nat)) : List (Word × Nat) :=
+  qs.flatMap fun q => ps.flatMap fun p => interRange p q
+
+/-- `[a, a + n)` unmapped: cut out of the mapped ranges and the overlays. -/
+def Kern.unmap (k : Kern) (a : Word) (n : Nat) : Kern :=
+  { k with maps := unmapRanges k.maps a n, ro := unmapRanges k.ro a n, noacc := unmapRanges k.noacc a n }
+
+@[simp] theorem Kern.unmap_maps (k : Kern) (a : Word) (n : Nat) :
+    (k.unmap a n).maps = unmapRanges k.maps a n := rfl
 
 def sysClose : Word := 57
 

@@ -16,7 +16,9 @@ v6.18.46 mm/mmap.c do_mmap, mm/util.c vm_mmap_pgoff).
   or a zero length.
 * Every other `mmap` (a file, MAP_FIXED, an address hint): NO outcome, fail
   closed.
-* The protection bits are not modelled: our memory is total.
+* `prot`: the new pages are read-write with PROT_WRITE, read-only with
+  PROT_READ or PROT_EXEC alone, no access with PROT_NONE (`withProt`;
+  Linux/Process.lean's permission); a bit beyond the three: no outcome.
 -/
 namespace NoCompiler.Linux
 
@@ -30,12 +32,27 @@ def einval : Word := -(BitVec.ofNat 64 22)
 /-- `[a, a + n)` and `[b, b + m)` share no byte (as numbers; both below TASK_SIZE). -/
 def disjointNat (a : Nat) (n : Nat) (b : Nat) (m : Nat) : Prop := a + n ≤ b ∨ b + m ≤ a
 
+/-- PROT_READ, PROT_WRITE, PROT_EXEC (asm-generic/mman-common.h). -/
+def protWrite : Word := 2
+def protReadExec : Word := 1 ||| 4
+
+/-- `[a, a + n)` with the protection `prot`, over whatever overlay it had:
+    read-write with PROT_WRITE (on RISC-V a writable page is readable),
+    read-only with PROT_READ or PROT_EXEC alone, no access with PROT_NONE. -/
+def withProt (prot a : Word) (n : Nat) (k : Kern) : Kern :=
+  let ro := unmapRanges k.ro a n
+  let na := unmapRanges k.noacc a n
+  if prot &&& protWrite ≠ 0 then { k with ro := ro, noacc := na }
+  else if prot &&& protReadExec ≠ 0 then { k with ro := (a, n) :: ro, noacc := na }
+  else { k with ro := ro, noacc := (a, n) :: na }
+
 def mmapSpec (k : Kern) (i : SyscallInput) (o : Outcome) (k' : Kern) : Prop :=
   let len := pageUp (i.arg 1)
-  if i.arg 0 = 0 ∧ i.arg 3 = mapPrivateAnon ∧ i.arg 4 = -1 ∧ i.arg 5 = 0 ∧ 0 < (i.arg 1).toNat then
+  if i.arg 0 = 0 ∧ i.arg 3 = mapPrivateAnon ∧ i.arg 4 = -1 ∧ i.arg 5 = 0 ∧ 0 < (i.arg 1).toNat ∧
+      (i.arg 2).toNat < 8 then
     (∃ a : Word, a.toNat % 4096 = 0 ∧ a.toNat + len ≤ taskSize ∧
         (∀ p ∈ k.maps, disjointNat a.toNat len p.1.toNat p.2) ∧
-        o = .ret { ret := a, zeros := [(a, len)] } none ∧ k' = { k with maps := (a, len) :: k.maps }) ∨
+        o = .ret { ret := a, zeros := [(a, len)] } none ∧ k' = withProt (i.arg 2) a len { k with maps := (a, len) :: k.maps }) ∨
       (o = .ret { ret := enomem } none ∧ k' = k)
   else False
 
@@ -45,7 +62,7 @@ def mmapSpec (k : Kern) (i : SyscallInput) (o : Outcome) (k' : Kern) : Prop :=
     succeeds too, as in Linux. -/
 def munmapSpec (k : Kern) (i : SyscallInput) (o : Outcome) (k' : Kern) : Prop :=
   if (i.arg 0).toNat % 4096 = 0 ∧ 0 < (i.arg 1).toNat then
-    o = .ret { ret := 0 } none ∧ k' = { k with maps := unmapRanges k.maps (i.arg 0) (pageUp (i.arg 1)) }
+    o = .ret { ret := 0 } none ∧ k' = k.unmap (i.arg 0) (pageUp (i.arg 1))
   else o = .ret { ret := einval } none ∧ k' = k
 
 /-- The process layer with `mmap` and `munmap`. -/
@@ -77,7 +94,8 @@ theorem mmap_fresh {k k' : Kern} {i : SyscallInput} {o : Outcome} (h : mmapSpec 
   unfold mmapSpec at h
   split at h
   · rcases h with ⟨a, h1, h2, h3, rfl, rfl⟩ | ⟨rfl, -⟩
-    · exact ⟨a, h1, h2, h3, rfl, List.mem_cons_self⟩
+    · refine ⟨a, h1, h2, h3, rfl, ?_⟩
+      unfold withProt; split <;> (try split) <;> exact List.mem_cons_self
     · exact absurd rfl (hok _ _ rfl)
   · exact h.elim
 
@@ -92,7 +110,8 @@ theorem munmap_unaligned {k k' : Kern} {i : SyscallInput} {o : Outcome} (h : (i.
 theorem mmap_file_none {k k' : Kern} {i : SyscallInput} {o : Outcome} (h : i.arg 4 = 3) :
     ¬ mmapSpec k i o k' := by
   have h4 : ¬ (i.arg 4 = -1) := by rw [h]; decide
-  have hc : ¬ (i.arg 0 = 0 ∧ i.arg 3 = mapPrivateAnon ∧ i.arg 4 = -1 ∧ i.arg 5 = 0 ∧ 0 < (i.arg 1).toNat) :=
+  have hc : ¬ (i.arg 0 = 0 ∧ i.arg 3 = mapPrivateAnon ∧ i.arg 4 = -1 ∧ i.arg 5 = 0 ∧ 0 < (i.arg 1).toNat ∧
+      (i.arg 2).toNat < 8) :=
     fun ⟨_, _, h', _⟩ => h4 h'
   intro hp
   unfold mmapSpec at hp

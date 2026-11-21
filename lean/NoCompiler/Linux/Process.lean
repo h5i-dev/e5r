@@ -1,10 +1,10 @@
-import NoCompiler.Linux.FsIo
+import NoCompiler.Linux.Prot
 import NoCompiler.Step
 import NoCompiler.Spec
 
 /-
 The whole process: the machine (the trusted `exec`, NoCompiler/Machine.lean)
-and the Linux layer for `ecall` (Linux/FsIo.lean), over `State × Kern`.
+and the Linux layer for `ecall` (Linux/Prot.lean), over `State × Kern`.
 
 * Accesses: a load or store, or a `read`/`write` buffer, must lie in the
   mapped ranges (`Kern.perm`, from `Kern.maps`); outside them the process has
@@ -21,17 +21,29 @@ and the Linux layer for `ecall` (Linux/FsIo.lean), over `State × Kern`.
 -/
 namespace NoCompiler.Linux
 
-/-- What the process may touch: every mapped range, read and write (the
-    protection bits are not modelled). A load or store outside it, or a
-    `read`/`write` buffer outside it, faults: the process has no step. -/
-def Kern.perm (k : Kern) : Perm := { rd := [], wr := k.maps.map fun p => ⟨p.1, p.2⟩ }
+/-- What the process may touch: the mapped ranges, read-write except where an
+    overlay says read-only (`Kern.ro`, kept inside the mapped ranges) or no
+    access (`Kern.noacc`). A load outside the readable ranges, a store outside
+    the writable ones, or a `read`/`write` buffer outside them, faults: the
+    process has no step. -/
+def Kern.perm (k : Kern) : Perm :=
+  { rd := (cutAll (interAll k.maps k.ro) k.noacc).map fun p => ⟨p.1, p.2⟩,
+    wr := (cutAll (cutAll k.maps k.ro) k.noacc).map fun p => ⟨p.1, p.2⟩ }
+
+theorem cutAll_nil (l : List (Word × Nat)) : cutAll l [] = l := rfl
+
+/-- With no overlays, every mapped range is read-write (the permission before
+    protections were modelled). -/
+theorem Kern.perm_plain (k : Kern) (hro : k.ro = []) (hna : k.noacc = []) :
+    k.perm = { rd := [], wr := k.maps.map fun p => ⟨p.1, p.2⟩ } := by
+  simp [Kern.perm, hro, hna, cutAll_nil, interAll]
 
 inductive PStep (c : Code) : State × Kern → State × Kern → Prop
   | exec {s s' : State} {k : Kern} {i : Instr} :
       s.exit = none → c.instr s.pc = some i → InstrOk k.perm i s → exec i s = some s' →
       PStep c (s, k) (s', k)
   | sys {s s' : State} {k k' : Kern} :
-      s.exit = none → c.instr s.pc = some .ecall → SysOk k.perm s → ProcStep6 (s, k) (s', k') →
+      s.exit = none → c.instr s.pc = some .ecall → SysOk k.perm s → ProcStep7 (s, k) (s', k') →
       PStep c (s, k) (s', k')
 
 theorem PStep.step {c : Code} {s s' : State} {k k' : Kern} (h : PStep c (s, k) (s', k'))
@@ -41,7 +53,7 @@ theorem PStep.step {c : Code} {s s' : State} {k k' : Kern} (h : PStep c (s, k) (
   | sys hx hi hok hp =>
     obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10⟩ := (hold hi).ne
     obtain ⟨hr, hl⟩ := (hold hi).ne6
-    exact .sys hx hi hok (ProcStep6.sys hp hr hl h1 h2 h3 h4 h5 h6 h7 h8 h9 h10)
+    exact .sys hx hi hok (ProcStep7.sys hp (hold hi).ne7 hr hl h1 h2 h3 h4 h5 h6 h7 h8 h9 h10)
 
 /-- A `Sys` transition is an outcome of the basic spec. -/
 theorem outcome_of_sys {s s' : State} (h : Sys s s') : ∃ o, spec (SyscallInput.of s) o ∧ o.apply s = s' := by
@@ -53,8 +65,8 @@ theorem PStep.progress {c : Code} {s s₁ : State} (k : Kern) (h : Step c k.perm
   cases h with
   | exec hx hi hok he => exact ⟨_, _, .exec hx hi hok he⟩
   | sys hx hi hok hy =>
-    obtain ⟨o, k', h⟩ := procSpec6_exists k (hold hi) hy
-    exact ⟨_, k', .sys hx hi hok (ProcStep6.step h)⟩
+    obtain ⟨o, k', h⟩ := procSpec7_exists k (hold hi) hy
+    exact ⟨_, k', .sys hx hi hok (ProcStep7.step h)⟩
 
 /-- The process reaches `Q` safely inside `D`: like `Reach`, over the process
     step. -/
@@ -79,17 +91,19 @@ theorem oldSys_of_step {c : Code} {P : Perm} {s s₁ : State} (h : Step c P s s�
                 · exact .inr (.inr (.inl h))
                 · exact .inr (.inr (.inr h))
 
-/-- At an instruction or an `OldSys` call, the mapped ranges do not change
-    (a file read moves its offset only), so neither does the permission. -/
-theorem PStep.maps_eq {c : Code} {s s' : State} {k k' : Kern} (h : PStep c (s, k) (s', k'))
-    (hold : c.instr s.pc = some .ecall → OldSys s) : k'.maps = k.maps := by
+/-- At an instruction or an `OldSys` call, the mapped ranges and their
+    protections do not change (a file read moves its offset only), so neither
+    does the permission. -/
+theorem PStep.mem_eq {c : Code} {s s' : State} {k k' : Kern} (h : PStep c (s, k) (s', k'))
+    (hold : c.instr s.pc = some .ecall → OldSys s) : k'.maps = k.maps ∧ k'.ro = k.ro ∧ k'.noacc = k.noacc := by
   cases h with
-  | exec => rfl
-  | sys _ hi _ hp => exact ProcStep6.maps_old hp (hold hi)
+  | exec => exact ⟨rfl, rfl, rfl⟩
+  | sys _ hi _ hp => exact ProcStep7.mem_old hp (hold hi)
 
 theorem PStep.perm_eq {c : Code} {s s' : State} {k k' : Kern} (h : PStep c (s, k) (s', k'))
     (hold : c.instr s.pc = some .ecall → OldSys s) : k'.perm = k.perm := by
-  simp only [Kern.perm, PStep.maps_eq h hold]
+  obtain ⟨h1, h2, h3⟩ := PStep.mem_eq h hold
+  simp only [Kern.perm, h1, h2, h3]
 
 /-- What is proved of the trusted `Step` holds of the process: a safe run to
     `Q` under the process's permission is a safe process run to `Q`. (A trusted
@@ -141,7 +155,49 @@ theorem load_unmapped_faults (s : State) (hpc : s.pc = 0x1000#64) :
     rw [hi] at hi'; cases hi'
     rcases hok with h0 | ⟨r, hr, _⟩
     · simp [LdOp.width] at h0
-    · simp [Kern.perm, Kern.init] at hr
+    · simp [Kern.perm, Kern.init, cutAll, interAll] at hr
+  | sys _ hi' _ _ => rw [hi] at hi'; cases hi'
+
+/-- One page at 0x1000 mapped read-only (`mmap` with PROT_READ, or `mprotect`). -/
+def kRo : Kern := { Kern.init with maps := [(0x1000, 4096)], ro := [(0x1000, 4096)] }
+
+/-- The same page with no access (PROT_NONE). -/
+def kNone : Kern := { Kern.init with maps := [(0x1000, 4096)], noacc := [(0x1000, 4096)] }
+
+/-- Control: a store to a read-only page faults: `sd a0, 0(a1)` with a1 in it
+    has no process step. -/
+theorem store_readonly_faults (s : State) (hpc : s.pc = 0x2000#64) (ha : s.reg 11 = 0x1000#64) :
+    let c : Code := ⟨0x2000#64, #[0x00a5b023#32]⟩
+    ¬ ∃ s' k', PStep c (s, kRo) (s', k') := by
+  intro c
+  have hi : c.instr s.pc = some (.store .sd 11 10 0) := by rw [hpc]; decide
+  have hw : kRo.perm.wr = [] := by decide
+  rintro ⟨s', k', h⟩
+  cases h with
+  | exec _ hi' hok _ =>
+    rw [hi] at hi'; cases hi'
+    rcases hok with h0 | ⟨r, hr, _⟩
+    · simp [StOp.width] at h0
+    · rw [hw] at hr; exact List.not_mem_nil hr
+  | sys _ hi' _ _ => rw [hi] at hi'; cases hi'
+
+/-- And a load from it is allowed: the readable ranges hold the page. -/
+theorem readonly_readable : kRo.perm.rd.map (fun r => (r.base, r.size)) = [(0x1000, 4096)] := by decide
+
+/-- Control: a load from a PROT_NONE page faults. -/
+theorem load_none_faults (s : State) (hpc : s.pc = 0x2000#64) :
+    let c : Code := ⟨0x2000#64, #[0x0005b503#32]⟩
+    ¬ ∃ s' k', PStep c (s, kNone) (s', k') := by
+  intro c
+  have hi : c.instr s.pc = some (.load .ld 10 11 0) := by rw [hpc]; decide
+  have hr0 : kNone.perm.rd = [] ∧ kNone.perm.wr = [] := by decide
+  rintro ⟨s', k', h⟩
+  cases h with
+  | exec _ hi' hok _ =>
+    rw [hi] at hi'; cases hi'
+    rcases hok with h0 | ⟨r, hr, _⟩
+    · simp [LdOp.width] at h0
+    · rw [hr0.1, hr0.2] at hr; exact List.not_mem_nil hr
   | sys _ hi' _ _ => rw [hi] at hi'; cases hi'
 
 end NoCompiler.Linux

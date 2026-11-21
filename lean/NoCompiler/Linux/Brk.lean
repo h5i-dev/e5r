@@ -30,8 +30,7 @@ def brkSpec (k : Kern) (req : Word) (o : Outcome) (k' : Kern) : Prop :=
     o = .ret { ret := k.brk } none ∧ k' = k
   else if req.toNat < k.brk.toNat then
     (o = .ret { ret := req } none ∧
-      k' = { k with brk := req,
-                    maps := unmapRanges k.maps (BitVec.ofNat 64 (pageUp req)) (pageUp k.brk - pageUp req) }) ∨
+      k' = { k.unmap (BitVec.ofNat 64 (pageUp req)) (pageUp k.brk - pageUp req) with brk := req }) ∨
     (o = .ret { ret := k.brk } none ∧ k' = k)
   else
     (o = .ret { ret := req, zeros := [(BitVec.ofNat 64 (pageUp k.brk), pageUp req - pageUp k.brk)] } none ∧

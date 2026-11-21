@@ -778,3 +778,29 @@ thing a fuzz driver does.
   FILE, `openat(AT_FDCWD, argv[1], O_RDONLY)` opens FILE as fd 3 at offset
   0; the control `openat_argv1_missing` gives ENOENT for a FILE not there.
 - Axioms: standard. lake env lean: Launch 1.92 s.
+
+### Twelfth step: page protections (lean/NoCompiler/Linux/Prot.lean)
+
+What Q5 (a) (db71a9e) left out: the permission bits. Before this step every
+mapped range was read-write.
+- `Kern.ro`, `Kern.noacc`: overlays on the mapped ranges (read-only;
+  PROT_NONE). `Kern.perm`: readable-only is `ro` inside the mapped ranges
+  minus `noacc`; writable is the mapped ranges minus both. Both stay inside
+  the mapped ranges whatever the overlays hold, so a stale overlay can only
+  take access away.
+- `mmap`'s `prot` (`withProt`): PROT_WRITE read-write, PROT_READ or
+  PROT_EXEC alone read-only, PROT_NONE no access; a bit beyond the three: no
+  outcome. `munmap` and a `brk` shrink cut the overlays too (`Kern.unmap`).
+- `mprotect` (226): EINVAL unaligned; 0 for `len = 0`; on a wholly mapped
+  range 0 and the new protection; a range not wholly mapped: no outcome
+  (Linux changes the pages before the hole, then ENOMEM; not modelled).
+- Process.lean steps by `ProcStep7`; `PStep.mem_eq`/`perm_eq` (the four
+  `OldSys` calls leave maps and overlays alone) keep `PReach.of_reach`.
+  `Kern.perm_plain`: with no overlays the permission is the old one.
+- Controls: `store_readonly_faults` (a store to a read-only page has no
+  step), `load_none_faults` (a load from a PROT_NONE page), with
+  `readonly_readable` (the read-only page is readable), `mprotect_unaligned`;
+  `mprotect_ro`.
+- `hello_process` now assumes its data readable and its stack frame
+  writable in the permission; `hello_process_plain` is the earlier form.
+- Axioms: standard. lake env lean: Prot 1.02 s, Process 1.13 s, Mmap 1.11 s.
