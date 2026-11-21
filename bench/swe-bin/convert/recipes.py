@@ -13,7 +13,12 @@ from __future__ import annotations
 
 import os
 import re
+import glob
+import json
 import shlex
+import shutil
+import subprocess
+import sys
 import subprocess
 from dataclasses import dataclass, field
 
@@ -85,6 +90,7 @@ def parse_automake(log: str) -> dict:
 
 
 class Recipe:
+    current: dict = {}  # subject path -> the ELF the tests run (set by the converter)
     name = ""
     language = ""
     subjects: list = []  # paths in the checkout of the riscv64 ELFs the agent may edit
@@ -218,6 +224,147 @@ class RedisLike(Recipe):
         return r
 
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import rusttc  # noqa: E402
+
+RV_RUSTFLAGS = ("-C linker=rv-cc -C link-self-contained=no -C target-feature=+zba,+zbb,-relax "
+                "-C code-model=medium -C relocation-model=static "
+                "-C link-arg=-Wl,--emit-relocs -C link-arg=-lgcc -Awarnings")  # -lgcc: old rustc links -nodefaultlibs, and musl's printf needs the long double builtins
+
+
+def rust_env_prefix(target_dir: str) -> str:
+    t = "riscv64imafd_unknown_linux_musl"
+    return (f"RUSTUP_HOME={rusttc.RUSTUP_HOME} CARGO_HOME={rusttc.CARGO_HOME} "
+            f"CARGO_TARGET_DIR={target_dir} CC_{t}=rv-cc CXX_{t}=rv-c++ AR_{t}=llvm-ar CFLAGS_{t}=-g ")
+
+
+class RustProgram(Recipe):
+    """A Rust program whose integration tests run it as a child process (bat, rg, coreutils, nu).
+
+    The subject is the program, built --release for riscv64 (build-std, the no-C target). The
+    tests are the SWE-bench command, built for the host. Every copy of the host program that the
+    tests can find (target/debug/P, deps/P-HASH, which cargo copies to target/debug/P on each run,
+    and P next to a test executable, where assert_cmd looks) is replaced by the qemu wrapper.
+    Tests in a test executable that does not run the program are excluded (see judge)."""
+    language = "Rust"
+
+    def __init__(self, name, bins, package_args=""):
+        self.name = name
+        self.bins = bins  # cargo bin target names
+        self.subjects = [f"rv/{b}" for b in bins]  # copied here from the riscv64 target dir
+        self.package_args = package_args  # cargo args selecting the bin's package
+
+    def dirs(self, wt):
+        # shared by the tasks of one repository (the converter runs them one at a time), so
+        # that dependencies and the rebuilt std are compiled once
+        root = os.path.join(SWB, "cargo-target", self.name)
+        return os.path.join(root, "rv"), os.path.join(root, "host")
+
+    def toolchain(self, wt, log):
+        head = subprocess.run(["git", "-C", wt, "rev-parse", "HEAD"], stdout=subprocess.PIPE,
+                              check=True).stdout.decode().strip()
+        try:
+            self.tc = rusttc.for_commit(wt, head)
+            self.tcm = rusttc.setup(self.tc)
+        except RuntimeError as e:
+            raise Failed("toolchain", str(e))
+        log.commands.append({"stage": "toolchain", "cwd": "", "cmd": f"# {json.dumps(self.tcm)}"})
+        return self.tc
+
+    def build(self, wt, log):
+        tc = self.toolchain(wt, log)
+        rv, _ = self.dirs(wt)
+        bins = " ".join(f"--bin {b}" for b in self.bins)
+        flags = f"{RV_RUSTFLAGS} {self.tcm['jump_tables_flag']}"
+        cmd = (f"{rust_env_prefix(rv)}RUSTFLAGS='{flags}' cargo +{tc} build --release "
+               f"-j{JOBS} {self.package_args} {bins} -Zbuild-std=std,panic_unwind "
+               f"{self.tcm['json_target_flag']} --target {self.tcm['target']}")
+        try:
+            log.run(cmd, wt, "build", timeout=7200)
+        except Failed as e:
+            # an old libc without riscv64 musl: bump libc only (recorded in the task's commands)
+            if "could not compile `libc`" not in e.detail:
+                raise
+            log.run(f"{rust_env_prefix(rv)}cargo +{tc} update -p libc --precise 0.2.155", wt, "build-libc-bump")
+            log.run(cmd, wt, "build", timeout=7200)
+        os.makedirs(os.path.join(wt, "rv"), exist_ok=True)
+        for b in self.bins:
+            shutil.copy(os.path.join(rv, "riscv64imafd-unknown-linux-musl", "release", b), os.path.join(wt, "rv", b))
+
+    def reset_generated(self, wt, log):
+        # keeps a libc bump (Cargo.lock) through the reset: the gold build uses the same lock
+        lock = os.path.join(wt, "Cargo.lock")
+        saved = open(lock, "rb").read() if os.path.exists(lock) else None
+        log.run("git checkout -q -- . && git clean -fdq", wt, "reset")
+        if saved is not None:
+            with open(lock, "wb") as fh:
+                fh.write(saved)
+
+    def _cargo_test(self, task):
+        t = test_line(task)
+        m = re.match(r"^((?:\w+=(?:\"[^\"]*\"|\S+)\s+)*)cargo test (.*)$", t)
+        if not m:
+            raise Failed("test", f"not a cargo test command: {t}")
+        return m.group(1), m.group(2)
+
+    def run_tests(self, wt, task, log):
+        _, host = self.dirs(wt)
+        envs, args = self._cargo_test(task)
+        # cargo's own args are before "--"; --no-run takes no test-binary args
+        cargo_args = args.split(" -- ")[0]
+        pre = f"{rust_env_prefix(host)}{envs}"
+        tc = self.tc
+        out = log.run(f"{pre}cargo +{tc} test -j{JOBS} {cargo_args} --no-run --message-format=json "
+                      f"2>/dev/null", wt, "test-build", timeout=7200, check=False)
+        exes = []
+        for line in out.splitlines():
+            try:
+                j = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if j.get("reason") == "compiler-artifact" and j.get("executable") and j["profile"]["test"]:
+                exes.append(j["executable"])
+        if not exes:
+            raise Failed("test-build", "the host tests did not build")
+        elfs = {b: self.current[f"rv/{b}"] for b in self.bins}
+        for b in self.bins:
+            places = [os.path.join(host, "debug", b)]
+            places += [p for p in glob.glob(os.path.join(host, "debug", "deps", b + "-*"))
+                       if not os.path.splitext(p)[1]]
+            places += [os.path.join(os.path.dirname(e), b) for e in exes]
+            for p in places:
+                wrapper(p, elfs[b])
+        return log.run(f"{pre}cargo +{tc} test -j{JOBS} {args} 2>&1 ; true", wt, "test",
+                       timeout=5400, check=False)
+
+    def parse(self, out):
+        # tests in a unit-test executable (cargo prints "Running unittests ...") run host code
+        # in-process, not the program: excluded
+        unit = getattr(self, "unit_tests", set())
+        section = ""
+        for line in out.splitlines():
+            m = re.match(r"^\s+Running (\S+)", line)
+            if m:
+                section = m.group(1)
+            m = re.match(r"^test (\S+) \.\.\. ", line)
+            if m and section == "unittests":
+                unit.add(m.group(1))
+        self.unit_tests = unit
+        return parse_cargo(out)
+
+    def excluded(self, test):
+        if test in getattr(self, "unit_tests", set()):
+            return "an in-process unit test of host code (cargo 'Running unittests'): it does not run the program"
+        return super().excluded(test)
+
+
+def parse_cargo(out: str) -> dict:
+    r = {}
+    for m in re.finditer(r"^test (\S+) \.\.\. (ok|FAILED|ignored)", out, re.M):
+        r[m.group(1)] = {"ok": "PASSED", "ignored": "SKIPPED"}.get(m.group(2), "FAILED")
+    return r
+
+
 def test_line(task) -> str:
     es = task["eval_script"]
     t = es.split(": '>>>>> Start Test Output'")[1].split(": '>>>>> End Test Output'")[0].strip()
@@ -228,4 +375,8 @@ def test_line(task) -> str:
 
 
 RECIPES = {"jqlang/jq": Jq(), "micropython/micropython": MicroPython(),
-           "redis/redis": RedisLike("redis"), "valkey-io/valkey": RedisLike("valkey")}
+           "redis/redis": RedisLike("redis"), "valkey-io/valkey": RedisLike("valkey"),
+           "sharkdp/bat": RustProgram("bat", ["bat"], "--package bat"),
+           "burntsushi/ripgrep": RustProgram("ripgrep", ["rg"], "--package ripgrep"),
+           "uutils/coreutils": RustProgram("coreutils", ["coreutils"], "--package coreutils"),
+           "nushell/nushell": RustProgram("nushell", ["nu"], "--package nu")}

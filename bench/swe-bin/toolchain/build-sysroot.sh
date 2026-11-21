@@ -65,9 +65,13 @@ cp "$SR/lib/libunwind.a" "$SR/lib/libgcc_eh.a"
 # rv-cc / rv-c++: the C compiler every C task uses (flags recorded in each task's recipe)
 for n in cc c++; do
   d=clang; [ $n = c++ ] && d=clang++
+  # -static, except for a -shared link (jemalloc's build makes a .so that is never used):
+  # that one links its objects only, -nostdlib (the sysroot has no shared libc)
   cat > "$BIN/rv-$n" <<EOS
 #!/bin/sh
-exec $d --target=riscv64-linux-musl $MARCH --sysroot=$SR -Qunused-arguments -fuse-ld=lld -static -Wl,--emit-relocs "\$@"
+st=-static
+for a in "\$@"; do [ "\$a" = -shared ] && st=-nostdlib; done
+exec $d --target=riscv64-linux-musl $MARCH --sysroot=$SR -Qunused-arguments -fuse-ld=lld \$st -Wl,--emit-relocs "\$@"
 EOS
   chmod +x "$BIN/rv-$n"
 done

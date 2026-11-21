@@ -112,6 +112,7 @@ def apply_patch(wt, log, text, name, stage):
 
 
 def run_side(recipe, wt, log, task, elfs, side):
+    recipe.current = dict(zip(recipe.subjects, elfs))
     for rel, elf in zip(recipe.subjects, elfs):
         wrapper(os.path.join(wt, rel), elf)
     out = recipe.run_tests(wt, task, log)
@@ -170,6 +171,7 @@ def convert(task, keep_work=False):
             t = time.time()
             recipe.build(wt, log)
             elfs = []
+            recipe.unit_tests = set()
             for rel in recipe.subjects:
                 dst = os.path.join(art, f"{side}.{os.path.basename(rel)}.debug.elf")
                 shutil.copy(os.path.join(wt, rel), dst)
