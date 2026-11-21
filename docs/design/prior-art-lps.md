@@ -697,3 +697,26 @@ musl binaries like OVP's need first):
 - Next: the same for programs that use the new calls (`brk`, `mmap`,
   `writev`, the startup calls). Their proofs need the process semantics
   directly, which is where C's automation would run.
+
+### Q5 (a): the process-level access check (lead's decision, 2026-11-21 03:58)
+
+- `Kern.maps` is now every mapped range. `Kern.perm` makes them all readable
+  and writable (protection bits are not modelled).
+- `PStep` requires `InstrOk k.perm` / `SysOk k.perm`, so a load, a store or
+  a syscall buffer outside the mapped ranges has no step: it faults. The
+  trusted `Step` and `State` are unchanged.
+- Now representable:
+  - `brk` grow records its pages;
+  - `brk` shrink unmaps [PAGE_ALIGN(req), PAGE_ALIGN(old));
+  - `munmap` cuts its page-rounded range out of every range
+    (`unmapRanges`); EINVAL for an unaligned address or a zero length.
+- `unmap_gone`: after unmapping, no range covers an address in the hole.
+- `PStep.kern_eq`: instructions and the four `OldSys` calls leave `Kern`
+  alone.
+  - `PReach.of_reach` (a trusted run under `k.perm`) and `of_reach_le` (any
+    spec whose permission is at most `k.perm`) carry proofs to the process.
+  - The control is `load_unmapped_faults`.
+- `hello_process` now assumes the kernel maps hello's read-only data and
+  its stack frame, instead of all of memory.
+- Axioms: standard. lake env lean: Fd 1.6 s, Brk 1.5 s, Mmap 2.2 s,
+  Process 2.1 s.

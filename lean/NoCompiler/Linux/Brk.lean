@@ -12,11 +12,11 @@ mm/mmap.c SYSCALL_DEFINE1(brk)).
   LPS also refuses a grow that would meet another mapping or exceed the memory
   budget; here such a grow may still succeed. That over-approximates Linux's
   outcomes, which is sound for proofs that hold for every outcome.
-* A shrink (`startBrk ≤ req < brk`): Linux unmaps the freed pages, so a later
-  access faults. Our memory is total and cannot say "unmapped", so a shrink
-  has NO outcome here: the process cannot step (fail closed), and no proof
-  goes through for a program that shrinks the break. That comes with partial
-  memory (LPS `eff_unmaps`).
+* A grow records its new pages in `Kern.maps`, so the process may touch them
+  (Linux/Process.lean).
+* A shrink (`startBrk ≤ req < brk`): the break `req`, with
+  [PAGE_ALIGN(req), PAGE_ALIGN(brk)) cut out of `Kern.maps` (LPS
+  `brk_unmaps`), so a later access there faults; or failure.
 -/
 namespace NoCompiler.Linux
 
@@ -28,10 +28,15 @@ def pageUp (x : Word) : Nat := (x.toNat + 4095) / 4096 * 4096
 def brkSpec (k : Kern) (req : Word) (o : Outcome) (k' : Kern) : Prop :=
   if req = 0 ∨ req.toNat < k.startBrk.toNat then
     o = .ret { ret := k.brk } none ∧ k' = k
-  else if req.toNat < k.brk.toNat then False
+  else if req.toNat < k.brk.toNat then
+    (o = .ret { ret := req } none ∧
+      k' = { k with brk := req,
+                    maps := unmapRanges k.maps (BitVec.ofNat 64 (pageUp req)) (pageUp k.brk - pageUp req) }) ∨
+    (o = .ret { ret := k.brk } none ∧ k' = k)
   else
     (o = .ret { ret := req, zeros := [(BitVec.ofNat 64 (pageUp k.brk), pageUp req - pageUp k.brk)] } none ∧
-      k' = { k with brk := req }) ∨
+      k' = { k with brk := req,
+                    maps := (BitVec.ofNat 64 (pageUp k.brk), pageUp req - pageUp k.brk) :: k.maps }) ∨
     (o = .ret { ret := k.brk } none ∧ k' = k)
 
 /-- The process layer so far: `brk`, then the fd table and the basic calls. -/
@@ -71,14 +76,19 @@ theorem brk_grow {k k' : Kern} {req : Word} {o : Outcome} (h0 : req ≠ 0)
   · exact .inl ⟨ho, rfl⟩
   · exact .inr h
 
-/-- Control: a shrink has no outcome (fail closed). -/
-theorem brk_shrink_none {k k' : Kern} {req : Word} {o : Outcome} (h0 : req ≠ 0)
-    (hs : k.startBrk.toNat ≤ req.toNat) (hlt : req.toNat < k.brk.toNat) : ¬ brkSpec k req o k' := by
+/-- A shrink either fails or unmaps the freed pages. -/
+theorem brk_shrink {k k' : Kern} {req : Word} {o : Outcome} (h0 : req ≠ 0)
+    (hs : k.startBrk.toNat ≤ req.toNat) (hlt : req.toNat < k.brk.toNat) (h : brkSpec k req o k') :
+    (o = .ret { ret := req } none ∧
+      k'.maps = unmapRanges k.maps (BitVec.ofNat 64 (pageUp req)) (pageUp k.brk - pageUp req)) ∨
+    (o = .ret { ret := k.brk } none ∧ k' = k) := by
   have h1 : ¬ (req = 0 ∨ req.toNat < k.startBrk.toNat) := by
     rintro (h | h)
     · exact h0 h
     · omega
-  simp only [brkSpec, h1, hlt, ↓reduceIte]
-  exact id
+  simp only [brkSpec, h1, hlt, ↓reduceIte] at h
+  rcases h with ⟨ho, rfl⟩ | h
+  · exact .inl ⟨ho, rfl⟩
+  · exact .inr h
 
 end NoCompiler.Linux

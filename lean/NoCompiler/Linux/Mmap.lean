@@ -11,8 +11,11 @@ v6.18.46 mm/mmap.c do_mmap, mm/util.c vm_mmap_pgoff).
   (generic_get_unmapped_area_topdown, which LPS runs); any free one is
   allowed here, which over-approximates Linux and is sound for proofs that
   hold for every outcome.
-* Every other `mmap` (a file, MAP_FIXED, an address hint), and `munmap`
-  (215): NO outcome, fail closed, until the layer has partial memory.
+* `munmap` (215): the pages cut out of `Kern.maps` (Linux/Fd.lean), so a
+  later access faults (Linux/Process.lean); EINVAL for an unaligned address
+  or a zero length.
+* Every other `mmap` (a file, MAP_FIXED, an address hint): NO outcome, fail
+  closed.
 * The protection bits are not modelled: our memory is total.
 -/
 namespace NoCompiler.Linux
@@ -22,6 +25,7 @@ def sysMunmap : Word := 215
 def mapPrivateAnon : Word := 0x22
 def taskSize : Nat := 0x800000000000
 def enomem : Word := -(BitVec.ofNat 64 12)
+def einval : Word := -(BitVec.ofNat 64 22)
 
 /-- `[a, a + n)` and `[b, b + m)` share no byte (as numbers; both below TASK_SIZE). -/
 def disjointNat (a : Nat) (n : Nat) (b : Nat) (m : Nat) : Prop := a + n ≤ b ∨ b + m ≤ a
@@ -35,10 +39,19 @@ def mmapSpec (k : Kern) (i : SyscallInput) (o : Outcome) (k' : Kern) : Prop :=
       (o = .ret { ret := enomem } none ∧ k' = k)
   else False
 
-/-- The process layer with `mmap`; `munmap` has no outcome. -/
+/-- `munmap(addr, len)`: 0, with the page-rounded range cut out of the mapped
+    ranges, for a page-aligned `addr` and `len > 0`; EINVAL otherwise
+    (mm/mmap.c, do_vmi_munmap). Unmapping a range that holds no mapping
+    succeeds too, as in Linux. -/
+def munmapSpec (k : Kern) (i : SyscallInput) (o : Outcome) (k' : Kern) : Prop :=
+  if (i.arg 0).toNat % 4096 = 0 ∧ 0 < (i.arg 1).toNat then
+    o = .ret { ret := 0 } none ∧ k' = { k with maps := unmapRanges k.maps (i.arg 0) (pageUp (i.arg 1)) }
+  else o = .ret { ret := einval } none ∧ k' = k
+
+/-- The process layer with `mmap` and `munmap`. -/
 def procSpec2 (k : Kern) (i : SyscallInput) (o : Outcome) (k' : Kern) : Prop :=
   if i.sysno = sysMmap then mmapSpec k i o k'
-  else if i.sysno = sysMunmap then False
+  else if i.sysno = sysMunmap then munmapSpec k i o k'
   else procSpec k i o k'
 
 inductive ProcStep2 : State × Kern → State × Kern → Prop
@@ -68,13 +81,12 @@ theorem mmap_fresh {k k' : Kern} {i : SyscallInput} {o : Outcome} (h : mmapSpec 
     · exact absurd rfl (hok _ _ rfl)
   · exact h.elim
 
-/-- Control: `munmap` has no outcome (fail closed). -/
-theorem munmap_none {k k' : Kern} {i : SyscallInput} {o : Outcome} (h : i.sysno = sysMunmap) :
-    ¬ procSpec2 k i o k' := by
-  have hmm : sysMunmap ≠ sysMmap := by decide
-  intro hp
-  unfold procSpec2 at hp
-  simp only [h, hmm, ↓reduceIte] at hp
+/-- Control: `munmap` of an unaligned address fails with EINVAL and unmaps nothing. -/
+theorem munmap_unaligned {k k' : Kern} {i : SyscallInput} {o : Outcome} (h : (i.arg 0).toNat % 4096 ≠ 0)
+    (hm : munmapSpec k i o k') : o = .ret { ret := einval } none ∧ k' = k := by
+  have hc : ¬ ((i.arg 0).toNat % 4096 = 0 ∧ 0 < (i.arg 1).toNat) := fun ⟨h', _⟩ => h h'
+  simp only [munmapSpec, hc, ↓reduceIte] at hm
+  exact hm
 
 /-- Control: mapping a file (fd 3) has no outcome either. -/
 theorem mmap_file_none {k k' : Kern} {i : SyscallInput} {o : Outcome} (h : i.arg 4 = 3) :

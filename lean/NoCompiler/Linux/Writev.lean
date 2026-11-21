@@ -18,7 +18,6 @@ buffer has (`writeSpec`, Linux/Basic.lean).
 namespace NoCompiler.Linux
 
 def sysWritev : Word := 66
-def einval : Word := -(BitVec.ofNat 64 22)
 
 /-- The `j`-th iovec's buffer. -/
 def iovBuf (m : Word → Byte) (iov : Word) (j : Nat) : List Byte :=

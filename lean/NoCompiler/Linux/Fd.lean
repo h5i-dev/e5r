@@ -24,10 +24,44 @@ structure Kern where
   /-- The program break's start and current value (Linux/Brk.lean); 0 until the loader sets them. -/
   startBrk : Word := 0
   brk : Word := 0
-  /-- Anonymous mappings made by `mmap` (Linux/Mmap.lean), as (base, size). -/
+  /-- The mapped ranges, (base, size), each below TASK_SIZE: what a load or a
+      store may touch (Linux/Process.lean). The loader's image and stack, the
+      heap `brk` grows, the pages `mmap` maps; `munmap` and a `brk` shrink cut
+      them out again. -/
   maps : List (Word × Nat) := []
 
 def Kern.init : Kern := { fds := [0, 1, 2] }
+
+/-- What is left of the range `p` once `[a, a + n)` is cut out of it (as numbers). -/
+def cutRange (a n : Nat) (p : Word × Nat) : List (Word × Nat) :=
+  let b := p.1.toNat
+  let e := b + p.2
+  (if b < a then [(p.1, min e a - b)] else []) ++
+  (if a + n < e then [(BitVec.ofNat 64 (max b (a + n)), e - max b (a + n))] else [])
+
+/-- The mapped ranges with `[a, a + n)` unmapped (Linux `do_vmi_munmap`: every
+    range that meets it is cut, not only one). -/
+def unmapRanges (maps : List (Word × Nat)) (a : Word) (n : Nat) : List (Word × Nat) :=
+  maps.flatMap (cutRange a.toNat n)
+
+/-- After unmapping `[a, a + n)`, no range covers an address in it (all ranges
+    below 2^63, so their bases are exact as numbers). -/
+theorem unmap_gone {maps : List (Word × Nat)} {a : Word} {n x : Nat}
+    (hb : ∀ p ∈ maps, p.1.toNat + p.2 < 2 ^ 63) (hx1 : a.toNat ≤ x) (hx2 : x < a.toNat + n) :
+    ∀ q ∈ unmapRanges maps a n, ¬ (q.1.toNat ≤ x ∧ x < q.1.toNat + q.2) := by
+  intro q hq
+  simp only [unmapRanges, List.mem_flatMap] at hq
+  obtain ⟨p, hp, hq⟩ := hq
+  have hlt := hb p hp
+  simp only [cutRange, List.mem_append] at hq
+  rcases hq with hq | hq
+  · split at hq
+    · simp only [List.mem_singleton] at hq; subst hq; dsimp only; omega
+    · simp at hq
+  · split at hq
+    · simp only [List.mem_singleton] at hq; subst hq; dsimp only
+      rw [BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)]; omega
+    · simp at hq
 
 def sysClose : Word := 57
 
