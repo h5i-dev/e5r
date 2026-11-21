@@ -1,22 +1,22 @@
 {
   "Examples/Chunks/CobsB.lean": {
-    "kernel_ms_per_instr": 514.35,
-    "total_ms_per_instr": 2939.52
+    "kernel_ms_per_instr": 134.19,
+    "total_ms_per_instr": 1226.13
   },
   "Examples/Chunks/Hello.lean": {
-    "kernel_ms_per_instr": 181.11,
-    "total_ms_per_instr": 1700.1
+    "kernel_ms_per_instr": 65.79,
+    "total_ms_per_instr": 611.04
   },
   "Examples/Chunks/Sum2B.lean": {
-    "kernel_ms_per_instr": 122.7,
-    "total_ms_per_instr": 2215.5
+    "kernel_ms_per_instr": 45.42,
+    "total_ms_per_instr": 893.1
   },
   "Examples/Chunks/SumB.lean": {
-    "kernel_ms_per_instr": 383.34,
-    "total_ms_per_instr": 1880.13
+    "kernel_ms_per_instr": 97.32,
+    "total_ms_per_instr": 742.2
   },
   "VC/MemChk1000": {
-    "kernel_ms_per_instr": 15.57,
-    "total_ms_per_instr": 16.86
+    "kernel_ms_per_instr": 6.93,
+    "total_ms_per_instr": 7.53
   }
 }
