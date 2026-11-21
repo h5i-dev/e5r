@@ -88,8 +88,11 @@ per binary, self-check included:
 - **Before the dataflow,** a linear scan missed one low part in `acos` and
   reported 2 own and 3 closure keys changed.
 - **Not yet:**
-  - the Lean-side measurement on the whole artifact. It needs the whole
-    module as Lean, the format A is redesigning (round2-next.md, 03:58).
+  - the Lean-side measurement on the whole artifact. Its module as one
+    Lean literal (1237 functions, 3.3 MB) does not elaborate under the 6 GB
+    cap: at the default heartbeats it times out after 29.5 s, 1.38 GB; with
+    no heartbeat limit it hits the recursion limit after 110.8 s, 4.36 GB.
+    It waits on the per-function format A is redesigning.
 
 Not yet: search by specification (the spec is named, not indexed), and
 ledger entries for theorems whose specification depends on the layout (data
