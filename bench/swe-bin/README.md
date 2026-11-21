@@ -7,12 +7,17 @@ The agent edits that binary with nocompiler's tools; writing and compiling sourc
 possible. The submission is judged by SWE-bench's criterion: every FAIL_TO_PASS and every
 PASS_TO_PASS test passes against the submitted binary, run under `qemu-riscv64-static`.
 
+> **Scratch mode is TODO (user decision, 14:35 UTC).** Patch mode is the environment. The
+> scratch-mode code below (the stubs, FUNCTIONS.md, swb-elf extract, the scratch smoke test) is a
+> prototype that ran once end to end (jqlang__jq-2235). It is not maintained or used for results
+> until the user takes it up again. The kernel's scratch-mode theorems stay as they are.
+
 Two modes share the tasks, the tests and the reward criterion:
 
 | mode | starting binary | what the agent gets | naming |
 | --- | --- | --- | --- |
 | **patch** (default) | the base commit's binary | the issue | the SWE-bench port |
-| **scratch** (opt-in, `--mode scratch`) | the base binary, with every function the gold patch changes replaced by a stub (`exit(127)`) | the issue, the tests, and per removed function its symbol, DWARF prototype, callers and size; no source | **SWE-bench-derived (function-level from-scratch)**, never reported as SWE-bench |
+| **scratch** (TODO; prototype, `--mode scratch`) | the base binary, with every function the gold patch changes replaced by a stub (`exit(127)`) | the issue, the tests, and per removed function its symbol, DWARF prototype, callers and size; no source | **SWE-bench-derived (function-level from-scratch)**, never reported as SWE-bench |
 
 ```
 bench/swe-bin/
@@ -137,5 +142,5 @@ two episodes per mode:
 
 - **Class B (tokio, axum, ruff):** the tests are compiled into the submitted test executable, so they are visible in it (lead decision Q1). A submission may change only functions of the crates under test, outside test modules; `harness.integrity` checks this against base before any test runs.
 - **No proof bonus yet:** `check_proof` reports "not available". nocompiler cannot yet build the Lean module of a whole musl binary (STATUS-D R-D1, assigned to B). The kernel's bonus path is proved, but it cannot be reached yet.
-- **Disassembly workaround:** until R-D1 lands, `disasm FILE FUNC` prints FUNC from a copy of the binary in which every other function is `ret` (`swb-elf isolate`). Functions outside the profile (F/D/A instructions) have no structured text; patch them with `nocompiler patch`, or rewrite them in profile code.
+- **Disassembly:** R-D1 landed (B, a2a13f3: module recovery per function), and `disasm FILE FUNC` prints FUNC from the binary itself. The `swb-elf isolate` fallback stays for binaries where nocompiler still gives up. Functions outside the profile (F/D/A instructions) have no structured text; patch them with `nocompiler patch`, or rewrite them in profile code.
 - **Platform:** musl rather than glibc, and qemu rather than hardware. A test that needs a glibc locale or real timing can fail at gold; such tasks are dropped with the reason (`tasks/notes.json`).
