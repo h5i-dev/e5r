@@ -570,3 +570,17 @@ musl binaries like OVP's need first):
   - `eff_unmaps` and `eff_copies`, which need partial memory;
   - an fd table;
   - errno values.
+
+### Second step: the fd table (lean/NoCompiler/Linux/Fd.lean)
+
+- `Kern` (the open descriptors; `Kern.init` = 0, 1, 2) and `fdSpec`:
+  - `read`/`write` on an open fd behave as in Basic.lean;
+  - on a closed fd the only outcome is EBADF (-9);
+  - `close` (57) returns 0 and removes an open fd, or EBADF.
+- `FdStep.sys`: at every syscall other than `close`, a step of this layer
+  is a step of `Sys`, so existing proofs cover it.
+- Control `write_closed_fd`: in a fresh process, writing fd 5 can only give
+  EBADF.
+- Axioms: `[propext]`. `lake env lean Fd.lean`: 0.47 s.
+- Next: the process start state (argv/envp/auxv, LPS `StackLayout.v`), then
+  `brk`/`mmap`.
