@@ -250,12 +250,24 @@ def auditRoots : List String := ["NoCompiler", "Examples", "Demo"]
 /-- The axiom audit over every module under `auditRoots` (`Audit.audit`). -/
 def axiomAudit (root : System.FilePath) : IO Bool := do
   let lean := root / "lean"
+  unless ← (lean / "lean-toolchain").pathExists do
+    -- A root with binaries only (scripts/core/check-audit-controls.sh's copies).
+    IO.println s!"skip axiom audit: {root} has no lean/ source tree (the binaries were checked)"
+    return true
   let mods ← Audit.sourceModules lean auditRoots
   let mut ok := true
   for u in ← Audit.debugOptionUses lean mods do
     IO.println s!"FAIL debugging option turned on (it closes goals with sorry): {u}"
     ok := false
-  Lean.initSearchPath (← Lean.findSysroot)
+  -- The sysroot of the toolchain lean/lean-toolchain names: ask `lean` from
+  -- inside lean/ (elan picks the toolchain by directory; outside, it would pick
+  -- its default, or none).
+  let out ← IO.Process.output { cmd := "lean", args := #["--print-prefix"], cwd := lean }
+  if out.exitCode != 0 then
+    IO.println s!"FAIL axiom audit: `lean --print-prefix` in {lean}: {out.stderr}"
+    return false
+  Lean.initSearchPath (System.FilePath.mk (out.stdout.trimAscii.toString))
+    [lean / ".lake" / "build" / "lib" / "lean"]
   let env ← try
       Lean.importModules (mods.map ({ module := · })) {}
     catch e =>
