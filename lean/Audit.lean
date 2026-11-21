@@ -258,14 +258,17 @@ def checkImage (root : System.FilePath) (path : String) (c : Code) (segs : List 
     section's, and the extent of `.text`. -/
 def elfLayout (b : ByteArray) : Except String Layout := do
   let fs ← Elf.funcSymbols b
+  let os ← Elf.objSymbols b
   let secs ← Elf.sections b
   let t ← Elf.text b
   let addr (s : String) : Word :=
     match fs.find? (·.1 == s) with
     | some (_, v) => BitVec.ofNat 64 v
-    | none => match secs.find? (·.name == s) with
-      | some sec => BitVec.ofNat 64 sec.addr
-      | none => 0
+    | none => match os.find? (·.1 == s) with
+      | some (_, v) => BitVec.ofNat 64 v
+      | none => match secs.find? (·.name == s) with
+        | some sec => BitVec.ofNat 64 sec.addr
+        | none => 0
   return { addr, base := t.base, size := t.words.size }
 
 /-- A module and the layout its proofs are instantiated at, against an ELF:

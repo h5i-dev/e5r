@@ -98,4 +98,23 @@ def funcSymbols (b : ByteArray) : Except String (List (String × Nat)) := do
     return (name, (← le b (o + 4) 1) % 16, ← le b (o + 8) 8, ← le b (o + 16) 8)
   return (syms.filter fun (_, ty, _, sz) => ty == 2 && sz > 0).map fun (nm, _, v, _) => (nm, v)
 
+/-- The data objects (STT_OBJECT with a size), by address, one per address;
+    namesakes get `#k`, their rank by address (as `module::data_objects`). -/
+def objSymbols (b : ByteArray) : Except String (List (String × Nat)) := do
+  let secs ← sections b
+  let some st := secs.find? (·.kind == 2) | return []
+  let some str := secs[st.link]? | throw "the symbol table links no string table"
+  let n := st.size / 24
+  let syms ← (List.range n).mapM fun i => do
+    let o := st.offset + 24 * i
+    let name ← cstr b (str.offset + (← le b o 4))
+    return (name, (← le b (o + 4) 1) % 16, ← le b (o + 8) 8, ← le b (o + 16) 8)
+  let objs := (syms.filter fun (_, ty, _, sz) => ty == 1 && sz > 0).map fun (nm, _, v, _) => (nm, v)
+  let sorted := objs.mergeSort fun x y => x.2 < y.2 || (x.2 == y.2 && decide (x.1 ≤ y.1))
+  let uniq := sorted.foldl (fun acc x => if acc.any (·.2 == x.2) then acc else acc ++ [x]) []
+  return (uniq.foldl (fun (acc : List (String × Nat) × List (String × Nat)) x =>
+      let k := (acc.1.filter (·.1 == x.1)).length
+      let dup := uniq.countP (·.1 == x.1) > 1
+      (acc.1 ++ [x], acc.2 ++ [(if dup then s!"{x.1}#{k}" else x.1, x.2)])) ([], [])).2
+
 end NoCompiler.Elf
