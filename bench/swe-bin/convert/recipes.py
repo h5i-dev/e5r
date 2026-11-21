@@ -109,6 +109,10 @@ class Recipe:
     def run_tests(self, wt: str, task: dict, log: Log) -> str:
         raise NotImplementedError
 
+    def refresh(self, wt: str, log: Log):
+        """Bring the build tree up to date before the harness puts the wrappers in, so that the
+        test command does not rebuild a subject over its wrapper."""
+
     def parse(self, out: str) -> dict:
         raise NotImplementedError
 
@@ -143,6 +147,14 @@ class Jq(Recipe):
     def reset_generated(self, wt, log):
         log.run("git checkout -q -- . && git clean -fdxq -e '*.rv.elf' && git submodule foreach -q git clean -fdxq",
                 wt, "reset")
+
+    def refresh(self, wt, log):
+        # `make -o jq check` keeps the top make from rebuilding jq, but -o is not passed to
+        # sub-makes: the tree has to be up to date
+        if os.path.lexists(os.path.join(wt, "jq")):
+            os.remove(os.path.join(wt, "jq"))
+        log.run("touch src/parser.y src/lexer.l", wt, "refresh")
+        log.run(f"make -j{JOBS}", wt, "refresh", timeout=3600)
 
     def run_tests(self, wt, task, log):
         # only jq's own tests: oniguruma's are riscv64 programs of their own (excluded above);

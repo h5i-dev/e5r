@@ -22,7 +22,6 @@ pub const EM_RISCV: u16 = 243;
 const PT_LOAD: u32 = 1;
 const PT_GNU_STACK: u32 = 0x6474_e551;
 const SHT_SYMTAB: u32 = 2;
-const SHT_STRTAB: u32 = 3;
 const SHT_RELA: u32 = 4;
 const SHT_NOBITS: u32 = 8;
 const SHF_WRITE: u64 = 1;
