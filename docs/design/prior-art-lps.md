@@ -765,3 +765,16 @@ needs.)
   `procSpec6_exists` keep its theorems. Examples by `decide` (`scatter`,
   `seekTo`), the control `lseek_closed`.
 - Axioms: standard. lake env lean: FsIo 1.33 s, Process 1.20 s.
+
+### Eleventh step: `prog FILE` from the start state (lean/NoCompiler/Linux/Launch.lean)
+
+The start state (third step) joined to the files (ninth step): the first
+thing a fuzz driver does.
+- `cString_of_readBytes`: a NUL-free `p` and its NUL at `a` read back as
+  the C string `p`.
+- `string_at`, `argv_string`: at entry, argv[i]'s bytes and NUL lie at the
+  address in the stack word at sp + 8 (i + 1).
+- `openat_argv1`: in a fresh process (fds 0, 1, 2) whose file system holds
+  FILE, `openat(AT_FDCWD, argv[1], O_RDONLY)` opens FILE as fd 3 at offset
+  0; the control `openat_argv1_missing` gives ENOENT for a FILE not there.
+- Axioms: standard. lake env lean: Launch 1.92 s.
