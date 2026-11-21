@@ -209,7 +209,7 @@ stepping:
 
 The side conditions are decided by comparing `RFunc`s. The ledger's
 `closure` key finds, without Lean, the functions it applies to: on the 7'
-artifact's one-line edit, all but 3 of 1235.
+artifact's one-line edit, all but 1 of 1235 (the edited function).
 
 ## Automation (`lean/NoCompiler/RefineAuto.lean`)
 

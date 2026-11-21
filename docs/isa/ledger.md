@@ -62,8 +62,12 @@ the other order, at sum.link1.elf's layout, all conditions decided.
   fails ("a misattributed relocation").
 - **Unique names.** Local functions that share a symbol (a crate linked
   twice) get `#k`, their rank by address among the namesakes.
-- **Low parts.** A `%pcrel_lo` user is found across conditional branches,
-  and across calls when its base register is callee-saved.
+- **Low parts.** The `%pcrel_lo` users of an `auipc` are the instructions its
+  value reaches, by a reaching-definitions dataflow over the function's
+  control flow. Branches and `jal zero` are followed, and a call keeps the
+  callee-saved registers. A read reached by several definitions is left
+  unattributed: its word stays in the key, a missed reuse but not a wrong
+  one.
 
 **Measured** on the rustc artifact of criterion 7' (examples/refine/targets,
 1235 functions, 685 at L1 or above; built with
@@ -74,23 +78,16 @@ per binary, self-check included:
 | | own key changed | closure key changed |
 | --- | --- | --- |
 | identical rebuild (a vs b) | 0 of 1235 | 0 of 1235 |
-| one-line edit (a vs e) | 2 of 1235 | 3 of 1235 |
-| one-line edit, L1+ functions | 2 of 685 | 3 of 685 |
+| one-line edit (a vs e) | 1 of 1235 | 1 of 1235 |
+| one-line edit, L1+ functions | 1 of 685 | 1 of 685 |
 
 - **Linked bytes vs keys.** For the same edit, linked bytes change for 191
-  of the 685 L1+ functions (criterion 7', v1-results.md); the relocatable
-  key changes for 2 of them.
-- **The two own-key changes:**
-  - `w_num_chars`, the edited function;
-  - `acos`, unedited. One `ld a1, -192(s3)` takes its base from an `auipc`
-    whose value reaches it through jumps and branches. The linear scan does
-    not attribute it, so its layout-dependent immediate stays in the key.
-    That is a missed reuse, not a wrong one: equal keys still mean equal
-    bits.
-- **The third closure-key change** is the exported `acos` wrapper: its own key
-  is unchanged, but it calls the builtin `acos`.
+  of the 685 L1+ functions (criterion 7', v1-results.md). The relocatable
+  key changes for exactly one: `w_num_chars`, the edited function, and its
+  closure key with it.
+- **Before the dataflow,** a linear scan missed one low part in `acos` and
+  reported 2 own and 3 closure keys changed.
 - **Not yet:**
-  - attribution by dataflow (reaching definitions) rather than a scan;
   - the Lean-side measurement on the whole artifact. It needs the whole
     module as Lean, the format A is redesigning (round2-next.md, 03:58).
 

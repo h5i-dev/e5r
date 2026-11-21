@@ -187,6 +187,89 @@ fn unique_names(bin: &Binary) -> std::collections::HashMap<u64, String> {
     out
 }
 
+const OTHER: u32 = 0;
+const MANY: u32 = u32::MAX;
+
+/// Reaching `auipc`s: for each instruction and register, `k + 1` if the
+/// register's only reaching definition is the `auipc` at `k` (outside the
+/// call pairs `calls`), `OTHER` if no `auipc` reaches it, `MANY` if several
+/// definitions do. Successors: the next instruction, branch targets, `jal
+/// zero` targets; a call (link register not zero) returns to the next one
+/// and keeps only the callee-saved registers (sp, gp, tp, s0-s11); `jalr
+/// zero` ends the path.
+fn reaching_auipcs(words: &[u32], calls: &std::collections::BTreeSet<usize>) -> Vec<[u32; 32]> {
+    let n = words.len();
+    let mut ins: Vec<Option<[u32; 32]>> = vec![None; n];
+    if n == 0 {
+        return vec![];
+    }
+    ins[0] = Some([OTHER; 32]);
+    let mut work = vec![0usize];
+    while let Some(k) = work.pop() {
+        let Some(st) = ins[k] else { continue };
+        let Some(i) = isa::decode(words[k]) else {
+            continue;
+        };
+        let mut out = st;
+        match i {
+            Instr::Auipc(rd, _) if rd.0 != 0 => {
+                out[rd.0 as usize] = if calls.contains(&k) {
+                    OTHER
+                } else {
+                    k as u32 + 1
+                }
+            }
+            _ => {
+                for r in 1..32u8 {
+                    if reads_or_writes(&i, Reg(r)).1 {
+                        out[r as usize] = OTHER;
+                    }
+                }
+                let is_call = matches!(i, Instr::Jal(rd, _) | Instr::Jalr(rd, _, _) if rd.0 != 0);
+                if is_call {
+                    for (r, v) in out.iter_mut().enumerate().skip(1) {
+                        if !matches!(r, 2 | 3 | 4 | 8 | 9 | 18..=27) {
+                            *v = OTHER;
+                        }
+                    }
+                }
+                if matches!(i, Instr::Ecall) {
+                    out[10] = OTHER;
+                }
+            }
+        }
+        let at = |off: i64| -> Option<usize> {
+            let t = k as i64 + off / 4;
+            (0..n as i64).contains(&t).then_some(t as usize)
+        };
+        let succ: Vec<Option<usize>> = match i {
+            Instr::Branch(_, _, _, off) => vec![at(4), at(off.signed())],
+            Instr::Jal(Reg(0), off) => vec![at(off.signed())],
+            Instr::Jalr(Reg(0), _, _) => vec![],
+            _ => vec![at(4)],
+        };
+        for t in succ.into_iter().flatten() {
+            let new = match ins[t] {
+                None => out,
+                Some(old) => {
+                    let mut m = old;
+                    for (v, o) in m.iter_mut().zip(out.iter()) {
+                        if *v != *o {
+                            *v = MANY;
+                        }
+                    }
+                    m
+                }
+            };
+            if ins[t] != Some(new) {
+                ins[t] = Some(new);
+                work.push(t);
+            }
+        }
+    }
+    ins.into_iter().map(|x| x.unwrap_or([OTHER; 32])).collect()
+}
+
 fn of_binary_unchecked(bin: &Binary) -> Result<Module, String> {
     let names = unique_names(bin);
     let sym_at = |t: u64| -> Option<(String, i64)> {
@@ -205,6 +288,14 @@ fn of_binary_unchecked(bin: &Binary) -> Result<Module, String> {
         let mut words = f.words.clone();
         let mut relocs = Vec::new();
         let n = words.len();
+        // The call pairs: auipc rd / jalr _, lo(rd).
+        let calls: std::collections::BTreeSet<usize> = (0..n.saturating_sub(1))
+            .filter(|&k| {
+                matches!((isa::decode(f.words[k]), isa::decode(f.words[k + 1])),
+                    (Some(Instr::Auipc(rd, _)), Some(Instr::Jalr(_, rs1, _))) if rs1 == rd)
+            })
+            .collect();
+        let reach = reaching_auipcs(&f.words, &calls);
         let mut k = 0;
         while k < n {
             let pc = f.entry + 4 * k as u64;
@@ -237,34 +328,29 @@ fn of_binary_unchecked(bin: &Binary) -> Result<Module, String> {
                     continue;
                 }
             }
-            // A data address: the users of rd until it is written again.
+            // A data address: the instructions the auipc's value reaches, by
+            // dataflow (reaching_auipcs), each a %pcrel_lo user. A read reached
+            // by several definitions is left as it is: its word stays in the
+            // key, a missed reuse but not a wrong one.
             let mut users = Vec::new();
-            for j in k + 1..n {
+            for j in 0..n {
+                if reach[j][rd.0 as usize] != k as u32 + 1 {
+                    continue;
+                }
                 let Some(i) = isa::decode(f.words[j]) else {
-                    break;
+                    continue;
                 };
+                if !reads_or_writes(&i, rd).0 {
+                    continue;
+                }
                 if let Some((lo, s_type)) = lo_user(&i, rd) {
                     users.push((j, lo, s_type));
-                } else if reads_or_writes(&i, rd).0 {
+                } else {
                     return Err(format!(
                         "{}: the auipc at {pc:#x} is used at {:#x} other than as a base",
                         f.name,
                         f.entry + 4 * j as u64
                     ));
-                }
-                // Across conditional branches too (clang and rustc hoist an
-                // auipc above a branch), until the register is written again
-                // or an unconditional jump ends the straight-line path (what
-                // follows a `jal zero` is not reached from here). A wrong
-                // attribution would disagree on the low part, and the module
-                // audit relinks and compares every byte.
-                // A call (rd = ra) keeps the callee-saved registers (s0-s11):
-                // a base in one of them is still live after it.
-                let (_, w) = reads_or_writes(&i, rd);
-                let callee_saved = matches!(rd.0, 8 | 9 | 18..=27);
-                let call = matches!(i, Instr::Jal(Reg(1), _) | Instr::Jalr(Reg(1), _, _));
-                if w || (matches!(i, Instr::Jal(..) | Instr::Jalr(..)) && !(call && callee_saved)) {
-                    break;
                 }
             }
             if users.is_empty() {
