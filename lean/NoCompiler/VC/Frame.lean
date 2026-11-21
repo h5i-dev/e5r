@@ -94,9 +94,10 @@ theorem Reach.of_exploreCalls {c : Code} {P : Perm} {D : Dom} {Q : State → Pro
     {cuts ces : List Word} {fuel k : Nat} {p : Word} {s : State} (hb : 4 * c.words.size < 2 ^ 64)
     (hk : p = c.base + BitVec.ofNat 64 (4 * k)) (hpc : s.pc = p) (hx : s.exit = none)
     (hf : ∀ f ∈ facts, f.den (ρOf s) P)
-    (hvc : exploreVC (ρOf s) s.mem P (CallQ c P D Q ces) facts c D (cuts ++ ces) fuel k p) :
+    (hvc : exploreVC (ρOf s) s.mem P (fun s' => s'.trace = s.trace → CallQ c P D Q ces s') facts c D
+      (cuts ++ ces) fuel k p) :
     Reach c P D Q s :=
-  Reach.trans (Reach.of_exploreAt hb hk hpc hx hf hvc) fun s' h => by
+  Reach.trans (Reach.of_exploreAtT hb hk hpc hx hf hvc) fun s' h => by
     unfold CallQ at h
     split at h
     · exact h
@@ -113,14 +114,15 @@ theorem CallQ.other {c : Code} {P : Perm} {D : Dom} {Q : State → Prop} {ces : 
 /-- A return end: the return address is the entry's `ra`, which is outside the
     function, so not a callee's entry. -/
 theorem CallQ.ret {c : Code} {P : Perm} {D Dc : Dom} {Q : State → Prop} {ces : List Word}
-    {entry : Word} {s0 s' : State} {X : Word} (he : Entry D entry s0)
+    {entry : Word} {s0 s' : State} {X : Word} {τ : List Event} (he : Entry D entry s0)
     (hcalls : ces.all (fun x => decide (D.mem x)) = true) (hX : X = s0.reg 1)
-    (hq : Q (s'.setPc (s0.reg 1))) :
-    NoCompiler.aligned (X &&& ~~~1) 4 ∧ CallQ c P Dc Q ces (s'.setPc (X &&& ~~~1)) := by
+    (hq : s'.trace = τ → Q (s'.setPc (s0.reg 1))) :
+    NoCompiler.aligned (X &&& ~~~1) 4 ∧
+      ((s'.setPc (X &&& ~~~1)).trace = τ → CallQ c P Dc Q ces (s'.setPc (X &&& ~~~1))) := by
   have hm : s0.reg 1 &&& ~~~1 = s0.reg 1 := and_not_one_of_aligned he.retAligned
   subst hX
   rw [hm]
-  refine ⟨he.retAligned, CallQ.other (fun hm' => he.ret ?_) hq⟩
+  refine ⟨he.retAligned, fun ht => CallQ.other (fun hm' => he.ret ?_) (hq (by simpa using ht))⟩
   exact of_decide_eq_true (List.all_eq_true.1 hcalls _ hm')
 
 end NoCompiler.VC.M

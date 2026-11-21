@@ -1856,11 +1856,28 @@ def reachPc (g : MVarId) : MetaM (Option (Ident × Nat)) := g.withContext do
         if let some ⟨_, v⟩ ← getBitVecValue? r then return some (mkIdent d.userName, v.toNat)
   return none
 
-set_option hygiene false in
+set_option hygiene false
+
+mutual
+/-- After a syscall: the process's exit, or the run from the state it leaves. -/
+partial def vcCont (cx : Ctx) (vx : VCx) (g : MVarId) (from_ : Nat) (hSI : Ident) : TacticM (List MVarId) := do
+  let t := (← instantiateMVars (← g.getType)).consumeMData
+  let e := t.appArg!
+  if (e.find? (·.isAppOf ``State.halt)).isSome then return ← closeExit cx g from_
+  let some pcN ← pcOf e | throwError "vc_auto: the pc after the syscall at {hex from_}"
+  let eT ← Term.exprToSyntax e
+  let [g] ← run g (← `(tactic| have nocompiler_hS : Same $(cx.s0) $eT $(cx.rs) := by
+      clear nocompiler_hS; have nocompiler_hS := $hSI:ident; nocompiler_same))
+    | throwError "vc_auto: Same after the syscall at {hex from_}"
+  vcRun cx vx g pcN (← `(by first | (simp only [State.setPc_pc]; done) | rfl))
+    (← `(by simp only [State.setReg_exit, State.setPc_exit', State.setMem_exit', State.emit_exit',
+      sysRet_exit, nocompiler_hx]))
+
 /-- The run from a point whose state is `Reach`'s (pc `pc`, by `hpcT`), by
     `explore`: the obligations it leaves and one goal per path end, the
     frame closed. A path ending at a callee's entry goes on through the
-    callee's theorem (`closeCall`) and is explored again from the return. -/
+    callee's theorem (`closeCall`), one ending at a syscall through `stepSys`,
+    and each is explored again from where it continues. -/
 partial def vcRun (cx : Ctx) (vx : VCx) (g : MVarId) (pc : Nat) (hpcT hxT : Lean.Term) :
     TacticM (List MVarId) := do
   let sp := cx.spec
@@ -1869,6 +1886,7 @@ partial def vcRun (cx : Ctx) (vx : VCx) (g : MVarId) (pc : Nat) (hpcT hxT : Lean
   let s0 := cx.s0
   let gs ← run g (← `(tactic| refine NoCompiler.VC.M.Reach.of_exploreCalls (facts := []) (cuts := $(vx.cutsT))
       (ces := $(vx.callsT)) (fuel := $(vx.fuelT)) (k := $(natLit ((pc - vx.baseN) / 4)))
+      (p := BitVec.ofNat 64 $(natLit pc))
       (by decide) (by decide) $hpcT $hxT (by simp) ?_))
   let [g] := gs | throwError "vc_auto: explore at {hex pc}"
   let fs ← simpArgs cx.facts
@@ -1926,10 +1944,10 @@ partial def vcRun (cx : Ctx) (vx : VCx) (g : MVarId) (pc : Nat) (hpcT hxT : Lean
     -- not rewrites: a rewrite by `n = k + 1` would go first into terms the
     -- caller's facts are stated about.
     -- The state reached, in the terms of the run's starting state.
-    let den : TSyntax `tactic ← `(tactic| open NoCompiler.VC.M in (try simp only [nocompiler_vreg, nocompiler_vmem,
+    let den : TSyntax `tactic ← `(tactic| open NoCompiler.VC.M in (try simp only [nocompiler_vreg, nocompiler_vmem, nocompiler_vt, State.setPc_trace,
       State.setPc_reg, State.setPc_mem, symDen, smemDen, evalI, evalR, loadVal]))
     let cleanup : TSyntax `tactic ← `(tactic|
-      (try clear nocompiler_vreg nocompiler_vmem nocompiler_vpc nocompiler_vx nocompiler_hS'))
+      (try clear nocompiler_vreg nocompiler_vmem nocompiler_vpc nocompiler_vx nocompiler_vt nocompiler_hS'))
     let vc (g : MVarId) : TacticM (List MVarId) := do
       let r ← run g den
       let r ← r.foldlM (fun acc g => return acc ++ (← run g (← `(tactic| (try nocompiler_vnorm [$fs,*]))))) []
@@ -1938,6 +1956,32 @@ partial def vcRun (cx : Ctx) (vx : VCx) (g : MVarId) (pc : Nat) (hpcT hxT : Lean
     match pe with
     | .cut S _ =>
       let pc' := S.pc.toNat
+      let [g] ← run g (← `(tactic| intro nocompiler_vt)) | throwError "vc_auto: cut"
+      if cx.ecalls.contains pc' then
+        -- A syscall: every outcome the environment allows (the step path's `stepSys`),
+        -- each explored again from the next instruction, or the process's exit.
+        let vregI := mkIdent (Name.mkSimple s!"nocompiler_vreg_{(hex pc').drop 2}")
+        let vmemI := mkIdent (Name.mkSimple s!"nocompiler_vmem_{(hex pc').drop 2}")
+        let vpcI := mkIdent (Name.mkSimple s!"nocompiler_vpc_{(hex pc').drop 2}")
+        let hSI := mkIdent (Name.mkSimple s!"nocompiler_hS_{(hex pc').drop 2}")
+        let vtI := mkIdent (Name.mkSimple s!"nocompiler_vt_{(hex pc').drop 2}")
+        let [g] ← run g (← `(tactic| (
+            refine NoCompiler.VC.M.CallQ.call (by rw [nocompiler_vpc]; decide) ?_
+            have nocompiler_hx : nocompiler_s'.exit = none := nocompiler_vx
+            have $vregI:ident := nocompiler_vreg
+            have $vmemI:ident := nocompiler_vmem
+            have $vpcI:ident := nocompiler_vpc
+            have $hSI:ident := nocompiler_hS'
+            have $vtI:ident := nocompiler_vt)))
+          | throwError "vc_auto: syscall at {hex pc'}"
+        let extra : Array Lean.Term := #[vpcI, vregI, vmemI, vtI, ← `(NoCompiler.VC.M.symDen),
+          ← `(NoCompiler.VC.M.smemDen), ← `(NoCompiler.evalI), ← `(NoCompiler.evalR), ← `(NoCompiler.loadVal)]
+        let cxs := { cx with facts := cx.facts ++ extra }
+        let (cont, left) ← g.withContext do stepSys cxs g pc'
+        out := out ++ left
+        for g' in cont do
+          out := out ++ (← g'.withContext do vcCont cxs vx g' pc' hSI)
+        continue
       if let some (_, thm, csp) := cx.callees.find? (·.1 == pc') then
         -- A call: the rest of the run by the callee's theorem, then explore from the return.
         let [g] ← run g (← `(tactic| (
@@ -1947,7 +1991,7 @@ partial def vcRun (cx : Ctx) (vx : VCx) (g : MVarId) (pc : Nat) (hpcT hxT : Lean
         let s1 ← g.withContext do
           let some d := (← getLCtx).findFromUserName? `nocompiler_s' | throwError "vc_auto: call"
           return mkFVar d.fvarId
-        let extra : Array Lean.Term := #[← `(nocompiler_vpc), ← `(nocompiler_vreg), ← `(nocompiler_vmem), ← `(NoCompiler.VC.M.symDen),
+        let extra : Array Lean.Term := #[← `(nocompiler_vpc), ← `(nocompiler_vreg), ← `(nocompiler_vmem), ← `(nocompiler_vt), ← `(NoCompiler.VC.M.symDen),
           ← `(NoCompiler.VC.M.smemDen), ← `(NoCompiler.evalI), ← `(NoCompiler.evalR), ← `(NoCompiler.loadVal)]
         let (cont, left) ← g.withContext do closeCall { cx with facts := cx.facts ++ extra } g pc' thm csp s1
         out := out ++ left
@@ -1990,6 +2034,7 @@ partial def vcRun (cx : Ctx) (vx : VCx) (g : MVarId) (pc : Nat) (hpcT hxT : Lean
       let tag ← endTag cx s!"{cx.origin}_ret_{cx.name S.pc.toNat}"
       let [gX, g] ← run g (← `(tactic| refine NoCompiler.VC.M.CallQ.ret $he (by decide) ?_ ?_))
         | throwError "vc_auto: ret"
+      let [g] ← run g (← `(tactic| intro nocompiler_vt)) | throwError "vc_auto: ret"
       -- The return address: `ra` as at the entry (kept, or reloaded from the frame).
       -- By rewriting only: a definitional check would unfold `Sym.den` on the whole state.
       let rX ← run gX (← `(tactic| first
@@ -2012,10 +2057,13 @@ partial def vcRun (cx : Ctx) (vx : VCx) (g : MVarId) (pc : Nat) (hpcT hxT : Lean
       let r ← r.foldlM (fun acc g => do return acc ++ (← vc g)) []
       out := out ++ (← tagged (rX ++ r) tag) ++ (← tagged rp (tag ++ "_preserved"))
   return out
+end
+
+set_option hygiene true
 
 /-- `nocompiler_auto` with every path run by `explore`: a function without syscalls. -/
 def vcCore (call : Call) (heads rsList : List Nat) (entryN : Nat) (callees : Array (Nat × Lean.Term × Name))
-    (frameList : List Nat) : TacticM Unit := do
+    (frameList : List Nat) (ecallList : List Nat := []) : TacticM Unit := do
   let baseN ← evalNat (← mkAppM ``BitVec.toNat #[← mkAppM ``Code.base #[call.code]])
   let sizeN ← evalNat (← mkAppM ``Array.size #[← mkAppM ``Code.words #[call.code]])
   let s0 := call.s0
@@ -2059,9 +2107,11 @@ def vcCore (call : Call) (heads rsList : List Nat) (entryN : Nat) (callees : Arr
   let lits (ns : List Nat) : TacticM Lean.Term :=
     `([$((ns.toArray.map fun h => (⟨(Syntax.mkNumLit (toString h)).raw⟩ : Lean.Term))),*].map (BitVec.ofNat 64))
   let callEntries := callees.toList.map (·.1)
-  let vx : VCx := { baseN, fuelT := natLit (sizeN + 2), cutsT := ← lits heads, callsT := ← lits callEntries }
+  let cutsT ← lits heads
+  let callsT ← lits (callEntries ++ ecallList)
+  let vx : VCx := { baseN, fuelT := natLit (sizeN + 2), cutsT, callsT }
   let mkCx (fs : Array Lean.Term) (mode : Mode) (origin : String) (endsRef : IO.Ref (Std.HashMap String Nat)) : Ctx :=
-    { ends := some endsRef, callees, cuts := heads, facts := call.userFacts ++ retFacts ++ fs, rs := rs,
+    { ends := some endsRef, callees, ecalls := ecallList, cuts := heads, facts := call.userFacts ++ retFacts ++ fs, rs := rs,
       s0 := s0, he := he, spec := mkIdent call.specName, hR := hR, mode := mode, origin := origin,
       labels := call.labels, entryN := entryN }
   let endsRef ← IO.mkRef ({} : Std.HashMap String Nat)
@@ -2137,9 +2187,7 @@ def vcCore (call : Call) (heads rsList : List Nat) (entryN : Nat) (callees : Arr
   replaceMainGoal (startGoals ++ bodyGoals)
 
 /-- Whether `vcCore` covers the function: no syscalls. -/
-def vcCovers (call : Call) (fE : Expr) : TacticM Bool := do
-  let ecallList ← evalNatList (mkApp2 (mkConst ``ecalls) call.code fE)
-  return ecallList.isEmpty
+def vcCovers (_call : Call) (_fE : Expr) : TacticM Bool := return true
 
 @[tactic vcAuto] def evalVcAuto : Tactic := fun stx => do
   let f : Lean.Term := ⟨stx[1]⟩
@@ -2151,7 +2199,7 @@ def vcCovers (call : Call) (fE : Expr) : TacticM Bool := do
   let rsList := if callees.isEmpty then rsList else
     (rsList ++ nonPreserved.filter (fun r => r != 1 || rsList.contains 1)).eraseDups
   unless ← vcCovers call fE do
-    throwError "vc_auto: functions with syscalls are not covered yet (use nocompiler_auto)"
+    throwError "vc_auto: not covered"
   let frameList ← evalNatList (mkApp2 (mkConst ``frameOf) call.code fE)
   let entryN ← evalNat (← mkAppM ``BitVec.toNat #[mkApp (mkConst ``Struct.Func.entry) fE])
   let given := call.cuts.toList.map (·.1)
@@ -2159,7 +2207,8 @@ def vcCovers (call : Call) (fE : Expr) : TacticM Bool := do
     unless given.contains h do throwError "vc_auto: no invariant for the loop at {hex h}"
   for h in given do
     unless heads.contains h do throwError "vc_auto: {hex h} is not a loop head of {f}"
-  vcCore call heads rsList entryN callees frameList
+  let ecallList ← evalNatList (mkApp2 (mkConst ``ecalls) call.code fE)
+  vcCore call heads rsList entryN callees frameList ecallList
 
 end VCPath
 
@@ -2193,7 +2242,7 @@ end VCPath
     -- counts as a failure, and so does a timeout: the run starts again step by step.
     let ok ← tryCatchRuntimeEx
       (do
-        withoutRecover (vcCore call heads rsList entryN callees frameList)
+        withoutRecover (vcCore call heads rsList entryN callees frameList ecallList)
         if errors (← getThe Core.State).messages != e0 then throwError "an error was logged"
         traceLine "[nocompiler_auto] paths by explore"
         pure true)

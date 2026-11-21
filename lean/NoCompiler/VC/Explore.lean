@@ -33,6 +33,12 @@ def PEnd.Next (ρ : Nat → Word) (μ : Word → Byte) (Q : State → Prop) : PE
   | .ret S cs => (∀ x ∈ cs, x.den ρ μ) → ∀ s', Matches ρ μ S s' → s'.exit = none →
       aligned ((S.reg 1).den ρ μ &&& ~~~1) 4 ∧ Q (s'.setPc ((S.reg 1).den ρ μ &&& ~~~1))
 
+theorem PEnd.Next.weaken {ρ : Nat → Word} {μ : Word → Byte} {Q : State → Prop} {H : State → Prop}
+    {e : PEnd} (h : e.Next ρ μ Q) : e.Next ρ μ (fun s' => H s' → Q s') := by
+  cases e with
+  | cut S cs => exact fun hc s' hm hx _ => h hc s' hm hx
+  | ret S cs => exact fun hc s' hm hx => ⟨(h hc s' hm hx).1, fun _ => (h hc s' hm hx).2⟩
+
 /-- The index of the word at `p`, when `p` is at a word boundary. -/
 def wordIdx (c : Code) (p : Word) : Option Nat :=
   if (p - c.base).toNat % 4 = 0 then some ((p - c.base).toNat / 4) else none
@@ -139,20 +145,20 @@ theorem pc_succ {b : Word} {k : Nat} (h : 4 * (k + 1) < 2 ^ 64) :
 
 /-- `explore`, sound. -/
 theorem Reach.of_explore {ρ : Nat → Word} {μ : Word → Byte} {c : Code} {P : Perm} {D : Dom}
-    {Q : State → Prop} {cuts : List Word} (hb : 4 * c.words.size < 2 ^ 64) :
+    {Q : State → Prop} {cuts : List Word} {τ : List Event} (hb : 4 * c.words.size < 2 ^ 64) :
     ∀ {fuel : Nat} {first : Bool} {k : Nat} {ws : List (BitVec 32)} {S : SState} {cs : List Cond}
       {ends : List PEnd} {obs : List Ob} {s : State},
       explore c D cuts fuel first k ws S cs = some (ends, obs) →
       c.words.toList.drop k = ws → S.pc = c.base + BitVec.ofNat 64 (4 * k) → Matches ρ μ S s →
-      s.exit = none → (∀ x ∈ cs, x.den ρ μ) → (∀ o ∈ obs, o.den ρ μ P) →
-      (∀ e ∈ ends, e.Next ρ μ Q) → Reach c P D Q s
-  | 0, _, _, _, _, _, _, _, _, h, _, _, _, _, _, _, _ => by simp [explore] at h
-  | fuel + 1, first, k, ws, S, cs, ends, obs, s, h, hd, hpc, hm, hx, hcs, hob, hN => by
+      s.exit = none → s.trace = τ → (∀ x ∈ cs, x.den ρ μ) → (∀ o ∈ obs, o.den ρ μ P) →
+      (∀ e ∈ ends, e.Next ρ μ (fun s' => s'.trace = τ → Q s')) → Reach c P D Q s
+  | 0, _, _, _, _, _, _, _, _, h, _, _, _, _, _, _, _, _ => by simp [explore] at h
+  | fuel + 1, first, k, ws, S, cs, ends, obs, s, h, hd, hpc, hm, hx, ht, hcs, hob, hN => by
     simp only [explore] at h
     split at h
     · -- a cut point
       simp only [Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
-      exact .done (hN _ (List.mem_singleton_self _) hcs s hm hx)
+      exact .done (hN _ (List.mem_singleton_self _) hcs s hm hx ht)
     split at h
     case isFalse => simp at h
     rename_i hD
@@ -193,7 +199,7 @@ theorem Reach.of_explore {ρ : Nat → Word} {μ : Word → Byte} {c : Code} {P 
       cases hc : evalBr op (s.reg rs1) (s.reg rs2)
       · simp only [Bool.false_eq_true, ite_false, Reach.opt_some]
         rw [hpcS]
-        exact Reach.of_explore hb h₂ hd₁ hpc₁ (matches_setPc hm _) (by simpa using hx)
+        exact Reach.of_explore hb h₂ hd₁ hpc₁ (matches_setPc hm _) (by simpa using hx) (by simpa using ht)
           (fun x hx' => by
             simp only [List.mem_cons] at hx'
             rcases hx' with rfl | hx'
@@ -203,7 +209,7 @@ theorem Reach.of_explore {ρ : Nat → Word} {μ : Word → Byte} {c : Code} {P 
           (fun e he => hN e (List.mem_append_right _ he))
       · rw [hpcS]
         simp only [ite_true, hal, Reach.opt_some]
-        exact Reach.of_explore hb h₁ rfl (wordIdx_sound hk') (matches_setPc hm _) (by simpa using hx)
+        exact Reach.of_explore hb h₁ rfl (wordIdx_sound hk') (matches_setPc hm _) (by simpa using hx) (by simpa using ht)
           (fun x hx' => by
             simp only [List.mem_cons] at hx'
             rcases hx' with rfl | hx'
@@ -224,7 +230,7 @@ theorem Reach.of_explore {ρ : Nat → Word} {μ : Word → Byte} {c : Code} {P 
       rw [hpcS]
       simp only [hal, ite_true, Reach.opt_some]
       exact Reach.of_explore hb h rfl (wordIdx_sound hk')
-        (matches_setReg_setPc hm rd _ _ (by first | rfl | (rw [hpcS]; rfl)) _) (by simpa using hx) hcs hob hN
+        (matches_setReg_setPc hm rd _ _ (by first | rfl | (rw [hpcS]; rfl)) _) (by simpa using hx) (by simpa using ht) hcs hob hN
     · -- jalr: the return, or a jump to a known address
       rename_i rd rs1 off hi
       split at h
@@ -237,7 +243,7 @@ theorem Reach.of_explore {ρ : Nat → Word} {μ : Word → Byte} {c : Code} {P 
         have hz : s.reg 1 + BitVec.signExtend 64 (0 : BitVec 12) = s.reg 1 := by
           rw [show BitVec.signExtend 64 (0 : BitVec 12) = 0 by decide]; bv_omega
         simp only [exec, jumpTo, setReg_x0', hz, hal, ite_true, Reach.opt_some]
-        exact .done hq
+        exact .done (hq (by simpa using ht))
       · split at h
         case h_2 => simp at h
         rename_i v hv
@@ -252,7 +258,7 @@ theorem Reach.of_explore {ρ : Nat → Word} {μ : Word → Byte} {c : Code} {P 
         simp only [exec, jumpTo, hrs]
         simp only [hal, ite_true, Reach.opt_some]
         exact Reach.of_explore hb h rfl (wordIdx_sound hk')
-          (matches_setReg_setPc hm rd _ _ (by first | rfl | (rw [hpcS]; rfl)) _) (by simpa using hx) hcs hob hN
+          (matches_setReg_setPc hm rd _ _ (by first | rfl | (rw [hpcS]; rfl)) _) (by simpa using hx) (by simpa using ht) hcs hob hN
     · -- a straight-line instruction
       rename_i i _ _ _ hi
       split at h
@@ -272,7 +278,7 @@ theorem Reach.of_explore {ρ : Nat → Word} {μ : Word → Byte} {c : Code} {P 
             (try obtain ⟨rfl, rfl⟩ := hst) <;> rfl
         exact NoCompiler.Reach.exec_step hD' hx (hfetch _ hi) hok
           (by rw [he, NoCompiler.Reach.opt_some]
-              exact Reach.of_explore hb hr hd₁ hS₁ hm₁ ((exec_exit he).trans hx) hcs
+              exact Reach.of_explore hb hr hd₁ hS₁ hm₁ ((exec_exit he).trans hx) ((exec_trace he).trans ht) hcs
                 (fun o ho => hob o (List.mem_append_right _ ho)) hN)
     · simp at h
 
@@ -332,7 +338,29 @@ theorem Reach.of_exploreAt {c : Code} {P : Perm} {D : Dom} {Q : State → Prop} 
     obtain ⟨ends, obs⟩ := r
     rw [h] at hvc
     simp only [Option.map_some] at hvc
-    refine Reach.of_explore hb h rfl hk (matches_init hpc) hx (by simp) (fun o ho => ?_) (allNext_mem hvc.2)
+    refine Reach.of_explore (τ := s.trace) hb h rfl hk (matches_init hpc) hx rfl (by simp) (fun o ho => ?_)
+      (fun e he => PEnd.Next.weaken (allNext_mem hvc.2 e he))
+    cases hc : o.check facts
+    · exact allOb_mem hvc.1 o (List.mem_filter.2 ⟨ho, by simp [hc]⟩)
+    · exact Ob.check_sound hf hc
+
+/-- As `Reach.of_exploreAt`, with the trace at every end known: the start's
+    (a path between cut points makes no syscall). -/
+theorem Reach.of_exploreAtT {c : Code} {P : Perm} {D : Dom} {Q : State → Prop} {facts : List Fact}
+    {cuts : List Word} {fuel k : Nat} {p : Word} {s : State} (hb : 4 * c.words.size < 2 ^ 64)
+    (hk : p = c.base + BitVec.ofNat 64 (4 * k)) (hpc : s.pc = p) (hx : s.exit = none)
+    (hf : ∀ f ∈ facts, f.den (ρOf s) P)
+    (hvc : exploreVC (ρOf s) s.mem P (fun s' => s'.trace = s.trace → Q s') facts c D cuts fuel k p) :
+    Reach c P D Q s := by
+  unfold exploreVC exploreR at hvc
+  cases h : explore c D cuts fuel true k (c.words.toList.drop k) (SState.init p) [] with
+  | none => rw [h] at hvc; exact hvc.elim
+  | some r =>
+    obtain ⟨ends, obs⟩ := r
+    rw [h] at hvc
+    simp only [Option.map_some] at hvc
+    refine Reach.of_explore (τ := s.trace) hb h rfl hk (matches_init hpc) hx rfl (by simp) (fun o ho => ?_)
+      (allNext_mem hvc.2)
     cases hc : o.check facts
     · exact allOb_mem hvc.1 o (List.mem_filter.2 ⟨ho, by simp [hc]⟩)
     · exact Ob.check_sound hf hc

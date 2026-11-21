@@ -342,6 +342,11 @@ theorem exec_exit {i : Instr} {s s' : State} (h : exec i s = some s') : s'.exit 
   cases i <;> simp only [exec, jumpTo] at h <;> (try split at h) <;> (try split at h) <;>
     simp only [Option.some.injEq, reduceCtorEq] at h <;> subst h <;> simp
 
+/-- An instruction leaves the trace alone (only a syscall adds to it). -/
+theorem exec_trace {i : Instr} {s s' : State} (h : exec i s = some s') : s'.trace = s.trace := by
+  cases i <;> simp only [exec, jumpTo] at h <;> (try split at h) <;> (try split at h) <;>
+    simp only [Option.some.injEq, reduceCtorEq] at h <;> subst h <;> simp
+
 /-- Run the words `ws` in order, inside `D`, collecting the obligations. -/
 def runW (D : Dom) : List (BitVec 32) → SState → Option (SState × List Ob)
   | [], S => some (S, [])
