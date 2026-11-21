@@ -203,7 +203,8 @@ def images : List (String × Code × List Segment) :=
    ("examples/elf/refine-sum-d.elf", Examples.Refine.Diff.ImgD.code, Examples.Refine.Diff.ImgD.segments),
    -- The same binaries in `--format chunks` (NoCompiler/Image.lean, "Code in chunks").
    ("examples/elf/hello.elf", Examples.Chunks.HelloImage.code, Examples.Chunks.HelloImage.segments),
-   ("examples/demo/elf/cobs.b.elf", Examples.Chunks.CobsImage.code, Examples.Chunks.CobsImage.segments)]
+   ("examples/demo/elf/cobs.b.elf", Examples.Chunks.CobsImage.code, Examples.Chunks.CobsImage.segments),
+   ("examples/demo/elf/sum.b.elf", Examples.Chunks.SumBImage.code, Examples.Chunks.SumBImage.segments)]
 
 /-- Modules and the layouts their theorems are instantiated at, with the ELF
     each layout is read from (docs/isa/v1.md, criterion 3). -/

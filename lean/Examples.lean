@@ -3,6 +3,11 @@ import Examples.Sum2
 import Examples.Hello
 import Examples.Chunks.HelloImage
 import Examples.Chunks.CobsImage
+import Examples.Chunks.SumBImage
+import Examples.Chunks.SumB
+import Examples.Chunks.Sum2B
+import Examples.Chunks.CobsB
+import Examples.Chunks.Hello
 import Examples.FrameControls
 import Examples.Link
 import Examples.LinkCalls

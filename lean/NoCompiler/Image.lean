@@ -29,6 +29,8 @@ namespace Segment
     literal, see `Chunk`). -/
 def bytesOfNat (len bits : Nat) : Array Byte := ((List.range len).map fun i => BitVec.ofNat 8 (bits >>> (8 * i))).toArray
 
+@[simp] theorem size_bytesOfNat (len bits : Nat) : (bytesOfNat len bits).size = len := by simp [bytesOfNat]
+
 /-- Memory holds the segment. -/
 def Loaded (g : Segment) (m : Word → Byte) : Prop :=
   ∀ i (h : i < g.bytes.size), m (g.base + BitVec.ofNat 64 i) = g.bytes[i]

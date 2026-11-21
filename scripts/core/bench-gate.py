@@ -24,12 +24,17 @@ LEAN = os.path.join(ROOT, "lean")
 BUDGET = os.path.join(ROOT, "scripts", "core", "bench-budget.json")
 MARGIN = 3.0  # measured here x3: CI runners are slower than the development host, and noisy
 
-# file (relative to lean/), module, image file, functions proved
+# file (relative to lean/), module, image file, functions proved. The proofs
+# are on images in chunks (`nocompiler export --format chunks`, the format that
+# scales to a whole binary): Examples/Chunks/ holds the same proofs as
+# Demo/SumB.lean, Demo/CobsB.lean, Demo/Sum2B.lean and Examples/Hello.lean,
+# which are on images with a lemma per instruction.
 FIXED = [
-    ("Demo/SumB.lean", "Demo.SumB", "Demo/Sum/ImageB.lean", ["sum"]),
-    ("Demo/CobsB.lean", "Demo.CobsB", "Demo/Cobs/ImageB.lean", ["cobs_decode"]),
-    ("Demo/Sum2B.lean", "Demo.Sum2B", "Demo/Sum/ImageB.lean", ["sum2"]),
-    ("Examples/Hello.lean", "Examples.Hello", "Examples/Hello/Image.lean", ["write_all", "hello"]),
+    ("Examples/Chunks/SumB.lean", "Examples.Chunks.SumB", "Examples/Chunks/SumBImage.lean", ["sum"]),
+    ("Examples/Chunks/CobsB.lean", "Examples.Chunks.CobsB", "Examples/Chunks/CobsImage.lean", ["cobs_decode"]),
+    ("Examples/Chunks/Sum2B.lean", "Examples.Chunks.Sum2B", "Examples/Chunks/SumBImage.lean", ["sum2"]),
+    ("Examples/Chunks/Hello.lean", "Examples.Chunks.Hello", "Examples/Chunks/HelloImage.lean",
+     ["write_all", "hello"]),
 ]
 
 UNIT = {"ns": 1e-6, "us": 1e-3, "μs": 1e-3, "ms": 1.0, "s": 1000.0}

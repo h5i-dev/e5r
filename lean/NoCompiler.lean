@@ -11,6 +11,7 @@ import NoCompiler.Elf
 import NoCompiler.Run
 import NoCompiler.Mem
 import NoCompiler.Image
+import NoCompiler.ImageSimp
 import NoCompiler.Trace
 import NoCompiler.Struct
 import NoCompiler.Frame

@@ -41,6 +41,7 @@ fn cli_check_annotate_export() {
     for (elf, module) in [
         ("examples/elf/hello.elf", "HelloImage"),
         ("examples/demo/elf/cobs.b.elf", "CobsImage"),
+        ("examples/demo/elf/sum.b.elf", "SumBImage"),
     ] {
         let out = Command::new(exe)
             .args(["export", &format!("{root}/{elf}"), "--format", "chunks"])

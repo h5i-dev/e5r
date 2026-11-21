@@ -164,9 +164,15 @@ fn export_as(
     source: &str,
     chunked: bool,
 ) -> Result<String, String> {
-    let metas = exportable(metas);
+    // A function's `_dom` is it and everything it calls, so the array format
+    // exports only the functions whose callees passed (`exportable`). The
+    // chunk format exports every function that passed: its level check is on
+    // its own chunk and needs only `entries`, and it gets `_dom` when its
+    // callees passed too.
+    let ok = exportable(metas);
+    let metas = if chunked { metas.to_vec() } else { ok.clone() };
     let metas = &metas[..];
-    let by_entry: BTreeMap<u64, &FuncMeta> = metas.iter().map(|m| (m.entry, m)).collect();
+    let by_entry: BTreeMap<u64, &FuncMeta> = ok.iter().map(|m| (m.entry, m)).collect();
     // Levels and certificates, from checking the binary again.
     let levels: BTreeMap<u64, (crate::profile::Level, Vec<crate::frame::CertFact>)> = bin
         .check()
@@ -324,8 +330,16 @@ fn export_as(
     )
     .unwrap();
     writeln!(o, "def entries : List Word := [{}]", entries.join(", ")).unwrap();
+    // Two local symbols can have one name: those get their address appended.
+    let mut seen_ids: BTreeMap<String, usize> = BTreeMap::new();
     for m in metas {
-        let id = ident(&m.name);
+        *seen_ids.entry(ident(&m.name)).or_default() += 1;
+    }
+    for m in metas {
+        let id = match ident(&m.name) {
+            id if seen_ids[&id] > 1 => format!("{id}_{:x}", m.entry),
+            id => id,
+        };
         let mut nodes = Vec::new();
         fn flat(ns: &[crate::profile::Node], out: &mut Vec<String>) {
             for n in ns {
@@ -512,7 +526,6 @@ fn export_as(
             )
             .unwrap();
         }
-        let dom = closure(m, &by_entry)?;
         writeln!(
             o,
             "\n/-- `{}`: [{:#x}, {:#x}), frame {} bytes. -/",
@@ -523,6 +536,16 @@ fn export_as(
         )
         .unwrap();
         writeln!(o, "def {id}_entry : Word := 0x{:x}#64", m.entry).unwrap();
+        if !by_entry.contains_key(&m.entry) {
+            writeln!(
+                o,
+                "-- no `{id}_dom`: `{}` calls, transitively, a function that did not pass the profile check",
+                m.name
+            )
+            .unwrap();
+            continue;
+        }
+        let dom = closure(m, &by_entry)?;
         let ranges: Vec<String> = dom
             .iter()
             .map(|(e, s)| format!("(0x{e:x}#64, {s})"))
@@ -588,6 +611,53 @@ mod tests {
                     let a = ((f.entry - bin.text_addr) / 4) as usize;
                     x <= a && a < y
                 })));
+        }
+    }
+
+    /// With `write_all` taken as failing the profile check, the array format
+    /// drops `hello` (its `_dom` would include `write_all`); the chunk format
+    /// still checks `hello`'s level, and only leaves out its `_dom`.
+    #[test]
+    fn chunks_check_functions_whose_callees_failed() {
+        let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+        let bytes = std::fs::read(format!("{root}/examples/elf/hello.elf")).unwrap();
+        let bin = crate::load(&bytes).unwrap();
+        let metas: Vec<FuncMeta> = bin
+            .check()
+            .into_iter()
+            .filter_map(|r| r.result.ok())
+            .filter(|m| m.name != "write_all")
+            .collect();
+        assert!(metas.iter().any(|m| m.name == "hello"));
+        let a = export(&bin, &metas, "T", "hello.elf").unwrap();
+        assert!(!a.contains("theorem hello_checked"));
+        let c = export_chunks(&bin, &metas, "T", "hello.elf").unwrap();
+        assert!(c.contains("theorem hello_checked"));
+        assert!(c.contains("def hello_entry"));
+        assert!(!c.contains("def hello_dom"));
+        assert!(c.contains("-- no `hello_dom`"));
+    }
+
+    /// Two functions with one name (local symbols) get their entries appended.
+    #[test]
+    fn colliding_names_get_their_entry() {
+        let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+        let bytes = std::fs::read(format!("{root}/examples/elf/hello.elf")).unwrap();
+        let bin = crate::load(&bytes).unwrap();
+        let mut metas: Vec<FuncMeta> = bin
+            .check()
+            .into_iter()
+            .filter_map(|r| r.result.ok())
+            .collect();
+        for m in metas.iter_mut() {
+            if m.name == "write_all" {
+                m.name = "hello".into();
+            }
+        }
+        let c = export_chunks(&bin, &metas, "T", "hello.elf").unwrap();
+        assert!(!c.contains("def hello_func"));
+        for m in metas.iter().filter(|m| m.name == "hello") {
+            assert!(c.contains(&format!("def hello_{:x}_func", m.entry)));
         }
     }
 

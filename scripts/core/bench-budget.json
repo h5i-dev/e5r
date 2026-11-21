@@ -1,22 +1,22 @@
 {
-  "Demo/CobsB.lean": {
-    "kernel_ms_per_instr": 161.46,
-    "total_ms_per_instr": 1705.65
+  "Examples/Chunks/CobsB.lean": {
+    "kernel_ms_per_instr": 514.35,
+    "total_ms_per_instr": 2939.52
   },
-  "Demo/Sum2B.lean": {
-    "kernel_ms_per_instr": 41.28,
-    "total_ms_per_instr": 1015.35
+  "Examples/Chunks/Hello.lean": {
+    "kernel_ms_per_instr": 181.11,
+    "total_ms_per_instr": 1700.1
   },
-  "Demo/SumB.lean": {
-    "kernel_ms_per_instr": 124.32,
-    "total_ms_per_instr": 888.51
+  "Examples/Chunks/Sum2B.lean": {
+    "kernel_ms_per_instr": 122.7,
+    "total_ms_per_instr": 2215.5
   },
-  "Examples/Hello.lean": {
-    "kernel_ms_per_instr": 78.57,
-    "total_ms_per_instr": 670.71
+  "Examples/Chunks/SumB.lean": {
+    "kernel_ms_per_instr": 383.34,
+    "total_ms_per_instr": 1880.13
   },
   "VC/MemChk1000": {
-    "kernel_ms_per_instr": 9.15,
-    "total_ms_per_instr": 9.84
+    "kernel_ms_per_instr": 15.57,
+    "total_ms_per_instr": 16.86
   }
 }
