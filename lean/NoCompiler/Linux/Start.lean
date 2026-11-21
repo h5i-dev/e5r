@@ -176,6 +176,79 @@ theorem envp_end_eq_execfn (top : Word) (argv envp : List (List Byte)) (execfn :
   simp only [BitVec.toNat_add, BitVec.toNat_sub, BitVec.toNat_ofNat]
   omega
 
+/-! ## The auxiliary vector (LPS StackLayout.v#L160-L276, `auxv_entries`)
+
+ARCH_DLINFO's ten entries first (fs/binfmt_elf.c: "ARCH_DLINFO must come
+first"), then create_elf_tables' sixteen, then the CONFIG_RSEQ pair. LPS's
+list ends with AT_NULL; here `StartArgs.headWords` appends it, so
+`auxvEntries` stops before it. -/
+
+/-- The launch's own values (LPS `LaunchAuxv` with its `CacheWords`). -/
+structure LaunchAuxv where
+  sysinfoEhdr : Word
+  /-- AT_L1I_CACHESIZE … AT_L3_CACHEGEOMETRY, in that order. -/
+  cache : List Word
+  minsigstksz : Word
+  rseq : Bool
+
+/-- The program headers' place, entry size and count (LPS `PhdrInfo`). -/
+structure PhdrInfo where
+  addr : Word
+  ent : Word
+  num : Word
+
+def AT_PHDR : Word := 3
+def AT_PHENT : Word := 4
+def AT_PHNUM : Word := 5
+def AT_PAGESZ : Word := 6
+def AT_BASE : Word := 7
+def AT_FLAGS : Word := 8
+def AT_ENTRY : Word := 9
+def AT_UID : Word := 11
+def AT_EUID : Word := 12
+def AT_GID : Word := 13
+def AT_EGID : Word := 14
+def AT_HWCAP : Word := 16
+def AT_CLKTCK : Word := 17
+def AT_SECURE : Word := 23
+def AT_RANDOM : Word := 25
+def AT_RSEQ_FEATURE_SIZE : Word := 27
+def AT_RSEQ_ALIGN : Word := 28
+def AT_EXECFN : Word := 31
+def AT_SYSINFO_EHDR : Word := 33
+def AT_MINSIGSTKSZ : Word := 51
+/-- AT_L1I_CACHESIZE (40) … AT_L3_CACHEGEOMETRY (47). -/
+def cacheTypes : List Word := [40, 41, 42, 43, 44, 45, 46, 47]
+
+def auxvEntries (la : LaunchAuxv) (ph : PhdrInfo) (entry uid gid hwcap atRandom atExecfn : Word) :
+    List (Word × Word) :=
+  [(AT_SYSINFO_EHDR, la.sysinfoEhdr)] ++ cacheTypes.zip la.cache ++ [(AT_MINSIGSTKSZ, la.minsigstksz),
+    (AT_HWCAP, hwcap), (AT_PAGESZ, 4096), (AT_CLKTCK, 100),
+    (AT_PHDR, ph.addr), (AT_PHENT, ph.ent), (AT_PHNUM, ph.num),
+    (AT_BASE, 0), (AT_FLAGS, 0), (AT_ENTRY, entry),
+    (AT_UID, uid), (AT_EUID, uid), (AT_GID, gid), (AT_EGID, gid),
+    (AT_SECURE, 0), (AT_RANDOM, atRandom), (AT_EXECFN, atExecfn)] ++
+  (if la.rseq then [(AT_RSEQ_FEATURE_SIZE, 28), (AT_RSEQ_ALIGN, 32)] else [])
+
+/-- With AT_NULL, 27 entries, or 29 with CONFIG_RSEQ (LPS `auxv_count`). -/
+theorem auxvEntries_count (la : LaunchAuxv) (hc : la.cache.length = 8) (ph : PhdrInfo)
+    (entry uid gid hwcap atRandom atExecfn : Word) :
+    (auxvEntries la ph entry uid gid hwcap atRandom atExecfn).length + 1 =
+      if la.rseq then 29 else 27 := by
+  unfold auxvEntries
+  cases la.rseq <;> simp [cacheTypes, List.length_zip, hc]
+
+/-- `getauxval(AT_PAGESZ)` is 4096 and `getauxval(AT_ENTRY)` the entry point. -/
+theorem auxv_pagesz_entry (la : LaunchAuxv) (hc : la.cache.length = 8) (ph : PhdrInfo)
+    (entry uid gid hwcap atRandom atExecfn : Word) :
+    (auxvEntries la ph entry uid gid hwcap atRandom atExecfn).lookup AT_PAGESZ = some 4096 ∧
+    (auxvEntries la ph entry uid gid hwcap atRandom atExecfn).lookup AT_ENTRY = some entry := by
+  obtain ⟨c0, c1, c2, c3, c4, c5, c6, c7, hcl⟩ : ∃ c0 c1 c2 c3 c4 c5 c6 c7, la.cache = [c0, c1, c2, c3, c4, c5, c6, c7] := by
+    match h : la.cache, hc with
+    | [c0, c1, c2, c3, c4, c5, c6, c7], _ => exact ⟨c0, c1, c2, c3, c4, c5, c6, c7, rfl⟩
+  constructor <;> simp [auxvEntries, hcl, cacheTypes, List.lookup, AT_PAGESZ, AT_ENTRY, AT_SYSINFO_EHDR,
+    AT_MINSIGSTKSZ, AT_HWCAP, AT_CLKTCK, AT_PHDR, AT_PHENT, AT_PHNUM, AT_BASE, AT_FLAGS]
+
 /-- Control: `prog x` with strings at 0x1000: argc 2, argv[0] at 0x1000 ("prog\0"),
     argv[1] at 0x1005; the head is 8 words with no envp and no auxv. -/
 example : ({ argv := [[0x70, 0x72, 0x6f, 0x67], [0x78]], envp := [], auxv := [], sbase := 0x1000 } :

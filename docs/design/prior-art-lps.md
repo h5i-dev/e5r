@@ -602,6 +602,12 @@ musl binaries like OVP's need first):
   `launchStringBytes`, `stringBaseAddr`, `atExecfnPtr`. Theorem
   `envp_end_eq_execfn`: argv then envp, laid from `stringBaseAddr`, end
   exactly at AT_EXECFN's file name (`[propext, Quot.sound]`).
-- Still parameters: the auxv entries, AT_RANDOM and the alignment pads (LPS
-  `auxv_entries`, `block_pad_len`).
-- Next: the auxv entries, then `brk`/`mmap`.
+- The auxv entries as LPS lists them: `LaunchAuxv`, `PhdrInfo`,
+  `auxvEntries` (ARCH_DLINFO's ten, the sixteen unconditional ones, the
+  rseq pair; AT_NULL is appended by `headWords`).
+  - `auxvEntries_count`: 27 entries with AT_NULL, 29 with CONFIG_RSEQ, as
+    LPS `auxv_count`.
+  - `auxv_pagesz_entry`: AT_PAGESZ = 4096 and AT_ENTRY = entry.
+- Still parameters: AT_RANDOM's bytes and the alignment pads (LPS
+  `at_random_bytes`, `block_pad_len`).
+- Next: `brk`/`mmap`.
