@@ -151,7 +151,7 @@ def sumW (xs : List Word) : Word := xs.foldl (· + ·) 0
 
 theorem sumW_take_succ (xs : List Word) (k : Nat) (h : k < xs.length) :
     sumW (xs.take (k + 1)) = sumW (xs.take k) + xs[k] := by
-  simp only [sumW, List.take_succ, List.getElem?_eq_getElem h, Option.toList_some, List.foldl_append,
+  simp only [sumW, List.take_add_one, List.getElem?_eq_getElem h, Option.toList_some, List.foldl_append,
     List.foldl_cons, List.foldl_nil]
 
 theorem ofNat_eq_zero {m : Nat} (h : m < 2 ^ 64) : BitVec.ofNat 64 m = 0#64 ↔ m = 0 := by
@@ -159,7 +159,7 @@ theorem ofNat_eq_zero {m : Nat} (h : m < 2 ^ 64) : BitVec.ofNat 64 m = 0#64 ↔ 
   · intro e; have := congrArg BitVec.toNat e; simp only [BitVec.toNat_ofNat] at this; omega
   · rintro rfl; rfl
 
-theorem add_ofNat_succ8 (a : Word) {k : Nat} (h : 8 * (k + 1) < 2 ^ 64) :
+theorem add_ofNat_succ8 (a : Word) {k : Nat} (_h : 8 * (k + 1) < 2 ^ 64) :
     a + BitVec.ofNat 64 (8 * k) + 8#64 = a + BitVec.ofNat 64 (8 * (k + 1)) := by
   rw [BitVec.add_assoc]; congr 1
   apply BitVec.eq_of_toNat_eq
@@ -392,5 +392,112 @@ theorem f_verified : VerifiedImg tcCode fD 0x3000#64 fSpec := by
       · show s'.reg 10 = x + 2
         rw [hpost]; show x + 1 + 1 = x + 2; bv_omega
     · exact hex.elim
+
+/-! ### A call that returns: ra saved in a stack frame across the call -/
+
+/-- `f` at 0x4000: `addi sp,sp,-16; sd ra,8(sp); jal ra,g; ld ra,8(sp); addi sp,sp,16; ret`;
+    `g` at 0x4018: `addi a0,a0,1; ret`. -/
+def frCode : Code := ⟨0x4000#64, #[0xff010113#32, 0x00113423#32, 0x010000ef#32, 0x00813083#32,
+  0x01010113#32, 0x00008067#32, 0x00150513#32, 0x00008067#32]⟩
+def g2D : Dom := [(0x4018#64, 8)]
+def f2D : Dom := [(0x4000#64, 32)]
+def f2Spec : Spec Word := { pre := fun x s => s.reg 10 = x, post := fun x _ s' => s'.reg 10 = x + 1, stack := 16 }
+
+def g2Spec : Spec Word := { pre := fun x s => s.reg 10 = x, post := fun x _ s' => s'.reg 10 = x + 1 }
+
+theorem g2_verified : VerifiedImg frCode g2D 0x4018#64 g2Spec := by
+  intro x s he hpre
+  have hpre' : s.reg 10 = x := hpre
+  have hm : s.reg 1 &&& ~~~1 = s.reg 1 := and_not_one_of_aligned he.retAligned
+  unfold Exec
+  refine Reach.of_exploreAt (facts := []) (cuts := []) (fuel := 10) (k := 6) (by decide) (by decide)
+    he.pc he.live (by simp) ?_
+  vc_ends
+  rw [hm]
+  refine ⟨he.retAligned, .inl (by simpa using he.ret), .inl ⟨by simpa using hx', rfl, ?_, ?_⟩⟩
+  · intro r hr
+    simp only [preservedRegs, List.mem_cons, List.not_mem_nil, or_false] at hr
+    rw [State.setPc_reg, hreg r]
+    rcases hr with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> rfl
+  · show (s'.setPc _).reg 10 = x + 1
+    rw [State.setPc_reg, hreg 10, ← hpre']; rfl
+
+/-- The registers `f` keeps without saving them: the preserved ones except sp. -/
+def keep : List Reg := [3, 4, 8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]
+
+theorem f2_verified : VerifiedImg frCode f2D 0x4000#64 f2Spec := by
+  intro x s he hpre
+  have hpre' : s.reg 10 = x := hpre
+  have hsp : aligned (s.reg 2) 16 := he.sp
+  have hra : aligned (s.reg 1) 4 := he.retAligned
+  have hslot : s.reg 2 + 18446744073709551600#64 + 8#64 - (s.reg Reg.sp - BitVec.ofNat 64 16) = 8#64 := by
+    simp only [Reg.sp]; bv_omega
+  unfold Exec
+  -- From the entry to the call.
+  refine Reach.trans (Q₁ := fun u => u.pc = 0x4018#64 ∧ u.exit = none ∧ u.reg 10 = x ∧
+      u.reg 1 = 0x400c#64 ∧ u.reg 2 = s.reg 2 + 18446744073709551600#64 ∧
+      (∀ r ∈ keep, u.reg r = s.reg r) ∧
+      u.mem = writeLE s.mem (s.reg 2 + 18446744073709551600#64 + 8#64) (s.reg 1).toNat 8) ?_ ?_
+  · refine Reach.of_exploreAt (facts := []) (cuts := [0x4018#64]) (fuel := 10) (k := 0) (by decide)
+      (by decide) he.pc he.live (by simp) ?_
+    vc_ends
+    · unfold aligned at hsp ⊢; bv_omega
+    · refine .inr ⟨Spec.stackRegion s 16, by simp [Spec.perm, f2Spec], ?_⟩
+      simp only [Region.covers, Spec.stackRegion, hslot]; decide
+    · simp only [keep, List.forall_mem_cons, List.not_mem_nil, false_imp_iff, imp_true_iff, and_true,
+        symDen, hpre']
+  -- The call, from g's specification.
+  · intro u ⟨hp, hux, hu10, hu1, hu2, hkeep, humem⟩
+    have hP : (g2Spec.perm (x + 0) u).le (f2Spec.perm x s) := by
+      refine ⟨fun a n h => ?_, fun a n h => ?_⟩ <;>
+      · rcases h with h0 | ⟨r, hr, hc⟩
+        · exact .inl h0
+        · simp only [Spec.perm, g2Spec, List.nil_append,
+            List.mem_cons, List.not_mem_nil, or_false] at hr
+          subst hr
+          simp only [Region.covers, Spec.stackRegion] at hc
+          exact .inl (by omega)
+    have heg : Entry g2D 0x4018#64 u :=
+      ⟨hp, hux, by rw [Reg.ra, hu1]; decide, by rw [Reg.ra, hu1]; decide,
+        by rw [Reg.sp, hu2]; unfold aligned at hsp ⊢; bv_omega⟩
+    refine VerifiedImg.call g2_verified (x + 0) heg (by show u.reg 10 = x + 0; rw [hu10]; bv_omega)
+      (fun y hy => by simp only [Dom.mem, g2D, f2D, List.any_cons, List.any_nil, Bool.or_false,
+        decide_eq_true_eq] at hy ⊢; bv_omega) hP fun t hd hm => ?_
+    rcases hd with ⟨htx, htpc, hpres, hpost⟩ | ⟨_, hex⟩
+    case inr => exact hex.elim
+    have hpost' : t.reg 10 = x + 0 + 1 := hpost
+    -- g writes nothing: its only writable region is 0 bytes of stack.
+    have hmem' : t.mem = u.mem := funext fun y => hm y fun ⟨r, hr, hy⟩ => by
+      simp only [Spec.perm, g2Spec, List.nil_append, List.mem_cons, List.not_mem_nil, or_false] at hr
+      subst hr; simp only [Region.mem, Spec.stackRegion] at hy; omega
+    have hs2 : t.reg 2 = u.reg 2 := hpres 2 (by simp [preservedRegs])
+    have hld : read64 t.mem (t.reg 2 + 8#64) = s.reg 1 := by
+      rw [hmem', humem, hs2, hu2, read64, Fast.readLE_writeLE_same (by decide)]
+      apply BitVec.eq_of_toNat_eq
+      have := (s.reg 1).isLt
+      simp only [BitVec.toNat_ofNat]; omega
+    have hslot' : t.reg 2 + 8#64 - (s.reg Reg.sp - BitVec.ofNat 64 16) = 8#64 := by
+      rw [hs2, hu2]; simp only [Reg.sp]; bv_omega
+    -- From the return address to f's return.
+    refine Reach.of_exploreAt (facts := []) (cuts := []) (fuel := 10) (k := 3) (p := 0x400c#64) (by decide)
+      (by decide) (by rw [htpc, Reg.ra, hu1]) htx (by simp) ?_
+    vc_ends
+    · rw [hs2, hu2]; unfold aligned at hsp ⊢; bv_omega
+    · refine .inr ⟨Spec.stackRegion s 16, by simp [Spec.perm, f2Spec], ?_⟩
+      simp only [Region.covers, Spec.stackRegion, hslot']; decide
+    · have hmk : s.reg 1 &&& ~~~1 = s.reg 1 := and_not_one_of_aligned hra
+      rw [hld, hmk]
+      refine ⟨hra, .inl (by simpa using he.ret), .inl ⟨by simpa using hx', rfl, fun r hr => ?_, ?_⟩⟩
+      · simp only [preservedRegs, List.mem_cons, List.not_mem_nil, or_false] at hr
+        rw [State.setPc_reg, hreg r]
+        rcases hr with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+        simp only [symDen, evalI] <;>
+        first
+          | (rw [hs2, hu2]; bv_omega)
+          | (rw [hpres _ (by decide), hkeep _ (by decide)])
+      · show (s'.setPc _).reg 10 = x + 1
+        rw [State.setPc_reg, hreg 10]
+        show t.reg 10 = x + 1
+        rw [hpost']; bv_omega
 
 end NoCompiler.VC.M.Example
