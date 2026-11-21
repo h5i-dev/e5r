@@ -108,3 +108,73 @@ fn the_ledger_key_is_sha256sum_of_the_canonical_form() {
     let out = child.wait_with_output().unwrap();
     assert_eq!(String::from_utf8(out.stdout).unwrap()[..64], ours);
 }
+
+/// The modules in chunks are what `module::lean_chunks` writes
+/// (lean/Examples/Link/{One,Two}Chunks.lean; lean/Examples/LinkChunks.lean
+/// decides they decode to the modules).
+#[test]
+fn the_committed_chunk_modules_are_what_lean_chunks_writes() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for (elf, ns) in [("sum.link1.elf", "One"), ("sum.link2.elf", "Two")] {
+        let bytes = std::fs::read(root.join("examples/elf").join(elf)).unwrap();
+        let m = nocompiler::module::of_binary(&nocompiler::load(&bytes).unwrap()).unwrap();
+        let sha = nocompiler::sha256::hex(&nocompiler::sha256::digest(&bytes));
+        let got =
+            nocompiler::module::lean_chunks(&m, &format!("Examples.Link.{ns}Chunks"), elf, &sha)
+                .unwrap();
+        let path = root.join(format!("lean/Examples/Link/{ns}Chunks.lean"));
+        assert_eq!(
+            got,
+            std::fs::read_to_string(&path).unwrap(),
+            "{} is stale",
+            path.display()
+        );
+    }
+}
+
+/// A negative addend, packed: the number lean/Examples/LinkChunks.lean
+/// (`reloc_negative`) decodes to this relocation.
+#[test]
+fn a_negative_addend_packs_as_lean_decodes_it() {
+    use nocompiler::module::{Kind, RFunc, Reloc};
+    let f = RFunc {
+        name: "f".into(),
+        entry: 0,
+        words: vec![0; 3],
+        relocs: vec![Reloc {
+            off: 8,
+            kind: Kind::PcrelLoI,
+            sym: "A".into(),
+            addend: -5,
+            hi_off: 4,
+        }],
+    };
+    let (bits, syms) = nocompiler::module::pack_relocs(&f).unwrap();
+    assert_eq!(bits, "0x00000000000002400002000004000008");
+    assert_eq!(syms, ["A"]);
+    assert_eq!(nocompiler::module::sym_code("A").unwrap(), "0x00000041");
+}
+
+/// The reuse files for the identical rebuild and a one-function edit: every
+/// function gets a theorem, except those whose closure holds the edit.
+#[test]
+fn reuse_lean_states_a_theorem_for_each_unchanged_closure() {
+    use nocompiler::module::{ReuseForm, reuse_lean};
+    let a = module("sum.link1.elf");
+    let (_, t, c) = reuse_lean(
+        &a,
+        &module("sum.link2.elf"),
+        "A",
+        "B",
+        "R",
+        ReuseForm::Verified,
+    );
+    assert_eq!((t, c), (3, 0));
+    let mut e = a.clone();
+    let s = e.funcs.iter_mut().find(|f| f.name == "sum").unwrap();
+    s.words[0] ^= 1 << 7;
+    let (text, t, c) = reuse_lean(&a, &e, "A", "B", "R", ReuseForm::Verified);
+    // sum, and _start and sum2 which call it, all changed.
+    assert_eq!((t, c), (0, 3));
+    assert!(text.contains("theorem c_1 : RChunk.subSeqG [A.f_1] [(1, 1)] [] B.groups = false"));
+}

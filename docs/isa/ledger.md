@@ -87,12 +87,48 @@ per binary, self-check included:
   closure key with it.
 - **Before the dataflow,** a linear scan missed one low part in `acos` and
   reported 2 own and 3 closure keys changed.
-- **Not yet:**
-  - the Lean-side measurement on the whole artifact. Its module as one
-    Lean literal (1237 functions, 3.3 MB) does not elaborate under the 6 GB
-    cap: at the default heartbeats it times out after 29.5 s, 1.38 GB; with
-    no heartbeat limit it hits the recursion limit after 110.8 s, 4.36 GB.
-    It waits on the per-function format A is redesigning.
+- **The Lean side, on the whole artifact (7').** Modules in chunks
+  (lean/NoCompiler/ModuleChunks.lean; `module::lean_chunks`): one `RChunk`
+  per function, all numbers (words, packed relocations, names and symbols
+  as numbers), the functions in groups of 32. `module::reuse_lean` writes
+  for every function of `a` whose call closure is unchanged in the other
+  build a theorem from `Verified` of its closure module in `a` to
+  `Verified` of the whole other module (`Verified.of_groups`), or the
+  `Refines` of the two images at one layout (`Refines.of_groups`); for a
+  changed one, a control (the kernel decides the check is `false`). Each
+  file compiled alone (`lean -o`, under the 6 GB cap, shared host):
+
+  | file | theorems | controls | time | max RSS |
+  | --- | --- | --- | --- | --- |
+  | module a / b / e (1235 functions, 87,242 words) | | | 15.9 / 12.7 / 10.5 s | 1.83 GB |
+  | import of two modules only (baseline) | | | 1.40 s | 1.58 GB |
+  | Verified, identical rebuild (a to b) | 1235 | 0 | 35.6 s | 2.76 GB |
+  | Verified, one-line edit (a to e) | 1234 | 1 (`w_num_chars`) | 34.5 s | 2.84 GB |
+  | Refines, identical rebuild | 1235 | 0 | 55.1 s | 2.87 GB |
+  | Refines, one-line edit | 1234 | 1 | 54.5 s | 2.90 GB |
+
+  About 28 ms per reused function for `Verified` after the baseline, 0.4 ms
+  per instruction of the artifact. Axioms: `r_570` uses propext,
+  Classical.choice, Quot.sound; the control `c_1233` none. In the kernel,
+  one `RChunk` comparison takes 1.7-2.1 ms (`decide +kernel`, profiler);
+  the rest is the walk to the function and the elaboration of each
+  statement. The theorems take the closure's `Verified` as a hypothesis:
+  the cost measured is the reuse step, not a proof of the function.
+- **What made it fit.** Measured on the way, same artifact:
+  - names as strings: one name comparison costs 0.2 s in the kernel and the
+    distinct-names check is quadratic; a 1235-theorem file did not finish
+    in 900 s. Names are numbers now, and distinct names follow from the
+    sublist and the larger module's `Ok`, so no string is compared;
+  - one flat list: walking to function 1000 costs 50-90 ms, a file 72-90
+    s and 4.10 GB. Groups of 32: 34-36 s, 2.8 GB;
+  - one literal for `.rodata` (78,496 bytes): 11.2 s for that literal
+    alone; parts of 1024 bytes. Relocations as 10,259 structure instances:
+    the module took 36.3 s; packed into one number per function, 8-16 s.
+- **Not yet:** a `--format chunks` flag for `nocompiler module` (cmd.rs and
+  main.rs are not B's files; the measurement used a driver over
+  `module::lean_chunks`/`reuse_lean`); a `Verified` module whose order of
+  callees differs between the builds (the check is a sublist: a callee moved
+  before its caller gives no theorem; none on this artifact).
 
 Not yet: search by specification (the spec is named, not indexed), and
 ledger entries for theorems whose specification depends on the layout (data
