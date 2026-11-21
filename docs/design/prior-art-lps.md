@@ -584,3 +584,21 @@ musl binaries like OVP's need first):
 - Axioms: `[propext]`. `lake env lean Fd.lean`: 0.47 s.
 - Next: the process start state (argv/envp/auxv, LPS `StackLayout.v`), then
   `brk`/`mmap`.
+
+### Third step: the process start state (lean/NoCompiler/Linux/Start.lean)
+
+- Ported from LPS `StackLayout.v`: `wordBytes` (`word_le8`), `stringAddrs`
+  (`string_addrs`) and `flattenStrings` (`flatten_strings`).
+- `StartArgs` (argv, envp, auxv pairs, string base). Its head words are
+  argc, the argv pointers, 0, the envp pointers, 0, the auxv pairs and
+  AT_NULL, in `build_stack_bytes`'s order.
+- `StartState entry a s`: pc at entry, no exit, empty trace, the head at sp,
+  the strings at the string base.
+- `argc_at_sp`: the word at sp is argc. `argv_at`: the word at
+  sp + 8(i+1) is argv[i]'s address. Both are proved from
+  `read64_of_wordBytes` and `read64_word`.
+- Axioms: `[propext, Quot.sound]`. `lake env lean Start.lean`: 1.4 s.
+- Still parameters, not computed: the string base, the auxv entries,
+  AT_RANDOM, the exec file name, the alignment pads. LPS computes them in
+  `string_base_addr`, `auxv_entries` and `block_pad_len`.
+- Next: compute those parameters, then `brk`/`mmap`.
