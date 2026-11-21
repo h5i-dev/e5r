@@ -1,1 +1,3 @@
 __pycache__/
+# the root .gitignore ignores env/ (Python virtualenvs); this one is the environment
+!env/

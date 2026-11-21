@@ -1,0 +1,30 @@
+# The swe-bin environment: its own workspace (not a member of the NoCompiler workspace), in
+# senv's two-crate layout: `kernel` (pure, extracted to Lean by `h5i app extract`) and `server`
+# (senv::Environment, the MCP tools, the test and proof harness).
+[workspace]
+resolver = "3"
+members = ["kernel", "server"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.88"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+senv = { git = "https://github.com/h5i-dev/senv", rev = "9650d88bb711645c5986f26f5dfd6e57c60188f8" }
+h5i-app = { version = "=0.5.5", default-features = false }
+clap = { version = "4", features = ["derive", "env"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time", "process"] }
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+
+[profile.release]
+overflow-checks = true

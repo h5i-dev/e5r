@@ -1,0 +1,14 @@
+[package]
+name = "swe-bin-kernel"
+description = "swe-bin's kernel: every reward and done decision, extracted to Lean by `h5i app extract`."
+version = "0.1.0"
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# Extracted to Lean. Keep it to the Rust that Charon and Aeneas translate, with no dependencies.
+[dependencies]
+
+[lints]
+workspace = true

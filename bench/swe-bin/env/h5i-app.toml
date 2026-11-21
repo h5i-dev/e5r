@@ -1,0 +1,101 @@
+# Read by `h5i app`: extract, check, prove, mutate.
+
+[extract]
+crate = "kernel"
+start-from = ["transition", "apply", "read_only", "initial"]
+
+[check]
+theorems = [
+    "swe_bin_kernel.Theorems.reward_spec",
+    "swe_bin_kernel.Theorems.submit_spec",
+    "swe_bin_kernel.Theorems.full_reward_iff_all_pass",
+    "swe_bin_kernel.Theorems.bonus_only_with_proof",
+    "swe_bin_kernel.Theorems.reward_values",
+    "swe_bin_kernel.Theorems.patch_bonus_needs_refines",
+    "swe_bin_kernel.Theorems.scratch_bonus_needs_verified",
+    "swe_bin_kernel.Theorems.initial_paid",
+    "swe_bin_kernel.Theorems.no_reward_without_submission",
+    "swe_bin_kernel.Theorems.only_submit_pays",
+    "swe_bin_kernel.Theorems.done_is_final",
+    "swe_bin_kernel.Theorems.task_is_fixed",
+    "swe_bin_kernel.Theorems.reset_spec",
+]
+
+[obligations]
+panic-free = "swe_bin_kernel.Theorems.panic_free"
+read-only = "swe_bin_kernel.Theorems.read_only_sound"
+
+# Bugs the proofs must reject (`h5i app mutate`): each is a reward hack an agent could find.
+# Each `old` occurs once in kernel/src/lib.rs.
+
+# pays without the FAIL_TO_PASS tests (the base binary would win)
+[[mutant]]
+name = "f2p_ignored"
+old = "hash_eq(&r.binary, binary) && r.f2p_passed == t.f2p && r.p2p_passed == t.p2p"
+new = "hash_eq(&r.binary, binary) && r.p2p_passed == t.p2p"
+
+# pays when the fix breaks PASS_TO_PASS tests
+[[mutant]]
+name = "p2p_ignored"
+old = "hash_eq(&r.binary, binary) && r.f2p_passed == t.f2p && r.p2p_passed == t.p2p"
+new = "hash_eq(&r.binary, binary) && r.f2p_passed == t.f2p"
+
+# a report about one binary pays for submitting another
+[[mutant]]
+name = "report_for_any_binary"
+old = "hash_eq(&r.binary, binary) && r.f2p_passed == t.f2p && r.p2p_passed == t.p2p"
+new = "r.f2p_passed == t.f2p && r.p2p_passed == t.p2p"
+
+# a proof alone pays
+[[mutant]]
+name = "bonus_without_tests"
+old = "    if all_pass(t, tests, binary) {\n        if proof_ok"
+new = "    if all_pass(t, tests, binary) || proof_ok(t, proof, binary) {\n        if proof_ok"
+
+# a proof the checker rejected earns the bonus
+[[mutant]]
+name = "unchecked_proof"
+old = "Some(p) => p.checked && hash_eq(&p.binary, binary)"
+new = "Some(p) => hash_eq(&p.binary, binary)"
+
+# a proof about another binary earns the bonus
+[[mutant]]
+name = "proof_for_any_binary"
+old = "p.checked && hash_eq(&p.binary, binary) && kind_eq"
+new = "p.checked && kind_eq"
+
+# patch mode pays for a Verified proof and scratch mode for a Refines proof
+[[mutant]]
+name = "any_kind_of_proof"
+old = " && kind_eq(p.kind, bonus_kind(t.mode))"
+new = ""
+
+# the bonus pays more than BONUS_MILLI
+[[mutant]]
+name = "bonus_inflated"
+old = "            FULL_MILLI + BONUS_MILLI\n"
+new = "            FULL_MILLI + BONUS_MILLI + BONUS_MILLI\n"
+
+# a finished episode accepts another submission
+[[mutant]]
+name = "submit_after_done"
+old = "if s.done {\n                Err(Error::Done)\n            } else if !s.started {\n                Err(Error::NotStarted)\n            } else {\n                let next = Snapshot {\n                    task: s.task,\n                    started: true,\n                    tests: s.tests,\n                    proof: s.proof,\n                    submitted: Some"
+new = "if !s.started {\n                Err(Error::NotStarted)\n            } else {\n                let next = Snapshot {\n                    task: s.task,\n                    started: true,\n                    tests: s.tests,\n                    proof: s.proof,\n                    submitted: Some"
+
+# a submission does not end the episode, so the agent can resubmit
+[[mutant]]
+name = "submit_does_not_end"
+old = "                    done: true,\n"
+new = "                    done: false,\n"
+
+# a new episode starts with the last episode's reward
+[[mutant]]
+name = "reset_keeps_reward"
+old = "                    done: false,\n                    reward_milli: 0,\n                };\n                Ok((Some(next), reply(&next)))\n            } else {\n                Err(Error::InvalidTask)"
+new = "                    done: false,\n                    reward_milli: s.reward_milli,\n                };\n                Ok((Some(next), reply(&next)))\n            } else {\n                Err(Error::InvalidTask)"
+
+# recording a proof switches the episode to patch mode
+[[mutant]]
+name = "proof_changes_mode"
+old = "                    task: s.task,\n                    started: true,\n                    tests: s.tests,\n                    proof: Some(*proof),"
+new = "                    task: Task { id: s.task.id, mode: Mode::Patch, f2p: s.task.f2p, p2p: s.task.p2p },\n                    started: true,\n                    tests: s.tests,\n                    proof: Some(*proof),"
