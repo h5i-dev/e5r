@@ -229,3 +229,15 @@ N instructions alternating `ld a3, 0(a0)` and `sd a3, 8(a0)`, run by `NoCompiler
 | 10,000 | 16 s | 16.4 s | 2.38 GB |
 
 That is about 1.4 to 1.6 ms per instruction. `Reach.of_runW` (trusted `Reach` from a run whose obligations hold) and `sstep_sound` use only `propext` and `Quot.sound`.
+
+### Measured: milestone 3, obligations discharged reflectively (`VC/Ob.lean`)
+
+The same ld/sd chain. Every obligation is checked by `Ob.check` from the facts "a0 is 8-aligned" and "a0 starts a 16-byte writable region", all in one kernel evaluation (`Gen.py OUTDIR memchk N`). `Ob.check_sound` and `Reach.of_runW_checked` (trusted `Reach` from a checked run) are proved once.
+
+| N | Kernel ("type checking") | Wall | Max RSS |
+| --- | --- | --- | --- |
+| 100 | 0.28 s | 0.65 s | 0.52 GB |
+| 1,000 | 3.15 s | 3.50 s | 0.89 GB |
+| 10,000 | 33.1 s | 33.5 s | 4.69 GB |
+
+That is about 3.2 ms per instruction, linear, with no goal or tactic per instruction. Memory at 10^4 is close to the 6 GB cap: one evaluation over the whole run keeps every state alive. Splitting per segment is what bounds it.

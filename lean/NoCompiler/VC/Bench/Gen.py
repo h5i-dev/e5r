@@ -10,6 +10,22 @@
 # ends at the right pc, and emits two obligations (alignment, permission) per instruction.
 import sys, os
 out = sys.argv[1]
+# The `memchk` form writes OUTDIR/MemChkN.lean: the same run, with every obligation discharged by
+# Ob.check from the facts "a0 is 8-aligned" and "a0 starts a 16-byte writable region".
+if len(sys.argv) > 2 and sys.argv[2] == "memchk":
+    os.makedirs(out, exist_ok=True)
+    for n in map(int, sys.argv[3:]):
+        with open(os.path.join(out, f"MemChk{n}.lean"), "w") as f:
+            f.write(f"""import NoCompiler.VC.Ob
+namespace NoCompiler.VC.M.Bench
+def chain : Code := ⟨0x10000#64, ((List.range {n}).map fun i => if i % 2 = 0 then 0x00053683#32 else 0x00d53423#32).toArray⟩
+def facts : List Fact := [.aligned 10 8, .region 10 16 true]
+set_option maxRecDepth 200000 in
+theorem chain_checked : (runW [(0x10000#64, 4 * {n})] chain.words.toList (SState.init 0x10000#64)).map
+    (fun p => p.2.all (Ob.check facts)) = some true := by decide +kernel
+end NoCompiler.VC.M.Bench
+""")
+    sys.exit(0)
 if len(sys.argv) > 2 and sys.argv[2] == "mem":
     os.makedirs(out, exist_ok=True)
     for n in map(int, sys.argv[3:]):

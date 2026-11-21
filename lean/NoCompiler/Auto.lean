@@ -4,6 +4,7 @@ import NoCompiler.Trace
 import NoCompiler.Fast.State
 import NoCompiler.VC.Straight
 import NoCompiler.VC.Mem
+import NoCompiler.VC.Ob
 
 /-
 Proof automation for structured code: `nocompiler_auto`.
