@@ -251,7 +251,9 @@ RV_RUSTFLAGS = ("-C linker=rv-cc -C link-self-contained=no -C target-feature=+zb
 def rust_env_prefix(target_dir: str) -> str:
     t = "riscv64imafd_unknown_linux_musl"
     return (f"RUSTUP_HOME={rusttc.RUSTUP_HOME} CARGO_HOME={rusttc.CARGO_HOME} "
-            f"CARGO_TARGET_DIR={target_dir} CC_{t}=rv-cc CXX_{t}=rv-c++ AR_{t}=llvm-ar CFLAGS_{t}=-g ")
+            f"CARGO_TARGET_DIR={target_dir} CC_{t}=rv-cc CXX_{t}=rv-c++ AR_{t}=llvm-ar CFLAGS_{t}=-g "
+            # a profile's `strip = true` (bat >= 0.24) conflicts with --emit-relocs in lld
+            "CARGO_PROFILE_RELEASE_STRIP=false CARGO_PROFILE_DEV_STRIP=false ")
 
 
 class RustProgram(Recipe):
@@ -304,9 +306,9 @@ class RustProgram(Recipe):
         tc = self.toolchain(wt, log)
         rv, _ = self.dirs(wt)
         bins = " ".join(f"--bin {b}" for b in self.bins)
-        flags = f"{RV_RUSTFLAGS} {self.tcm['jump_tables_flag']}"
+        flags = f"{RV_RUSTFLAGS} {self.tcm['jump_tables_flag']} {self.tcm.get('unstable_flag', '')}"
         cmd = (f"{rust_env_prefix(rv)}{self.target_env()}RUSTFLAGS='{flags}' cargo +{tc} build --release "
-               f"-j{JOBS} {self.package_args} {bins} --target {rusttc.TARGET}")
+               f"-j{JOBS} {self.package_args} {bins} {self.tcm['json_target_flag']} --target {rusttc.TARGET}")
         try:
             log.run(cmd, wt, "build", timeout=7200)
         except Failed as e:
@@ -429,13 +431,13 @@ class RustTests(RustProgram):
         tc = self.toolchain(wt, log)
         rv, _ = self.dirs(wt)
         envs, cargo_opts, _ = self._parts(self.task)
-        rustflags = f"{RV_RUSTFLAGS} {self.tcm['jump_tables_flag']}"
+        rustflags = f"{RV_RUSTFLAGS} {self.tcm['jump_tables_flag']} {self.tcm.get('unstable_flag', '')}"
         m = re.search(r"RUSTFLAGS=(\"[^\"]*\"|\S+)", envs)
         if m:  # e.g. --cfg tokio_unstable
             rustflags += " " + m.group(1).strip('"').replace("-Awarnings", "")
         cmd = (f"{rust_env_prefix(rv)}CARGO_PROFILE_DEV_OPT_LEVEL=2 "
                f"{self.target_env()}RUSTFLAGS='{rustflags}' cargo +{tc} test --no-run -j{JOBS} "
-               f"{' '.join(map(shlex.quote, cargo_opts))} --target {rusttc.TARGET} "
+               f"{' '.join(map(shlex.quote, cargo_opts))} {self.tcm['json_target_flag']} --target {rusttc.TARGET} "
                f"--message-format=json 2>/dev/null")
         out = log.run(cmd, wt, "build", timeout=7200, check=False)
         exes = []

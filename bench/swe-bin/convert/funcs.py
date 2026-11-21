@@ -444,3 +444,11 @@ def signatures(debug_elf: str, names: list[str]) -> dict:
                 static = "static " if "DW_AT_external" not in die.attributes else ""
                 out[n] = f"{static}{ret} {n}({', '.join(params) or 'void'})"
     return out
+
+
+def has_line_tables(path: str) -> bool:
+    if not os.path.exists(path):
+        return False
+    with open(path, "rb") as fh:
+        e = ELFFile(fh)
+        return e.get_section_by_name(".debug_line") is not None

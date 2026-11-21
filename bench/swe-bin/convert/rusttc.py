@@ -96,7 +96,10 @@ def setup(tc: str) -> dict:
     meta = os.path.join(d, "meta.json")
     if os.path.exists(meta):
         with open(meta) as fh:
-            return json.load(fh)
+            m = json.load(fh)
+        # a meta from before the std was installed (or a std removed since) is redone
+        if m.get("sysroot_std") and os.path.exists(os.path.join(m["sysroot_std"], ".swe-bin-std")):
+            return m
     os.makedirs(d, exist_ok=True)
     spec = json.loads(_run(["rustc", f"+{tc}", "-Z", "unstable-options", "--print", "target-spec-json",
                             "--target", "riscv64gc-unknown-linux-musl"]))
@@ -122,7 +125,10 @@ def setup(tc: str) -> dict:
         jt = "-Z no-jump-tables"
     else:
         jt = ""
-    m = {"toolchain": tc, "target": path, "sysroot_std": install_std(tc, path, jt, cargo_z),
+    # newer rustc wants -Zunstable-options for any custom target, newer cargo -Zjson-target-spec
+    unstable = "-Zunstable-options" if "json-target-spec" in cargo_z else ""
+    m = {"toolchain": tc, "target": path, "unstable_flag": unstable,
+         "sysroot_std": install_std(tc, path, f"{jt} {unstable}", cargo_z),
          "jump_tables_flag": jt,
          "json_target_flag": "-Zjson-target-spec" if "json-target-spec" in cargo_z else ""}
     with open(meta, "w") as fh:
@@ -166,10 +172,16 @@ def install_std(tc: str, spec: str, jt: str, cargo_z: str) -> str:
     p = subprocess.run(args, cwd=work, env=e, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if p.returncode != 0:
         raise RuntimeError(f"std for {tc}: {p.stdout.decode()[-1500:]}")
-    deps = os.path.join(work, "target", TARGET, "release", "deps")
+    # release/deps/ in older cargo; release/build/<crate>/<hash>/out/ in the 2026 layout
     os.makedirs(dst, exist_ok=True)
-    for f in os.listdir(deps):
-        if f.endswith(".rlib") and not f.startswith("libswb_std"):
-            shutil.copy(os.path.join(deps, f), os.path.join(dst, f))
+    n = 0
+    for root, _, files in os.walk(os.path.join(work, "target", TARGET, "release")):
+        for f in files:
+            # .rmeta too: newer rustc keeps the full metadata there, and the rlib has a stub
+            if f.endswith((".rlib", ".rmeta")) and not f.startswith("libswb_std"):
+                shutil.copy(os.path.join(root, f), os.path.join(dst, f))
+                n += 1
+    if n == 0:
+        raise RuntimeError(f"std for {tc}: no rlib built")
     open(os.path.join(dst, ".swe-bin-std"), "w").close()
     return dst

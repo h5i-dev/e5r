@@ -87,7 +87,7 @@ def analyze(rel, b, g, patch=""):
     by_name_g = {f.name: f for f in fg.values()}
     removes = sorted(set(src_b) | {n for n in src_g if n in by_name_b})
     basis = "source lines (DWARF)"
-    if not removes:  # no line tables: the byte-level set
+    if not removes and not funcs.has_line_tables(bd):  # no line tables: the byte-level set
         removes, basis = sorted({fb[k].name for k in mod}), "bytes (no line tables)"
     sigs = funcs.signatures(bd, removes) if os.path.exists(bd) else {}
     calls = funcs.callers(b, removes)
