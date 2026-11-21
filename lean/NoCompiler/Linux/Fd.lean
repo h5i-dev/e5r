@@ -21,8 +21,11 @@ namespace NoCompiler.Linux
 /-- The kernel's state of the process, so far: its open descriptors. -/
 structure Kern where
   fds : List Word
+  /-- The program break's start and current value (Linux/Brk.lean); 0 until the loader sets them. -/
+  startBrk : Word := 0
+  brk : Word := 0
 
-def Kern.init : Kern := ⟨[0, 1, 2]⟩
+def Kern.init : Kern := { fds := [0, 1, 2] }
 
 def sysClose : Word := 57
 
@@ -35,7 +38,7 @@ def fdSpec (k : Kern) (i : SyscallInput) (o : Outcome) (k' : Kern) : Prop :=
     if i.arg 0 ∈ k.fds then spec i o ∧ k' = k
     else o = .ret { ret := ebadf } none ∧ k' = k
   else if i.sysno = sysClose then
-    if i.arg 0 ∈ k.fds then o = .ret { ret := 0 } none ∧ k' = ⟨k.fds.erase (i.arg 0)⟩
+    if i.arg 0 ∈ k.fds then o = .ret { ret := 0 } none ∧ k' = { k with fds := k.fds.erase (i.arg 0) }
     else o = .ret { ret := ebadf } none ∧ k' = k
   else spec i o ∧ k' = k
 

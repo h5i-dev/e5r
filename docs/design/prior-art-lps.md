@@ -610,4 +610,22 @@ musl binaries like OVP's need first):
   - `auxv_pagesz_entry`: AT_PAGESZ = 4096 and AT_ENTRY = entry.
 - Still parameters: AT_RANDOM's bytes and the alignment pads (LPS
   `at_random_bytes`, `block_pad_len`).
-- Next: `brk`/`mmap`.
+
+### Fourth step: `brk` (lean/NoCompiler/Linux/Brk.lean)
+
+- `Kern` gains `startBrk`/`brk`. `brkSpec` follows LPS `brk_r_ok`:
+  - a query, or a request below the start: the break, unchanged;
+  - a grow: the new break, with [PAGE_ALIGN(old), PAGE_ALIGN(req))
+    zero-filled (`brk_zeros`), or failure;
+  - a shrink: NO outcome (fail closed), because our memory is total and
+    cannot say "unmapped" (Linux faults on the freed pages).
+- LPS's grow gates (other mappings, the memory budget) are not modelled. A
+  grow here may succeed where LPS refuses it: an over-approximation, which
+  is sound for proofs over every outcome.
+- `procSpec`/`ProcStep` combine `brk` with the fd layer.
+  - `ProcStep.sys`: at every syscall but `close` and `brk`, a step is a
+    `Sys` step.
+  - `brk_query`, `brk_grow`, and the control `brk_shrink_none`.
+- Axioms: `[propext]` / `[propext, Quot.sound]`. `lake env lean Brk.lean`:
+  0.40 s.
+- Next: partial memory (needed for unmaps: brk shrink, munmap), then `mmap`.
