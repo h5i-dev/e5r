@@ -16,6 +16,32 @@ out = sys.argv[1]
 # segments of K, and one theorem per segment (the segment's run, every obligation checked).
 # The `vcrun` form writes OUTDIR/VcRun{KIND}N_K.lean: N instructions (KIND add: addi a0,a0,1; KIND mem:
 # alternating ld a3,0(a0) and sd a3,8(a0)) as segments of K, one segVC theorem per segment closed by vc_run.
+# The `vclit` form writes OUTDIR/VcLit{KIND}N_K_{j}.lean for j < FILES: as `vcrun`, but every segment is
+# its own literal word list (as per-function code chunks are), the segments spread over FILES files.
+if len(sys.argv) > 2 and sys.argv[2] == "vclit":
+    os.makedirs(out, exist_ok=True)
+    kind, n, k, files = sys.argv[3], int(sys.argv[4]), int(sys.argv[5]), int(sys.argv[6])
+    word = {"add": lambda i: "0x00150513#32",
+            "mem": lambda i: "0x00053683#32" if i % 2 == 0 else "0x00d53423#32"}[kind]
+    nseg = n // k
+    per = (nseg + files - 1) // files
+    for j in range(files):
+        with open(os.path.join(out, f"VcLit{kind}{n}_{k}_{j}.lean"), "w") as f:
+            f.write(f"""import NoCompiler.VC.Tactic
+namespace NoCompiler.VC.M.Bench
+def D : Dom := [(0x10000#64, 4 * {n})]
+def facts : List Fact := [.aligned 10 8, .region 10 16 true]
+""")
+            for i in range(j * per, min(nseg, (j + 1) * per)):
+                words = ", ".join(word(x) for x in range(k))
+                f.write(f"""def seg_{i} : List (BitVec 32) := [{words}]
+set_option maxRecDepth 200000 in
+theorem seg_{i}_ok (ρ : Nat → Word) (μ : Word → Byte) : segVC ρ μ (fun _ => True) facts D seg_{i}
+    (SState.init (0x10000#64 + BitVec.ofNat 64 {4 * k * i})) := by
+  unfold segVC; vc_run; exact ⟨by decide +kernel, fun _ _ _ => trivial⟩
+""")
+            f.write("end NoCompiler.VC.M.Bench\n")
+    sys.exit(0)
 if len(sys.argv) > 2 and sys.argv[2] == "vcrun":
     os.makedirs(out, exist_ok=True)
     kind, n, k = sys.argv[3], int(sys.argv[4]), int(sys.argv[5])

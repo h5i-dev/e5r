@@ -249,4 +249,67 @@ theorem sum_reach (a : Word) (xs : List Word) (s : State) (hpc : s.pc = 0x11190#
         rw [hur]
       · rw [State.setPc_reg, e10, BitVec.add_zero, h12', show k + 1 = xs.length by omega, List.take_length]
 
+/-! ### The same three with `vc_ends` -/
+
+set_option maxRecDepth 4000 in
+theorem abs_spec2 {P : Perm} (s : State) (hpc : s.pc = 0x2000#64) (hx : s.exit = none)
+    (hra : aligned (s.reg 1 &&& ~~~1) 4) :
+    Reach absCode P absD (fun s' => s'.pc = s.reg 1 &&& ~~~1 ∧
+      s'.reg 10 = if (s.reg 10).slt 0 then 0 - s.reg 10 else s.reg 10) s := by
+  refine Reach.of_exploreAt (facts := []) (cuts := []) (fuel := 10) (k := 0) (by decide) (by decide)
+    hpc hx (by simp) ?_
+  vc_ends
+  all_goals simp_all
+theorem countdown3 {P : Perm} (s : State) (hpc : s.pc = 0x1000#64) (ha : s.reg 10 ≠ 0)
+    (hra : aligned (s.reg 1 &&& ~~~1) 4) (hx : s.exit = none) :
+    Reach (Code.ofSegs 0x1000#64 segs) P D (fun s' => s'.reg 10 = 0 ∧ s'.pc = s.reg 1 &&& ~~~1) s := by
+  refine Reach.cutpoints (fun pc u => pc = 0x1000#64 ∧ u.exit = none ∧ u.reg 1 = s.reg 1 ∧ u.reg 10 ≠ 0)
+    (fun _ u => (u.reg 10).toNat) ?_ ?_
+  · intro R hR; subst hR; exact .done (.inr ⟨hpc, hx, rfl, ha⟩)
+  · intro u ⟨hp, hux, hur, hu⟩ R hR; subst hR
+    refine Reach.of_exploreAt (facts := []) (cuts := [0x1000#64]) (fuel := 10) (k := 0) (by decide)
+      (by decide) hp hux (by simp) ?_
+    vc_ends
+    · simp only [bne_iff_ne, ne_eq] at hc
+      refine .inr ⟨⟨hur, ?_⟩, ?_⟩
+      · exact hc
+      · bv_omega
+    · simp only [bne_eq_false_iff_eq] at hc
+      exact ⟨hur ▸ hra, .inl ⟨hc, by rw [hur]⟩⟩
+theorem sum_reach2 (a : Word) (xs : List Word) (s : State) (hpc : s.pc = 0x11190#64) (hx : s.exit = none)
+    (ha0 : s.reg 10 = a) (ha1 : s.reg 11 = BitVec.ofNat 64 xs.length) (hlen : 8 * xs.length < 2 ^ 64)
+    (hal : aligned a 8) (harr : arr64 s.mem a xs) (hra : aligned (s.reg 1 &&& ~~~1) 4) :
+    Reach sumCode ⟨[arrRegion a xs], []⟩ sumD (fun s' => s'.pc = s.reg 1 &&& ~~~1 ∧ s'.reg 10 = sumW xs) s := by
+  have hn : xs.length < 2 ^ 64 := by omega
+  refine Reach.cutpoints (fun pc u => pc = 0x11198#64 ∧ u.exit = none ∧ u.reg 1 = s.reg 1 ∧ u.mem = s.mem ∧
+      ∃ k, k < xs.length ∧ u.reg 10 = a + BitVec.ofNat 64 (8 * k) ∧
+        u.reg 11 = BitVec.ofNat 64 (xs.length - k) ∧ u.reg 12 = sumW (xs.take k))
+    (fun _ u => (u.reg 11).toNat) ?_ ?_
+  · intro R hR; subst hR
+    refine Reach.of_exploreAt (facts := []) (cuts := [0x11198#64]) (fuel := 20) (k := 0) (by decide)
+      (by decide) hpc hx (by simp) ?_
+    vc_ends
+    · simp only [beq_iff_eq, ha1, ofNat_eq_zero hn] at hc
+      exact ⟨hra, .inl (by rw [List.eq_nil_of_length_eq_zero hc]; rfl)⟩
+    · simp only [beq_eq_false_iff_ne, ne_eq, ha1, ofNat_eq_zero hn] at hc
+      exact .inr ⟨0, by omega, by rw [ha0]; simp, by rw [ha1]; simp, rfl⟩
+  · intro u ⟨hp, hux, hur, hum, k, hk, h10, h11, h12⟩ R hR; subst hR
+    refine Reach.of_exploreAt (facts := []) (cuts := [0x11198#64]) (fuel := 20) (k := 2) (by decide)
+      (by decide) hp hux (by simp) ?_
+    have hsub : u.reg 11 + 18446744073709551615#64 = BitVec.ofNat 64 (xs.length - (k + 1)) := by
+      rw [h11, ofNat_add_allOnes _ (by omega) (by omega)]; rfl
+    have h12' : read64 u.mem (u.reg 10 + 0#64) + u.reg 12 = sumW (xs.take (k + 1)) := by
+      rw [hum, h10, BitVec.add_zero, harr k hk, h12, sumW_take_succ xs k hk, BitVec.add_comm]
+    vc_ends
+    · rw [h10, BitVec.add_zero]; exact aligned_add_ofNat hal (by omega) (by decide)
+    · refine .inr ⟨arrRegion a xs, by simp, ?_⟩
+      simp only [Region.covers, arrRegion]
+      rw [h10, BitVec.add_zero, add_ofNat_sub_toNat a (by omega)]; omega
+    · simp only [hsub, bne_iff_ne, ne_eq, ofNat_eq_zero (m := xs.length - (k + 1)) (by omega)] at hc
+      refine .inr ⟨⟨hur, hum, k + 1, by omega, by rw [h10, add_ofNat_succ8 a (by omega)], hsub, h12'⟩, ?_⟩
+      rw [hsub, h11]; simp only [BitVec.toNat_ofNat]; omega
+    · simp only [hsub, bne_eq_false_iff_eq, ofNat_eq_zero (m := xs.length - (k + 1)) (by omega)] at hc
+      refine ⟨hur ▸ hra, .inl ⟨by rw [hur], ?_⟩⟩
+      rw [BitVec.add_zero, h12', show k + 1 = xs.length by omega, List.take_length]
+
 end NoCompiler.VC.M.Example

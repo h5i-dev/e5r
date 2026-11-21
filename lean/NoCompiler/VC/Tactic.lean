@@ -71,4 +71,72 @@ elab "vc_run" : tactic => withMainContext do
   let g' ← g.replaceTargetEq r.eNew r.eqProof
   replaceMainGoal (g' :: r.mvarIds)
 
+/-! ### Denotations in the machine's own terms
+
+`symDen` rewrites `Sym.den ρ μ x` (and `SMem.den ρ μ m`), for closed `x`, to
+the expression it denotes, built from the machine's operations: `ρOf u n` is
+`u.reg n`, the base memory is `μ`. The step is definitional (`dsimproc`), so the
+kernel checks it by unfolding `Sym.den` on a small closed term; `x` is found by
+compiled evaluation. -/
+
+unsafe def evalSymImpl (e : Expr) : MetaM Sym := evalExpr Sym (mkConst ``Sym) e
+@[implemented_by evalSymImpl] opaque evalSym (e : Expr) : MetaM Sym
+unsafe def evalSMemImpl (e : Expr) : MetaM SMem := evalExpr SMem (mkConst ``SMem) e
+@[implemented_by evalSMemImpl] opaque evalSMem (e : Expr) : MetaM SMem
+
+/-- The value of variable `n` under `ρ`: `u.reg n` when `ρ` is `ρOf u`. -/
+def varE (ρ : Expr) (n : Nat) : MetaM Expr := do
+  if ρ.isAppOfArity ``ρOf 1 && n < 32 then
+    mkAppM ``State.reg #[ρ.appArg!, ← mkNumeral (mkApp (mkConst ``Fin) (mkNatLit 32)) n]
+  else return mkApp ρ (mkNatLit n)
+
+mutual
+partial def symE (ρ μ : Expr) : Sym → MetaM Expr
+  | .var n => varE ρ n
+  | .const w => return toExpr w
+  | .iop op a imm => return mkApp3 (mkConst ``evalI) (toExpr op) (← symE ρ μ a) (toExpr imm)
+  | .rop op a b => return mkApp3 (mkConst ``evalR) (toExpr op) (← symE ρ μ a) (← symE ρ μ b)
+  | .load op m a => return mkApp3 (mkConst ``loadVal) (toExpr op) (← smemE ρ μ m) (← symE ρ μ a)
+  | .addiw a imm => do mkAppM ``sext32 #[← mkAppM ``HAdd.hAdd #[← symE ρ μ a, toExpr imm]]
+  | .sh op a n => return mkApp3 (mkConst ``evalSh) (toExpr op) (← symE ρ μ a) (mkNatLit n)
+  | .shw op a n => return mkApp3 (mkConst ``evalShW) (toExpr op) (← symE ρ μ a) (mkNatLit n)
+  | .rwop op a b => return mkApp3 (mkConst ``evalRW) (toExpr op) (← symE ρ μ a) (← symE ρ μ b)
+  | .uop op a => return mkApp2 (mkConst ``evalU) (toExpr op) (← symE ρ μ a)
+partial def smemE (ρ μ : Expr) : SMem → MetaM Expr
+  | .base => return μ
+  | .write m a v w => do
+    return mkApp4 (mkConst ``writeLE) (← smemE ρ μ m) (← symE ρ μ a)
+      (← mkAppM ``BitVec.toNat #[← symE ρ μ v]) (mkNatLit w)
+end
+
+dsimproc symDen (Sym.den _ _ _) := fun e => do
+  let_expr Sym.den ρ μ x := e | return .continue
+  if x.hasFVar || x.hasMVar then return .continue
+  return .done (← symE ρ μ (← evalSym x))
+
+dsimproc smemDen (SMem.den _ _ _) := fun e => do
+  let_expr SMem.den ρ μ m := e | return .continue
+  if m.hasFVar || m.hasMVar then return .continue
+  return .done (← smemE ρ μ (← evalSMem m))
+
+set_option hygiene false in
+/-- The goals of one cut point, after `Reach.of_exploreAt`: run `explore`
+    (`vc_run`), split the residual obligations and the ends into one goal each,
+    and in each end introduce the end state `s'` with its path conditions `hc`,
+    registers `hreg`, memory `hmem`, pc `hpc'` and `hx'`, every symbolic value
+    rewritten into the machine's terms over the cut point's state. -/
+macro "vc_ends" : tactic => `(tactic| (
+  unfold exploreVC; vc_run
+  simp only [allOb, allNext, Ob.den, symDen, smemDen, evalI, and_true]
+  refine ?_
+  repeat' apply And.intro
+  all_goals try (
+    simp only [PEnd.Next]
+    intro hc s' ⟨_, hpc', hreg, hmem⟩ hx'
+    simp only [List.forall_mem_cons, List.not_mem_nil, false_imp_iff, imp_true_iff, and_true,
+      Cond.den, symDen, smemDen, evalBr, evalI, evalR, loadVal] at hc
+    simp only [hreg, hmem, hpc', State.setPc_pc, State.setPc_reg, State.setPc_mem, State.setPc_exit,
+      symDen, smemDen, evalI, evalR, loadVal, hx', true_and] )
+  all_goals try exact True.intro))
+
 end NoCompiler.VC.M
