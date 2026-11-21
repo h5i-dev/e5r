@@ -826,3 +826,22 @@ The third step's parameters, computed as LPS does (`StackLayout.v#L368-L512`).
   `Run.valid_stack_top_va`, `entry_launch_ok_va`); here they are whatever
   the hypotheses allow.
 - Axioms: standard. lake env lean: Stack 1.60 s.
+
+### Validation against Linux (lean/Examples/LinuxProbe*)
+
+The plan's budget asked for a differential test against LPS's extraction;
+there is no Rocq toolchain here (only the `aeneas` opam switch), so the
+model is tested against Linux itself instead.
+- `Examples/LinuxProbe/probe.c`: a freestanding rv64 program that makes
+  each modelled file syscall on a 6-byte file (openat, read, lseek with
+  SET/CUR/END/DATA/HOLE and bad `whence`, readv over two iovecs, read to
+  EOF, fstat, close twice, calls on the closed fd, readv with 1025 iovecs,
+  openat of a missing path, reopen) and prints the results.
+- `probe.out`: its output under qemu-riscv64 user mode on a Linux
+  6.12.113 host. The file calls go to the host kernel; mprotect and munmap
+  are qemu's emulation, not Linux. `run.sh` rebuilds, reruns and diffs.
+- `Examples/LinuxProbe.lean`: each line of `probe.out` as a theorem, decided
+  by the kernel, that the model's outcome is the one Linux returned (all 29
+  agree, including SEEK_DATA/SEEK_HOLE, ENXIO at the end, the lowest free
+  fd reused after close, EINVAL for 1025 iovecs).
+- Not run in CI (no qemu or ld.lld on the runners); rerun by hand.

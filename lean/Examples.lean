@@ -20,3 +20,4 @@ import Examples.LinkData
 import Examples.LinuxHello
 import Examples.LinkReuse
 import Examples.LinkChunks
+import Examples.LinuxProbe
