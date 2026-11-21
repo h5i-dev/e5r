@@ -151,7 +151,8 @@ pub fn of_binary(bin: &Binary) -> Result<Module, String> {
         .map(|f| (f.name.clone(), f.entry))
         .chain(m.skipped.iter().map(|f| (f.name.clone(), f.entry)))
         .collect();
-    let data: Vec<(String, u64)> = m.data.iter().map(|d| (d.name.clone(), d.addr)).collect();
+    let mut data: Vec<(String, u64)> = m.data.iter().map(|d| (d.name.clone(), d.addr)).collect();
+    data.extend(data_objects(bin).into_iter().map(|(n, a, _)| (n, a)));
     let addr = |s: &str| -> Option<u64> {
         entries
             .get(s)
@@ -188,6 +189,35 @@ pub fn of_binary(bin: &Binary) -> Result<Module, String> {
     m.funcs = kept;
     m.skipped.sort_by_key(|f| f.entry);
     Ok(m)
+}
+
+/// The data objects (STT_OBJECT symbols with a size), each with a name unique
+/// among them (`#k` by address for namesakes), its address and size.
+pub fn data_objects(bin: &Binary) -> Vec<(String, u64, u64)> {
+    let Ok(e) = crate::elf::Elf::parse(bin.bytes) else {
+        return Vec::new();
+    };
+    let mut v: Vec<(String, u64, u64)> = e
+        .symbols
+        .iter()
+        .filter(|s| s.kind == 1 && s.size > 0)
+        .map(|s| (s.name.clone(), s.value, s.size))
+        .collect();
+    v.sort_by_key(|o| (o.1, o.0.clone()));
+    v.dedup_by_key(|o| o.1);
+    let mut count: std::collections::HashMap<String, usize> = Default::default();
+    for o in &v {
+        *count.entry(o.0.clone()).or_default() += 1;
+    }
+    let mut seen: std::collections::HashMap<String, usize> = Default::default();
+    for o in &mut v {
+        if count[&o.0] > 1 {
+            let k = seen.entry(o.0.clone()).or_default();
+            o.0 = format!("{}#{k}", o.0);
+            *k += 1;
+        }
+    }
+    v
 }
 
 /// A name per function, unique in the module: the symbol, or, when several
@@ -302,9 +332,13 @@ fn reaching_auipcs(words: &[u32], calls: &std::collections::BTreeSet<usize>) -> 
 
 fn of_binary_unchecked(bin: &Binary) -> Result<Module, String> {
     let names = unique_names(bin);
+    let objs = data_objects(bin);
     let sym_at = |t: u64| -> Option<(String, i64)> {
         if let Some(n) = names.get(&t) {
             return Some((n.clone(), 0));
+        }
+        if let Some((n, a, _)) = objs.iter().find(|(_, a, z)| t >= *a && t < a + z) {
+            return Some((n.clone(), (t - a) as i64));
         }
         bin.segments
             .iter()
