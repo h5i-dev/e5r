@@ -11,7 +11,7 @@ the function's relocatable form, which is the same wherever it is linked.
 of the binary's module (`nocompiler module`, `crates/nocompiler/src/module.rs`):
 
 ```json
-{"name":"sum","sha256":"75e31c5d...","closure":"b58d12d1...","level":"L2","depth":0,
+{"name":"sum","sha256":"a3944f27...","closure":"4ef4bfc7...","level":"L2","depth":0,
  "theorem":"Examples.Link.sum_relocatable","spec":"Examples.Sum.spec"}
 ```
 

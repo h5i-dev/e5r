@@ -80,3 +80,31 @@ fn sum2_has_one_proof_text_for_both_links() {
     assert_eq!(blocks[0], blocks[1]);
     assert!(!blocks[0].contains("0x"), "the proof names an address");
 }
+
+/// The ledger's `sha256` is what `sha256sum` prints for the function's
+/// canonical form (it was once SHA-256 of that digest).
+#[test]
+fn the_ledger_key_is_sha256sum_of_the_canonical_form() {
+    use std::io::Write;
+    let m = module("sum.link1.elf");
+    let sum = m.funcs.iter().find(|f| f.name == "sum").unwrap();
+    let canon = nocompiler::module::canonical(sum);
+    let ours = nocompiler::sha256::hex(&nocompiler::sha256::digest(&canon));
+    assert_eq!(
+        ours,
+        "a3944f27b6cece706dcd9e118d7709c7c54b34f52b32fcb3e9800e95a30990ef"
+    );
+    let want = include_str!("../../../examples/link/ledger.jsonl");
+    assert!(want.contains(&format!("\"name\":\"sum\",\"sha256\":\"{ours}\"")));
+    let Ok(mut child) = std::process::Command::new("sha256sum")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+    else {
+        eprintln!("sha256sum not installed: skipping the live comparison");
+        return;
+    };
+    child.stdin.take().unwrap().write_all(&canon).unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(String::from_utf8(out.stdout).unwrap()[..64], ours);
+}

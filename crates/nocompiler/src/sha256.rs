@@ -71,14 +71,20 @@ pub fn digest(data: &[u8]) -> [u8; 32] {
     out
 }
 
-/// Lowercase hex digest.
-pub fn hex(data: &[u8]) -> String {
-    digest(data).iter().map(|b| format!("{b:02x}")).collect()
+/// A digest in lowercase hex. Only formats: `hex(&digest(data))` is what
+/// `sha256sum` prints for `data`. (It once hashed its argument again, so every
+/// printed value was SHA-256 of the digest; the type now rules that out.)
+pub fn hex(d: &[u8; 32]) -> String {
+    d.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::hex;
+    use super::digest;
+
+    fn hex(data: &[u8]) -> String {
+        super::hex(&digest(data))
+    }
 
     #[test]
     fn matches_the_fips_180_vectors() {
@@ -100,5 +106,32 @@ mod tests {
             hex(&[b'a'; 1_000_000]),
             "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
         );
+    }
+
+    /// A committed ELF against `sha256sum`: the recorded value (from
+    /// `sha256sum examples/elf/sum.elf`) and, where the tool is installed, a
+    /// fresh run of it on every committed example ELF.
+    #[test]
+    fn matches_sha256sum_on_committed_elfs() {
+        let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+        let sum = std::fs::read(format!("{root}/examples/elf/sum.elf")).unwrap();
+        assert_eq!(
+            hex(&sum),
+            "1214abbe2dfed2827b44696b93d89085cddab57205d586ecbbedb9f89230910d"
+        );
+        for elf in [
+            "examples/elf/sum.elf",
+            "examples/elf/hello.elf",
+            "examples/demo/elf/cobs.b.elf",
+        ] {
+            let path = format!("{root}/{elf}");
+            let Ok(out) = std::process::Command::new("sha256sum").arg(&path).output() else {
+                eprintln!("sha256sum not installed: skipping the live comparison");
+                return;
+            };
+            assert!(out.status.success());
+            let want = String::from_utf8(out.stdout).unwrap();
+            assert_eq!(hex(&std::fs::read(&path).unwrap()), want[..64], "{elf}");
+        }
     }
 }
