@@ -35,8 +35,11 @@ def cert : Cert := ⟨(List.range 9).map fun i =>
 
 theorem cert_ok : check cA cB DA DB eA eB cert = true := by decide +kernel
 
+/-- A runs: `sum` is verified (decision 2026-11-21 (3): a refinement carries this). -/
+theorem sum_runs : ARuns Examples.Sum.spec cA DA eA := ARuns.of_verified Examples.Sum.sum_verified
+
 theorem sum_link2_refines : Refines Examples.Sum.spec cA DA eA cB DB eB :=
-  Refines.of_lockstep (k := cert) cert_ok
+  Refines.of_lockstep (k := cert) sum_runs cert_ok
 
 theorem spec_pcFree : Examples.Sum.spec.PcFree where
   pre := fun _ _ _ => Iff.rfl

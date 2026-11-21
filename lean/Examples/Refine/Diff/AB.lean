@@ -45,8 +45,9 @@ theorem region0_ok : region0.Ok Examples.Refine.Diff.ImgA.code Examples.Refine.D
   nocompiler_region region0 [.rop .add 12 13 12]
     [.rop .add 12 12 13]
 
-/-- B refines A, for every specification. -/
-theorem refines {α : Type} (sp : Spec α) :
+/-- B refines A, for every specification A runs under (`hA`). -/
+theorem refines {α : Type} (sp : Spec α)
+    (hA : ARuns sp Examples.Refine.Diff.ImgA.code Examples.Refine.Diff.ImgA.sum_dom Examples.Refine.Diff.ImgA.sum_entry) :
     Refines sp Examples.Refine.Diff.ImgA.code Examples.Refine.Diff.ImgA.sum_dom Examples.Refine.Diff.ImgA.sum_entry
       Examples.Refine.Diff.ImgB.code Examples.Refine.Diff.ImgB.sum_dom Examples.Refine.Diff.ImgB.sum_entry := by
   nocompiler_refine cert [region0_ok]

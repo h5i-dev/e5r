@@ -10,7 +10,7 @@ equivalence of the two instructions on agreeing states.
 -/
 namespace Examples.Refine.Peephole
 open NoCompiler NoCompiler.Lockstep
-open Examples.Refine.Relink (cA DA eA allRegs spec_pcFree spec_obsInv)
+open Examples.Refine.Relink (cA DA eA allRegs spec_pcFree spec_obsInv sum_runs)
 
 /-- `add a0, a2, zero`. -/
 def addWord : BitVec 32 := 0x00060533#32
@@ -50,7 +50,7 @@ theorem region_ok : region.Ok cA cB := by
   rw [show BitVec.signExtend 64 (0 : BitVec 12) = 0 by decide]
 
 theorem refines : Refines Examples.Sum.spec cA DA eA cB DA eA :=
-  Refines.of_cert cert_ok (fun r hr => by simp [cert] at hr; subst hr; exact region_ok)
+  Refines.of_cert sum_runs cert_ok (fun r hr => by simp [cert] at hr; subst hr; exact region_ok)
 
 /-- B meets `sum`'s specification, through refinement. -/
 theorem sum_peephole : VerifiedImg cB DA eA (Examples.Sum.spec.avoid DA) :=
@@ -76,12 +76,13 @@ end Examples.Refine.Peephole
 /-! ## The same, by the automation (NoCompiler/RefineAuto.lean) -/
 namespace Examples.Refine.Peephole.Auto
 open NoCompiler Examples.Refine.Peephole
-open Examples.Refine.Relink (cA DA eA)
+open Examples.Refine.Relink (cA DA eA sum_runs)
 
 theorem region_ok' : region.Ok cA cB := by
   nocompiler_region region [.iop .addi 10 12 0] [.rop .add 10 12 0]
 
 theorem refines' : Refines Examples.Sum.spec cA DA eA cB DA eA := by
+  have hA := sum_runs
   nocompiler_refine Examples.Refine.Peephole.cert [region_ok']
 
 end Examples.Refine.Peephole.Auto

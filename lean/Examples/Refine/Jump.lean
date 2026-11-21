@@ -2,6 +2,7 @@ import Examples.Refine.Diff.ImgA
 import Examples.Refine.Diff.ImgC
 import Examples.Sum
 import NoCompiler.RefineAuto
+import Examples.Refine.Diff
 
 /-
 A certificate with jump pairs (docs/isa/refine.md): A is `sum`, C is `sum`
@@ -41,6 +42,7 @@ theorem region0_ok : region0.Ok ImgA.code ImgC.code := by
 
 theorem refines : Refines Examples.Sum.spec ImgA.code ImgA.sum_dom ImgA.sum_entry
     ImgC.code ImgC.sum_dom ImgC.sum_entry := by
+  have hA := Examples.Refine.Diff.sum_a_runs
   nocompiler_refine cert [region0_ok]
 
 /-! ## Controls -/

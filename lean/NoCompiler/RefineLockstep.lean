@@ -470,10 +470,10 @@ theorem shapeOk_facts {r : RRegion} (h : r.shapeOk DA DB = true) :
   exact ⟨h1, h2, h3, h4, Dom.sub_of_rangeIn h5, Dom.sub_of_rangeIn h6⟩
 
 /-- Soundness of the certificate check: a certificate whose regions are all
-    proved gives `Refines sp A B`, for every specification. -/
-theorem _root_.NoCompiler.Refines.of_cert {α : Type} {sp : Spec α} {eA eB : Word}
+    proved gives `RefinesRel sp A B`, for every specification. -/
+theorem _root_.NoCompiler.RefinesRel.of_cert {α : Type} {sp : Spec α} {eA eB : Word}
     (hc : check cA cB DA DB eA eB k = true) (hreg : ∀ r ∈ k.regions, r.Ok cA cB) :
-    Refines sp cA DA eA cB DB eB := by
+    RefinesRel sp cA DA eA cB DB eB := by
   unfold check at hc
   simp only [Bool.and_eq_true, List.all_eq_true, Option.isSome_iff_exists] at hc
   obtain ⟨⟨hall, hrall⟩, e0, he0⟩ := hc
@@ -496,7 +496,7 @@ theorem _root_.NoCompiler.Refines.of_cert {α : Type} {sp : Spec α} {eA eB : Wo
     · simp only [regionOk, Bool.and_eq_true] at hrall
       obtain ⟨h1, h2, _, _, h5, h6⟩ := shapeOk_facts (hrall r hr).1
       exact ⟨h5 _ h1, h6 _ h2⟩
-  refine Refines.of_bigSim (fun _ s => Rel k s) (fun a s he hraB _ => ?_)
+  refine RefinesRel.of_bigSim (fun _ s => Rel k s) (fun a s he hraB _ => ?_)
     (fun a s he _ => .inl ⟨he.live, rfl, e0, hm0, by simp [hb0], by rw [he.pc, ha0],
       ⟨fun _ _ => rfl, rfl, rfl, rfl⟩⟩)
   have hraA := he.ret
@@ -561,10 +561,17 @@ theorem _root_.NoCompiler.Refines.of_cert {α : Type} {sp : Spec α} {eA eB : Wo
     · exact absurd (.inl (hpb ▸ hraB)) hf
     · exact absurd (.inr (hag.exit ▸ hx)) hf
 
+/-- `Refines` from A's run, a checked certificate, and its regions' proofs. -/
+theorem _root_.NoCompiler.Refines.of_cert {α : Type} {sp : Spec α} {eA eB : Word}
+    (hA : ARuns sp cA DA eA) (hc : check cA cB DA DB eA eB k = true)
+    (hreg : ∀ r ∈ k.regions, r.Ok cA cB) : Refines sp cA DA eA cB DB eB :=
+  ⟨hA, RefinesRel.of_cert hc hreg⟩
+
 /-- A certificate without regions: lockstep. -/
 theorem _root_.NoCompiler.Refines.of_lockstep {α : Type} {sp : Spec α} {eA eB : Word}
-    (hc : check cA cB DA DB eA eB ⟨k.pairs, []⟩ = true) : Refines sp cA DA eA cB DB eB :=
-  Refines.of_cert hc (fun _ h => by simp at h)
+    (hA : ARuns sp cA DA eA) (hc : check cA cB DA DB eA eB ⟨k.pairs, []⟩ = true) :
+    Refines sp cA DA eA cB DB eB :=
+  Refines.of_cert hA hc (fun _ h => by simp at h)
 
 end
 

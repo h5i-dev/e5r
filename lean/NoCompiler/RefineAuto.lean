@@ -10,7 +10,7 @@ unchanged instructions, one `RRegion` per changed interval, live sets) and,
 per region, the two instruction sequences. Then
 
     theorem region_0_ok : region_0.Ok cA cB := by nocompiler_region region_0 [as…] [bs…]
-    theorem refines : Refines spec cA DA eA cB DB eB := by
+    theorem refines (hA : ARuns spec cA DA eA) : Refines spec cA DA eA cB DB eB := by
       nocompiler_refine cert [region_0_ok, …]
 
 * `nocompiler_region r as bs`: the straight-line region `r` (register
@@ -45,9 +45,10 @@ macro "nocompiler_region_bv" r:ident as:term:max bs:term:max : tactic => `(tacti
     (by decide +kernel) (by decide +kernel) ?_
   seq_equiv_bv))
 
-/-- `Refines` from a certificate and its regions' proofs. -/
+/-- `Refines` from a certificate and its regions' proofs. A's run (`ARuns`,
+    decision 2026-11-21 (3)) is taken from a hypothesis in the context. -/
 macro "nocompiler_refine" k:ident " [" hs:term,* "]" : tactic => `(tactic| (
-  refine Refines.of_cert (k := $k) (by decide +kernel) ?_
+  refine Refines.of_cert (k := $k) (by assumption) (by decide +kernel) ?_
   unfold $k:ident
   dsimp only
   simp only [List.forall_mem_cons]

@@ -623,7 +623,7 @@ pub fn lean(
         }
         let _ = writeln!(
             o,
-            "\n/-- B refines A, for every specification{}. -/",
+            "\n/-- B refines A, for every specification A runs under (`hA`){}. -/",
             if hyps.is_empty() {
                 ""
             } else {
@@ -631,14 +631,16 @@ pub fn lean(
             }
         );
         let body = if uses.is_empty() {
-            "\n  Refines.of_cert (k := cert) (by decide +kernel) (by intro r h; simp [cert] at h)"
+            "\n  Refines.of_cert (k := cert) hA (by decide +kernel) (by intro r h; simp [cert] at h)"
                 .to_string()
         } else {
             format!(" by\n  nocompiler_refine cert [{}]", uses.join(", "))
         };
         let _ = writeln!(
             o,
-            "theorem refines {{α : Type}} (sp : Spec α){} :\n    Refines sp {ca} {ia}.{}_dom {ia}.{}_entry\n      {cb} {ib}.{}_dom {ib}.{}_entry :={body}",
+            "theorem refines {{α : Type}} (sp : Spec α)\n    (hA : ARuns sp {ca} {ia}.{}_dom {ia}.{}_entry){} :\n    Refines sp {ca} {ia}.{}_dom {ia}.{}_entry\n      {cb} {ib}.{}_dom {ib}.{}_entry :={body}",
+            p.id_a,
+            p.id_a,
             hyps.concat(),
             p.id_a,
             p.id_a,

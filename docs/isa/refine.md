@@ -11,13 +11,30 @@ Status:
 ## The statement (`lean/NoCompiler/Refine.lean`)
 
 ```lean
-def Refines (sp : Spec α) (cA : Code) (DA : Dom) (eA : Word) (cB : Code) (DB : Dom) (eB : Word) : Prop :=
+def ARuns (sp : Spec α) (cA : Code) (DA : Dom) (eA : Word) : Prop :=
+  ∀ a s, Entry DA eA s → sp.pre a s → Exec cA (sp.perm a s) DA (fun _ => True) s
+
+def RefinesRel (sp : Spec α) (cA : Code) (DA : Dom) (eA : Word) (cB : Code) (DB : Dom) (eB : Word) : Prop :=
   ∀ a s, Entry DA eA s → ¬ DB.mem (s.reg Reg.ra) → sp.pre a s →
     Exec cA (sp.perm a s) DA (fun _ => True) s →
     Exec cB (sp.perm a s) DB
       (fun tb => ∃ ta, Run cA (sp.perm a s) DA s ta ∧ Final DA ta ∧ Obs (sp.dead s) ta tb)
       (s.setPc eB)
+
+structure Refines (sp : Spec α) (cA DA eA cB DB eB) : Prop where
+  runs : ARuns sp cA DA eA            -- A runs, from every entry sp allows
+  rel  : RefinesRel sp cA DA eA cB DB eB
 ```
+
+`Refines` has two parts (decision 2026-11-21 (3)). `runs` is a full proof
+that A runs safely and ends from every entry `sp` allows; `ARuns.of_verified`
+gets it from A's `VerifiedImg`. `rel` is the relation: on every entry state
+where A's run is safe and terminates, B behaves as A. `RefinesRel` alone is
+conditional on A's run, and is vacuous for an A that never runs:
+lean/Examples/Refine/Vacuous.lean shows an A of one illegal word with a
+`RefinesRel` to any code, and no `Refines` from it. The proof methods
+(`RefinesRel.of_sim`, `.of_bigSim`, `.of_cert`) prove `rel`. `Refines.of_sim`,
+`.of_bigSim`, `.of_cert` and `.of_lockstep` take `hA : ARuns …` as well.
 
 On every entry state where A's run under the permission `sp.perm` is safe and terminates, B's run from the same state (at B's entry), under the **same** permission, is safe and terminates too. Every way B can end is a way A can end (`Run`: some run of A), with the same observations. Only `pre` and the permission of `sp` play a part. Its postcondition is not used.
 
@@ -27,7 +44,7 @@ On every entry state where A's run under the permission `sp.perm` is safe and te
   - Caller-saved registers other than a0/a1 may differ, and so may the dead stack.
 - **Syscalls.** The environment's choices (how much a `write` accepts, what a `read` returns) are matched through the trace, which records them. This makes the claim trace refinement: B's behaviours are a subset of A's.
 - **Aborts.** An exit is an observation. Wherever A aborts, B must abort with the same status after the same events.
-- **Where A fails.** If A faults, steps outside the permission, makes a syscall the model does not admit, or does not terminate, the claim says nothing about B on that state. The permission and the precondition are therefore part of what is claimed. A permission too small for A would make the claim vacuous, so each use should come with a proof that A runs under it, for example A's own `VerifiedImg`.
+- **Where A fails.** `rel` says nothing about B on a state where A faults, steps outside the permission, makes a syscall the model does not admit, or does not terminate. `runs` rules such entry states out: every entry `sp` allows is one where A runs.
 
 ## What it gives
 
@@ -58,7 +75,7 @@ A certificate is a list of pairs `(pb, pa, live)`: B at `pb` runs in step with A
 - a return is reached with ra, a0, a1 and the preserved registers live;
 - the two entries are a pair.
 
-`Refines.of_lockstep` is the soundness theorem: `check … = true → Refines sp A B`, for every `sp`. It covers leaf functions only. It is the base case of paired execution (item 3), whose other cases add pairs of *different* instructions, each with an equivalence obligation.
+`Refines.of_lockstep` is the soundness theorem: `ARuns sp A → check … = true → Refines sp A B`, for every `sp`. It covers leaf functions only. It is the base case of paired execution (item 3), whose other cases add pairs of *different* instructions, each with an equivalence obligation.
 
 **Regions** (`lean/NoCompiler/RefineRegion.lean`). A certificate also has regions, `RRegion`. Each pairs an interval of B's code with one of A's, with one entry and one exit each and live sets at both, and stands for a changed interval. Its obligation `RRegion.Ok` is a local refinement under every permission:
 - from agreeing entry states where A's run through its interval is safe, B's run through its interval is safe;
@@ -66,7 +83,7 @@ A certificate is a list of pairs `(pb, pa, live)`: B at `pb` runs in step with A
 
 The check decides a region's shape: entries inside the intervals, exits outside them, intervals inside the functions' code, and the exit a point of the certificate whose live set `liveOut` covers. The contents are proved separately.
 
-`Refines.of_cert`: `check … = true → (∀ r ∈ regions, r.Ok cA cB) → Refines sp A B`. `RRegion.Ok.of_instr` proves the one-instruction case from the two instructions' equivalence on agreeing states (and B's access being A's). Straight-line blocks (item 6) and loops (items 3 and 4) are further ways of proving `Ok`.
+`Refines.of_cert`: `ARuns sp A → check … = true → (∀ r ∈ regions, r.Ok cA cB) → Refines sp A B`. `RRegion.Ok.of_instr` proves the one-instruction case from the two instructions' equivalence on agreeing states (and B's access being A's). Straight-line blocks (item 6) and loops (items 3 and 4) are further ways of proving `Ok`.
 
 **Example** (`lean/Examples/Refine/Relink.lean`). `sum` as linked in examples/elf/sum.link2.elf (`.text` at 0x40000) refines `sum` in examples/elf/sum.elf. The 9-pair certificate is checked by `decide +kernel` in about a second. `Refines.verified` then turns `Examples.Sum.sum_verified` into `sum`'s theorem at link 2 (for callers outside A's code), a second, independent route to what `Examples.Link.sum_link2` gets by translation.
 
@@ -159,9 +176,9 @@ Lockstep.Cert` (pairs and regions), and for each straight-line region its two
 instruction lists `region<k>_as`/`_bs`. With `--images` (the modules of
 `nocompiler export`'s images of A and B) also the proofs, by the automation
 below: `region<k>_ok` by `nocompiler_region` (`nocompiler_region_bv` with
-`--bv`) for each straight-line region, and `refines {α} (sp : Spec α) :
-Refines sp A B` by `nocompiler_refine`, taking each structured region's `Ok`
-as a hypothesis `h<k>`. None of it is trusted: the kernel checks the
+`--bv`) for each straight-line region, and `refines {α} (sp : Spec α) (hA :
+ARuns sp A) : Refines sp A B` by `nocompiler_refine`, taking A's run and each
+structured region's `Ok` as hypotheses (`hA`, `h<k>`). None of it is trusted: the kernel checks the
 certificate and every proof.
 
 **Example** (`examples/refine/diff/`, `lean/Examples/Refine/Diff.lean`):
@@ -186,12 +203,13 @@ A task's proof is generated. The tree diff (item 5) writes the certificate and, 
 
 ```lean
 theorem region_0_ok : region_0.Ok cA cB := by nocompiler_region region_0 [as…] [bs…]
-theorem refines : Refines spec cA DA eA cB DB eB := by nocompiler_refine cert [region_0_ok]
+theorem refines (hA : ARuns spec cA DA eA) : Refines spec cA DA eA cB DB eB := by
+  nocompiler_refine cert [region_0_ok]
 ```
 
 - `nocompiler_region r as bs` closes the straight-line region `r` with `RRegion.ok_of_seqEquiv` and `seq_equiv` (kernel tier). Its side conditions are decided.
 - `nocompiler_region_bv` does the same with `seq_equiv_bv`, so the result is in the bv_decide tier.
-- `nocompiler_refine cert [h, …]` applies `Refines.of_cert`: the kernel decides the check, and `h, …` are the regions' proofs in the certificate's order.
+- `nocompiler_refine cert [h, …]` applies `Refines.of_cert`: A's run comes from a hypothesis in the context, the kernel decides the check, and `h, …` are the regions' proofs in the certificate's order.
 
 Example: `Examples.Refine.Peephole.Auto.refines'` is the peephole refinement in two lines.
 

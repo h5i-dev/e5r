@@ -131,16 +131,38 @@ end Obs
 /-- The dead stack of a function with specification `sp` entered at `s`. -/
 def Spec.dead {α : Type} (sp : Spec α) (s : State) : Region := Spec.stackRegion s sp.stack
 
-/-- B (code `cB`, region `DB`, entry `eB`) refines A (`cA`, `DA`, `eA`) for
-    the entries `sp.pre` allows, under the permission `sp.perm` (the
-    postcondition of `sp` plays no part). -/
-def Refines {α : Type} (sp : Spec α) (cA : Code) (DA : Dom) (eA : Word)
+/-- The relational part of a refinement: wherever A runs safely and ends, B
+    (code `cB`, region `DB`, entry `eB`) does too and ends as some run of A
+    (`cA`, `DA`, `eA`) does, for the entries `sp.pre` allows, under the
+    permission `sp.perm` (the postcondition of `sp` plays no part). On its own
+    it is CONDITIONAL on A's run, and so vacuous for an A that never runs:
+    a refinement is stated as `Refines`, which also carries `ARuns`. The
+    proof methods (`of_sim`, `of_bigSim`, `of_cert`) prove this part. -/
+def RefinesRel {α : Type} (sp : Spec α) (cA : Code) (DA : Dom) (eA : Word)
     (cB : Code) (DB : Dom) (eB : Word) : Prop :=
   ∀ a s, Entry DA eA s → ¬ DB.mem (s.reg Reg.ra) → sp.pre a s →
     Exec cA (sp.perm a s) DA (fun _ => True) s →
     Exec cB (sp.perm a s) DB
       (fun tb => ∃ ta, Run cA (sp.perm a s) DA s ta ∧ Final DA ta ∧ Obs (sp.dead s) ta tb)
       (s.setPc eB)
+
+/-- A runs: from every entry `sp` allows, A runs safely under `sp.perm` and
+    ends (leaves `DA` or exits). Decision 2026-11-21 (3): a refinement is only
+    stated together with this. -/
+def ARuns {α : Type} (sp : Spec α) (cA : Code) (DA : Dom) (eA : Word) : Prop :=
+  ∀ a s, Entry DA eA s → sp.pre a s → Exec cA (sp.perm a s) DA (fun _ => True) s
+
+/-- B refines A (docs/isa/refine.md): A runs from every entry `sp` allows
+    (`runs`), and wherever it does, B runs too and ends as A does (`rel`). -/
+structure Refines {α : Type} (sp : Spec α) (cA : Code) (DA : Dom) (eA : Word)
+    (cB : Code) (DB : Dom) (eB : Word) : Prop where
+  runs : ARuns sp cA DA eA
+  rel : RefinesRel sp cA DA eA cB DB eB
+
+/-- A verified function runs. -/
+theorem ARuns.of_verified {α : Type} {sp : Spec α} {c : Code} {D : Dom} {e : Word}
+    (h : VerifiedImg c D e sp) : ARuns sp c D e :=
+  fun a s he hp => Exec.mono (fun _ _ => trivial) (h a s he hp)
 
 @[simp] theorem State.setPc_self (s : State) : s.setPc s.pc = s := rfl
 @[simp] theorem State.setPc_setPc (s : State) (p q : Word) : (s.setPc p).setPc q = s.setPc q := rfl
@@ -153,20 +175,21 @@ theorem Spec.perm_setPc (a : α) (s : State) (p : Word) (h : ∀ a s p, sp.reads
     (h' : ∀ a s p, sp.writes a (s.setPc p) = sp.writes a s) : sp.perm a (s.setPc p) = sp.perm a s := by
   simp only [Spec.perm, Spec.stackRegion, State.reg_setPc, h, h']
 
-/-- Every function refines itself. -/
-theorem Refines.refl (c : Code) (D : Dom) (e : Word) : Refines sp c D e c D e := by
+theorem RefinesRel.refl (c : Code) (D : Dom) (e : Word) : RefinesRel sp c D e c D e := by
   intro a s he _ _ hA
   rw [← he.pc, State.setPc_self]
   exact Reach.mono (fun t ⟨⟨hf, _⟩, hr⟩ => ⟨hf, t, hr, hf, Obs.refl _ t⟩) hA.run
 
-/-- Refinement composes: a sequence of edits, each proved, is proved. The
-    middle function has to be enterable wherever the outer two are. -/
-theorem Refines.trans {cA cB cC : Code} {DA DB DC : Dom} {eA eB eC : Word}
-    (h₁ : Refines sp cA DA eA cB DB eB) (h₂ : Refines sp cB DB eB cC DC eC)
+/-- Every function that runs refines itself. -/
+theorem Refines.refl {c : Code} {D : Dom} {e : Word} (h : ARuns sp c D e) : Refines sp c D e c D e :=
+  ⟨h, RefinesRel.refl c D e⟩
+
+theorem RefinesRel.trans {cA cB cC : Code} {DA DB DC : Dom} {eA eB eC : Word}
+    (h₁ : RefinesRel sp cA DA eA cB DB eB) (h₂ : RefinesRel sp cB DB eB cC DC eC)
     (hB : ∀ s, Entry DA eA s → ¬ DC.mem (s.reg Reg.ra) → Entry DB eB (s.setPc eB))
     (hpre : ∀ a s, sp.pre a s → sp.pre a (s.setPc eB))
     (hperm : ∀ a s, sp.perm a (s.setPc eB) = sp.perm a s) :
-    Refines sp cA DA eA cC DC eC := by
+    RefinesRel sp cA DA eA cC DC eC := by
   intro a s he hC hp hA
   have hEB := hB s he hC
   have hBx := h₁ a s he hEB.ret hp hA
@@ -177,6 +200,16 @@ theorem Refines.trans {cA cB cC : Code} {DA DB DC : Dom} {eA eB eC : Word}
   refine Exec.mono (fun tc ⟨tb, hrb, hfb, hob⟩ => ?_) hCx
   obtain ⟨ta, hra, hfa, hoa⟩ := hBx.run_final hrb hfb
   exact ⟨ta, hra, hfa, hoa.trans (by simpa [Spec.dead, Spec.stackRegion] using hob)⟩
+
+/-- Refinement composes: a sequence of edits, each proved, is proved. The
+    middle function has to be enterable wherever the outer two are. -/
+theorem Refines.trans {cA cB cC : Code} {DA DB DC : Dom} {eA eB eC : Word}
+    (h₁ : Refines sp cA DA eA cB DB eB) (h₂ : Refines sp cB DB eB cC DC eC)
+    (hB : ∀ s, Entry DA eA s → ¬ DC.mem (s.reg Reg.ra) → Entry DB eB (s.setPc eB))
+    (hpre : ∀ a s, sp.pre a s → sp.pre a (s.setPc eB))
+    (hperm : ∀ a s, sp.perm a (s.setPc eB) = sp.perm a s) :
+    Refines sp cA DA eA cC DC eC :=
+  ⟨h₁.runs, h₁.rel.trans h₂.rel hB hpre hperm⟩
 
 /-- A specification that does not look at the entry pc. -/
 structure Spec.PcFree (sp : Spec α) : Prop where
@@ -210,7 +243,7 @@ theorem Refines.verified {cA cB : Code} {DA DB : Dom} {eA eB : Word}
     ⟨rfl, he.live, hra, he.retAligned, he.sp⟩
   have hpA : sp.pre a (s.setPc eA) := (hpc.pre a s eA).2 hp
   have hA := hv a _ hEA hpA
-  have hB := hr a _ hEA (by simpa using he.ret) hpA (Exec.mono (fun _ _ => trivial) hA)
+  have hB := hr.rel a _ hEA (by simpa using he.ret) hpA (Exec.mono (fun _ _ => trivial) hA)
   rw [hperm, State.setPc_setPc, ← he.pc, State.setPc_self] at hB
   show Exec cB (sp.perm a s) DB (sp.Done a s) s
   refine Exec.mono (fun tb ⟨ta, hrun, hf, ho⟩ => ?_) hB
@@ -296,16 +329,25 @@ theorem Sim.exec {dead : Region} {R : State → State → Prop} {μ : State → 
           · exact ih s₁ hst sa' hrun₁ (h0.trans (.step hdA hst hrun₁)) sb' hr'
           · exact ihm _ (hm ▸ hlt) sb' hr' rfl
 
-/-- `Refines` from a simulation that relates every entry state of A to the
-    same state at B's entry. -/
-theorem Refines.of_sim {α : Type} {sp : Spec α} {eA eB : Word}
+/-- `RefinesRel` from a simulation that relates every entry state of A to
+    the same state at B's entry. -/
+theorem RefinesRel.of_sim {α : Type} {sp : Spec α} {eA eB : Word}
     (R : α → State → State → State → Prop) (μ : State → Nat)
     (hsim : ∀ a s, Entry DA eA s → ¬ DB.mem (s.reg Reg.ra) → sp.pre a s →
       Sim cA DA cB DB (sp.perm a s) (sp.dead s) (R a s) μ)
     (hR : ∀ a s, Entry DA eA s → sp.pre a s → R a s s (s.setPc eB)) :
-    Refines sp cA DA eA cB DB eB := by
+    RefinesRel sp cA DA eA cB DB eB := by
   intro a s he hb hp hA
   exact (hsim a s he hb hp).exec hA _ (hR a s he hp)
+
+/-- `Refines` from A's run and a simulation. -/
+theorem Refines.of_sim {α : Type} {sp : Spec α} {eA eB : Word} (hA : ARuns sp cA DA eA)
+    (R : α → State → State → State → Prop) (μ : State → Nat)
+    (hsim : ∀ a s, Entry DA eA s → ¬ DB.mem (s.reg Reg.ra) → sp.pre a s →
+      Sim cA DA cB DB (sp.perm a s) (sp.dead s) (R a s) μ)
+    (hR : ∀ a s, Entry DA eA s → sp.pre a s → R a s s (s.setPc eB)) :
+    Refines sp cA DA eA cB DB eB :=
+  ⟨hA, RefinesRel.of_sim R μ hsim hR⟩
 
 end Sim
 
@@ -371,14 +413,22 @@ theorem BigSim.exec {F : State → State → Prop} {R : State → State → Prop
         refine Reach.trans (hs.move _ _ hr hf hA') (fun tb ⟨ta, ⟨s₁, _, hst, hrun₁⟩, hr'⟩ => ?_)
         exact ih s₁ hst ta hrun₁ (h0.trans (.step hdA hst hrun₁)) tb hr'
 
-theorem Refines.of_bigSim {α : Type} {sp : Spec α} {eA eB : Word}
+theorem RefinesRel.of_bigSim {α : Type} {sp : Spec α} {eA eB : Word}
     (R : α → State → State → State → Prop)
     (hsim : ∀ a s, Entry DA eA s → ¬ DB.mem (s.reg Reg.ra) → sp.pre a s →
       BigSim cA DA cB DB (sp.perm a s) (Obs (sp.dead s)) (R a s))
     (hR : ∀ a s, Entry DA eA s → sp.pre a s → R a s s (s.setPc eB)) :
-    Refines sp cA DA eA cB DB eB := by
+    RefinesRel sp cA DA eA cB DB eB := by
   intro a s he hb hp hA
   exact (hsim a s he hb hp).exec hA _ (hR a s he hp)
+
+theorem Refines.of_bigSim {α : Type} {sp : Spec α} {eA eB : Word} (hA : ARuns sp cA DA eA)
+    (R : α → State → State → State → Prop)
+    (hsim : ∀ a s, Entry DA eA s → ¬ DB.mem (s.reg Reg.ra) → sp.pre a s →
+      BigSim cA DA cB DB (sp.perm a s) (Obs (sp.dead s)) (R a s))
+    (hR : ∀ a s, Entry DA eA s → sp.pre a s → R a s s (s.setPc eB)) :
+    Refines sp cA DA eA cB DB eB :=
+  ⟨hA, RefinesRel.of_bigSim R hsim hR⟩
 
 /-- A safe run in `D` is a safe run in any `E ⊆ D`, stopped at `E`'s exit. -/
 theorem Exec.restrict {c : Code} {P : Perm} {D E : Dom} {Q : State → Prop} {s : State}
