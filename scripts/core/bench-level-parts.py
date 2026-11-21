@@ -15,7 +15,8 @@ under the cap (bench-chunk-checks.py's `lean`):
   checkL2  Struct.checkL2 (R4 to R6)
   level    the whole `_checked` theorem
   fast     the same statement through `Struct.levelFast` (Frame.lean: decoded once)
-Reports wall, peak memory and kernel time per part and size.
+Reports wall, peak memory and kernel time per part and size. PARTS=a,b runs
+only those parts; FUNCS=f,g names the functions instead of SIZE.
 """
 import os, re, subprocess, sys
 
@@ -50,8 +51,9 @@ def main():
     rec = next((l for l in img.splitlines() if l.startswith("set_option maxRecDepth")), "")
     print("| function | instructions | part | rc | wall (s) | peak (KB) | kernel (ms) |")
     print("| --- | --- | --- | --- | --- | --- | --- |")
-    for n in sizes:
-        f = min((g for g in checked if g in lens), key=lambda g: abs(lens[g] - n))
+    named = [g for g in os.environ.get("FUNCS", "").split(",") if g]
+    for n in (named or sizes):
+        f = n if named else min((g for g in checked if g in lens), key=lambda g: abs(lens[g] - n))
         c, lv, full = checked[f]
         stmts = {p: f"theorem part_{p} : {t.format(f=f, c='(' + c + ')')} := by decide +kernel"
                  for p, t in PARTS.items()}
@@ -65,7 +67,7 @@ def main():
         for p, t in stmts.items():
             if only and p not in only.split(","):
                 continue
-            path = os.path.join(work, f"Part_{n}_{p}.lean")
+            path = os.path.join(work, f"Part_{lens[f]}_{p}.lean")
             open(path, "w").write(f"import {bcc['NS']}\n{rec}\nnamespace {bcc['NS']}\nopen NoCompiler\n\n{t}\n\n"
                                   f"end {bcc['NS']}\n")
             r = bcc["lean"](work, ["-Dprofiler=true", path])
