@@ -49,6 +49,23 @@ theorem sum_refines : Refines Examples.Sum.spec
         decide +kernel)
     (by decide +kernel) (by decide +kernel) sum_one
 
+/-- The second link's functions in the other order: `sum2`, `sum`, `_start`. -/
+def revGroups : List (List RChunk) := [[TwoChunks.f_2, TwoChunks.f_1, TwoChunks.f_0]]
+
+/-- `_start` calls `sum`, which now comes first: a theorem about `_start`'s
+    closure module (here a hypothesis) still carries, the closure found in
+    the new order (`of_groups_perm`). -/
+theorem start_reordered {α : Type} {sp : Layout → Spec α}
+    (h : Verified (Module.ofChunks [OneChunks.f_0, OneChunks.f_1] OneChunks.datas) "_start" sp) :
+    Verified (Module.ofChunks revGroups.flatten TwoChunks.datas) "_start" sp :=
+  Verified.of_groups_perm (fs' := [OneChunks.f_1, OneChunks.f_0]) (ks := [(1, 1), (0, 0)])
+    (by decide +kernel) (by decide +kernel) h
+
+/-- Control: in the old order, the closure is not a sublist of the new one. -/
+theorem start_unordered_fails :
+    RChunk.subSeqG [OneChunks.f_0, OneChunks.f_1] [(1, 2), (0, 0)] [] revGroups = false := by
+  decide +kernel
+
 /-- Control: one bit of `sum`'s words changed, and the check fails. -/
 theorem changed_fails :
     RChunk.subSeqG [{ OneChunks.f_1 with bits := OneChunks.f_1.bits ^^^ 1 }] [(1, 1)] [] TwoChunks.groups

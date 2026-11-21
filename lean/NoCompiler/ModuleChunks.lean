@@ -203,6 +203,22 @@ theorem Verified.of_groups {α : Type} {fs : List RChunk} {gs : List (List RChun
     (h : Verified (Module.ofChunks fs ds) f sp) : Verified (Module.ofChunks gs.flatten ds') f sp :=
   Verified.of_sublist (RChunk.subSeq_of_subSeqG hs) h
 
+/-- The theorem does not depend on the order of the module's functions. -/
+theorem Verified.of_perm {α : Type} {fs fs' : List RChunk} {ds : List DChunk} {f : Sym}
+    {sp : Layout → Spec α} (hp : List.Perm fs fs')
+    (h : Verified (Module.ofChunks fs ds) f sp) : Verified (Module.ofChunks fs' ds) f sp :=
+  fun L hL => Verified.of_sub (fun _ hg => ((hp.map RChunk.func).subset hg))
+    (hL.names.perm ((hp.map RChunk.func).map _).symm) h L hL
+
+/-- `Verified.of_groups` when the closure's functions come in another order
+    in the larger module: `fs'` is `fs` reordered (decided by `List.Perm`,
+    on the same constants), and `fs'` is what is found in the groups. -/
+theorem Verified.of_groups_perm {α : Type} {fs fs' : List RChunk} {gs : List (List RChunk)}
+    {ks : List (Nat × Nat)} {ds ds' : List DChunk} {f : Sym} {sp : Layout → Spec α}
+    (hp : List.Perm fs fs') (hs : RChunk.subSeqG fs' ks [] gs = true)
+    (h : Verified (Module.ofChunks fs ds) f sp) : Verified (Module.ofChunks gs.flatten ds') f sp :=
+  Verified.of_groups hs (Verified.of_perm hp h)
+
 /-- An unchanged verified function refines itself across two modules in
     chunks that both hold `fs`, at one layout. -/
 theorem Refines.of_chunks {α : Type} {fs fa fb : List RChunk} {ka kb : List Nat}
@@ -228,5 +244,20 @@ theorem Refines.of_groups {α : Type} {fs : List RChunk} {ga gb : List (List RCh
   have ha := RChunk.subSeq_of_subSeqG hsa
   Refines.of_sub_verified hA hB (Module.ofChunks_sub ha)
     (Module.ofChunks_sub (RChunk.subSeq_of_subSeqG hsb)) (Module.ofChunks_names ha hA) hv
+
+/-- `Refines.of_groups` with the closure in another order in `B`'s groups. -/
+theorem Refines.of_groups_perm {α : Type} {fs fs' : List RChunk} {ga gb : List (List RChunk)}
+    {ka kb : List (Nat × Nat)} {ds da db : List DChunk} {L : Layout} {f : Sym} {sp : Layout → Spec α}
+    (hA : (Module.ofChunks ga.flatten da).Ok L) (hB : (Module.ofChunks gb.flatten db).Ok L)
+    (hsa : RChunk.subSeqG fs ka [] ga = true) (hp : List.Perm fs fs')
+    (hsb : RChunk.subSeqG fs' kb [] gb = true)
+    (hv : Verified (Module.ofChunks fs ds) f sp) :
+    let M := Module.ofChunks fs ds
+    Refines (sp L) ((Module.ofChunks ga.flatten da).link L) (M.dom L f) (L.addr f)
+      ((Module.ofChunks gb.flatten db).link L) (M.dom L f) (L.addr f) :=
+  have ha := RChunk.subSeq_of_subSeqG hsa
+  Refines.of_sub_verified hA hB (Module.ofChunks_sub ha)
+    (fun _ hg => (((RChunk.subSeq_of_subSeqG hsb).map RChunk.func).subset
+      ((hp.map RChunk.func).subset hg))) (Module.ofChunks_names ha hA) hv
 
 end NoCompiler

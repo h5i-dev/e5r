@@ -894,44 +894,71 @@ pub fn reuse_lean(
             })
         });
         let name = str_lit(&old.funcs[i].name);
-        let kb = at
+        // The closure in the new module's order (by its index there), and
+        // whether that is another order than the old module's.
+        let order: Option<Vec<(usize, usize)>> = cl
             .iter()
-            .copied()
+            .zip(&at)
+            .map(|(&j, k)| k.map(|k| (k, j)))
             .collect::<Option<Vec<_>>>()
-            .and_then(|ks| steps(&ks));
-        match (same, kb) {
-            (true, Some(kb)) => {
-                thms += 1;
-                let old_m = format!("(Module.ofChunks {fs} {old_ns}.datas)");
-                match form {
-                    ReuseForm::Verified => {
-                        let _ = writeln!(
-                            o,
-                            "theorem r_{i} {{α : Type}} {{sp : Layout → Spec α}} (h : Verified {old_m} {name} sp) :\n    Verified (Module.ofChunks {new_ns}.groups.flatten {new_ns}.datas) {name} sp :=\n  Verified.of_groups (ks := [{kb}]) (by decide +kernel) h\n"
-                        );
-                    }
-                    ReuseForm::Refines => {
-                        let ka = steps(&cl).expect("a closure is sorted");
-                        let _ = writeln!(
-                            o,
-                            "theorem r_{i} {{α : Type}} {{sp : Layout → Spec α}} {{L : Layout}}\n    (hA : (Module.ofChunks {old_ns}.groups.flatten {old_ns}.datas).Ok L)\n    (hB : (Module.ofChunks {new_ns}.groups.flatten {new_ns}.datas).Ok L)\n    (h : Verified {old_m} {name} sp) :\n    Refines (sp L) ((Module.ofChunks {old_ns}.groups.flatten {old_ns}.datas).link L) ({old_m}.dom L {name}) (L.addr {name})\n      ((Module.ofChunks {new_ns}.groups.flatten {new_ns}.datas).link L) ({old_m}.dom L {name}) (L.addr {name}) :=\n  Refines.of_groups (ka := [{ka}]) (kb := [{kb}]) hA hB (by decide +kernel) (by decide +kernel) h\n"
-                        );
-                    }
-                }
-            }
-            (false, Some(kb)) => {
-                ctls += 1;
+            .map(|mut v| {
+                v.sort();
+                v
+            });
+        let Some(order) = order else {
+            // A callee gone: no theorem and no control.
+            ctls += 1;
+            let _ = writeln!(o, "-- {name}: a callee is gone; not attempted\n");
+            continue;
+        };
+        let ks: Vec<usize> = order.iter().map(|&(k, _)| k).collect();
+        let kb = steps(&ks).expect("sorted and distinct");
+        let moved = order.iter().map(|&(_, j)| j).ne(cl.iter().copied());
+        let fs2: Vec<String> = order
+            .iter()
+            .map(|(_, j)| format!("{old_ns}.f_{j}"))
+            .collect();
+        let fs2 = format!("[{}]", fs2.join(", "));
+        if !same {
+            ctls += 1;
+            let _ = writeln!(
+                o,
+                "/-- {name} changed (in itself or a callee): no reuse. -/\ntheorem c_{i} : RChunk.subSeqG {fs2} [{kb}] [] {new_ns}.groups = false := by decide +kernel\n"
+            );
+            continue;
+        }
+        thms += 1;
+        let old_m = format!("(Module.ofChunks {fs} {old_ns}.datas)");
+        let new_m = format!("(Module.ofChunks {new_ns}.groups.flatten {new_ns}.datas)");
+        match form {
+            ReuseForm::Verified => {
+                let proof = if moved {
+                    format!(
+                        "Verified.of_groups_perm (fs' := {fs2}) (ks := [{kb}]) (by decide +kernel) (by decide +kernel) h"
+                    )
+                } else {
+                    format!("Verified.of_groups (ks := [{kb}]) (by decide +kernel) h")
+                };
                 let _ = writeln!(
                     o,
-                    "/-- {name} changed (in itself or a callee): no reuse. -/\ntheorem c_{i} : RChunk.subSeqG {fs} [{kb}] [] {new_ns}.groups = false := by decide +kernel\n"
+                    "theorem r_{i} {{α : Type}} {{sp : Layout → Spec α}} (h : Verified {old_m} {name} sp) :\n    Verified {new_m} {name} sp :=\n  {proof}\n"
                 );
             }
-            (_, None) => {
-                // A callee gone or reordered: no theorem and no control.
-                ctls += 1;
+            ReuseForm::Refines => {
+                let ka = steps(&cl).expect("a closure is sorted");
+                let old_a = format!("(Module.ofChunks {old_ns}.groups.flatten {old_ns}.datas)");
+                let proof = if moved {
+                    format!(
+                        "Refines.of_groups_perm (fs' := {fs2}) (ka := [{ka}]) (kb := [{kb}]) hA hB (by decide +kernel) (by decide +kernel) (by decide +kernel) h"
+                    )
+                } else {
+                    format!(
+                        "Refines.of_groups (ka := [{ka}]) (kb := [{kb}]) hA hB (by decide +kernel) (by decide +kernel) h"
+                    )
+                };
                 let _ = writeln!(
                     o,
-                    "-- {name}: a callee is gone or moved before another; not attempted\n"
+                    "theorem r_{i} {{α : Type}} {{sp : Layout → Spec α}} {{L : Layout}}\n    (hA : {old_a}.Ok L)\n    (hB : {new_m}.Ok L)\n    (h : Verified {old_m} {name} sp) :\n    Refines (sp L) ({old_a}.link L) ({old_m}.dom L {name}) (L.addr {name})\n      ({new_m}.link L) ({old_m}.dom L {name}) (L.addr {name}) :=\n  {proof}\n"
                 );
             }
         }

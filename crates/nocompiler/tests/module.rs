@@ -178,3 +178,20 @@ fn reuse_lean_states_a_theorem_for_each_unchanged_closure() {
     assert_eq!((t, c), (0, 3));
     assert!(text.contains("theorem c_1 : RChunk.subSeqG [A.f_1] [(1, 1)] [] B.groups = false"));
 }
+
+/// Functions in another order in the new module: `_start` comes after
+/// `sum`, which it calls, and its theorem still carries (`of_groups_perm`).
+#[test]
+fn reuse_lean_handles_a_callee_moved_before_its_caller() {
+    use nocompiler::module::{ReuseForm, reuse_lean};
+    let a = module("sum.link1.elf");
+    let mut r = a.clone();
+    r.funcs.reverse(); // sum2, sum, _start
+    let (text, t, c) = reuse_lean(&a, &r, "A", "B", "R", ReuseForm::Verified);
+    assert_eq!((t, c), (3, 0));
+    assert!(text.contains("theorem r_0 "), "{text}");
+    assert!(
+        text.contains("Verified.of_groups_perm (fs' := [A.f_1, A.f_0]) (ks := [(1, 1), (0, 0)])"),
+        "{text}"
+    );
+}

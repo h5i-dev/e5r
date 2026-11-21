@@ -126,9 +126,13 @@ per binary, self-check included:
     the module took 36.3 s; packed into one number per function, 8-16 s.
 - **Not yet:** a `--format chunks` flag for `nocompiler module` (cmd.rs and
   main.rs are not B's files; the measurement used a driver over
-  `module::lean_chunks`/`reuse_lean`); a `Verified` module whose order of
-  callees differs between the builds (the check is a sublist: a callee moved
-  before its caller gives no theorem; none on this artifact).
+  `module::lean_chunks`/`reuse_lean`).
+- **Callees in another order.** When the new build puts a callee before its
+  caller, the closure is found in the new order and the theorem carried
+  through `Verified.of_perm` (`of_groups_perm`; the `List.Perm` is between
+  the same constants, so the kernel compares no chunk twice).
+  Examples/LinkChunks.lean `start_reordered`, with a control. None on this
+  artifact: the files above are unchanged by it (regenerated, byte-equal).
 
 Not yet: search by specification (the spec is named, not indexed), and
 ledger entries for theorems whose specification depends on the layout (data
