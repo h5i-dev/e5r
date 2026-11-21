@@ -608,8 +608,8 @@ musl binaries like OVP's need first):
   - `auxvEntries_count`: 27 entries with AT_NULL, 29 with CONFIG_RSEQ, as
     LPS `auxv_count`.
   - `auxv_pagesz_entry`: AT_PAGESZ = 4096 and AT_ENTRY = entry.
-- Still parameters: AT_RANDOM's bytes and the alignment pads (LPS
-  `at_random_bytes`, `block_pad_len`).
+- Still parameters here: AT_RANDOM's bytes and the alignment pads (LPS
+  `at_random_bytes`, `block_pad_len`); the thirteenth step computes them.
 
 ### Fourth step: `brk` (lean/NoCompiler/Linux/Brk.lean)
 
@@ -804,3 +804,25 @@ mapped range was read-write.
 - `hello_process` now assumes its data readable and its stack frame
   writable in the permission; `hello_process_plain` is the earlier form.
 - Axioms: standard. lake env lean: Prot 1.02 s, Process 1.13 s, Mmap 1.11 s.
+
+### Thirteenth step: the whole entry stack (lean/NoCompiler/Linux/Stack.lean)
+
+The third step's parameters, computed as LPS does (`StackLayout.v#L368-L512`).
+- `atRandomBytes` (16 bytes of a 128-bit draw), `blockHeadSize` (C),
+  `atRandomPtr`, `blockPadLen` (clamped at 0), `launchArgs` (the
+  `StartArgs` of a launch: auxv from `auxvEntries` with AT_RANDOM and
+  AT_EXECFN filled in, strings at `stringBaseAddr`), `buildStackBytes`
+  (head, gap, random bytes, pad, strings with the exec name, the 8-byte
+  slot). The head is `StartArgs.head`, the words LPS writes with
+  `word_le8`/`auxv_bytes`, so the third step's lemmas read it.
+- `StackFits`: sp, C, the strings and the slot lie below `top`. Under it:
+  `buildStackBytes_length` (exactly `top - sp` bytes, LPS
+  `length_entry_stack_image_launch`), `startState_of_stack` (memory from
+  sp holding the block is a `StartState` for `launchArgs`, so
+  `argc_at_sp`, `argv_at`, `argv_string`, `openat_argv1` apply to a real
+  launch), `strings_at`, `execfn_at`; and, with no fit needed,
+  `random_at` (AT_RANDOM points at the sixteen bytes).
+- Not modelled: the range of `top` and of the pad (LPS
+  `Run.valid_stack_top_va`, `entry_launch_ok_va`); here they are whatever
+  the hypotheses allow.
+- Axioms: standard. lake env lean: Stack 1.60 s.

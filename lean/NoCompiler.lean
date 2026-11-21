@@ -38,6 +38,7 @@ import NoCompiler.Linux.Fs
 import NoCompiler.Linux.FsIo
 import NoCompiler.Linux.Launch
 import NoCompiler.Linux.Prot
+import NoCompiler.Linux.Stack
 import NoCompiler.Linux.Process
 import NoCompiler.RefineReuse
 import NoCompiler.ModuleChunks

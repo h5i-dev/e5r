@@ -12,8 +12,9 @@ At entry, sp points at
 (`head`), each a little-endian 8-byte word, and the strings they point to lie
 at `sbase` (`strs`, each NUL-terminated, argv then envp). LPS also lays the
 exec file name, AT_RANDOM bytes and the alignment pads and computes `sbase`
-and the auxv from the launch; here they are parameters (`StartArgs`), to be
-filled in from LPS's `auxv_entries` and `string_base_addr` in the next step.
+and the auxv from the launch; here they are parameters (`StartArgs`), and
+Linux/Stack.lean computes them (`launchArgs`, `buildStackBytes`,
+`startState_of_stack`).
 
 `StartState` says a machine state is such an entry state. `argc_at_sp` and
 `argv_at`: from it, the word at sp is argc and the word at sp + 8 + 8i is the
