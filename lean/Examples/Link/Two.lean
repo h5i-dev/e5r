@@ -15,8 +15,8 @@ def module : Module where
         0x00500593#32, 0x00040513#32, 0x00000097#32, 0x000080e7#32, 0x00050493#32, 0x00840513#32,
         0x00300593#32, 0x00000097#32, 0x000080e7#32, 0x00950533#32, 0x05d00893#32, 0x00000073#32,
         0x01813083#32, 0x01013403#32, 0x00813483#32, 0x02010113#32, 0x00008067#32],
-      relocs := [{ off := 16, kind := .pcrelHi, sym := ".data", addend := 0, hiOff := 16 },
-        { off := 20, kind := .pcrelLoI, sym := ".data", addend := 0, hiOff := 16 },
+      relocs := [{ off := 16, kind := .pcrelHi, sym := "data", addend := 0, hiOff := 16 },
+        { off := 20, kind := .pcrelLoI, sym := "data", addend := 0, hiOff := 16 },
         { off := 32, kind := .call, sym := "sum", addend := 0, hiOff := 32 },
         { off := 52, kind := .call, sym := "sum", addend := 0, hiOff := 52 }] },
     { name := "sum", words := [0x00000613#32, 0x00058c63#32, 0x00053683#32, 0x00c68633#32, 0xfff58593#32, 0x00850513#32,
@@ -36,6 +36,7 @@ def layout : Layout where
     if s = "_start" then 0x40000#64 else
     if s = "sum" then 0x400b0#64 else
     if s = "sum2" then 0x4005c#64 else
+    if s = "data" then 0x410d8#64 else
     if s = ".data" then 0x410d8#64 else
     0
   base := 0x40000#64

@@ -68,6 +68,8 @@ pub struct Module {
     /// be made relocatable, or did not relink to the binary's words. Calls to
     /// them stay relocations to their symbol.
     pub skipped: Vec<Skipped>,
+    /// The data objects (`data_objects`) a relocation may name: name and address.
+    pub objects: Vec<(String, u64)>,
     pub text_addr: u64,
     pub text_words: usize,
 }
@@ -152,7 +154,7 @@ pub fn of_binary(bin: &Binary) -> Result<Module, String> {
         .chain(m.skipped.iter().map(|f| (f.name.clone(), f.entry)))
         .collect();
     let mut data: Vec<(String, u64)> = m.data.iter().map(|d| (d.name.clone(), d.addr)).collect();
-    data.extend(data_objects(bin).into_iter().map(|(n, a, _)| (n, a)));
+    data.extend(m.objects.iter().cloned());
     let addr = |s: &str| -> Option<u64> {
         entries
             .get(s)
@@ -492,6 +494,7 @@ fn of_binary_unchecked(bin: &Binary) -> Result<Module, String> {
         funcs,
         data,
         skipped,
+        objects: objs.iter().map(|(n, a, _)| (n.clone(), *a)).collect(),
         text_addr: bin.text_addr,
         text_words: bin.text.len(),
     })
@@ -594,6 +597,9 @@ pub fn lean(m: &Module, namespace: &str, source: &str, sha: &str) -> String {
             f.entry,
             f.reason.replace('\n', " ")
         );
+    }
+    for (n, a) in &m.objects {
+        let _ = writeln!(o, "    if s = {} then 0x{a:x}#64 else", str_lit(n));
     }
     for d in &m.data {
         let _ = writeln!(

@@ -1,3 +1,3 @@
-{"name":"_start","sha256":"e7724c4d9bdf5bbcded945cfb551aec73e347b46d68a663334e1f2480eac644d","closure":"ed69d40730f68bebd2c00cc01ef28f4ed035b8da081d3f330acc7e9487664f7a","level":"L2","depth":32,"theorem":null,"spec":null}
+{"name":"_start","sha256":"6c3f9c4be3d299b427eee07d0d3166b2676690a1da6be7234ac2c6bbff5bc821","closure":"1f6b6b8e78eb4200af95a743fa62d19017a69f23b94134dc999dcd708a00c2bb","level":"L2","depth":32,"theorem":null,"spec":null}
 {"name":"sum","sha256":"a3944f27b6cece706dcd9e118d7709c7c54b34f52b32fcb3e9800e95a30990ef","closure":"4ef4bfc74df50b5e374bf1d2be0cbb28f45f7fee93482f34942a9714d6e3c589","level":"L2","depth":0,"theorem":"Examples.Link.sum_relocatable","spec":"Examples.Sum.spec"}
 {"name":"sum2","sha256":"2a8db40a24e261cd291da8ae78aacbf0b34144f4c90a3314b9ae03bc89a2ea8d","closure":"57c26152c0bf69a1fd1a1484ba1d76643dc1a520f5181bad22bb0970c3079c82","level":"L2","depth":32,"theorem":null,"spec":null}
