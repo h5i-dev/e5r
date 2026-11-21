@@ -11,3 +11,4 @@ import Examples.Refine.Diff
 import Examples.Refine.Jump
 import Examples.LinkData
 import Examples.LinuxHello
+import Examples.LinkReuse

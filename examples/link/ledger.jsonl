@@ -1,3 +1,3 @@
-{"name":"_start","sha256":"4afac2cd4a05d49066f6a70ee31010cd99c41c98b7380e34a61258c36e36720d","level":"L2","depth":32,"theorem":null,"spec":null}
-{"name":"sum","sha256":"75e31c5df6ef09407a23bb0353313a7fdd1edb3754ebda667fde0a0f43c862b4","level":"L2","depth":0,"theorem":"Examples.Link.sum_relocatable","spec":"Examples.Sum.spec"}
-{"name":"sum2","sha256":"9d800ea8af705069e6168fcbe3b86c5b315f35f3edb7410d4cda700b79f3926b","level":"L2","depth":32,"theorem":null,"spec":null}
+{"name":"_start","sha256":"4afac2cd4a05d49066f6a70ee31010cd99c41c98b7380e34a61258c36e36720d","closure":"fdb9876781d38aa00b2b686402020162bf194fc4473cc364e553147ec84b0ef9","level":"L2","depth":32,"theorem":null,"spec":null}
+{"name":"sum","sha256":"75e31c5df6ef09407a23bb0353313a7fdd1edb3754ebda667fde0a0f43c862b4","closure":"b58d12d163eea67e158cec36059768a874dfae5e858cd62e275859c90eb124ee","level":"L2","depth":0,"theorem":"Examples.Link.sum_relocatable","spec":"Examples.Sum.spec"}
+{"name":"sum2","sha256":"9d800ea8af705069e6168fcbe3b86c5b315f35f3edb7410d4cda700b79f3926b","closure":"75e472a15cca4752a967cc6d219acbaae87ef3a1a063a03b29e6a240fce0f00c","level":"L2","depth":32,"theorem":null,"spec":null}

@@ -104,11 +104,94 @@ fn reads_or_writes(i: &Instr, r: Reg) -> (bool, bool) {
     (reads, writes)
 }
 
-/// The module of a binary, or why its code is not relocatable.
+/// The words of `f` with its relocations applied, at the addresses `addr`
+/// gives (Lean `RFunc.patched`, NoCompiler/Module.lean: `Reloc.apply`).
+pub fn patched(f: &RFunc, addr: &dyn Fn(&str) -> Option<u64>) -> Option<Vec<u32>> {
+    let mut w = f.words.clone();
+    for r in &f.relocs {
+        let d = addr(&r.sym)?
+            .wrapping_add(r.addend as u64)
+            .wrapping_sub(f.entry.wrapping_add(r.hi_off));
+        let hi20 = ((d.wrapping_add(0x800) >> 12) as u32) << 12;
+        let lo12 = (d & 0xfff) as u32;
+        let k = (r.off / 4) as usize;
+        match r.kind {
+            Kind::Call => {
+                w[k] |= hi20;
+                w[k + 1] |= lo12 << 20;
+            }
+            Kind::PcrelHi => w[k] |= hi20,
+            Kind::PcrelLoI => w[k] |= lo12 << 20,
+            Kind::PcrelLoS => w[k] |= ((lo12 & 0x1f) << 7) | ((lo12 >> 5) << 25),
+        }
+    }
+    Some(w)
+}
+
+/// The module of a binary, or why its code is not relocatable. The module is
+/// checked against the binary: every function, relinked at the binary's own
+/// addresses, gives back the binary's words.
 pub fn of_binary(bin: &Binary) -> Result<Module, String> {
+    let m = of_binary_unchecked(bin)?;
+    let addr = |s: &str| -> Option<u64> {
+        m.funcs
+            .iter()
+            .find(|f| f.name == s)
+            .map(|f| f.entry)
+            .or_else(|| m.data.iter().find(|d| d.name == s).map(|d| d.addr))
+    };
+    for f in &m.funcs {
+        let b = bin.funcs.iter().find(|g| g.entry == f.entry).unwrap();
+        let w =
+            patched(f, &addr).ok_or_else(|| format!("{}: a relocation names no symbol", f.name))?;
+        if w != b.words {
+            let k = w
+                .iter()
+                .zip(&b.words)
+                .position(|(x, y)| x != y)
+                .unwrap_or(0);
+            return Err(format!(
+                "{}: relinked at its own address, the word at {:#x} differs (a misattributed relocation)",
+                f.name,
+                f.entry + 4 * k as u64
+            ));
+        }
+    }
+    Ok(m)
+}
+
+/// A name per function, unique in the module: the symbol, or, when several
+/// local functions share a symbol (a crate linked twice), the symbol with
+/// `#k`, `k` its rank by address among them (stable while the linker keeps
+/// their order).
+fn unique_names(bin: &Binary) -> std::collections::HashMap<u64, String> {
+    let mut by_name: std::collections::BTreeMap<&str, Vec<u64>> = Default::default();
+    for f in &bin.funcs {
+        by_name.entry(&f.name).or_default().push(f.entry);
+    }
+    let mut out = std::collections::HashMap::new();
+    for (n, mut es) in by_name {
+        es.sort();
+        let dup = es.len() > 1;
+        for (k, e) in es.into_iter().enumerate() {
+            out.insert(
+                e,
+                if dup {
+                    format!("{n}#{k}")
+                } else {
+                    n.to_string()
+                },
+            );
+        }
+    }
+    out
+}
+
+fn of_binary_unchecked(bin: &Binary) -> Result<Module, String> {
+    let names = unique_names(bin);
     let sym_at = |t: u64| -> Option<(String, i64)> {
-        if let Some(f) = bin.funcs.iter().find(|f| f.entry == t) {
-            return Some((f.name.clone(), 0));
+        if let Some(n) = names.get(&t) {
+            return Some((n.clone(), 0));
         }
         bin.segments
             .iter()
@@ -117,7 +200,7 @@ pub fn of_binary(bin: &Binary) -> Result<Module, String> {
     };
     let mut funcs = Vec::new();
     let mut ordered: Vec<_> = bin.funcs.iter().collect();
-    ordered.sort_by(|a, b| a.name.cmp(&b.name)); // by name: the same module at every layout
+    ordered.sort_by(|a, b| names[&a.entry].cmp(&names[&b.entry])); // by name: the same module at every layout
     for f in ordered {
         let mut words = f.words.clone();
         let mut relocs = Vec::new();
@@ -144,7 +227,7 @@ pub fn of_binary(bin: &Binary) -> Result<Module, String> {
                     relocs.push(Reloc {
                         off: 4 * k as u64,
                         kind: Kind::Call,
-                        sym: g.name.clone(),
+                        sym: names[&g.entry].clone(),
                         addend: 0,
                         hi_off: 4 * k as u64,
                     });
@@ -169,8 +252,18 @@ pub fn of_binary(bin: &Binary) -> Result<Module, String> {
                         f.entry + 4 * j as u64
                     ));
                 }
+                // Across conditional branches too (clang and rustc hoist an
+                // auipc above a branch), until the register is written again
+                // or an unconditional jump ends the straight-line path (what
+                // follows a `jal zero` is not reached from here). A wrong
+                // attribution would disagree on the low part, and the module
+                // audit relinks and compares every byte.
+                // A call (rd = ra) keeps the callee-saved registers (s0-s11):
+                // a base in one of them is still live after it.
                 let (_, w) = reads_or_writes(&i, rd);
-                if w || matches!(i, Instr::Branch(..) | Instr::Jal(..) | Instr::Jalr(..)) {
+                let callee_saved = matches!(rd.0, 8 | 9 | 18..=27);
+                let call = matches!(i, Instr::Jal(Reg(1), _) | Instr::Jalr(Reg(1), _, _));
+                if w || (matches!(i, Instr::Jal(..) | Instr::Jalr(..)) && !(call && callee_saved)) {
                     break;
                 }
             }
@@ -216,7 +309,7 @@ pub fn of_binary(bin: &Binary) -> Result<Module, String> {
             k += 1;
         }
         funcs.push(RFunc {
-            name: f.name.clone(),
+            name: names[&f.entry].clone(),
             entry: f.entry,
             words,
             relocs,
@@ -372,6 +465,11 @@ pub fn canonical(f: &RFunc) -> Vec<u8> {
 pub struct Entry {
     pub name: String,
     pub sha256: String,
+    /// The reuse key: the hash of the function's and every callee's canonical
+    /// form (transitively), by name. Equal in two builds exactly when the
+    /// function and everything it calls are unchanged as relocatable code, which
+    /// is what `Verified.of_sub` (NoCompiler/Relocate.lean) needs.
+    pub closure: String,
     pub level: String,
     pub depth: Option<u64>,
     /// The Lean theorem and specification, when the function has a proof.
@@ -405,6 +503,34 @@ pub fn ledger(
         seen.pop();
         Some(m.frame + deepest)
     }
+    // The call graph by name (call relocations), and each function's closure.
+    let by_name: std::collections::HashMap<&str, &RFunc> =
+        m.funcs.iter().map(|f| (f.name.as_str(), f)).collect();
+    let closure_key = |f: &RFunc| -> String {
+        let mut seen = std::collections::BTreeSet::new();
+        let mut stack = vec![f.name.as_str()];
+        while let Some(n) = stack.pop() {
+            if !seen.insert(n) {
+                continue;
+            }
+            if let Some(g) = by_name.get(n) {
+                for r in &g.relocs {
+                    if r.kind == Kind::Call {
+                        stack.push(r.sym.as_str());
+                    }
+                }
+            }
+        }
+        let mut bytes = Vec::new();
+        for n in &seen {
+            bytes.extend_from_slice(n.as_bytes());
+            bytes.push(b'\n');
+            if let Some(g) = by_name.get(n) {
+                bytes.extend_from_slice(&canonical(g));
+            }
+        }
+        crate::sha256::hex(&crate::sha256::digest(&bytes))
+    };
     m.funcs
         .iter()
         .map(|f| {
@@ -416,6 +542,7 @@ pub fn ledger(
             Entry {
                 name: f.name.clone(),
                 sha256: crate::sha256::hex(&crate::sha256::digest(&canonical(f))),
+                closure: closure_key(f),
                 level: meta
                     .map(|m| format!("{:?}", m.level))
                     .unwrap_or_else(|| "none".into()),
@@ -434,9 +561,10 @@ pub fn ledger_json(es: &[Entry]) -> String {
     for e in es {
         let _ = writeln!(
             o,
-            "{{\"name\":{},\"sha256\":{},\"level\":{},\"depth\":{},\"theorem\":{},\"spec\":{}}}",
+            "{{\"name\":{},\"sha256\":{},\"closure\":{},\"level\":{},\"depth\":{},\"theorem\":{},\"spec\":{}}}",
             q(&e.name),
             q(&e.sha256),
+            q(&e.closure),
             q(&e.level),
             e.depth
                 .map(|d| d.to_string())

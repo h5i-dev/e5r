@@ -345,4 +345,133 @@ theorem Verified.mono {α : Type} {M M' : Module} {f : Sym} {sp : Layout → Spe
   have hgm : g ∈ M.funcs := List.mem_of_find?_eq_some hg
   exact Module.instr_append hgm (of_decide_eq_true hx)
 
+/-! ## Reuse of unchanged code
+
+A function's identity across builds is its relocatable form (`RFunc`: the
+words with every relocated field zero, and the relocations), not its linked
+bytes: in a one-line edit most linked functions move and their pc-relative
+offsets change, but their `RFunc`s do not. `Verified.of_sub`: a theorem about
+`M` holds in any `M'` that holds `M`'s `RFunc`s, wherever `M'` puts them; its
+side conditions are decided by comparing those `RFunc`s. -/
+
+namespace Module
+
+/-- In a module that links at `L`, the word at `y` inside `r`'s code is `r`'s. -/
+theorem wordAt_of_mem {M : Module} {L : Layout} (hL : M.Ok L) {r : RFunc} (hr : r ∈ M.funcs) {y : Word}
+    (hy : (y - L.addr r.name).toNat < 4 * r.words.length) :
+    M.wordAt L y = (r.patched L).getD ((y - L.addr r.name).toNat / 4) 0 := by
+  unfold wordAt
+  obtain ⟨g, hg⟩ : ∃ g, M.funcs.find? (fun f => decide ((y - L.addr f.name).toNat < 4 * f.words.length)) = some g :=
+    Option.isSome_iff_exists.1 (List.find?_isSome.2 ⟨r, hr, by simpa using hy⟩)
+  rw [hg]
+  have hgm := List.mem_of_find?_eq_some hg
+  have hgy : (y - L.addr g.name).toNat < 4 * g.words.length := by simpa using List.find?_some hg
+  have : g = r := by
+    by_cases hn : g.name = r.name
+    · exact eq_of_name hL hr hgm hn
+    exfalso
+    have d1 := hL.disjoint g hgm r hr hn
+    have d2 := hL.disjoint r hr g hgm (Ne.symm hn)
+    rw [BitVec.toNat_sub] at hy hgy d1 d2
+    have := (y).isLt; have := (L.addr r.name).isLt; have := (L.addr g.name).isLt
+    omega
+  subst this; rfl
+
+/-- Two modules that both link at `L` and both hold `r` have the same word there. -/
+theorem wordAt_congr {M M' : Module} {L : Layout} (hL : M.Ok L) (hL' : M'.Ok L) {r : RFunc}
+    (hr : r ∈ M.funcs) (hr' : r ∈ M'.funcs) {y : Word} (hy : (y - L.addr r.name).toNat < 4 * r.words.length) :
+    M'.wordAt L y = M.wordAt L y := by
+  rw [wordAt_of_mem hL hr hy, wordAt_of_mem hL' hr' hy]
+
+/-- A module whose functions are among `M'`'s, with distinct names, links
+    wherever `M'` does. -/
+theorem Ok.of_sub {M M' : Module} {L : Layout} (hL' : M'.Ok L) (hsub : ∀ f ∈ M.funcs, f ∈ M'.funcs)
+    (hn : (M.funcs.map (·.name)).Nodup) : M.Ok L where
+  base := hL'.base
+  size := hL'.size
+  names := hn
+  funcs := fun f hf => hL'.funcs f (hsub f hf)
+  disjoint := fun f hf g hg => hL'.disjoint f (hsub f hf) g (hsub g hg)
+  relocs := fun f hf => hL'.relocs f (hsub f hf)
+
+theorem func?_sub {M M' : Module} {L : Layout} (hL' : M'.Ok L) (hsub : ∀ f ∈ M.funcs, f ∈ M'.funcs)
+    {g : Sym} {r : RFunc} (h : M.func? g = some r) : M'.func? g = some r := by
+  have hr := List.mem_of_find?_eq_some h
+  have hn : r.name = g := by simpa using List.find?_some h
+  rw [← hn]; exact func?_eq hL' (hsub r hr)
+
+theorem reach_sub' {M M' : Module} {L : Layout} (hL' : M'.Ok L) (hsub : ∀ f ∈ M.funcs, f ∈ M'.funcs) :
+    ∀ (n n' : Nat) (f g : Sym), n ≤ n' → g ∈ M.reach n f → g ∈ M'.reach n' f
+  | 0, _, f, g, _, h => by
+    simp [reach] at h; subst h
+    cases ‹Nat› <;> simp [reach]
+  | n + 1, 0, _, _, h, _ => absurd h (by omega)
+  | n + 1, n' + 1, f, g, h, hg => by
+    simp only [reach, List.mem_cons] at hg ⊢
+    rcases hg with rfl | hg
+    · exact .inl rfl
+    · right
+      cases hf : M.func? f with
+      | none => simp [hf] at hg
+      | some r =>
+        rw [func?_sub hL' hsub hf]
+        simp only [hf, Option.map_some, Option.getD_some, List.mem_flatMap] at hg ⊢
+        obtain ⟨c, hc, hg⟩ := hg
+        exact ⟨c, hc, reach_sub' hL' hsub n n' c g (by omega) hg⟩
+
+theorem dom_sub' {M M' : Module} {L : Layout} (hL' : M'.Ok L) (hsub : ∀ f ∈ M.funcs, f ∈ M'.funcs)
+    (hn : (M.funcs.map (·.name)).Nodup) (f : Sym) : (M.dom L f).sub (M'.dom L f) := by
+  have hlen : M.funcs.length ≤ M'.funcs.length :=
+    List.Nodup.length_le_of_subset ((List.pairwise_map.1 hn).imp fun {a b} (h : a.name ≠ b.name) (e : a = b) => h (by rw [e])) (fun x hx => hsub x hx)
+  intro x hx
+  unfold Dom.mem dom at *
+  obtain ⟨r, hr, hx⟩ := List.any_eq_true.1 hx
+  refine List.any_eq_true.2 ⟨r, ?_, hx⟩
+  simp only [List.mem_map, List.mem_filterMap] at hr ⊢
+  obtain ⟨g, ⟨h, hh, hg⟩, rfl⟩ := hr
+  exact ⟨g, ⟨h, reach_sub' hL' hsub _ _ _ _ hlen hh, func?_sub hL' hsub hg⟩, rfl⟩
+
+/-- The images of two modules that hold `r` agree on `r`'s code. -/
+theorem instr_congr {M M' : Module} {L : Layout} (hL : M.Ok L) (hL' : M'.Ok L) {x : Word} {r : RFunc}
+    (hr : r ∈ M.funcs) (hr' : r ∈ M'.funcs) (hx : (x - L.addr r.name).toNat < 4 * r.words.length) :
+    (M'.link L).instr x = (M.link L).instr x := by
+  unfold Code.instr Code.fetch link
+  dsimp only
+  split
+  · rename_i h4
+    rw [List.getElem?_toArray, List.getElem?_toArray, List.getElem?_map, List.getElem?_map]
+    cases hj : (List.range L.size)[(x - L.base).toNat / 4]? with
+    | none => rfl
+    | some j =>
+      simp only [Option.map_some]
+      have hjv : j = (x - L.base).toNat / 4 := by
+        by_cases hk : (x - L.base).toNat / 4 < L.size
+        · rw [List.getElem?_range hk] at hj; exact (Option.some.inj hj).symm
+        · rw [List.getElem?_eq_none (by simpa using hk)] at hj; cases hj
+      have hy : L.base + BitVec.ofNat 64 (4 * j) = x := by
+        rw [hjv, show 4 * ((x - L.base).toNat / 4) = (x - L.base).toNat by omega,
+          BitVec.ofNat_toNat, BitVec.setWidth_eq]; bv_omega
+      rw [hy, wordAt_congr hL hL' hr hr' hx]
+  · rfl
+
+end Module
+
+/-- Reuse of unchanged code: a function verified in `M` is verified in every
+    module `M'` that holds `M`'s functions unchanged (the same `RFunc`s:
+    relocatable words with the relocated fields zero, and the same
+    relocations), wherever `M'` puts them. -/
+theorem Verified.of_sub {α : Type} {M M' : Module} {f : Sym} {sp : Layout → Spec α}
+    (hsub : ∀ g ∈ M.funcs, g ∈ M'.funcs) (hn : (M.funcs.map (·.name)).Nodup)
+    (h : Verified M f sp) : Verified M' f sp := by
+  intro L hL'
+  have hL := Module.Ok.of_sub hL' hsub hn
+  refine VerifiedImg.mono_dom (Module.dom_sub' hL' hsub hn f) (VerifiedImg.congr_code ?_ (h L hL))
+  intro x hx
+  unfold Dom.mem Module.dom at hx
+  obtain ⟨r, hr, hx⟩ := List.any_eq_true.1 hx
+  simp only [List.mem_map, List.mem_filterMap] at hr
+  obtain ⟨g, ⟨_, _, hg⟩, rfl⟩ := hr
+  have hgm : g ∈ M.funcs := List.mem_of_find?_eq_some hg
+  exact Module.instr_congr hL hL' hgm (hsub g hgm) (by simpa [RFunc.region] using of_decide_eq_true hx)
+
 end NoCompiler
