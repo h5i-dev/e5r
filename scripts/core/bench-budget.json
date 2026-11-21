@@ -1,18 +1,22 @@
 {
   "Demo/CobsB.lean": {
-    "kernel_ms_per_instr": 251.46,
-    "total_ms_per_instr": 2474.85
+    "kernel_ms_per_instr": 161.46,
+    "total_ms_per_instr": 1705.65
   },
   "Demo/Sum2B.lean": {
-    "kernel_ms_per_instr": 57.0,
-    "total_ms_per_instr": 1094.67
+    "kernel_ms_per_instr": 41.28,
+    "total_ms_per_instr": 1015.35
   },
   "Demo/SumB.lean": {
-    "kernel_ms_per_instr": 145.32,
-    "total_ms_per_instr": 1031.67
+    "kernel_ms_per_instr": 124.32,
+    "total_ms_per_instr": 888.51
   },
   "Examples/Hello.lean": {
-    "kernel_ms_per_instr": 74.55,
-    "total_ms_per_instr": 777.69
+    "kernel_ms_per_instr": 78.57,
+    "total_ms_per_instr": 670.71
+  },
+  "VC/MemChk1000": {
+    "kernel_ms_per_instr": 9.15,
+    "total_ms_per_instr": 9.84
   }
 }

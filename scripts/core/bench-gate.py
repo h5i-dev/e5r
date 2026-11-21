@@ -49,6 +49,13 @@ def capped(cmd):
         ["timeout", "900"] + cmd
 
 
+# Generated benchmarks of the reflective VC generator (lean/NoCompiler/VC/Bench/Gen.py):
+# name, Gen.py arguments, the module to build first, instructions.
+GENERATED = [
+    ("VC/MemChk1000", ["memchk", "1000"], "NoCompiler.VC.Ob", 1000),
+]
+
+
 def instrs(image, funcs):
     src = open(os.path.join(LEAN, image)).read()
     n = 0
@@ -79,7 +86,7 @@ def measure(path, module, image, funcs):
     if r.returncode != 0:
         sys.exit(f"bench-gate: {path} does not check:\n{(r.stdout + r.stderr)[-2000:]}")
     p = profile(r.stdout + r.stderr)
-    n = instrs(image, funcs)
+    n = funcs if image is None else instrs(image, funcs)
     total = sum(p.values())
     kernel = p.get("type checking", 0.0)
     return {"instrs": n, "wall_s": round(wall, 2), "total_ms": round(total, 1), "kernel_ms": round(kernel, 1),
@@ -92,6 +99,13 @@ def main():
         global BUDGET
         BUDGET = sys.argv[sys.argv.index("--budget") + 1]
     rows = {path: measure(path, mod, img, fs) for path, mod, img, fs in FIXED}
+    import tempfile
+    gen = tempfile.mkdtemp(prefix="bench-gate-")
+    for name, args, mod, n in GENERATED:
+        subprocess.run(["python3", "-I", os.path.join(LEAN, "NoCompiler", "VC", "Bench", "Gen.py"), gen] + args,
+                       check=True)
+        f = os.path.join(gen, os.path.basename(name).replace("VC/", "") + ".lean")
+        rows[name] = measure(f, mod, None, n)
     print("| file | instructions | wall (s) | total (ms) | kernel (ms) | total ms/instr | kernel ms/instr |")
     print("| --- | --- | --- | --- | --- | --- | --- |")
     for path, r in rows.items():
