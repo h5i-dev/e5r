@@ -1,5 +1,6 @@
 import NoCompiler.Linux.Startup
 import NoCompiler.Step
+import NoCompiler.Spec
 
 /-
 The whole process: the machine (the trusted `exec`, NoCompiler/Machine.lean)
@@ -80,16 +81,46 @@ inductive PReach (c : Code) (D : Dom) (Q : State → Prop) : State × Kern → P
       D.mem s.pc → (∃ s' k', PStep c (s, k) (s', k')) →
       (∀ s' k', PStep c (s, k) (s', k') → PReach c D Q (s', k')) → PReach c D Q (s, k)
 
+/-- A trusted step at an `ecall` is one of the four syscalls: `Sys` has no other. -/
+theorem oldSys_of_step {c : Code} {P : Perm} {s s₁ : State} (h : Step c P s s₁)
+    (hi : c.instr s.pc = some .ecall) : OldSys s := by
+  cases h with
+  | exec _ hi' _ hx => rw [hi] at hi'; cases hi'; simp [exec_ecall] at hx
+  | sys _ _ _ hy =>
+    cases hy with
+    | writeOk _ h => exact .inr (.inl h)
+    | writeErr _ h => exact .inr (.inl h)
+    | readOk _ h => exact .inl h
+    | readErr _ h => exact .inl h
+    | exit h => rcases h with h | h
+                · exact .inr (.inr (.inl h))
+                · exact .inr (.inr (.inr h))
+
 /-- What is proved of the trusted `Step` holds of the process: a safe run to
-    `Q` under `Perm.top` is a safe process run to `Q`, from any kernel state,
-    when every `ecall` in the code is one of the trusted model's syscalls. -/
-theorem PReach.of_reach {c : Code} {D : Dom} {Q : State → Prop}
-    (hold : ∀ u : State, c.instr u.pc = some .ecall → OldSys u) {s : State}
+    `Q` under `Perm.top` is a safe process run to `Q`, from any kernel state.
+    (A trusted run only ever makes the four syscalls `Sys` has.) -/
+theorem PReach.of_reach {c : Code} {D : Dom} {Q : State → Prop} {s : State}
     (h : Reach c Perm.top D Q s) (k : Kern) : PReach c D Q (s, k) := by
   induction h generalizing k with
   | done hq => exact .done hq
   | step hd hex _ ih =>
     obtain ⟨s₁, st⟩ := hex
-    exact .step hd (PStep.progress k st (hold _)) (fun s' k' hp => ih s' (PStep.step hp (hold _)) k')
+    have hold := oldSys_of_step st
+    exact .step hd (PStep.progress k st hold) (fun s' k' hp => ih s' (PStep.step hp hold) k')
+
+/-- A safe run under `P` is a safe run under any larger permission: the
+    transitions are the same, only their side conditions get weaker. -/
+theorem Reach.widen {c : Code} {P P' : Perm} {D : Dom} {Q : State → Prop} {s : State}
+    (hle : P.le P') (h : Reach c P D Q s) : Reach c P' D Q s := by
+  induction h with
+  | done hq => exact .done hq
+  | step hd hex _ ih =>
+    obtain ⟨s₁, st⟩ := hex
+    exact .step hd ⟨s₁, Step.mono hle st⟩ (fun s' st' => ih s' (Step.restrict st st'))
+
+/-- A region that does not wrap past 2^64 lies inside `Perm.top`'s. -/
+theorem Region.within_top {r : Region} (h : r.base.toNat + r.size ≤ 2 ^ 64) :
+    r.within ⟨0, 2 ^ 64⟩ := by
+  unfold Region.within; simpa using h
 
 end NoCompiler.Linux

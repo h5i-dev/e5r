@@ -684,9 +684,15 @@ musl binaries like OVP's need first):
 - `PStep.progress`: wherever `Step c Perm.top` can move, so can the process.
   On a closed fd it answers EBADF, so it never loses a step there.
 - **`PReach.of_reach`:** a safe trusted run to `Q` (`Reach c Perm.top D Q s`)
-  is a safe process run to `Q` from any kernel state, when every `ecall` in
-  the code is an `OldSys` call. So the existing theorems apply to the
-  process.
+  is a safe process run to `Q` from any kernel state.
+  - No hypothesis on the code is needed: a trusted step at an `ecall` is
+    always one of the four (`oldSys_of_step`).
+  - `Reach.widen` moves a run from a spec's permission to `Perm.top`.
+- **Example** (`lean/Examples/LinuxHello.lean`, `hello_process`): the
+  verified `hello` (`Examples.Hello.hello_verified`), as a whole process
+  from any kernel state, with sp ≥ 16. It is safe until it leaves its code
+  or exits, and ends as `helloSpec` says. Nothing about its code is proved
+  again. Standard axioms.
 - Axioms: `[propext, Quot.sound]`. `lake env lean Process.lean`: 0.44 s.
 - Next: the same for programs that use the new calls (`brk`, `mmap`,
   `writev`, the startup calls). Their proofs need the process semantics
