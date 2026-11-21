@@ -256,3 +256,33 @@ The memchk chain of 10,000 instructions, as `Code.ofSegs` with segments of K, wi
 - **Segments of 100 cut memory further but take about 1.9× the time.** That suggests a per-theorem overhead not yet located.
 - **Earlier single-run numbers on this host varied with load:** one 100-instruction segment alone measured 0.29 s at one time and 0.43 s at another.
 - **Each segment's lemma (`Reach.of_seg`) reaches its words through `ofSegs_drop`,** proved once by induction, so it never walks the code before it.
+
+### Measured: milestone 4c and the symbolic memory (`VC/Tactic.lean`, `VC/Mem.lean`)
+
+`vc_run` leaves the segment's end state in the goal, so the successors' conditions can be stated over it. It finds the value with compiled code and has the kernel check `runSeg … = v`. Measured on one segment of 1,000 `addi` (`Gen.py OUTDIR vcrun add 1000 1000`), single runs:
+
+| How the kernel checks `runSeg … = v` | Kernel ("type checking") |
+| --- | --- |
+| `rfl`, as an auxiliary theorem | 10.7 s |
+| `decide` on the derived `DecidableEq`, as an auxiliary theorem | 3.48 s in the kernel, but 202 s in the elaborator (`mkAuxTheorem` checks the proof) |
+| `decide`, the proof term passed straight to `rewrite` (kept) | 3.43 s |
+| for comparison: the run alone, `decide +kernel` on `(runSeg …).map …` | 1.23 s |
+
+The compiled evaluation itself takes 11 ms.
+
+Symbolic memory:
+- Before, a load's memory was the whole write chain, and a store pushed a write. On the alternating `ld a3,0(a0)` / `sd a3,8(a0)` chain, each value then contained the memory twice. The tree `toExpr` builds doubled with every pair: 20 instructions took 0.25 s of kernel time, and 40 were killed.
+- Now `symLoad` reads past disjoint writes (`rdSkip`, decided on the constants of variable-plus-constant addresses) and forwards an 8-byte store to an 8-byte load. `symStore` replaces a write of the same range, moving past disjoint writes to reach it.
+- These are proved from `Fast.writeLE_apply` (a write, pointwise), `writeLE_overwrite` and `writeLE_comm`.
+
+| Run (segments of 1,000, one `vc_run` theorem each) | Kernel | Wall | Max RSS |
+| --- | --- | --- | --- |
+| mem 40, before `symStore` | 0.26 s | 1.38 s | 1.59 GB |
+| mem 1,000, `symLoad` only | 50.5 s | 52.3 s | 7.27 GB |
+| mem 1,000 | 4.16 s | 5.30 s | 2.08 GB |
+| add 10,000 | 35.3 s | 36.6 s | 2.14 GB |
+| mem 10,000 | 40.4 s | 42.0 s | 2.15 GB |
+
+The 7.27 GB figure is what `/usr/bin/time` reported under the 6 GB cap. It probably counts something the cap does not.
+
+That is 3.5 to 4.0 ms per instruction with the end state exposed, against the 1 ms target. About a third is the kernel's own run; the rest is comparing with the value.

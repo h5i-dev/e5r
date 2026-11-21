@@ -45,6 +45,28 @@ theorem writeLE_apply_of_ne {m : Word → Byte} {b x : Word} {v : Nat} :
       have := h (j + 1) (by omega)
       rwa [show b + 1 + BitVec.ofNat 64 j = b + BitVec.ofNat 64 (j + 1) by bv_omega])
 
+/-- A write, pointwise: byte `x` is written exactly when it is `j < n` bytes past `a`,
+    and then it is byte `j` of the value (the lowest such `j` is `(x - a).toNat`). -/
+theorem writeLE_apply {m : Word → Byte} (x : Word) :
+    ∀ {n : Nat} {a : Word} {v : Nat}, writeLE m a v n x =
+      if (x - a).toNat < n then BitVec.ofNat 8 (v / 256 ^ (x - a).toNat) else m x
+  | 0, _, _ => by simp [writeLE]
+  | n + 1, a, v => by
+    simp only [writeLE]
+    by_cases hx : x = a
+    · subst hx; simp
+    · rw [if_neg hx, writeLE_apply x]
+      have e : (x - a).toNat = (x - (a + 1)).toNat + 1 := by
+        have : x - a ≠ 0 := fun h => hx (by bv_omega)
+        bv_omega
+      rw [e, Nat.pow_succ, Nat.mul_comm, ← Nat.div_div_eq_div_mul]
+      simp only [Nat.add_lt_add_iff_right]
+
+/-- A write over a write of the same range. -/
+theorem writeLE_overwrite (m : Word → Byte) (a : Word) (v₁ v₂ n : Nat) :
+    writeLE (writeLE m a v₁ n) a v₂ n = writeLE m a v₂ n := by
+  funext x; rw [writeLE_apply, writeLE_apply, writeLE_apply]; split <;> simp_all
+
 /-- The ranges `[a, a+k)` and `[b, b+n)` do not overlap (modulo 2^64). -/
 def Disjoint (a : Word) (k : Nat) (b : Word) (n : Nat) : Prop :=
   n ≤ (a - b).toNat ∧ k ≤ (b - a).toNat
@@ -61,6 +83,15 @@ theorem Disjoint.ne {a b : Word} {k n : Nat} (h : Disjoint a k b n) {i j : Nat} 
   have hi' : i < 2 ^ 64 := by omega
   have hj' : j < 2 ^ 64 := by omega
   bv_omega
+
+/-- Writes to disjoint ranges commute. -/
+theorem writeLE_comm {m : Word → Byte} {a b : Word} {v w n k : Nat} (h : Disjoint a n b k) :
+    writeLE (writeLE m b w k) a v n = writeLE (writeLE m a v n) b w k := by
+  funext x
+  simp only [writeLE_apply x]
+  unfold Disjoint at h
+  by_cases ha : (x - a).toNat < n <;> by_cases hb : (x - b).toNat < k <;> simp only [ha, hb, ite_true, ite_false]
+  exfalso; bv_omega
 
 /-- A read of a range disjoint from a write sees the memory before the write. -/
 theorem readLE_writeLE_of_disjoint {m : Word → Byte} {a b : Word} {v k n : Nat}

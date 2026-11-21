@@ -1,4 +1,5 @@
 import NoCompiler.VC.Straight
+import NoCompiler.Fast.Mem
 
 /-
 Reflective verification conditions, milestone 2 (docs/design/prior-art-others.md,
@@ -55,6 +56,125 @@ def Ob.den (ρ : Nat → Word) (μ : Word → Byte) (P : Perm) : Ob → Prop
   | .canRead a w => P.canRead (a.den ρ μ) w
   | .canWrite a w => P.canWrite (a.den ρ μ) w
 
+/-- An address as variable `n` plus constant `k`, when it is one. -/
+def Sym.lin : Sym → Option (Nat × Word)
+  | .var n => some (n, 0)
+  | .iop .addi a imm => (Sym.lin a).map fun p => (p.1, p.2 + imm)
+  | _ => none
+
+theorem Sym.lin_den {ρ : Nat → Word} {μ : Word → Byte} :
+    ∀ {a : Sym} {n : Nat} {k : Word}, a.lin = some (n, k) → a.den ρ μ = ρ n + k
+  | .var _, n, k, h => by
+    simp only [Sym.lin, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
+    simp [Sym.den]
+  | .iop op a imm, n, k, h => by
+    cases op <;> simp only [Sym.lin, reduceCtorEq] at h
+    cases ha : a.lin with
+    | none => rw [ha] at h; simp at h
+    | some p =>
+      rw [ha] at h; simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at h
+      obtain ⟨rfl, rfl⟩ := h
+      rw [Sym.den, Sym.lin_den ha]; simp [evalI]; bv_omega
+  | .const _, _, _, h | .rop .., _, _, h | .load .., _, _, h => by simp [Sym.lin] at h
+
+/-! ### Reading through symbolic writes
+
+A load looks past the writes on top of the memory that are disjoint from it:
+both addresses the same variable plus constants, the ranges decided on the
+constants alone (`disj`), since `(x + k₁) - (x + k₂) = k₁ - k₂`. An 8-byte load
+right after an 8-byte store at the same address is the stored value (`symLoad`). -/
+
+def disj (a : Sym) (w : Nat) (b : Sym) (n : Nat) : Bool :=
+  match a.lin, b.lin with
+  | some (x, k₁), some (y, k₂) => x == y && decide (Fast.Disjoint k₁ w k₂ n)
+  | _, _ => false
+
+/-- The memory a `w`-byte load at `a` reads, with the disjoint writes on top removed. -/
+def rdSkip (a : Sym) (w : Nat) : SMem → SMem
+  | .base => .base
+  | .write m b v n => if disj a w b n then rdSkip a w m else .write m b v n
+
+/-- The symbolic value of a load. -/
+def symLoad (op : LdOp) (m : SMem) (a : Sym) : Sym :=
+  match op, m with
+  | .ld, .write m' b v 8 => if a.lin.isSome && a.lin == b.lin then v else .load .ld (rdSkip a 8 (.write m' b v 8)) a
+  | op, m => .load op (rdSkip a op.width m) a
+
+theorem disj_sound {ρ : Nat → Word} {μ : Word → Byte} {a b : Sym} {w n : Nat} (h : disj a w b n = true) :
+    Fast.Disjoint (a.den ρ μ) w (b.den ρ μ) n := by
+  unfold disj at h
+  split at h
+  · rename_i x k₁ y k₂ ha hb
+    simp only [Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at h
+    obtain ⟨rfl, hd⟩ := h
+    rw [Sym.lin_den ha, Sym.lin_den hb]
+    have e₁ : ρ x + k₁ - (ρ x + k₂) = k₁ - k₂ := by bv_omega
+    have e₂ : ρ x + k₂ - (ρ x + k₁) = k₂ - k₁ := by bv_omega
+    unfold Fast.Disjoint at hd ⊢; rw [e₁, e₂]; exact hd
+  · simp at h
+
+theorem rdSkip_read {ρ : Nat → Word} {μ : Word → Byte} {a : Sym} {w : Nat} :
+    ∀ m : SMem, readLE ((rdSkip a w m).den ρ μ) (a.den ρ μ) w = readLE (m.den ρ μ) (a.den ρ μ) w
+  | .base => rfl
+  | .write m b v n => by
+    simp only [rdSkip]
+    split
+    · rename_i h
+      rw [rdSkip_read m, SMem.den, Fast.readLE_writeLE_of_disjoint (disj_sound h)]
+    · rfl
+
+theorem loadVal_congr {op : LdOp} {m m' : Word → Byte} {a : Word}
+    (h : readLE m a op.width = readLE m' a op.width) : loadVal op m a = loadVal op m' a := by
+  cases op <;> simp only [loadVal, read8, read16, read32, read64, LdOp.width] at h ⊢ <;> rw [h]
+
+theorem symLoad_den {ρ : Nat → Word} {μ : Word → Byte} (op : LdOp) (m : SMem) (a : Sym) :
+    (symLoad op m a).den ρ μ = loadVal op (m.den ρ μ) (a.den ρ μ) := by
+  unfold symLoad
+  split
+  · rename_i m' b v
+    split
+    · rename_i h
+      simp only [Bool.and_eq_true, Option.isSome_iff_exists, beq_iff_eq] at h
+      obtain ⟨⟨p, hp⟩, hab⟩ := h
+      have hb : b.lin = some p := hab ▸ hp
+      have e : a.den ρ μ = b.den ρ μ := by
+        obtain ⟨x, k⟩ := p; rw [Sym.lin_den hp, Sym.lin_den hb]
+      rw [SMem.den, e, loadVal, read64, Fast.readLE_writeLE_same (by decide)]
+      apply BitVec.eq_of_toNat_eq
+      have := (Sym.den ρ μ v).isLt
+      simp only [BitVec.toNat_ofNat]
+      omega
+    · rw [Sym.den]; exact loadVal_congr (rdSkip_read _)
+  · rw [Sym.den]; exact loadVal_congr (rdSkip_read _)
+
+/-- The symbolic memory after an `n`-byte store of `v` at `a`: it replaces a
+    write of the same range, moving past the disjoint writes above it, so a
+    memory holds at most one write per range it can tell apart. -/
+def symStore (a v : Sym) (n : Nat) : SMem → SMem
+  | .base => .write .base a v n
+  | .write m b w k =>
+    if a.lin.isSome && a.lin == b.lin && n == k then .write m a v n
+    else if disj a n b k then .write (symStore a v n m) b w k
+    else .write (.write m b w k) a v n
+
+theorem symStore_den {ρ : Nat → Word} {μ : Word → Byte} (a v : Sym) (n : Nat) :
+    ∀ m : SMem, (symStore a v n m).den ρ μ = writeLE (m.den ρ μ) (a.den ρ μ) (v.den ρ μ).toNat n
+  | .base => rfl
+  | .write m b w k => by
+    simp only [symStore]
+    split
+    · rename_i h
+      simp only [Bool.and_eq_true, Option.isSome_iff_exists, beq_iff_eq] at h
+      obtain ⟨⟨⟨⟨x, c⟩, hp⟩, hab⟩, rfl⟩ := h
+      have hb : b.lin = some (x, c) := hab ▸ hp
+      have e : b.den ρ μ = a.den ρ μ := by rw [Sym.lin_den hp, Sym.lin_den hb]
+      simp only [SMem.den, e, Fast.writeLE_overwrite]
+    · split
+      · rename_i _ h
+        simp only [SMem.den, symStore_den a v n m]
+        exact (Fast.writeLE_comm (disj_sound h)).symm
+      · rfl
+
 /-- A symbolic state: 32 register slots, the memory, a concrete pc. -/
 structure SState where
   regs : List Sym
@@ -106,10 +226,10 @@ def sstep (i : Instr) (S : SState) : Option (SState × List Ob) :=
     some ({ S.setReg rd (.rop op (S.reg rs1) (S.reg rs2)) with pc := S.pc + 4 }, [])
   | .load op rd rs1 off =>
     let a := addr S rs1 off
-    some ({ S.setReg rd (.load op S.mem a) with pc := S.pc + 4 }, [.aligned a op.width, .canRead a op.width])
+    some ({ S.setReg rd (symLoad op S.mem a) with pc := S.pc + 4 }, [.aligned a op.width, .canRead a op.width])
   | .store op rs1 rs2 off =>
     let a := addr S rs1 off
-    some ({ S with mem := .write S.mem a (S.reg rs2) op.width, pc := S.pc + 4 },
+    some ({ S with mem := symStore a (S.reg rs2) op.width S.mem, pc := S.pc + 4 },
       [.aligned a op.width, .canWrite a op.width])
   | _ => none
 
@@ -162,7 +282,7 @@ theorem sstep_sound {ρ : Nat → Word} {μ : Word → Byte} {P : Perm} {S S' : 
     have hcr := hob (.canRead (addr S rs1 off) op.width) (by simp)
     simp only [Ob.den, addr_den hr] at hal hcr
     refine ⟨(s.setReg rd (loadVal op s.mem (ea s rs1 off))).setPc (s.pc + 4), ?_, hcr,
-      upd _ _ _ (by simp [Sym.den, addr_den hr, hmem])⟩
+      upd _ _ _ (by rw [symLoad_den, addr_den hr, hmem])⟩
     simp only [exec, hal, ite_true]
   | store op rs1 rs2 off =>
     simp only [sstep, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
@@ -172,7 +292,7 @@ theorem sstep_sound {ρ : Nat → Word} {μ : Word → Byte} {P : Perm} {S S' : 
     refine ⟨(s.setMem (writeLE s.mem (ea s rs1 off) (s.reg rs2).toNat op.width)).setPc (s.pc + 4), ?_, hcw,
       ⟨hl, by simp [hpc], fun q => by simp [hr q, SState.reg], ?_⟩⟩
     · simp only [exec, hal, ite_true]
-    · simp [SMem.den, addr_den hr, hmem, hr rs2]
+    · simp [symStore_den, addr_den hr, hmem, hr rs2]
   | _ => simp [sstep] at h
 
 theorem exec_exit {i : Instr} {s s' : State} (h : exec i s = some s') : s'.exit = s.exit := by

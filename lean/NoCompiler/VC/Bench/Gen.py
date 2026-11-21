@@ -14,6 +14,29 @@ out = sys.argv[1]
 # Ob.check from the facts "a0 is 8-aligned" and "a0 starts a 16-byte writable region".
 # The `seg` form writes OUTDIR/SegN_K.lean: the memchk chain of N instructions as Code.ofSegs with
 # segments of K, and one theorem per segment (the segment's run, every obligation checked).
+# The `vcrun` form writes OUTDIR/VcRun{KIND}N_K.lean: N instructions (KIND add: addi a0,a0,1; KIND mem:
+# alternating ld a3,0(a0) and sd a3,8(a0)) as segments of K, one segVC theorem per segment closed by vc_run.
+if len(sys.argv) > 2 and sys.argv[2] == "vcrun":
+    os.makedirs(out, exist_ok=True)
+    kind, n, k = sys.argv[3], int(sys.argv[4]), int(sys.argv[5])
+    word = {"add": "fun _ => 0x00150513#32",
+            "mem": "fun i => if i % 2 = 0 then 0x00053683#32 else 0x00d53423#32"}[kind]
+    with open(os.path.join(out, f"VcRun{kind}{n}_{k}.lean"), "w") as f:
+        f.write(f"""import NoCompiler.VC.Tactic
+namespace NoCompiler.VC.M.Bench
+def seg : List (BitVec 32) := (List.range {k}).map ({word})
+def segs : List (List (BitVec 32)) := List.replicate {n // k} seg
+def D : Dom := [(0x10000#64, 4 * {n})]
+def facts : List Fact := [.aligned 10 8, .region 10 16 true]
+""")
+        for i in range(n // k):
+            f.write(f"""set_option maxRecDepth 200000 in
+theorem seg_{i} (ρ : Nat → Word) (μ : Word → Byte) : segVC ρ μ (fun _ => True) facts D (segs.getD {i} [])
+    (SState.init (0x10000#64 + BitVec.ofNat 64 {4 * k * i})) := by
+  unfold segVC; vc_run; exact ⟨by decide +kernel, fun _ _ _ => trivial⟩
+""")
+        f.write("end NoCompiler.VC.M.Bench\n")
+    sys.exit(0)
 if len(sys.argv) > 2 and sys.argv[2] == "seg":
     os.makedirs(out, exist_ok=True)
     n, k = int(sys.argv[3]), int(sys.argv[4])

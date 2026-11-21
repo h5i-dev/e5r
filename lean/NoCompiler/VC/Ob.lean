@@ -15,27 +15,6 @@ closed by `obs.all (Ob.check facts) = true`, evaluated by the kernel, and
 -/
 namespace NoCompiler.VC.M
 
-/-- An address as variable `n` plus constant `k`, when it is one. -/
-def Sym.lin : Sym → Option (Nat × Word)
-  | .var n => some (n, 0)
-  | .iop .addi a imm => (Sym.lin a).map fun p => (p.1, p.2 + imm)
-  | _ => none
-
-theorem Sym.lin_den {ρ : Nat → Word} {μ : Word → Byte} :
-    ∀ {a : Sym} {n : Nat} {k : Word}, a.lin = some (n, k) → a.den ρ μ = ρ n + k
-  | .var _, n, k, h => by
-    simp only [Sym.lin, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
-    simp [Sym.den]
-  | .iop op a imm, n, k, h => by
-    cases op <;> simp only [Sym.lin, reduceCtorEq] at h
-    cases ha : a.lin with
-    | none => rw [ha] at h; simp at h
-    | some p =>
-      rw [ha] at h; simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at h
-      obtain ⟨rfl, rfl⟩ := h
-      rw [Sym.den, Sym.lin_den ha]; simp [evalI]; bv_omega
-  | .const _, _, _, h | .rop .., _, _, h | .load .., _, _, h => by simp [Sym.lin] at h
-
 /-- What a precondition tells about the variables. -/
 inductive Fact
   /-- Variable `n` is `al`-aligned. -/
