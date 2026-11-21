@@ -1,7 +1,7 @@
 # Usage: python3 -I Art.py ELF WORKDIR [N] [suffix|drop]
 # The explore path's kernel cost on a real binary's largest functions, on its chunk image.
 #   1. `nocompiler export --format chunks` (NOCOMPILER, default target/release/nocompiler) of ELF;
-#   2. the image without its theorems (WORKDIR/ArtImg.lean), compiled once to an .olean;
+#   2. the image without its `_checked` theorems (WORKDIR/ArtImg.lean), compiled once to an .olean;
 #   3. for the N largest functions (default 20), by compiled evaluation: the stop points their paths
 #      reach (callee entries) and the starts (entry, loop heads, every return address after a call,
 #      to a fixed point), as nocompiler_auto's explore path runs them;
@@ -36,7 +36,9 @@ subprocess.run([nc, "export", "--namespace", "Art.T", "--format", "chunks", "-o"
 src = open(art).read()
 lines, out, i = src.split("\n"), [], 0
 while i < len(lines):
-    if lines[i].startswith("theorem "):
+    # The level checks go (685 of them do not fit one module); the chunk theorems stay
+    # (nocompiler_auto's explore path runs over a function's chunk through them).
+    if lines[i].startswith("theorem ") and "_checked :" in lines[i]:
         if out and out[-1].startswith("/--") and out[-1].rstrip().endswith("-/"):
             out.pop()
         i += 1
