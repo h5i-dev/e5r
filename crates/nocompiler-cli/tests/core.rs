@@ -23,7 +23,11 @@ fn cli_check_annotate_export() {
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
     for (name, module) in [("sum", "Sum"), ("hello", "Hello")] {
         let out = Command::new(exe)
-            .args(["export", "--lean-level-check", &format!("{root}/examples/elf/{name}.elf")])
+            .args([
+                "export",
+                "--lean-level-check",
+                &format!("{root}/examples/elf/{name}.elf"),
+            ])
             .args(["--namespace", &format!("Examples.{module}.Image")])
             .output()
             .unwrap();
@@ -44,7 +48,13 @@ fn cli_check_annotate_export() {
         ("examples/demo/elf/sum.b.elf", "SumBImage"),
     ] {
         let out = Command::new(exe)
-            .args(["export", "--lean-level-check", &format!("{root}/{elf}"), "--format", "chunks"])
+            .args([
+                "export",
+                "--lean-level-check",
+                &format!("{root}/{elf}"),
+                "--format",
+                "chunks",
+            ])
             .args(["--namespace", &format!("Examples.Chunks.{module}")])
             .output()
             .unwrap();
