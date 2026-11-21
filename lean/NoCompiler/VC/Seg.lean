@@ -182,4 +182,62 @@ theorem Reach.of_runSeg {ρ : Nat → Word} {μ : Word → Byte} {c : Code} {P :
       · simp at h
     · simp at h
 
+/-- Floyd's method on `Reach.loop`: an invariant at every cut point (`inv pc`)
+    and a measure (`μ pc`) that every path from one cut point to the next
+    decreases. With the loop heads as cut points, every path from the start or
+    from a cut point reaches the end (`Q`) or a cut point without passing
+    another. The postconditions are given as equations so that a proof can
+    keep them abstract while it runs. -/
+theorem _root_.NoCompiler.Reach.cutpoints {c : Code} {P : Perm} {D : Dom} {Q : State → Prop}
+    (inv : Word → State → Prop) (μ : Word → State → Nat) {s : State}
+    (start : ∀ R : State → Prop, R = (fun s' => Q s' ∨ inv s'.pc s') → Reach c P D R s)
+    (body : ∀ u, inv u.pc u → ∀ R : State → Prop,
+      R = (fun s' => Q s' ∨ (inv s'.pc s' ∧ μ s'.pc s' < μ u.pc u)) → Reach c P D R u) :
+    Reach c P D Q s :=
+  Reach.trans (start _ rfl) fun s' h => h.elim .done fun hi =>
+    Reach.loop (fun u => inv u.pc u) (fun u => μ u.pc u) (fun u hu => body u hu _ rfl) s' hi
+
+/-! ## Cut points (milestone 4c)
+
+At a cut point nothing is known symbolically: the segment from there runs from
+`SState.init`, whose variables are the state's registers (`ρOf`) and whose base
+memory is the state's memory. `segVC` is what one cut point's segment leaves to
+prove, and `Reach.of_segAt` is its soundness, so a function's proof is
+`Reach.cutpoints` with one `segVC` per cut point. -/
+
+/-- A state's registers as the variables of `SState.init`. -/
+def ρOf (s : State) (n : Nat) : Word := if h : n < 32 then s.reg ⟨n, h⟩ else 0
+
+theorem matches_init {s : State} {p : Word} (h : s.pc = p) :
+    Matches (ρOf s) s.mem (SState.init p) s := by
+  refine ⟨by simp [SState.init], h, fun r => ?_, by simp [SState.init, SMem.den]⟩
+  by_cases hr : r.val = 0
+  · have : r = 0 := Fin.ext hr
+    subst this; simp [SState.reg, Sym.den]
+  · simp [SState.reg, SState.init, hr, Sym.den, ρOf, r.isLt]
+
+/-- One cut point's verification condition: the segment's run, its obligations
+    checked from the facts, and what its successors must satisfy. -/
+def segVC (ρ : Nat → Word) (μ : Word → Byte) (Q : State → Prop) (facts : List Fact) (D : Dom)
+    (ws : List (BitVec 32)) (S : SState) : Prop :=
+  match runSeg D ws S with
+  | some (S', obs, t) => obs.all (Ob.check facts) = true ∧ t.Next ρ μ Q S'
+  | none => False
+
+theorem Reach.of_segAt {base : Word} {segs : List (List (BitVec 32))} {i : Nat} (hi : i < segs.length)
+    {P : Perm} {D : Dom} {Q : State → Prop} {facts : List Fact} {s : State}
+    (hpc : s.pc = base + BitVec.ofNat 64 (4 * segOffset segs i))
+    (hb : 4 * (segOffset segs i + segs[i].length) < 2 ^ 64) (hx : s.exit = none)
+    (hf : ∀ f ∈ facts, f.den (ρOf s) P)
+    (hvc : segVC (ρOf s) s.mem Q facts D segs[i]
+      (SState.init (base + BitVec.ofNat 64 (4 * segOffset segs i)))) :
+    Reach (Code.ofSegs base segs) P D Q s := by
+  unfold segVC at hvc
+  split at hvc
+  · rename_i S' obs t h
+    exact Reach.of_runSeg (rest := (segs.drop (i + 1)).flatten)
+      (by rw [ofSegs_drop, drop_flatten_get segs i hi]) hb rfl (matches_init hpc) hx h
+      (fun o ho => Ob.check_sound hf (List.all_eq_true.1 hvc.1 o ho)) hvc.2
+  · exact hvc.elim
+
 end NoCompiler.VC.M

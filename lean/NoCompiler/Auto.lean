@@ -6,6 +6,8 @@ import NoCompiler.VC.Straight
 import NoCompiler.VC.Mem
 import NoCompiler.VC.Ob
 import NoCompiler.VC.Seg
+import NoCompiler.VC.Tactic
+import NoCompiler.VC.Example
 
 /-
 Proof automation for structured code: `nocompiler_auto`.
@@ -77,22 +79,7 @@ cannot determine is left whole, for the proof to give them by name
 -/
 namespace NoCompiler
 
-/-! ## Cut points -/
-
-/-- Floyd's method on `Reach.loop`: an invariant at every cut point (`inv pc`)
-    and a measure (`μ pc`) that every path from one cut point to the next
-    decreases. With the loop heads as cut points, every path from the start or
-    from a cut point reaches the end (`Q`) or a cut point without passing
-    another. The postconditions are given as equations so that a proof can
-    keep them abstract while it runs. -/
-theorem Reach.cutpoints {c : Code} {P : Perm} {D : Dom} {Q : State → Prop}
-    (inv : Word → State → Prop) (μ : Word → State → Nat) {s : State}
-    (start : ∀ R : State → Prop, R = (fun s' => Q s' ∨ inv s'.pc s') → Reach c P D R s)
-    (body : ∀ u, inv u.pc u → ∀ R : State → Prop,
-      R = (fun s' => Q s' ∨ (inv s'.pc s' ∧ μ s'.pc s' < μ u.pc u)) → Reach c P D R u) :
-    Reach c P D Q s :=
-  Reach.trans (start _ rfl) fun s' h => h.elim .done fun hi =>
-    Reach.loop (fun u => inv u.pc u) (fun u => μ u.pc u) (fun u hu => body u hu _ rfl) s' hi
+/-! ## Cut points: `Reach.cutpoints` is in NoCompiler/VC/Seg.lean. -/
 
 /-- An aligned access goes ahead. -/
 theorem Reach.opt_aligned {c : Code} {P : Perm} {D : Dom} {Q : State → Prop} {a : Word} {w : Nat}
