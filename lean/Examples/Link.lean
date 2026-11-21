@@ -59,7 +59,7 @@ theorem sum_verified' : VerifiedImg Examples.Sum.Image.code
   rw [this]; exact Examples.Sum.sum_verified
 
 /-- `sum` is verified at every layout of the module. -/
-theorem sum_relocatable : Verified One.module "sum" Examples.Sum.spec :=
+theorem sum_relocatable : Verified One.module "sum" (fun _ => Examples.Sum.spec) :=
   Verified.of_leaf (f := sumF) sumF_mem rfl sumF_free (c₀ := Examples.Sum.Image.code)
     (e₀ := Examples.Sum.Image.sum_entry) (by decide) (by decide) sumF_words (by decide)
     spec_shiftInv sum_verified'
@@ -75,7 +75,8 @@ theorem sum_link2 : VerifiedImg (Two.module.link Two.layout) (Two.module.dom Two
   same_module ▸ sum_relocatable.img (by decide +kernel)
 
 /-- T6: linked with anything else, `sum` keeps its theorem. -/
-theorem sum_in_any_program (M' : Module) : Verified (One.module ++ M') "sum" Examples.Sum.spec :=
+theorem sum_in_any_program (M' : Module) :
+    Verified (One.module ++ M') "sum" (fun _ => Examples.Sum.spec) :=
   sum_relocatable.mono
 
 end Examples.Link

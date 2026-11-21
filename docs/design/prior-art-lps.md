@@ -339,3 +339,106 @@ ones are on 90 harnesses of 32 libraries.
      the binary's size).
    
    Measuring either needs a Rocq 9.2 + LPS build. We did not do it.
+
+---
+
+## Implementation plan (B, round2-next.md)
+
+**Files B owns** (round2-next.md):
+- `lean/NoCompiler/{Module,Relocate,Refine*}.lean`
+- `lean/Examples/**`
+- `docs/isa/{refine,ledger}.md`
+
+**Not mine, needed by step 2** (requested in STATUS-B, waiting for the lead):
+- `crates/nocompiler/src/treediff.rs` and `crates/nocompiler/tests/treediff.rs`.
+  The tree diff writes `theorem refines … : Refines …` into
+  `lean/Examples/Refine/Diff/*.lean`, and the test compares those files with
+  its output. Changing the statement therefore needs a one-line change in
+  the generator.
+- `lean/Audit.lean`: theorem names stay the same, so it needs no change.
+
+**Step 1: decision 2, a layout-dependent `Verified`** (Module.lean,
+Relocate.lean, Examples/Link.lean).
+
+```lean
+def Verified (M : Module) (f : Sym) (spec : Layout → Spec α) : Prop :=
+  ∀ L, M.Ok L → VerifiedImg (M.link L) (M.dom L f) (L.addr f) (spec L)
+```
+
+- A spec that mentions a data address writes `L.addr "table"`. A
+  layout-independent spec is `fun _ => sp`.
+- `Verified.of_leaf`: a leaf without relocations reads no symbol, so it
+  concludes `Verified M f.name (fun _ => sp)`.
+- `Verified.mono` is generic in `spec`.
+- Migrate `Examples/Link.lean` (`sum_relocatable`, `sum_in_any_program`).
+  Nothing else uses `Verified`:
+  `grep -rlw Verified lean --include=*.lean` gives Module, Relocate, Shift
+  (a comment only), Link and Audit (names only).
+- Then the first data-symbol theorem: a leaf that loads from a data symbol
+  through `auipc`/`ld` relocations. Its spec reads `L.addr d`, and it is
+  proved over every layout from one image. That needs a pcrel-data case of
+  `Verified.of_leaf`. This is a separate commit after step 1.
+
+**Step 2: decision 3, Refines carries a full proof that A runs**
+(Refine*.lean, Examples/Refine/**).
+
+```lean
+def ARuns (sp) (cA DA eA) : Prop :=          -- A runs safely and ends, for every entry sp allows
+  ∀ a s, Entry DA eA s → sp.pre a s → Exec cA (sp.perm a s) DA (fun _ => True) s
+def RefinesRel (sp) (cA DA eA cB DB eB) : Prop := …today's Refines…   -- conditional on A's run
+structure Refines (sp) (cA DA eA cB DB eB) : Prop where
+  runs : ARuns sp cA DA eA
+  rel  : RefinesRel sp cA DA eA cB DB eB
+theorem ARuns.of_verified : VerifiedImg cA DA eA sp → ARuns sp cA DA eA
+```
+
+- Today's `Refines` assumes `Exec cA …` as a premise, so it holds vacuously
+  for an A that never runs. Under the structure above, a `Refines` cannot
+  be stated without A's proof.
+- The proof methods produce `RefinesRel`:
+  - `of_sim`, `of_bigSim`, `of_lockstep`, `of_cert`;
+  - `nocompiler_refine` (RefineAuto.lean).
+- `Refines.of_cert (hA : ARuns …) …` and friends build the structure.
+- `Refines.refl` takes `ARuns`. `trans` and `verified` read `.runs`/`.rel`.
+- Every example's `refines` supplies `ARuns.of_verified sum_verified`
+  (Relink, Peephole, Jump, Diff).
+- The generated `refines` becomes
+  `theorem refines (sp) (hA : ARuns sp A…) : Refines sp A… B…`. That is the
+  generator change requested above.
+- Controls: a crashing A (an `ebreak`-like illegal word) has a `RefinesRel`
+  to anything, but `ARuns` for it is refuted by `decide` on its one step.
+- Audit (not mine): suggest that it reject any theorem whose conclusion is
+  `RefinesRel` in an `Examples.` namespace. Posted to STATUS for the lead
+  and the Audit owner.
+
+**Step 3: a written plan for porting the LPS environment model to Lean, with
+a first step.**
+- The plan doc is `docs/design/lps-port.md`, which needs the lead's OK as a
+  new file.
+- Scope order: process start state (stack, auxv), then `exit`/`write`/`read`
+  on fds as lists, then `brk`/`mmap` placement.
+- The first step: a Lean `SyscallEffect`-style record and the `exit_group`
+  and `write` cases, checked against LPS's Rocq text side by side.
+
+**Measured budget** (lake env lean per file, today, on this machine; command
+`for f in …; do time lake env lean $f; done`):
+
+| File | Time |
+| --- | --- |
+| Module.lean | 1.5 s |
+| Relocate.lean | 5.7 s |
+| Refine.lean | 1.2 s |
+| RefineLockstep.lean | 3.6 s |
+| Examples/Link.lean | 2.4 s |
+| Relink.lean | 3.7 s |
+| Peephole.lean | 4.0 s |
+| Diff.lean | 2.2 s |
+| Jump.lean | 3.2 s |
+
+Steps 1 and 2 may change each by at most +20 % (they add one argument or
+field, no new stepping). They are re-measured with the same command, and the
+numbers go in the commit message.
+
+**Chunks:** each step is one commit of at most a few hundred lines. Each
+lands on `next` only after `lake build`, the audit, `cargo test -p nocompiler
+-p nocompiler-cli`, fmt and clippy, with outputs in STATUS-B.md.

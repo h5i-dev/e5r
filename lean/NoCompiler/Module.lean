@@ -10,7 +10,8 @@ fields a relocation fills left zero, and the relocations) and data. A layout
 functions make at that layout, and `M.segments L` the data.
 
 `Verified M f spec` quantifies over every layout the module can be linked at
-(`M.Ok L`): the claim is still about the machine's `Exec` over the linked
+(`M.Ok L`), with a specification `spec : Layout → Spec α` that may name the
+layout's addresses (a function's data moves with the layout): the claim is still about the machine's `Exec` over the linked
 image, so the adequacy theorems apply at each layout unchanged. `link` is not
 trusted: `nocompiler-audit` evaluates it at the layout read from an ELF's
 symbol table and compares it with the ELF's bytes.
@@ -183,15 +184,19 @@ end Module
 
 /-! ## Verified, over every layout -/
 
-/-- `f` meets `spec` wherever the module is linked (docs/isa/v1.md): for every
-    layout `L` the module can be linked at, `f`'s code in the image `M.link L`,
-    entered at `L.addr f`, is `VerifiedImg` (NoCompiler/Spec.lean). -/
-def Verified {α : Type} (M : Module) (f : Sym) (spec : Spec α) : Prop :=
-  ∀ L, M.Ok L → VerifiedImg (M.link L) (M.dom L f) (L.addr f) spec
+/-- `f` meets `spec L` wherever the module is linked (docs/isa/v1.md): for
+    every layout `L` the module can be linked at, `f`'s code in the image
+    `M.link L`, entered at `L.addr f`, is `VerifiedImg` (NoCompiler/Spec.lean)
+    for the specification at that layout. The specification depends on the
+    layout because a function's data does: a spec about a table names it as
+    `L.addr "table"`. One that names no address is `fun _ => sp`. -/
+def Verified {α : Type} (M : Module) (f : Sym) (spec : Layout → Spec α) : Prop :=
+  ∀ L, M.Ok L → VerifiedImg (M.link L) (M.dom L f) (L.addr f) (spec L)
 
 /-- At one layout: the code-level statement, about that image. -/
-theorem Verified.img {α : Type} {M : Module} {f : Sym} {spec : Spec α} (h : Verified M f spec)
-    {L : Layout} (hL : M.Ok L) : VerifiedImg (M.link L) (M.dom L f) (L.addr f) spec :=
+theorem Verified.img {α : Type} {M : Module} {f : Sym} {spec : Layout → Spec α}
+    (h : Verified M f spec) {L : Layout} (hL : M.Ok L) :
+    VerifiedImg (M.link L) (M.dom L f) (L.addr f) (spec L) :=
   h L hL
 
 /-! ## Code that agrees on a region -/

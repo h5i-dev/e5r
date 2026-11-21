@@ -7,7 +7,7 @@ Relocatable proofs of leaf functions (docs/isa/v1.md, relocation).
 `Module.fetch_link`: at any layout the module can be linked at, the image
 `M.link L` holds `f`'s patched words from `L.addr f`. For a function without
 relocations those are its words, wherever it is; with `VerifiedImg.shift`
-(NoCompiler/Shift.lean) a proof of it at one image gives `Verified M f spec`,
+(NoCompiler/Shift.lean) a proof of it at one image gives `Verified M f (fun _ => spec)`,
 over every layout (`Verified.of_leaf`), provided it calls nothing, all its
 instructions are pcFree, and the specification does not look at the pc or
 `ra`. The proof is not redone: the same theorem, at every layout.
@@ -118,7 +118,7 @@ theorem Verified.of_leaf {α : Type} {M : Module} {f : RFunc} (hf : f ∈ M.func
       c₀.fetch (e₀ + BitVec.ofNat 64 (4 * i)) = some (f.words.getD i 0))
     (hlen : 4 * f.words.length < 2 ^ 64)
     {sp : Spec α} (hs : sp.ShiftInv) (hv : VerifiedImg c₀ [(e₀, 4 * f.words.length)] e₀ sp) :
-    Verified M f.name sp := by
+    Verified M f.name (fun _ => sp) := by
   intro L hL
   obtain ⟨hal, _⟩ := hL.funcs f hf
   have hcal : f.callees = [] := by simp [RFunc.callees, hrel]
@@ -284,7 +284,8 @@ end Module
 
 /-- T6 (docs/isa/v1.md): a theorem about a module holds in any module that
     extends it. -/
-theorem Verified.mono {α : Type} {M M' : Module} {f : Sym} {sp : Spec α} (h : Verified M f sp) :
+theorem Verified.mono {α : Type} {M M' : Module} {f : Sym} {sp : Layout → Spec α}
+    (h : Verified M f sp) :
     Verified (M ++ M') f sp := by
   intro L hL
   have h0 := h L hL.left

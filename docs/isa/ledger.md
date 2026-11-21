@@ -3,7 +3,8 @@
 A library of verified functions is useful only if a caller can find one by
 what it does and use it without regenerating it. The unit is the triple the
 review asked for: bytes, specification, proof. Since v1's proofs are about
-relocatable functions (`Verified M f spec`, [v1.md](v1.md)), the bytes are
+relocatable functions (`Verified M f spec`, with `spec : Layout → Spec α`,
+[v1.md](v1.md)), the bytes are
 the function's relocatable form, which is the same wherever it is linked.
 
 `nocompiler ledger FILE [--proofs TSV]` writes one JSON object per function
