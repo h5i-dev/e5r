@@ -71,6 +71,8 @@ jobs:
         run: lake exe nocompiler-audit
       - name: Audit controls (a new sorry, bv_decide or debug-option file is caught without editing a list)
         run: ./lean/AuditControls/run.sh
+      - name: Proof-checking cost per instruction on fixed proofs, against scripts/core/bench-budget.json
+        run: python3 -I scripts/core/bench-gate.py
       - run: cargo test -p nocompiler --no-fail-fast -- --nocapture
       # The core commands through the one binary (crates/nocompiler-cli).
       - run: cargo test -p nocompiler-cli --test core -- --nocapture

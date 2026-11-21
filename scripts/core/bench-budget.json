@@ -1,0 +1,18 @@
+{
+  "Demo/CobsB.lean": {
+    "kernel_ms_per_instr": 251.46,
+    "total_ms_per_instr": 2474.85
+  },
+  "Demo/Sum2B.lean": {
+    "kernel_ms_per_instr": 57.0,
+    "total_ms_per_instr": 1094.67
+  },
+  "Demo/SumB.lean": {
+    "kernel_ms_per_instr": 145.32,
+    "total_ms_per_instr": 1031.67
+  },
+  "Examples/Hello.lean": {
+    "kernel_ms_per_instr": 74.55,
+    "total_ms_per_instr": 777.69
+  }
+}

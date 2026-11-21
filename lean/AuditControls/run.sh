@@ -25,6 +25,12 @@ cp -r examples/elf "$work/root/examples/elf"
 mkdir -p "$work/root/examples/demo" && cp -r examples/demo/elf "$work/root/examples/demo/elf"
 L="$work/root/lean"
 fail=0
+# Every lake call runs under a memory cap (6 GB, no swap) where systemd-run
+# works (the shared development host); plain elsewhere (CI runners).
+if systemd-run --user --scope --quiet -p MemoryMax=64M true 2>/dev/null; then
+  lake() { systemd-run --user --scope --quiet -p MemoryMax=6G -p MemorySwapMax=0 \
+    --setenv=PATH="$PATH" ${ELAN_HOME:+--setenv=ELAN_HOME="$ELAN_HOME"} timeout 900 lake "$@"; }
+fi
 audit() { (cd "$L" && lake exe nocompiler-audit .. > "$work/out" 2>&1); }
 add() { printf '%s\n' "$2" > "$L/Examples/$1.lean"; }
 drop() { rm -f "$L/Examples/$1.lean"; rm -rf "$L/.lake/build/lib/lean/Examples/$1".*; }
