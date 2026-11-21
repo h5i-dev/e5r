@@ -442,3 +442,103 @@ numbers go in the commit message.
 **Chunks:** each step is one commit of at most a few hundred lines. Each
 lands on `next` only after `lake build`, the audit, `cargo test -p nocompiler
 -p nocompiler-cli`, fmt and clippy, with outputs in STATUS-B.md.
+
+---
+
+## Plan: porting the LPS environment model to Lean (step 3 of the plan above)
+
+**What there is to port.** All counts are from LPS d3f3a701:
+
+```
+find theories/LinuxProcessSem/<dir> -name '*.v' | xargs cat | wc -l
+grep -cE "^\s*\(\* [a-z_0-9]+ +\*\)"    # over Sys/SyscallTable.v's spec_table
+```
+
+- **Syscall surface:** 93 syscalls, one arm each in `spec_table`
+  (`theories/LinuxProcessSem/Sys/SyscallTable.v#L41`). It includes
+  accept…write, `brk`, `mmap`/`munmap`/`mremap`/`mprotect`, `openat`,
+  `read`/`write`/`readv`/`pwrite64`, `clone`, `futex`, signals, time,
+  sockets and `getrandom`.
+- **Syscall semantics:** `Sys/` is 37 files and 31,871 lines:
+  - Fs: 13,883;
+  - Kernel: 6,783;
+  - Mm: 5,110;
+  - Net: 3,241;
+  - Drivers: 151.
+- **Kernel and process state:** `State.v` is 10,888 lines.
+  - `SyscallInput` (#L654) and `SyscallEffect` (#L719) are the interface
+    between the machine and a syscall.
+  - `Model` (#L4885) holds the fd table, VMAs, I/O streams, fs, creds,
+    limits and time.
+- **Running:**
+  - `Run.v` (6,827 lines) has `apply_effect` (#L96-L226), the initial
+    state and the step relation;
+  - `StackLayout.v` (626) has argv/envp/auxv;
+  - `Vdso*.v` covers the vDSO.
+- **Conformance:** `Checks/` is 154 files and 99,491 lines.
+
+**What we have.** `lean/NoCompiler/Env.lean` defines `Sys : State → State →
+Prop` with `write` (fd-agnostic, any accepted length), `read`, and
+`exit`/`exit_group`. It has no fd table, no memory map, no process start
+state, and the trace has `write`/`read`/`exit` events (`Machine.lean#L22`).
+It is trusted (docs/isa/trust.md) and not in my file list.
+
+**Design: keep the trusted core, add a Linux layer beside it.**
+
+1. **Same interface as LPS.** A syscall is a relation from a
+   `SyscallInput` (a7, a0..a5, the readable and writable views of memory)
+   and the kernel state to a set of allowed outcomes. An outcome is a
+   `SyscallEffect`:
+   - the return value;
+   - writes;
+   - zero-filled, unmapped and copied ranges, kept symbolic as `(base,
+     size)`. LPS's comment at `State.v#L719ff` explains why: multi-megabyte
+     grants stay O(1) in proofs.
+   
+   `applyEffect` is deterministic. Porting it arm by arm keeps each Lean
+   definition next to its Rocq source, citing the same Linux v6.18.46 file
+   and function.
+2. **One state for the process.** It holds our `State` (machine) and a
+   `Kern` record (fd table as a list, VMAs, brk, I/O streams), as LPS does.
+   - Our existing `Sys` must become a theorem, not a definition: the Linux
+     layer, restricted to fds 0/1/2 and to `write`/`read`/`exit`, admits
+     exactly the transitions `Sys` admits.
+   - Every existing proof then stays valid, by that refinement.
+3. **Validation, not trust by translation.**
+   - LPS ships an extraction (`theories/Riscv/Extraction.v`) and its
+     `Checks/`.
+   - We would run the same syscall sequences through the Lean definitions
+     (`#eval`) and through LPS's extracted checker, and diff the outcome
+     sets. This uses the method our ISA semantics already uses against
+     qemu/Sail.
+4. **Cost.**
+   - Effects are applied once per syscall, symbolically, so a proof pays
+     per syscall, not per byte.
+   - The reflective VC generator (C) treats an `ecall` as a call into this
+     relation: per syscall arm, one lemma proved once.
+
+**Order** (each item is a chunk of at most a few hundred lines; what static
+musl binaries like OVP's need first):
+
+1. `SyscallEffect` and `applyEffect` (writes, zeros, unmaps), plus the
+   `write`/`read` arms on an fd table with 0/1/2, and `exit`/`exit_group`.
+   Then the theorem that this restriction is our `Sys`.
+2. The process start state: argv/envp/auxv on the stack, from
+   `StackLayout.v`.
+3. `brk`, `mmap`/`munmap` with Linux's placement (`Mm/`), and
+   `set_tid_address`, `rt_sigprocmask`, `ioctl(TIOCGWINSZ)`, `writev`: the
+   calls a static musl `main` makes before and after user code.
+4. `openat`/`close`/`fstat`/`read` over an in-memory file system (`Fs/`),
+   for the fuzz-driver shape `<file> FILE`.
+
+**First step (proposed, after the lead's OK on files).**
+- New files: `lean/NoCompiler/Linux/Effect.lean` and
+  `lean/NoCompiler/Linux/Basic.lean`. They are not in my list (R4 in
+  STATUS-B).
+- `Effect.lean`: `SyscallInput`, `SyscallEffect`, `applyEffect`, ported
+  from `State.v#L654-L726` and `Run.v#L96-L226`.
+- `Basic.lean`: `exit_group`, and `write`/`read` on fds 0/1/2.
+- The theorem `Linux.basic_iff_sys : Linux.Basic s s' ↔ Sys s s'` for
+  machine states whose fd table is the initial one.
+- Its budget: the `#eval` differential test against LPS's extraction for
+  the three arms, and `lake env lean` under 5 s per file.
