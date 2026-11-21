@@ -18,6 +18,11 @@ proof about `Sys` covers it.
 -/
 namespace NoCompiler.Linux
 
+/-- An open regular file (Linux/Fs.lean): its contents and the file offset. -/
+structure OpenFile where
+  data : List Byte
+  off : Nat
+
 /-- The kernel's state of the process, so far: its open descriptors. -/
 structure Kern where
   fds : List Word
@@ -29,6 +34,10 @@ structure Kern where
       heap `brk` grows, the pages `mmap` maps; `munmap` and a `brk` shrink cut
       them out again. -/
   maps : List (Word × Nat) := []
+  /-- The read-only in-memory file system (Linux/Fs.lean): path bytes (no NUL) and contents. -/
+  fs : List (List Byte × List Byte) := []
+  /-- The descriptors `openat` opened on files of `fs`, with their offsets. -/
+  files : List (Word × OpenFile) := []
 
 def Kern.init : Kern := { fds := [0, 1, 2] }
 

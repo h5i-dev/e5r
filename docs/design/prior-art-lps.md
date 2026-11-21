@@ -711,8 +711,8 @@ musl binaries like OVP's need first):
   - `munmap` cuts its page-rounded range out of every range
     (`unmapRanges`); EINVAL for an unaligned address or a zero length.
 - `unmap_gone`: after unmapping, no range covers an address in the hole.
-- `PStep.kern_eq`: instructions and the four `OldSys` calls leave `Kern`
-  alone.
+- `PStep.maps_eq`/`perm_eq` (was `kern_eq` before the ninth step):
+  instructions and the four `OldSys` calls leave the mapped ranges alone.
   - `PReach.of_reach` (a trusted run under `k.perm`) and `of_reach_le` (any
     spec whose permission is at most `k.perm`) carry proofs to the process.
   - The control is `load_unmapped_faults`.
@@ -720,3 +720,28 @@ musl binaries like OVP's need first):
   its stack frame, instead of all of memory.
 - Axioms: standard. lake env lean: Fd 1.6 s, Brk 1.5 s, Mmap 2.2 s,
   Process 2.1 s.
+
+### Ninth step: files (lean/NoCompiler/Linux/Fs.lean; item 4 of the order)
+
+For the fuzz-driver shape `prog FILE`: a read-only file system in memory
+(`Kern.fs`, path bytes to contents, given at the start) and the open files
+(`Kern.files`, descriptor to contents and offset).
+- `openat` (56): a NUL-terminated path of at most 4096 bytes, AT_FDCWD or
+  an absolute path, read-only flags (no O_CREAT, O_TRUNC, O_DIRECTORY).
+  A known path gets the lowest free descriptor (EMFILE from 1024 on); an
+  unknown one ENOENT. Anything else has no outcome.
+- `read` on a file descriptor: exactly the next `min n MAX_RW_COUNT` bytes,
+  the offset advanced. `fileRead_sys`: that is one of the reads `Sys`
+  allows, so `ProcStep5.sys` covers `read` too.
+- `fstat` (80): some 128-byte `struct stat` whose `st_size` is the file's
+  length; EBADF on a closed fd. `close` forgets the file.
+- Process.lean now steps `ecall` by `ProcStep5`. A file read changes
+  `Kern` (the offset), so `PStep.kern_eq` became `PStep.maps_eq`/`perm_eq`,
+  and `PReach.of_reach` is proved for every kernel state with the same
+  permission (`of_reach'`). Its statement is unchanged.
+- Examples and controls: `openat_in` (fd 3 on "in" in a fresh process),
+  `openat_missing` (ENOENT), `openat_write_none` (O_WRONLY has no outcome);
+  `lowestFree`, `OpenFile.chunk` and `cString` by `decide`.
+- Axioms: standard. lake env lean: Fs 2.6 s, Process 2.1 s.
+- Not modelled: `lseek`, `pread`, writable files, directories, `getdents`,
+  `newfstatat`; the other `struct stat` fields are left free.
