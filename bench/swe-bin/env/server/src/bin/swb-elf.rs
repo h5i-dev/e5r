@@ -39,7 +39,8 @@ fn run(args: &[String]) -> Result<String, String> {
 fn write_exe(path: &str, img: &[u8]) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
     std::fs::write(path, img).map_err(|e| format!("{path}: {e}"))?;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).map_err(|e| format!("{path}: {e}"))
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
+        .map_err(|e| format!("{path}: {e}"))
 }
 
 fn main() -> ExitCode {

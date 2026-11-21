@@ -15,7 +15,9 @@ enum Mode {
 }
 
 #[derive(Parser)]
-#[command(about = "Serve swe-bin (SWE-bench Multilingual C/Rust on riscv64 binaries) as an OpenEnv environment")]
+#[command(
+    about = "Serve swe-bin (SWE-bench Multilingual C/Rust on riscv64 binaries) as an OpenEnv environment"
+)]
 struct Args {
     #[command(flatten)]
     serve: senv::ServeArgs,
@@ -50,7 +52,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tasks_dir = a.bench.join("tasks");
     let dataset = a.swb.join("dl/cr.jsonl");
     let tasks = swe_bin_env::load_tasks(&tasks_dir, &a.swb, &dataset)?;
-    eprintln!("swe-bin: {} kept tasks from {}", tasks.len(), tasks_dir.display());
+    eprintln!(
+        "swe-bin: {} kept tasks from {}",
+        tasks.len(),
+        tasks_dir.display()
+    );
     std::fs::create_dir_all(&a.episodes)?;
     swe_bin_env::configure(swe_bin_env::Config {
         harness: a.bench.join("convert/harness.py"),

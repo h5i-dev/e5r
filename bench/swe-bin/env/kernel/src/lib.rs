@@ -377,12 +377,27 @@ mod tests {
 
     #[test]
     fn the_bonus_needs_the_modes_proof() {
-        for (mode, kind) in [(Mode::Patch, ProofKind::Refines), (Mode::Scratch, ProofKind::Verified)] {
+        for (mode, kind) in [
+            (Mode::Patch, ProofKind::Refines),
+            (Mode::Scratch, ProofKind::Verified),
+        ] {
             let s = run(&started(mode), tests(1, 2, 3)).unwrap();
-            let good = run(&run(&s, proof(1, kind, true)).unwrap(), Command::Submit { binary: h(1) }).unwrap();
+            let good = run(
+                &run(&s, proof(1, kind, true)).unwrap(),
+                Command::Submit { binary: h(1) },
+            )
+            .unwrap();
             assert_eq!(good.reward_milli, FULL_MILLI + BONUS_MILLI);
-            let other = if kind == ProofKind::Refines { ProofKind::Verified } else { ProofKind::Refines };
-            for c in [proof(1, other, true), proof(1, kind, false), proof(2, kind, true)] {
+            let other = if kind == ProofKind::Refines {
+                ProofKind::Verified
+            } else {
+                ProofKind::Refines
+            };
+            for c in [
+                proof(1, other, true),
+                proof(1, kind, false),
+                proof(2, kind, true),
+            ] {
                 let r = run(&run(&s, c).unwrap(), Command::Submit { binary: h(1) }).unwrap();
                 assert_eq!(r.reward_milli, FULL_MILLI);
             }
@@ -400,7 +415,11 @@ mod tests {
     fn done_is_final() {
         let s = run(&started(Mode::Scratch), Command::Submit { binary: h(1) }).unwrap();
         assert!(s.done);
-        for c in [tests(1, 2, 3), proof(1, ProofKind::Verified, true), Command::Submit { binary: h(1) }] {
+        for c in [
+            tests(1, 2, 3),
+            proof(1, ProofKind::Verified, true),
+            Command::Submit { binary: h(1) },
+        ] {
             assert_eq!(run(&s, c), Err(Error::Done));
         }
     }
@@ -408,13 +427,19 @@ mod tests {
     #[test]
     fn reports_need_a_started_episode_and_sane_counts() {
         assert_eq!(run(&initial(), tests(1, 0, 0)), Err(Error::NotStarted));
-        assert_eq!(run(&started(Mode::Patch), tests(1, 3, 0)), Err(Error::InvalidReport));
+        assert_eq!(
+            run(&started(Mode::Patch), tests(1, 3, 0)),
+            Err(Error::InvalidReport)
+        );
         let bad = Task {
             id: 1,
             mode: Mode::Patch,
             f2p: 0,
             p2p: 0,
         };
-        assert_eq!(run(&initial(), Command::Reset { task: bad }), Err(Error::InvalidTask));
+        assert_eq!(
+            run(&initial(), Command::Reset { task: bad }),
+            Err(Error::InvalidTask)
+        );
     }
 }

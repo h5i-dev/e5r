@@ -31,8 +31,16 @@ pub fn episode_path(dir: &Path, name: &str) -> Result<PathBuf, String> {
     let ok = !name.is_empty()
         && name.len() <= 128
         && !name.starts_with('.')
-        && name.chars().all(|c| c.is_ascii_alphanumeric() || "._-+".contains(c));
-    if ok { Ok(dir.join(name)) } else { Err(format!("{name:?}: file names are plain names in the episode directory")) }
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "._-+".contains(c));
+    if ok {
+        Ok(dir.join(name))
+    } else {
+        Err(format!(
+            "{name:?}: file names are plain names in the episode directory"
+        ))
+    }
 }
 
 pub fn list(dir: &Path) -> Value {
@@ -53,7 +61,13 @@ pub fn list(dir: &Path) -> Value {
 }
 
 /// Run `prog args` in `cwd` with a time limit; stdout and stderr, each cut at `max` bytes.
-pub fn run(prog: &Path, args: &[String], cwd: &Path, timeout: Duration, max: usize) -> Result<(i32, String), String> {
+pub fn run(
+    prog: &Path,
+    args: &[String],
+    cwd: &Path,
+    timeout: Duration,
+    max: usize,
+) -> Result<(i32, String), String> {
     let mut child = Command::new(prog)
         .args(args)
         .current_dir(cwd)
@@ -82,8 +96,18 @@ pub fn run(prog: &Path, args: &[String], cwd: &Path, timeout: Duration, max: usi
             buf
         })
     };
-    let out = take(child.stdout.take().map(|x| Box::new(x) as Box<dyn Read + Send>));
-    let err = take(child.stderr.take().map(|x| Box::new(x) as Box<dyn Read + Send>));
+    let out = take(
+        child
+            .stdout
+            .take()
+            .map(|x| Box::new(x) as Box<dyn Read + Send>),
+    );
+    let err = take(
+        child
+            .stderr
+            .take()
+            .map(|x| Box::new(x) as Box<dyn Read + Send>),
+    );
     let start = Instant::now();
     let status = loop {
         match child.try_wait() {
@@ -114,20 +138,28 @@ pub fn run(prog: &Path, args: &[String], cwd: &Path, timeout: Duration, max: usi
 
 /// The converter's harness (convert/harness.py): JSON with the test results.
 pub fn harness(cfg: &Config, task: &str, elfs: &[PathBuf], which: &str) -> Value {
-    let mut args = vec![cfg.harness.to_string_lossy().into_owned(), "run".into(), task.into()];
+    let mut args = vec![
+        cfg.harness.to_string_lossy().into_owned(),
+        "run".into(),
+        task.into(),
+    ];
     args.extend(elfs.iter().map(|p| p.to_string_lossy().into_owned()));
     args.push(format!("--which={which}"));
     match run(&cfg.python, &args, &cfg.swb, cfg.test_timeout, 1 << 22) {
         Ok((_, out)) => {
             let line = out.lines().find(|l| l.starts_with('{')).unwrap_or("");
-            serde_json::from_str(line).unwrap_or_else(|_| json!({ "error": out.chars().take(2000).collect::<String>() }))
+            serde_json::from_str(line)
+                .unwrap_or_else(|_| json!({ "error": out.chars().take(2000).collect::<String>() }))
         }
         Err(e) => json!({ "error": e }),
     }
 }
 
 fn s(args: &Map<String, Value>, k: &str) -> Result<String, String> {
-    args.get(k).and_then(Value::as_str).map(String::from).ok_or(format!("missing string argument {k:?}"))
+    args.get(k)
+        .and_then(Value::as_str)
+        .map(String::from)
+        .ok_or(format!("missing string argument {k:?}"))
 }
 
 fn opt(args: &Map<String, Value>, k: &str) -> Option<String> {
@@ -146,36 +178,148 @@ fn schema(props: &[(&str, &str)], required: &[&str]) -> Value {
 pub fn specs() -> Vec<(&'static str, &'static str, Value)> {
     let file = ("file", "a file in the episode directory");
     vec![
-        ("list_files", "The files of the episode directory.", schema(&[], &[])),
-        ("read_file", "Read a text file (ISSUE.md, structured text, notes).", schema(&[file], &["file"])),
-        ("write_file", "Write a text file (.s .lean .txt .md .json .patch).", schema(&[file, ("content", "the text")], &["file", "content"])),
-        ("copy_file", "Copy a file (for example a binary before editing it).", schema(&[("from", "source"), ("to", "destination")], &["from", "to"])),
-        ("disasm", "nocompiler disasm: a function (or `all`) as structured text, which `asm` reads back.", schema(&[file, ("target", "a symbol, an address, or `all`")], &["file"])),
-        ("asm", "nocompiler asm: structured text to a relocatable object.", schema(&[file, ("out", "the object to write (.o)")], &["file", "out"])),
-        ("link", "Link an object from `asm` into a binary: its functions replace the binary's functions of the same name (calls go to the new code); new functions are added.", schema(&[("binary", "the binary"), ("object", "the object"), ("out", "the binary to write")], &["binary", "object", "out"])),
-        ("check", "nocompiler check: every function against the profile.", schema(&[file], &["file"])),
-        ("funcs", "nocompiler funcs: the recovered functions.", schema(&[file], &["file"])),
+        (
+            "list_files",
+            "The files of the episode directory.",
+            schema(&[], &[]),
+        ),
+        (
+            "read_file",
+            "Read a text file (ISSUE.md, structured text, notes).",
+            schema(&[file], &["file"]),
+        ),
+        (
+            "write_file",
+            "Write a text file (.s .lean .txt .md .json .patch).",
+            schema(&[file, ("content", "the text")], &["file", "content"]),
+        ),
+        (
+            "copy_file",
+            "Copy a file (for example a binary before editing it).",
+            schema(
+                &[("from", "source"), ("to", "destination")],
+                &["from", "to"],
+            ),
+        ),
+        (
+            "disasm",
+            "nocompiler disasm: a function (or `all`) as structured text, which `asm` reads back.",
+            schema(
+                &[file, ("target", "a symbol, an address, or `all`")],
+                &["file"],
+            ),
+        ),
+        (
+            "asm",
+            "nocompiler asm: structured text to a relocatable object.",
+            schema(
+                &[file, ("out", "the object to write (.o)")],
+                &["file", "out"],
+            ),
+        ),
+        (
+            "link",
+            "Link an object from `asm` into a binary: its functions replace the binary's functions of the same name (calls go to the new code); new functions are added.",
+            schema(
+                &[
+                    ("binary", "the binary"),
+                    ("object", "the object"),
+                    ("out", "the binary to write"),
+                ],
+                &["binary", "object", "out"],
+            ),
+        ),
+        (
+            "check",
+            "nocompiler check: every function against the profile.",
+            schema(&[file], &["file"]),
+        ),
+        (
+            "funcs",
+            "nocompiler funcs: the recovered functions.",
+            schema(&[file], &["file"]),
+        ),
         ("symbols", "nocompiler symbols.", schema(&[file], &["file"])),
-        ("sections", "nocompiler sections.", schema(&[file], &["file"])),
+        (
+            "sections",
+            "nocompiler sections.",
+            schema(&[file], &["file"]),
+        ),
         ("info", "nocompiler info.", schema(&[file], &["file"])),
         ("strings", "nocompiler strings.", schema(&[file], &["file"])),
         ("stats", "nocompiler stats.", schema(&[file], &["file"])),
-        ("xrefs", "nocompiler xrefs: references to or from an address or symbol.", schema(&[file, ("target", "address or symbol")], &["file", "target"])),
-        ("decompile", "nocompiler decompile: a function as pseudo-C (read only; nothing compiles it).", schema(&[file, ("target", "the function")], &["file", "target"])),
-        ("diff", "nocompiler diff: which functions changed between two binaries.", schema(&[file, ("other", "the other binary")], &["file", "other"])),
-        ("refine", "nocompiler refine: block/loop tree diff of a function in two binaries.", schema(&[file, ("other", "the other binary"), ("target", "the function")], &["file", "other", "target"])),
-        ("emulate", "nocompiler emulate: run a function in the interpreter.", schema(&[file, ("target", "the function")], &["file", "target"])),
-        ("run_tests", "Run the tests against the current binaries under qemu. Patch mode: the PASS_TO_PASS tests only (the issue's tests are hidden, as in SWE-bench). Scratch mode: all of them.", schema(&[("files", "comma-separated binaries, one per subject (default: the starting names)")], &[])),
-        ("check_proof", "Check a Lean proof for the bonus.", schema(&[file], &["file"])),
+        (
+            "xrefs",
+            "nocompiler xrefs: references to or from an address or symbol.",
+            schema(
+                &[file, ("target", "address or symbol")],
+                &["file", "target"],
+            ),
+        ),
+        (
+            "decompile",
+            "nocompiler decompile: a function as pseudo-C (read only; nothing compiles it).",
+            schema(&[file, ("target", "the function")], &["file", "target"]),
+        ),
+        (
+            "diff",
+            "nocompiler diff: which functions changed between two binaries.",
+            schema(&[file, ("other", "the other binary")], &["file", "other"]),
+        ),
+        (
+            "refine",
+            "nocompiler refine: block/loop tree diff of a function in two binaries.",
+            schema(
+                &[
+                    file,
+                    ("other", "the other binary"),
+                    ("target", "the function"),
+                ],
+                &["file", "other", "target"],
+            ),
+        ),
+        (
+            "emulate",
+            "nocompiler emulate: run a function in the interpreter.",
+            schema(&[file, ("target", "the function")], &["file", "target"]),
+        ),
+        (
+            "run_tests",
+            "Run the tests against the current binaries under qemu. Patch mode: the PASS_TO_PASS tests only (the issue's tests are hidden, as in SWE-bench). Scratch mode: all of them.",
+            schema(
+                &[(
+                    "files",
+                    "comma-separated binaries, one per subject (default: the starting names)",
+                )],
+                &[],
+            ),
+        ),
+        (
+            "check_proof",
+            "Check a Lean proof for the bonus.",
+            schema(&[file], &["file"]),
+        ),
     ]
 }
 
 fn nc(cfg: &Config, dir: &Path, args: Vec<String>) -> Result<Value, String> {
-    let (code, out) = run(&cfg.nocompiler, &args, dir, cfg.tool_timeout, cfg.max_output)?;
+    let (code, out) = run(
+        &cfg.nocompiler,
+        &args,
+        dir,
+        cfg.tool_timeout,
+        cfg.max_output,
+    )?;
     Ok(json!({ "exit": code, "output": out }))
 }
 
-pub fn call(cfg: &Config, task: &TaskInfo, dir: &Path, name: &str, a: &Map<String, Value>) -> Result<Value, String> {
+pub fn call(
+    cfg: &Config,
+    task: &TaskInfo,
+    dir: &Path,
+    name: &str,
+    a: &Map<String, Value>,
+) -> Result<Value, String> {
     let f = |k: &str| -> Result<String, String> {
         let n = s(a, k)?;
         episode_path(dir, &n)?;

@@ -48,7 +48,7 @@ def kept_tasks():
     for n in names:
         with open(os.path.join(BENCH, "tasks", n)) as fh:
             j = json.load(fh)
-        if j["status"] == "kept":
+        if j.get("status") == "kept":  # notes.json has none
             out.append(j)
     return out
 

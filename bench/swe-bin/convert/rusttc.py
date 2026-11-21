@@ -24,9 +24,10 @@ CARGO_HOME = "/mnt/scratch/ec2-user/cargo"
 TARGET = "riscv64imafd-unknown-linux-musl"
 # the current nightly: for repositories without a Cargo.lock (recipes.RustProgram.toolchain)
 LOCK_TOOLCHAIN = "nightly-2026-11-01"
-# std's own libc has riscv64 musl from early 2022 (std of nightly-2021-10 does not build for the
-# target: 709 errors in libc 0.2.106, sharkdp__bat-1892). Older commits get this nightly.
-FLOOR = dt.date(2022, 3, 1)
+# Older std does not build for the target: nightly-2021-10's libc 0.2.106 has no riscv64 musl
+# (709 errors), and nightly-2022-03-01's std uses SYS_clone3, which its libc does not define
+# for riscv64 musl (sharkdp__bat-1892). nightly-2022-11-04 builds (sharkdp__bat-2393).
+FLOOR = dt.date(2022, 11, 1)
 
 
 def _env():

@@ -123,7 +123,10 @@ pub struct Elf {
 }
 
 fn cstr(b: &[u8], off: usize) -> String {
-    let end = b[off.min(b.len())..].iter().position(|&c| c == 0).map_or(b.len(), |p| off + p);
+    let end = b[off.min(b.len())..]
+        .iter()
+        .position(|&c| c == 0)
+        .map_or(b.len(), |p| off + p);
     String::from_utf8_lossy(&b[off.min(b.len())..end]).into_owned()
 }
 
@@ -179,7 +182,16 @@ impl Elf {
             }
         }
         let symtab = shdrs.iter().position(|s| s.sh_type == SHT_SYMTAB);
-        Ok(Elf { data, e_type, machine, flags, phdrs, shdrs, phoff, symtab })
+        Ok(Elf {
+            data,
+            e_type,
+            machine,
+            flags,
+            phdrs,
+            shdrs,
+            phoff,
+            symtab,
+        })
     }
 
     pub fn section(&self, i: usize) -> Result<&[u8], Error> {
@@ -187,14 +199,19 @@ impl Elf {
         if s.sh_type == SHT_NOBITS {
             return Ok(&[]);
         }
-        match self.data.get(s.offset as usize..(s.offset + s.size) as usize) {
+        match self
+            .data
+            .get(s.offset as usize..(s.offset + s.size) as usize)
+        {
             Some(b) => Ok(b),
             None => err(format!("section {} outside the file", s.name)),
         }
     }
 
     pub fn symbols(&self) -> Result<Vec<Sym>, Error> {
-        let Some(i) = self.symtab else { return Ok(Vec::new()) };
+        let Some(i) = self.symtab else {
+            return Ok(Vec::new());
+        };
         let st = &self.shdrs[i];
         let strs = self.section(st.link as usize)?.to_vec();
         let b = self.section(i)?;
@@ -220,7 +237,12 @@ impl Elf {
         for k in 0..(b.len() / 24) {
             let o = k * 24;
             let info = rd(b, o + 8, 8)?;
-            out.push((rd(b, o, 8)?, (info & 0xffff_ffff) as u32, (info >> 32) as usize, rd(b, o + 16, 8)? as i64));
+            out.push((
+                rd(b, o, 8)?,
+                (info & 0xffff_ffff) as u32,
+                (info >> 32) as usize,
+                rd(b, o + 16, 8)? as i64,
+            ));
         }
         Ok(out)
     }
@@ -240,7 +262,10 @@ impl Elf {
 pub fn check_submission(data: &[u8]) -> Result<(), Error> {
     let e = Elf::parse(data.to_vec())?;
     if e.machine != EM_RISCV {
-        return err(format!("e_machine is {}, not RISC-V ({EM_RISCV})", e.machine));
+        return err(format!(
+            "e_machine is {}, not RISC-V ({EM_RISCV})",
+            e.machine
+        ));
     }
     if e.e_type != 2 {
         return err(format!("e_type is {}, not an executable (2)", e.e_type));
@@ -334,12 +359,21 @@ pub fn link(bin: &[u8], obj: &[u8]) -> Result<(Vec<u8>, LinkReport), Error> {
     let (seg_va, old_seg): (u64, Vec<u8>) = match swb_sec {
         Some(i) => (b.shdrs[i].addr, b.section(i)?.to_vec()),
         None => {
-            let end = b.phdrs.iter().filter(|p| p.p_type == PT_LOAD).map(|p| p.vaddr + p.memsz).max().unwrap_or(0);
+            let end = b
+                .phdrs
+                .iter()
+                .filter(|p| p.p_type == PT_LOAD)
+                .map(|p| p.vaddr + p.memsz)
+                .max()
+                .unwrap_or(0);
             (align_up(end, PAGE) + PAGE, Vec::new())
         }
     };
     let ph_idx = match swb_sec {
-        Some(_) => b.phdrs.iter().position(|p| p.p_type == PT_LOAD && p.vaddr == seg_va),
+        Some(_) => b
+            .phdrs
+            .iter()
+            .position(|p| p.p_type == PT_LOAD && p.vaddr == seg_va),
         None => b.phdrs.iter().position(|p| p.p_type == PT_GNU_STACK),
     };
     let Some(ph_idx) = ph_idx else {
@@ -360,7 +394,10 @@ pub fn link(bin: &[u8], obj: &[u8]) -> Result<(Vec<u8>, LinkReport), Error> {
         } else {
             seg.extend_from_slice(o.section(i)?);
         }
-        placed.push(Placed { sec: i, addr: seg_va + off });
+        placed.push(Placed {
+            sec: i,
+            addr: seg_va + off,
+        });
     }
     let sec_addr = |i: usize| placed.iter().find(|p| p.sec == i).map(|p| p.addr);
 
@@ -375,7 +412,10 @@ pub fn link(bin: &[u8], obj: &[u8]) -> Result<(Vec<u8>, LinkReport), Error> {
         let s = &osyms[k];
         if s.shndx != 0 && s.shndx < 0xff00 {
             let Some(a) = sec_addr(s.shndx as usize) else {
-                return err(format!("symbol {} is in a section that is not loaded", s.name));
+                return err(format!(
+                    "symbol {} is in a section that is not loaded",
+                    s.name
+                ));
             };
             return Ok(a + s.value);
         }
@@ -384,9 +424,18 @@ pub fn link(bin: &[u8], obj: &[u8]) -> Result<(Vec<u8>, LinkReport), Error> {
         }
         match by_name_b.get(s.name.as_str()).map(|v| v.as_slice()) {
             Some([one]) => Ok(one.value),
-            Some(many) => match many.iter().filter(|x| x.is_global()).collect::<Vec<_>>().as_slice() {
+            Some(many) => match many
+                .iter()
+                .filter(|x| x.is_global())
+                .collect::<Vec<_>>()
+                .as_slice()
+            {
                 [g] => Ok(g.value),
-                _ => err(format!("symbol {} is defined {} times in the binary", s.name, many.len())),
+                _ => err(format!(
+                    "symbol {} is defined {} times in the binary",
+                    s.name,
+                    many.len()
+                )),
             },
             None => err(format!("undefined symbol {}", s.name)),
         }
@@ -471,7 +520,9 @@ pub fn link(bin: &[u8], obj: &[u8]) -> Result<(Vec<u8>, LinkReport), Error> {
         if !s.is_func() || !s.is_global() || s.shndx == 0 || s.shndx >= 0xff00 {
             continue;
         }
-        let Some(a) = sec_addr(s.shndx as usize) else { continue };
+        let Some(a) = sec_addr(s.shndx as usize) else {
+            continue;
+        };
         let addr = a + s.value;
         let size = if s.size > 0 {
             s.size
@@ -485,13 +536,17 @@ pub fn link(bin: &[u8], obj: &[u8]) -> Result<(Vec<u8>, LinkReport), Error> {
                 .unwrap_or(o.shdrs[s.shndx as usize].size);
             next - s.value
         };
-        let olds: Vec<usize> =
-            (0..new_syms.len()).filter(|&k| new_syms[k].is_func() && new_syms[k].name == s.name).collect();
+        let olds: Vec<usize> = (0..new_syms.len())
+            .filter(|&k| new_syms[k].is_func() && new_syms[k].name == s.name)
+            .collect();
         match olds.as_slice() {
             [k] => {
                 let f = new_syms[*k].clone();
                 if f.size < 8 {
-                    return err(format!("{} is {} bytes: too small for the 8-byte jump", f.name, f.size));
+                    return err(format!(
+                        "{} is {} bytes: too small for the 8-byte jump",
+                        f.name, f.size
+                    ));
                 }
                 let j = far_jump(f.value, addr);
                 if seg_va <= f.value && f.value + 8 <= seg_va + old_seg.len() as u64 {
@@ -522,19 +577,32 @@ pub fn link(bin: &[u8], obj: &[u8]) -> Result<(Vec<u8>, LinkReport), Error> {
                 });
                 added.push(s.name.clone());
             }
-            _ => return err(format!("{} names {} functions in the binary", s.name, olds.len())),
+            _ => {
+                return err(format!(
+                    "{} names {} functions in the binary",
+                    s.name,
+                    olds.len()
+                ));
+            }
         }
     }
 
     let image = rebuild(&b, &mut out, seg_va, &seg, ph_idx, swb_sec, &new_syms)?;
-    Ok((image, LinkReport { segment: (seg_va, seg.len() as u64), replaced, added }))
+    Ok((
+        image,
+        LinkReport {
+            segment: (seg_va, seg.len() as u64),
+            replaced,
+            added,
+        },
+    ))
 }
 
 /// Write the binary: alloc contents unchanged at their offsets (`out`), then the segment, then
 /// every non-alloc section, then the section headers.
 fn rebuild(
     b: &Elf,
-    out: &mut Vec<u8>,
+    out: &mut [u8],
     seg_va: u64,
     seg: &[u8],
     ph_idx: usize,
@@ -542,13 +610,23 @@ fn rebuild(
     syms: &[Sym],
 ) -> Result<Vec<u8>, Error> {
     // the end of everything loaded
-    let mut end = b.phdrs.iter().filter(|p| p.p_type == PT_LOAD).map(|p| p.offset + p.filesz).max().unwrap_or(0);
+    let mut end = b
+        .phdrs
+        .iter()
+        .filter(|p| p.p_type == PT_LOAD)
+        .map(|p| p.offset + p.filesz)
+        .max()
+        .unwrap_or(0);
     end = end.max(b.phoff + 56 * b.phdrs.len() as u64);
     if let Some(i) = swb_sec {
         // the old segment is replaced: anything loaded before it stays
-        end = b.phdrs.iter()
+        end = b
+            .phdrs
+            .iter()
             .filter(|p| p.p_type == PT_LOAD && p.vaddr != b.shdrs[i].addr)
-            .map(|p| p.offset + p.filesz).max().unwrap_or(0);
+            .map(|p| p.offset + p.filesz)
+            .max()
+            .unwrap_or(0);
     }
     let mut img: Vec<u8> = out[..end as usize].to_vec();
     // segment: file offset congruent to its address modulo the page size
@@ -635,7 +713,10 @@ fn rebuild(
         s.size = content.len() as u64;
         if Some(i) == sym_i {
             // sh_info: one past the last local symbol
-            let last_local = syms.iter().rposition(|x| !x.is_global()).map_or(0, |p| p + 1);
+            let last_local = syms
+                .iter()
+                .rposition(|x| !x.is_global())
+                .map_or(0, |p| p + 1);
             s.info = last_local as u32;
         }
     }
@@ -647,7 +728,9 @@ fn rebuild(
         if ph.p_type == PT_LOAD || k == ph_idx {
             continue;
         }
-        if let Some(i) = b.shdrs.iter().position(|x| x.flags & SHF_ALLOC == 0 && x.sh_type != 0 && x.offset == ph.offset && ph.filesz > 0) {
+        if let Some(i) = b.shdrs.iter().position(|x| {
+            x.flags & SHF_ALLOC == 0 && x.sh_type != 0 && x.offset == ph.offset && ph.filesz > 0
+        }) {
             wr(&mut img, b.phoff as usize + k * 56 + 8, 8, shdrs[i].offset)?;
         }
     }
@@ -725,7 +808,9 @@ pub fn isolate(bin: &[u8], keep: &str) -> Result<Vec<u8>, Error> {
         if !s.is_func() || s.name == keep || s.size < 4 {
             continue;
         }
-        let Some(fo) = b.file_offset(s.value, s.size) else { continue };
+        let Some(fo) = b.file_offset(s.value, s.size) else {
+            continue;
+        };
         for k in 0..(s.size / 4) as usize {
             wr(&mut out, fo + 4 * k, 4, 0x0000_8067)?;
         }
@@ -744,13 +829,33 @@ pub fn isolate(bin: &[u8], keep: &str) -> Result<Vec<u8>, Error> {
 pub fn extract(bin: &[u8], names: &[String]) -> Result<Vec<u8>, Error> {
     let b = Elf::parse(bin.to_vec())?;
     let syms = b.symbols()?;
-    let mut named: Vec<&Sym> = syms.iter().filter(|s| !s.name.is_empty() && s.shndx != 0 && s.shndx < 0xff00
-        && s.info & 0xf != 4 && !s.name.starts_with(".L") && !s.name.starts_with('$')).collect();
+    let mut named: Vec<&Sym> = syms
+        .iter()
+        .filter(|s| {
+            !s.name.is_empty()
+                && s.shndx != 0
+                && s.shndx < 0xff00
+                && s.info & 0xf != 4
+                && !s.name.starts_with(".L")
+                && !s.name.starts_with('$')
+        })
+        .collect();
     named.sort_by_key(|s| s.value);
     // anonymous constants (`.L.str.N`, rustc's `anon.<hash>.N`): copied into the object
-    let is_anon = |n: &str| n.starts_with(".L") || n.starts_with("anon.") || n.starts_with("alloc_");
-    let anon: Vec<&Sym> = syms.iter().filter(|s| s.size > 0 && s.shndx != 0 && s.shndx < 0xff00
-        && is_anon(&s.name) && b.shdrs.get(s.shndx as usize).is_some_and(|h| h.flags & SHF_EXECINSTR == 0)).collect();
+    let is_anon =
+        |n: &str| n.starts_with(".L") || n.starts_with("anon.") || n.starts_with("alloc_");
+    let anon: Vec<&Sym> = syms
+        .iter()
+        .filter(|s| {
+            s.size > 0
+                && s.shndx != 0
+                && s.shndx < 0xff00
+                && is_anon(&s.name)
+                && b.shdrs
+                    .get(s.shndx as usize)
+                    .is_some_and(|h| h.flags & SHF_EXECINSTR == 0)
+        })
+        .collect();
     let mut rodata: Vec<u8> = Vec::new();
     let mut lits: Vec<(u64, String, u64)> = Vec::new(); // (binary address, label, rodata offset)
     let holder = |a: u64| -> Option<(&str, u64)> {
@@ -766,7 +871,9 @@ pub fn extract(bin: &[u8], names: &[String]) -> Result<Vec<u8>, Error> {
             }
             j -= 1;
         }
-        named.get(i.wrapping_sub(1)).map(|s| (s.name.as_str(), a - s.value))
+        named
+            .get(i.wrapping_sub(1))
+            .map(|s| (s.name.as_str(), a - s.value))
     };
     // every relocation that applies to an executable section
     let mut relocs: Vec<(u64, u32, u64)> = Vec::new(); // (address, type, target address)
@@ -788,7 +895,10 @@ pub fn extract(bin: &[u8], names: &[String]) -> Result<Vec<u8>, Error> {
     let mut labels: Vec<(String, u64)> = Vec::new();
     let mut rel_out: Vec<(u64, u32, String, i64)> = Vec::new();
     for n in names {
-        let fs: Vec<&Sym> = syms.iter().filter(|s| s.is_func() && &s.name == n && s.size > 0).collect();
+        let fs: Vec<&Sym> = syms
+            .iter()
+            .filter(|s| s.is_func() && &s.name == n && s.size > 0)
+            .collect();
         let [f] = fs.as_slice() else {
             return err(format!("{n}: {} functions with that name", fs.len()));
         };
@@ -801,16 +911,25 @@ pub fn extract(bin: &[u8], names: &[String]) -> Result<Vec<u8>, Error> {
         fsyms.push((n.clone(), base, f.size));
         // calls and jumps to another function of the same section have no relocation (the
         // assembler resolved them, -mno-relax): decode them, as CALL / JAL relocations
-        let mut fr: Vec<(u64, u32, u64)> = relocs.iter().filter(|r| f.value <= r.0 && r.0 < f.value + f.size).cloned().collect();
+        let mut fr: Vec<(u64, u32, u64)> = relocs
+            .iter()
+            .filter(|r| f.value <= r.0 && r.0 < f.value + f.size)
+            .cloned()
+            .collect();
         let has = |fr: &Vec<(u64, u32, u64)>, a: u64| fr.iter().any(|r| r.0 == a);
-        let words: Vec<u32> = (0..(f.size / 4) as usize).map(|k| rd(&b.data, fo + 4 * k, 4).unwrap_or(0) as u32).collect();
+        let words: Vec<u32> = (0..(f.size / 4) as usize)
+            .map(|k| rd(&b.data, fo + 4 * k, 4).unwrap_or(0) as u32)
+            .collect();
         for k in 0..words.len() {
             let a = f.value + 4 * k as u64;
             let w = words[k];
             let inside = |t: u64| f.value <= t && t < f.value + f.size;
             if w & 0x7f == 0x6f && !has(&fr, a) {
                 // jal: imm[20|10:1|11|19:12]
-                let imm = (((w >> 31) & 1) << 20) | (((w >> 21) & 0x3ff) << 1) | (((w >> 20) & 1) << 11) | (((w >> 12) & 0xff) << 12);
+                let imm = (((w >> 31) & 1) << 20)
+                    | (((w >> 21) & 0x3ff) << 1)
+                    | (((w >> 20) & 1) << 11)
+                    | (((w >> 12) & 0xff) << 12);
                 let t = a.wrapping_add((((imm as i64) << 43) >> 43) as u64);
                 if !inside(t) {
                     fr.push((a, 17, t));
@@ -871,12 +990,26 @@ pub fn extract(bin: &[u8], names: &[String]) -> Result<Vec<u8>, Error> {
     write_object(&text, &rodata, &fsyms, &labels, &lit_labels, &rel_out)
 }
 
+/// (name, type, flags, offset, size, link, info, align, entsize)
+type Shdr64 = (u32, u32, u64, u64, u64, u32, u32, u64, u64);
+
 /// A minimal ELF64 RISC-V relocatable: .text, .rodata, .rela.text, .symtab, .strtab, .shstrtab.
-fn write_object(text: &[u8], rodata: &[u8], funcs: &[(String, u64, u64)], labels: &[(String, u64)],
-                lit_labels: &[(String, u64)], rels: &[(u64, u32, String, i64)]) -> Result<Vec<u8>, Error> {
+fn write_object(
+    text: &[u8],
+    rodata: &[u8],
+    funcs: &[(String, u64, u64)],
+    labels: &[(String, u64)],
+    lit_labels: &[(String, u64)],
+    rels: &[(u64, u32, String, i64)],
+) -> Result<Vec<u8>, Error> {
     // symbols: null, locals (section, labels), globals (functions, then undefined)
     let mut strtab = vec![0u8];
-    let name = |s: &str, st: &mut Vec<u8>| -> u32 { let n = st.len(); st.extend_from_slice(s.as_bytes()); st.push(0); n as u32 };
+    let name = |s: &str, st: &mut Vec<u8>| -> u32 {
+        let n = st.len();
+        st.extend_from_slice(s.as_bytes());
+        st.push(0);
+        n as u32
+    };
     let mut sy: Vec<(u32, u8, u16, u64, u64)> = vec![(0, 0, 0, 0, 0), (0, 3, 1, 0, 0)]; // null, STT_SECTION .text
     let mut index: HashMap<String, usize> = HashMap::new();
     for (l, off) in labels {
@@ -938,12 +1071,32 @@ fn write_object(text: &[u8], rodata: &[u8], funcs: &[(String, u64, u64)], labels
     let shoff = align_up(img.len() as u64, 8);
     img.resize(shoff as usize, 0);
     // (name, type, flags, offset, size, link, info, align, entsize)
-    let hdrs: [(u32, u32, u64, u64, u64, u32, u32, u64, u64); 7] = [
+    let hdrs: [Shdr64; 7] = [
         (0, 0, 0, 0, 0, 0, 0, 0, 0),
-        (1, 1, SHF_ALLOC | SHF_EXECINSTR, t_off, text.len() as u64, 0, 0, 16, 0),
+        (
+            1,
+            1,
+            SHF_ALLOC | SHF_EXECINSTR,
+            t_off,
+            text.len() as u64,
+            0,
+            0,
+            16,
+            0,
+        ),
         (7, 1, SHF_ALLOC, ro_off, rodata.len() as u64, 0, 0, 8, 0),
         (15, SHT_RELA, 0x40, r_off, rela.len() as u64, 4, 1, 8, 24),
-        (26, SHT_SYMTAB, 0, s_off, symtab.len() as u64, 5, first_global as u32, 8, 24),
+        (
+            26,
+            SHT_SYMTAB,
+            0,
+            s_off,
+            symtab.len() as u64,
+            5,
+            first_global as u32,
+            8,
+            24,
+        ),
         (34, 3, 0, st_off, strtab.len() as u64, 0, 0, 1, 0),
         (42, 3, 0, sh_off, shstr.len() as u64, 0, 0, 1, 0),
     ];
@@ -979,13 +1132,19 @@ fn write_object(text: &[u8], rodata: &[u8], funcs: &[(String, u64, u64)], labels
 // ---- stub ------------------------------------------------------------------------------------
 
 /// `addi a0, zero, 127; addi a7, zero, 94; ecall` (exit_group(127)), then `ebreak` to the end.
-pub fn stub(bin: &[u8], names: &[String]) -> Result<(Vec<u8>, Vec<(String, u64)>), Error> {
+/// The stubbed binary, and (name, words) of every function stubbed.
+pub type Stubbed = (Vec<u8>, Vec<(String, u64)>);
+
+pub fn stub(bin: &[u8], names: &[String]) -> Result<Stubbed, Error> {
     let b = Elf::parse(bin.to_vec())?;
     let syms = b.symbols()?;
     let mut out = b.data.clone();
     let mut done = Vec::new();
     for n in names {
-        let fs: Vec<&Sym> = syms.iter().filter(|s| s.is_func() && &s.name == n && s.size > 0).collect();
+        let fs: Vec<&Sym> = syms
+            .iter()
+            .filter(|s| s.is_func() && &s.name == n && s.size > 0)
+            .collect();
         let [f] = fs.as_slice() else {
             return err(format!("{n}: {} functions with that name", fs.len()));
         };
@@ -997,7 +1156,7 @@ pub fn stub(bin: &[u8], names: &[String]) -> Result<(Vec<u8>, Vec<(String, u64)>
         };
         let code = [0x07f0_0513u32, 0x05e0_0893, 0x0000_0073];
         for k in 0..(f.size / 4) as usize {
-            let w = if k < 3 { code[k] } else { 0x0010_0073 };
+            let w = code.get(k).copied().unwrap_or(0x0010_0073);
             wr(&mut out, fo + 4 * k, 4, w as u64)?;
         }
         done.push((n.clone(), f.size / 4));
