@@ -1,6 +1,7 @@
 import NoCompiler.VC.Tactic
 import NoCompiler.Mem
 import NoCompiler.Arith
+import NoCompiler.Tactic
 
 /-
 A loop through cut points, milestone 4c: each cut point's segment is run by
@@ -327,5 +328,69 @@ example : ((exploreR ⟨0x3000#64, #[0x008000ef#32, 0x00000013#32, 0x00000013#32
     [(0x3000#64, 16)] [0x3008#64] 10 0 0x3000#64 []).map fun r =>
     r.1.map fun e => match e with | .cut S _ => (S.pc, S.reg 1) | .ret S _ => (S.pc, S.reg 1)) =
     some [(0x3008#64, .const 0x3004#64)] := by decide +kernel
+
+/-! ### A tail call through the callee's specification -/
+
+/-- `f: addi a0,a0,1; jal zero, g` at 0x3000 and `g: addi a0,a0,1; ret` at 0x3008. -/
+def tcCode : Code := ⟨0x3000#64, #[0x00150513#32, 0x0040006f#32, 0x00150513#32, 0x00008067#32]⟩
+def gD : Dom := [(0x3008#64, 8)]
+def fD : Dom := [(0x3000#64, 16)]
+def gSpec : Spec Word := { pre := fun x s => s.reg 10 = x, post := fun x _ s' => s'.reg 10 = x + 1 }
+def fSpec : Spec Word := { pre := fun x s => s.reg 10 = x, post := fun x _ s' => s'.reg 10 = x + 2 }
+
+theorem g_verified : VerifiedImg tcCode gD 0x3008#64 gSpec := by
+  intro x s he hpre
+  unfold Exec
+  refine Reach.of_exploreAt (facts := []) (cuts := []) (fuel := 10) (k := 2) (by decide) (by decide)
+    he.pc he.live (by simp) ?_
+  have hpre' : s.reg 10 = x := hpre
+  have hm : s.reg 1 &&& ~~~1 = s.reg 1 := and_not_one_of_aligned he.retAligned
+  vc_ends
+  rw [hm]
+  refine ⟨he.retAligned, .inl (by simpa using he.ret), .inl ⟨by simpa using hx', rfl, ?_, ?_⟩⟩
+  · intro r hr
+    simp only [preservedRegs, List.mem_cons, List.not_mem_nil, or_false] at hr
+    rw [State.setPc_reg, hreg r]
+    rcases hr with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> rfl
+  · show (s'.setPc _).reg 10 = x + 1
+    rw [State.setPc_reg, hreg 10, ← hpre']; rfl
+
+theorem gD_sub : gD.sub fD := by
+  intro y hy
+  simp only [Dom.mem, gD, fD, List.any_cons, List.any_nil, Bool.or_false, decide_eq_true_eq] at hy ⊢
+  bv_omega
+
+/-- `f` from `g`'s specification alone: a tail call. -/
+theorem f_verified : VerifiedImg tcCode fD 0x3000#64 fSpec := by
+  intro x s he hpre
+  have hpre' : s.reg 10 = x := hpre
+  unfold Exec
+  refine Reach.trans (Q₁ := fun u => u.pc = 0x3008#64 ∧ u.exit = none ∧ u.reg 10 = x + 1 ∧
+      ∀ r ∈ (1 : Reg) :: preservedRegs, u.reg r = s.reg r) ?_ ?_
+  · refine Reach.of_exploreAt (facts := []) (cuts := [0x3008#64]) (fuel := 10) (k := 0) (by decide)
+      (by decide) he.pc he.live (by simp) ?_
+    vc_ends
+    refine ⟨by rw [← hpre']; rfl, ?_⟩
+    simp only [preservedRegs, List.forall_mem_cons, List.not_mem_nil, false_imp_iff, imp_true_iff,
+      and_true, symDen]
+  · intro u ⟨hp, hux, hu10, hsame⟩
+    have h1 : u.reg 1 = s.reg 1 := hsame 1 (by simp)
+    have h2 : u.reg 2 = s.reg 2 := hsame 2 (by simp [preservedRegs])
+    have hP : (gSpec.perm (x + 1) u).le (fSpec.perm x s) := by
+      have : gSpec.perm (x + 1) u = fSpec.perm x s := by
+        simp only [Spec.perm, gSpec, fSpec, Spec.stackRegion, Reg.sp]; rw [h2]
+      rw [this]; exact Perm.le_refl _
+    have heg : Entry gD 0x3008#64 u :=
+      ⟨hp, hux, fun h => he.ret (by rw [← h1]; exact gD_sub _ h), by rw [Reg.ra, h1]; exact he.retAligned,
+        by rw [Reg.sp, h2]; exact he.sp⟩
+    refine VerifiedImg.call g_verified (x + 1) heg hu10 gD_sub hP fun s' hd _ => ?_
+    rcases hd with ⟨hx', hpc', hpres, hpost⟩ | ⟨_, hex⟩
+    · refine .done ⟨.inl ?_, .inl ⟨hx', by rw [hpc', h1], fun r hr => ?_, ?_⟩⟩
+      · rw [hpc']; show ¬ fD.mem (u.reg 1); rw [h1]; exact he.ret
+      · rw [hpres r hr]
+        exact hsame r (List.mem_cons_of_mem _ hr)
+      · show s'.reg 10 = x + 2
+        rw [hpost]; show x + 1 + 1 = x + 2; bv_omega
+    · exact hex.elim
 
 end NoCompiler.VC.M.Example
