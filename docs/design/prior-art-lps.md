@@ -663,3 +663,14 @@ musl binaries like OVP's need first):
 - `ProcStep3.sys`; the control `writev_too_many`.
 - Axioms: `[propext, Quot.sound]` / `[propext]`. `lake env lean
   Writev.lean`: 0.48 s.
+
+### Seventh step: musl's startup calls (lean/NoCompiler/Linux/Startup.lean)
+
+- `set_tid_address`: some tid in [1, 4194304].
+- `rt_sigprocmask`: 0, with some 8 bytes at `oldset` if that is non-null;
+  EINVAL for a size other than 8 or a bad `how`.
+- `ioctl(fd, TIOCGWINSZ, p)`: ENOTTY, or 0 with some 8-byte `winsize`; EBADF
+  on a closed fd. Every other ioctl has no outcome.
+- These are over-approximations where the model keeps no state (the pid,
+  the signal mask, terminals).
+- `ProcStep4.sys`; `sigprocmask_no_old`; the control `ioctl_other_none`.
