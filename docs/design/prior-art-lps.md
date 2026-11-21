@@ -542,3 +542,31 @@ musl binaries like OVP's need first):
   machine states whose fd table is the initial one.
 - Its budget: the `#eval` differential test against LPS's extraction for
   the three arms, and `lake env lean` under 5 s per file.
+
+### First step of the port: done (lean/NoCompiler/Linux/)
+
+- **`Linux/Effect.lean`:**
+  - `SyscallInput` (a7, a0..a5, memory) and `Effect` (`ret`, `writes`,
+    `zeros`), as LPS `State.v#L654`/`#L719`;
+  - `Effect.mem`: zeros, then writes, in LPS's order (`Run.v#L96-L226`);
+  - `Outcome` (return with an effect and maybe an event, or exit) and
+    `Outcome.apply`.
+- **`Linux/Basic.lean`:**
+  - `readSpec`, `writeSpec`, `exitSpec`;
+  - `spec`, a dispatch on the syscall number in the place of LPS's
+    `spec_table`;
+  - the step relation `Basic`;
+  - **`basic_iff_sys : Basic s s' ↔ Sys s s'`**: the layer admits exactly
+    the transitions of the trusted `Sys` (Env.lean), so every existing proof
+    holds of it;
+  - the control `no_step_unmodeled`: `close` (57) has no step.
+- **Axioms** (`#print axioms`): both theorems depend on `[propext]` only.
+- **Cost:** `lake env lean`: Effect.lean 0.45 s, Basic.lean 0.66 s (budget
+  5 s).
+- **Not done:**
+  - the differential test against LPS's extraction. No Rocq is installed
+    here (`opam` reports "Opam has not been initialised"); it needs a Rocq
+    9.2 + LPS build on /mnt/scratch;
+  - `eff_unmaps` and `eff_copies`, which need partial memory;
+  - an fd table;
+  - errno values.
