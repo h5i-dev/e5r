@@ -9,3 +9,4 @@ import Examples.Refine.Straight
 import Examples.Refine.Peephole
 import Examples.Refine.Diff
 import Examples.Refine.Jump
+import Examples.LinkData

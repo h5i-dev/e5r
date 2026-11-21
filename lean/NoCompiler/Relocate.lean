@@ -185,6 +185,53 @@ theorem Verified.of_leaf {α : Type} {M : Module} {f : RFunc} (hf : f ∈ M.func
       simp only [Option.bind_some] at hi
       rw [hi] at this; simpa using this
 
+/-! ## Relocated words
+
+What a relocation puts in a word, as numbers: `decode` reads fields by `Nat`
+arithmetic (`bits`), so a patched word decodes by `omega` once its `toNat` is
+in this form. `hi_lo`: the `auipc` part and the sign-extended low part add up
+to the distance, for every distance `InRange` allows. Kernel tier. -/
+namespace Module
+
+theorem Reloc.and_shl_eq_zero (k : Nat) (w x : BitVec 32) (hw : w.toNat < 2 ^ k) : w &&& (x <<< k) = 0 := by
+  ext i hi
+  simp only [BitVec.getElem_and, BitVec.getElem_shiftLeft]
+  by_cases h : i < k
+  · simp [h]
+  · have : w[i] = false := by
+      rw [BitVec.getElem_eq_testBit_toNat]
+      exact Nat.testBit_lt_two_pow (Nat.lt_of_lt_of_le hw (Nat.pow_le_pow_right (by decide) (by omega)))
+    simp [this]
+
+theorem Reloc.toNat_or_shl (k : Nat) (w x : BitVec 32) (hw : w.toNat < 2 ^ k) :
+    (w ||| (x <<< k)).toNat = (w.toNat + x.toNat * 2 ^ k) % 2 ^ 32 := by
+  rw [← BitVec.add_eq_or_of_and_eq_zero _ _ (Reloc.and_shl_eq_zero k w x hw), BitVec.toNat_add,
+    BitVec.toNat_shiftLeft, Nat.add_mod_mod, Nat.shiftLeft_eq]
+
+theorem Reloc.toNat_patchU (w : BitVec 32) (d : Word) (hw : w.toNat < 4096) :
+    (Reloc.patchU w d).toNat = w.toNat + ((d + 0x800#64) >>> 12).toNat % 2 ^ 20 * 4096 := by
+  unfold Reloc.patchU Reloc.hi20
+  rw [Reloc.toNat_or_shl 12 _ _ hw, BitVec.toNat_setWidth]
+  omega
+
+theorem Reloc.toNat_patchI (w : BitVec 32) (d : Word) (hw : w.toNat < 2 ^ 20) :
+    (Reloc.patchI w d).toNat = w.toNat + d.toNat % 4096 * 2 ^ 20 := by
+  unfold Reloc.patchI Reloc.lo12
+  rw [Reloc.toNat_or_shl 20 _ _ hw, BitVec.toNat_setWidth, BitVec.toNat_setWidth]
+  omega
+
+theorem Reloc.hi_lo (d : BitVec 64) (h1 : -(2 : Int) ^ 31 - 2 ^ 11 ≤ d.toInt) (h2 : d.toInt < 2 ^ 31 - 2 ^ 11) :
+    ((BitVec.ofNat 20 (((d + 0x800#64) >>> 12).toNat)).setWidth 32 <<< 12).signExtend 64 +
+      (BitVec.ofNat 12 (d.toNat % 4096)).signExtend 64 = d := by
+  apply BitVec.eq_of_toNat_eq
+  rw [BitVec.toInt_eq_toNat_cond] at h1 h2
+  simp only [BitVec.toNat_add, BitVec.toNat_signExtend, BitVec.msb_eq_decide, BitVec.toNat_setWidth,
+    BitVec.toNat_shiftLeft, BitVec.toNat_ofNat, BitVec.toNat_ushiftRight]
+  have hd := d.isLt
+  split at h1 <;> split at h2 <;> (repeat' split) <;> simp_all <;> omega
+
+end Module
+
 /-! ## T6: adding modules keeps every theorem -/
 
 /-- A larger region: the run returns to the same `ra`, now outside it too. -/
