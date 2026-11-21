@@ -12,6 +12,8 @@ namespace NoCompiler.VC.M
 
 /-- A branch condition along a path: `evalBr op a b` came out `val`. -/
 structure Cond where
+  /-- The branch's address, for naming its hypothesis. -/
+  pc : Word
   op : BrOp
   a : Sym
   b : Sym
@@ -67,9 +69,9 @@ def explore (c : Code) (D : Dom) (cuts : List Word) :
             match wordIdx c t with
             | some k' =>
               both (explore c D cuts fuel false k' (c.words.toList.drop k') { S with pc := t }
-                  (⟨op, S.reg rs1, S.reg rs2, true⟩ :: cs))
+                  (⟨S.pc, op, S.reg rs1, S.reg rs2, true⟩ :: cs))
                 (explore c D cuts fuel false (k + 1) ws' { S with pc := S.pc + 4 }
-                  (⟨op, S.reg rs1, S.reg rs2, false⟩ :: cs))
+                  (⟨S.pc, op, S.reg rs1, S.reg rs2, false⟩ :: cs))
             | none => none
           else none
         | some (.jal rd off) =>

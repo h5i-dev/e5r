@@ -33,6 +33,8 @@ def okWidth (w : Nat) : Bool := w == 1 || w == 2 || w == 4 || w == 8
 /-- The checker. -/
 def Ob.check (facts : List Fact) : Ob → Bool
   | .aligned a w =>
+    -- A byte access is always aligned.
+    w == 1 ||
     match a.lin with
     | some (n, k) => okWidth w && k.toNat % w == 0 &&
         facts.any fun f => match f with
@@ -81,6 +83,9 @@ theorem Ob.check_sound {ρ : Nat → Word} {μ : Word → Byte} {P : Perm} {fact
   cases o with
   | aligned a w =>
     simp only [Ob.check] at h
+    by_cases h1 : w = 1
+    · subst h1; simp only [Ob.den, NoCompiler.aligned, Nat.mod_one]
+    rw [show (w == 1) = false from by simpa using h1, Bool.false_or] at h
     split at h
     · rename_i n k hl
       simp only [Bool.and_eq_true, beq_iff_eq, List.any_eq_true] at h
