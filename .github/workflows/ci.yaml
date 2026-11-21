@@ -66,9 +66,11 @@ jobs:
       - name: Lean library, example proofs and the axiom audit
         working-directory: lean
         run: lake build
-      - name: The proofs' images are the committed binaries
+      - name: The proofs' images are the committed binaries; the axiom audit over every declaration
         working-directory: lean
         run: lake exe nocompiler-audit
+      - name: Audit controls (a new sorry, bv_decide or debug-option file is caught without editing a list)
+        run: ./lean/AuditControls/run.sh
       - run: cargo test -p nocompiler --no-fail-fast -- --nocapture
       # The core commands through the one binary (crates/nocompiler-cli).
       - run: cargo test -p nocompiler-cli --test core -- --nocapture

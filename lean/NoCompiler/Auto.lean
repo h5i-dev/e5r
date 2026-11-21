@@ -1788,6 +1788,11 @@ def autoCore (fl : Flavor) (call : Call) (heads rsList : List Nat) (entryN : Nat
     bodyGoals := bodyGoals ++ gs
   traceLine s!"[auto] done, {startGoals.length + bodyGoals.length} goals left"
   if nocompiler.auto.debugKernel.get (← getOptions) then
+    -- Debugging only. What is left is closed with `sorry` (so the audit rejects
+    -- the declaration as depending on `sorryAx`), and an error is logged, so a
+    -- file with the option on does not build at all.
+    logError "nocompiler_auto: nocompiler.auto.debugKernel is on: the goals left are closed with sorry; \
+      this is not a proof (turn the option off)"
     for g in startGoals ++ bodyGoals do
       unless ← g.isAssigned do g.withContext do g.assign (← mkSorry (← g.getType) false)
     let log ← logRef.get

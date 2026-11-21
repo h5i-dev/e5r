@@ -1,77 +1,134 @@
 import Examples
 import Demo
+import Lean
 
 /-
 `lake build nocompiler-audit && lake exe nocompiler-audit` (from lean/): the checks that tie
-the proofs to the binaries.
+the proofs to the binaries, and the axiom audit.
 
-At build time, `#assert_standard_axioms` fails the build if a listed theorem
-depends on any axiom beyond Lean's three standard ones (propext,
-Classical.choice, Quot.sound): no `sorry`, no `native_decide`, no
-`ofReduceBool`, no axiom of our own. At run time, `main` reads each committed ELF file with the
-Lean reader in NoCompiler/Elf.lean and checks that its `.text` is word for word the
-image the proofs are about, and that every data section (`.rodata`, `.data`,
-`.bss`, ...) is byte for byte the exported segment.
+At run time, `main`
+* reads each committed ELF file with the Lean reader in NoCompiler/Elf.lean
+  and checks that its `.text` is word for word the image the proofs are
+  about, and every data section byte for byte the exported segment;
+* checks each module against the ELF it is linked into (layout, `Module.Ok`,
+  `Module.link`, data);
+* audits the axioms of EVERY declaration of every module under NoCompiler/,
+  Examples/ and Demo/ (found from the source tree, not from a list;
+  `Audit.audit` below): standard, the bv_decide tier (printed), or forbidden
+  (fails), and fails if a source file's module was not built;
+* fails if committed source turns on `nocompiler_auto`'s debugging option, which
+  closes goals with `sorry`.
 -/
+/-
+The axiom audit (docs/isa/trust.md, "The audit"): every declaration of every
+module of the project, found from the source tree, not from a list.
+
+Each declaration's transitive axioms are classified:
+
+* **standard**: only `propext`, `Classical.choice`, `Quot.sound`;
+* **bv_decide tier**: the standard three plus axioms of native computation
+  (`Lean.ofReduceBool`, `Lean.trustCompiler`, and the per-theorem
+  `<thm>._native.*` axioms Lean 4.35 generates for `bv_decide` and
+  `native_decide`), at least one of them. Such a theorem rests on the compiled
+  evaluation of a certificate checker as well as on the kernel;
+* **forbidden**: anything else, `sorryAx` included, and any axiom the project
+  declares itself.
+
+The audit fails on a forbidden declaration and prints the bv_decide tier.
+-/
+namespace Audit
+open Lean
+
+def standardAxioms : List Name := [``propext, ``Classical.choice, ``Quot.sound]
+
+/-- An axiom of native computation. -/
+def isNativeAxiom (n : Name) : Bool :=
+  n == `Lean.ofReduceBool || n == `Lean.trustCompiler || n.components.any (· == `_native)
+
+inductive Tier | standard | bvDecide | forbidden
+  deriving DecidableEq, Repr
+
+def classify (axs : Array Name) : Tier :=
+  if axs.all standardAxioms.contains then .standard
+  else if axs.all (fun a => standardAxioms.contains a || isNativeAxiom a) then .bvDecide
+  else .forbidden
+
+/-- The axioms a constant depends on, memoised across constants. -/
+partial def axiomsOf (env : Environment) (n : Name) :
+    StateM (Std.HashMap Name (Array Name)) (Array Name) := do
+  if let some r := (← get)[n]? then return r
+  -- Mark first: a recursive or mutual group refers back to itself.
+  modify (·.insert n #[])
+  let some ci := env.find? n | return #[]
+  let r ← match ci with
+    | .axiomInfo _ => pure #[n]
+    | _ =>
+      let mut acc : Std.HashSet Name := {}
+      for c in ci.getUsedConstantsAsSet do
+        if c != n then
+          for a in ← axiomsOf env c do acc := acc.insert a
+      pure acc.toArray
+  modify (·.insert n r)
+  return r
+
+structure Report where
+  checked : Nat
+  bvTier : Array Name
+  forbidden : Array (Name × Array Name)
+
+/-- Audit every constant whose module is one of `mods`. -/
+def audit (env : Environment) (mods : Std.HashSet Name) : Report := Id.run do
+  let mut cache : Std.HashMap Name (Array Name) := {}
+  let mut checked := 0
+  let mut bv := #[]
+  let mut bad := #[]
+  for (n, _) in env.constants.map₁.toList do
+    let some idx := env.getModuleIdxFor? n | continue
+    let some m := env.header.moduleNames[idx.toNat]? | continue
+    unless mods.contains m do continue
+    let (axs, c) := (axiomsOf env n).run cache
+    cache := c
+    checked := checked + 1
+    match classify axs with
+    | .standard => pure ()
+    | .bvDecide => if !n.isInternal then bv := bv.push n
+    | .forbidden => bad := bad.push (n, axs)
+  return { checked, bvTier := bv.qsort (·.toString < ·.toString),
+           forbidden := bad.qsort (·.1.toString < ·.1.toString) }
+
+/-- The modules of the project: every `.lean` file under the given roots
+    (`NoCompiler`, `Examples`, `Demo`, and their root files), as module names. -/
+partial def sourceModules (lean : System.FilePath) (roots : List String) : IO (Array Name) := do
+  let mut out := #[]
+  for r in roots do
+    if ← (lean / s!"{r}.lean").pathExists then out := out.push (Name.mkSimple r)
+    let dir := lean / r
+    if ← dir.isDir then
+      for p in ← dir.walkDir do
+        if p.extension == some "lean" then
+          let cs := (p.toString.toList.drop (lean.toString.length + 1))
+          let rel := String.ofList (cs.take (cs.length - 5))
+          out := out.push ((rel.splitOn "/").foldl (fun n c => .str n c) .anonymous)
+  return out.qsort (·.toString < ·.toString)
+
+/-- Lines of committed source that turn on `nocompiler_auto`'s debugging option
+    (`set_option nocompiler.auto.debugKernel true`), which closes what the tactic
+    leaves with `sorry`: none may exist. -/
+def debugOptionUses (lean : System.FilePath) (mods : Array Name) : IO (Array String) := do
+  let mut out := #[]
+  for m in mods do
+    let p := (m.components.foldl (fun p c => p / c.toString) lean).addExtension "lean"
+    let src ← IO.FS.readFile p
+    for (l, i) in (src.splitOn "\n").zipIdx do
+      let words := (l.splitOn " ").filter (· ≠ "")
+      if words.take 3 == ["set_option", "nocompiler.auto.debugKernel", "true"] then
+        out := out.push s!"{p}:{i + 1}: {l}"
+  return out
+
+end Audit
+
 open NoCompiler
 
-open Lean Elab Command in
-/-- Fail unless the theorem depends on no axiom beyond Lean's standard three. -/
-elab "#assert_standard_axioms " id:ident : command => do
-  let n ← liftCoreM (realizeGlobalConstNoOverload id)
-  let axs ← liftCoreM (Lean.collectAxioms n)
-  let bad := axs.filter (fun a => !([``propext, ``Classical.choice, ``Quot.sound].contains a))
-  unless bad.isEmpty do throwError "{n} depends on {bad.toList}"
-
-/-- An axiom of native computation: what `native_decide` and `bv_decide`
-    rest on (`Lean.ofReduceBool`, `Lean.trustCompiler`, and the per-theorem
-    `<thm>._native.*` axioms Lean 4.35 generates for them). -/
-def isNativeAxiom (n : Lean.Name) : Bool :=
-  n == `Lean.ofReduceBool || n == `Lean.trustCompiler ||
-    n.components.any (fun c => c == `_native)
-
-open Lean Elab Command in
-/-- The bv_decide tier (docs/isa/trust.md): fail unless the theorem's axioms
-    are the standard three plus axioms of native computation, at least one of
-    them. Such a theorem rests on the compiled evaluation of a SAT
-    certificate checker as well as on the kernel. -/
-elab "#assert_bv_tier " id:ident : command => do
-  let n ← liftCoreM (realizeGlobalConstNoOverload id)
-  let axs ← liftCoreM (Lean.collectAxioms n)
-  let other := axs.filter fun a =>
-    !([``propext, ``Classical.choice, ``Quot.sound].contains a) && !isNativeAxiom a
-  unless other.isEmpty do throwError "{n} depends on {other.toList}, outside the bv_decide tier"
-  unless axs.any isNativeAxiom do throwError "{n} uses no native computation: assert it standard"
-
-open Lean Elab Command in
-/-- A control for the audit: fail unless the theorem depends on an axiom
-    beyond the standard three, i.e. unless `#assert_standard_axioms` rejects
-    it. -/
-elab "#assert_not_standard " id:ident : command => do
-  let n ← liftCoreM (realizeGlobalConstNoOverload id)
-  let axs ← liftCoreM (Lean.collectAxioms n)
-  let bad := axs.filter (fun a => !([``propext, ``Classical.choice, ``Quot.sound].contains a))
-  if bad.isEmpty then throwError "{n} has only the standard axioms: the audit would not flag it"
-
--- The adequacy theorems and the program-logic rules every proof builds on.
-#assert_standard_axioms NoCompiler.Exec.hw_safe
-#assert_standard_axioms NoCompiler.Exec.hw_final
-#assert_standard_axioms NoCompiler.Exec.hw_terminates
-#assert_standard_axioms NoCompiler.Reach.bind
-#assert_standard_axioms NoCompiler.Reach.loop
-#assert_standard_axioms NoCompiler.Reach.exec_step
-#assert_standard_axioms NoCompiler.Reach.sys_step
-#assert_standard_axioms NoCompiler.Reach.frame
-#assert_standard_axioms NoCompiler.VerifiedImg.call
-#assert_standard_axioms NoCompiler.VerifiedImg.frame
-#assert_standard_axioms NoCompiler.VerifiedImg.hw
--- The structural checker in Lean, and its theorem.
-#assert_standard_axioms NoCompiler.Struct.cfi
-#assert_standard_axioms NoCompiler.Struct.inv_entry
-#assert_standard_axioms Examples.Sum.Image.sum_checked
-#assert_standard_axioms Examples.Sum.Image.sum2_checked
-#assert_standard_axioms Examples.Hello.Image.write_all_checked
-#assert_standard_axioms Examples.Hello.Image.hello_checked
 
 -- The Lean checker rejects what breaks the rules: `sum` without its tree
 -- (its branches then have no structured target), with the loop recorded as a
@@ -87,78 +144,8 @@ example : Struct.check Examples.Hello.Image.code
 -- `sum2` with no function entries known: its calls go nowhere allowed.
 example : Struct.check Examples.Sum.Image.code Examples.Sum.Image.sum2_func [] = false := by decide
 
--- The examples.
-#assert_standard_axioms Examples.Sum.sum_verified
-#assert_standard_axioms Examples.Sum.sum_hw
-#assert_standard_axioms Examples.Sum2.sum2_verified
-#assert_standard_axioms Examples.Hello.write_all_verified
-#assert_standard_axioms Examples.Hello.hello_verified
--- Relocation (docs/isa/v1.md): the translation theorem, and sum at every layout and at two.
-#assert_standard_axioms NoCompiler.VerifiedImg.shift
-#assert_standard_axioms NoCompiler.Verified.of_leaf
-#assert_standard_axioms NoCompiler.Module.fetch_link
-#assert_standard_axioms NoCompiler.Verified.mono
-#assert_standard_axioms Examples.Link.sum_in_any_program
-#assert_standard_axioms Examples.Link.L1.sum2_here
-#assert_standard_axioms Examples.Link.L2.sum2_here
-#assert_standard_axioms Examples.Link.same_module
-#assert_standard_axioms Examples.Link.sum_relocatable
-#assert_standard_axioms Examples.Link.sum_link1
-#assert_standard_axioms Examples.Link.sum_link2
--- Refinement (docs/isa/refine.md): the meta-theorems, the lockstep certificate, the example.
-#assert_standard_axioms NoCompiler.Refines.refl
-#assert_standard_axioms NoCompiler.Refines.trans
-#assert_standard_axioms NoCompiler.Refines.verified
-#assert_standard_axioms NoCompiler.Refines.of_sim
-#assert_standard_axioms NoCompiler.Refines.of_lockstep
-#assert_standard_axioms NoCompiler.exec_congr
-#assert_standard_axioms NoCompiler.sys_congr
-#assert_standard_axioms Examples.Refine.Relink.sum_link2_refines
-#assert_standard_axioms Examples.Refine.Relink.sum_link2'
--- Straight-line equivalence (refinement item 6): the kernel tier, then the
--- bv_decide tier, listed separately (and printed by the audit at run time).
-#assert_standard_axioms NoCompiler.execSeq_alu
-#assert_standard_axioms NoCompiler.SeqEquiv.agree
-#assert_standard_axioms Examples.Refine.Straight.slli_sh3add
-#assert_standard_axioms Examples.Refine.Straight.mul8_slli
-#assert_standard_axioms Examples.Refine.Straight.index_sh3add
-#assert_standard_axioms Examples.Refine.Straight.shift_refuted
-#assert_standard_axioms Examples.Refine.Straight.live_temp_refuted
-#assert_standard_axioms NoCompiler.RRegion.ok_of_seqEquiv
-#assert_standard_axioms Examples.Refine.Straight.mulRegion_ok
-#assert_standard_axioms Examples.Refine.Diff.refines_b
-#assert_standard_axioms Examples.Refine.Diff.AB.region0_ok
-#assert_standard_axioms Examples.Refine.Diff.refines_c
-#assert_standard_axioms Examples.Refine.Diff.AC.region0_ok
-#assert_standard_axioms Examples.Refine.Diff.refines_d
-#assert_standard_axioms Examples.Refine.Diff.AD.region0_ok
-#assert_bv_tier Examples.Refine.Straight.branchless_min
-#assert_bv_tier Examples.Refine.Straight.round8
--- The control: the standard check rejects a bv_decide theorem.
-#assert_not_standard Examples.Refine.Straight.branchless_min
 
-/-- The bv_decide tier: every theorem above checked with `#assert_bv_tier`. -/
-def bvTier : List String :=
-  ["Examples.Refine.Straight.branchless_min", "Examples.Refine.Straight.round8"]
-#assert_standard_axioms NoCompiler.Refines.of_bigSim
-#assert_standard_axioms NoCompiler.Refines.of_cert
-#assert_standard_axioms NoCompiler.RRegion.Ok.of_instr
-#assert_standard_axioms Examples.Refine.Peephole.refines
-#assert_standard_axioms Examples.Refine.Peephole.sum_peephole
-#assert_standard_axioms NoCompiler.RRegion.Ok.of_bigSim
-#assert_standard_axioms Examples.Refine.Peephole.Auto.refines'
-#assert_standard_axioms Examples.Refine.Jump.refines
 
--- The demo (demo/README.md): each function on the nocompiler build (B, `VerifiedImg`)
--- and on the ordinary rv64gc build (A, `VerifiedC`, NoCompiler/Ext/Rvc.lean).
-#assert_standard_axioms Demo.Sum.sum_b
-#assert_standard_axioms Demo.Sum.sum_a
-#assert_standard_axioms Demo.Sum.sum2_b
-#assert_standard_axioms Demo.Sum.sum2_a
-#assert_standard_axioms Demo.Cobs.cobs_b
-#assert_standard_axioms Demo.Cobs.cobs_a
-#assert_standard_axioms Demo.Sum.ImageB.sum_checked
-#assert_standard_axioms Demo.Cobs.ImageB.cobs_decode_checked
 
 /-- Each committed binary (relative to the repository root), and the code
     image and data segments its proofs use. -/
@@ -257,6 +244,33 @@ def checkModule (root : System.FilePath) (path : String) (M : Module) (L : Layou
     IO.println s!"ok   {path}: the module ({M.funcs.length} functions, {M.data.length} data) linked at the ELF's layout is its .text and data"
     return true
 
+/-- The source roots whose every module the axiom audit covers. -/
+def auditRoots : List String := ["NoCompiler", "Examples", "Demo"]
+
+/-- The axiom audit over every module under `auditRoots` (`Audit.audit`). -/
+def axiomAudit (root : System.FilePath) : IO Bool := do
+  let lean := root / "lean"
+  let mods ← Audit.sourceModules lean auditRoots
+  let mut ok := true
+  for u in ← Audit.debugOptionUses lean mods do
+    IO.println s!"FAIL debugging option turned on (it closes goals with sorry): {u}"
+    ok := false
+  Lean.initSearchPath (← Lean.findSysroot)
+  let env ← try
+      Lean.importModules (mods.map ({ module := · })) {}
+    catch e =>
+      IO.println s!"FAIL axiom audit: a module of the source tree could not be imported (not built?): {e}"
+      return false
+  let r := Audit.audit env (Std.HashSet.ofArray mods)
+  for (n, axs) in r.forbidden do
+    IO.println s!"FAIL {n} depends on {axs.toList}"
+  if r.forbidden.isEmpty then
+    IO.println s!"ok   axiom audit: {r.checked} declarations in {mods.size} modules; {r.bvTier.size} in the bv_decide tier, the rest standard"
+  IO.println s!"bv_decide tier ({r.bvTier.size} theorems; they rest on native evaluation too, docs/isa/trust.md):"
+  for t in r.bvTier do
+    IO.println s!"  {t}"
+  return ok && r.forbidden.isEmpty
+
 def main (args : List String) : IO UInt32 := do
   let root : System.FilePath := args.headD ".."
   let mut ok := true
@@ -266,7 +280,5 @@ def main (args : List String) : IO UInt32 := do
     ok := (← checkImageC root p c) && ok
   for (p, M, L) in modules do
     ok := (← checkModule root p M L) && ok
-  IO.println s!"bv_decide tier ({bvTier.length} theorems; they rest on native evaluation too, docs/isa/trust.md):"
-  for t in bvTier do
-    IO.println s!"  {t}"
+  ok := (← axiomAudit root) && ok
   return if ok then 0 else 1
