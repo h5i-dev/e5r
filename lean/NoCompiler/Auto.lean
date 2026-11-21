@@ -2,6 +2,7 @@ import NoCompiler.Struct
 import NoCompiler.Image
 import NoCompiler.Trace
 import NoCompiler.Fast.State
+import NoCompiler.VC.Straight
 
 /-
 Proof automation for structured code: `nocompiler_auto`.
