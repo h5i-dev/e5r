@@ -237,25 +237,51 @@ theorem allNext_mem {ρ : Nat → Word} {μ : Word → Byte} {Q : State → Prop
     · exact h₁
     · exact allNext_mem h₂ _ h
 
+/-- Every obligation, as one conjunction. -/
+def allOb (ρ : Nat → Word) (μ : Word → Byte) (P : Perm) : List Ob → Prop
+  | [] => True
+  | o :: os => o.den ρ μ P ∧ allOb ρ μ P os
+
+theorem allOb_mem {ρ : Nat → Word} {μ : Word → Byte} {P : Perm} :
+    ∀ {os : List Ob}, allOb ρ μ P os → ∀ o ∈ os, o.den ρ μ P
+  | [], _, _, h => by simp at h
+  | _ :: _, ⟨h₁, h₂⟩, _, h => by
+    simp only [List.mem_cons] at h
+    rcases h with rfl | h
+    · exact h₁
+    · exact allOb_mem h₂ _ h
+
+/-- The paths from `p` (word `k`), with the obligations the checker does not
+    discharge from `facts`: what is left of them is the caller's. -/
+def exploreR (c : Code) (D : Dom) (cuts : List Word) (fuel k : Nat) (p : Word) (facts : List Fact) :
+    Option (List PEnd × List Ob) :=
+  (explore c D cuts fuel true k (c.words.toList.drop k) (SState.init p) []).map
+    fun r => (r.1, r.2.filter fun o => !o.check facts)
+
 /-- One cut point's verification condition: every path from `p` (word `k`) to
-    the next cut points and returns, its obligations checked from the facts,
-    and each end's condition. -/
-def exploreVC (ρ : Nat → Word) (μ : Word → Byte) (Q : State → Prop) (facts : List Fact) (c : Code)
-    (D : Dom) (cuts : List Word) (fuel k : Nat) (p : Word) : Prop :=
-  match explore c D cuts fuel true k (c.words.toList.drop k) (SState.init p) [] with
-  | some (ends, obs) => obs.all (Ob.check facts) = true ∧ allNext ρ μ Q ends
+    the next cut points and returns; the obligations the checker leaves; and
+    each end's condition. -/
+def exploreVC (ρ : Nat → Word) (μ : Word → Byte) (P : Perm) (Q : State → Prop) (facts : List Fact)
+    (c : Code) (D : Dom) (cuts : List Word) (fuel k : Nat) (p : Word) : Prop :=
+  match exploreR c D cuts fuel k p facts with
+  | some (ends, res) => allOb ρ μ P res ∧ allNext ρ μ Q ends
   | none => False
 
 theorem Reach.of_exploreAt {c : Code} {P : Perm} {D : Dom} {Q : State → Prop} {facts : List Fact}
     {cuts : List Word} {fuel k : Nat} {p : Word} {s : State} (hb : 4 * c.words.size < 2 ^ 64)
     (hk : p = c.base + BitVec.ofNat 64 (4 * k)) (hpc : s.pc = p) (hx : s.exit = none)
-    (hf : ∀ f ∈ facts, f.den (ρOf s) P) (hvc : exploreVC (ρOf s) s.mem Q facts c D cuts fuel k p) :
+    (hf : ∀ f ∈ facts, f.den (ρOf s) P) (hvc : exploreVC (ρOf s) s.mem P Q facts c D cuts fuel k p) :
     Reach c P D Q s := by
-  unfold exploreVC at hvc
-  split at hvc
-  · rename_i ends obs h
-    exact Reach.of_explore hb h rfl hk (matches_init hpc) hx (by simp)
-      (fun o ho => Ob.check_sound hf (List.all_eq_true.1 hvc.1 o ho)) (allNext_mem hvc.2)
-  · exact hvc.elim
+  unfold exploreVC exploreR at hvc
+  cases h : explore c D cuts fuel true k (c.words.toList.drop k) (SState.init p) [] with
+  | none => rw [h] at hvc; exact hvc.elim
+  | some r =>
+    obtain ⟨ends, obs⟩ := r
+    rw [h] at hvc
+    simp only [Option.map_some] at hvc
+    refine Reach.of_explore hb h rfl hk (matches_init hpc) hx (by simp) (fun o ho => ?_) (allNext_mem hvc.2)
+    cases hc : o.check facts
+    · exact allOb_mem hvc.1 o (List.mem_filter.2 ⟨ho, by simp [hc]⟩)
+    · exact Ob.check_sound hf hc
 
 end NoCompiler.VC.M

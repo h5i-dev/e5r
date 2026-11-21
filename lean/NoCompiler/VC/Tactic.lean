@@ -46,22 +46,22 @@ unsafe def evalRunSegImpl (e : Expr) : MetaM (Option (SState × List Ob × Term)
 @[implemented_by evalRunSegImpl]
 opaque evalRunSeg (e : Expr) : MetaM (Option (SState × List Ob × Term))
 
-/-- The value of a closed `explore` term, by compiled evaluation. -/
+/-- The value of a closed `exploreR` term, by compiled evaluation. -/
 unsafe def evalExploreImpl (e : Expr) : MetaM (Option (List PEnd × List Ob)) := do
   evalExpr (Option (List PEnd × List Ob)) (← inferType e) e
 
 @[implemented_by evalExploreImpl]
 opaque evalExplore (e : Expr) : MetaM (Option (List PEnd × List Ob))
 
-/-- Rewrite the first closed `runSeg D ws S` or `explore …` in the goal to its
+/-- Rewrite the first closed `runSeg D ws S` or `exploreR …` in the goal to its
     value, with a kernel-checked equation (`decide`). -/
 elab "vc_run" : tactic => withMainContext do
   let g ← getMainGoal
   let tgt ← instantiateMVars (← g.getType)
   let closed (t : Expr) := !t.hasFVar && !t.hasMVar
   let some t := tgt.find? fun t =>
-      (t.isAppOfArity ``runSeg 3 || t.isAppOfArity ``explore 9) && closed t
-    | throwError "vc_run: no closed `runSeg` or `explore` term in the goal"
+      (t.isAppOfArity ``runSeg 3 || t.isAppOfArity ``exploreR 7) && closed t
+    | throwError "vc_run: no closed `runSeg` or `exploreR` term in the goal"
   let v ← if t.isAppOf ``runSeg then pure (toExpr (← evalRunSeg t)) else pure (toExpr (← evalExplore t))
   let eq ← mkEq t v
   let inst ← synthInstance (mkApp (mkConst ``Decidable) eq)

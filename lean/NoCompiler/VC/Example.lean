@@ -1,4 +1,6 @@
 import NoCompiler.VC.Tactic
+import NoCompiler.Mem
+import NoCompiler.Arith
 
 /-
 A loop through cut points, milestone 4c: each cut point's segment is run by
@@ -76,7 +78,7 @@ theorem abs_spec {P : Perm} (s : State) (hpc : s.pc = 0x2000#64) (hx : s.exit = 
   refine Reach.of_exploreAt (facts := []) (cuts := []) (fuel := 10) (k := 0) (by decide) (by decide)
     hpc hx (by simp) ?_
   unfold exploreVC; vc_run; simp only
-  refine ⟨rfl, ?_, ?_, trivial⟩
+  refine ⟨trivial, ?_, ?_, trivial⟩
   · simp only [PEnd.Next]
     intro hc s' ⟨_, _, hreg, _⟩ _
     have hc' : evalBr .bge (s.reg 10) 0 = true := hc _ (List.mem_singleton_self _)
@@ -106,7 +108,7 @@ theorem countdown' {P : Perm} (s : State) (hpc : s.pc = 0x1000#64) (ha : s.reg 1
     refine Reach.of_exploreAt (facts := []) (cuts := [0x1000#64]) (fuel := 10) (k := 0) (by decide)
       (by decide) hp hux (by simp) ?_
     unfold exploreVC; vc_run; simp only
-    refine ⟨rfl, ?_, ?_, trivial⟩
+    refine ⟨trivial, ?_, ?_, trivial⟩
     · -- the back edge
       simp only [PEnd.Next]
       intro hc s' ⟨_, hpc', hreg, _⟩ hx'
@@ -134,5 +136,117 @@ theorem countdown' {P : Perm} (s : State) (hpc : s.pc = 0x1000#64) (ha : s.reg 1
       refine ⟨hra', .inl ⟨by rw [State.setPc_reg, h10]; exact hc', ?_⟩⟩
       show u.reg 1 &&& ~~~1 = s.reg 1 &&& ~~~1
       rw [hur]
+
+/-! ### A loop over an array, as clang compiled it -/
+
+/-- `sum` from examples/sum.c, the first 9 words of Examples/Sum/Image.lean at 0x11190
+    (copied: that module imports all of `NoCompiler`, this file included).
+    `li a2,0; beqz a1,+24; L: ld a3,0(a0); add a2,a3,a2; addi a1,a1,-1; addi a0,a0,8; bnez a1,L;
+    mv a0,a2; ret`. -/
+def sumCode : Code := ⟨0x11190#64, #[0x00000613#32, 0x00058c63#32, 0x00053683#32, 0x00c68633#32,
+  0xfff58593#32, 0x00850513#32, 0xfe0598e3#32, 0x00060513#32, 0x00008067#32]⟩
+def sumD : Dom := [(0x11190#64, 36)]
+def sumW (xs : List Word) : Word := xs.foldl (· + ·) 0
+
+theorem sumW_take_succ (xs : List Word) (k : Nat) (h : k < xs.length) :
+    sumW (xs.take (k + 1)) = sumW (xs.take k) + xs[k] := by
+  simp only [sumW, List.take_succ, List.getElem?_eq_getElem h, Option.toList_some, List.foldl_append,
+    List.foldl_cons, List.foldl_nil]
+
+theorem ofNat_eq_zero {m : Nat} (h : m < 2 ^ 64) : BitVec.ofNat 64 m = 0#64 ↔ m = 0 := by
+  constructor
+  · intro e; have := congrArg BitVec.toNat e; simp only [BitVec.toNat_ofNat] at this; omega
+  · rintro rfl; rfl
+
+theorem add_ofNat_succ8 (a : Word) {k : Nat} (h : 8 * (k + 1) < 2 ^ 64) :
+    a + BitVec.ofNat 64 (8 * k) + 8#64 = a + BitVec.ofNat 64 (8 * (k + 1)) := by
+  rw [BitVec.add_assoc]; congr 1
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
+  omega
+
+/-- `sum`: from the entry, with read permission on the array only, every run
+    reaches the return with the sum in a0. -/
+theorem sum_reach (a : Word) (xs : List Word) (s : State) (hpc : s.pc = 0x11190#64) (hx : s.exit = none)
+    (ha0 : s.reg 10 = a) (ha1 : s.reg 11 = BitVec.ofNat 64 xs.length) (hlen : 8 * xs.length < 2 ^ 64)
+    (hal : aligned a 8) (harr : arr64 s.mem a xs) (hra : aligned (s.reg 1 &&& ~~~1) 4) :
+    Reach sumCode ⟨[arrRegion a xs], []⟩ sumD (fun s' => s'.pc = s.reg 1 &&& ~~~1 ∧ s'.reg 10 = sumW xs) s := by
+  refine Reach.cutpoints (fun pc u => pc = 0x11198#64 ∧ u.exit = none ∧ u.reg 1 = s.reg 1 ∧ u.mem = s.mem ∧
+      ∃ k, k < xs.length ∧ u.reg 10 = a + BitVec.ofNat 64 (8 * k) ∧
+        u.reg 11 = BitVec.ofNat 64 (xs.length - k) ∧ u.reg 12 = sumW (xs.take k))
+    (fun _ u => (u.reg 11).toNat) ?_ ?_
+  · intro R hR; subst hR
+    refine Reach.of_exploreAt (facts := []) (cuts := [0x11198#64]) (fuel := 20) (k := 0) (by decide)
+      (by decide) hpc hx (by simp) ?_
+    unfold exploreVC; vc_run; simp only
+    have hn : xs.length < 2 ^ 64 := by omega
+    have h11 : (Sym.var 11).den (ρOf s) s.mem = s.reg 11 := rfl
+    have hz : (Sym.const 0#64).den (ρOf s) s.mem = 0#64 := rfl
+    refine ⟨trivial, ?_, ?_, trivial⟩
+    · -- n = 0: straight to the return
+      simp only [PEnd.Next]
+      intro hc s' ⟨_, _, hreg, _⟩ _
+      have hc' := hc _ (List.mem_singleton_self _)
+      simp only [Cond.den, h11, hz, evalBr, beq_iff_eq, ha1, ofNat_eq_zero hn] at hc'
+      have h10 : s'.reg 10 = 0#64 + 0#64 := by rw [hreg 10]; rfl
+      refine ⟨hra, .inl ⟨rfl, ?_⟩⟩
+      rw [State.setPc_reg, h10, List.eq_nil_of_length_eq_zero hc']; rfl
+    · -- n ≠ 0: to the loop head with k = 0
+      simp only [PEnd.Next]
+      intro hc s' ⟨_, hpc', hreg, hmem⟩ hx'
+      have hc' := hc _ (List.mem_singleton_self _)
+      simp only [Cond.den, h11, hz, evalBr, beq_eq_false_iff_ne, ne_eq, ha1, ofNat_eq_zero hn] at hc'
+      refine .inr ⟨hpc', hx', by rw [hreg 1]; rfl, hmem, 0, by omega, ?_, ?_, ?_⟩
+      · rw [hreg 10]; show s.reg 10 = _; rw [ha0]; simp
+      · rw [hreg 11]; show s.reg 11 = _; rw [ha1]; simp
+      · rw [hreg 12]; show (0#64 : Word) + 0#64 = _; rfl
+  · intro u ⟨hp, hux, hur, hum, k, hk, h10, h11, h12⟩ R hR; subst hR
+    refine Reach.of_exploreAt (facts := []) (cuts := [0x11198#64]) (fuel := 20) (k := 2) (by decide)
+      (by decide) hp hux (by simp) ?_
+    unfold exploreVC; vc_run; simp only
+    have hn : xs.length < 2 ^ 64 := by omega
+    have hd : (Sym.iop .addi (.var 11) 18446744073709551615#64).den (ρOf u) u.mem
+        = u.reg 11 + 18446744073709551615#64 := rfl
+    have hz : (Sym.const 0#64).den (ρOf u) u.mem = 0#64 := rfl
+    have hsub : u.reg 11 + 18446744073709551615#64 = BitVec.ofNat 64 (xs.length - (k + 1)) := by
+      rw [h11, ofNat_add_allOnes _ (by omega) (by omega)]; rfl
+    have hld : read64 u.mem (u.reg 10 + 0#64) = xs[k] := by
+      rw [hum, h10, BitVec.add_zero]; exact harr k hk
+    have h12' : read64 u.mem (u.reg 10 + 0#64) + u.reg 12 = sumW (xs.take (k + 1)) := by
+      rw [hld, h12, sumW_take_succ xs k hk, BitVec.add_comm]
+    refine ⟨⟨?_, ?_, trivial⟩, ?_, ?_, trivial⟩
+    · -- the load is aligned
+      show aligned (u.reg 10 + 0#64) 8
+      rw [h10, BitVec.add_zero]; exact aligned_add_ofNat hal (by omega) (by decide)
+    · -- and inside the array
+      refine .inr ⟨arrRegion a xs, by simp, ?_⟩
+      show (u.reg 10 + 0#64 - a).toNat + 8 ≤ 8 * xs.length
+      rw [h10, BitVec.add_zero, add_ofNat_sub_toNat a (by omega)]; omega
+    · -- the back edge, with k + 1
+      simp only [PEnd.Next]
+      intro hc s' ⟨_, hpc', hreg, hmem⟩ hx'
+      have hc' := hc _ (List.mem_singleton_self _)
+      simp only [Cond.den, hd, hz, hsub, evalBr, bne_iff_ne, ne_eq,
+        ofNat_eq_zero (m := xs.length - (k + 1)) (by omega)] at hc'
+      have e10 : s'.reg 10 = u.reg 10 + 8#64 := by rw [hreg 10]; rfl
+      have e11 : s'.reg 11 = u.reg 11 + 18446744073709551615#64 := by rw [hreg 11]; rfl
+      have e12 : s'.reg 12 = read64 u.mem (u.reg 10 + 0#64) + u.reg 12 := by rw [hreg 12]; rfl
+      refine .inr ⟨⟨hpc', hx', by rw [hreg 1]; exact hur, hmem.trans hum, k + 1, by omega, ?_, ?_, ?_⟩, ?_⟩
+      · rw [e10, h10, add_ofNat_succ8 a (by omega)]
+      · rw [e11, hsub]
+      · rw [e12, h12']
+      · rw [e11, hsub, h11]; simp only [BitVec.toNat_ofNat]; omega
+    · -- the return, after the last element
+      simp only [PEnd.Next]
+      intro hc s' ⟨_, _, hreg, _⟩ _
+      have hc' := hc _ (List.mem_singleton_self _)
+      simp only [Cond.den, hd, hz, hsub, evalBr, bne_eq_false_iff_eq,
+        ofNat_eq_zero (m := xs.length - (k + 1)) (by omega)] at hc'
+      have e10 : s'.reg 10 = read64 u.mem (u.reg 10 + 0#64) + u.reg 12 + 0#64 := by rw [hreg 10]; rfl
+      have hra' : aligned (u.reg 1 &&& ~~~1) 4 := by rw [hur]; exact hra
+      refine ⟨hra', .inl ⟨?_, ?_⟩⟩
+      · show u.reg 1 &&& ~~~1 = s.reg 1 &&& ~~~1
+        rw [hur]
+      · rw [State.setPc_reg, e10, BitVec.add_zero, h12', show k + 1 = xs.length by omega, List.take_length]
 
 end NoCompiler.VC.M.Example
