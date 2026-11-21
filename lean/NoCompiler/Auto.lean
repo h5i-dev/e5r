@@ -9,6 +9,7 @@ import NoCompiler.VC.Seg
 import NoCompiler.VC.Tactic
 import NoCompiler.VC.Example
 import NoCompiler.VC.Frame
+import NoCompiler.VC.Chunk
 
 /-
 Proof automation for structured code: `nocompiler_auto`.
@@ -1839,6 +1840,9 @@ syntax (name := vcAuto) "vc_auto " term:max ident ident (" [" Lean.Parser.Tactic
 structure VCx where
   baseN : Nat
   fuelT : Lean.Term
+  /-- On a chunk image: the function's chunk code, its range as a `Dom`, the
+      image's `<f>_chunk` theorem, and the chunk itself (explore runs there). -/
+  onChunk : Option (Lean.Term × Lean.Term × Lean.Term × Lean.Term × Lean.Term) := none
   /-- The loop heads and the callees' entries: where a path stops. -/
   cutsT : Lean.Term
   /-- The callees' entries: where the rest of the run is due, by the callee's theorem. -/
@@ -1884,10 +1888,19 @@ partial def vcRun (cx : Ctx) (vx : VCx) (g : MVarId) (pc : Nat) (hpcT hxT : Lean
   let he := cx.he
   let rs := cx.rs
   let s0 := cx.s0
-  let gs ← run g (← `(tactic| refine NoCompiler.VC.M.Reach.of_exploreCalls (facts := []) (cuts := $(vx.cutsT))
-      (ces := $(vx.callsT)) (fuel := $(vx.fuelT)) (k := $(natLit ((pc - vx.baseN) / 4)))
-      (p := BitVec.ofNat 64 $(natLit pc))
-      (by decide) (by decide) $hpcT $hxT (by simp) ?_))
+  let gs ← match vx.onChunk with
+    | none => run g (← `(tactic| refine NoCompiler.VC.M.Reach.of_exploreCalls (facts := []) (cuts := $(vx.cutsT))
+        (ces := $(vx.callsT)) (fuel := $(vx.fuelT)) (k := $(natLit ((pc - vx.baseN) / 4)))
+        (p := BitVec.ofNat 64 $(natLit pc))
+        (fetch := fun k => Code.words _ |>.toList.drop k)
+        (by decide) (fun _ => rfl) (by decide) $hpcT $hxT (by simp) ?_))
+    | some (cT, dT, hagT, chT, baseT) => run g (← `(tactic|
+        refine NoCompiler.VC.M.Reach.of_exploreCallsOn (c' := $cT) (D' := $dT) (facts := []) (cuts := $(vx.cutsT))
+        (ces := $(vx.callsT)) (fuel := $(vx.fuelT)) (k := $(natLit ((pc - vx.baseN) / 4)))
+        (p := BitVec.ofNat 64 $(natLit pc))
+        (fetch := NoCompiler.VC.M.Chunk.suffix $chT)
+        $hagT (Dom.sub_of_ranges (by decide)) (by decide) (NoCompiler.VC.M.Chunk.suffix_eq $baseT $chT)
+        (by decide) $hpcT $hxT (by simp) ?_))
   let [g] := gs | throwError "vc_auto: explore at {hex pc}"
   let fs ← simpArgs cx.facts
   let gs ← run g (← `(tactic| open NoCompiler.VC.M in (
@@ -2063,8 +2076,20 @@ set_option hygiene true
 
 /-- `nocompiler_auto` with every path run by `explore`: a function without syscalls. -/
 def vcCore (call : Call) (heads rsList : List Nat) (entryN : Nat) (callees : Array (Nat × Lean.Term × Name))
-    (frameList : List Nat) (ecallList : List Nat := []) : TacticM Unit := do
-  let baseN ← evalNat (← mkAppM ``BitVec.toNat #[← mkAppM ``Code.base #[call.code]])
+    (frameList : List Nat) (ecallList : List Nat := []) (chunkThm : Option Name := none) : TacticM Unit := do
+  -- On a chunk image, explore over the function's chunk (VC/Chunk.lean).
+  let chunkInfo ← match chunkThm with
+    | none => pure none
+    | some n => do
+      let ty ← instantiateMVars (← inferType (mkConst n))
+      forallTelescope ty fun xs b => do
+        let some dm := (← inferType xs[1]!).consumeMData.getAppArgs[0]? | return none
+        let cE := (b.getArg! 2).appFn!.appArg!
+        unless cE.isAppOfArity ``NoCompiler.Chunk.code 2 do return none
+        return some (cE, dm, cE.getArg! 0, cE.getArg! 1)
+  let baseN ← match chunkInfo with
+    | some (cE, _, _, _) => evalNat (← mkAppM ``BitVec.toNat #[← mkAppM ``Code.base #[cE]])
+    | none => evalNat (← mkAppM ``BitVec.toNat #[← mkAppM ``Code.base #[call.code]])
   let sizeN ← evalNat (← mkAppM ``Array.size #[← mkAppM ``Code.words #[call.code]])
   let s0 := call.s0
   let he := call.he
@@ -2109,7 +2134,11 @@ def vcCore (call : Call) (heads rsList : List Nat) (entryN : Nat) (callees : Arr
   let callEntries := callees.toList.map (·.1)
   let cutsT ← lits heads
   let callsT ← lits (callEntries ++ ecallList)
-  let vx : VCx := { baseN, fuelT := natLit (sizeN + 2), cutsT, callsT }
+  let onChunk ← match chunkInfo, chunkThm with
+    | some (cE, dm, bE, chE), some n => pure (some (← Term.exprToSyntax cE, ← Term.exprToSyntax dm,
+        (← `($(mkIdent n))), ← Term.exprToSyntax chE, ← Term.exprToSyntax bE))
+    | _, _ => pure none
+  let vx : VCx := { baseN, fuelT := natLit (sizeN + 2), cutsT, callsT, onChunk }
   let mkCx (fs : Array Lean.Term) (mode : Mode) (origin : String) (endsRef : IO.Ref (Std.HashMap String Nat)) : Ctx :=
     { ends := some endsRef, callees, ecalls := ecallList, cuts := heads, facts := call.userFacts ++ retFacts ++ fs, rs := rs,
       s0 := s0, he := he, spec := mkIdent call.specName, hR := hR, mode := mode, origin := origin,
@@ -2186,6 +2215,16 @@ def vcCore (call : Call) (heads rsList : List Nat) (entryN : Nat) (callees : Arr
     bodyGoals := bodyGoals ++ gs
   replaceMainGoal (startGoals ++ bodyGoals)
 
+/-- The image's `<f>_chunk` theorem for the function `f` (`<f>_func`), on a chunk image. -/
+def chunkOf (f : Syntax) : TacticM (Option Name) := do
+  unless f.isIdent do return none
+  let e ← try Term.elabTerm f none catch _ => return none
+  let .const fn _ := (← instantiateMVars e) | return none
+  let .str p s := fn | return none
+  unless s.endsWith "_func" do return none
+  let cn := Name.str p ((String.ofList (s.toList.take (s.length - 5))) ++ "_chunk")
+  return if (← getEnv).contains cn then some cn else none
+
 /-- Whether `vcCore` covers the function: no syscalls. -/
 def vcCovers (_call : Call) (_fE : Expr) : TacticM Bool := return true
 
@@ -2208,7 +2247,7 @@ def vcCovers (_call : Call) (_fE : Expr) : TacticM Bool := return true
   for h in given do
     unless heads.contains h do throwError "vc_auto: {hex h} is not a loop head of {f}"
   let ecallList ← evalNatList (mkApp2 (mkConst ``ecalls) call.code fE)
-  vcCore call heads rsList entryN callees frameList ecallList
+  vcCore call heads rsList entryN callees frameList ecallList (← chunkOf stx[1])
 
 end VCPath
 
@@ -2242,7 +2281,7 @@ end VCPath
     -- counts as a failure, and so does a timeout: the run starts again step by step.
     let ok ← tryCatchRuntimeEx
       (do
-        withoutRecover (vcCore call heads rsList entryN callees frameList ecallList)
+        withoutRecover (vcCore call heads rsList entryN callees frameList ecallList (← chunkOf stx[1]))
         if errors (← getThe Core.State).messages != e0 then throwError "an error was logged"
         traceLine "[nocompiler_auto] paths by explore"
         pure true)

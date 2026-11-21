@@ -91,13 +91,14 @@ def CallQ (c : Code) (P : Perm) (D : Dom) (Q : State → Prop) (ces : List Word)
   if s.pc ∈ ces then Reach c P D Q s else Q s
 
 theorem Reach.of_exploreCalls {c : Code} {P : Perm} {D : Dom} {Q : State → Prop} {facts : List Fact}
-    {cuts ces : List Word} {fuel k : Nat} {p : Word} {s : State} (hb : 4 * c.words.size < 2 ^ 64)
+    {cuts ces : List Word} {fuel k : Nat} {p : Word} {s : State} {fetch : Nat → List (BitVec 32)}
+    (hb : 4 * c.words.size < 2 ^ 64) (hfe : ∀ k, fetch k = c.words.toList.drop k)
     (hk : p = c.base + BitVec.ofNat 64 (4 * k)) (hpc : s.pc = p) (hx : s.exit = none)
     (hf : ∀ f ∈ facts, f.den (ρOf s) P)
     (hvc : exploreVC (ρOf s) s.mem P (fun s' => s'.trace = s.trace → CallQ c P D Q ces s') facts c D
-      (cuts ++ ces) fuel k p) :
+      (cuts ++ ces) fuel k p fetch) :
     Reach c P D Q s :=
-  Reach.trans (Reach.of_exploreAtT hb hk hpc hx hf hvc) fun s' h => by
+  Reach.trans (Reach.of_exploreAtT hb hfe hk hpc hx hf hvc) fun s' h => by
     unfold CallQ at h
     split at h
     · exact h

@@ -319,13 +319,15 @@ theorem sum_reach2 (a : Word) (xs : List Word) (s : State) (hpc : s.pc = 0x11190
 def callCode : Code := ⟨0x3000#64, #[0x00000097#32, 0x008080e7#32, 0x00000013#32, 0x00008067#32]⟩
 
 /-- The path from 0x3000 ends at the callee's entry, with the return address in ra. -/
-example : ((exploreR callCode [(0x3000#64, 16)] [0x3008#64] 10 0 0x3000#64 []).map fun r =>
+example : ((exploreR callCode [(0x3000#64, 16)] [0x3008#64] (fun k => callCode.words.toList.drop k) 10 0
+    0x3000#64 []).map fun r =>
     r.1.map fun e => match e with | .cut S _ => (S.pc, S.reg 1) | .ret S _ => (S.pc, S.reg 1)) =
     some [(0x3008#64, .const 0x3008#64)] := by decide +kernel
 
 /-- `jal ra, +8` at 0x3000 calls 0x3008 the same way. -/
 example : ((exploreR ⟨0x3000#64, #[0x008000ef#32, 0x00000013#32, 0x00000013#32, 0x00008067#32]⟩
-    [(0x3000#64, 16)] [0x3008#64] 10 0 0x3000#64 []).map fun r =>
+    [(0x3000#64, 16)] [0x3008#64] (fun k => [0x008000ef#32, 0x00000013#32, 0x00000013#32, 0x00008067#32].drop k)
+    10 0 0x3000#64 []).map fun r =>
     r.1.map fun e => match e with | .cut S _ => (S.pc, S.reg 1) | .ret S _ => (S.pc, S.reg 1)) =
     some [(0x3008#64, .const 0x3004#64)] := by decide +kernel
 

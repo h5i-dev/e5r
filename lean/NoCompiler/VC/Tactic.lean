@@ -67,7 +67,7 @@ elab "vc_run" : tactic => withMainContext do
   let tgt ← instantiateMVars (← g.getType)
   let closed (t : Expr) := !t.hasFVar && !t.hasMVar
   let some t := tgt.find? fun t =>
-      (t.isAppOfArity ``runSeg 3 || t.isAppOfArity ``exploreR 7) && closed t
+      (t.isAppOfArity ``runSeg 3 || t.isAppOfArity ``exploreR 8) && closed t
     | throwError "vc_run: no closed `runSeg` or `exploreR` term in the goal"
   let v ← if t.isAppOf ``runSeg then pure (toExpr (← evalRunSeg t)) else pure (toExpr (← evalExplore t))
   let eq ← mkEq t v
