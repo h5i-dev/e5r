@@ -51,6 +51,7 @@ def run(iid, elfs, which="all"):
         tj = json.load(fh)
     row = dataset_row(iid)
     recipe = RECIPES[row["repo"]]
+    recipe.subjects = list(tj["subjects"])  # class B recipes find theirs at build time
     if len(elfs) != len(recipe.subjects):
         raise SystemExit(f"{iid}: {len(recipe.subjects)} subjects ({', '.join(recipe.subjects)}), {len(elfs)} ELFs given")
     work = os.path.join(SWB, "work", iid)

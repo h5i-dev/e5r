@@ -22,6 +22,8 @@ SWB = os.environ.get("SWB", "/mnt/scratch/ec2-user/swe-bin")
 RUSTUP_HOME = "/mnt/scratch/ec2-user/rustup"
 CARGO_HOME = "/mnt/scratch/ec2-user/cargo"
 TARGET = "riscv64imafd-unknown-linux-musl"
+# the current nightly: for repositories without a Cargo.lock (recipes.RustProgram.toolchain)
+LOCK_TOOLCHAIN = "nightly-2026-11-01"
 
 
 def _env():

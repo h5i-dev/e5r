@@ -146,6 +146,7 @@ def judge(task, recipe, base, gold):
 def convert(task, keep_work=False):
     iid = task["instance_id"]
     recipe = RECIPES[task["repo"]]
+    recipe.task = task
     work = os.path.join(SWB, "work", iid)
     art = os.path.join(SWB, "artifacts", iid)
     shutil.rmtree(work, ignore_errors=True)
@@ -168,6 +169,9 @@ def convert(task, keep_work=False):
             if side == "gold":
                 recipe.reset_generated(wt, log)
                 apply_patch(wt, log, task["patch"], "gold", "gold-patch")
+            early = getattr(recipe, "build_with_test_patch", False)
+            if early:  # the tests are compiled into the subject: build with the test patch
+                apply_patch(wt, log, task["test_patch"], "test", "test-patch")
             t = time.time()
             recipe.build(wt, log)
             elfs = []
@@ -179,12 +183,16 @@ def convert(task, keep_work=False):
                 log.run(f"llvm-objcopy --strip-debug {dst} {stripped}", wt, "strip")
                 elfs.append(stripped)
             build_s = round(time.time() - t, 1)
-            apply_patch(wt, log, task["test_patch"], "test", "test-patch")
+            if not early:
+                apply_patch(wt, log, task["test_patch"], "test", "test-patch")
             t = time.time()
             res = run_side(recipe, wt, log, task, elfs, side)
             sides[side] = {"elfs": elfs, "results": res, "build_s": build_s,
                            "test_s": round(time.time() - t, 1)}
             log.run(f"git apply -R --whitespace=nowarn {os.path.join(work, 'test.patch')}", wt, "test-unpatch")
+        rec["subjects"] = list(recipe.subjects)
+        if getattr(recipe, "deviation", None):
+            rec["deviation"] = recipe.deviation
         rows, excluded, why = judge(task, recipe, sides["base"]["results"], sides["gold"]["results"])
         rec["tests"] = rows
         rec["excluded_tests"] = excluded

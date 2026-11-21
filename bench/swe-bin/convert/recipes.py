@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import re
+import datetime
 import glob
 import json
 import shlex
@@ -241,7 +242,10 @@ import rusttc  # noqa: E402
 
 RV_RUSTFLAGS = ("-C linker=rv-cc -C link-self-contained=no -C target-feature=+zba,+zbb,-relax "
                 "-C code-model=medium -C relocation-model=static "
-                "-C link-arg=-Wl,--emit-relocs -C link-arg=-lgcc -Awarnings")  # -lgcc: old rustc links -nodefaultlibs, and musl's printf needs the long double builtins
+                "-C link-arg=-Wl,--emit-relocs -C link-arg=-lgcc -C link-arg=-lswb_lfs64 -Awarnings")
+# -lgcc: old rustc links -nodefaultlibs, and musl's printf needs the long double builtins.
+# -lswb_lfs64: stat64 and the other LFS64 names, which std from 2022 and earlier links
+# (toolchain/build-sysroot.sh)
 
 
 def rust_env_prefix(target_dir: str) -> str:
@@ -276,7 +280,15 @@ class RustProgram(Recipe):
         head = subprocess.run(["git", "-C", wt, "rev-parse", "HEAD"], stdout=subprocess.PIPE,
                               check=True).stdout.decode().strip()
         try:
-            self.tc = rusttc.for_commit(wt, head)
+            tracked = subprocess.run(["git", "-C", wt, "ls-files", "--error-unmatch", "Cargo.lock"],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+            if tracked:
+                self.tc = rusttc.for_commit(wt, head)
+            else:
+                # no lock file (axum): dependencies resolve today, as SWE-bench's images resolved
+                # them when they were built, so the compiler is a current one. A lock resolved as
+                # of the commit date does not work: some of those versions are yanked now
+                self.tc = rusttc.LOCK_TOOLCHAIN
             self.tcm = rusttc.setup(self.tc)
         except RuntimeError as e:
             raise Failed("toolchain", str(e))
@@ -370,6 +382,107 @@ class RustProgram(Recipe):
         return super().excluded(test)
 
 
+class RustTests(RustProgram):
+    """Class B (tokio, axum, ruff): the tests are compiled into the ELF with the code under test.
+
+    The subjects are the riscv64 test executables of the SWE-bench command, built at the base
+    commit WITH the test patch (as SWE-bench builds them), in the dev profile at opt-level 2 with
+    debug assertions kept. Each runs under qemu with the command's test filter and the arguments
+    after `--`, from its package's directory. Lead decision (Q1, 12:28 UTC): the submission is
+    that test ELF, and run_tests/submit reject a binary whose functions outside the crates under
+    test differ from base; the tests being visible in the binary is a recorded deviation."""
+
+    build_with_test_patch = True
+    deviation = ("class B: the FAIL_TO_PASS tests are compiled into the submitted test ELF, so "
+                 "they are visible in it (in SWE-bench they are hidden); functions outside the "
+                 "crates under test must stay byte-identical to base")
+
+    def __init__(self, name):
+        super().__init__(name, [])
+        self.subjects = []
+
+    def _parts(self, task):
+        envs, args = self._cargo_test(task)
+        cargo_part, _, after = args.partition(" -- ")
+        toks = shlex.split(cargo_part)
+        cargo_opts, filt, i = [], [], 0
+        takes_value = {"--package", "-p", "--test", "--features", "--bin", "--example", "--bench"}
+        while i < len(toks):
+            t = toks[i]
+            if t in takes_value and i + 1 < len(toks):
+                cargo_opts += [t, toks[i + 1]]
+                i += 2
+            elif t.startswith("-"):
+                cargo_opts.append(t)
+                i += 1
+            else:
+                filt.append(t)
+                i += 1
+        cargo_opts = [o for o in cargo_opts if o != "--no-fail-fast"]
+        return envs, cargo_opts, filt + shlex.split(after)
+
+    def build(self, wt, log):
+        tc = self.toolchain(wt, log)
+        rv, _ = self.dirs(wt)
+        envs, cargo_opts, _ = self._parts(self.task)
+        rustflags = f"{RV_RUSTFLAGS} {self.tcm['jump_tables_flag']}"
+        m = re.search(r"RUSTFLAGS=(\"[^\"]*\"|\S+)", envs)
+        if m:  # e.g. --cfg tokio_unstable
+            rustflags += " " + m.group(1).strip('"').replace("-Awarnings", "")
+        cmd = (f"{rust_env_prefix(rv)}CARGO_PROFILE_DEV_OPT_LEVEL=2 CARGO_PROFILE_DEV_DEBUG=0 "
+               f"RUSTFLAGS='{rustflags}' cargo +{tc} test --no-run -j{JOBS} {' '.join(map(shlex.quote, cargo_opts))} "
+               f"-Zbuild-std=std,panic_unwind {self.tcm['json_target_flag']} --target {self.tcm['target']} "
+               f"--message-format=json 2>/dev/null")
+        out = log.run(cmd, wt, "build", timeout=7200, check=False)
+        exes = []
+        for line in out.splitlines():
+            try:
+                j = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if j.get("reason") == "compiler-artifact" and j.get("executable") and j["profile"]["test"]:
+                kind = j["target"]["kind"][0]
+                name = j["target"]["name"] + ("" if kind == "test" else f"-{kind}")
+                exes.append((name, j["executable"], os.path.dirname(j["manifest_path"])))
+            if j.get("reason") == "build-finished" and not j.get("success"):
+                # show the compiler's errors
+                log.run(cmd.replace("--message-format=json 2>/dev/null", "2>&1 | tail -40"), wt, "build-errors",
+                        timeout=7200, check=False)
+                raise Failed("build", "the test executables did not build (with the test patch at this commit)")
+        if not exes:
+            raise Failed("build", "no test executable")
+        os.makedirs(os.path.join(wt, "rv-tests"), exist_ok=True)
+        self.subjects, self.pkg_dirs = [], {}
+        for name, exe, pkg in sorted(exes):
+            rel = f"rv-tests/{name}"
+            shutil.copy(exe, os.path.join(wt, rel))
+            self.subjects.append(rel)
+            self.pkg_dirs[rel] = os.path.relpath(pkg, wt)
+        with open(os.path.join(wt, "rv-tests", "pkgdirs.json"), "w") as fh:
+            json.dump(self.pkg_dirs, fh)
+
+    def run_tests(self, wt, task, log):
+        envs, _, exe_args = self._parts(task)
+        pkg_dirs = getattr(self, "pkg_dirs", None)
+        if not pkg_dirs:
+            with open(os.path.join(wt, "rv-tests", "pkgdirs.json")) as fh:
+                pkg_dirs = json.load(fh)
+        out = []
+        for rel, elf in self.current.items():
+            pkg = os.path.join(wt, pkg_dirs.get(rel, "."))
+            args = " ".join(shlex.quote(a) for a in exe_args)
+            out.append(f"     Running {rel}")
+            out.append(log.run(f"CARGO_MANIFEST_DIR={shlex.quote(pkg)} {shlex.quote(QEMU)} {shlex.quote(elf)} {args} 2>&1 ; true",
+                               pkg, "test", timeout=5400, check=False))
+        return "\n".join(out)
+
+    def parse(self, out):
+        return parse_cargo(out)
+
+    def excluded(self, test):
+        return Recipe.excluded(self, test)
+
+
 def parse_cargo(out: str) -> dict:
     r = {}
     for m in re.finditer(r"^test (\S+) \.\.\. (ok|FAILED|ignored)", out, re.M):
@@ -391,4 +504,7 @@ RECIPES = {"jqlang/jq": Jq(), "micropython/micropython": MicroPython(),
            "sharkdp/bat": RustProgram("bat", ["bat"], "--package bat"),
            "burntsushi/ripgrep": RustProgram("ripgrep", ["rg"], "--package ripgrep"),
            "uutils/coreutils": RustProgram("coreutils", ["coreutils"], "--package coreutils"),
-           "nushell/nushell": RustProgram("nushell", ["nu"], "--package nu")}
+           "nushell/nushell": RustProgram("nushell", ["nu"], "--package nu"),
+           "tokio-rs/tokio": RustTests("tokio"),
+           "tokio-rs/axum": RustTests("axum"),
+           "astral-sh/ruff": RustTests("ruff")}

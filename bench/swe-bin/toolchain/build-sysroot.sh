@@ -100,3 +100,17 @@ cat > "$SR/include/sys/cdefs.h" <<'EOH'
 #define __THROW
 #endif
 EOH
+# libswb_lfs64.a: the LFS64 names (stat64, lseek64, open64, ...) as tail calls to the plain
+# functions. musl >= 1.2.4 has them only as macros in its headers, but std from 2022 and
+# earlier links them by name. Generated from the headers' `#define X64 X`, for every X that
+# libc.a defines as a function.
+mkdir -p "$B/lfs64"; cd "$B/lfs64"
+llvm-nm --defined-only "$SR/lib/libc.a" 2>/dev/null | awk '$2=="T"||$2=="W"{print $3}' | sort -u > defined.txt
+grep -rhoE "^#define [a-z_0-9]+64(_r)? [a-z_0-9]+$" "$SRC/musl-1.2.5/include" | awk '{print $2, $3}' | sort -u |
+  while read -r a b; do
+    # a tail call, not `.set` (which cannot alias a symbol of another object)
+    if grep -qx "$b" defined.txt; then printf '.globl %s\n.type %s, @function\n%s:\n  tail %s\n' "$a" "$a" "$a" "$b"; fi
+  done > lfs64.s
+$CC -c lfs64.s -o lfs64.o
+rm -f "$SR/lib/libswb_lfs64.a"; llvm-ar rcs "$SR/lib/libswb_lfs64.a" lfs64.o
+echo "lfs64 aliases: $(grep -c '^  tail' lfs64.s)"
