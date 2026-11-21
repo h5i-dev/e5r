@@ -1,7 +1,8 @@
 import Examples.Refine.Diff.AB
 import Examples.Refine.Diff.AC
 import Examples.Refine.Diff.AD
-import Examples.Sum
+import Examples.Refine.Relink
+import NoCompiler.Auto
 
 /-
 The tree diff (item 5) feeding the automation (NoCompiler/RefineAuto.lean):
@@ -14,8 +15,11 @@ and the proofs: `region0_ok` by `nocompiler_region`, `refines` by
 `nocompiler_refine` (Examples/Refine/Diff/AB.lean, AC.lean). Nothing in them
 is trusted: the kernel checks the certificate and every proof.
 
-Here: the generated theorems at `sum`'s specification, and `sum`'s
-correctness carried to B and C.
+Here: the generated theorems at `sum`'s specification; `sum_a`, A meets
+`sum`'s specification (by `nocompiler_auto` on A's image); and `sum_b`,
+`sum_c`, `sum_d`: B, C and D meet it too (outside A's code region,
+`Spec.avoid`), each by `Refines.verified` from `sum_a` and the refinement,
+never looking at B's, C's or D's code otherwise.
 -/
 namespace Examples.Refine.Diff
 open NoCompiler
@@ -45,5 +49,40 @@ example : ¬ SeqEquiv [11] [11] [.iop .addi 11 11 0xfff#12] [.iop .addi 11 11 0x
   intro h
   have := h (fun _ => 5) (fun _ => 5) (fun _ _ => rfl) 11 (by simp)
   revert this; decide
+
+/-- A, the original `sum` (examples/refine/diff), meets `sum`'s specification. -/
+theorem sum_a : VerifiedImg ImgA.code ImgA.sum_dom ImgA.sum_entry Examples.Sum.spec := by
+  rintro ⟨a, xs⟩ s he ⟨ha0, ha1, hlen, hal, harr⟩
+  nocompiler_auto ImgA.sum_func s he
+    loop_inv $l1 (fun u => ∃ m, u.reg 11 = BitVec.ofNat 64 m ∧ 0 < m ∧ m ≤ xs.length ∧
+        u.reg 10 = a + BitVec.ofNat 64 (8 * (xs.length - m)) ∧
+        u.reg 12 = Examples.Sum.sumW (xs.take (xs.length - m)) ∧ u.mem = s.mem)
+      measure (fun u => (u.reg 11).toNat)
+  case entry_ret_x20 => exact (Vocab.foldl_of_length_zero _ _ xs (by omega)).symm
+  case entry_to_l1 => rfl
+  case l1_to_l1 =>
+    unfold Examples.Sum.sumW
+    rw [Vocab.foldl_take_sub_pred _ _ xs m (by omega) (by omega)]; exact BitVec.add_comm _ _
+  case l1_ret_x20 =>
+    unfold Examples.Sum.sumW
+    rw [Vocab.foldl_eq_last _ _ xs m (by omega) (by omega)]; exact BitVec.add_comm _ _
+
+open Examples.Refine.Relink (spec_pcFree spec_obsInv) in
+/-- B (the loop's add commuted) meets `sum`'s specification, through `refines_b`. -/
+theorem sum_b : VerifiedImg ImgB.code ImgB.sum_dom ImgB.sum_entry
+    (Examples.Sum.spec.avoid ImgA.sum_dom) :=
+  refines_b.verified sum_a spec_pcFree spec_obsInv
+
+open Examples.Refine.Relink (spec_pcFree spec_obsInv) in
+/-- C (an `xor t5, t5, t5` inserted in the loop) meets it, through `refines_c`. -/
+theorem sum_c : VerifiedImg ImgC.code ImgC.sum_dom ImgC.sum_entry
+    (Examples.Sum.spec.avoid ImgA.sum_dom) :=
+  refines_c.verified sum_a spec_pcFree spec_obsInv
+
+open Examples.Refine.Relink (spec_pcFree spec_obsInv) in
+/-- D (the counter stepped by -2 then +1) meets it, through `refines_d`. -/
+theorem sum_d : VerifiedImg ImgD.code ImgD.sum_dom ImgD.sum_entry
+    (Examples.Sum.spec.avoid ImgA.sum_dom) :=
+  refines_d.verified sum_a spec_pcFree spec_obsInv
 
 end Examples.Refine.Diff
