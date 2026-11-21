@@ -24,6 +24,8 @@ structure Kern where
   /-- The program break's start and current value (Linux/Brk.lean); 0 until the loader sets them. -/
   startBrk : Word := 0
   brk : Word := 0
+  /-- Anonymous mappings made by `mmap` (Linux/Mmap.lean), as (base, size). -/
+  maps : List (Word × Nat) := []
 
 def Kern.init : Kern := { fds := [0, 1, 2] }
 

@@ -30,3 +30,4 @@ import NoCompiler.Linux.Basic
 import NoCompiler.Linux.Fd
 import NoCompiler.Linux.Start
 import NoCompiler.Linux.Brk
+import NoCompiler.Linux.Mmap

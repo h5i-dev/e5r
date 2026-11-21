@@ -628,4 +628,26 @@ musl binaries like OVP's need first):
   - `brk_query`, `brk_grow`, and the control `brk_shrink_none`.
 - Axioms: `[propext]` / `[propext, Quot.sound]`. `lake env lean Brk.lean`:
   0.40 s.
-- Next: partial memory (needed for unmaps: brk shrink, munmap), then `mmap`.
+
+### Fifth step: anonymous `mmap` (lean/NoCompiler/Linux/Mmap.lean)
+
+- `Kern.maps` records the mappings. `mmap(0, len, prot, MAP_PRIVATE |
+  MAP_ANONYMOUS, -1, 0)` gives either:
+  - some page-aligned range of PAGE_ALIGN(len) bytes, below TASK_SIZE,
+    disjoint from every earlier mapping, zero-filled and recorded; or
+  - ENOMEM.
+  
+  Linux picks one particular address (LPS runs its placement search). Any
+  free one is allowed here, which over-approximates Linux and is sound.
+- Every other `mmap` and `munmap` has no outcome (fail closed).
+- `ProcStep2.sys`: at every syscall but close/brk/mmap/munmap a step is a
+  `Sys` step.
+- `mmap_fresh`, and the controls `munmap_none`, `mmap_file_none`.
+- Axioms: `[propext]`. `lake env lean Mmap.lean`: 0.42 s.
+- Not yet: `brk`'s grow is not recorded in `Kern.maps`, so an `mmap` may be
+  given pages that overlap the heap.
+- Open, a design question for the lead: partial memory, so that unmapped
+  pages fault (`munmap`, `brk` shrink, PROT_NONE). Loads and stores are
+  stepped by the trusted `Step`, which does not see `Kern`. Faulting there
+  needs either a process-level step that checks accesses against
+  `Kern.maps`, or a partial `State.mem` (Machine.lean, not mine).
