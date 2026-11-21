@@ -63,7 +63,7 @@ def main():
     d = os.path.join(work, *NS.split(".")[:-1])
     os.makedirs(d, exist_ok=True)
     t0 = time.monotonic()
-    src = subprocess.run([NOCOMPILER, "export", "--format", "chunks", "--namespace", NS, elf],
+    src = subprocess.run([NOCOMPILER, "export", "--lean-level-check", "--format", "chunks", "--namespace", NS, elf],
                          capture_output=True, text=True, check=True).stdout
     export_s = round(time.monotonic() - t0, 2)
     lines = src.splitlines()

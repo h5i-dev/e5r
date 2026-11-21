@@ -85,7 +85,7 @@ pub fn export(
     namespace: &str,
     source: &str,
 ) -> Result<String, String> {
-    export_as(bin, metas, namespace, source, false)
+    export_as(bin, metas, namespace, source, false, true)
 }
 
 /// The image in chunks (lean/NoCompiler/Image.lean, "Code in chunks"): `.text`
@@ -97,7 +97,23 @@ pub fn export_chunks(
     namespace: &str,
     source: &str,
 ) -> Result<String, String> {
-    export_as(bin, metas, namespace, source, true)
+    export_as(bin, metas, namespace, source, true, true)
+}
+
+/// The image in either format (`chunked`), with or without the Lean level
+/// check (`level_check`). Without it, each function's level is the Rust
+/// checker's verdict, recorded as `<f>_level`, the statement `<f>_checked`
+/// would prove, as a `Prop`: a theorem that needs the level takes it as a
+/// hypothesis (never an axiom), and `--lean-level-check` proves it.
+pub fn export_with(
+    bin: &Binary,
+    metas: &[FuncMeta],
+    namespace: &str,
+    source: &str,
+    chunked: bool,
+    level_check: bool,
+) -> Result<String, String> {
+    export_as(bin, metas, namespace, source, chunked, level_check)
 }
 
 /// `Σ xs[i] << (4 * digits * i)` as a hexadecimal Lean literal: the number
@@ -163,6 +179,7 @@ fn export_as(
     namespace: &str,
     source: &str,
     chunked: bool,
+    level_check: bool,
 ) -> Result<String, String> {
     // A function's `_dom` is it and everything it calls, so the array format
     // exports only the functions whose callees passed (`exportable`). The
@@ -490,12 +507,37 @@ fn export_as(
             crate::profile::Level::L1 => "l1",
             crate::profile::Level::L2 => "l2",
         };
-        writeln!(
-            o,
-            "/-- `{}` is at level {:?} (docs/isa/v1.md), as the kernel checks it. -/",
-            m.name, level
-        )
-        .unwrap();
+        if level_check {
+            writeln!(
+                o,
+                "/-- `{}` is at level {:?} (docs/isa/v1.md), as the kernel checks it. -/",
+                m.name, level
+            )
+            .unwrap();
+        } else {
+            writeln!(
+                o,
+                "/-- `{}` is at level {:?} (docs/isa/v1.md) by the Rust checker (`nocompiler export` {}), not checked\n    \
+                 here: the statement only. A theorem that needs it takes it as a hypothesis; `nocompiler export\n    \
+                 --lean-level-check` proves it (as `{id}_checked`). -/",
+                m.name,
+                level,
+                env!("CARGO_PKG_VERSION")
+            )
+            .unwrap();
+        }
+        let (head, proof) = if level_check {
+            (
+                format!("theorem {id}_checked :"),
+                if chunked {
+                    " := by decide +kernel"
+                } else {
+                    " := by decide"
+                },
+            )
+        } else {
+            (format!("def {id}_level : Prop :="), "")
+        };
         if chunked {
             let w = ((m.entry - bin.text_addr) / 4) as usize;
             let k = bounds
@@ -505,7 +547,7 @@ fn export_as(
             let base = format!("0x{:x}#64", bin.text_addr);
             writeln!(
                 o,
-                "theorem {id}_checked : Struct.level (chunk_{k}.code {base}) {id}_func entries {id}_frame {id}_cert = some .{lv} := by decide +kernel"
+                "{head} Struct.level (chunk_{k}.code {base}) {id}_func entries {id}_frame {id}_cert = some .{lv}{proof}"
             )
             .unwrap();
             writeln!(
@@ -522,7 +564,7 @@ fn export_as(
         } else {
             writeln!(
                 o,
-                "theorem {id}_checked : Struct.level code {id}_func entries {id}_frame {id}_cert = some .{lv} := by decide"
+                "{head} Struct.level code {id}_func entries {id}_frame {id}_cert = some .{lv}{proof}"
             )
             .unwrap();
         }
@@ -636,6 +678,49 @@ mod tests {
         assert!(c.contains("def hello_entry"));
         assert!(!c.contains("def hello_dom"));
         assert!(c.contains("-- no `hello_dom`"));
+    }
+
+    /// Without the level check, `<f>_level` states what `<f>_checked` proves,
+    /// as a `Prop`, and nothing claims it; with it, the output is as before.
+    #[test]
+    fn level_check_is_opt_in() {
+        let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+        let bytes = std::fs::read(format!("{root}/examples/elf/hello.elf")).unwrap();
+        let bin = crate::load(&bytes).unwrap();
+        let metas: Vec<FuncMeta> = bin
+            .check()
+            .into_iter()
+            .filter_map(|r| r.result.ok())
+            .collect();
+        for chunked in [false, true] {
+            let on = export_with(&bin, &metas, "T", "hello.elf", chunked, true).unwrap();
+            let off = export_with(&bin, &metas, "T", "hello.elf", chunked, false).unwrap();
+            let before = if chunked {
+                export_chunks(&bin, &metas, "T", "hello.elf").unwrap()
+            } else {
+                export(&bin, &metas, "T", "hello.elf").unwrap()
+            };
+            assert_eq!(on, before);
+            assert!(
+                !off.contains("theorem hello_checked")
+                    && !off.contains("theorem write_all_checked")
+            );
+            for l in on
+                .lines()
+                .filter(|l| l.starts_with("theorem hello_checked :"))
+            {
+                let stmt = l
+                    .split(" := by decide")
+                    .next()
+                    .unwrap()
+                    .replace("theorem hello_checked :", "");
+                assert!(
+                    off.contains(&format!("def hello_level : Prop :={stmt}\n")),
+                    "{stmt}"
+                );
+            }
+            assert!(off.contains("by the Rust checker"));
+        }
     }
 
     /// Two functions with one name (local symbols) get their entries appended.

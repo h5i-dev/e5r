@@ -3,7 +3,7 @@
 
     python3 -I scripts/core/bench-prove.py IMAGE.lean OUTDIR [--max N] [--only NAME]
 
-IMAGE.lean is `nocompiler export A.elf --namespace Bench.Image -o IMAGE.lean`
+IMAGE.lean is `nocompiler export --lean-level-check A.elf --namespace Bench.Image -o IMAGE.lean`
 of the whole artifact (examples/refine/targets). That file does not elaborate
 as one module (docs/isa/v1-results.md, 7'), so for each exported function
 this writes OUTDIR/F_<k>.lean, a slice of it: `code` cut to the function's

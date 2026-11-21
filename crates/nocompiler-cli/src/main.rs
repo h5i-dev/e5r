@@ -149,6 +149,11 @@ pub enum Command {
         /// (scales to whole binaries); default: one array, a lemma per instruction.
         #[arg(long, value_name = "FORMAT", value_parser = ["chunks", "array"], default_value = "array")]
         format: String,
+        /// Prove each function's level in Lean (`<f>_checked`, by `decide`).
+        /// Default: the Rust checker's level, as the statement `<f>_level`
+        /// that a theorem needing it takes as a hypothesis.
+        #[arg(long)]
+        lean_level_check: bool,
         /// Write the Lean file here instead of to standard output.
         #[arg(short = 'o', value_name = "OUT.lean")]
         out: Option<PathBuf>,
@@ -844,11 +849,13 @@ fn core(cli: &Cli, w: &mut out::Out) -> Option<Result<u8, String>> {
             file,
             namespace,
             format,
+            lean_level_check,
             out,
         } => cmd::export(
             file,
             namespace,
             format == "chunks",
+            *lean_level_check,
             out.as_deref(),
             &mut text,
         ),

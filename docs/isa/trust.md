@@ -14,6 +14,7 @@ trusting the following, and nothing else.
 | Instruction semantics | `lean/NoCompiler/Machine.lean` | Against qemu-riscv64 (`crates/nocompiler/tests/semantics.rs`) and against the official Sail RISC-V model's C emulator (`crates/nocompiler/tests/sail.rs`), each on random programs over every instruction |
 | The machine model | `HwStep` in `lean/NoCompiler/Step.lean` | By reading: fetch from memory, decode, execute, or hand ECALL to the environment |
 | The environment model | `lean/NoCompiler/Env.lean` | By reading against the Linux syscall ABI; its assumptions are listed in [environment.md](environment.md) |
+| The process step | `PStep` in `lean/NoCompiler/Linux/Process.lean` | By reading: the process step (machine `exec` under `Kern.perm`, `ecall` by the Linux layer); `PStep.step` proves each step at the trusted syscalls is a `Step c k.perm` step |
 | The meaning of the definitions a theorem is stated with | `Reach`, `Exec`, `Spec`, `VerifiedImg`, `Preserved`, `Entry` | By reading [spec.md](spec.md) and the files |
 | `Layout` | `lean/NoCompiler/Module.lean` | By reading: an address per symbol, and the start and length in words of the code image. Check that a theorem's layout is the binary's: the audit compares it with the ELF's symbol table (below) |
 | `Module.link` | `lean/NoCompiler/Module.lean` | By reading, or by the audit: the image is, word by word, the word of the function covering the address with its relocations patched (`Reloc.apply`: `auipc`/`jalr` pairs, `%pcrel_hi`, `%pcrel_lo` I and S), zero elsewhere. A wrong `link` makes the audit's comparison with the ELF's `.text` fail; it is trusted only as far as that comparison is (see "Compiled code") |
@@ -46,8 +47,20 @@ trusting the following, and nothing else.
 - **`.nocompiler.struct`**, and the Rust profile checker: they make proofs easier
   to write. A proof about a binary that breaks the rules is still a proof.
   Where conformance itself is the claim, the Lean checker
-  (`lean/NoCompiler/Struct.lean`) decides rules R1 to R3 in the kernel
+  (`lean/NoCompiler/Struct.lean`, `Frame.lean`) decides the rules in the kernel
   (`<name>_checked`), and `Struct.cfi` proves what they mean for control flow.
+- **A function's level, by default.** `nocompiler export` writes the Rust
+  checker's level of each function as a statement, `<name>_level : Prop`
+  (`Struct.level … = some .l2`), with the exporter's version and the ELF's
+  SHA-256 in the file's header, and proves nothing about it. A theorem that
+  needs a level takes `<name>_level` as a hypothesis, never as an axiom (the
+  audit fails on any axiom). So the default trusts the Rust checker only for
+  level claims, and only where a reader takes such a hypothesis as discharged;
+  no `VerifiedImg`, `Verified` or `Refines` theorem depends on a level (the
+  step tactics, the explore path and the VC generator use none).
+  `nocompiler export --lean-level-check` removes even that: it writes
+  `<name>_checked`, the kernel's proof of the same statement. CI keeps it on
+  for every committed image.
 - **The tactics** (`lean/NoCompiler/Tactic.lean`): a tactic that does the wrong
   thing produces a term the kernel rejects.
 - **The program logic** (`Reach.bind`, `Reach.loop`, `VerifiedImg.call`, and

@@ -34,7 +34,7 @@ for src in examples/*.c; do
     mkdir -p examples/elf
     cp "$out/$name.elf" "examples/elf/$name.elf"
     mod=$(echo "$name" | sed -E 's/(^|_)([a-z])/\U\2/g')
-    "$NOCOMPILER" export "examples/elf/$name.elf" --namespace "Examples.$mod.Image" \
+    "$NOCOMPILER" export --lean-level-check "examples/elf/$name.elf" --namespace "Examples.$mod.Image" \
       -o "lean/Examples/$mod/Image.lean"
   elif ! cmp -s "$out/$name.elf" "examples/elf/$name.elf"; then
     echo "$name: the build differs from examples/elf/$name.elf ($("$CLANG" --version | head -1))"

@@ -22,7 +22,7 @@ for x in a b c d; do
   if [ "${1:-}" = --update ]; then
     cp "$out/refine-sum-$x.elf" examples/elf/
     X=$(echo $x | tr a-z A-Z)
-    "$NOCOMPILER" export "examples/elf/refine-sum-$x.elf" --namespace "Examples.Refine.Diff.Img$X" \
+    "$NOCOMPILER" export --lean-level-check "examples/elf/refine-sum-$x.elf" --namespace "Examples.Refine.Diff.Img$X" \
       -o "lean/Examples/Refine/Diff/Img$X.lean"
   elif ! cmp -s "$out/refine-sum-$x.elf" "examples/elf/refine-sum-$x.elf"; then
     echo "refine-sum-$x.elf differs from examples/elf/"; status=1

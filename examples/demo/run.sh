@@ -37,7 +37,7 @@ tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 (cd lean && "${LAKE[@]}" build NoCompiler.Ext.Rvc NoCompiler.Elf rvc-run >/dev/null)
 for f in sum cobs; do
   F=$(echo "$f" | sed -E 's/(^|_)([a-z])/\U\2/g')
-  "$NOCOMPILER" export "examples/demo/elf/$f.b.elf" --namespace "Demo.$F.ImageB" -o "$tmp/$F.B.lean"
+  "$NOCOMPILER" export --lean-level-check "examples/demo/elf/$f.b.elf" --namespace "Demo.$F.ImageB" -o "$tmp/$F.B.lean"
   (cd lean && lake env lean --run ../examples/demo/tools/ExportC.lean "../examples/demo/elf/$f.a.elf" "Demo.$F.ImageA" \
     $(demo_funcs "../examples/demo/elf/$f.a.elf") > "$tmp/$F.A.lean")
   for S in A B; do

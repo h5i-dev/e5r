@@ -208,6 +208,7 @@ pub fn export(
     file: &Path,
     ns: &str,
     chunks: bool,
+    lean_level_check: bool,
     dst: Option<&Path>,
     out: &mut String,
 ) -> Result<u8, String> {
@@ -220,11 +221,8 @@ pub fn export(
             Err(vs) => eprintln!("nocompiler: skipping {} ({} violations)", r.name, vs.len()),
         }
     }
-    let text = if chunks {
-        crate::lean::export_chunks(&bin, &metas, ns, &file_name(file))?
-    } else {
-        crate::lean::export(&bin, &metas, ns, &file_name(file))?
-    };
+    let text =
+        crate::lean::export_with(&bin, &metas, ns, &file_name(file), chunks, lean_level_check)?;
     match dst {
         Some(dst) => std::fs::write(dst, text).map_err(|e| format!("{}: {e}", dst.display()))?,
         None => out.push_str(&text),
