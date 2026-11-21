@@ -651,3 +651,15 @@ musl binaries like OVP's need first):
   stepped by the trusted `Step`, which does not see `Kern`. Faulting there
   needs either a process-level step that checks accesses against
   `Kern.maps`, or a partial `State.mem` (Machine.lean, not mine).
+
+### Sixth step: `writev` (lean/NoCompiler/Linux/Writev.lean)
+
+- `writev(fd, iov, iovcnt)` gathers the iovecs' buffers (`gather`).
+  - On an open fd with iovcnt ≤ 1024, it has `write`'s outcomes for the
+    gathered bytes (`writeBytesSpec`).
+  - More than 1024 iovecs: EINVAL. A closed fd: EBADF.
+- `writev_one`: with one iovec, `writev` has exactly the outcomes of
+  `write` of that buffer (`writeSpec`, Basic.lean).
+- `ProcStep3.sys`; the control `writev_too_many`.
+- Axioms: `[propext, Quot.sound]` / `[propext]`. `lake env lean
+  Writev.lean`: 0.48 s.
