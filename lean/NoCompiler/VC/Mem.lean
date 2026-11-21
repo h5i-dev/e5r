@@ -25,6 +25,11 @@ inductive Sym
   | iop (op : IOp) (a : Sym) (imm : Word)
   | rop (op : ROp) (a b : Sym)
   | load (op : LdOp) (m : SMem) (a : Sym)
+  | addiw (a : Sym) (imm : Word)
+  | sh (op : ShOp) (a : Sym) (n : Nat)
+  | shw (op : ShWOp) (a : Sym) (n : Nat)
+  | rwop (op : RWOp) (a b : Sym)
+  | uop (op : UOp) (a : Sym)
 /-- A symbolic memory: the base memory, then writes of `width` bytes. -/
 inductive SMem
   | base
@@ -40,6 +45,11 @@ def Sym.den (ρ : Nat → Word) (μ : Word → Byte) : Sym → Word
   | .iop op a imm => evalI op (a.den ρ μ) imm
   | .rop op a b => evalR op (a.den ρ μ) (b.den ρ μ)
   | .load op m a => loadVal op (m.den ρ μ) (a.den ρ μ)
+  | .addiw a imm => sext32 (a.den ρ μ + imm)
+  | .sh op a n => evalSh op (a.den ρ μ) n
+  | .shw op a n => evalShW op (a.den ρ μ) n
+  | .rwop op a b => evalRW op (a.den ρ μ) (b.den ρ μ)
+  | .uop op a => evalU op (a.den ρ μ)
 def SMem.den (ρ : Nat → Word) (μ : Word → Byte) : SMem → (Word → Byte)
   | .base => μ
   | .write m a v w => writeLE (m.den ρ μ) (a.den ρ μ) (v.den ρ μ).toNat w
@@ -75,7 +85,8 @@ theorem Sym.lin_den {ρ : Nat → Word} {μ : Word → Byte} :
       rw [ha] at h; simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at h
       obtain ⟨rfl, rfl⟩ := h
       rw [Sym.den, Sym.lin_den ha]; simp [evalI]; bv_omega
-  | .const _, _, _, h | .rop .., _, _, h | .load .., _, _, h => by simp [Sym.lin] at h
+  | .const _, _, _, h | .rop .., _, _, h | .load .., _, _, h | .addiw .., _, _, h | .sh .., _, _, h
+  | .shw .., _, _, h | .rwop .., _, _, h | .uop .., _, _, h => by simp [Sym.lin] at h
 
 /-! ### Reading through symbolic writes
 
@@ -224,6 +235,17 @@ def sstep (i : Instr) (S : SState) : Option (SState × List Ob) :=
     some ({ S.setReg rd (.iop op (S.reg rs1) (imm.signExtend 64)) with pc := S.pc + 4 }, [])
   | .rop op rd rs1 rs2 =>
     some ({ S.setReg rd (.rop op (S.reg rs1) (S.reg rs2)) with pc := S.pc + 4 }, [])
+  | .lui rd imm =>
+    some ({ S.setReg rd (.const ((imm.setWidth 32 <<< 12).signExtend 64)) with pc := S.pc + 4 }, [])
+  | .auipc rd imm =>
+    some ({ S.setReg rd (.const (S.pc + (imm.setWidth 32 <<< 12).signExtend 64)) with pc := S.pc + 4 }, [])
+  | .addiw rd rs1 imm =>
+    some ({ S.setReg rd (.addiw (S.reg rs1) (imm.signExtend 64)) with pc := S.pc + 4 }, [])
+  | .shift op rd rs1 sh => some ({ S.setReg rd (.sh op (S.reg rs1) sh.toNat) with pc := S.pc + 4 }, [])
+  | .shiftw op rd rs1 sh => some ({ S.setReg rd (.shw op (S.reg rs1) sh.toNat) with pc := S.pc + 4 }, [])
+  | .rwop op rd rs1 rs2 =>
+    some ({ S.setReg rd (.rwop op (S.reg rs1) (S.reg rs2)) with pc := S.pc + 4 }, [])
+  | .uop op rd rs1 => some ({ S.setReg rd (.uop op (S.reg rs1)) with pc := S.pc + 4 }, [])
   | .load op rd rs1 off =>
     let a := addr S rs1 off
     some ({ S.setReg rd (symLoad op S.mem a) with pc := S.pc + 4 }, [.aligned a op.width, .canRead a op.width])
@@ -276,6 +298,27 @@ theorem sstep_sound {ρ : Nat → Word} {μ : Word → Byte} {P : Perm} {S S' : 
     simp only [sstep, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
     exact ⟨(s.setReg rd (evalR op (s.reg rs1) (s.reg rs2))).setPc (s.pc + 4), by simp only [exec],
       trivial, upd _ _ _ (by simp [Sym.den, hr rs1, hr rs2])⟩
+  | lui rd imm =>
+    simp only [sstep, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
+    exact ⟨(s.setReg rd ((imm.setWidth 32 <<< 12).signExtend 64)).setPc (s.pc + 4), by simp only [exec], trivial, upd _ _ _ (by simp [Sym.den])⟩
+  | auipc rd imm =>
+    simp only [sstep, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
+    exact ⟨(s.setReg rd (s.pc + (imm.setWidth 32 <<< 12).signExtend 64)).setPc (s.pc + 4), by simp only [exec], trivial, upd _ _ _ (by simp [Sym.den, hpc])⟩
+  | addiw rd rs1 imm =>
+    simp only [sstep, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
+    exact ⟨(s.setReg rd (sext32 (s.reg rs1 + imm.signExtend 64))).setPc (s.pc + 4), by simp only [exec], trivial, upd _ _ _ (by simp [Sym.den, hr rs1])⟩
+  | shift op rd rs1 sh =>
+    simp only [sstep, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
+    exact ⟨(s.setReg rd (evalSh op (s.reg rs1) sh.toNat)).setPc (s.pc + 4), by simp only [exec], trivial, upd _ _ _ (by simp [Sym.den, hr rs1])⟩
+  | shiftw op rd rs1 sh =>
+    simp only [sstep, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
+    exact ⟨(s.setReg rd (evalShW op (s.reg rs1) sh.toNat)).setPc (s.pc + 4), by simp only [exec], trivial, upd _ _ _ (by simp [Sym.den, hr rs1])⟩
+  | rwop op rd rs1 rs2 =>
+    simp only [sstep, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
+    exact ⟨(s.setReg rd (evalRW op (s.reg rs1) (s.reg rs2))).setPc (s.pc + 4), by simp only [exec], trivial, upd _ _ _ (by simp [Sym.den, hr rs1, hr rs2])⟩
+  | uop op rd rs1 =>
+    simp only [sstep, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
+    exact ⟨(s.setReg rd (evalU op (s.reg rs1))).setPc (s.pc + 4), by simp only [exec], trivial, upd _ _ _ (by simp [Sym.den, hr rs1])⟩
   | load op rd rs1 off =>
     simp only [sstep, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
     have hal := hob (.aligned (addr S rs1 off) op.width) (by simp)

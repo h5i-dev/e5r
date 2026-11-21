@@ -1,5 +1,5 @@
 import Lean
-import NoCompiler.VC.Seg
+import NoCompiler.VC.Explore
 
 /-
 `vc_run`: evaluate a segment's symbolic run in a goal, milestone 4c
@@ -22,14 +22,22 @@ deriving instance ToExpr for NoCompiler.IOp
 deriving instance ToExpr for NoCompiler.ROp
 deriving instance ToExpr for NoCompiler.LdOp
 deriving instance ToExpr for NoCompiler.BrOp
+deriving instance ToExpr for NoCompiler.ShOp
+deriving instance ToExpr for NoCompiler.ShWOp
+deriving instance ToExpr for NoCompiler.RWOp
+deriving instance ToExpr for NoCompiler.UOp
 deriving instance ToExpr for NoCompiler.VC.M.Sym, NoCompiler.VC.M.SMem
 deriving instance ToExpr for NoCompiler.VC.M.Ob
 deriving instance ToExpr for NoCompiler.VC.M.Term
 deriving instance ToExpr for NoCompiler.VC.M.SState
+deriving instance ToExpr for NoCompiler.VC.M.Cond
+deriving instance ToExpr for NoCompiler.VC.M.PEnd
 deriving instance DecidableEq for NoCompiler.VC.M.Sym, NoCompiler.VC.M.SMem
 deriving instance DecidableEq for NoCompiler.VC.M.Ob
 deriving instance DecidableEq for NoCompiler.VC.M.Term
 deriving instance DecidableEq for NoCompiler.VC.M.SState
+deriving instance DecidableEq for NoCompiler.VC.M.Cond
+deriving instance DecidableEq for NoCompiler.VC.M.PEnd
 
 /-- The value of a closed `runSeg` term, by compiled evaluation. -/
 unsafe def evalRunSegImpl (e : Expr) : MetaM (Option (SState × List Ob × Term)) := do
@@ -38,14 +46,23 @@ unsafe def evalRunSegImpl (e : Expr) : MetaM (Option (SState × List Ob × Term)
 @[implemented_by evalRunSegImpl]
 opaque evalRunSeg (e : Expr) : MetaM (Option (SState × List Ob × Term))
 
-/-- Rewrite the first closed `runSeg D ws S` in the goal to its value, with a
-    kernel-checked equation (`decide`). -/
+/-- The value of a closed `explore` term, by compiled evaluation. -/
+unsafe def evalExploreImpl (e : Expr) : MetaM (Option (List PEnd × List Ob)) := do
+  evalExpr (Option (List PEnd × List Ob)) (← inferType e) e
+
+@[implemented_by evalExploreImpl]
+opaque evalExplore (e : Expr) : MetaM (Option (List PEnd × List Ob))
+
+/-- Rewrite the first closed `runSeg D ws S` or `explore …` in the goal to its
+    value, with a kernel-checked equation (`decide`). -/
 elab "vc_run" : tactic => withMainContext do
   let g ← getMainGoal
   let tgt ← instantiateMVars (← g.getType)
-  let some t := tgt.find? fun t => t.isAppOfArity ``runSeg 3 && !t.hasFVar && !t.hasMVar
-    | throwError "vc_run: no closed `runSeg` term in the goal"
-  let v := toExpr (← evalRunSeg t)
+  let closed (t : Expr) := !t.hasFVar && !t.hasMVar
+  let some t := tgt.find? fun t =>
+      (t.isAppOfArity ``runSeg 3 || t.isAppOfArity ``explore 9) && closed t
+    | throwError "vc_run: no closed `runSeg` or `explore` term in the goal"
+  let v ← if t.isAppOf ``runSeg then pure (toExpr (← evalRunSeg t)) else pure (toExpr (← evalExplore t))
   let eq ← mkEq t v
   let inst ← synthInstance (mkApp (mkConst ``Decidable) eq)
   let pf := mkApp3 (mkConst ``of_decide_eq_true) eq inst
