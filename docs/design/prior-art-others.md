@@ -217,3 +217,15 @@ Straight-line chain of N `addi a0, a0, 1`. Checked statement: the run succeeds, 
 
 - **Instruction lookup is the quadratic term.** `Code.instr` walks the word list on every lookup in the kernel.
 - **Words in order is linear.** `runW` gets about 3 ms per instruction of kernel time at 10^3 to 10^4. That is within about 3× of the 1 ms target, not at it. Peak memory also grows: this chain makes one 10^4-deep term. Splitting per segment (step 3) bounds it.
+
+### Measured: milestone 2, loads and stores (`VC/Mem.lean`)
+
+N instructions alternating `ld a3, 0(a0)` and `sd a3, 8(a0)`, run by `NoCompiler.VC.M.runW` inside the code's region. Checked statement: the run succeeds, ends at the right pc, and emits 2N obligations (alignment and permission per access). The obligations are generated and counted, not yet discharged; simplifying them is the next milestone. Same setup as above (`Gen.py OUTDIR mem N`).
+
+| N | Kernel ("type checking") | Wall | Max RSS |
+| --- | --- | --- | --- |
+| 100 | 0.13 s | 0.57 s | 0.49 GB |
+| 1,000 | 1.37 s | 1.76 s | 0.66 GB |
+| 10,000 | 16 s | 16.4 s | 2.38 GB |
+
+That is about 1.4 to 1.6 ms per instruction. `Reach.of_runW` (trusted `Reach` from a run whose obligations hold) and `sstep_sound` use only `propext` and `Quot.sound`.

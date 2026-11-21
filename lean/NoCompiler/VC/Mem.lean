@@ -1,0 +1,241 @@
+import NoCompiler.VC.Straight
+
+/-
+Reflective verification conditions, milestone 2 (docs/design/prior-art-others.md,
+"Implementation plan"): loads and stores.
+
+Symbolic values now include loads from a symbolic memory, and the symbolic
+memory is the base memory with symbolic writes on top (`SMem`), both
+denoting with the machine's own `loadVal` and `writeLE`. A symbolic step
+emits what an access needs as data (`Ob`: alignment and permission of the
+address), so a run's output is the end state and a list of obligations, and
+`Reach.of_runW` turns "every obligation holds and the end state satisfies Q"
+into the trusted `Reach`, proved once. Simplifying the obligations (offsets
+inside a known region, aligned bases) is the next milestone; here they are
+left as they come.
+-/
+namespace NoCompiler.VC.M
+
+mutual
+/-- A symbolic 64-bit value. -/
+inductive Sym
+  | var (n : Nat)
+  | const (w : Word)
+  | iop (op : IOp) (a : Sym) (imm : Word)
+  | rop (op : ROp) (a b : Sym)
+  | load (op : LdOp) (m : SMem) (a : Sym)
+/-- A symbolic memory: the base memory, then writes of `width` bytes. -/
+inductive SMem
+  | base
+  | write (m : SMem) (a : Sym) (v : Sym) (width : Nat)
+end
+
+instance : Inhabited Sym := ⟨.const 0⟩
+
+mutual
+def Sym.den (ρ : Nat → Word) (μ : Word → Byte) : Sym → Word
+  | .var n => ρ n
+  | .const w => w
+  | .iop op a imm => evalI op (a.den ρ μ) imm
+  | .rop op a b => evalR op (a.den ρ μ) (b.den ρ μ)
+  | .load op m a => loadVal op (m.den ρ μ) (a.den ρ μ)
+def SMem.den (ρ : Nat → Word) (μ : Word → Byte) : SMem → (Word → Byte)
+  | .base => μ
+  | .write m a v w => writeLE (m.den ρ μ) (a.den ρ μ) (v.den ρ μ).toNat w
+end
+
+/-- What an access needs. -/
+inductive Ob
+  | aligned (a : Sym) (width : Nat)
+  | canRead (a : Sym) (width : Nat)
+  | canWrite (a : Sym) (width : Nat)
+
+def Ob.den (ρ : Nat → Word) (μ : Word → Byte) (P : Perm) : Ob → Prop
+  | .aligned a w => NoCompiler.aligned (a.den ρ μ) w
+  | .canRead a w => P.canRead (a.den ρ μ) w
+  | .canWrite a w => P.canWrite (a.den ρ μ) w
+
+/-- A symbolic state: 32 register slots, the memory, a concrete pc. -/
+structure SState where
+  regs : List Sym
+  mem : SMem
+  pc : Word
+
+namespace SState
+def reg (S : SState) (r : Reg) : Sym := if r.val = 0 then .const 0 else S.regs.getD r.val (.const 0)
+def setReg (S : SState) (r : Reg) (v : Sym) : SState :=
+  if r.val = 0 then S else { S with regs := S.regs.set r.val v }
+def init (pc : Word) : SState := ⟨(List.range 32).map .var, .base, pc⟩
+
+theorem reg_setReg {S : SState} (hS : S.regs.length = 32) (r q : Reg) (v : Sym) :
+    (S.setReg r v).reg q = if r.val = 0 then S.reg q else if q = r then v else S.reg q := by
+  unfold SState.setReg SState.reg
+  by_cases hr : r.val = 0
+  · simp [hr]
+  · simp only [hr, ite_false]
+    by_cases hq : q = r
+    · subst hq
+      have : q.val < S.regs.length := by omega
+      simp [hr, List.getD_eq_getElem?_getD, List.getElem?_set_self this]
+    · have hv : r.val ≠ q.val := fun e => hq (Fin.ext e).symm
+      simp [hq, List.getD_eq_getElem?_getD, List.getElem?_set_ne hv]
+
+theorem length_setReg {S : SState} (hS : S.regs.length = 32) (r : Reg) (v : Sym) :
+    (S.setReg r v).regs.length = 32 := by
+  unfold SState.setReg; split
+  · exact hS
+  · simpa using hS
+
+@[simp] theorem setReg_mem (S : SState) (r : Reg) (v : Sym) : (S.setReg r v).mem = S.mem := by
+  unfold SState.setReg; split <;> rfl
+end SState
+
+/-- `S` describes `s` under `ρ` (registers) and `μ` (the base memory). -/
+def Matches (ρ : Nat → Word) (μ : Word → Byte) (S : SState) (s : State) : Prop :=
+  S.regs.length = 32 ∧ s.pc = S.pc ∧ (∀ r : Reg, s.reg r = (S.reg r).den ρ μ) ∧ s.mem = S.mem.den ρ μ
+
+/-- The address of an access, as the machine computes it (`ea`). -/
+def addr (S : SState) (rs1 : Reg) (off : BitVec 12) : Sym := .iop .addi (S.reg rs1) (off.signExtend 64)
+
+/-- One symbolic step and what it needs; `none` for what milestone 2 does not cover. -/
+def sstep (i : Instr) (S : SState) : Option (SState × List Ob) :=
+  match i with
+  | .iop op rd rs1 imm =>
+    some ({ S.setReg rd (.iop op (S.reg rs1) (imm.signExtend 64)) with pc := S.pc + 4 }, [])
+  | .rop op rd rs1 rs2 =>
+    some ({ S.setReg rd (.rop op (S.reg rs1) (S.reg rs2)) with pc := S.pc + 4 }, [])
+  | .load op rd rs1 off =>
+    let a := addr S rs1 off
+    some ({ S.setReg rd (.load op S.mem a) with pc := S.pc + 4 }, [.aligned a op.width, .canRead a op.width])
+  | .store op rs1 rs2 off =>
+    let a := addr S rs1 off
+    some ({ S with mem := .write S.mem a (S.reg rs2) op.width, pc := S.pc + 4 },
+      [.aligned a op.width, .canWrite a op.width])
+  | _ => none
+
+theorem reg0 (S : SState) : S.reg 0 = .const 0 := by simp [SState.reg]
+
+theorem addr_den {ρ : Nat → Word} {μ : Word → Byte} {S : SState} {s : State}
+    (hr : ∀ r : Reg, s.reg r = (S.reg r).den ρ μ) (rs1 : Reg) (off : BitVec 12) :
+    (addr S rs1 off).den ρ μ = ea s rs1 off := by
+  simp [addr, Sym.den, evalI, ea, hr rs1]
+
+/-- One step, sound: when its obligations hold, the machine steps (with the
+    access permitted) to a state the next symbolic state describes. -/
+theorem sstep_sound {ρ : Nat → Word} {μ : Word → Byte} {P : Perm} {S S' : SState} {s : State}
+    {i : Instr} {obs : List Ob} (hm : Matches ρ μ S s) (h : sstep i S = some (S', obs))
+    (hob : ∀ o ∈ obs, o.den ρ μ P) :
+    ∃ s', exec i s = some s' ∧ InstrOk P i s ∧ Matches ρ μ S' s' := by
+  obtain ⟨hl, hpc, hr, hmem⟩ := hm
+  have upd : ∀ (rd : Reg) (v : Sym) (w : Word), w = v.den ρ μ →
+      Matches ρ μ { S.setReg rd v with pc := S.pc + 4 } ((s.setReg rd w).setPc (s.pc + 4)) := by
+    intro rd v w hw
+    refine ⟨SState.length_setReg hl rd v, by simp [hpc], fun q => ?_, by simp [hmem]⟩
+    simp only [State.setPc_reg, State.reg_setReg]
+    show _ = ((S.setReg rd v).reg q).den ρ μ
+    rw [SState.reg_setReg hl]
+    by_cases hq0 : q = 0
+    · subst hq0
+      by_cases h0 : rd = 0
+      · simp [h0, Sym.den, reg0]
+      · have : (0 : Reg) ≠ rd := Ne.symm h0
+        simp [h0, this, Sym.den, reg0]
+    · by_cases hr0 : rd.val = 0
+      · have : rd = 0 := Fin.ext hr0
+        subst this
+        simp [hq0, hr q]
+      · by_cases hq : q = rd
+        · subst hq; simp [hq0, hw]
+        · simp [hq0, hr0, hq, hr q]
+  cases i with
+  | iop op rd rs1 imm =>
+    simp only [sstep, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
+    exact ⟨(s.setReg rd (evalI op (s.reg rs1) (imm.signExtend 64))).setPc (s.pc + 4), by simp only [exec],
+      trivial, upd _ _ _ (by simp [Sym.den, hr rs1])⟩
+  | rop op rd rs1 rs2 =>
+    simp only [sstep, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
+    exact ⟨(s.setReg rd (evalR op (s.reg rs1) (s.reg rs2))).setPc (s.pc + 4), by simp only [exec],
+      trivial, upd _ _ _ (by simp [Sym.den, hr rs1, hr rs2])⟩
+  | load op rd rs1 off =>
+    simp only [sstep, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
+    have hal := hob (.aligned (addr S rs1 off) op.width) (by simp)
+    have hcr := hob (.canRead (addr S rs1 off) op.width) (by simp)
+    simp only [Ob.den, addr_den hr] at hal hcr
+    refine ⟨(s.setReg rd (loadVal op s.mem (ea s rs1 off))).setPc (s.pc + 4), ?_, hcr,
+      upd _ _ _ (by simp [Sym.den, addr_den hr, hmem])⟩
+    simp only [exec, hal, ite_true]
+  | store op rs1 rs2 off =>
+    simp only [sstep, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
+    have hal := hob (.aligned (addr S rs1 off) op.width) (by simp)
+    have hcw := hob (.canWrite (addr S rs1 off) op.width) (by simp)
+    simp only [Ob.den, addr_den hr] at hal hcw
+    refine ⟨(s.setMem (writeLE s.mem (ea s rs1 off) (s.reg rs2).toNat op.width)).setPc (s.pc + 4), ?_, hcw,
+      ⟨hl, by simp [hpc], fun q => by simp [hr q, SState.reg], ?_⟩⟩
+    · simp only [exec, hal, ite_true]
+    · simp [SMem.den, addr_den hr, hmem, hr rs2]
+  | _ => simp [sstep] at h
+
+theorem exec_exit {i : Instr} {s s' : State} (h : exec i s = some s') : s'.exit = s.exit := by
+  cases i <;> simp only [exec, jumpTo] at h <;> (try split at h) <;> (try split at h) <;>
+    simp only [Option.some.injEq, reduceCtorEq] at h <;> subst h <;> simp
+
+/-- Run the words `ws` in order, inside `D`, collecting the obligations. -/
+def runW (D : Dom) : List (BitVec 32) → SState → Option (SState × List Ob)
+  | [], S => some (S, [])
+  | w :: ws, S =>
+    if D.mem S.pc then
+      match decode w with
+      | some i => match sstep i S with
+        | some (S₁, o₁) => (runW D ws S₁).map fun (S', o) => (S', o₁ ++ o)
+        | none => none
+      | none => none
+    else none
+
+/-- The trusted `Reach` from a run: when the run's obligations hold, every
+    execution of the image from a described state reaches `Q`, provided `Q`
+    holds of every state the end state describes. -/
+theorem Reach.of_runW {ρ : Nat → Word} {μ : Word → Byte} {c : Code} {P : Perm} {D : Dom}
+    {Q : State → Prop} :
+    ∀ {ws : List (BitVec 32)} {k : Nat} {S S' : SState} {obs : List Ob} {s : State},
+      c.words.toList.drop k = ws → 4 * (k + ws.length) < 2 ^ 64 →
+      S.pc = c.base + BitVec.ofNat 64 (4 * k) → Matches ρ μ S s → s.exit = none →
+      runW D ws S = some (S', obs) → (∀ o ∈ obs, o.den ρ μ P) →
+      (∀ s', Matches ρ μ S' s' → s'.exit = none → Q s') → Reach c P D Q s
+  | [], _, S, S', obs, s, _, _, _, hm, hx, h, _, hQ => by
+    simp only [runW, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
+    exact .done (hQ s hm hx)
+  | w :: ws, k, S, S', obs, s, hd, hb, hpc, hm, hx, h, hob, hQ => by
+    simp only [runW] at h
+    split at h
+    · rename_i hD
+      split at h
+      · rename_i i hi
+        split at h
+        · rename_i S₁ o₁ hst
+          cases hr : runW D ws S₁ with
+          | none => rw [hr] at h; simp at h
+          | some p =>
+            obtain ⟨S₂, o₂⟩ := p
+            rw [hr] at h; simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at h
+            obtain ⟨rfl, rfl⟩ := h
+            have hw : c.words.toList[k]? = some w := by rw [← List.head?_drop, hd]; rfl
+            have hfetch : c.instr s.pc = some i := by
+              rw [hm.2.1, hpc]; unfold Code.instr
+              rw [Code.fetch_index c k (by simp at hb; omega), hw]; exact hi
+            obtain ⟨s₁, he, hok, hm₁⟩ := sstep_sound (P := P) hm hst
+              (fun o ho => hob o (List.mem_append_left _ ho))
+            have hpc₁ : S₁.pc = c.base + BitVec.ofNat 64 (4 * (k + 1)) := by
+              cases i <;> simp only [sstep, Option.some.injEq, Prod.mk.injEq, reduceCtorEq] at hst <;>
+                (try obtain ⟨rfl, rfl⟩ := hst) <;> simp_all [BitVec.ofNat_add] <;> bv_omega
+            have hd₁ : c.words.toList.drop (k + 1) = ws := by rw [← List.drop_drop, hd]; rfl
+            have hx₁ : s₁.exit = none := (exec_exit he).trans hx
+            have hD' : D.mem s.pc := by rw [hm.2.1]; exact hD
+            have hrest : Reach c P D Q s₁ :=
+              Reach.of_runW hd₁ (by simp at hb ⊢; omega) hpc₁ hm₁ hx₁ hr
+                (fun o ho => hob o (List.mem_append_right _ ho)) hQ
+            exact NoCompiler.Reach.exec_step hD' hx hfetch hok (by rw [he, NoCompiler.Reach.opt_some]; exact hrest)
+        · simp at h
+      · simp at h
+    · simp at h
+
+end NoCompiler.VC.M
