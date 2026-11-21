@@ -312,4 +312,20 @@ theorem sum_reach2 (a : Word) (xs : List Word) (s : State) (hpc : s.pc = 0x11190
       refine ⟨hur ▸ hra, .inl ⟨by rw [hur], ?_⟩⟩
       rw [BitVec.add_zero, h12', show k + 1 = xs.length by omega, List.take_length]
 
+/-! ### A call: the callee's entry is a cut point -/
+
+/-- `auipc ra, 0; jalr ra, 8(ra)` at 0x3000 calls 0x3008 (`addi zero, zero, 0; ret`). -/
+def callCode : Code := ⟨0x3000#64, #[0x00000097#32, 0x008080e7#32, 0x00000013#32, 0x00008067#32]⟩
+
+/-- The path from 0x3000 ends at the callee's entry, with the return address in ra. -/
+example : ((exploreR callCode [(0x3000#64, 16)] [0x3008#64] 10 0 0x3000#64 []).map fun r =>
+    r.1.map fun e => match e with | .cut S _ => (S.pc, S.reg 1) | .ret S _ => (S.pc, S.reg 1)) =
+    some [(0x3008#64, .const 0x3008#64)] := by decide +kernel
+
+/-- `jal ra, +8` at 0x3000 calls 0x3008 the same way. -/
+example : ((exploreR ⟨0x3000#64, #[0x008000ef#32, 0x00000013#32, 0x00000013#32, 0x00008067#32]⟩
+    [(0x3000#64, 16)] [0x3008#64] 10 0 0x3000#64 []).map fun r =>
+    r.1.map fun e => match e with | .cut S _ => (S.pc, S.reg 1) | .ret S _ => (S.pc, S.reg 1)) =
+    some [(0x3008#64, .const 0x3004#64)] := by decide +kernel
+
 end NoCompiler.VC.M.Example

@@ -74,12 +74,24 @@ def explore (c : Code) (D : Dom) (cuts : List Word) :
           else none
         | some (.jal rd off) =>
           let t := S.pc + off.signExtend 64
-          if rd = 0 ∧ aligned t 4 then
+          if aligned t 4 then
             match wordIdx c t with
-            | some k' => explore c D cuts fuel false k' (c.words.toList.drop k') { S with pc := t } cs
+            | some k' => explore c D cuts fuel false k' (c.words.toList.drop k')
+                { S.setReg rd (.const (S.pc + 4)) with pc := t } cs
             | none => none
           else none
-        | some (.jalr rd rs1 off) => if rd = 0 ∧ rs1 = 1 ∧ off = 0 then some ([.ret S cs], []) else none
+        | some (.jalr rd rs1 off) =>
+          if rd = 0 ∧ rs1 = 1 ∧ off = 0 then some ([.ret S cs], []) else
+          match S.reg rs1 with
+          | .const v =>
+            let t := (v + off.signExtend 64) &&& ~~~1
+            if aligned t 4 then
+              match wordIdx c t with
+              | some k' => explore c D cuts fuel false k' (c.words.toList.drop k')
+                  { S.setReg rd (.const (S.pc + 4)) with pc := t } cs
+              | none => none
+            else none
+          | _ => none
         | some i =>
           match sstep i S with
           | some (S₁, o₁) => (explore c D cuts fuel false (k + 1) ws' S₁ cs).map fun p => (p.1, o₁ ++ p.2)
@@ -90,6 +102,30 @@ def explore (c : Code) (D : Dom) (cuts : List Word) :
 theorem matches_setPc {ρ : Nat → Word} {μ : Word → Byte} {S : SState} {s : State} (hm : Matches ρ μ S s)
     (t : Word) : Matches ρ μ { S with pc := t } (s.setPc t) :=
   ⟨hm.1, rfl, fun r => (State.setPc_reg s t r).trans (hm.2.2.1 r), (State.setPc_mem s t).trans hm.2.2.2⟩
+
+/-- A register written and the pc set, in both states. -/
+theorem matches_setReg_setPc {ρ : Nat → Word} {μ : Word → Byte} {S : SState} {s : State}
+    (hm : Matches ρ μ S s) (rd : Reg) (v : Sym) (w : Word) (hw : w = v.den ρ μ) (p : Word) :
+    Matches ρ μ { S.setReg rd v with pc := p } ((s.setReg rd w).setPc p) := by
+  obtain ⟨hl, _, hr, hmem⟩ := hm
+  have hmS : (S.setReg rd v).mem = S.mem := by unfold SState.setReg; split <;> rfl
+  refine ⟨SState.length_setReg hl rd v, rfl, fun q => ?_, by rw [State.setPc_mem, State.setReg_mem, hmem]; show _ = SMem.den ρ μ (S.setReg rd v).mem; rw [hmS]⟩
+  simp only [State.setPc_reg, State.reg_setReg]
+  show _ = ((S.setReg rd v).reg q).den ρ μ
+  rw [SState.reg_setReg hl]
+  by_cases hq0 : q = 0
+  · subst hq0
+    by_cases h0 : rd = 0
+    · simp [h0, Sym.den, reg0]
+    · have : (0 : Reg) ≠ rd := Ne.symm h0
+      simp [h0, this, Sym.den, reg0]
+  · by_cases hr0 : rd.val = 0
+    · have : rd = 0 := Fin.ext hr0
+      subst this
+      simp [hq0, hr q]
+    · by_cases hq : q = rd
+      · subst hq; simp [hq0, hw]
+      · simp [hq0, hr0, hq, hr q]
 
 theorem pc_succ {b : Word} {k : Nat} (h : 4 * (k + 1) < 2 ^ 64) :
     b + BitVec.ofNat 64 (4 * k) + 4 = b + BitVec.ofNat 64 (4 * (k + 1)) := by
@@ -173,33 +209,48 @@ theorem Reach.of_explore {ρ : Nat → Word} {μ : Word → Byte} {c : Code} {P 
             · exact hcs x hx')
           (fun o ho => hob o (List.mem_append_left _ ho))
           (fun e he => hN e (List.mem_append_left _ he))
-    · -- jal zero
+    · -- jal
       rename_i rd off hi
       split at h
       case isFalse => simp at h
-      rename_i hc; obtain ⟨rfl, hal⟩ := hc
+      rename_i hal
       split at h
       case h_2 => simp at h
       rename_i k' hk'
       refine Reach.exec_step hD' hx (hfetch _ hi) trivial ?_
-      simp only [exec, jumpTo, setReg_x0']
+      simp only [exec, jumpTo]
       rw [hpcS]
       simp only [hal, ite_true, Reach.opt_some]
-      exact Reach.of_explore hb h rfl (wordIdx_sound hk') (matches_setPc hm _) (by simpa using hx) hcs hob hN
-    · -- jalr zero, 0(ra)
+      exact Reach.of_explore hb h rfl (wordIdx_sound hk')
+        (matches_setReg_setPc hm rd _ _ (by first | rfl | (rw [hpcS]; rfl)) _) (by simpa using hx) hcs hob hN
+    · -- jalr: the return, or a jump to a known address
       rename_i rd rs1 off hi
       split at h
-      case isFalse => simp at h
-      rename_i hc; obtain ⟨rfl, rfl, rfl⟩ := hc
-      simp only [Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
-      obtain ⟨hal, hq⟩ := hN _ (List.mem_singleton_self _) hcs s hm hx
-      have h1 := (hm.2.2.1 1).symm
-      rw [h1] at hal hq
-      refine Reach.exec_step hD' hx (hfetch _ hi) trivial ?_
-      have hz : s.reg 1 + BitVec.signExtend 64 (0 : BitVec 12) = s.reg 1 := by
-        rw [show BitVec.signExtend 64 (0 : BitVec 12) = 0 by decide]; bv_omega
-      simp only [exec, jumpTo, setReg_x0', hz, hal, ite_true, Reach.opt_some]
-      exact .done hq
+      · rename_i hc; obtain ⟨rfl, rfl, rfl⟩ := hc
+        simp only [Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
+        obtain ⟨hal, hq⟩ := hN _ (List.mem_singleton_self _) hcs s hm hx
+        have h1 := (hm.2.2.1 1).symm
+        rw [h1] at hal hq
+        refine Reach.exec_step hD' hx (hfetch _ hi) trivial ?_
+        have hz : s.reg 1 + BitVec.signExtend 64 (0 : BitVec 12) = s.reg 1 := by
+          rw [show BitVec.signExtend 64 (0 : BitVec 12) = 0 by decide]; bv_omega
+        simp only [exec, jumpTo, setReg_x0', hz, hal, ite_true, Reach.opt_some]
+        exact .done hq
+      · split at h
+        case h_2 => simp at h
+        rename_i v hv
+        split at h
+        case isFalse => simp at h
+        rename_i hal
+        split at h
+        case h_2 => simp at h
+        rename_i k' hk'
+        have hrs : s.reg rs1 = v := by rw [hm.2.2.1 rs1, hv]; rfl
+        refine Reach.exec_step hD' hx (hfetch _ hi) trivial ?_
+        simp only [exec, jumpTo, hrs]
+        simp only [hal, ite_true, Reach.opt_some]
+        exact Reach.of_explore hb h rfl (wordIdx_sound hk')
+          (matches_setReg_setPc hm rd _ _ (by first | rfl | (rw [hpcS]; rfl)) _) (by simpa using hx) hcs hob hN
     · -- a straight-line instruction
       rename_i i _ _ _ hi
       split at h

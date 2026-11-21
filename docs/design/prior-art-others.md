@@ -286,3 +286,14 @@ Symbolic memory:
 The 7.27 GB figure is what `/usr/bin/time` reported under the 6 GB cap. It probably counts something the cap does not.
 
 That is 3.5 to 4.0 ms per instruction with the end state exposed, against the 1 ms target. About a third is the kernel's own run; the rest is comparing with the value.
+
+### Milestone 5: paths between cut points (`VC/Explore.lean`) and goals in the machine's terms
+
+- **`explore`** follows every path from a cut point to the next cut points and returns.
+  - At a conditional branch it explores both successors, recording the condition (symbolic operands and outcome) as data.
+  - It follows straight-line code word by word, and `jal` to its target. `jalr` goes to its target when that is a known constant, as after `auipc ra`; a call sets the link register on the way.
+  - A path ends at a cut point, or at `jalr zero, 0(ra)` (a return).
+  - A call is handled by listing the callee's entry as a cut point. Its condition is then discharged with the callee's `VerifiedImg.call`, never looking at the callee's code.
+- **Soundness** is `Reach.of_explore`, proved once by induction on fuel. `exploreVC` states one cut point's condition: the obligations the checker cannot discharge (an array index, say), and each end's condition under its path conditions.
+- **`vc_ends`** turns each end into a goal over the cut point's registers in the machine's own operations: `u.reg 10 + 8`, `read64 u.mem (u.reg 10 + 0)`. The `symDen`/`smemDen` simprocs evaluate a closed symbolic value with compiled code and replace it by its denotation, definitionally, so the kernel checks the step on the small term.
+- **Example: clang's `sum` loop** (Examples/Sum/Image.lean, 9 words). It needs two cut-point conditions. The load's alignment and read permission are the only residual obligations. `sum_reach2` is about 35 lines of arithmetic about the specification. The hand-split `sum_reach` in the same file is about 85 lines.
