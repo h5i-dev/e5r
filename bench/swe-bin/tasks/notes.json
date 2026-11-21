@@ -1,0 +1,4 @@
+{
+  "jqlang__jq-2919": "the FAIL_TO_PASS test (tests/shtest) checks that jq honours LC_ALL with a host locale (`locale -a` gives aa_DJ.utf8); musl's strptime in a static binary has no glibc locale data, so the gold build fails it too: `jq does not honor LC_ALL environment variable` (work/jqlang__jq-2919/src/tests/shtest.log)",
+  "valkey-io__valkey-928": "the FAIL_TO_PASS test passes with the base build under qemu, so it does not tell the fix apart"
+}

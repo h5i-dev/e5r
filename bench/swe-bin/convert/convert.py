@@ -212,6 +212,11 @@ def convert(task, keep_work=False):
             elfs = []
             recipe.unit_tests = set()
             for rel in recipe.subjects:
+                with open(os.path.join(wt, rel), "rb") as fh:
+                    hdr = fh.read(52)
+                if len(hdr) == 52 and int.from_bytes(hdr[48:52], "little") & 1:
+                    # EF_RISCV_RVC: some input was compiled with the C extension
+                    raise Failed("build", f"{rel} has the RVC flag (compressed instructions); nocompiler refuses it")
                 dst = os.path.join(art, f"{side}.{os.path.basename(rel)}.debug.elf")
                 shutil.copy(os.path.join(wt, rel), dst)
                 stripped = dst.replace(".debug.elf", ".elf")

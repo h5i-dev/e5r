@@ -71,6 +71,13 @@ for n in cc c++; do
 #!/bin/sh
 st=-static
 for a in "\$@"; do [ "\$a" = -shared ] && st=-nostdlib; done
+# the cc crate adds its own -march (rv64gc, from the target name): it would win over ours, so
+# every -march, -mabi and -mcmodel of the caller is dropped
+n=\$#
+while [ \$n -gt 0 ]; do
+  a=\$1; shift; n=\$((n-1))
+  case "\$a" in -march=*|-mabi=*|-mcmodel=*) ;; *) set -- "\$@" "\$a";; esac
+done
 exec $d --target=riscv64-linux-musl $MARCH --sysroot=$SR -Qunused-arguments -fuse-ld=lld \$st -Wl,--emit-relocs "\$@"
 EOS
   chmod +x "$BIN/rv-$n"
