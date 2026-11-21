@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Proof-checking cost per instruction on fixed functions, against a budget (CI gate).
 
-    python3 -I scripts/core/bench-gate.py [--record] [--budget FILE]
+    python3 -I scripts/core/bench-gate.py [--record | --record-from-ci RUN] [--budget FILE]
 
 For each entry of FIXED (a committed proof file and the functions it proves),
 checks the file with `lake env lean -Dprofiler=true` from lean/ (its
@@ -13,7 +13,9 @@ Instructions are the functions' lengths as their images record them
 milliseconds per instruction, and wall-clock seconds.
 
 With --record, writes the measured values times MARGIN as the budget
-(scripts/core/bench-budget.json). Without, fails (exit 1) if any entry's total
+(scripts/core/bench-budget.json); with --record-from-ci RUN, the values a CI
+run measured (printed there as annotations), which is how the committed budget
+is recorded: CI runners are load-free, the shared development host is not. Without, fails (exit 1) if any entry's total
 or kernel ms per instruction is over its budget. The budget is meant to come
 down as the proof machinery gets faster: re-record and commit it then.
 """
@@ -98,7 +100,39 @@ def measure(path, module, image, funcs):
             "total_ms_per_instr": round(total / n, 2), "kernel_ms_per_instr": round(kernel / n, 2)}
 
 
+def record_from_ci(run):
+    """The budget from CI run RUN's measurements (its `core` job's bench-gate
+    annotations), times MARGIN: CI runners are load-free, the shared
+    development host is not, so the budget is recorded from CI only."""
+    import urllib.request
+    url = subprocess.run(["git", "remote", "get-url", "origin"], cwd=ROOT, capture_output=True, text=True,
+                         check=True).stdout.strip()
+    repo = re.sub(r"(\.git)?$", "", re.split(r"github\.com[:/]", url)[1])
+    api = f"https://api.github.com/repos/{repo}"
+    get = lambda u: json.load(urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "bench-gate"})))
+    jobs = get(f"{api}/actions/runs/{run}/jobs?per_page=100")["jobs"]
+    job = next(j for j in jobs if j["name"] == "core")
+    if job["conclusion"] != "success":
+        sys.exit(f"bench-gate: run {run}'s core job did not succeed ({job['conclusion']})")
+    budget = {}
+    for a in get(f"{api}/check-runs/{job['id']}/annotations?per_page=100"):
+        m = re.match(r"(\S+) total_ms_per_instr=([\d.]+) kernel_ms_per_instr=([\d.]+)$", a["message"])
+        if a["title"] == "bench-gate" and m:
+            budget[m.group(1)] = {"total_ms_per_instr": round(float(m.group(2)) * MARGIN, 2),
+                                  "kernel_ms_per_instr": round(float(m.group(3)) * MARGIN, 2)}
+    want = {f for f, _, _, _ in FIXED} | {n for n, _, _, _ in GENERATED}
+    if set(budget) != want:
+        sys.exit(f"bench-gate: run {run} measured {sorted(budget)}, the gate has {sorted(want)}")
+    with open(BUDGET, "w") as f:
+        json.dump(budget, f, indent=2, sort_keys=True)
+        f.write("\n")
+    print(f"recorded the budget (x{MARGIN}) from CI run {run} (job {job['id']}, {job['head_sha']}) in {BUDGET}")
+    return 0
+
+
 def main():
+    if "--record-from-ci" in sys.argv:
+        return record_from_ci(sys.argv[sys.argv.index("--record-from-ci") + 1])
     record = "--record" in sys.argv
     if "--budget" in sys.argv:
         global BUDGET
@@ -116,6 +150,12 @@ def main():
     for path, r in rows.items():
         print(f"| {path} | {r['instrs']} | {r['wall_s']} | {r['total_ms']} | {r['kernel_ms']} | "
               f"{r['total_ms_per_instr']} | {r['kernel_ms_per_instr']} |")
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        # The measured values as annotations, which the API serves without a
+        # token: `--record-from-ci RUN` records the budget from them.
+        for path, r in rows.items():
+            print(f"::notice title=bench-gate::{path} total_ms_per_instr={r['total_ms_per_instr']} "
+                  f"kernel_ms_per_instr={r['kernel_ms_per_instr']}")
     if record:
         budget = {p: {"total_ms_per_instr": round(r["total_ms_per_instr"] * MARGIN, 2),
                       "kernel_ms_per_instr": round(r["kernel_ms_per_instr"] * MARGIN, 2)} for p, r in rows.items()}

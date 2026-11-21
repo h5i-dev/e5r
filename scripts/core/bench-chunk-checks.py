@@ -2,7 +2,7 @@
 """The Lean level check over every function of a binary, on its chunk image
 (docs/isa/v1-results.md, criterion 7').
 
-    python3 -I scripts/core/bench-chunk-checks.py ELF WORKDIR [--budget N] [--json OUT]
+    python3 -I scripts/core/bench-chunk-checks.py ELF WORKDIR [--budget N | --largest K] [--json OUT]
 
 Exports ELF with `nocompiler export --format chunks`, then splits the module in
 two: the image (everything but the `_checked` theorems), compiled once to an
@@ -126,16 +126,25 @@ def main():
         mods.append(row)
         fails.extend(row["failed"])
 
-    # Modules of about `budget` instructions.
+    # Modules of about `budget` instructions; with --largest K, only the K
+    # largest functions, each alone (how the cost grows with a function's size).
     group_idx, cur, n = [], [], 0
-    for i, nm in enumerate(names):
+    if "--largest" in sys.argv:
+        k = int(sys.argv[sys.argv.index("--largest") + 1])
+        order = sorted(range(len(names)), key=lambda i: -int(sizes.get(names[i], 0)))[:k]
+        for i in sorted(order, key=lambda i: int(sizes.get(names[i], 0))):
+            run([i])
+        names_done = True
+    else:
+        names_done = False
+    for i, nm in enumerate([] if names_done else names):
         k = int(sizes.get(nm, 0))
         if cur and n + k > budget:
             group_idx.append(cur)
             cur, n = [], 0
         cur.append(i)
         n += k
-    if cur:
+    if cur and not names_done:
         group_idx.append(cur)
     for idx in group_idx:
         run(idx)
@@ -146,10 +155,14 @@ def main():
     rows["checks_wall_s"] = round(sum(m["wall_s"] for m in mods), 2)
     rows["checks_kernel_ms"] = round(sum(m["kernel_ms"] for m in mods), 1)
     rows["checks_peak_kb"] = max((m["peak_kb"] or 0) for m in mods) if mods else 0
-    i = rows["instructions"]
+    i = max(1, sum(m["instructions"] for m in mods))
     print(f"export {export_s} s; image: wall {rows['image']['wall_s']} s, peak {rows['image']['peak_kb']} KB")
+    if names_done:
+        for m in mods:
+            print(f"SIZE {m.get('function')}: {m['instructions']} instructions, rc {m['rc']}, wall {m['wall_s']} s, "
+                  f"peak {m['peak_kb']} KB, kernel {m['kernel_ms']} ms")
     print(f"retried: {len(retried)} killed modules, {rows['retried_wall_s']} s (not in the totals below)")
-    print(f"checks: {rows['functions']} functions, {i} instructions, {len(mods)} modules; wall "
+    print(f"checks: {sum(m['functions'] for m in mods)} functions, {i} instructions, {len(mods)} modules; wall "
           f"{rows['checks_wall_s']} s ({round(1000 * rows['checks_wall_s'] / i, 2)} ms/instr), kernel "
           f"{rows['checks_kernel_ms']} ms ({round(rows['checks_kernel_ms'] / i, 2)} ms/instr), max peak "
           f"{rows['checks_peak_kb']} KB; failed {len(fails)}")
