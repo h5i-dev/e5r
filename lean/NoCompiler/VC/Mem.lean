@@ -196,15 +196,15 @@ def runW (D : Dom) : List (BitVec 32) → SState → Option (SState × List Ob)
     holds of every state the end state describes. -/
 theorem Reach.of_runW {ρ : Nat → Word} {μ : Word → Byte} {c : Code} {P : Perm} {D : Dom}
     {Q : State → Prop} :
-    ∀ {ws : List (BitVec 32)} {k : Nat} {S S' : SState} {obs : List Ob} {s : State},
-      c.words.toList.drop k = ws → 4 * (k + ws.length) < 2 ^ 64 →
+    ∀ {ws rest : List (BitVec 32)} {k : Nat} {S S' : SState} {obs : List Ob} {s : State},
+      c.words.toList.drop k = ws ++ rest → 4 * (k + ws.length) < 2 ^ 64 →
       S.pc = c.base + BitVec.ofNat 64 (4 * k) → Matches ρ μ S s → s.exit = none →
       runW D ws S = some (S', obs) → (∀ o ∈ obs, o.den ρ μ P) →
       (∀ s', Matches ρ μ S' s' → s'.exit = none → Q s') → Reach c P D Q s
-  | [], _, S, S', obs, s, _, _, _, hm, hx, h, _, hQ => by
+  | [], _, _, S, S', obs, s, _, _, _, hm, hx, h, _, hQ => by
     simp only [runW, Option.some.injEq, Prod.mk.injEq] at h; obtain ⟨rfl, rfl⟩ := h
     exact .done (hQ s hm hx)
-  | w :: ws, k, S, S', obs, s, hd, hb, hpc, hm, hx, h, hob, hQ => by
+  | w :: ws, rest, k, S, S', obs, s, hd, hb, hpc, hm, hx, h, hob, hQ => by
     simp only [runW] at h
     split at h
     · rename_i hD
@@ -227,7 +227,7 @@ theorem Reach.of_runW {ρ : Nat → Word} {μ : Word → Byte} {c : Code} {P : P
             have hpc₁ : S₁.pc = c.base + BitVec.ofNat 64 (4 * (k + 1)) := by
               cases i <;> simp only [sstep, Option.some.injEq, Prod.mk.injEq, reduceCtorEq] at hst <;>
                 (try obtain ⟨rfl, rfl⟩ := hst) <;> simp_all [BitVec.ofNat_add] <;> bv_omega
-            have hd₁ : c.words.toList.drop (k + 1) = ws := by rw [← List.drop_drop, hd]; rfl
+            have hd₁ : c.words.toList.drop (k + 1) = ws ++ rest := by rw [← List.drop_drop, hd]; rfl
             have hx₁ : s₁.exit = none := (exec_exit he).trans hx
             have hD' : D.mem s.pc := by rw [hm.2.1]; exact hD
             have hrest : Reach c P D Q s₁ :=

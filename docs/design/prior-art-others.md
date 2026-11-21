@@ -241,3 +241,18 @@ The same ld/sd chain. Every obligation is checked by `Ob.check` from the facts "
 | 10,000 | 33.1 s | 33.5 s | 4.69 GB |
 
 That is about 3.2 ms per instruction, linear, with no goal or tactic per instruction. Memory at 10^4 is close to the 6 GB cap: one evaluation over the whole run keeps every state alive. Splitting per segment is what bounds it.
+
+### Measured: milestone 4a, one lemma per segment (`VC/Seg.lean`)
+
+The memchk chain of 10,000 instructions, as `Code.ofSegs` with segments of K, with one theorem per segment (`Gen.py OUTDIR seg N K`). Run back to back on the shared host (load average 4 to 6 throughout), so these are comparable with each other but noisy. Single theorems vary from 0.33 s to 1.54 s within one file.
+
+| Form | Kernel ("type checking", whole file) | Wall | Max RSS |
+| --- | --- | --- | --- |
+| one run of 10,000 (`MemChk10000`) | 34 s | 34.5 s | 4.69 GB |
+| 10 segments of 1,000 | 36.6 s (3.3 to 4.1 s each) | 37.0 s | 0.92 GB |
+| 100 segments of 100 | 64.8 s (0.33 to 1.54 s each) | 65.9 s | 0.72 GB |
+
+- **Segments of 1,000 keep the time and cut peak memory by about 5×.**
+- **Segments of 100 cut memory further but take about 1.9× the time.** That suggests a per-theorem overhead not yet located.
+- **Earlier single-run numbers on this host varied with load:** one 100-instruction segment alone measured 0.29 s at one time and 0.43 s at another.
+- **Each segment's lemma (`Reach.of_seg`) reaches its words through `ofSegs_drop`,** proved once by induction, so it never walks the code before it.

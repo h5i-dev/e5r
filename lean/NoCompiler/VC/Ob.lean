@@ -163,7 +163,7 @@ theorem Reach.of_runW_checked {ρ : Nat → Word} {μ : Word → Byte} {c : Code
     (h : runW D c.words.toList S = some (S', obs)) (hchk : obs.all (Ob.check facts) = true)
     (hf : ∀ f ∈ facts, f.den ρ P) (hQ : ∀ s', Matches ρ μ S' s' → s'.exit = none → Q s') :
     Reach c P D Q s :=
-  Reach.of_runW (k := 0) (by simp) (by simpa using hb) (by simp [hc]) hm hx h
+  Reach.of_runW (k := 0) (rest := []) (by simp) (by simpa using hb) (by simp [hc]) hm hx h
     (fun o ho => Ob.check_sound hf (List.all_eq_true.1 hchk o ho)) hQ
 
 end NoCompiler.VC.M
