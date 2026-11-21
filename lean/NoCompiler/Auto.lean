@@ -2099,7 +2099,9 @@ def parseCallees (fl : Flavor) (stx : Syntax) : TacticM (Array (Nat × Term × N
     unless given.contains h do throwError "nocompiler_auto: no invariant for the loop at {hex h}"
   for h in given do
     unless heads.contains h do throwError "nocompiler_auto: {hex h} is not a loop head of {f}"
-  if nocompiler.auto.vc.get (← getOptions) && callees.isEmpty && (← vcCovers call fE rsList) then
+  -- The debugging option is about the step-by-step run (its log of steps).
+  if nocompiler.auto.vc.get (← getOptions) && !nocompiler.auto.debugKernel.get (← getOptions) &&
+      callees.isEmpty && (← vcCovers call fE rsList) then
     let st ← saveState
     let errors := fun (l : MessageLog) => (l.toList.filter (·.severity == .error)).length
     let e0 := errors (← getThe Core.State).messages
