@@ -530,7 +530,7 @@ fn export_as(
             (
                 format!("theorem {id}_checked :"),
                 if chunked {
-                    " := by decide +kernel"
+                    " := Struct.level_of_fast (by decide +kernel)"
                 } else {
                     " := by decide"
                 },
@@ -710,7 +710,7 @@ mod tests {
                 .filter(|l| l.starts_with("theorem hello_checked :"))
             {
                 let stmt = l
-                    .split(" := by decide")
+                    .split(" := ")
                     .next()
                     .unwrap()
                     .replace("theorem hello_checked :", "");

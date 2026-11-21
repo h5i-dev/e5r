@@ -45,7 +45,7 @@ def sum_frame : Struct.Frame := ⟨0, [], []⟩
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
 def sum_cert : Struct.Cert := Struct.Cert.ofRuns [(9, 0, 268174082, [])]
 /-- `sum` is at level L2 (docs/isa/v1.md), as the kernel checks it. -/
-theorem sum_checked : Struct.level (chunk_0.code 0x11190#64) sum_func entries sum_frame sum_cert = some .l2 := by decide +kernel
+theorem sum_checked : Struct.level (chunk_0.code 0x11190#64) sum_func entries sum_frame sum_cert = some .l2 := Struct.level_of_fast (by decide +kernel)
 /-- The image is `sum`'s chunk where the chunk is. -/
 theorem sum_chunk : ∀ x, Dom.mem [chunk_0.range 0x11190#64] x → code.instr x = (chunk_0.code 0x11190#64).instr x :=
   Code.ofChunks_instr (k := 0) chunks_contig (by decide +kernel) chunks_bound
@@ -64,7 +64,7 @@ def sum2_frame : Struct.Frame := ⟨32, [⟨0, .save 18⟩, ⟨8, .save 9⟩, �
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
 def sum2_cert : Struct.Cert := Struct.Cert.ofRuns [(1, 0, 268174082, []), (1, 32, 268174082, []), (1, 32, 268174082, [(24, 1)]), (1, 32, 268174082, [(16, 8), (24, 1)]), (1, 32, 268174082, [(8, 9), (16, 8), (24, 1)]), (1, 32, 268174082, [(0, 18), (8, 9), (16, 8), (24, 1)]), (1, 32, 268173826, [(0, 18), (8, 9), (16, 8), (24, 1)]), (1, 32, 268173314, [(0, 18), (8, 9), (16, 8), (24, 1)]), (2, 32, 268173312, [(0, 18), (8, 9), (16, 8), (24, 1)]), (6, 32, 267911168, [(0, 18), (8, 9), (16, 8), (24, 1)]), (1, 32, 267911170, [(0, 18), (8, 9), (16, 8), (24, 1)]), (1, 32, 267911426, [(0, 18), (8, 9), (16, 8), (24, 1)]), (1, 32, 267911938, [(0, 18), (8, 9), (16, 8), (24, 1)]), (1, 32, 268174082, [(0, 18), (8, 9), (16, 8), (24, 1)]), (1, 0, 268174082, [(0, 18), (8, 9), (16, 8), (24, 1)])]
 /-- `sum2` is at level L2 (docs/isa/v1.md), as the kernel checks it. -/
-theorem sum2_checked : Struct.level (chunk_1.code 0x11190#64) sum2_func entries sum2_frame sum2_cert = some .l2 := by decide +kernel
+theorem sum2_checked : Struct.level (chunk_1.code 0x11190#64) sum2_func entries sum2_frame sum2_cert = some .l2 := Struct.level_of_fast (by decide +kernel)
 /-- The image is `sum2`'s chunk where the chunk is. -/
 theorem sum2_chunk : ∀ x, Dom.mem [chunk_1.range 0x11190#64] x → code.instr x = (chunk_1.code 0x11190#64).instr x :=
   Code.ofChunks_instr (k := 1) chunks_contig (by decide +kernel) chunks_bound
@@ -83,7 +83,7 @@ def _start_frame : Struct.Frame := ⟨32, [⟨8, .save 9⟩, ⟨16, .save 8⟩, 
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
 def _start_cert : Struct.Cert := Struct.Cert.ofRuns [(1, 0, 268174082, []), (1, 32, 268174082, []), (1, 32, 268174082, [(24, 1)]), (1, 32, 268174082, [(16, 8), (24, 1)]), (1, 32, 268174082, [(8, 9), (16, 8), (24, 1)]), (4, 32, 268173826, [(8, 9), (16, 8), (24, 1)]), (2, 32, 268173824, [(8, 9), (16, 8), (24, 1)]), (8, 32, 268173312, [(8, 9), (16, 8), (24, 1)]), (1, 32, 268173314, [(8, 9), (16, 8), (24, 1)]), (1, 32, 268173570, [(8, 9), (16, 8), (24, 1)]), (1, 32, 268174082, [(8, 9), (16, 8), (24, 1)]), (1, 0, 268174082, [(8, 9), (16, 8), (24, 1)])]
 /-- `_start` is at level L2 (docs/isa/v1.md), as the kernel checks it. -/
-theorem _start_checked : Struct.level (chunk_2.code 0x11190#64) _start_func entries _start_frame _start_cert = some .l2 := by decide +kernel
+theorem _start_checked : Struct.level (chunk_2.code 0x11190#64) _start_func entries _start_frame _start_cert = some .l2 := Struct.level_of_fast (by decide +kernel)
 /-- The image is `_start`'s chunk where the chunk is. -/
 theorem _start_chunk : ∀ x, Dom.mem [chunk_2.range 0x11190#64] x → code.instr x = (chunk_2.code 0x11190#64).instr x :=
   Code.ofChunks_instr (k := 2) chunks_contig (by decide +kernel) chunks_bound

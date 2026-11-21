@@ -14,6 +14,7 @@ under the cap (bench-chunk-checks.py's `lean`):
   check    Struct.check (R1 to R3)
   checkL2  Struct.checkL2 (R4 to R6)
   level    the whole `_checked` theorem
+  fast     the same statement through `Struct.levelFast` (Frame.lean: decoded once)
 Reports wall, peak memory and kernel time per part and size.
 """
 import os, re, subprocess, sys
@@ -23,7 +24,13 @@ src = open(os.path.join(HERE, "bench-chunk-checks.py")).read().replace("sys.exit
 bcc = {"__name__": "bcc", "__file__": os.path.join(HERE, "bench-chunk-checks.py")}
 exec(compile(src, "bench-chunk-checks.py", "exec"), bcc)
 
+FI = "(Struct.instrFast {c} {f}_func (Struct.ITree.ofList (Struct.decoded {c} {f}_func)))"
+FA = "(Struct.certFast {f}_func (Struct.ITree.ofList {f}_cert))"
 PARTS = {
+    "ftree": "((Struct.ITree.ofList (Struct.decoded {c} {f}_func)).get? ({f}_func.len - 1)).isSome = true",
+    "fdecode": "(List.range {f}_func.len).all (fun i => (" + FI + " ({f}_func.entry + BitVec.ofNat 64 (4 * i))).isSome) = true",
+    "fcheck": "Struct.checkW " + FI + " {f}_func entries = true",
+    "fcheckL2": "Struct.checkL2W " + FI + " " + FA + " {f}_func {f}_frame {f}_cert = true",
     "decode": "(List.range {f}_func.len).all (fun i => ({c}.instr ({f}_func.entry + BitVec.ofNat 64 (4 * i))).isSome) = true",
     "check": "Struct.check {c} {f}_func entries = true",
     "checkL2": "Struct.checkL2 {c} {f}_func {f}_frame {f}_cert = true",
@@ -50,8 +57,14 @@ def main():
                  for p, t in PARTS.items()}
         if lv != "l2":
             stmts.pop("checkL2")
+            stmts.pop("fcheckL2")
         stmts["level"] = full.replace(f"theorem {f}_checked", "theorem part_level") + " := by decide +kernel"
+        stmts["fast"] = (full.replace(f"theorem {f}_checked", "theorem part_fast") +
+                         " := Struct.level_of_fast (by decide +kernel)")
+        only = os.environ.get("PARTS")
         for p, t in stmts.items():
+            if only and p not in only.split(","):
+                continue
             path = os.path.join(work, f"Part_{n}_{p}.lean")
             open(path, "w").write(f"import {bcc['NS']}\n{rec}\nnamespace {bcc['NS']}\nopen NoCompiler\n\n{t}\n\n"
                                   f"end {bcc['NS']}\n")

@@ -44,7 +44,7 @@ def cobs_decode_frame : Struct.Frame := ⟨0, [], []⟩
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
 def cobs_decode_cert : Struct.Cert := Struct.Cert.ofRuns [(55, 0, 268174082, [])]
 /-- `cobs_decode` is at level L2 (docs/isa/v1.md), as the kernel checks it. -/
-theorem cobs_decode_checked : Struct.level (chunk_0.code 0x11190#64) cobs_decode_func entries cobs_decode_frame cobs_decode_cert = some .l2 := by decide +kernel
+theorem cobs_decode_checked : Struct.level (chunk_0.code 0x11190#64) cobs_decode_func entries cobs_decode_frame cobs_decode_cert = some .l2 := Struct.level_of_fast (by decide +kernel)
 /-- The image is `cobs_decode`'s chunk where the chunk is. -/
 theorem cobs_decode_chunk : ∀ x, Dom.mem [chunk_0.range 0x11190#64] x → code.instr x = (chunk_0.code 0x11190#64).instr x :=
   Code.ofChunks_instr (k := 0) chunks_contig (by decide +kernel) chunks_bound
@@ -63,7 +63,7 @@ def _start_frame : Struct.Frame := ⟨32, [⟨24, .save 1⟩], [⟨0, 24⟩]⟩
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
 def _start_cert : Struct.Cert := Struct.Cert.ofRuns [(1, 0, 268174082, []), (1, 32, 268174082, []), (5, 32, 268174082, [(24, 1)]), (9, 32, 268174080, [(24, 1)])]
 /-- `_start` is at level L2 (docs/isa/v1.md), as the kernel checks it. -/
-theorem _start_checked : Struct.level (chunk_1.code 0x11190#64) _start_func entries _start_frame _start_cert = some .l2 := by decide +kernel
+theorem _start_checked : Struct.level (chunk_1.code 0x11190#64) _start_func entries _start_frame _start_cert = some .l2 := Struct.level_of_fast (by decide +kernel)
 /-- The image is `_start`'s chunk where the chunk is. -/
 theorem _start_chunk : ∀ x, Dom.mem [chunk_1.range 0x11190#64] x → code.instr x = (chunk_1.code 0x11190#64).instr x :=
   Code.ofChunks_instr (k := 1) chunks_contig (by decide +kernel) chunks_bound

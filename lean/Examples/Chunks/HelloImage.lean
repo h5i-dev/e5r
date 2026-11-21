@@ -45,7 +45,7 @@ def write_all_frame : Struct.Frame := ⟨0, [], []⟩
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
 def write_all_cert : Struct.Cert := Struct.Cert.ofRuns [(11, 0, 268174082, [])]
 /-- `write_all` is at level L2 (docs/isa/v1.md), as the kernel checks it. -/
-theorem write_all_checked : Struct.level (chunk_0.code 0x11164#64) write_all_func entries write_all_frame write_all_cert = some .l2 := by decide +kernel
+theorem write_all_checked : Struct.level (chunk_0.code 0x11164#64) write_all_func entries write_all_frame write_all_cert = some .l2 := Struct.level_of_fast (by decide +kernel)
 /-- The image is `write_all`'s chunk where the chunk is. -/
 theorem write_all_chunk : ∀ x, Dom.mem [chunk_0.range 0x11164#64] x → code.instr x = (chunk_0.code 0x11164#64).instr x :=
   Code.ofChunks_instr (k := 0) chunks_contig (by decide +kernel) chunks_bound
@@ -64,7 +64,7 @@ def hello_frame : Struct.Frame := ⟨16, [⟨8, .save 1⟩], []⟩
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
 def hello_cert : Struct.Cert := Struct.Cert.ofRuns [(1, 0, 268174082, []), (1, 16, 268174082, []), (5, 16, 268174082, [(8, 1)]), (7, 16, 268174080, [(8, 1)]), (1, 16, 268174082, [(8, 1)]), (1, 0, 268174082, [(8, 1)])]
 /-- `hello` is at level L2 (docs/isa/v1.md), as the kernel checks it. -/
-theorem hello_checked : Struct.level (chunk_1.code 0x11164#64) hello_func entries hello_frame hello_cert = some .l2 := by decide +kernel
+theorem hello_checked : Struct.level (chunk_1.code 0x11164#64) hello_func entries hello_frame hello_cert = some .l2 := Struct.level_of_fast (by decide +kernel)
 /-- The image is `hello`'s chunk where the chunk is. -/
 theorem hello_chunk : ∀ x, Dom.mem [chunk_1.range 0x11164#64] x → code.instr x = (chunk_1.code 0x11164#64).instr x :=
   Code.ofChunks_instr (k := 1) chunks_contig (by decide +kernel) chunks_bound
@@ -83,7 +83,7 @@ def _start_frame : Struct.Frame := ⟨0, [], []⟩
 /-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/
 def _start_cert : Struct.Cert := Struct.Cert.ofRuns [(2, 0, 268174082, [])]
 /-- `_start` is at level L2 (docs/isa/v1.md), as the kernel checks it. -/
-theorem _start_checked : Struct.level (chunk_2.code 0x11164#64) _start_func entries _start_frame _start_cert = some .l2 := by decide +kernel
+theorem _start_checked : Struct.level (chunk_2.code 0x11164#64) _start_func entries _start_frame _start_cert = some .l2 := Struct.level_of_fast (by decide +kernel)
 /-- The image is `_start`'s chunk where the chunk is. -/
 theorem _start_chunk : ∀ x, Dom.mem [chunk_2.range 0x11164#64] x → code.instr x = (chunk_2.code 0x11164#64).instr x :=
   Code.ofChunks_instr (k := 2) chunks_contig (by decide +kernel) chunks_bound

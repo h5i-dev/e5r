@@ -283,5 +283,232 @@ theorem checkL2_of_level {c : Code} {f : Func} {entries : List Word} {fr : Frame
       · assumption
       · cases h
 
+/-! ## The same level, in time about linear in the function
+
+`level` reads an instruction with `c.instr`, an `Array` index the kernel
+reduces as a walk down the list under the array, and the certificate with
+`List.getD`: both linear in the index, at every instruction, so `decide` on
+`level` is quadratic in the function's size (docs/isa/v1-results.md, 7').
+`levelFast` is `level` with those two reads replaced: the function's words are
+decoded once into an `ITree` (a Braun tree: logarithmic lookup), and the
+certificate is put in another. `levelFast_eq` proves it equal to `level`, so
+`<f>_checked` keeps its statement and is proved as `level_of_fast (by decide)`.
+-/
+
+/-- `level` with the reads of an instruction (`I`) and of the certificate's fact
+    at an address (`A`) as parameters (`levelW_spec`: with `c.instr` and
+    `cert.getD`, it is `level`). -/
+def pairAtW (I : Word → Option Instr) (f : Func) (pc : Word) : Option (Reg × Word) :=
+  if f.contains (pc - 4) then pairOf (I pc) (I (pc - 4)) (pc - 4) else none
+
+def instrOkW (I : Word → Option Instr) (f : Func) (entries : List Word) (pc : Word) : Bool :=
+  match I pc with
+  | none => false
+  | some i =>
+    let fall := f.contains (pc + 4)
+    let local_ (t : Word) := f.contains t && f.target pc t && (pairAtW I f t).isNone
+    match i with
+    | .branch _ _ _ off => fall && local_ (pc + off.signExtend 64)
+    | .jal rd off =>
+      let t := pc + off.signExtend 64
+      if rd = 0 then local_ t || entries.contains t
+      else rd == 1 && entries.contains t && fall
+    | .jalr rd rs1 off =>
+      if rd = 0 && rs1 = 1 && off = 0 then true
+      else match pairAtW I f pc with
+        | some (r, v) =>
+          let t := (v + off.signExtend 64) &&& ~~~1
+          entries.contains t && ((rd == 1 && r == 1 && fall) || (rd == 0 && r == 6))
+        | none => false
+    | _ => fall
+
+def checkW (I : Word → Option Instr) (f : Func) (entries : List Word) : Bool :=
+  (List.range f.len).all fun i => instrOkW I f entries (f.entry + BitVec.ofNat 64 (4 * i))
+
+def instrL2W (I : Word → Option Instr) (A : Word → Fact) (f : Func) (fr : Frame) (pc : Word) : Bool :=
+  match I pc with
+  | none => false
+  | some i =>
+    let F := A pc
+    let pairNext := match I (pc + 4) with
+      | some (.jalr 1 1 _) => true
+      | _ => false
+    match step fr pairNext F i with
+    | none => false
+    | some G =>
+      (succs f pc i).all (fun s => !f.contains s || (A s).le G) &&
+      (!leaves f pc i || (F.depth == 0 && savedRegs.all (F.keep.contains ·)))
+
+def savesOkW (I : Word → Option Instr) (f : Func) (fr : Frame) : Bool :=
+  let ins := (List.range f.len).filterMap fun i => I (f.entry + BitVec.ofNat 64 (4 * i))
+  ins.all (fun i => match i.dst with
+    | some r => r == 1 || !savedRegs.contains r || (fr.saveOf r).isSome
+    | none => true) &&
+  (!ins.any calls || (fr.saveOf 1).isSome)
+
+def checkL2W (I : Word → Option Instr) (A : Word → Fact) (f : Func) (fr : Frame) (cert : Cert) : Bool :=
+  fr.wellFormed && savesOkW I f fr && cert.length == f.len && cert.head? == some Fact.entry &&
+  cert.all (·.depth ≤ fr.size) &&
+  (List.range f.len).all fun i => instrL2W I A f fr (f.entry + BitVec.ofNat 64 (4 * i))
+
+def levelW (I : Word → Option Instr) (A : Word → Fact) (f : Func) (entries : List Word) (fr : Frame)
+    (cert : Cert) : Option Level :=
+  if !(List.range f.len).all (fun i => (I (f.entry + BitVec.ofNat 64 (4 * i))).isSome) then none
+  else if !checkW I f entries then some .l0
+  else if checkL2W I A f fr cert then some .l2
+  else some .l1
+
+theorem levelW_spec (c : Code) (f : Func) (entries : List Word) (fr : Frame) (cert : Cert) :
+    levelW c.instr (fun p => cert.getD ((p - f.entry).toNat / 4) Fact.entry) f entries fr cert =
+      level c f entries fr cert := rfl
+
+/-- A Braun tree: the root is element 0, the left subtree the elements
+    1, 3, 5, ..., the right one 2, 4, 6, ... -/
+inductive ITree (α : Type) where
+  | leaf
+  | node (l : ITree α) (v : α) (r : ITree α)
+
+namespace ITree
+
+def get? {α : Type} : ITree α → Nat → Option α
+  | leaf, _ => none
+  | node l v r, i => if i = 0 then some v else if i % 2 = 1 then get? l (i / 2) else get? r (i / 2 - 1)
+
+/-- Elements 0, 2, 4, ... -/
+def evens {α : Type} : List α → List α
+  | [] => []
+  | [x] => [x]
+  | x :: _ :: xs => x :: evens xs
+
+/-- Elements 1, 3, 5, ... -/
+def odds {α : Type} : List α → List α
+  | [] => []
+  | _ :: xs => evens xs
+
+theorem evens_get {α : Type} : ∀ (xs : List α) (k : Nat), (evens xs)[k]? = xs[2 * k]?
+  | [], _ => by simp [evens]
+  | [_], 0 => by simp [evens]
+  | [_], k + 1 => by simp [evens]
+  | _ :: _ :: xs, 0 => by simp [evens]
+  | _ :: _ :: xs, k + 1 => by
+    rw [show 2 * (k + 1) = 2 * k + 1 + 1 by omega]
+    simp only [evens, List.getElem?_cons_succ]
+    exact evens_get xs k
+
+theorem odds_get {α : Type} (xs : List α) (k : Nat) : (odds xs)[k]? = xs[2 * k + 1]? := by
+  cases xs with
+  | nil => simp [odds]
+  | cons _ xs => simp only [odds, List.getElem?_cons_succ]; exact evens_get xs k
+
+theorem length_evens_le {α : Type} : ∀ (xs : List α), (evens xs).length ≤ xs.length
+  | [] => by simp [evens]
+  | [_] => by simp [evens]
+  | _ :: _ :: xs => by simp only [evens, List.length_cons]; have := length_evens_le xs; omega
+
+theorem length_odds_le {α : Type} (xs : List α) : (odds xs).length ≤ xs.length := by
+  cases xs with
+  | nil => simp [odds]
+  | cons _ xs => simp only [odds, List.length_cons]; have := length_evens_le xs; omega
+
+/-- The tree of a list of at most `n` elements (`n` bounds the depth). -/
+def ofListN {α : Type} : Nat → List α → ITree α
+  | 0, _ => leaf
+  | _ + 1, [] => leaf
+  | n + 1, x :: xs => node (ofListN n (evens xs)) x (ofListN n (odds xs))
+
+def ofList {α : Type} (xs : List α) : ITree α := ofListN xs.length xs
+
+theorem get?_ofListN {α : Type} : ∀ (n : Nat) (xs : List α) (i : Nat), xs.length ≤ n →
+    (ofListN n xs).get? i = xs[i]?
+  | 0, xs, i, h => by
+    have : xs = [] := List.eq_nil_of_length_eq_zero (by omega)
+    subst this; simp [ofListN, get?]
+  | _ + 1, [], i, _ => by simp [ofListN, get?]
+  | n + 1, x :: xs, i, h => by
+    have hl : xs.length ≤ n := by simp at h; omega
+    simp only [ofListN, get?]
+    by_cases h0 : i = 0
+    · subst h0; simp
+    · simp only [h0, ↓reduceIte]
+      obtain ⟨j, rfl⟩ : ∃ j, i = j + 1 := ⟨i - 1, by omega⟩
+      rw [List.getElem?_cons_succ]
+      by_cases h1 : (j + 1) % 2 = 1
+      · simp only [h1, ↓reduceIte]
+        rw [get?_ofListN n _ _ (Nat.le_trans (length_evens_le xs) hl), evens_get]
+        rw [show 2 * ((j + 1) / 2) = j by omega]
+      · simp only [h1, ↓reduceIte]
+        rw [get?_ofListN n _ _ (Nat.le_trans (length_odds_le xs) hl), odds_get]
+        rw [show 2 * ((j + 1) / 2 - 1) + 1 = j by omega]
+
+theorem get?_ofList {α : Type} (xs : List α) (i : Nat) : (ofList xs).get? i = xs[i]? :=
+  get?_ofListN _ xs i (Nat.le_refl _)
+
+end ITree
+
+/-- `f`'s words, decoded once: from word `(f.entry - c.base) / 4` of `c`. -/
+def decoded (c : Code) (f : Func) : List (Option Instr) :=
+  ((c.words.toList.drop ((f.entry - c.base).toNat / 4)).take f.len).map decode
+
+/-- `f`'s words are where `decoded` takes them: aligned, and the function does
+    not wrap around the address space. -/
+def fastOk (c : Code) (f : Func) : Bool :=
+  (f.entry - c.base).toNat % 4 == 0 && (f.entry - c.base).toNat + 4 * f.len < 2 ^ 64
+
+/-- `c.instr`, from `T` inside `f`. -/
+def instrFast (c : Code) (f : Func) (T : ITree (Option Instr)) (pc : Word) : Option Instr :=
+  if f.contains pc then (T.get? ((pc - f.entry).toNat / 4)).getD none else c.instr pc
+
+theorem instrFast_eq {c : Code} {f : Func} (h : fastOk c f = true) (pc : Word) :
+    instrFast c f (ITree.ofList (decoded c f)) pc = c.instr pc := by
+  unfold instrFast
+  split
+  · rename_i hc
+    simp only [Func.contains, Bool.and_eq_true, decide_eq_true_eq, beq_iff_eq] at hc
+    simp only [fastOk, Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at h
+    obtain ⟨hd, hd4⟩ := hc
+    obtain ⟨he4, hb⟩ := h
+    have hoff : (pc - c.base).toNat = (f.entry - c.base).toNat + (pc - f.entry).toNat := by
+      have : pc - c.base = (pc - f.entry) + (f.entry - c.base) := by bv_omega
+      rw [this, BitVec.toNat_add, Nat.mod_eq_of_lt (by omega)]
+      omega
+    generalize (pc - f.entry).toNat = d at hd hd4 hoff
+    generalize he : (f.entry - c.base).toNat = e at he4 hb hoff
+    simp only [Code.instr, Code.fetch, hoff, ITree.get?_ofList, decoded, he]
+    simp only [show (e + d) % 4 = 0 by omega, ↓reduceIte]
+    rw [List.getElem?_map, List.getElem?_take_of_lt (by omega), List.getElem?_drop,
+      show e / 4 + d / 4 = (e + d) / 4 by omega, Array.getElem?_toList]
+    cases c.words[(e + d) / 4]? <;> rfl
+  · rfl
+
+/-- The certificate's fact at an address, from `T`. -/
+def certFast (f : Func) (T : ITree Fact) (p : Word) : Fact :=
+  (T.get? ((p - f.entry).toNat / 4)).getD Fact.entry
+
+theorem certFast_eq (f : Func) (cert : Cert) (p : Word) :
+    certFast f (ITree.ofList cert) p = cert.getD ((p - f.entry).toNat / 4) Fact.entry := by
+  simp [certFast, ITree.get?_ofList, List.getD_eq_getElem?_getD]
+
+/-- `level`, reading the function's instructions and its certificate from
+    trees built once. -/
+def levelFast (c : Code) (f : Func) (entries : List Word) (fr : Frame) (cert : Cert) : Option Level :=
+  if fastOk c f then
+    levelW (instrFast c f (ITree.ofList (decoded c f))) (certFast f (ITree.ofList cert)) f entries fr cert
+  else level c f entries fr cert
+
+theorem levelFast_eq (c : Code) (f : Func) (entries : List Word) (fr : Frame) (cert : Cert) :
+    levelFast c f entries fr cert = level c f entries fr cert := by
+  unfold levelFast
+  split
+  · rename_i h
+    rw [← levelW_spec]
+    congr 1
+    · funext pc; exact instrFast_eq h pc
+    · funext p; exact certFast_eq f cert p
+  · rfl
+
+theorem level_of_fast {c : Code} {f : Func} {entries : List Word} {fr : Frame} {cert : Cert} {l : Level}
+    (h : levelFast c f entries fr cert = some l) : level c f entries fr cert = some l :=
+  levelFast_eq c f entries fr cert ▸ h
+
 end Struct
 end NoCompiler
