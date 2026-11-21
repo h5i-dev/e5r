@@ -16,6 +16,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import shutil
 import subprocess
 
 SWB = os.environ.get("SWB", "/mnt/scratch/ec2-user/swe-bin")
@@ -48,12 +49,30 @@ def installed(tc: str) -> bool:
     return os.path.isdir(os.path.join(RUSTUP_HOME, "toolchains", f"{tc}-x86_64-unknown-linux-gnu"))
 
 
+def _locked(fn):
+    """One installation at a time (two converters installing the same nightly at once leave it
+    without its manifest)."""
+    def run(*a):
+        import fcntl
+        os.makedirs(os.path.join(SWB, "tc"), exist_ok=True)
+        with open(os.path.join(SWB, "tc", "rustup.lock"), "w") as lk:
+            fcntl.flock(lk, fcntl.LOCK_EX)
+            return fn(*a)
+    return run
+
+
+def works(tc: str) -> bool:
+    return subprocess.run(["rustc", f"+{tc}", "--version"], env=_env(), stdout=subprocess.DEVNULL,
+                          stderr=subprocess.DEVNULL).returncode == 0
+
+
+@_locked
 def install(date: dt.date) -> str:
     """The first nightly on or after `date` that installs with rust-src (some days lack one)."""
     last = ""
     for k in range(10):
         tc = f"nightly-{(date + dt.timedelta(days=k)).isoformat()}"
-        if installed(tc):
+        if installed(tc) and works(tc):
             return tc
         p = subprocess.run(["rustup", "toolchain", "install", tc, "--profile", "minimal",
                             "-c", "rust-src", "--no-self-update"], env=_env(),
@@ -70,6 +89,7 @@ def for_commit(repo_dir: str, commit: str) -> str:
     return install(max(dt.date.fromisoformat(out), FLOOR))
 
 
+@_locked
 def setup(tc: str) -> dict:
     """The target spec path and the flags `tc` understands; cached per toolchain."""
     d = os.path.join(SWB, "tc", "rust", tc)
@@ -102,9 +122,54 @@ def setup(tc: str) -> dict:
         jt = "-Z no-jump-tables"
     else:
         jt = ""
-    m = {"toolchain": tc, "target": path,
+    m = {"toolchain": tc, "target": path, "sysroot_std": install_std(tc, path, jt, cargo_z),
          "jump_tables_flag": jt,
          "json_target_flag": "-Zjson-target-spec" if "json-target-spec" in cargo_z else ""}
     with open(meta, "w") as fh:
         json.dump(m, fh, indent=1)
     return m
+
+
+# The flags std is built with: the same code generation as the programs (recipes.RV_RUSTFLAGS
+# without the link arguments).
+STD_RUSTFLAGS = ("-C target-feature=+zba,+zbb,-relax -C code-model=medium -C relocation-model=static "
+                 "-C debuginfo=1 -C embed-bitcode=yes -Awarnings")  # bitcode: for projects built with LTO (bat)
+
+
+def install_std(tc: str, spec: str, jt: str, cargo_z: str) -> str:
+    """Build std for the no-C target once, and install it into the toolchain's sysroot
+    (lib/rustlib/<target>/lib), as xargo did before -Zbuild-std. A project then builds with the
+    plain `--target`, and build scripts that probe the target's std (autocfg: indexmap 1.x sets
+    its default hasher only when it finds std) find it. With -Zbuild-std they do not, and
+    plist 1.1 does not compile (sharkdp__bat-1892)."""
+    sysroot = _run(["rustc", f"+{tc}", "--print", "sysroot"]).strip()
+    dst = os.path.join(sysroot, "lib", "rustlib", TARGET, "lib")
+    if os.path.exists(os.path.join(dst, ".swe-bin-std")):
+        return dst
+    shutil.rmtree(dst, ignore_errors=True)
+    work = os.path.join(SWB, "tc", "rust", tc, "std-build")
+    os.makedirs(os.path.join(work, "src"), exist_ok=True)
+    with open(os.path.join(work, "Cargo.toml"), "w") as fh:
+        fh.write('[package]\nname = "swb_std"\nversion = "0.0.0"\nedition = "2018"\n[lib]\npath = "src/lib.rs"\n'
+                 '[profile.release]\npanic = "unwind"\n')
+    with open(os.path.join(work, "src", "lib.rs"), "w") as fh:
+        fh.write("pub fn f() -> usize { std::env::args().count() }\n")
+    e = _env()
+    # by name, through RUST_TARGET_PATH: rustc records a target given as a path with a hash of
+    # the path in the crates' triple, and a project built by name would not find them
+    e.update(RUSTFLAGS=f"{STD_RUSTFLAGS} {jt}", CARGO_TARGET_DIR=os.path.join(work, "target"),
+             PATH=f"{SWB}/tc/bin:{e['PATH']}", RUST_TARGET_PATH=os.path.dirname(spec))
+    args = ["cargo", f"+{tc}", "build", "--release", "-Zbuild-std=std,panic_unwind,proc_macro",
+            "--target", TARGET]
+    if "json-target-spec" in cargo_z:
+        args.insert(4, "-Zjson-target-spec")
+    p = subprocess.run(args, cwd=work, env=e, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if p.returncode != 0:
+        raise RuntimeError(f"std for {tc}: {p.stdout.decode()[-1500:]}")
+    deps = os.path.join(work, "target", TARGET, "release", "deps")
+    os.makedirs(dst, exist_ok=True)
+    for f in os.listdir(deps):
+        if f.endswith(".rlib") and not f.startswith("libswb_std"):
+            shutil.copy(os.path.join(deps, f), os.path.join(dst, f))
+    open(os.path.join(dst, ".swe-bin-std"), "w").close()
+    return dst

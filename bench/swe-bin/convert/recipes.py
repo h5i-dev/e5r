@@ -257,7 +257,8 @@ def rust_env_prefix(target_dir: str) -> str:
 class RustProgram(Recipe):
     """A Rust program whose integration tests run it as a child process (bat, rg, coreutils, nu).
 
-    The subject is the program, built --release for riscv64 (build-std, the no-C target). The
+    The subject is the program, built --release for riscv64 (the no-C target, its std installed in
+    the toolchain by rusttc.install_std). The
     tests are the SWE-bench command, built for the host. Every copy of the host program that the
     tests can find (target/debug/P, deps/P-HASH, which cargo copies to target/debug/P on each run,
     and P next to a test executable, where assert_cmd looks) is replaced by the qemu wrapper.
@@ -295,14 +296,17 @@ class RustProgram(Recipe):
         log.commands.append({"stage": "toolchain", "cwd": "", "cmd": f"# {json.dumps(self.tcm)}"})
         return self.tc
 
+    def target_env(self):
+        # the no-C target by name, with its std installed in the toolchain (rusttc.install_std)
+        return f"RUST_TARGET_PATH={os.path.dirname(self.tcm['target'])} "
+
     def build(self, wt, log):
         tc = self.toolchain(wt, log)
         rv, _ = self.dirs(wt)
         bins = " ".join(f"--bin {b}" for b in self.bins)
         flags = f"{RV_RUSTFLAGS} {self.tcm['jump_tables_flag']}"
-        cmd = (f"{rust_env_prefix(rv)}RUSTFLAGS='{flags}' cargo +{tc} build --release "
-               f"-j{JOBS} {self.package_args} {bins} -Zbuild-std=std,panic_unwind "
-               f"{self.tcm['json_target_flag']} --target {self.tcm['target']}")
+        cmd = (f"{rust_env_prefix(rv)}{self.target_env()}RUSTFLAGS='{flags}' cargo +{tc} build --release "
+               f"-j{JOBS} {self.package_args} {bins} --target {rusttc.TARGET}")
         try:
             log.run(cmd, wt, "build", timeout=7200)
         except Failed as e:
@@ -430,8 +434,8 @@ class RustTests(RustProgram):
         if m:  # e.g. --cfg tokio_unstable
             rustflags += " " + m.group(1).strip('"').replace("-Awarnings", "")
         cmd = (f"{rust_env_prefix(rv)}CARGO_PROFILE_DEV_OPT_LEVEL=2 "
-               f"RUSTFLAGS='{rustflags}' cargo +{tc} test --no-run -j{JOBS} {' '.join(map(shlex.quote, cargo_opts))} "
-               f"-Zbuild-std=std,panic_unwind {self.tcm['json_target_flag']} --target {self.tcm['target']} "
+               f"{self.target_env()}RUSTFLAGS='{rustflags}' cargo +{tc} test --no-run -j{JOBS} "
+               f"{' '.join(map(shlex.quote, cargo_opts))} --target {rusttc.TARGET} "
                f"--message-format=json 2>/dev/null")
         out = log.run(cmd, wt, "build", timeout=7200, check=False)
         exes = []

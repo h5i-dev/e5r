@@ -215,8 +215,17 @@ def convert(task, keep_work=False):
                 with open(os.path.join(wt, rel), "rb") as fh:
                     hdr = fh.read(52)
                 if len(hdr) == 52 and int.from_bytes(hdr[48:52], "little") & 1:
-                    # EF_RISCV_RVC: some input was compiled with the C extension
-                    raise Failed("build", f"{rel} has the RVC flag (compressed instructions); nocompiler refuses it")
+                    # EF_RISCV_RVC. Old rustc sets it in its own objects with the C extension off
+                    # (B saw this in refine-targets.md): clear it if no instruction is compressed
+                    out = log.run(f"llvm-objdump -d {os.path.join(wt, rel)} | awk '$2 ~ /^[0-9a-f]{{4}}$/' | wc -l",
+                                  wt, "rvc-count")
+                    n16 = int(out.split()[0]) if out.split() else -1
+                    if n16 != 0:
+                        raise Failed("build", f"{rel} has {n16} compressed instructions; nocompiler refuses RVC")
+                    with open(os.path.join(wt, rel), "r+b") as fh:
+                        fh.seek(48)
+                        fh.write((int.from_bytes(hdr[48:52], "little") & ~1).to_bytes(4, "little"))
+                    rec.setdefault("notes", []).append(f"{side} {rel}: EF_RISCV_RVC cleared (0 compressed instructions)")
                 dst = os.path.join(art, f"{side}.{os.path.basename(rel)}.debug.elf")
                 shutil.copy(os.path.join(wt, rel), dst)
                 stripped = dst.replace(".debug.elf", ".elf")
