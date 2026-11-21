@@ -200,6 +200,7 @@ def convert(task, keep_work=False):
         recipe.prepare(wt, log)
         sides = {}
         for side in ("base", "gold"):
+            rec["failed_side"] = side
             if side == "gold":
                 recipe.reset_generated(wt, log)
                 apply_patch(wt, log, task["patch"], "gold", "gold-patch")
@@ -214,7 +215,8 @@ def convert(task, keep_work=False):
                 dst = os.path.join(art, f"{side}.{os.path.basename(rel)}.debug.elf")
                 shutil.copy(os.path.join(wt, rel), dst)
                 stripped = dst.replace(".debug.elf", ".elf")
-                log.run(f"llvm-objcopy --strip-debug {dst} {stripped}", wt, "strip")
+                # .debug_gdb_scripts stays: rustc references it from .text (an --emit-relocs relocation)
+                log.run(f"llvm-objcopy --strip-debug --keep-section=.debug_gdb_scripts {dst} {stripped}", wt, "strip")
                 elfs.append(stripped)
             build_s = round(time.time() - t, 1)
             if not early:
@@ -224,9 +226,11 @@ def convert(task, keep_work=False):
             sides[side] = {"elfs": elfs, "results": res, "build_s": build_s,
                            "test_s": round(time.time() - t, 1)}
             log.run(f"git apply -R --whitespace=nowarn {os.path.join(work, 'test.patch')}", wt, "test-unpatch")
+        rec.pop("failed_side", None)
         rec["subjects"] = list(recipe.subjects)
         if getattr(recipe, "deviation", None):
             rec["deviation"] = recipe.deviation
+            rec["editable_crates"] = getattr(recipe, "editable", [])
         rows, excluded, why = judge(task, recipe, sides["base"]["results"], sides["gold"]["results"])
         rec["tests"] = rows
         rec["excluded_tests"] = excluded
@@ -240,7 +244,7 @@ def convert(task, keep_work=False):
         else:
             rec["status"] = "kept"
     except Failed as e:
-        rec["drop_reason"] = [f"{e.stage} failed"]
+        rec["drop_reason"] = [f"{e.stage} failed at {rec.get('failed_side', 'checkout')}"]
         rec["error"] = e.detail[-2000:]
     rec["commands"] = log.commands
     rec["convert_s"] = round(time.time() - t0, 1)

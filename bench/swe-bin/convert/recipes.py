@@ -460,6 +460,17 @@ class RustTests(RustProgram):
             self.pkg_dirs[rel] = os.path.relpath(pkg, wt)
         with open(os.path.join(wt, "rv-tests", "pkgdirs.json"), "w") as fh:
             json.dump(self.pkg_dirs, fh)
+        # the crates under test: the workspace's own library crates (the integrity check)
+        meta = log.run(f"{rust_env_prefix(rv)}cargo +{tc} metadata --no-deps --format-version 1 2>/dev/null",
+                       wt, "metadata", check=False)
+        crates = set()
+        for line in meta.splitlines():
+            if line.startswith("{"):
+                for pk in json.loads(line).get("packages", []):
+                    for tg in pk.get("targets", []):
+                        if "lib" in tg.get("kind", []) or "proc-macro" in tg.get("kind", []):
+                            crates.add(tg["name"].replace("-", "_"))
+        self.editable = sorted(crates)
 
     def run_tests(self, wt, task, log):
         envs, _, exe_args = self._parts(task)
