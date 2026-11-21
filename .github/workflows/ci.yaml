@@ -19,12 +19,17 @@ env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
 
-# One in-flight run per ref. Pushing a fix ten seconds after a typo should not
-# leave the first run holding a runner; `main` is exempt so a merge is never
-# cancelled by the merge behind it.
+# Pull requests: one in-flight run per PR; pushing a fix ten seconds after a
+# typo should not leave the first run holding a runner.
+# Pushes (main, next): every commit gets its own group, so no run is ever
+# cancelled, neither in progress nor pending (GitHub cancels a pending run in
+# a group when a newer one arrives, even without cancel-in-progress). Every
+# commit that lands on next or main is a claim that it passes, and a cancelled
+# run leaves that commit unchecked: on next, runs for 962964f, 3249b86, 74e7559
+# and 187c313 were cancelled by the push behind them before this change.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Keep package mirror/network stalls bounded, separately from analysis time.
 # apt options below retain retries and fail with the actual download error.
