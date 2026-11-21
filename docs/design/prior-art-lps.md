@@ -674,3 +674,20 @@ musl binaries like OVP's need first):
 - These are over-approximations where the model keeps no state (the pid,
   the signal mask, terminals).
 - `ProcStep4.sys`; `sigprocmask_no_old`; the control `ioctl_other_none`.
+
+### Eighth step: the whole process (lean/NoCompiler/Linux/Process.lean)
+
+- `PStep c`, over `State × Kern`: an instruction steps by the trusted `exec`
+  (under `Perm.top`), an `ecall` by the Linux layer (`ProcStep4`).
+- `PStep.step`: at the trusted model's syscalls (`OldSys`: read, write,
+  exit, exit_group), a process step is a `Step c Perm.top` step.
+- `PStep.progress`: wherever `Step c Perm.top` can move, so can the process.
+  On a closed fd it answers EBADF, so it never loses a step there.
+- **`PReach.of_reach`:** a safe trusted run to `Q` (`Reach c Perm.top D Q s`)
+  is a safe process run to `Q` from any kernel state, when every `ecall` in
+  the code is an `OldSys` call. So the existing theorems apply to the
+  process.
+- Axioms: `[propext, Quot.sound]`. `lake env lean Process.lean`: 0.44 s.
+- Next: the same for programs that use the new calls (`brk`, `mmap`,
+  `writev`, the startup calls). Their proofs need the process semantics
+  directly, which is where C's automation would run.
