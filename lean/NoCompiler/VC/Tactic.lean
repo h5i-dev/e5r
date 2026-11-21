@@ -7,13 +7,15 @@ import NoCompiler.VC.Explore
 
 A cut point's condition (`segVC`) mentions `runSeg D ws S` on closed data.
 `vc_run` finds that term, computes its value with compiled code (`evalExpr`),
-and rewrites the goal with `runSeg D ws S = v`, proved by `decide` on the
-derived `DecidableEq`: the kernel checks it by evaluating `runSeg` itself and
+and rewrites the goal with `runSeg D ws S = v`, by the
+proof `Eq.refl v`: the kernel checks it by evaluating `runSeg` itself and
 comparing, so the compiled evaluation is only a way to find `v` and is not
 trusted. The proof goes into the theorem as it is, unchecked by the elaborator
-(building it as an auxiliary theorem first made the elaborator check it, and a
-proof by `rfl` made the kernel compare by unfolding; both were measured slower,
-docs/design/prior-art-others.md).
+(building it as an auxiliary theorem first made the elaborator check it).
+`Eq.refl` replaced `decide` on the derived `DecidableEq` after measuring both
+on the same files (c-logs/bench/xover/xover.txt): kernel time with `Eq.refl`
+0.56x at 10 instructions per segment to 0.68x at 1000, and 35.4 s against 46 s
+on 10^4 instructions (`nocompiler.vc.byDecide` restores `decide`).
 -/
 namespace NoCompiler.VC.M
 open Lean Meta Elab Tactic
@@ -53,8 +55,13 @@ unsafe def evalExploreImpl (e : Expr) : MetaM (Option (List PEnd × List Ob)) :=
 @[implemented_by evalExploreImpl]
 opaque evalExplore (e : Expr) : MetaM (Option (List PEnd × List Ob))
 
+register_option nocompiler.vc.byDecide : Bool :=
+  { defValue := false, descr := "vc_run: prove the equation by `decide` on the derived DecidableEq \
+      instead of `Eq.refl` (measured slower at every size, kept for comparison)" }
+
 /-- Rewrite the first closed `runSeg D ws S` or `exploreR …` in the goal to its
-    value, with a kernel-checked equation (`decide`). -/
+    value, with a kernel-checked equation (`Eq.refl`: the kernel evaluates the
+    term while it compares it with the value). -/
 elab "vc_run" : tactic => withMainContext do
   let g ← getMainGoal
   let tgt ← instantiateMVars (← g.getType)
@@ -64,9 +71,12 @@ elab "vc_run" : tactic => withMainContext do
     | throwError "vc_run: no closed `runSeg` or `exploreR` term in the goal"
   let v ← if t.isAppOf ``runSeg then pure (toExpr (← evalRunSeg t)) else pure (toExpr (← evalExplore t))
   let eq ← mkEq t v
-  let inst ← synthInstance (mkApp (mkConst ``Decidable) eq)
-  let pf := mkApp3 (mkConst ``of_decide_eq_true) eq inst
-    (mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Bool) (mkConst ``Bool.true))
+  let pf ← if !nocompiler.vc.byDecide.get (← getOptions) then
+      mkExpectedTypeHint (← mkEqRefl v) eq
+    else do
+      let inst ← synthInstance (mkApp (mkConst ``Decidable) eq)
+      pure <| mkApp3 (mkConst ``of_decide_eq_true) eq inst
+        (mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Bool) (mkConst ``Bool.true))
   let r ← g.rewrite tgt pf
   let g' ← g.replaceTargetEq r.eNew r.eqProof
   replaceMainGoal (g' :: r.mvarIds)
