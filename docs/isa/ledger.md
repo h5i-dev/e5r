@@ -47,6 +47,14 @@ words costs:
 The ledger's `closure` key says, without Lean, which functions this applies
 to: those whose closure key is the same in both builds.
 
+`Refines.of_sub` / `Refines.of_sub_verified`
+(`lean/NoCompiler/RefineReuse.lean`): two modules that both hold `M`'s
+`RFunc`s and link at a layout `L`. On `f`'s code region, the second image
+refines the first, with no stepping (`RefinesRel.of_code_eq`: the images
+agree there). A's run comes from `M`'s `Verified` theorem.
+`Examples.LinkReuse.sum_refines_rev`: `sum` in a module with the functions in
+the other order, at sum.link1.elf's layout, all conditions decided.
+
 **How a module is recovered** (`module::of_binary`):
 - **Self-check.** Every recovered relocation is checked: the module,
   relinked at the binary's own addresses (`module::patched`, the Rust twin

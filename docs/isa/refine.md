@@ -197,6 +197,20 @@ certificate and every proof.
 `crates/nocompiler/tests/treediff.rs` checks these numbers and that the
 generated Lean is the committed one.
 
+## Unchanged functions (`lean/NoCompiler/RefineReuse.lean`)
+
+A function unchanged between two builds, as relocatable code (the same
+`RFunc`, docs/isa/ledger.md), refines itself at function granularity, with no
+stepping:
+- `RefinesRel.of_code_eq`: code that agrees with A's on A's region refines A
+  there;
+- `Refines.of_sub_verified`: for two modules holding the function's closure
+  unchanged, at one layout, from its `Verified` theorem.
+
+The side conditions are decided by comparing `RFunc`s. The ledger's
+`closure` key finds, without Lean, the functions it applies to: on the 7'
+artifact's one-line edit, all but 3 of 1235.
+
 ## Automation (`lean/NoCompiler/RefineAuto.lean`)
 
 A task's proof is generated. The tree diff (item 5) writes the certificate and, per region, its two instruction sequences. The proof then reads:

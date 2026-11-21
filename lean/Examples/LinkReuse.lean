@@ -1,4 +1,5 @@
 import Examples.Link
+import NoCompiler.RefineReuse
 
 /-
 Reuse of unchanged code (docs/isa/ledger.md, `Verified.of_sub`): `sum`'s
@@ -21,6 +22,19 @@ def module' : Module where
 
 theorem sum_reused : Verified module' "sum" (fun _ => Examples.Sum.spec) :=
   Verified.of_sub (by decide) (by decide) sum_relocatable
+
+/-- The same functions in the other order. -/
+def moduleRev : Module where
+  funcs := One.module.funcs.reverse
+
+/-- At sum.link1.elf's layout, `sum` in `moduleRev`'s image refines `sum` in
+    the module's own image: decided by comparing `RFunc`s and checking the
+    layout, with A's run from `sum_relocatable`. -/
+theorem sum_refines_rev : Refines Examples.Sum.spec (One.module.link One.layout)
+    (One.module.dom One.layout "sum") (One.layout.addr "sum")
+    (moduleRev.link One.layout) (One.module.dom One.layout "sum") (One.layout.addr "sum") :=
+  Refines.of_sub_verified (sp := fun _ => Examples.Sum.spec) (by decide +kernel) (by decide +kernel)
+    (fun _ h => h) (by decide) (by decide) sum_relocatable
 
 /-- Control: with one word of `sum` changed, the side condition fails. -/
 example : ¬ ∀ g ∈ One.module.funcs,
