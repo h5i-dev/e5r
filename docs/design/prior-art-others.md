@@ -179,3 +179,24 @@ Myreen, Gordon and Slind turn machine code into HOL functions with a proved tran
 5. **Reflective VC generation (Vale) is the one way here that makes the per-instruction cost a function evaluation rather than tactic work.** In Lean that would be a verified `vcgen : Code → Spec → Prop` evaluated by the kernel or `simp` with `decide`. Its soundness is proved once.
 6. **Even LNSym's measured rate is far from the scale target, and it grows with length.** It is about 110 ms per instruction at 400 steps (44 s), against the user's target of about 1 ms per instruction amortised. So a per-path symbolic simulation, even a well-engineered one, is not the scale design by itself. Unchanged code has to be discharged without re-simulation (byte equality, reused block lemmas), and the per-instruction work has to be an evaluation.
 7. **None of the three has a published whole-binary result at 10^5 instructions.** The largest measured runs are LNSym's (hundreds of instructions) and Vale's (procedures of AES-GCM). The scale target is beyond all three.
+
+## Implementation plan (C, round 2 next: the core for scale)
+
+Files I own: `lean/NoCompiler/Fast/*`, `lean/NoCompiler/VC/*`, `lean/NoCompiler/Auto.lean`. The trusted definitions (`Machine.lean`, `Step.lean`, `Env.lean`, `Spec.lean`) are not changed. Every existing proof keeps building; when `nocompiler_auto` moves onto the new core, each example is migrated in the same commit.
+
+**Step 1: fast representation, proved equal to the trusted one once (`Fast/`).** These are LNSym's `AxEffects` and Vale's lifted memory, in our terms.
+- `FState`: a flat register file (32 words, one slot each, so no write chains), pc, memory, trace and exit. Memory is a base `Word → Byte` plus a list of word-level writes `(addr, width, value)`, newest first.
+- `FState.toState : FState → State`, the abstraction function.
+- Read lemmas at word/range level: a read of `n` bytes at `a` over a write of `m` bytes at `b` is the written value when the ranges are equal, and the older read when they are disjoint. Disjointness is decided by `omega` on `toNat`, as in LNSym's `simp_mem`. A frame lemma covers memory outside every write.
+- `fstep : Code → FState → Option FState`, deterministic, every instruction but `ecall`.
+- `fstep_sound : fstep c S = some S' → c.instr S.pc = some i ∧ exec i S.toState = some S'.toState`. This is the only bridge to the trusted semantics, proved once by cases on the instruction.
+
+**Step 2: reflective VC generation on it (`VC/`), from A's `VC/Straight.lean` (next-a at d61cbf7).** This is Vale's `wp` in our terms. Its milestones:
+1. Straight-line ALU code. Symbolic values `Sym` (denotation = the machine's `evalI`/`evalR`/…), the flat symbolic state, `run`, and `run_sound`, proved once. The kernel evaluates `run` on closed data, by `rfl`/`decide`, not tactics.
+2. Loads and stores. Symbolic word-level memory, with permission and alignment obligations emitted as formulas.
+3. Branches, with cut points from the block/loop tree.
+4. Calls and syscalls.
+
+**Step 3: `nocompiler_auto` on the new core (`Auto.lean`).** A segment (cut point to cut point) is closed by the generator's soundness theorem applied to its evaluated output. Only the residual formulas become goals. One lemma per segment (A's design).
+
+**Budget, measured, not assumed.** Before moving on from milestone 1, I measure elaboration plus kernel time, and peak memory, for a straight-line ALU chain of 10^2, 10^3 and 10^4 instructions built as closed data in a Lean file under `VC/`. The target is the user's: about 1 ms per instruction amortised. LNSym's measured rate (above) is about 110 ms per instruction at 400 steps. If the reflective run is not linear, or not near the target at 10^4, I report that and stop to rethink before step 3.
