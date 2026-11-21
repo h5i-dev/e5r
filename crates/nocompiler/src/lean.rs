@@ -55,12 +55,38 @@ pub fn closure(f: &FuncMeta, metas: &BTreeMap<u64, &FuncMeta>) -> Result<Vec<(u6
     Ok(out)
 }
 
+/// The functions whose code region can be formed: those that call, transitively,
+/// only functions that passed the profile check. Every other one is skipped,
+/// and reported on stderr; skipping one can skip its callers, so to a fixpoint.
+pub fn exportable(metas: &[FuncMeta]) -> Vec<FuncMeta> {
+    let mut keep: Vec<FuncMeta> = metas.to_vec();
+    loop {
+        let by_entry: BTreeMap<u64, &FuncMeta> = keep.iter().map(|m| (m.entry, m)).collect();
+        let bad: BTreeSet<u64> = keep
+            .iter()
+            .filter_map(|m| match closure(m, &by_entry) {
+                Ok(_) => None,
+                Err(e) => {
+                    eprintln!("nocompiler: skipping {} ({e})", m.name);
+                    Some(m.entry)
+                }
+            })
+            .collect();
+        if bad.is_empty() {
+            return keep;
+        }
+        keep.retain(|m| !bad.contains(&m.entry));
+    }
+}
+
 pub fn export(
     bin: &Binary,
     metas: &[FuncMeta],
     namespace: &str,
     source: &str,
 ) -> Result<String, String> {
+    let metas = exportable(metas);
+    let metas = &metas[..];
     let by_entry: BTreeMap<u64, &FuncMeta> = metas.iter().map(|m| (m.entry, m)).collect();
     // Levels and certificates, from checking the binary again.
     let levels: BTreeMap<u64, (crate::profile::Level, Vec<crate::frame::CertFact>)> = bin
@@ -332,4 +358,40 @@ pub fn export(
     }
     writeln!(o, "\nend {namespace}").unwrap();
     Ok(o)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::profile::Level;
+
+    fn meta(name: &str, entry: u64, callees: &[u64]) -> FuncMeta {
+        FuncMeta {
+            name: name.into(),
+            entry,
+            size: 8,
+            level: Level::L2,
+            frame: 0,
+            depth: None,
+            callees: callees.to_vec(),
+            nodes: vec![],
+            slots: vec![],
+            ranges: vec![],
+            ext: vec![],
+        }
+    }
+
+    /// A function calling one that did not pass the profile check is skipped,
+    /// and so is its caller, transitively; the rest are kept.
+    #[test]
+    fn exportable_skips_callers_of_non_conforming_functions() {
+        let ms = [
+            meta("leaf", 0x100, &[]),
+            meta("calls_leaf", 0x200, &[0x100]),
+            meta("calls_bad", 0x300, &[0x900]),
+            meta("calls_calls_bad", 0x400, &[0x300, 0x100]),
+        ];
+        let names: Vec<String> = exportable(&ms).into_iter().map(|m| m.name).collect();
+        assert_eq!(names, ["leaf", "calls_leaf"]);
+    }
 }
