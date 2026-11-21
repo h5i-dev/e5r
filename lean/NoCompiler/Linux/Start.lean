@@ -135,6 +135,47 @@ theorem argv_at {e : Word} {a : StartArgs} {s : State} (h : StartState e a s) {i
   rw [List.getElem_append_left (by simp [hlen]; omega)]
   simp
 
+/-! ## Where the strings go (LPS StackLayout.v#L388-L425) -/
+
+/-- argc, the argv pointers and their NULL, the envp pointers and their NULL
+    (`block_items`). -/
+def blockItems (argv envp : List (List Byte)) : Nat := argv.length + envp.length + 3
+
+/-- The string bytes with their NULs: argv, envp, the exec file name
+    (`launch_string_bytes`). -/
+def launchStringBytes (argv envp : List (List Byte)) (execfn : List Byte) : Nat :=
+  (flattenStrings argv).length + (flattenStrings envp).length + execfn.length + 1
+
+/-- The lowest string byte, argv[0]: the strings end 8 bytes below the stack
+    top, the slot create_init_stack_vma skips (`string_base_addr`). -/
+def stringBaseAddr (top : Word) (argv envp : List (List Byte)) (execfn : List Byte) : Word :=
+  top - BitVec.ofNat 64 (8 + launchStringBytes argv envp execfn)
+
+/-- AT_EXECFN: the exec file name, at the top of the string area (`at_execfn_ptr`). -/
+def atExecfnPtr (top : Word) (execfn : List Byte) : Word :=
+  top - BitVec.ofNat 64 (8 + execfn.length + 1)
+
+theorem stringAddrs_snd (b : Word) (l : List (List Byte)) :
+    (stringAddrs b l).2 = b + BitVec.ofNat 64 (flattenStrings l).length := by
+  induction l generalizing b with
+  | nil => simp [stringAddrs, flattenStrings]
+  | cons x l ih =>
+    simp only [stringAddrs, ih, flattenStrings, List.flatMap_cons, List.length_append, List.length_cons,
+      List.length_nil]
+    simp only [flattenStrings] at ih
+    apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_add, BitVec.toNat_ofNat]; omega
+
+/-- The strings fit: argv, then envp, laid from the computed base, end exactly
+    where AT_EXECFN's file name starts. -/
+theorem envp_end_eq_execfn (top : Word) (argv envp : List (List Byte)) (execfn : List Byte) :
+    (stringAddrs (stringAddrs (stringBaseAddr top argv envp execfn) argv).2 envp).2 =
+      atExecfnPtr top execfn := by
+  rw [stringAddrs_snd, stringAddrs_snd]
+  unfold stringBaseAddr atExecfnPtr launchStringBytes
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_add, BitVec.toNat_sub, BitVec.toNat_ofNat]
+  omega
+
 /-- Control: `prog x` with strings at 0x1000: argc 2, argv[0] at 0x1000 ("prog\0"),
     argv[1] at 0x1005; the head is 8 words with no envp and no auxv. -/
 example : ({ argv := [[0x70, 0x72, 0x6f, 0x67], [0x78]], envp := [], auxv := [], sbase := 0x1000 } :

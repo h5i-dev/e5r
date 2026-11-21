@@ -598,7 +598,10 @@ musl binaries like OVP's need first):
   sp + 8(i+1) is argv[i]'s address. Both are proved from
   `read64_of_wordBytes` and `read64_word`.
 - Axioms: `[propext, Quot.sound]`. `lake env lean Start.lean`: 1.4 s.
-- Still parameters, not computed: the string base, the auxv entries,
-  AT_RANDOM, the exec file name, the alignment pads. LPS computes them in
-  `string_base_addr`, `auxv_entries` and `block_pad_len`.
-- Next: compute those parameters, then `brk`/`mmap`.
+- The string base is now computed as LPS does: `blockItems`,
+  `launchStringBytes`, `stringBaseAddr`, `atExecfnPtr`. Theorem
+  `envp_end_eq_execfn`: argv then envp, laid from `stringBaseAddr`, end
+  exactly at AT_EXECFN's file name (`[propext, Quot.sound]`).
+- Still parameters: the auxv entries, AT_RANDOM and the alignment pads (LPS
+  `auxv_entries`, `block_pad_len`).
+- Next: the auxv entries, then `brk`/`mmap`.
