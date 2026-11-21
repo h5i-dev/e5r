@@ -34,6 +34,7 @@ import NoCompiler.Linux.Mmap
 import NoCompiler.Linux.Writev
 import NoCompiler.Linux.Startup
 import NoCompiler.Linux.Fs
+import NoCompiler.Linux.FsIo
 import NoCompiler.Linux.Process
 import NoCompiler.RefineReuse
 import NoCompiler.ModuleChunks

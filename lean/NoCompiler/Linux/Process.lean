@@ -1,10 +1,10 @@
-import NoCompiler.Linux.Fs
+import NoCompiler.Linux.FsIo
 import NoCompiler.Step
 import NoCompiler.Spec
 
 /-
 The whole process: the machine (the trusted `exec`, NoCompiler/Machine.lean)
-and the Linux layer for `ecall` (Linux/Fs.lean), over `State × Kern`.
+and the Linux layer for `ecall` (Linux/FsIo.lean), over `State × Kern`.
 
 * Accesses: a load or store, or a `read`/`write` buffer, must lie in the
   mapped ranges (`Kern.perm`, from `Kern.maps`); outside them the process has
@@ -31,7 +31,7 @@ inductive PStep (c : Code) : State × Kern → State × Kern → Prop
       s.exit = none → c.instr s.pc = some i → InstrOk k.perm i s → exec i s = some s' →
       PStep c (s, k) (s', k)
   | sys {s s' : State} {k k' : Kern} :
-      s.exit = none → c.instr s.pc = some .ecall → SysOk k.perm s → ProcStep5 (s, k) (s', k') →
+      s.exit = none → c.instr s.pc = some .ecall → SysOk k.perm s → ProcStep6 (s, k) (s', k') →
       PStep c (s, k) (s', k')
 
 theorem PStep.step {c : Code} {s s' : State} {k k' : Kern} (h : PStep c (s, k) (s', k'))
@@ -40,7 +40,8 @@ theorem PStep.step {c : Code} {s s' : State} {k k' : Kern} (h : PStep c (s, k) (
   | exec hx hi hok he => exact .exec hx hi hok he
   | sys hx hi hok hp =>
     obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10⟩ := (hold hi).ne
-    exact .sys hx hi hok (ProcStep5.sys hp h1 h2 h3 h4 h5 h6 h7 h8 h9 h10)
+    obtain ⟨hr, hl⟩ := (hold hi).ne6
+    exact .sys hx hi hok (ProcStep6.sys hp hr hl h1 h2 h3 h4 h5 h6 h7 h8 h9 h10)
 
 /-- A `Sys` transition is an outcome of the basic spec. -/
 theorem outcome_of_sys {s s' : State} (h : Sys s s') : ∃ o, spec (SyscallInput.of s) o ∧ o.apply s = s' := by
@@ -52,8 +53,8 @@ theorem PStep.progress {c : Code} {s s₁ : State} (k : Kern) (h : Step c k.perm
   cases h with
   | exec hx hi hok he => exact ⟨_, _, .exec hx hi hok he⟩
   | sys hx hi hok hy =>
-    obtain ⟨o, k', h⟩ := procSpec5_exists k (hold hi) hy
-    exact ⟨_, k', .sys hx hi hok (ProcStep5.step h)⟩
+    obtain ⟨o, k', h⟩ := procSpec6_exists k (hold hi) hy
+    exact ⟨_, k', .sys hx hi hok (ProcStep6.step h)⟩
 
 /-- The process reaches `Q` safely inside `D`: like `Reach`, over the process
     step. -/
@@ -84,7 +85,7 @@ theorem PStep.maps_eq {c : Code} {s s' : State} {k k' : Kern} (h : PStep c (s, k
     (hold : c.instr s.pc = some .ecall → OldSys s) : k'.maps = k.maps := by
   cases h with
   | exec => rfl
-  | sys _ hi _ hp => exact ProcStep5.maps_old hp (hold hi)
+  | sys _ hi _ hp => exact ProcStep6.maps_old hp (hold hi)
 
 theorem PStep.perm_eq {c : Code} {s s' : State} {k k' : Kern} (h : PStep c (s, k) (s', k'))
     (hold : c.instr s.pc = some .ecall → OldSys s) : k'.perm = k.perm := by

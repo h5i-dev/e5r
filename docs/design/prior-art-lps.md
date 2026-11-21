@@ -745,3 +745,23 @@ For the fuzz-driver shape `prog FILE`: a read-only file system in memory
 - Axioms: standard. lake env lean: Fs 2.6 s, Process 2.1 s.
 - Not modelled: `lseek`, `pread`, writable files, directories, `getdents`,
   `newfstatat`; the other `struct stat` fields are left free.
+
+### Tenth step: `readv` and `lseek` (lean/NoCompiler/Linux/FsIo.lean)
+
+What musl's stdio does to a file beyond `read`: `__stdio_read` reads with
+`readv`, `fseek`/`ftell` call `lseek`. (There is no docs/design/lps-port.md;
+the port's plan is this document, and its four-item order ended with the
+ninth step, so this step was chosen as the next thing a musl `prog FILE`
+needs.)
+- `readv` (65): on a file, the next `min total MAX_RW_COUNT` bytes,
+  scattered over the iovecs in order (`scatter`), the offset advanced; on
+  another open fd, any bytes up to that length scattered the same way, or
+  an error; more than 1024 iovecs EINVAL; closed EBADF.
+- `lseek` (62): on a file, SEEK_SET/CUR/END with EINVAL outside
+  `[0, 2^63)`, SEEK_DATA/SEEK_HOLE as on a file with no holes (ENXIO at or
+  past the end), any other `whence` EINVAL (`seekTo`); on fds 0/1/2 ESPIPE
+  or any offset; closed EBADF.
+- Process.lean steps by `ProcStep6`; `ProcStep6.sys`, `maps_old` and
+  `procSpec6_exists` keep its theorems. Examples by `decide` (`scatter`,
+  `seekTo`), the control `lseek_closed`.
+- Axioms: standard. lake env lean: FsIo 1.33 s, Process 1.20 s.
