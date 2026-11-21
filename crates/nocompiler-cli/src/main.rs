@@ -145,6 +145,10 @@ pub enum Command {
         /// The Lean namespace of the image.
         #[arg(long, value_name = "NS")]
         namespace: String,
+        /// `chunks`: one number literal per function, no lemma per instruction
+        /// (scales to whole binaries); default: one array, a lemma per instruction.
+        #[arg(long, value_name = "FORMAT", value_parser = ["chunks", "array"], default_value = "array")]
+        format: String,
         /// Write the Lean file here instead of to standard output.
         #[arg(short = 'o', value_name = "OUT.lean")]
         out: Option<PathBuf>,
@@ -834,8 +838,15 @@ fn core(cli: &Cli, w: &mut out::Out) -> Option<Result<u8, String>> {
         Command::Export {
             file,
             namespace,
+            format,
             out,
-        } => cmd::export(file, namespace, out.as_deref(), &mut text),
+        } => cmd::export(
+            file,
+            namespace,
+            format == "chunks",
+            out.as_deref(),
+            &mut text,
+        ),
         Command::Module {
             file,
             namespace,

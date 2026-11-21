@@ -1,6 +1,8 @@
 import Examples.Sum
 import Examples.Sum2
 import Examples.Hello
+import Examples.Chunks.HelloImage
+import Examples.Chunks.CobsImage
 import Examples.FrameControls
 import Examples.Link
 import Examples.LinkCalls

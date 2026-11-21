@@ -57,6 +57,8 @@ trusting the following, and nothing else.
 
 ## Compiled code
 
+Images in chunk format (`nocompiler export --format chunks`, `lean/NoCompiler/Image.lean`, "Code in chunks") are decoded in Lean (`Chunk.words`, `Segment.bytesOfNat`, `Struct.Cert.ofRuns`): the image a proof is about is the decoded `Code`, and the audit compares that decoded image with the ELF word by word and byte by byte (two of them are in its list: hello, cobs.b). The decoders and the exporter are not trusted beyond that comparison. `Code.ofChunks_instr` (the image equals a chunk's own code on the chunk's range) is a theorem.
+
 Some checks are not done by the kernel but by compiled Lean code (the Lean
 compiler and runtime, and the C compiler it uses), and some by native
 evaluation inside a proof:

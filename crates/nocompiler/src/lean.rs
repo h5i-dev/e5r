@@ -85,6 +85,85 @@ pub fn export(
     namespace: &str,
     source: &str,
 ) -> Result<String, String> {
+    export_as(bin, metas, namespace, source, false)
+}
+
+/// The image in chunks (lean/NoCompiler/Image.lean, "Code in chunks"): `.text`
+/// as one literal per symbol, no lemma per instruction, data segments in
+/// parts; elaborates in time and memory linear in the binary.
+pub fn export_chunks(
+    bin: &Binary,
+    metas: &[FuncMeta],
+    namespace: &str,
+    source: &str,
+) -> Result<String, String> {
+    export_as(bin, metas, namespace, source, true)
+}
+
+/// `Σ xs[i] << (4 * digits * i)` as a hexadecimal Lean literal: the number
+/// `Chunk` (digits 8) and `Segment.bytesOfNat` (digits 2) decode.
+pub fn nat_hex(xs: &[u32], digits: usize) -> String {
+    let mut h = String::with_capacity(2 + digits * xs.len());
+    h.push_str("0x");
+    for x in xs.iter().rev() {
+        write!(h, "{x:0digits$x}").unwrap();
+    }
+    if xs.is_empty() {
+        h.push('0');
+    }
+    h
+}
+
+/// Gap chunks (no function in them) are cut to this many words.
+const PART: usize = 1024;
+
+/// Chunk boundaries, in words from the start of `.text`: every function's entry
+/// and end, but none strictly inside a function, so each function is in one
+/// chunk; stretches with no function in them cut every `PART` words.
+pub fn chunk_bounds(bin: &Binary) -> Vec<(usize, usize)> {
+    let n = bin.text.len();
+    let iv: Vec<(usize, usize)> = bin
+        .funcs
+        .iter()
+        .filter(|f| f.entry >= bin.text_addr && !f.words.is_empty())
+        .map(|f| {
+            let a = ((f.entry - bin.text_addr) / 4) as usize;
+            (a.min(n), (a + f.words.len()).min(n))
+        })
+        .collect();
+    let mut cut: BTreeSet<usize> = [0, n].into_iter().collect();
+    for &(a, b) in &iv {
+        cut.insert(a);
+        cut.insert(b);
+    }
+    cut.retain(|&c| !iv.iter().any(|&(a, b)| a < c && c < b));
+    let cut: Vec<usize> = cut.into_iter().collect();
+    let mut out = Vec::new();
+    for w in cut.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        if a == b {
+            continue;
+        }
+        if iv.iter().any(|&(x, _)| a <= x && x < b) {
+            out.push((a, b));
+        } else {
+            let mut x = a;
+            while x < b {
+                out.push((x, (x + PART).min(b)));
+                x += PART;
+            }
+        }
+    }
+    out
+}
+
+fn export_as(
+    bin: &Binary,
+    metas: &[FuncMeta],
+    namespace: &str,
+    source: &str,
+    chunked: bool,
+) -> Result<String, String> {
     let metas = exportable(metas);
     let metas = &metas[..];
     let by_entry: BTreeMap<u64, &FuncMeta> = metas.iter().map(|m| (m.entry, m)).collect();
@@ -107,7 +186,17 @@ pub fn export(
     writeln!(o, "SHA-256: {sha}").unwrap();
     writeln!(o, "-/").unwrap();
     writeln!(o, "import NoCompiler\n").unwrap();
-    if bin.text.len() > 128 {
+    let bounds = if chunked { chunk_bounds(bin) } else { vec![] };
+    if chunked {
+        // `decide` on one function's chunk, and `Chunk.contig` over the list.
+        let big = bounds
+            .iter()
+            .map(|(a, b)| b - a)
+            .max()
+            .unwrap_or(0)
+            .max(bounds.len());
+        writeln!(o, "set_option maxRecDepth {}\n", (64 * big).max(512)).unwrap();
+    } else if bin.text.len() > 128 {
         // Each `instr_` lemma evaluates `Code.instr` on the array literal, which
         // recurses once per element before its index; the default depth runs
         // out a little past 128 words.
@@ -128,18 +217,45 @@ pub fn export(
         bin.text_addr
     )
     .unwrap();
-    write!(o, "def code : Code := ⟨0x{:x}#64, #[", bin.text_addr).unwrap();
-    for (i, w) in bin.text.iter().enumerate() {
-        o.push_str(if i == 0 {
-            "\n  "
-        } else if i % 6 == 0 {
-            ",\n  "
-        } else {
-            ", "
-        });
-        write!(o, "0x{w:08x}#32").unwrap();
+    if chunked {
+        let base = format!("0x{:x}#64", bin.text_addr);
+        for (k, &(a, b)) in bounds.iter().enumerate() {
+            writeln!(
+                o,
+                "def chunk_{k} : Chunk := ⟨{a}, {}, {}⟩",
+                b - a,
+                nat_hex(&bin.text[a..b], 8)
+            )
+            .unwrap();
+        }
+        let names: Vec<String> = (0..bounds.len()).map(|k| format!("chunk_{k}")).collect();
+        writeln!(o, "\n/-- The chunks, in order. -/").unwrap();
+        writeln!(o, "def chunks : List Chunk := [{}]", names.join(", ")).unwrap();
+        writeln!(o, "def code : Code := Code.ofChunks {base} chunks").unwrap();
+        writeln!(
+            o,
+            "theorem chunks_contig : Chunk.contig 0 chunks = true := by decide +kernel"
+        )
+        .unwrap();
+        writeln!(
+            o,
+            "theorem chunks_bound : 4 * Chunk.total chunks < 2 ^ 64 := by decide +kernel\n"
+        )
+        .unwrap();
+    } else {
+        write!(o, "def code : Code := ⟨0x{:x}#64, #[", bin.text_addr).unwrap();
+        for (i, w) in bin.text.iter().enumerate() {
+            o.push_str(if i == 0 {
+                "\n  "
+            } else if i % 6 == 0 {
+                ",\n  "
+            } else {
+                ", "
+            });
+            write!(o, "0x{w:08x}#32").unwrap();
+        }
+        writeln!(o, "]⟩\n").unwrap();
     }
-    writeln!(o, "]⟩\n").unwrap();
     let mut names = Vec::new();
     for g in &bin.segments {
         let id = format!("seg{}", ident(&g.name.replace('.', "_")));
@@ -154,6 +270,9 @@ pub fn export(
         .unwrap();
         let bytes = if g.zero {
             format!("Array.replicate {} 0", g.bytes.len())
+        } else if chunked {
+            let ws: Vec<u32> = g.bytes.iter().map(|&x| x as u32).collect();
+            format!("Segment.bytesOfNat {} {}", g.bytes.len(), nat_hex(&ws, 2))
         } else {
             let mut b = String::from("#[");
             for (i, x) in g.bytes.iter().enumerate() {
@@ -180,6 +299,9 @@ pub fn export(
     writeln!(o, "/-- Every allocated section that is not code. -/").unwrap();
     writeln!(o, "def segments : List Segment := [{}]\n", names.join(", ")).unwrap();
     for (i, &w) in bin.text.iter().enumerate() {
+        if chunked {
+            break;
+        }
         let pc = bin.text_addr + 4 * i as u64;
         if let Some(ins) = isa::decode(w) {
             writeln!(o, "/-- `{}` -/", ins.asm(pc)).unwrap();
@@ -312,8 +434,35 @@ pub fn export(
             "/-- The certificate for rules R4 to R6 (NoCompiler/Frame.lean): the fact before each instruction. -/"
         )
         .unwrap();
+        // As runs, when every `keep` is increasing (so a mask gives it back).
+        let sorted = cert
+            .iter()
+            .all(|c| c.keep.windows(2).all(|w| w[0] < w[1]) && c.keep.iter().all(|&r| r < 32));
         if facts.is_empty() {
             writeln!(o, "def {id}_cert : Struct.Cert := []").unwrap();
+        } else if chunked && sorted {
+            let mut runs: Vec<(usize, &crate::frame::CertFact)> = Vec::new();
+            for c in cert.iter() {
+                match runs.last_mut() {
+                    Some((n, last)) if *last == c => *n += 1,
+                    _ => runs.push((1, c)),
+                }
+            }
+            let rs: Vec<String> = runs
+                .iter()
+                .map(|(n, c)| {
+                    let mask: u64 = c.keep.iter().map(|&r| 1u64 << r).sum();
+                    let held: Vec<String> =
+                        c.held.iter().map(|(k, r)| format!("({k}, {r})")).collect();
+                    format!("({n}, {}, {mask}, [{}])", c.depth, held.join(", "))
+                })
+                .collect();
+            writeln!(
+                o,
+                "def {id}_cert : Struct.Cert := Struct.Cert.ofRuns [{}]",
+                rs.join(", ")
+            )
+            .unwrap();
         } else {
             writeln!(
                 o,
@@ -333,11 +482,36 @@ pub fn export(
             m.name, level
         )
         .unwrap();
-        writeln!(
-            o,
-            "theorem {id}_checked : Struct.level code {id}_func entries {id}_frame {id}_cert = some .{lv} := by decide"
-        )
-        .unwrap();
+        if chunked {
+            let w = ((m.entry - bin.text_addr) / 4) as usize;
+            let k = bounds
+                .iter()
+                .position(|&(a, b)| a <= w && w < b)
+                .ok_or_else(|| format!("{}: in no chunk", m.name))?;
+            let base = format!("0x{:x}#64", bin.text_addr);
+            writeln!(
+                o,
+                "theorem {id}_checked : Struct.level (chunk_{k}.code {base}) {id}_func entries {id}_frame {id}_cert = some .{lv} := by decide +kernel"
+            )
+            .unwrap();
+            writeln!(
+                o,
+                "/-- The image is `{}`'s chunk where the chunk is. -/",
+                m.name
+            )
+            .unwrap();
+            writeln!(
+                o,
+                "theorem {id}_chunk : ∀ x, Dom.mem [chunk_{k}.range {base}] x → code.instr x = (chunk_{k}.code {base}).instr x :=\n  Code.ofChunks_instr (k := {k}) chunks_contig (by decide +kernel) chunks_bound"
+            )
+            .unwrap();
+        } else {
+            writeln!(
+                o,
+                "theorem {id}_checked : Struct.level code {id}_func entries {id}_frame {id}_cert = some .{lv} := by decide"
+            )
+            .unwrap();
+        }
         let dom = closure(m, &by_entry)?;
         writeln!(
             o,
@@ -378,6 +552,42 @@ mod tests {
             slots: vec![],
             ranges: vec![],
             ext: vec![],
+        }
+    }
+
+    #[test]
+    fn nat_hex_puts_the_first_word_lowest() {
+        assert_eq!(nat_hex(&[0x13, 0xdeadbeef], 8), "0xdeadbeef00000013");
+        assert_eq!(nat_hex(&[1, 2, 0xff], 2), "0xff0201");
+        assert_eq!(nat_hex(&[], 8), "0x0");
+    }
+
+    /// Chunks cover `.text` back to back, every function inside one chunk, gaps
+    /// cut to `PART` words.
+    #[test]
+    fn chunks_partition_text_and_keep_functions_whole() {
+        let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+        for elf in ["examples/elf/hello.elf", "examples/demo/elf/cobs.b.elf"] {
+            let bytes = std::fs::read(format!("{root}/{elf}")).unwrap();
+            let bin = crate::load(&bytes).unwrap();
+            let cs = chunk_bounds(&bin);
+            assert_eq!(cs.first().unwrap().0, 0);
+            assert_eq!(cs.last().unwrap().1, bin.text.len());
+            assert!(cs.windows(2).all(|w| w[0].1 == w[1].0 && w[0].0 < w[0].1));
+            for f in &bin.funcs {
+                let a = ((f.entry - bin.text_addr) / 4) as usize;
+                let b = a + f.words.len();
+                assert!(
+                    cs.iter().any(|&(x, y)| x <= a && b <= y),
+                    "{elf}: {}",
+                    f.name
+                );
+            }
+            assert!(cs.iter().all(|&(x, y)| y - x <= PART
+                || bin.funcs.iter().any(|f| {
+                    let a = ((f.entry - bin.text_addr) / 4) as usize;
+                    x <= a && a < y
+                })));
         }
     }
 

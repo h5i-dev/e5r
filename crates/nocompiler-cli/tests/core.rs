@@ -37,6 +37,26 @@ fn cli_check_annotate_export() {
         );
     }
 
+    // And the images in chunk format (lean/NoCompiler/Image.lean, "Code in chunks").
+    for (elf, module) in [
+        ("examples/elf/hello.elf", "HelloImage"),
+        ("examples/demo/elf/cobs.b.elf", "CobsImage"),
+    ] {
+        let out = Command::new(exe)
+            .args(["export", &format!("{root}/{elf}"), "--format", "chunks"])
+            .args(["--namespace", &format!("Examples.Chunks.{module}")])
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        let committed =
+            std::fs::read_to_string(format!("{root}/lean/Examples/Chunks/{module}.lean")).unwrap();
+        assert_eq!(
+            String::from_utf8(out.stdout).unwrap(),
+            committed,
+            "lean/Examples/Chunks/{module}.lean is stale"
+        );
+    }
+
     assert_eq!(
         Command::new(exe)
             .args(["check", "/nonexistent"])

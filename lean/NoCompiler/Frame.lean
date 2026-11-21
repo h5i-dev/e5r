@@ -68,6 +68,16 @@ def Fact.le (g f : Fact) : Bool :=
 /-- The facts, one per instruction of the function. -/
 abbrev Cert := List Fact
 
+/-- The registers of a bit mask, in increasing order: how
+    `nocompiler export --format chunks` writes a fact's `keep`. -/
+def regsOfMask (m : Nat) : List Nat := (List.range 32).filter fun r => m.testBit r
+
+/-- A certificate as runs: `(n, depth, keep as a mask, held)` is `n` equal
+    facts in a row. What `nocompiler export --format chunks` writes, so that a
+    certificate costs a few literals per run, not per instruction. -/
+def Cert.ofRuns (rs : List (Nat × Nat × Nat × List (Nat × Nat))) : Cert :=
+  rs.flatMap fun (n, d, m, h) => List.replicate n ⟨d, regsOfMask m, h⟩
+
 namespace Frame
 
 def slotAt (fr : Frame) (k : Int) : Option Slot :=

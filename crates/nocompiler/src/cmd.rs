@@ -200,9 +200,17 @@ pub fn cc(args: &[String], dst: &Path, out: &mut String) -> Result<u8, String> {
     Ok(if report.conforms { 0 } else { VIOLATION })
 }
 
-/// `nocompiler export FILE --namespace NS [-o OUT.lean]`: export `.text` and
-/// every conforming function to Lean. Without `dst` the text goes to `out`.
-pub fn export(file: &Path, ns: &str, dst: Option<&Path>, out: &mut String) -> Result<u8, String> {
+/// `nocompiler export FILE --namespace NS [--format chunks] [-o OUT.lean]`: export
+/// `.text` and every conforming function to Lean; with `chunks`, in the format
+/// of lean/NoCompiler/Image.lean, "Code in chunks". Without `dst` the text goes
+/// to `out`.
+pub fn export(
+    file: &Path,
+    ns: &str,
+    chunks: bool,
+    dst: Option<&Path>,
+    out: &mut String,
+) -> Result<u8, String> {
     let bytes = read(file)?;
     let bin = crate::load(&bytes)?;
     let mut metas = Vec::new();
@@ -212,7 +220,11 @@ pub fn export(file: &Path, ns: &str, dst: Option<&Path>, out: &mut String) -> Re
             Err(vs) => eprintln!("nocompiler: skipping {} ({} violations)", r.name, vs.len()),
         }
     }
-    let text = crate::lean::export(&bin, &metas, ns, &file_name(file))?;
+    let text = if chunks {
+        crate::lean::export_chunks(&bin, &metas, ns, &file_name(file))?
+    } else {
+        crate::lean::export(&bin, &metas, ns, &file_name(file))?
+    };
     match dst {
         Some(dst) => std::fs::write(dst, text).map_err(|e| format!("{}: {e}", dst.display()))?,
         None => out.push_str(&text),
