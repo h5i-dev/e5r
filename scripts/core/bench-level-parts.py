@@ -27,10 +27,11 @@ exec(compile(src, "bench-chunk-checks.py", "exec"), bcc)
 
 FI = "(Struct.instrFast {c} {f}_func (Struct.ITree.ofList (Struct.decoded {c} {f}_func)))"
 FA = "(Struct.certFast {f}_func (Struct.ITree.ofList {f}_cert))"
+FE = "(Struct.entriesFast entries (Struct.ITree.ofList entries))"
 PARTS = {
     "ftree": "((Struct.ITree.ofList (Struct.decoded {c} {f}_func)).get? ({f}_func.len - 1)).isSome = true",
     "fdecode": "(List.range {f}_func.len).all (fun i => (" + FI + " ({f}_func.entry + BitVec.ofNat 64 (4 * i))).isSome) = true",
-    "fcheck": "Struct.checkW " + FI + " {f}_func entries = true",
+    "fcheck": "Struct.checkW " + FI + " " + FE + " {f}_func = true",
     "fcheckL2": "Struct.checkL2W " + FI + " " + FA + " {f}_func {f}_frame {f}_cert = true",
     "decode": "(List.range {f}_func.len).all (fun i => ({c}.instr ({f}_func.entry + BitVec.ofNat 64 (4 * i))).isSome) = true",
     "check": "Struct.check {c} {f}_func entries = true",

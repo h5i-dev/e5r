@@ -301,7 +301,7 @@ certificate is put in another. `levelFast_eq` proves it equal to `level`, so
 def pairAtW (I : Word → Option Instr) (f : Func) (pc : Word) : Option (Reg × Word) :=
   if f.contains (pc - 4) then pairOf (I pc) (I (pc - 4)) (pc - 4) else none
 
-def instrOkW (I : Word → Option Instr) (f : Func) (entries : List Word) (pc : Word) : Bool :=
+def instrOkW (I : Word → Option Instr) (E : Word → Bool) (f : Func) (pc : Word) : Bool :=
   match I pc with
   | none => false
   | some i =>
@@ -311,19 +311,19 @@ def instrOkW (I : Word → Option Instr) (f : Func) (entries : List Word) (pc : 
     | .branch _ _ _ off => fall && local_ (pc + off.signExtend 64)
     | .jal rd off =>
       let t := pc + off.signExtend 64
-      if rd = 0 then local_ t || entries.contains t
-      else rd == 1 && entries.contains t && fall
+      if rd = 0 then local_ t || E t
+      else rd == 1 && E t && fall
     | .jalr rd rs1 off =>
       if rd = 0 && rs1 = 1 && off = 0 then true
       else match pairAtW I f pc with
         | some (r, v) =>
           let t := (v + off.signExtend 64) &&& ~~~1
-          entries.contains t && ((rd == 1 && r == 1 && fall) || (rd == 0 && r == 6))
+          E t && ((rd == 1 && r == 1 && fall) || (rd == 0 && r == 6))
         | none => false
     | _ => fall
 
-def checkW (I : Word → Option Instr) (f : Func) (entries : List Word) : Bool :=
-  (List.range f.len).all fun i => instrOkW I f entries (f.entry + BitVec.ofNat 64 (4 * i))
+def checkW (I : Word → Option Instr) (E : Word → Bool) (f : Func) : Bool :=
+  (List.range f.len).all fun i => instrOkW I E f (f.entry + BitVec.ofNat 64 (4 * i))
 
 def instrL2W (I : Word → Option Instr) (A : Word → Fact) (f : Func) (fr : Frame) (pc : Word) : Bool :=
   match I pc with
@@ -351,15 +351,15 @@ def checkL2W (I : Word → Option Instr) (A : Word → Fact) (f : Func) (fr : Fr
   cert.all (·.depth ≤ fr.size) &&
   (List.range f.len).all fun i => instrL2W I A f fr (f.entry + BitVec.ofNat 64 (4 * i))
 
-def levelW (I : Word → Option Instr) (A : Word → Fact) (f : Func) (entries : List Word) (fr : Frame)
+def levelW (I : Word → Option Instr) (A : Word → Fact) (E : Word → Bool) (f : Func) (fr : Frame)
     (cert : Cert) : Option Level :=
   if !(List.range f.len).all (fun i => (I (f.entry + BitVec.ofNat 64 (4 * i))).isSome) then none
-  else if !checkW I f entries then some .l0
+  else if !checkW I E f then some .l0
   else if checkL2W I A f fr cert then some .l2
   else some .l1
 
 theorem levelW_spec (c : Code) (f : Func) (entries : List Word) (fr : Frame) (cert : Cert) :
-    levelW c.instr (fun p => cert.getD ((p - f.entry).toNat / 4) Fact.entry) f entries fr cert =
+    levelW c.instr (fun p => cert.getD ((p - f.entry).toNat / 4) Fact.entry) (entries.contains ·) f fr cert =
       level c f entries fr cert := rfl
 
 /-- A Braun tree: the root is element 0, the left subtree the elements
@@ -488,11 +488,62 @@ theorem certFast_eq (f : Func) (cert : Cert) (p : Word) :
     certFast f (ITree.ofList cert) p = cert.getD ((p - f.entry).toNat / 4) Fact.entry := by
   simp [certFast, ITree.get?_ofList, List.getD_eq_getElem?_getD]
 
-/-- `level`, reading the function's instructions and its certificate from
-    trees built once. -/
+/-- Binary search for `t` among the elements `[lo, hi)` of `T`, by address
+    (`fuel` bounds the steps). `true` only if it finds `t` (`bsearch_sound`);
+    a miss says nothing, so `entriesFast` falls back to the list. -/
+def bsearch (T : ITree Word) (t : Word) : Nat → Nat → Nat → Bool
+  | 0, _, _ => false
+  | fuel + 1, lo, hi =>
+    if lo < hi then
+      let mid := (lo + hi) / 2
+      match T.get? mid with
+      | none => false
+      | some x =>
+        if x == t then true
+        else if x.toNat < t.toNat then bsearch T t fuel (mid + 1) hi
+        else bsearch T t fuel lo mid
+    else false
+
+theorem bsearch_sound {T : ITree Word} {t : Word} :
+    ∀ (fuel lo hi : Nat), bsearch T t fuel lo hi = true → ∃ i, T.get? i = some t
+  | 0, _, _, h => by simp [bsearch] at h
+  | fuel + 1, lo, hi, h => by
+    unfold bsearch at h
+    split at h
+    · dsimp only at h
+      split at h
+      · cases h
+      · rename_i x hx
+        split at h
+        · rename_i he; exact ⟨_, by rw [hx, beq_iff_eq.1 he]⟩
+        · split at h
+          · exact bsearch_sound fuel _ _ h
+          · exact bsearch_sound fuel _ _ h
+    · cases h
+
+/-- `entries.contains t`: a binary search in `T`, else the list. The list is
+    sorted as `nocompiler export` writes it, so a call's target costs a
+    logarithm; a walk down the list costs the kernel about 0.15 ms per element
+    whatever it compares (1235 entries in the 7' artifact). -/
+def entriesFast (entries : List Word) (T : ITree Word) (t : Word) : Bool :=
+  bsearch T t 64 0 entries.length || entries.contains t
+
+theorem entriesFast_eq (entries : List Word) (t : Word) :
+    entriesFast entries (ITree.ofList entries) t = entries.contains t := by
+  unfold entriesFast
+  cases h : bsearch (ITree.ofList entries) t 64 0 entries.length
+  · simp
+  · obtain ⟨i, hi⟩ := bsearch_sound _ _ _ h
+    rw [ITree.get?_ofList] at hi
+    have : t ∈ entries := List.mem_of_getElem? hi
+    simp [this]
+
+/-- `level`, reading the function's instructions, its certificate and the
+    entries from trees built once. -/
 def levelFast (c : Code) (f : Func) (entries : List Word) (fr : Frame) (cert : Cert) : Option Level :=
   if fastOk c f then
-    levelW (instrFast c f (ITree.ofList (decoded c f))) (certFast f (ITree.ofList cert)) f entries fr cert
+    levelW (instrFast c f (ITree.ofList (decoded c f))) (certFast f (ITree.ofList cert))
+      (entriesFast entries (ITree.ofList entries)) f fr cert
   else level c f entries fr cert
 
 theorem levelFast_eq (c : Code) (f : Func) (entries : List Word) (fr : Frame) (cert : Cert) :
@@ -504,6 +555,7 @@ theorem levelFast_eq (c : Code) (f : Func) (entries : List Word) (fr : Frame) (c
     congr 1
     · funext pc; exact instrFast_eq h pc
     · funext p; exact certFast_eq f cert p
+    · funext t; exact entriesFast_eq entries t
   · rfl
 
 theorem level_of_fast {c : Code} {f : Func} {entries : List Word} {fr : Frame} {cert : Cert} {l : Level}
